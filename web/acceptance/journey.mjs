@@ -291,7 +291,12 @@ export async function findPendingEnrollment(ui, config) {
   while (Date.now() < deadline) {
     try {
       await ui.driver.goto(`${config.origin}/enrollment`);
-      await ui.click({ css: "summary", text: "Devices waiting for approval" });
+      // The pending section is open on the page: a heading naming the count
+      // when devices wait, otherwise the labelled empty section.
+      await waitAny(ui, [
+        { role: "heading", contains: "waiting for approval" },
+        { label: "Devices waiting for approval" },
+      ]);
     } catch (error) {
       // An interrupted page load is retried until the deadline.
       if (!interrupted(error)) throw error;
