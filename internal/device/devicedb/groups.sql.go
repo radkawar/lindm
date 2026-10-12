@@ -84,6 +84,40 @@ func (q *Queries) ListDeviceGroups(ctx context.Context, arg ListDeviceGroupsPara
 	return items, nil
 }
 
+const listDeviceGroupsByID = `-- name: ListDeviceGroupsByID :many
+SELECT g.id, g.name,
+    ARRAY(SELECT m.device_id::text FROM device_group_memberships m WHERE m.group_id = g.id ORDER BY m.device_id)::text[] AS device_ids
+FROM device_groups g
+WHERE g.id = ANY($1::uuid[])
+ORDER BY g.id
+`
+
+type ListDeviceGroupsByIDRow struct {
+	ID        uuid.UUID
+	Name      string
+	DeviceIds []string
+}
+
+func (q *Queries) ListDeviceGroupsByID(ctx context.Context, groupIds []uuid.UUID) ([]ListDeviceGroupsByIDRow, error) {
+	rows, err := q.db.Query(ctx, listDeviceGroupsByID, groupIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDeviceGroupsByIDRow{}
+	for rows.Next() {
+		var i ListDeviceGroupsByIDRow
+		if err := rows.Scan(&i.ID, &i.Name, &i.DeviceIds); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockDeviceGroup = `-- name: LockDeviceGroup :one
 SELECT id, name FROM device_groups WHERE id = $1 FOR UPDATE
 `

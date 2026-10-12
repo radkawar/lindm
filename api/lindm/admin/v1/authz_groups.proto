@@ -14,8 +14,24 @@ message DeviceGroup {
 }
 
 message ListDeviceGroupsRequest {
+  option (buf.validate.message).cel = {
+    id: "device_groups.lookup_unpaged"
+    message: "a lookup by group IDs is not paged"
+    expression: "size(this.group_ids) == 0 || (this.page_token == '' && this.page_size == 0u)"
+  };
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 100];
   string page_token = 2 [(buf.validate.field).string.max_len = 128];
+  // Exact lookup of saved selections (for example an account's scope group that
+  // is not on the first page). Returns the existing groups among these IDs in
+  // ID order; unknown IDs are omitted. Twenty full groups (1,000 members each)
+  // fit one response.
+  repeated string group_ids = 3 [(buf.validate.field).repeated = {
+    max_items: 20
+    unique: true
+    items: {
+      string: {uuid: true}
+    }
+  }];
 }
 message ListDeviceGroupsResponse {
   repeated DeviceGroup groups = 1;

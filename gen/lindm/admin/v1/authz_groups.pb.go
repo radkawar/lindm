@@ -84,9 +84,14 @@ func (x *DeviceGroup) GetDeviceIds() []string {
 }
 
 type ListDeviceGroupsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PageSize  uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Exact lookup of saved selections (for example an account's scope group that
+	// is not on the first page). Returns the existing groups among these IDs in
+	// ID order; unknown IDs are omitted. Twenty full groups (1,000 members each)
+	// fit one response.
+	GroupIds      []string `protobuf:"bytes,3,rep,name=group_ids,json=groupIds,proto3" json:"group_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -133,6 +138,13 @@ func (x *ListDeviceGroupsRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *ListDeviceGroupsRequest) GetGroupIds() []string {
+	if x != nil {
+		return x.GroupIds
+	}
+	return nil
 }
 
 type ListDeviceGroupsResponse struct {
@@ -423,11 +435,13 @@ const file_lindm_admin_v1_authz_groups_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
-	"device_ids\x18\x03 \x03(\tR\tdeviceIds\"h\n" +
+	"device_ids\x18\x03 \x03(\tR\tdeviceIds\"\xb2\x02\n" +
 	"\x17ListDeviceGroupsRequest\x12$\n" +
 	"\tpage_size\x18\x01 \x01(\rB\a\xbaH\x04*\x02\x18dR\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\tpageToken\"w\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\tpageToken\x12.\n" +
+	"\tgroup_ids\x18\x03 \x03(\tB\x11\xbaH\x0e\x92\x01\v\x10\x14\x18\x01\"\x05r\x03\xb0\x01\x01R\bgroupIds:\x97\x01\xbaH\x93\x01\x1a\x90\x01\n" +
+	"\x1cdevice_groups.lookup_unpaged\x12\"a lookup by group IDs is not paged\x1aLsize(this.group_ids) == 0 || (this.page_token == '' && this.page_size == 0u)\"w\n" +
 	"\x18ListDeviceGroupsResponse\x123\n" +
 	"\x06groups\x18\x01 \x03(\v2\x1b.lindm.admin.v1.DeviceGroupR\x06groups\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x80\x02\n" +

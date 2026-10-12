@@ -30,3 +30,10 @@ FROM device_groups g
 WHERE g.id > sqlc.arg('after_id')::uuid
 ORDER BY g.id
 LIMIT sqlc.arg('row_limit')::int;
+
+-- name: ListDeviceGroupsByID :many
+SELECT g.id, g.name,
+    ARRAY(SELECT m.device_id::text FROM device_group_memberships m WHERE m.group_id = g.id ORDER BY m.device_id)::text[] AS device_ids
+FROM device_groups g
+WHERE g.id = ANY(sqlc.arg('group_ids')::uuid[])
+ORDER BY g.id;

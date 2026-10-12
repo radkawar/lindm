@@ -32,6 +32,9 @@ func (s *Service) ListDeviceGroups(ctx context.Context, req *connect.Request[adm
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
 		return nil, core.Invalid("invalid_group_request")
 	}
+	if ids := req.Msg.GetGroupIds(); len(ids) > 0 {
+		return s.lookupDeviceGroups(ctx, ids)
+	}
 	after, err := core.DecodeProfileCursor(req.Msg.GetPageToken())
 	if err != nil {
 		return nil, err
@@ -62,6 +65,37 @@ func (s *Service) ListDeviceGroups(ctx context.Context, req *connect.Request[adm
 	}
 	if len(response.Groups) < len(rows) {
 		response.NextPageToken = core.EncodeProfileCursor(rows[len(response.Groups)-1].ID)
+	}
+	return core.NoStore(response), nil
+}
+
+// lookupDeviceGroups names saved selections wherever they sort in the paged
+// list. The request bound (20 IDs, 1,000 members per group) fits one response.
+func (s *Service) lookupDeviceGroups(ctx context.Context, raw []string) (*connect.Response[adminv1.ListDeviceGroupsResponse], error) {
+	ids := make([]uuid.UUID, 0, len(raw))
+	for _, value := range raw {
+		id, err := core.ParseUUID(value)
+		if err != nil {
+			return nil, core.Invalid("invalid_group_request")
+		}
+		ids = append(ids, id)
+	}
+	rows, err := devicedb.New(s.Pool).ListDeviceGroupsByID(ctx, ids)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	response := &adminv1.ListDeviceGroupsResponse{}
+	var budget core.ResponsePageBudget
+	for _, row := range rows {
+		group := &adminv1.DeviceGroup{Id: row.ID.String(), Name: row.Name, DeviceIds: row.DeviceIds}
+		fits, err := budget.Take(group)
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		if !fits {
+			return nil, core.MapErr(core.ErrInternalState)
+		}
+		response.Groups = append(response.Groups, group)
 	}
 	return core.NoStore(response), nil
 }
