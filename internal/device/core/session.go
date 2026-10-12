@@ -12,6 +12,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/rpcreason"
 )
@@ -191,5 +192,5 @@ func holdClonedIdentity(ctx context.Context, q *devicedb.Queries, principal Devi
 	if err := q.HoldGeneration(ctx, principal.GenerationID); err != nil {
 		return err
 	}
-	return InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: ActionDeviceRecoveryHold, ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, AuditDetails("cause", reason))
+	return InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: auditkind.DeviceRecoveryHold.String(), ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, AuditDetails("cause", reason))
 }

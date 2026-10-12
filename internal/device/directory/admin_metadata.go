@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -22,7 +23,7 @@ import (
 
 // Metadata and definitions share a catalog lock so a concurrent definition
 // change cannot invalidate a value admitted against the previous definition.
-func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, method, resource, reason string, requestID uuid.UUID, deviceID *uuid.UUID, apply func(context.Context, *devicedb.Queries, identity.Principal) error) error {
+func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, method string, kind auditkind.Kind, resource, reason string, requestID uuid.UUID, deviceID *uuid.UUID, apply func(context.Context, *devicedb.Queries, identity.Principal) error) error {
 	actor, err := s.Require(ctx, identity.PermissionManageInventory)
 	if err != nil {
 		return err
@@ -67,7 +68,7 @@ func (s *Service) inventoryMutation(ctx context.Context, message proto.Message, 
 		if err := apply(ctx, q, authorized); err != nil {
 			return err
 		}
-		if err := core.InsertAudit(ctx, q, &actor.ID, "inventory."+method, resource, reason); err != nil {
+		if err := core.InsertAudit(ctx, q, &actor.ID, kind, resource, reason); err != nil {
 			return err
 		}
 		id := uuid.Nil
@@ -100,7 +101,7 @@ func (s *Service) SetDeviceMetadata(ctx context.Context, req *connect.Request[ad
 	id, _ := uuid.Parse(req.Msg.GetDeviceId())
 	requestID, _ := uuid.Parse(req.Msg.GetRequestId())
 	metadata := req.Msg.GetMetadata()
-	err := s.inventoryMutation(ctx, req.Msg, "SetDeviceMetadata", id.String(), req.Msg.GetReason(), requestID, &id, func(ctx context.Context, q *devicedb.Queries, authorized identity.Principal) error {
+	err := s.inventoryMutation(ctx, req.Msg, "SetDeviceMetadata", auditkind.InventorySetDeviceMetadata, id.String(), req.Msg.GetReason(), requestID, &id, func(ctx context.Context, q *devicedb.Queries, authorized identity.Principal) error {
 		labels, err := q.ListDeviceLabels(ctx, id)
 		if err != nil {
 			return err
@@ -163,7 +164,7 @@ func (s *Service) SetAttributeDefinition(ctx context.Context, req *connect.Reque
 	defer s.Release()
 	definition := req.Msg.GetDefinition()
 	requestID, _ := uuid.Parse(req.Msg.GetRequestId())
-	err := s.inventoryMutation(ctx, req.Msg, "SetAttributeDefinition", definition.GetKey(), req.Msg.GetReason(), requestID, nil, func(ctx context.Context, q *devicedb.Queries, _ identity.Principal) error {
+	err := s.inventoryMutation(ctx, req.Msg, "SetAttributeDefinition", auditkind.InventorySetAttributeDefinition, definition.GetKey(), req.Msg.GetReason(), requestID, nil, func(ctx context.Context, q *devicedb.Queries, _ identity.Principal) error {
 		incompatible, err := q.AttributeDefinitionHasIncompatibleValues(ctx, devicedb.AttributeDefinitionHasIncompatibleValuesParams{
 			Key: definition.GetKey(), ValueField: attributeValueField(definition.GetType()),
 			IsEnum: definition.GetType() == adminv1.AttributeType_ATTRIBUTE_TYPE_ENUM, EnumValues: definition.GetEnumValues(),

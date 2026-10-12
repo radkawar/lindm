@@ -36,6 +36,7 @@ import * as pass2ReviewPreflight from "./pass2-bug3-review-preflight.mjs";
 import * as pass2ApprovalPreflight from "./pass2-p2-5-approval-preflight.mjs";
 import * as commandPalette from "./command-palette.mjs";
 import * as commandPaletteTyping from "./command-palette-typing.mjs";
+import * as auditLogPass2 from "./audit-log-pass2.mjs";
 import * as wipeForm from "./wipe-form.mjs";
 import * as customAttributeNames from "./custom-attribute-names.mjs";
 import * as pass2Bug4 from "./pass2-bug4-enrollment-stale.mjs";
@@ -85,6 +86,7 @@ export const ownerEdits = [
   secretReveal,
   approvals,
   audit,
+  auditLogPass2,
   pass2RestartDelay,
   // Need the route device's inventory stale, so they precede the wipe check's refresh.
   pass2ReviewPreflight,

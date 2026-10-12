@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -157,7 +158,7 @@ func TestAuthorizationStaleObservationAndRestoredRole(t *testing.T) {
 }
 
 func TestAuthorizationAuditFailureRollsBackAllState(t *testing.T) {
-	for _, action := range []string{auditAuthorizationChanged, auditDisabled} {
+	for _, action := range auditkind.Strings(auditkind.IdentityAuthorizationChanged, auditkind.IdentityDisabled) {
 		t.Run(action, func(t *testing.T) {
 			svc, ctx, conn := integrationService(t)
 			createAuthorizationEffects(t, ctx, conn)
@@ -246,7 +247,7 @@ func TestAuthorizationOwnerPinInvalidatesAdminGrant(t *testing.T) {
 		if n != 1 {
 			t.Fatalf("owner pin affected %d principals", n)
 		}
-		return svc.insertSystemAudit(ctx, q, &admin.actorID, auditOwnerBootstrapped, principalResource(admin.actorID), reasonInitialOwner)
+		return svc.insertSystemAudit(ctx, q, &admin.actorID, auditkind.IdentityOwnerBootstrapped, principalResource(admin.actorID), reasonInitialOwner)
 	}
 	// Exercise the production pin query without a synthetic HTTP bootstrap.
 	tx, err := conn.Begin(ctx)
@@ -584,7 +585,7 @@ func readAuthorizationState(t *testing.T, ctx context.Context, conn *pgx.Conn, a
 	var state authorizationState
 	if err := conn.QueryRow(ctx, `SELECT authorization_version, authorization_role,
 		(SELECT count(*) FROM audit_events WHERE resource_id = $2 AND action = $3)
-		FROM principals WHERE id = $1`, actor, principalResource(actor), auditAuthorizationChanged).Scan(&state.Version, &state.Role, &state.Changes); err != nil {
+		FROM principals WHERE id = $1`, actor, principalResource(actor), auditkind.IdentityAuthorizationChanged.String()).Scan(&state.Version, &state.Role, &state.Changes); err != nil {
 		t.Fatal(err)
 	}
 	return state

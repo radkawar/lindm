@@ -21,6 +21,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -262,7 +263,7 @@ func (s *Service) resolveKind(ctx context.Context, cookie, kind string) (Princip
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
 	}
 	if kind == "cli" && sess.BreakGlass && s.breakGlass.GetConsoleOnly() {
-		if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "", "CLI forbidden by console-only policy"); err != nil {
+		if err := s.emergencyAudit(ctx, sess.PrincipalID, auditkind.IdentityBreakGlassDenied, "", "CLI forbidden by console-only policy"); err != nil {
 			return Principal{}, accessDecision{}, err
 		}
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
@@ -281,7 +282,7 @@ func (s *Service) resolveKind(ctx context.Context, cookie, kind string) (Princip
 					return Principal{}, accessDecision{}, err
 				}
 			}
-			if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "", "emergency session expired or revoked"); err != nil {
+			if err := s.emergencyAudit(ctx, sess.PrincipalID, auditkind.IdentityBreakGlassDenied, "", "emergency session expired or revoked"); err != nil {
 				return Principal{}, accessDecision{}, err
 			}
 		}
@@ -295,7 +296,7 @@ func (s *Service) resolveKind(ctx context.Context, cookie, kind string) (Princip
 		if err := s.logout(ctx, cookie, sess.PrincipalID); err != nil && !errors.Is(err, errNotFound) {
 			return Principal{}, accessDecision{}, err
 		}
-		if err := s.emergencyAudit(ctx, sess.PrincipalID, "identity.break_glass_denied", "", "session authentication mode changed"); err != nil {
+		if err := s.emergencyAudit(ctx, sess.PrincipalID, auditkind.IdentityBreakGlassDenied, "", "session authentication mode changed"); err != nil {
 			return Principal{}, accessDecision{}, err
 		}
 		return Principal{}, accessDecision{Kind: accessUnauthenticated}, nil
@@ -441,7 +442,7 @@ func (s *Service) BootstrapOwner(ctx context.Context, issuer, subject string) er
 		if marked != 1 {
 			return ErrOwnerInitialized
 		}
-		return s.insertSystemAudit(ctx, q, &row.ID, auditOwnerBootstrapped, principalResource(row.ID), reasonInitialOwner)
+		return s.insertSystemAudit(ctx, q, &row.ID, auditkind.IdentityOwnerBootstrapped, principalResource(row.ID), reasonInitialOwner)
 	})
 }
 
@@ -520,7 +521,7 @@ func (s *Service) denyAbsent(ctx context.Context, subject string, obs directoryO
 		if err != nil {
 			mapped := s.dbErr(err)
 			if errors.Is(mapped, errNotFound) {
-				return s.insertSystemAudit(ctx, q, nil, auditLoginDenied, "subject/"+subject, reasonAbsent)
+				return s.insertSystemAudit(ctx, q, nil, auditkind.IdentityLoginDenied, "subject/"+subject, reasonAbsent)
 			}
 			return mapped
 		}
@@ -561,7 +562,7 @@ func (s *Service) completeLogin(ctx context.Context, subject string, obs directo
 			if reason == "" {
 				reason = reasonUnqualified
 			}
-			return s.insertSystemAudit(ctx, q, &actor, auditLoginDenied, principalResource(row.ID), reason)
+			return s.insertSystemAudit(ctx, q, &actor, auditkind.IdentityLoginDenied, principalResource(row.ID), reason)
 		}
 		if err := q.InsertSession(ctx, identitydb.InsertSessionParams{
 			TokenHash:   sessionHash(cookie),
@@ -569,7 +570,7 @@ func (s *Service) completeLogin(ctx context.Context, subject string, obs directo
 		}); err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertAudit(ctx, q, &actor, auditLogin, principalResource(row.ID), "")
+		return s.insertAudit(ctx, q, &actor, auditkind.IdentityLogin, principalResource(row.ID), "")
 	})
 	if err != nil {
 		return "", false, err

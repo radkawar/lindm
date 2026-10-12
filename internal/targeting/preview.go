@@ -19,6 +19,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -412,7 +413,7 @@ func (s *Store) Activate(ctx context.Context, tx pgx.Tx, p identity.Principal, p
 		return nil, err
 	}
 	out := new(adminv1.ActivateTargetPreviewResponse)
-	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.preview.activate", r, out); ok || err != nil {
+	if ok, err := receipt(ctx, q, p, r.RequestId, auditkind.TargetingPreviewActivate, r, out); ok || err != nil {
 		return out.Preview, err
 	}
 	preview := new(policyv1.TargetPreview)
@@ -452,7 +453,7 @@ func (s *Store) Activate(ctx context.Context, tx pgx.Tx, p identity.Principal, p
 		return nil, err
 	}
 	out.Preview = preview
-	return preview, saveReceipt(ctx, q, p, r.RequestId, "targeting.preview.activate", row.DeviceID.String(), r.Reason, "", r, out)
+	return preview, saveReceipt(ctx, q, p, r.RequestId, auditkind.TargetingPreviewActivate, row.DeviceID.String(), r.Reason, "", r, out)
 }
 
 // Eligible is a fresh pre-start fence, not permission to enlarge a pinned cohort.

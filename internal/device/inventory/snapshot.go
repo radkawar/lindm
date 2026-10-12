@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"buf.build/go/protovalidate"
@@ -787,7 +788,7 @@ func activateIfPending(ctx context.Context, q *devicedb.Queries, device devicedb
 	if err := q.ActivateGeneration(ctx, *device.CurrentGenerationID); err != nil {
 		return "", err
 	}
-	if err := core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: core.ActionDeviceActivate, ResourceID: device.ID.String(), TargetDeviceID: &device.ID}, core.AuditDetails("status", "activated")); err != nil {
+	if err := core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: auditkind.DeviceActivate.String(), ResourceID: device.ID.String(), TargetDeviceID: &device.ID}, core.AuditDetails("status", "activated")); err != nil {
 		return "", err
 	}
 	return core.StateActive, nil

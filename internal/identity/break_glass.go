@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -33,7 +34,7 @@ func (s *Service) terminateEmergencySessions(ctx context.Context) error {
 			if err = s.bumpLocalAuthorization(ctx, q, id, principal.AuthorizationRole); err != nil {
 				return s.dbErr(err)
 			}
-			return s.insertSystemAudit(ctx, q, &id, "identity.break_glass_terminated", principalResource(id), "authentication service restarted; emergency policy re-established")
+			return s.insertSystemAudit(ctx, q, &id, auditkind.IdentityBreakGlassTerminated, principalResource(id), "authentication service restarted; emergency policy re-established")
 		}); err != nil {
 			return err
 		}
@@ -41,7 +42,7 @@ func (s *Service) terminateEmergencySessions(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) emergencyAudit(ctx context.Context, id uuid.UUID, action, reason, systemContext string) error {
+func (s *Service) emergencyAudit(ctx context.Context, id uuid.UUID, action auditkind.Kind, reason, systemContext string) error {
 	auditCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
 	// No actor FK acquisition here: worker denials may hold the principal lock in

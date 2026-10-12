@@ -17,6 +17,7 @@ import (
 
 	adminv1connect "lindm/gen/lindm/admin/v1/adminv1connect"
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -136,7 +137,7 @@ func (s *Service) handleCLIApprovalPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if principal.BreakGlass && s.breakGlass.GetConsoleOnly() {
-		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "", "CLI forbidden by console-only policy"); err != nil {
+		if err := s.emergencyAudit(r.Context(), principal.ID, auditkind.IdentityBreakGlassDenied, "", "CLI forbidden by console-only policy"); err != nil {
 			writeStatus(w, http.StatusServiceUnavailable)
 			return
 		}
@@ -168,7 +169,7 @@ func (s *Service) handleCLIApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if principal.BreakGlass && s.breakGlass.GetConsoleOnly() {
-		if err := s.emergencyAudit(r.Context(), principal.ID, "identity.break_glass_denied", "", "CLI forbidden by console-only policy"); err != nil {
+		if err := s.emergencyAudit(r.Context(), principal.ID, auditkind.IdentityBreakGlassDenied, "", "CLI forbidden by console-only policy"); err != nil {
 			writeStatus(w, http.StatusServiceUnavailable)
 			return
 		}
@@ -235,7 +236,7 @@ func (s *Service) approveCLI(ctx context.Context, cookie, binding string, actor 
 			return s.dbErr(err)
 		}
 		location = request.RedirectUri + "?" + url.Values{"code": {code}, "state": {request.State}}.Encode()
-		return s.insertAudit(ctx, q, &actor.ID, "identity.cli_approved", principalResource(actor.ID), session.IncidentReason)
+		return s.insertAudit(ctx, q, &actor.ID, auditkind.IdentityCLIApproved, principalResource(actor.ID), session.IncidentReason)
 	})
 	return location, err
 }
@@ -280,7 +281,7 @@ func (s *Service) exchangeCLI(ctx context.Context, request *authv1.CLIExchangeRe
 			return s.dbErr(err)
 		}
 		result.ExpiresAt = timestamppb.New(expiry.Time)
-		return s.insertAudit(ctx, q, &row.ID, "identity.cli_login", principalResource(row.ID), session.IncidentReason)
+		return s.insertAudit(ctx, q, &row.ID, auditkind.IdentityCLILogin, principalResource(row.ID), session.IncidentReason)
 	})
 	if err != nil {
 		return nil, err

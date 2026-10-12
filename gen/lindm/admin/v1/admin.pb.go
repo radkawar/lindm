@@ -1795,8 +1795,12 @@ type AuditEvent struct {
 	Details map[string]string `protobuf:"bytes,9,rep,name=details,proto3" json:"details,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Current account label, not immutable historical evidence or authority.
 	ActorDisplayName string `protobuf:"bytes,10,opt,name=actor_display_name,json=actorDisplayName,proto3" json:"actor_display_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// For device_action.* events, the capability of the device action the event
+	// records (for example "device.restart.v1"); empty otherwise. Display
+	// context joined at read time, not part of the hash-bound audit payload.
+	DeviceActionCapability string `protobuf:"bytes,11,opt,name=device_action_capability,json=deviceActionCapability,proto3" json:"device_action_capability,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AuditEvent) Reset() {
@@ -1895,6 +1899,13 @@ func (x *AuditEvent) GetDetails() map[string]string {
 func (x *AuditEvent) GetActorDisplayName() string {
 	if x != nil {
 		return x.ActorDisplayName
+	}
+	return ""
+}
+
+func (x *AuditEvent) GetDeviceActionCapability() string {
+	if x != nil {
+		return x.DeviceActionCapability
 	}
 	return ""
 }
@@ -2671,7 +2682,7 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\bgrant_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\agrantId\x12!\n" +
 	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"\x1f\n" +
 	"\x1dRevokeEnrollmentGrantResponse\"\x16\n" +
-	"\x14RevokeDeviceResponse\"\x8c\x04\n" +
+	"\x14RevokeDeviceResponse\"\xd0\x04\n" +
 	"\n" +
 	"AuditEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12;\n" +
@@ -2686,7 +2697,8 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x0fdevice_hostname\x18\b \x01(\tB\b\xbaH\x05r\x03\x18\x80 R\x0edeviceHostname\x12Z\n" +
 	"\adetails\x18\t \x03(\v2'.lindm.admin.v1.AuditEvent.DetailsEntryB\x17\xbaH\x14\x9a\x01\x11\x10 \"\x06r\x04\x10\x01\x18@*\x05r\x03\x18\x80 R\adetails\x12,\n" +
 	"\x12actor_display_name\x18\n" +
-	" \x01(\tR\x10actorDisplayName\x1a:\n" +
+	" \x01(\tR\x10actorDisplayName\x12B\n" +
+	"\x18device_action_capability\x18\v \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x16deviceActionCapability\x1a:\n" +
 	"\fDetailsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x13\n" +

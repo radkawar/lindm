@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -114,7 +115,7 @@ func (s *Service) ConfirmRefreshInventoryPublication(ctx context.Context, req *c
 	if err := q.SetDeviceActionInventoryReceipt(ctx, devicedb.SetDeviceActionInventoryReceiptParams{ID: id, InventoryReceiptEnvelope: envelope, InventoryReceiptDocument: document}); err != nil {
 		return nil, core.MapErr(err)
 	}
-	if err := core.DispatchSystemAudit(ctx, q, nil, "device_action.inventory_published", id, "status", "full_inventory_published"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, nil, auditkind.DeviceActionInventoryPublished, id, "status", "full_inventory_published"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

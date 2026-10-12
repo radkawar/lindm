@@ -21,6 +21,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
@@ -225,12 +226,12 @@ func (s *Service) reserveNewProvisioningEnrollment(ctx context.Context, tx pgx.T
 	if consumed != 1 {
 		return nil, rpcreason.Error(connect.CodePermissionDenied, "provisioning_token_expired")
 	}
-	if err := InsertAudit(ctx, q, &token.CreatedBy, "provisioning.reserve", deviceID.String(), token.Reason); err != nil {
+	if err := InsertAudit(ctx, q, &token.CreatedBy, auditkind.ProvisioningReserve, deviceID.String(), token.Reason); err != nil {
 		return nil, err
 	}
 	if importer != nil {
 		actor := importer.ActorID()
-		if err := InsertAudit(ctx, q, &actor, "enrollment.offline_import", transactionID.String(), token.Reason); err != nil {
+		if err := InsertAudit(ctx, q, &actor, auditkind.EnrollmentOfflineImport, transactionID.String(), token.Reason); err != nil {
 			return nil, err
 		}
 	}

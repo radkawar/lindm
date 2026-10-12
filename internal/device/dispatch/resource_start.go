@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/secrets"
 
 	"lindm/internal/device/core"
@@ -25,7 +26,7 @@ import (
 )
 
 var resourceReasons = signedReasons{
-	invalidStart: "invalid_service_start_request", invalidResult: "invalid_service_result_request", resultAudit: "resource_action.result",
+	invalidStart: "invalid_service_start_request", invalidResult: "invalid_service_result_request", resultAudit: auditkind.ResourceActionResult,
 	binding:          reason{connect.CodePermissionDenied, "resource_action_binding_rejected"},
 	challenge:        reason{connect.CodePermissionDenied, "resource_challenge_rejected"},
 	challengeBinding: reason{connect.CodePermissionDenied, "resource_challenge_binding_rejected"},
@@ -241,7 +242,7 @@ func (k *resourceStart) persist(ctx context.Context, s *Service, st *startState[
 	}
 	// The audit append holds the deployment-wide chain head until commit, so it
 	// is the transaction's last statement.
-	if err := core.DispatchSystemAudit(ctx, st.q, &k.head.ActorID, "resource_action.start", st.id, "authority", "fresh_actor_authorization"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, st.q, &k.head.ActorID, auditkind.ResourceActionStart, st.id, "authority", "fresh_actor_authorization"); err != nil {
 		return core.MapErr(err)
 	}
 	return nil

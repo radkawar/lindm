@@ -13,6 +13,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/rpcreason"
 )
@@ -102,7 +103,7 @@ func (s *Service) RenewIdentity(ctx context.Context, req *connect.Request[device
 		if err := q.CountRenewalIssuance(ctx, principal.GenerationID); err != nil {
 			return err
 		}
-		if err := InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: ActionDeviceRenew, ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, AuditDetails("certificate_sha256", hex.EncodeToString(issued.Fingerprint))); err != nil {
+		if err := InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: auditkind.DeviceRenew.String(), ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, AuditDetails("certificate_sha256", hex.EncodeToString(issued.Fingerprint))); err != nil {
 			return err
 		}
 		pemBytes, expires = issued.PEM, issued.NotAfter

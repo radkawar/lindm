@@ -35,70 +35,77 @@ function AuditScopePicker({ kind, ...props }: PickerProps & { kind: "actor" | "d
     selectedOption && !choices.some((item) => item.value === props.value)
       ? [{ ...selectedOption, description: "Current selection" }, ...choices]
       : choices;
+  // Choice loading, errors and paging live inside the popover; only the
+  // selected name's state shows under the trigger, so the filter bar stays one row.
   return (
-    <div className="grid gap-2">
-      <SearchPicker
-        {...props}
-        search={search}
-        onSearchChange={setSearch}
-        options={options}
-        note={`Enter the beginning of ${kind === "actor" ? "an account name" : "a hostname"}. Only names with recorded events appear; up to 100 choices per page.`}
-      >
-        {!props.disabled && list.isPending ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            Loading choices…
-          </p>
-        ) : null}
-        {!!props.value && selected.isPending ? (
-          <p role="status" className="text-xs text-muted-foreground">
-            Loading selected name…
-          </p>
-        ) : null}
-        {list.error ? (
-          <RpcError failure={toRpcFailure(list.error)}>
-            <Button variant="outline" onClick={() => void list.refetch()}>
-              Retry choices
-            </Button>
-          </RpcError>
-        ) : null}
-        {selected.error ? (
-          <RpcError failure={toRpcFailure(selected.error)}>
-            <Button variant="outline" onClick={() => void selected.refetch()}>
-              Retry selected name
-            </Button>
-          </RpcError>
-        ) : null}
-        {!!props.value && selected.isSuccess && !selectedOption ? (
-          <p className="text-xs text-muted-foreground">
-            The selected name is no longer available. Its saved filter still applies.
-          </p>
-        ) : null}
-        {!props.disabled && list.isSuccess && list.data.options.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No recorded names match this search.</p>
-        ) : null}
-      </SearchPicker>
-      {!props.disabled ? (
-        <div className="flex gap-2">
-          {afterId ? (
-            <Button
-              variant="outline"
-              disabled={list.isFetching}
-              onClick={() => setPage({ namePrefix, token: "" })}
-            >
-              First choices
-            </Button>
-          ) : null}
-          {list.isSuccess && list.data.nextAfterId ? (
-            <Button
-              variant="outline"
-              disabled={list.isFetching}
-              onClick={() => setPage({ namePrefix, token: list.data?.nextAfterId ?? "" })}
-            >
-              More choices
-            </Button>
-          ) : null}
-        </div>
+    <SearchPicker
+      {...props}
+      placeholder={kind === "actor" ? "Anyone" : "Any device"}
+      search={search}
+      onSearchChange={setSearch}
+      options={options}
+      note={`Enter the beginning of ${kind === "actor" ? "an account name" : "a hostname"}. Only names with recorded events appear; up to 100 choices per page.`}
+      footer={
+        props.disabled ? null : (
+          <>
+            {list.isPending ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                Loading choices…
+              </p>
+            ) : null}
+            {list.error ? (
+              <RpcError failure={toRpcFailure(list.error)}>
+                <Button variant="outline" onClick={() => void list.refetch()}>
+                  Retry choices
+                </Button>
+              </RpcError>
+            ) : null}
+            {list.isSuccess && list.data.options.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No recorded names match this search.</p>
+            ) : null}
+            {afterId || (list.isSuccess && list.data.nextAfterId) ? (
+              <div className="flex gap-2">
+                {afterId ? (
+                  <Button
+                    variant="outline"
+                    disabled={list.isFetching}
+                    onClick={() => setPage({ namePrefix, token: "" })}
+                  >
+                    First choices
+                  </Button>
+                ) : null}
+                {list.isSuccess && list.data.nextAfterId ? (
+                  <Button
+                    variant="outline"
+                    disabled={list.isFetching}
+                    onClick={() => setPage({ namePrefix, token: list.data?.nextAfterId ?? "" })}
+                  >
+                    More choices
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </>
+        )
+      }
+    >
+      {!!props.value && selected.isPending ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          Loading selected name…
+        </p>
       ) : null}
-    </div>
+      {selected.error ? (
+        <RpcError failure={toRpcFailure(selected.error)}>
+          <Button variant="outline" onClick={() => void selected.refetch()}>
+            Retry selected name
+          </Button>
+        </RpcError>
+      ) : null}
+      {!!props.value && selected.isSuccess && !selectedOption ? (
+        <p className="text-xs text-muted-foreground">
+          The selected name is no longer available. Its saved filter still applies.
+        </p>
+      ) : null}
+    </SearchPicker>
   );
 }

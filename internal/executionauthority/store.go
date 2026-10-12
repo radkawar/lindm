@@ -19,6 +19,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/executionauthority/authoritydb"
 	"lindm/internal/protodata"
 	"lindm/internal/trust"
@@ -220,7 +221,7 @@ func (s *Store) initialize(ctx context.Context, q *authoritydb.Queries, cfg Conf
 		return err
 	}
 	return q.InsertAudit(ctx, authoritydb.InsertAuditParams{
-		ID: uuid.New(), OccurredAt: stamp, Action: "execution_authority.initialize",
+		ID: uuid.New(), OccurredAt: stamp, Action: auditkind.ExecutionAuthorityInitialize.String(),
 		ResourceID: s.deploymentID.String(), Context: "verified public bootstrap root pin",
 	})
 }

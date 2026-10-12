@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 )
 
 const (
@@ -26,7 +27,7 @@ type accessDecision struct {
 	Kind           accessKind
 	Role           string
 	RevokeSessions bool
-	AuditAction    string
+	AuditAction    auditkind.Kind
 	AuditReason    string
 }
 
@@ -74,7 +75,7 @@ func decideAccess(now time.Time, configuredIssuer string, policy *authorizationP
 		return accessDecision{
 			Kind:           accessUnauthenticated,
 			RevokeSessions: true,
-			AuditAction:    auditLineageDenied,
+			AuditAction:    auditkind.IdentityLineageDenied,
 			AuditReason:    reasonUnqualified,
 		}
 	}
@@ -82,7 +83,7 @@ func decideAccess(now time.Time, configuredIssuer string, policy *authorizationP
 		return accessDecision{
 			Kind:           accessUnauthenticated,
 			RevokeSessions: true,
-			AuditAction:    auditDisabled,
+			AuditAction:    auditkind.IdentityDisabled,
 			AuditReason:    reasonDisabled,
 		}
 	}

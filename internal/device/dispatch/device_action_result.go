@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/secrets"
 
 	"lindm/internal/device/core"
@@ -194,7 +195,7 @@ func (s *Service) ingestRecoveryEscrow(ctx context.Context, q *devicedb.Queries,
 	if _, err := q.InsertDeviceActionEscrow(ctx, devicedb.InsertDeviceActionEscrowParams{ActionID: action.ID, BindingDocument: canonical, KeyID: sealed.KeyID, WrappedKey: sealed.WrappedKey, Ciphertext: sealed.Ciphertext, SecretSha256: sealed.SecretSHA256}); err != nil {
 		return core.MapErr(err)
 	}
-	return core.MapErr(core.DispatchSystemAudit(ctx, q, nil, "device_action.escrow_store", action.ID, "proof", "verified_encrypted_recovery"))
+	return core.MapErr(core.DispatchSystemAudit(ctx, q, nil, auditkind.DeviceActionEscrowStore, action.ID, "proof", "verified_encrypted_recovery"))
 }
 
 func (k *deviceActionResult) persist(ctx context.Context, _ *Service, st *deviceActionResultState, document []byte) error {

@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -66,7 +67,8 @@ func (r signedRow) boundTo(p core.DevicePrincipal) bool {
 
 // signedReasons names a kind's refusals at shared fences and its audit action.
 type signedReasons struct {
-	invalidStart, invalidResult, resultAudit                         string
+	invalidStart, invalidResult                                      string
+	resultAudit                                                      auditkind.Kind
 	binding, challenge, challengeBinding, startConflict, startWindow reason
 	nonce, attestation, resultConflict, ungranted                    reason
 }

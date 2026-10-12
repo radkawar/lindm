@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -124,7 +125,7 @@ func (s *Service) GetDeviceActionWork(ctx context.Context, req *connect.Request[
 }
 
 var deviceActionReasons = signedReasons{
-	invalidStart: "invalid_device_action_start", invalidResult: "invalid_device_action_result", resultAudit: "device_action.result",
+	invalidStart: "invalid_device_action_start", invalidResult: "invalid_device_action_result", resultAudit: auditkind.DeviceActionResult,
 	binding:          reason{connect.CodePermissionDenied, "device_action_binding_rejected"},
 	challenge:        reason{connect.CodePermissionDenied, "device_action_challenge_rejected"},
 	challengeBinding: reason{connect.CodePermissionDenied, "device_action_challenge_binding_rejected"},
@@ -333,7 +334,7 @@ func (k *deviceActionStart) persist(ctx context.Context, s *Service, st *startSt
 			return core.MapErr(err)
 		}
 	}
-	if err := core.DispatchSystemAudit(ctx, st.q, &k.action.ActorID, "device_action.start", st.id, "authority", "fresh_authorization"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, st.q, &k.action.ActorID, auditkind.DeviceActionStart, st.id, "authority", "fresh_authorization"); err != nil {
 		return core.MapErr(err)
 	}
 	if k.consumption != nil {

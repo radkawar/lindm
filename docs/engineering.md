@@ -204,6 +204,23 @@ to the device page, falling back to "Unnamed device"; mode and duration read
 Audit exports hash the exact PostgreSQL JSON bytes of the complete immutable row,
 including `target_device_id` and `details`; current hostname is display context,
 not historical evidence. Preserve original payload bytes when verifying the chain.
+Every recorded action code is an `auditkind.Kind` (`internal/auditkind`): audit
+write helpers take a `Kind`, which only that package constructs, and sqlc audit
+parameters receive its `String()`, so `auditkind.All()` is the complete list of
+kinds a server can write. The console names each kind from
+`web/src/features/audit/action-names.json` ("Created one-time enrollment code");
+`TestEveryKindHasAConsoleName` fails when a registered kind has no name or the
+file names a kind the server never records. The raw code stays in Details.
+Device-action events also carry the action's capability (`device_action_capability`,
+joined at read time) so the console names the kind ("Requested device action:
+Restart"). The "Human actions" view (`AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS`) and its
+export selection list events with an actor, minus `auditkind.HumanActionsExcluded()`:
+sign-in, command-line sign-in, sign-out and approvals-inbox reads.
+The audit filters are one bar: the view switch (a select below md), then Actor,
+Device and a single Time range control (All time, last calendar week, or custom
+UTC dates shown beside it) inside `FilterPanel`. Below md each row stacks when, who,
+device and reason under the action, so Details is never off-screen. Export is
+offered only to unrestricted `integrations.manage` holders.
 
 RPC presentation uses the Connect code and `Lindm-Reason` together. Known missing
 capabilities or inventory are neutral; stale data, permission and re-authentication

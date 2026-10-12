@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -179,5 +180,5 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err
 	}
-	return core.DispatchSystemAudit(ctx, q, &actor, "resource_assignment.assign", id, "source", "target_preview_activation")
+	return core.DispatchSystemAudit(ctx, q, &actor, auditkind.ResourceAssignmentAssign, id, "source", "target_preview_activation")
 }

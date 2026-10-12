@@ -12,6 +12,7 @@ import (
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -151,7 +152,7 @@ func (s *Service) RotateSCIMCredential(ctx context.Context, request *authv1.Rota
 	if err := q.RotateSCIMCredential(ctx, identitydb.RotateSCIMCredentialParams{ID: connector.ID, CredentialHash: domainHash(scimCredentialDomain, secret)}); err != nil {
 		return nil, s.dbErr(err)
 	}
-	if err := s.insertSystemAudit(ctx, q, &actor.ID, "identity.scim_credential_rotated", "scim/"+connector.ID, "dedicated connector credential replaced"); err != nil {
+	if err := s.insertSystemAudit(ctx, q, &actor.ID, auditkind.IdentitySCIMCredentialRotated, "scim/"+connector.ID, "dedicated connector credential replaced"); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/executionauthority/authoritydb"
 	"lindm/internal/protodata"
 	"lindm/internal/trust"
@@ -123,7 +124,7 @@ func (s *Store) Apply(ctx context.Context, tx pgx.Tx, request *agentv1.UpdateExe
 	stamp, auditID := timestamp(now), uuid.New()
 	if err := q.InsertAudit(ctx, authoritydb.InsertAuditParams{
 		ID: auditID, OccurredAt: stamp, ActorID: &actorID,
-		Action: "execution_authority.update", ResourceID: s.deploymentID.String(), Reason: reason,
+		Action: auditkind.ExecutionAuthorityUpdate.String(), ResourceID: s.deploymentID.String(), Reason: reason,
 	}); err != nil {
 		return nil, err
 	}

@@ -704,24 +704,25 @@ WHERE f.sequence <= $1::bigint
   AND ($4::smallint IN (0, 4) OR f.action_category = $4)
   AND ($4::smallint <> 4
        OR (f.actor_id IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.id = f.event_id AND a.action = 'approval.listed')))
-  AND ($5::timestamptz IS NULL OR f.occurred_at >= $5)
-  AND ($6::timestamptz IS NULL OR f.occurred_at < $6)
-  AND ($7::uuid IS NULL
-       OR (f.occurred_at, f.event_id) < ($8::timestamptz, $7::uuid))
+           AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.id = f.event_id AND a.action = ANY($5::text[]))))
+  AND ($6::timestamptz IS NULL OR f.occurred_at >= $6)
+  AND ($7::timestamptz IS NULL OR f.occurred_at < $7)
+  AND ($8::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < ($9::timestamptz, $8::uuid))
 ORDER BY f.occurred_at DESC, f.event_id DESC
 LIMIT 128
 `
 
 type PageAuditSelectionParams struct {
-	SnapshotSequence int64
-	ActorID          *uuid.UUID
-	TargetDeviceID   *uuid.UUID
-	ActionCategory   int16
-	OccurredFrom     pgtype.Timestamptz
-	OccurredUntil    pgtype.Timestamptz
-	CursorID         *uuid.UUID
-	CursorOccurredAt pgtype.Timestamptz
+	SnapshotSequence     int64
+	ActorID              *uuid.UUID
+	TargetDeviceID       *uuid.UUID
+	ActionCategory       int16
+	HumanExcludedActions []string
+	OccurredFrom         pgtype.Timestamptz
+	OccurredUntil        pgtype.Timestamptz
+	CursorID             *uuid.UUID
+	CursorOccurredAt     pgtype.Timestamptz
 }
 
 type PageAuditSelectionRow struct {
@@ -739,6 +740,7 @@ func (q *Queries) PageAuditSelection(ctx context.Context, arg PageAuditSelection
 		arg.ActorID,
 		arg.TargetDeviceID,
 		arg.ActionCategory,
+		arg.HumanExcludedActions,
 		arg.OccurredFrom,
 		arg.OccurredUntil,
 		arg.CursorID,

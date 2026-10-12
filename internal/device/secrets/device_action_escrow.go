@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -103,7 +104,7 @@ func (s *Service) DeviceActionReceipt(ctx context.Context, principal core.Device
 	if err := q.SetDeviceActionEscrowReceipt(ctx, devicedb.SetDeviceActionEscrowReceiptParams{ID: id, EscrowReceiptEnvelope: envelope}); err != nil {
 		return nil, core.MapErr(err)
 	}
-	if err := core.DispatchSystemAudit(ctx, q, nil, "device_action.escrow_receipt", id, "status", "durable_escrow_committed"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, nil, auditkind.DeviceActionEscrowReceipt, id, "status", "durable_escrow_committed"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -239,7 +240,7 @@ func (s *Service) RevealRecoveryKey(ctx context.Context, req *connect.Request[ad
 		return nil, core.MapErr(core.NotFoundIfMissing(err))
 	}
 	// Audit admission commits before plaintext is released, including every replay.
-	if err := core.DispatchAudit(ctx, q, &actor.ID, "recovery_key.reveal", id, req.Msg.GetReason()); err != nil {
+	if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.RecoveryKeyReveal, id, req.Msg.GetReason()); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := s.LockActionApproval(ctx, tx, consumption, authorization, identity.PermissionReadRecoveryKeys); err != nil {

@@ -22,6 +22,7 @@ func writeAuditSelection(ctx context.Context, q *reportdb.Queries, writer io.Wri
 		ActorID:          selection.ActorID, TargetDeviceID: selection.TargetDeviceID,
 		ActionCategory: int16(selection.Filter.GetActionCategory()),
 		OccurredFrom:   selection.OccurredFrom, OccurredUntil: selection.OccurredUntil,
+		HumanExcludedActions: selection.HumanExcludedActions,
 	}
 	var count uint64
 	for {

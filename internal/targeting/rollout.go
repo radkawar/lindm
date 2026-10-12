@@ -15,6 +15,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -87,7 +88,7 @@ func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal,
 		return nil, err
 	}
 	out := new(adminv1.PutRolloutResponse)
-	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.rollout.put", r, out); ok || err != nil {
+	if ok, err := receipt(ctx, q, p, r.RequestId, auditkind.TargetingRolloutPut, r, out); ok || err != nil {
 		return out, err
 	}
 	for _, ring := range r.Rollout.Rings {
@@ -118,7 +119,7 @@ func (s *Store) PutRollout(ctx context.Context, tx pgx.Tx, p identity.Principal,
 	if err != nil {
 		return nil, err
 	}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.put", id.String(), r.Reason, "", r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, auditkind.TargetingRolloutPut, id.String(), r.Reason, "", r, out)
 }
 
 type member struct {
@@ -300,7 +301,7 @@ func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 		return nil, err
 	}
 	out := new(adminv1.ControlRolloutResponse)
-	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.rollout.control", r, out); ok || err != nil {
+	if ok, err := receipt(ctx, q, p, r.RequestId, auditkind.TargetingRolloutControl, r, out); ok || err != nil {
 		return out, err
 	}
 	id := uuid.MustParse(r.RolloutId)
@@ -346,7 +347,7 @@ func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 			if err != nil {
 				return nil, err
 			}
-			return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), auditReason, auditContext, r, out)
+			return out, saveReceipt(ctx, q, p, r.RequestId, auditkind.TargetingRolloutControl, id.String(), auditReason, auditContext, r, out)
 		}
 		if !ready {
 			return nil, ErrNotReady
@@ -381,7 +382,7 @@ func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 	if err != nil {
 		return nil, err
 	}
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.rollout.control", id.String(), auditReason, auditContext, r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, auditkind.TargetingRolloutControl, id.String(), auditReason, auditContext, r, out)
 }
 func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListRolloutsRequest) (*adminv1.ListRolloutsResponse, error) {
 	if err := s.validate(r); err != nil {

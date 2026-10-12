@@ -21,6 +21,7 @@ import (
 
 	bundlev1 "lindm/gen/lindm/bundle/v1"
 	"lindm/internal/advisory"
+	"lindm/internal/auditkind"
 	"lindm/internal/offlinebundle/bundledb"
 	"lindm/internal/releasebuild"
 	"lindm/internal/releaseupdate"
@@ -247,7 +248,7 @@ func (i *Importer) finish(ctx context.Context, conn *pgxpool.Conn, bundle *Bundl
 			return errors.New("offlinebundle: import ledger changed during import")
 		}
 		return q.InsertBundleAudit(ctx, bundledb.InsertBundleAuditParams{
-			ID: uuid.New(), Action: "offline_bundle.imported", ResourceID: manifest.GetBundleId(),
+			ID: uuid.New(), Action: auditkind.OfflineBundleImported.String(), ResourceID: manifest.GetBundleId(),
 			Sequence: fmt.Sprint(manifest.GetSequence()), Release: manifest.GetRelease().GetVersion(), Custody: manifest.GetCustody(),
 		})
 	})

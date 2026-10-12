@@ -29,6 +29,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -156,7 +157,10 @@ func begin(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.P
 	}
 	return q, nil
 }
-func receipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id, method string, request, response proto.Message) (bool, error) {
+
+// A targeting receipt's method is its audit kind code.
+func receipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id string, kind auditkind.Kind, request, response proto.Message) (bool, error) {
+	method := kind.String()
 	b, err := encoded(request)
 	if err != nil {
 		return false, err
@@ -173,7 +177,8 @@ func receipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, 
 	}
 	return true, proto.Unmarshal(row.Response, response)
 }
-func saveReceipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id, method, resource, reason, auditContext string, request, response proto.Message) error {
+func saveReceipt(ctx context.Context, q *targetingdb.Queries, p identity.Principal, id string, kind auditkind.Kind, resource, reason, auditContext string, request, response proto.Message) error {
+	method := kind.String()
 	b, err := encoded(request)
 	if err != nil {
 		return err
@@ -200,7 +205,7 @@ func (s *Store) PutDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Princ
 		return nil, err
 	}
 	out := new(adminv1.PutDynamicGroupResponse)
-	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.group.put", r, out); ok || err != nil {
+	if ok, err := receipt(ctx, q, p, r.RequestId, auditkind.TargetingGroupPut, r, out); ok || err != nil {
 		return out, err
 	}
 	if _, valid, err := expressionDefinitions(ctx, q, r.Group.Expression); err != nil {
@@ -231,7 +236,7 @@ func (s *Store) PutDynamicGroup(ctx context.Context, tx pgx.Tx, p identity.Princ
 		return nil, err
 	}
 	out.Group = group
-	return out, saveReceipt(ctx, q, p, r.RequestId, "targeting.group.put", group.GroupId, r.Reason, "", r, out)
+	return out, saveReceipt(ctx, q, p, r.RequestId, auditkind.TargetingGroupPut, group.GroupId, r.Reason, "", r, out)
 }
 func (s *Store) ListDynamicGroups(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListDynamicGroupsRequest) (*adminv1.ListDynamicGroupsResponse, error) {
 	if err := s.validate(r); err != nil {
@@ -268,15 +273,15 @@ func (s *Store) PutAssignment(ctx context.Context, tx pgx.Tx, p identity.Princip
 		return nil, err
 	}
 	out := new(adminv1.PutTargetAssignmentResponse)
-	if ok, err := receipt(ctx, q, p, r.RequestId, "targeting.assignment.put", r, out); ok || err != nil {
+	if ok, err := receipt(ctx, q, p, r.RequestId, auditkind.TargetingAssignmentPut, r, out); ok || err != nil {
 		return out, err
 	}
-	return s.putAssignment(ctx, q, p, r, "targeting.assignment.put", r)
+	return s.putAssignment(ctx, q, p, r, auditkind.TargetingAssignmentPut, r)
 }
 
 // The reviewed and legacy APIs share mutation semantics, but retain distinct
 // receipt methods and the exact request bytes supplied to each API.
-func (s *Store) putAssignment(ctx context.Context, q *targetingdb.Queries, p identity.Principal, r *adminv1.PutTargetAssignmentRequest, method string, request proto.Message) (*adminv1.PutTargetAssignmentResponse, error) {
+func (s *Store) putAssignment(ctx context.Context, q *targetingdb.Queries, p identity.Principal, r *adminv1.PutTargetAssignmentRequest, method auditkind.Kind, request proto.Message) (*adminv1.PutTargetAssignmentResponse, error) {
 	out := new(adminv1.PutTargetAssignmentResponse)
 	exists, err := q.TargetProfileRevisionExists(ctx, uuid.MustParse(r.Assignment.ProfileRevisionId))
 	if err != nil {

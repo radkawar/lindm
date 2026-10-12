@@ -586,26 +586,21 @@ async function recoveryAudit(ctx) {
     "Keep the category visible while composing actor, device and time scope.",
     "The recovery-key-reveal quick view is selected; the date range is still explicit and separate.",
   );
-  await main.getByRole("button", { name: "Last week", exact: true }).click();
+  await main.getByRole("combobox", { name: "Time range", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Last week, Monday to Sunday (UTC)", exact: true })
+    .click();
   await settled(page);
-  // Date-range navigation remounts the controlled form. Observe the current
-  // visible inputs rather than holding a detached pre-navigation element.
-  await page.waitForFunction(
-    () => {
-      const from = document.getElementById("audit-from");
-      const through = document.getElementById("audit-through");
-      return (
-        from instanceof HTMLInputElement &&
-        through instanceof HTMLInputElement &&
-        /^\d{4}-\d{2}-\d{2}$/.test(from.value) &&
-        /^\d{4}-\d{2}-\d{2}$/.test(through.value)
-      );
+  // The chosen week is saved as fixed UTC dates in the URL.
+  await page.waitForURL(
+    /[?&]from=\d{4}-\d{2}-\d{2}.*[?&]through=\d{4}-\d{2}-\d{2}|[?&]through=\d{4}-\d{2}-\d{2}.*[?&]from=\d{4}-\d{2}-\d{2}/,
+    {
+      timeout: 15_000,
     },
-    null,
-    { timeout: 15_000 },
   );
-  const from = await main.getByLabel("From (UTC)", { exact: true }).inputValue();
-  const through = await main.getByLabel("Through (UTC)", { exact: true }).inputValue();
+  const saved = () => new URL(page.url()).searchParams;
+  const from = saved().get("from") ?? "";
+  const through = saved().get("through") ?? "";
   requireState(
     /^\d{4}-\d{2}-\d{2}$/.test(from) &&
       /^\d{4}-\d{2}-\d{2}$/.test(through) &&
@@ -619,7 +614,7 @@ async function recoveryAudit(ctx) {
   } else {
     for (const row of await rows.all()) {
       requireState(
-        (await row.getByRole("cell").nth(1).innerText()).trim() === "Recovery key reveal",
+        (await row.getByRole("cell").nth(1).innerText()).trim().startsWith("Revealed recovery key"),
         "recovery_audit_wrong_action_category",
       );
     }
@@ -639,8 +634,11 @@ async function recoveryAudit(ctx) {
   await visible(main.getByRole("heading", { name: "Audit log", exact: true }));
   await settled(page);
   requireState(
-    (await main.getByLabel("From (UTC)", { exact: true }).inputValue()) === from &&
-      (await main.getByLabel("Through (UTC)", { exact: true }).inputValue()) === through &&
+    saved().get("from") === from &&
+      saved().get("through") === through &&
+      (await main.getByRole("combobox", { name: "Time range", exact: true }).innerText()).includes(
+        "Last week",
+      ) &&
       (await main
         .getByRole("button", { name: "Recovery key reveals", exact: true })
         .getAttribute("aria-pressed")) === "true",
@@ -657,8 +655,8 @@ async function recoveryAudit(ctx) {
   );
   const hostname = routeDevice(ctx.config).Hostname;
   for (const choice of [
-    { label: "Actor account", name: "console-owner", slug: "actor" },
-    { label: "Target device", name: hostname, slug: "device" },
+    { label: "Actor", name: "console-owner", slug: "actor" },
+    { label: "Device", name: hostname, slug: "device" },
   ]) {
     await main.getByRole("button", { name: new RegExp(`^${choice.label} `) }).click();
     // The picker's choices float in a popover outside main.

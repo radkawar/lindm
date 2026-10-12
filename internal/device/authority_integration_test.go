@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -114,7 +115,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 	if err := conn.QueryRow(ctx, `SELECT d.state, g.state, g.session_epoch FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID).Scan(&state, &generationState, &epoch); err != nil {
 		t.Fatal(err)
 	}
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action=$1 AND resource_id=$2`, core.ActionDeviceRecoveryHold, principal.DeviceID.String()).Scan(&holds); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events WHERE action=$1 AND resource_id=$2`, auditkind.DeviceRecoveryHold.String(), principal.DeviceID.String()).Scan(&holds); err != nil {
 		t.Fatal(err)
 	}
 	if state != core.StateRecoveryHold || generationState != core.StateRecoveryHold || epoch != 2 || holds != 1 {

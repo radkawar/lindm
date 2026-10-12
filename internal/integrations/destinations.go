@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/integrations/integrationdb"
 	"lindm/internal/rpcreason"
 )
@@ -61,8 +62,8 @@ func timestamp(value pgtype.Timestamptz) *timestamppb.Timestamp {
 func destinationMessage(row integrationdb.IntegrationDestination) *integrationsv1.Destination {
 	return &integrationsv1.Destination{Id: row.ID.String(), Config: &integrationsv1.DestinationConfig{DisplayName: row.DisplayName, Kind: integrationsv1.DestinationKind(row.Kind), Endpoint: row.Endpoint, PinnedCaPem: row.PinnedCaPem, Enabled: row.Enabled}, CreatedAt: timestamp(row.CreatedAt), UpdatedAt: timestamp(row.UpdatedAt), Version: uint64(row.Version), PreviousSecretExpiresAt: timestamp(row.PreviousSecretExpiresAt)}
 }
-func audit(ctx context.Context, q *integrationdb.Queries, actor uuid.UUID, action, resource, reason string) error {
-	return q.InsertIntegrationAudit(ctx, integrationdb.InsertIntegrationAuditParams{ID: uuid.New(), ActorID: &actor, Action: action, ResourceID: resource, Reason: reason})
+func audit(ctx context.Context, q *integrationdb.Queries, actor uuid.UUID, action auditkind.Kind, resource, reason string) error {
+	return q.InsertIntegrationAudit(ctx, integrationdb.InsertIntegrationAuditParams{ID: uuid.New(), ActorID: &actor, Action: action.String(), ResourceID: resource, Reason: reason})
 }
 func (s *Service) CreateDestination(ctx context.Context, req *connect.Request[integrationsv1.CreateDestinationRequest]) (*connect.Response[integrationsv1.CreateDestinationResponse], error) {
 	response := &integrationsv1.CreateDestinationResponse{}
@@ -81,7 +82,7 @@ func (s *Service) CreateDestination(ctx context.Context, req *connect.Request[in
 			return err
 		}
 		response.Destination = destinationMessage(row)
-		return audit(ctx, q, actor, "integration.destination.created", id.String(), req.Msg.Reason)
+		return audit(ctx, q, actor, auditkind.IntegrationDestinationCreated, id.String(), req.Msg.Reason)
 	})
 	if err != nil {
 		return nil, err
@@ -114,7 +115,7 @@ func (s *Service) UpdateDestination(ctx context.Context, req *connect.Request[in
 			return err
 		}
 		response.Destination = destinationMessage(row)
-		return audit(ctx, q, actor, "integration.destination.updated", id.String(), req.Msg.Reason)
+		return audit(ctx, q, actor, auditkind.IntegrationDestinationUpdated, id.String(), req.Msg.Reason)
 	})
 	if err != nil {
 		return nil, err
@@ -141,7 +142,7 @@ func (s *Service) DeleteDestination(ctx context.Context, req *connect.Request[in
 		if err = q.CancelDestinationDeliveries(ctx, id); err != nil {
 			return err
 		}
-		return audit(ctx, q, actor, "integration.destination.deleted", id.String(), req.Msg.Reason)
+		return audit(ctx, q, actor, auditkind.IntegrationDestinationDeleted, id.String(), req.Msg.Reason)
 	})
 	if err != nil {
 		return nil, err
@@ -175,7 +176,7 @@ func (s *Service) RotateDestinationSecret(ctx context.Context, req *connect.Requ
 			return err
 		}
 		response.Destination = destinationMessage(row)
-		return audit(ctx, q, actor, "integration.destination.secret_rotated", id.String(), req.Msg.Reason)
+		return audit(ctx, q, actor, auditkind.IntegrationDestinationSecretRotated, id.String(), req.Msg.Reason)
 	})
 	if err != nil {
 		return nil, err
@@ -208,7 +209,7 @@ func (s *Service) ReplayDelivery(ctx context.Context, req *connect.Request[integ
 			return err
 		}
 		response.Delivery = deliveryMessage(row)
-		return audit(ctx, q, actor, "integration.delivery.replayed", id.String(), req.Msg.Reason)
+		return audit(ctx, q, actor, auditkind.IntegrationDeliveryReplayed, id.String(), req.Msg.Reason)
 	})
 	if err != nil {
 		return nil, err

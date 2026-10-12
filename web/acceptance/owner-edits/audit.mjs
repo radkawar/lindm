@@ -6,10 +6,11 @@ export const task = {
   route: "/audit",
   priority: "normal",
   acceptance:
-    "Opening /audit shows no 'Approval listed' or 'Advisory findings changed' rows unless 'All actions' is selected; empty reason/device cells are blank.",
+    "Opening /audit shows no approvals-inbox or advisory-findings rows unless 'All actions' is selected; empty reason/device cells are blank.",
 };
 
-const CHURN = ["Approval listed", "Advisory findings changed"];
+// Human names from web/src/features/audit/action-names.json.
+const CHURN = ["Opened approvals inbox", "Updated advisory findings"];
 
 async function rows(main) {
   // `has:` locators resolve relative to the row, so a main-anchored one never matched.
@@ -38,6 +39,11 @@ function churnIn(list) {
 
 export async function check({ page, visit, settle, require, capture, step }) {
   const main = page.getByRole("main");
+  // Opening the approvals inbox records a read-only event, so one sits on the
+  // first All actions page even after bulk seed edits.
+  step("open approvals inbox");
+  await visit("/approvals");
+  await settle();
   step("open default audit view");
   await visit("/audit");
   await main.getByRole("heading", { name: "Audit log", exact: true }).waitFor({ timeout: 30_000 });
@@ -68,8 +74,6 @@ export async function check({ page, visit, settle, require, capture, step }) {
   require((await all.getAttribute("aria-pressed")) ===
     "true", "All actions did not become selected");
   const everything = await rows(main);
-  // The seed lists the approvals inbox and recomputes advisory findings, so
-  // under All actions such rows must appear on the first page.
   require(churnIn(everything).length > 0, "All actions does not show read-only/system events");
   require(!everything.some(
     (row) => row.reason === "Not recorded" || row.device === "Not recorded",

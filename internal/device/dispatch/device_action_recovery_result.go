@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -114,7 +115,7 @@ func (s *Service) CheckpointRecoveryAction(ctx context.Context, req *connect.Req
 		if err := q.SetRecoveryCheckpoint(ctx, devicedb.SetRecoveryCheckpointParams{ActionID: row.ActionID, CheckpointDocument: document, CheckpointSha256: digest, CheckpointSequence: int64(checkpoint.GetSequence()), CheckpointReceiptEnvelope: envelope, JournalDocument: journalDocument, EffectCommitted: effect, StoredAt: core.Timestamptz(now)}); err != nil {
 			return nil, core.MapErr(err)
 		}
-		if err := core.DispatchSystemAudit(ctx, q, nil, "device_action.recovery_checkpoint", row.ActionID, "phase", checkpoint.GetPhase().String()); err != nil {
+		if err := core.DispatchSystemAudit(ctx, q, nil, auditkind.DeviceActionRecoveryCheckpoint, row.ActionID, "phase", checkpoint.GetPhase().String()); err != nil {
 			return nil, core.MapErr(err)
 		}
 		response = &recoveryv1.CheckpointRecoveryActionResponse{CheckpointSha256: digest, Sequence: checkpoint.GetSequence(), ReceiptEnvelope: envelope}
@@ -285,7 +286,7 @@ func (s *Service) ReportRecoveryResult(ctx context.Context, req *connect.Request
 			return nil, core.MapErr(err)
 		}
 	}
-	if err := core.DispatchSystemAudit(ctx, q, nil, "device_action.recovery_result", row.ActionID, "proof", "verified_action_scoped_proof"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, nil, auditkind.DeviceActionRecoveryResult, row.ActionID, "proof", "verified_action_scoped_proof"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	response.Closed = !unknown

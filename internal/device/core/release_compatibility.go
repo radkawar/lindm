@@ -14,6 +14,7 @@ import (
 
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	"lindm/gen/lindm/releasemanagement/v1/releasemanagementv1connect"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/releaseupdate"
@@ -108,7 +109,7 @@ func (s *Service) RegisterReleaseSeries(ctx context.Context, req *connect.Reques
 		if err := q.PutReleasedAgentSeries(ctx, devicedb.PutReleasedAgentSeriesParams{Major: int32(series.GetMajor()), Minor: int32(series.GetMinor()), ReleasedAt: Timestamptz(series.GetReleasedAt().AsTime()), SupportUntil: Timestamptz(series.GetSupportUntil().AsTime()), MinimumProtocol: int32(series.GetMinimumProtocol()), MaximumProtocol: int32(series.GetMaximumProtocol())}); err != nil {
 			return err
 		}
-		if err := InsertAudit(ctx, q, &actor.ID, "release.series.register", fmt.Sprintf("%d.%d", series.GetMajor(), series.GetMinor()), req.Msg.GetReason()); err != nil {
+		if err := InsertAudit(ctx, q, &actor.ID, auditkind.ReleaseSeriesRegister, fmt.Sprintf("%d.%d", series.GetMajor(), series.GetMinor()), req.Msg.GetReason()); err != nil {
 			return err
 		}
 		return CompleteAdmin(ctx, q, actor.ID, "RegisterReleaseSeries", id, uuid.Nil, uuid.Nil, time.Unix(0, 0).UTC())

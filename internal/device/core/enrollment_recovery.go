@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
@@ -93,7 +94,7 @@ func (s *Service) CreateRecoveryEnrollmentGrant(ctx context.Context, req *connec
 		if err := q.InsertRecoveryEnrollmentGrant(ctx, devicedb.InsertRecoveryEnrollmentGrantParams{GrantID: grantID, DeviceID: deviceID, ExpectedGenerationID: generation, ExpectedRevokedAt: device.RevokedAt}); err != nil {
 			return nil, MapErr(err)
 		}
-		if err := InsertAudit(ctx, q, &actor.ID, "device.recovery_authorized", deviceID.String(), req.Msg.GetReason()); err != nil {
+		if err := InsertAudit(ctx, q, &actor.ID, auditkind.DeviceRecoveryAuthorized, deviceID.String(), req.Msg.GetReason()); err != nil {
 			return nil, MapErr(err)
 		}
 		if err := CompleteAdmin(ctx, q, actor.ID, methodCreateRecoveryGrant, requestID, grantID, deviceID, expires); err != nil {
@@ -156,7 +157,7 @@ func (s *Service) recoverEnrollment(ctx context.Context, q *devicedb.Queries, gr
 	if consumed != 1 {
 		return nil, uuid.Nil, uuid.Nil, ErrInternalState
 	}
-	if err := InsertAudit(ctx, q, &grant.CreatedBy, "device.recovered", binding.DeviceID.String(), grant.Reason); err != nil {
+	if err := InsertAudit(ctx, q, &grant.CreatedBy, auditkind.DeviceRecovered, binding.DeviceID.String(), grant.Reason); err != nil {
 		return nil, uuid.Nil, uuid.Nil, err
 	}
 	return issued, binding.DeviceID, generation, nil

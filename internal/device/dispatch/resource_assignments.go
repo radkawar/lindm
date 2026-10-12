@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -199,9 +200,9 @@ func (s *Service) applyResourceAssignment(ctx context.Context, tx pgx.Tx, q *dev
 	} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, core.MapErr(err)
 	}
-	auditAction := "resource_assignment.assign"
+	auditAction := auditkind.ResourceAssignmentAssign
 	if req.Msg.GetClear() {
-		auditAction = "resource_assignment.clear"
+		auditAction = auditkind.ResourceAssignmentClear
 	}
 	if err := core.DispatchAudit(ctx, q, &actor.ID, auditAction, id, req.Msg.GetReason()); err != nil {
 		return nil, core.MapErr(err)
@@ -483,5 +484,5 @@ func (s *Service) ActivateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 	if err := q.SetResourceAssignmentHead(ctx, devicedb.SetResourceAssignmentHeadParams{GenerationID: receipt.GenerationID, AssignmentID: id}); err != nil {
 		return err
 	}
-	return core.InsertAudit(ctx, q, &token.CreatedBy, "resource_assignment.assign", id.String(), token.Reason)
+	return core.InsertAudit(ctx, q, &token.CreatedBy, auditkind.ResourceAssignmentAssign, id.String(), token.Reason)
 }

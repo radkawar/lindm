@@ -26,6 +26,7 @@ import (
 
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	integrationsv1connect "lindm/gen/lindm/integrations/v1/integrationsv1connect"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/reports/reportdb"
 	"lindm/internal/rpcreason"
@@ -267,7 +268,7 @@ func (s *Service) UpsertReportSchedule(ctx context.Context, request *connect.Req
 			return err
 		}
 		response.Schedule = scheduleMessage(row)
-		return q.InsertReportAudit(ctx, reportdb.InsertReportAuditParams{ActorID: &actor, Action: "report.schedule.updated", ResourceID: id.String(), Reason: request.Msg.GetReason()})
+		return q.InsertReportAudit(ctx, reportdb.InsertReportAuditParams{ActorID: &actor, Action: auditkind.ReportScheduleUpdated.String(), ResourceID: id.String(), Reason: request.Msg.GetReason()})
 	})
 	if err != nil {
 		return nil, reportError(err)
@@ -288,7 +289,7 @@ func (s *Service) CreateAuditExport(ctx context.Context, request *connect.Reques
 		if err != nil {
 			return err
 		}
-		return q.InsertReportAudit(ctx, reportdb.InsertReportAuditParams{ActorID: &actor, Action: "report.audit_export.created", ResourceID: row.ID.String(), Reason: request.Msg.GetReason()})
+		return q.InsertReportAudit(ctx, reportdb.InsertReportAuditParams{ActorID: &actor, Action: auditkind.ReportAuditExportCreated.String(), ResourceID: row.ID.String(), Reason: request.Msg.GetReason()})
 	})
 	if err != nil {
 		return nil, reportError(err)

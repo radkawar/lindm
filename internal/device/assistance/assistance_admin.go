@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -166,7 +167,7 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 		if err != nil {
 			return err
 		}
-		if err := recordAssistanceAudit(ctx, q, &actor.ID, "assistance.request", row, req.Msg.GetReason(), "target", req.Msg.GetTargetUsername()); err != nil {
+		if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceRequest, row, req.Msg.GetReason(), "target", req.Msg.GetTargetUsername()); err != nil {
 			return err
 		}
 		session = assistanceMessage(row)
@@ -326,7 +327,7 @@ func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Reques
 		if err != nil {
 			return err
 		}
-		if err := recordAssistanceAudit(ctx, q, &actor.ID, "assistance.join", row, "", "offer", row.OfferFingerprint); err != nil {
+		if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceJoin, row, "", "offer", row.OfferFingerprint); err != nil {
 			return err
 		}
 		response.Session, response.OfferSdp, response.IceServers = assistanceMessage(row), row.OfferSdp, []*agentv1.AssistanceIceServer{ice}
@@ -379,7 +380,7 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 		if err := q.AnswerAssistanceSession(ctx, devicedb.AnswerAssistanceSessionParams{ID: row.ID, AnsweredAt: core.Timestamptz(now), AnswerSdp: req.Msg.GetAnswerSdp(), AnswerFingerprint: fingerprint}); err != nil {
 			return err
 		}
-		if err := recordAssistanceAudit(ctx, q, &actor.ID, "assistance.answer", row, "", "offer", row.OfferFingerprint, "answer", fingerprint); err != nil {
+		if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceAnswer, row, "", "offer", row.OfferFingerprint, "answer", fingerprint); err != nil {
 			return err
 		}
 		row, err = q.GetAssistanceSession(ctx, row.ID)
@@ -423,7 +424,7 @@ func (s *Service) StopAssistanceSession(ctx context.Context, req *connect.Reques
 			return err
 		}
 		if row.State != assistanceEnded {
-			if err := recordAssistanceAudit(ctx, q, &actor.ID, "assistance.stop", row, ""); err != nil {
+			if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceStop, row, ""); err != nil {
 				return err
 			}
 			if err := endAssistance(ctx, q, &row, now, &actor.ID, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, "", false, revoked); err != nil {

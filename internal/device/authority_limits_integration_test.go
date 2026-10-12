@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -152,7 +153,7 @@ func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
 	}
 	var deviceState, generationState string
 	var epoch, audits int64
-	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT count(*) FROM audit_events WHERE action=$3 AND resource_id=$2) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID, principal.DeviceID.String(), core.ActionDeviceRecoveryHold).Scan(&deviceState, &generationState, &epoch, &audits); err != nil {
+	if err := conn.QueryRow(ctx, `SELECT d.state,g.state,g.session_epoch,(SELECT count(*) FROM audit_events WHERE action=$3 AND resource_id=$2) FROM devices d JOIN enrollment_generations g ON g.id=d.current_generation_id WHERE d.id=$1`, principal.DeviceID, principal.DeviceID.String(), auditkind.DeviceRecoveryHold.String()).Scan(&deviceState, &generationState, &epoch, &audits); err != nil {
 		t.Fatal(err)
 	}
 	if deviceState != "recovery_hold" || generationState != "recovery_hold" || epoch != 1 || audits != 1 {

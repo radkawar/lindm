@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 )
@@ -132,7 +133,7 @@ func (s *Service) ApprovePendingEnrollment(ctx context.Context, req *connect.Req
 		if changed != 1 {
 			return nil, MapErr(ErrInternalState)
 		}
-		if err := InsertAudit(ctx, q, &actor.ID, "provisioning.approve", receipt.DeviceID.String(), req.Msg.GetReason()); err != nil {
+		if err := InsertAudit(ctx, q, &actor.ID, auditkind.ProvisioningApprove, receipt.DeviceID.String(), req.Msg.GetReason()); err != nil {
 			return nil, MapErr(err)
 		}
 	}

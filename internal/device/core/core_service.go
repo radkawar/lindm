@@ -73,14 +73,6 @@ const (
 	methodCreateGrant  = "CreateEnrollmentGrant"
 	methodRevokeGrant  = "RevokeEnrollmentGrant"
 	methodRevokeDevice = "RevokeDevice"
-
-	actionGrantCreate        = "enrollment_grant.create"
-	actionGrantRevoke        = "enrollment_grant.revoke"
-	actionDeviceRevoke       = "device.revoke"
-	actionDeviceEnroll       = "device.enroll"
-	ActionDeviceRenew        = "device.renew"
-	ActionDeviceActivate     = "device.activate"
-	ActionDeviceRecoveryHold = "device.recovery_hold"
 )
 
 // Config holds resolved control-plane resources. It is not a serialized

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/rpcreason"
 )
@@ -40,11 +41,11 @@ var (
 	ErrInternalState       = rpcreason.Error(connect.CodeInternal, "internal")
 )
 
-func InsertAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action, resourceID, reason string) error {
+func InsertAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action auditkind.Kind, resourceID, reason string) error {
 	return q.InsertAuditEvent(ctx, devicedb.InsertAuditEventParams{
 		ID:         uuid.New(),
 		ActorID:    actor,
-		Action:     action,
+		Action:     action.String(),
 		ResourceID: resourceID,
 		Reason:     reason,
 	})
@@ -71,9 +72,9 @@ func InsertDetailedAudit(ctx context.Context, q *devicedb.Queries, event deviced
 	return q.InsertAuditEvent(ctx, event)
 }
 
-func DispatchSystemAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action string, id uuid.UUID, pairs ...string) error {
+func DispatchSystemAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action auditkind.Kind, id uuid.UUID, pairs ...string) error {
 	return InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
-		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: id.String(),
+		ID: uuid.New(), ActorID: actor, Action: action.String(), ResourceID: id.String(),
 	}, AuditDetails(pairs...))
 }
 
@@ -131,7 +132,7 @@ func (s *Service) revokeLockedDevice(ctx context.Context, q *devicedb.Queries, d
 	if err := q.RevokeGenerations(ctx, deviceID); err != nil {
 		return false, err
 	}
-	if err := InsertAudit(ctx, q, &actor, actionDeviceRevoke, deviceID.String(), reason); err != nil {
+	if err := InsertAudit(ctx, q, &actor, auditkind.DeviceRevoke, deviceID.String(), reason); err != nil {
 		return false, err
 	}
 	return true, nil
@@ -182,6 +183,6 @@ func NotFoundIfMissing(err error) error {
 	return err
 }
 
-func DispatchAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action string, id uuid.UUID, reason string) error {
-	return q.InsertAuditEvent(ctx, devicedb.InsertAuditEventParams{ID: uuid.New(), ActorID: actor, Action: action, ResourceID: id.String(), Reason: reason})
+func DispatchAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action auditkind.Kind, id uuid.UUID, reason string) error {
+	return q.InsertAuditEvent(ctx, devicedb.InsertAuditEventParams{ID: uuid.New(), ActorID: actor, Action: action.String(), ResourceID: id.String(), Reason: reason})
 }

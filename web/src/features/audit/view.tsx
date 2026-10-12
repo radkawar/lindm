@@ -4,8 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ui/select-field";
+import { ListPagination } from "@/components/ui/list-pagination";
 import type { PickerSlot } from "@/components/ui/search-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -17,22 +16,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { Timestamp } from "@/components/ui/timestamp";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { PAGE_SIZES } from "@/lib/list-search";
 import { canPermission } from "@/lib/permissions";
-import { formatTimestamp, freshnessLabel } from "@/lib/time";
+import { auditActionLabel } from "./actions";
 import { auditQueryOptions } from "./queries";
 import { AuditExport } from "./export";
 import { AuditFilters } from "./filters";
-import type { AuditSearch } from "./search";
+import { DEFAULT_AUDIT_VIEW, type AuditSearch } from "./search";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useListPagination } from "@/hooks/use-list-pagination";
-
-const ACTION_LABELS: Record<string, string> = {
-  "device_action.escrow_receipt": "Recovery secret storage confirmed",
-  "identity.authorization_updated": "Organization access policy changed",
-};
 
 export function AuditView({
   search,
@@ -49,32 +44,37 @@ export function AuditView({
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const canOpenDevices = canPermission(principal, "fleet.read", true);
+  const canExport = canPermission(principal, "integrations.manage", true);
   const list = useQuery(auditQueryOptions(lifetime, search));
   const pagination = useListPagination(search, (page) => onSearch({ ...search, ...page }));
   const failure = list.error ? toRpcFailure(list.error) : null;
-  const now = new Date();
+  const clearFilters = () =>
+    onSearch({
+      ...search,
+      view: DEFAULT_AUDIT_VIEW,
+      actorId: "",
+      deviceId: "",
+      from: "",
+      through: "",
+      pageToken: "",
+    });
 
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Audit log"
         description="Who changed what, and why. Secret values are never recorded."
+        onRefresh={() => void list.refetch()}
+        refreshing={list.isFetching}
         actions={
-          <div className="flex flex-wrap gap-2">
+          canExport ? (
             <AuditExport
               search={search}
               accountPicker={accountPicker}
               devicePicker={devicePicker}
               disabled={!list.isSuccess || list.isFetching}
             />
-            <Button
-              variant="outline"
-              onClick={() => void list.refetch()}
-              disabled={list.isFetching}
-            >
-              Refresh
-            </Button>
-          </div>
+          ) : null
         }
       />
       {failure ? <RpcError failure={failure} /> : null}
@@ -84,21 +84,6 @@ export function AuditView({
         devicePicker={devicePicker}
         onChange={(next) => onSearch({ ...search, ...next, pageToken: "" })}
       />
-      <div className="flex flex-wrap items-center gap-2 border-y py-3 text-sm">
-        <Label htmlFor="audit-page-size">Page size</Label>
-        <SelectField
-          id="audit-page-size"
-          className="h-9"
-          value={pageSize}
-          onValueChange={(value) => {
-            const next = Number(value);
-            if (next === 50 || next === 100 || next === 200) {
-              onSearch({ ...search, pageSize: next, pageToken: "" });
-            }
-          }}
-          options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
-        />
-      </div>
       {list.isPending ? (
         <div role="status" className="grid gap-3 border p-4">
           <span className="text-sm text-muted-foreground">Loading audit log…</span>
@@ -109,31 +94,38 @@ export function AuditView({
       ) : null}
       {list.isSuccess && list.data.events.length === 0 ? (
         <EmptyState
-          title="No matching events"
+          title={pageToken ? "No more matching events" : "No matching events"}
           description={
             pageToken
-              ? "No more events match the chosen scope and time range. Return to the previous page or change the filters."
-              : "No audit events match the chosen scope and time range. Choose another range or clear the filters."
+              ? "No more events match these filters and time range."
+              : "No audit events match these filters and time range."
+          }
+          action={
+            pageToken ? (
+              <Button variant="outline" onClick={pagination.previous}>
+                {pagination.previousLabel}
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )
           }
         />
       ) : null}
       {list.data && list.data.events.length > 0 ? (
-        <Table>
+        <Table aria-label="Audit events">
           <TableHeader>
             <TableRow>
-              <TableHead>When</TableHead>
+              <TableHead className="hidden md:table-cell">When</TableHead>
               <TableHead>Action</TableHead>
-              <TableHead>Who</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Device</TableHead>
-              <TableHead>
-                <span className="sr-only">Details</span>
-              </TableHead>
+              <TableHead className="hidden md:table-cell">Who</TableHead>
+              <TableHead className="hidden md:table-cell">Device</TableHead>
+              <TableHead className="hidden md:table-cell">Reason</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.data.events.map((event) => {
-              const occurred = formatTimestamp(event.occurredAt);
               const mode =
                 event.details.mode === "view"
                   ? "View only"
@@ -141,27 +133,34 @@ export function AuditView({
                     ? "Control"
                     : null;
               const duration = auditDuration(event.details.duration_seconds);
+              const who = !event.actorId.trim()
+                ? "System"
+                : event.actorDisplayName.trim()
+                  ? `${event.actorDisplayName}${event.actorId === principal.id ? " (you)" : ""}`
+                  : event.actorId === principal.id
+                    ? "You"
+                    : "Account name unavailable";
+              const hostname = event.deviceHostname.trim() || "Unnamed device";
+              const device =
+                event.targetDeviceId && canOpenDevices ? (
+                  <Link
+                    to="/devices/$deviceId"
+                    params={{ deviceId: event.targetDeviceId }}
+                    className="underline underline-offset-4 hover:text-primary"
+                  >
+                    {hostname}
+                  </Link>
+                ) : event.targetDeviceId ? (
+                  hostname
+                ) : null;
+              const reason = event.reason.trim();
               return (
-                <TableRow key={event.id}>
-                  <TableCell>
-                    {occurred.date ? (
-                      <time dateTime={occurred.utc}>
-                        {occurred.local} ({freshnessLabel(occurred.date, now)})
-                      </time>
-                    ) : (
-                      "Not recorded"
-                    )}
+                <TableRow key={event.id} className="align-top">
+                  <TableCell className="hidden whitespace-nowrap md:table-cell">
+                    <Timestamp value={event.occurredAt} />
                   </TableCell>
-                  <TableCell>
-                    <div>
-                      {event.action.trim()
-                        ? (ACTION_LABELS[event.action.trim()] ??
-                          event.action
-                            .trim()
-                            .replace(/[._]+/g, " ")
-                            .replace(/^./, (first) => first.toUpperCase()))
-                        : "Not recorded"}
-                    </div>
+                  <TableCell className="whitespace-normal break-words md:min-w-56">
+                    <div>{auditActionLabel(event.action, event.deviceActionCapability)}</div>
                     {mode || duration ? (
                       <p className="text-xs text-muted-foreground">
                         {mode}
@@ -169,36 +168,23 @@ export function AuditView({
                         {duration}
                       </p>
                     ) : null}
-                  </TableCell>
-                  <TableCell>
-                    {!event.actorId.trim()
-                      ? "System"
-                      : event.actorDisplayName.trim()
-                        ? `${event.actorDisplayName}${event.actorId === principal.id ? " (you)" : ""}`
-                        : event.actorId === principal.id
-                          ? "You"
-                          : "Account name unavailable"}
-                  </TableCell>
-                  <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                    {event.reason.trim()}
-                  </TableCell>
-                  <TableCell>
-                    {event.targetDeviceId && canOpenDevices ? (
-                      <Link
-                        to="/devices/$deviceId"
-                        params={{ deviceId: event.targetDeviceId }}
-                        className="underline underline-offset-4 hover:text-primary"
-                      >
-                        {event.deviceHostname.trim() || "Unnamed device"}
-                      </Link>
-                    ) : event.targetDeviceId ? (
-                      event.deviceHostname.trim() || "Unnamed device"
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
+                    {/* Below md the row stacks: when, who and device under the action. */}
+                    <div className="grid gap-0.5 text-xs text-muted-foreground md:hidden">
+                      <Timestamp value={event.occurredAt} />
+                      <span>
+                        {who}
+                        {device ? " · " : null}
+                        {device}
+                      </span>
+                      {reason ? <span className="text-foreground">{reason}</span> : null}
+                    </div>
                     <TechnicalDetails
                       items={[
                         { label: "Action code", value: event.action.trim() },
+                        {
+                          label: "Device action capability",
+                          value: event.deviceActionCapability.trim(),
+                        },
                         { label: "Resource ID", value: event.resourceId.trim() },
                         { label: "Actor ID", value: event.actorId.trim() },
                         { label: "Event ID", value: event.id },
@@ -210,24 +196,38 @@ export function AuditView({
                       ]}
                     />
                   </TableCell>
+                  <TableCell className="hidden min-w-36 whitespace-normal break-words md:table-cell">
+                    {who}
+                  </TableCell>
+                  <TableCell className="hidden min-w-32 whitespace-normal break-words md:table-cell">
+                    {device}
+                  </TableCell>
+                  <TableCell className="hidden min-w-48 whitespace-normal break-words md:table-cell">
+                    {reason}
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       ) : null}
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="outline" disabled={pageToken === ""} onClick={pagination.previous}>
-          {pagination.previousLabel}
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.isSuccess || !list.data.nextPageToken || list.isFetching}
-          onClick={() => pagination.next(list.data?.nextPageToken ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
+      <ListPagination
+        label="Audit log pages"
+        previousLabel={pagination.previousLabel}
+        onPrevious={pageToken ? pagination.previous : undefined}
+        onNext={
+          list.isSuccess && list.data.nextPageToken
+            ? () => pagination.next(list.data.nextPageToken)
+            : undefined
+        }
+        busy={list.isFetching}
+        pageSize={pageSize}
+        pageSizes={PAGE_SIZES}
+        onPageSizeChange={(next) => {
+          if (next === 50 || next === 100 || next === 200)
+            onSearch({ ...search, pageSize: next, pageToken: "" });
+        }}
+      />
     </section>
   );
 }

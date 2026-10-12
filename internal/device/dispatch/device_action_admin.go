@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -269,7 +270,7 @@ func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	if err := q.InsertDeviceAction(ctx, devicedb.InsertDeviceActionParams{ID: id, DeviceID: deviceID, GenerationID: generationID, Capability: capability, LuksUuids: luksUUIDs, RequestID: requestID, RequestDigest: digest, RequestDocument: document, ActorID: actor.ID, AuthorizationVersion: int64(authorization.Version()), ApprovalID: approvalID, IntentEnvelope: envelope, IntentDocument: intentBytes, IssuedAt: core.Timestamptz(now), ExpiresAt: core.Timestamptz(expires)}); err != nil {
 		return nil, core.MapErr(err)
 	}
-	if err := core.DispatchAudit(ctx, q, &actor.ID, "device_action.create", id, req.Msg.GetReason()); err != nil {
+	if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.DeviceActionCreate, id, req.Msg.GetReason()); err != nil {
 		return nil, core.MapErr(err)
 	}
 	row, err := q.GetDeviceAction(ctx, id)

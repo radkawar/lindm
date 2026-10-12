@@ -87,8 +87,9 @@ export enum AuditActionCategory {
   REMOTE_SESSIONS = 3,
 
   /**
-   * Actions taken by a person: excludes system events (no actor) and
-   * read-only access bookkeeping such as listing the approvals inbox.
+   * Decisions taken by a person: excludes system events (no actor), session
+   * bookkeeping (sign-in, command-line sign-in, sign-out) and read-only access
+   * bookkeeping such as listing the approvals inbox.
    *
    * @generated from enum value: AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS = 4;
    */

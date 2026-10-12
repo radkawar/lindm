@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/inventory"
 
 	"lindm/internal/device/core"
@@ -539,7 +540,7 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 					t.Fatal(err)
 				}
 				if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events
-					WHERE resource_id = $1 AND action = $2`, deviceID.String(), core.ActionDeviceRenew).Scan(&audits); err != nil {
+					WHERE resource_id = $1 AND action = $2`, deviceID.String(), auditkind.DeviceRenew.String()).Scan(&audits); err != nil {
 					t.Fatal(err)
 				}
 				if total != 3 || active != 1 || overlapping != 1 || revoked != 1 || audits != 2 {

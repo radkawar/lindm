@@ -146,56 +146,64 @@ func (q *Queries) ListAuditDevices(ctx context.Context, arg ListAuditDevicesPara
 const listAuditEvents = `-- name: ListAuditEvents :many
 SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.details,
        f.target_device_id, COALESCE(d.hostname, '')::text AS device_hostname,
-       COALESCE(p.display_name, '')::text AS actor_display_name
+       COALESCE(p.display_name, '')::text AS actor_display_name,
+       COALESCE(da.capability, '')::text AS device_action_capability
 FROM audit_event_search f
 JOIN audit_events a ON a.id = f.event_id
 LEFT JOIN devices d ON d.id = f.target_device_id
 LEFT JOIN principals p ON p.id = f.actor_id
+LEFT JOIN device_actions da ON a.action LIKE 'device\_action.%' AND da.id::text = a.resource_id
 WHERE f.sequence <= $1::bigint
   AND ($2::uuid IS NULL OR f.actor_id = $2)
   AND ($3::uuid IS NULL OR f.target_device_id = $3)
   AND ($4::smallint IN (0, 4) OR f.action_category = $4)
   AND ($4::smallint <> 4
-       OR (f.actor_id IS NOT NULL AND a.action <> 'approval.listed'))
-  AND ($5::timestamptz IS NULL OR f.occurred_at >= $5)
-  AND ($6::timestamptz IS NULL OR f.occurred_at < $6)
-  AND ($7::uuid IS NULL
-       OR (f.occurred_at, f.event_id) < ($8::timestamptz, $7::uuid))
+       OR (f.actor_id IS NOT NULL AND a.action <> ALL($5::text[])))
+  AND ($6::timestamptz IS NULL OR f.occurred_at >= $6)
+  AND ($7::timestamptz IS NULL OR f.occurred_at < $7)
+  AND ($8::uuid IS NULL
+       OR (f.occurred_at, f.event_id) < ($9::timestamptz, $8::uuid))
 ORDER BY f.occurred_at DESC, f.event_id DESC
-LIMIT $9::int
+LIMIT $10::int
 `
 
 type ListAuditEventsParams struct {
-	SnapshotSequence int64
-	ActorID          *uuid.UUID
-	TargetDeviceID   *uuid.UUID
-	ActionCategory   int16
-	OccurredFrom     pgtype.Timestamptz
-	OccurredUntil    pgtype.Timestamptz
-	CursorID         *uuid.UUID
-	CursorOccurredAt pgtype.Timestamptz
-	RowLimit         int32
+	SnapshotSequence     int64
+	ActorID              *uuid.UUID
+	TargetDeviceID       *uuid.UUID
+	ActionCategory       int16
+	HumanExcludedActions []string
+	OccurredFrom         pgtype.Timestamptz
+	OccurredUntil        pgtype.Timestamptz
+	CursorID             *uuid.UUID
+	CursorOccurredAt     pgtype.Timestamptz
+	RowLimit             int32
 }
 
 type ListAuditEventsRow struct {
-	ID               uuid.UUID
-	OccurredAt       pgtype.Timestamptz
-	ActorID          *uuid.UUID
-	Action           string
-	ResourceID       string
-	Reason           string
-	Details          []byte
-	TargetDeviceID   *uuid.UUID
-	DeviceHostname   string
-	ActorDisplayName string
+	ID                     uuid.UUID
+	OccurredAt             pgtype.Timestamptz
+	ActorID                *uuid.UUID
+	Action                 string
+	ResourceID             string
+	Reason                 string
+	Details                []byte
+	TargetDeviceID         *uuid.UUID
+	DeviceHostname         string
+	ActorDisplayName       string
+	DeviceActionCapability string
 }
 
+// device_action_capability names the device action a device_action.* event
+// records; device action capabilities never change after creation.
+// Human actions: a person acted, and the kind is not session or read bookkeeping.
 func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditEvents,
 		arg.SnapshotSequence,
 		arg.ActorID,
 		arg.TargetDeviceID,
 		arg.ActionCategory,
+		arg.HumanExcludedActions,
 		arg.OccurredFrom,
 		arg.OccurredUntil,
 		arg.CursorID,
@@ -220,6 +228,7 @@ func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams
 			&i.TargetDeviceID,
 			&i.DeviceHostname,
 			&i.ActorDisplayName,
+			&i.DeviceActionCapability,
 		); err != nil {
 			return nil, err
 		}

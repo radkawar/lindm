@@ -17,6 +17,7 @@ import (
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	"lindm/internal/advisory/advisorydb"
 	"lindm/internal/advisory/feed"
+	"lindm/internal/auditkind"
 )
 
 const (
@@ -143,7 +144,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	if updated != 1 {
 		return ErrConflict
 	}
-	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: "advisory.feed.ingested", ResourceID: source.GetId(), Context: reason}); err != nil {
+	if err := q.InsertAdvisoryAudit(ctx, advisorydb.InsertAdvisoryAuditParams{ID: uuid.New(), Action: auditkind.AdvisoryFeedIngested.String(), ResourceID: source.GetId(), Context: reason}); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {

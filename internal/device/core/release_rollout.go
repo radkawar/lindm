@@ -11,6 +11,7 @@ import (
 
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	updatev1 "lindm/gen/lindm/update/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
@@ -101,7 +102,7 @@ func (s *Service) SetRollout(ctx context.Context, req *connect.Request[releasema
 		if err := q.InsertReleaseRollout(ctx, devicedb.InsertReleaseRolloutParams{RequestID: id, ActorID: actor.ID, RequestDigest: digest, Ring: req.Msg.GetRing(), ExpectedGeneration: int64(req.Msg.GetExpectedGeneration()), Paused: req.Msg.GetPaused(), EligiblePercentage: int32(req.Msg.GetEligiblePercentage()), Reason: req.Msg.GetReason()}); err != nil {
 			return err
 		}
-		return InsertAudit(ctx, q, &actor.ID, "release.rollout.request", id.String(), req.Msg.GetReason())
+		return InsertAudit(ctx, q, &actor.ID, auditkind.ReleaseRolloutRequest, id.String(), req.Msg.GetReason())
 	})
 	if err != nil {
 		return nil, MapErr(err)
@@ -133,7 +134,7 @@ func (s *Service) SetRollout(ctx context.Context, req *connect.Request[releasema
 		if err := q.CompleteReleaseRollout(ctx, devicedb.CompleteReleaseRolloutParams{RequestID: id, PublishedChannel: encoded}); err != nil {
 			return err
 		}
-		return InsertAudit(ctx, q, &actor.ID, "release.rollout.published", id.String(), row.Reason)
+		return InsertAudit(ctx, q, &actor.ID, auditkind.ReleaseRolloutPublished, id.String(), row.Reason)
 	})
 	if err != nil {
 		return nil, MapErr(err)

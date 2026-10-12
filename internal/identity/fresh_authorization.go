@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -302,7 +303,7 @@ func (s *Service) authorizeFreshAlone(ctx context.Context, actorID uuid.UUID, pe
 		if decision.Kind != accessOK || !Authorize(principal, permission) {
 			denied = ErrAuthorizationDenied
 			if snapshot.BreakGlass {
-				return s.insertSystemAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "permission denied: "+string(permission))
+				return s.insertSystemAudit(ctx, q, &actorID, auditkind.IdentityBreakGlassDenied, principalResource(actorID), "permission denied: "+string(permission))
 			}
 			return nil
 		}
@@ -315,7 +316,7 @@ func (s *Service) authorizeFreshAlone(ctx context.Context, actorID uuid.UUID, pe
 			deadline, err := q.ActiveBreakGlassDeadline(ctx, actorID)
 			if err != nil {
 				denied = ErrAuthorizationDenied
-				return s.insertSystemAudit(ctx, q, &actorID, "identity.break_glass_denied", principalResource(actorID), "active emergency session required")
+				return s.insertSystemAudit(ctx, q, &actorID, auditkind.IdentityBreakGlassDenied, principalResource(actorID), "active emergency session required")
 			}
 			if deadline.Time.Before(expires) {
 				expires = deadline.Time
@@ -371,7 +372,7 @@ func (s *Service) LockAuthorizationShared(ctx context.Context, tx pgx.Tx, author
 func (s *Service) lockAuthorization(ctx context.Context, tx pgx.Tx, authorization *Authorization, permission Permission, shared bool) (result error) {
 	defer func() {
 		if result != nil && s != nil && authorization != nil && authorization.service == s && authorization.breakGlass {
-			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, "identity.break_glass_denied", "", "worker authorization fence denied: "+string(permission)))
+			result = errors.Join(result, s.emergencyAudit(ctx, authorization.actorID, auditkind.IdentityBreakGlassDenied, "", "worker authorization fence denied: "+string(permission)))
 		}
 	}()
 	if s == nil || tx == nil || authorization == nil || authorization.service != s || authorization.actorID == uuid.Nil || authorization.version <= 0 || authorization.role == "" || authorization.permission != permission || !Authorize(authorization.principal, permission) {

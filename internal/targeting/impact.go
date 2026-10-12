@@ -16,6 +16,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -161,7 +162,7 @@ func (s *Store) SaveImpact(ctx context.Context, tx pgx.Tx, p identity.Principal,
 		return nil, err
 	}
 	out := new(adminv1.PutTargetAssignmentResponse)
-	const method = "targeting.assignment.save_reviewed"
+	method := auditkind.TargetingAssignmentSaveReviewed
 	if ok, err := receipt(ctx, q, p, r.RequestId, method, r, out); ok || err != nil {
 		return out, err
 	}

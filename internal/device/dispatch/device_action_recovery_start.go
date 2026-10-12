@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -232,7 +233,7 @@ func (s *Service) mintRecoveryStart(ctx context.Context, tx pgx.Tx, q *devicedb.
 	if err := q.SetDeviceActionGrant(ctx, devicedb.SetDeviceActionGrantParams{ID: row.ActionID, ChallengeProof: req.Msg.GetRequestProof(), ChallengeDocument: challengeDocument, StartGrantEnvelope: envelope, StartAuthorizedAt: core.Timestamptz(now)}); err != nil {
 		return nil, core.MapErr(err)
 	}
-	if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_start", action.ID, "authority", "fresh_two_human_recovery_authority"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, auditkind.DeviceActionRecoveryStart, action.ID, "authority", "fresh_two_human_recovery_authority"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := s.Identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {

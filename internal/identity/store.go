@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -44,7 +45,7 @@ type authWrite struct {
 	brokerSubject    string
 	groups           []string
 	revoke           bool
-	auditAction      string
+	auditAction      auditkind.Kind
 	auditReason      string
 	conflict         bool
 }
@@ -277,7 +278,7 @@ func (s *Service) planObservation(row identitydb.Principal, existing identitydb.
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
 		w.revoke = true
-		w.auditAction = auditLineageDenied
+		w.auditAction = auditkind.IdentityLineageDenied
 		w.auditReason = reasonConflict
 	case !obs.Found:
 		w.enabled = false
@@ -286,14 +287,14 @@ func (s *Service) planObservation(row identitydb.Principal, existing identitydb.
 		w.source, w.deactivatedAt = s.tombstone(row.DeactivationSource, prevAt, prevDeactivated, w.observedAt)
 		w.deactivated = true
 		w.revoke = true
-		w.auditAction = auditDisabled
+		w.auditAction = auditkind.IdentityDisabled
 		w.auditReason = reasonAbsent
 	case !obs.Direct || obs.UserID != row.Subject:
 		w.enabled = false
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
 		w.revoke = true
-		w.auditAction = auditLineageDenied
+		w.auditAction = auditkind.IdentityLineageDenied
 		w.auditReason = reasonUnqualified
 		if row.DeactivationSource == deactivationSCIM {
 			w.deactivated = true
@@ -309,7 +310,7 @@ func (s *Service) planObservation(row identitydb.Principal, existing identitydb.
 			s.copyLineage(&w, existing, missing, row)
 		}
 		if !prevDeactivated {
-			w.auditAction = auditDisabled
+			w.auditAction = auditkind.IdentityDisabled
 			w.auditReason = reasonDisabled
 		}
 	default:
@@ -328,7 +329,7 @@ func (s *Service) planEnabledObservation(w *authWrite, row identitydb.Principal,
 		w.observed = true
 		w.observedAt = obs.AcquiredAt
 		w.revoke = true
-		w.auditAction = auditLineageDenied
+		w.auditAction = auditkind.IdentityLineageDenied
 		w.auditReason = reasonConflict
 		return
 	}
@@ -344,12 +345,12 @@ func (s *Service) planEnabledObservation(w *authWrite, row identitydb.Principal,
 		w.deactivated = true
 		w.source = deactivationSCIM
 		w.revoke = true
-		w.auditAction = auditLineageDenied
+		w.auditAction = auditkind.IdentityLineageDenied
 		w.auditReason = reasonTombstone
 		return
 	}
 	if prevDeactivated {
-		w.auditAction = auditReactivated
+		w.auditAction = auditkind.IdentityReactivated
 		w.auditReason = reasonReactivated
 	}
 	w.enabled = true
@@ -397,11 +398,11 @@ func (s *Service) revokeAndAudit(ctx context.Context, q *identitydb.Queries, id 
 			return s.dbErr(err)
 		}
 	}
-	if w.auditAction == "" && revoked > 0 {
-		w.auditAction = auditDisabled
+	if w.auditAction == (auditkind.Kind{}) && revoked > 0 {
+		w.auditAction = auditkind.IdentityDisabled
 		w.auditReason = reasonDisabled
 	}
-	if w.auditAction != "" && (w.auditAction != auditDisabled || !prevDeactivated || revoked > 0) {
+	if w.auditAction != (auditkind.Kind{}) && (w.auditAction != auditkind.IdentityDisabled || !prevDeactivated || revoked > 0) {
 		return s.insertSystemAudit(ctx, q, &id, w.auditAction, principalResource(id), w.auditReason)
 	}
 	return nil
@@ -540,7 +541,7 @@ func (s *Service) revokePrincipal(ctx context.Context, id uuid.UUID) error {
 		if err != nil {
 			return s.dbErr(err)
 		}
-		if n == 0 || dec.AuditAction == "" {
+		if n == 0 || dec.AuditAction == (auditkind.Kind{}) {
 			return nil
 		}
 		return s.insertSystemAudit(ctx, q, &id, dec.AuditAction, principalResource(id), dec.AuditReason)
@@ -574,14 +575,14 @@ func (s *Service) logout(ctx context.Context, cookie string, principalID uuid.UU
 			if err := s.bumpLocalAuthorization(ctx, q, principalID, account.Role); err != nil {
 				return s.dbErr(err)
 			}
-			return s.insertAudit(ctx, q, &principalID, "identity.break_glass_terminated", principalResource(principalID), session.IncidentReason)
+			return s.insertAudit(ctx, q, &principalID, auditkind.IdentityBreakGlassTerminated, principalResource(principalID), session.IncidentReason)
 		}
-		return s.insertAudit(ctx, q, &principalID, auditLogout, principalResource(principalID), "")
+		return s.insertAudit(ctx, q, &principalID, auditkind.IdentityLogout, principalResource(principalID), "")
 	})
 }
 
-func (s *Service) insertAudit(ctx context.Context, q *identitydb.Queries, actor *uuid.UUID, action, resource, reason string) error {
-	if !boundedText(action, 1, 128) || !boundedText(resource, 1, 512) || !boundedText(reason, 0, 512) {
+func (s *Service) insertAudit(ctx context.Context, q *identitydb.Queries, actor *uuid.UUID, action auditkind.Kind, resource, reason string) error {
+	if action == (auditkind.Kind{}) || !boundedText(resource, 1, 512) || !boundedText(reason, 0, 512) {
 		return errStore
 	}
 	id, err := uuid.NewRandom()
@@ -591,20 +592,20 @@ func (s *Service) insertAudit(ctx context.Context, q *identitydb.Queries, actor 
 	return s.dbErr(q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{
 		ID:         id,
 		ActorID:    actor,
-		Action:     action,
+		Action:     action.String(),
 		ResourceID: resource,
 		Reason:     reason,
 	}))
 }
 
 // insertSystemAudit records generated context, not an operator-authored reason.
-func (s *Service) insertSystemAudit(ctx context.Context, q *identitydb.Queries, actor *uuid.UUID, action, resource, context string) error {
+func (s *Service) insertSystemAudit(ctx context.Context, q *identitydb.Queries, actor *uuid.UUID, action auditkind.Kind, resource, context string) error {
 	details, err := json.Marshal(map[string]string{"context": context})
 	if err != nil {
 		return err
 	}
 	return s.dbErr(q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{
-		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: resource, Details: details,
+		ID: uuid.New(), ActorID: actor, Action: action.String(), ResourceID: resource, Details: details,
 	}))
 }
 
@@ -755,7 +756,7 @@ func (s *Service) persistAuthorization(ctx context.Context, q *identitydb.Querie
 	if err != nil {
 		return 0, s.dbErr(err)
 	}
-	if err := s.insertSystemAudit(ctx, q, &row.ID, auditAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(row.AuthorizationRole, nextRole)); err != nil {
+	if err := s.insertSystemAudit(ctx, q, &row.ID, auditkind.IdentityAuthorizationChanged, principalResource(row.ID), authorizationChangeReason(row.AuthorizationRole, nextRole)); err != nil {
 		return 0, err
 	}
 	return version, nil

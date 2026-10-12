@@ -32,8 +32,9 @@ const (
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS AuditActionCategory = 1
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS  AuditActionCategory = 2
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS      AuditActionCategory = 3
-	// Actions taken by a person: excludes system events (no actor) and
-	// read-only access bookkeeping such as listing the approvals inbox.
+	// Decisions taken by a person: excludes system events (no actor), session
+	// bookkeeping (sign-in, command-line sign-in, sign-out) and read-only access
+	// bookkeeping such as listing the approvals inbox.
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS AuditActionCategory = 4
 )
 

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -267,7 +268,7 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 		if err != nil {
 			return s.dbErr(err)
 		}
-		if err := s.insertSystemAudit(ctx, q, &actor, "approval.created", row.ID.String(), binding.action); err != nil {
+		if err := s.insertSystemAudit(ctx, q, &actor, auditkind.ApprovalCreated, row.ID.String(), binding.action); err != nil {
 			return err
 		}
 		projection, err = q.GetApprovalProjection(ctx, row.ID)
@@ -424,7 +425,7 @@ func (s *Service) LockAndConsumeApproval(ctx context.Context, tx pgx.Tx, pair *A
 		return ErrAuthorizationExpired
 	}
 	actor := pair.requester.ActorID()
-	return s.insertSystemAudit(ctx, q, &actor, "approval.consumed", row.ID.String(), row.Action)
+	return s.insertSystemAudit(ctx, q, &actor, auditkind.ApprovalConsumed, row.ID.String(), row.Action)
 }
 
 func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, approve bool, reason string, scope ApprovalScope, admit ApprovalAdmission) (*adminv1.Approval, error) {
@@ -447,9 +448,9 @@ func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, appro
 	if row.DeviceID != nil {
 		pair.binding.target = *row.DeviceID
 	}
-	state, action := "rejected", "approval.rejected"
+	state, action := "rejected", auditkind.ApprovalRejected
 	if approve {
-		state, action = "approved", "approval.approved"
+		state, action = "approved", auditkind.ApprovalApproved
 	}
 	var projection approvalProjection
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
@@ -538,7 +539,7 @@ func (s *Service) WithdrawApproval(ctx context.Context, actor, id uuid.UUID, rea
 		if _, err := q.WithdrawApproval(ctx, identitydb.WithdrawApprovalParams{ID: id, RequesterID: actor, Reason: reason}); err != nil {
 			return s.dbErr(err)
 		}
-		if err := s.insertAudit(ctx, q, &actor, "approval.withdrawn", id.String(), reason); err != nil {
+		if err := s.insertAudit(ctx, q, &actor, auditkind.ApprovalWithdrawn, id.String(), reason); err != nil {
 			return err
 		}
 		projection, err = q.GetApprovalProjection(ctx, id)

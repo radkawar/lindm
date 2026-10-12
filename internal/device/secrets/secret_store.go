@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -172,7 +173,7 @@ func (s *Service) CreateSecret(ctx context.Context, req *connect.Request[adminv1
 			if err := q.InsertManagedSecretVersion(ctx, devicedb.InsertManagedSecretVersionParams{SecretID: id, Version: 1, RequestID: requestID, BindingDocument: binding, KeyID: record.KeyID, WrappedKey: record.WrappedKey, Ciphertext: record.Ciphertext, Reason: req.Msg.GetReason(), CreatedBy: actor.ID}); err != nil {
 				return err
 			}
-			if err := core.DispatchAudit(ctx, q, &actor.ID, "secret.created", id, req.Msg.GetReason()); err != nil {
+			if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.SecretCreated, id, req.Msg.GetReason()); err != nil {
 				return err
 			}
 		}
@@ -245,7 +246,7 @@ func (s *Service) RotateSecret(ctx context.Context, req *connect.Request[adminv1
 			if advanced != 1 {
 				return errSecretVersionConflict
 			}
-			if err := core.DispatchAudit(ctx, q, &actor.ID, "secret.rotated", id, req.Msg.GetReason()); err != nil {
+			if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.SecretRotated, id, req.Msg.GetReason()); err != nil {
 				return err
 			}
 		}
@@ -403,7 +404,7 @@ func (s *Service) RevealSecret(ctx context.Context, req *connect.Request[adminv1
 		return nil, core.MapErr(core.NotFoundIfMissing(err))
 	}
 	// Audit admission commits before plaintext is released, including every replay.
-	if err := core.DispatchAudit(ctx, q, &actor.ID, "secret.reveal", id, req.Msg.GetReason()); err != nil {
+	if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.SecretReveal, id, req.Msg.GetReason()); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := s.LockActionApproval(ctx, tx, consumption, authorization, identity.PermissionRevealSecrets); err != nil {

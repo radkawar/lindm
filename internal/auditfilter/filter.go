@@ -1,6 +1,7 @@
 // Package auditfilter normalizes shared audit selections for SQL and cursor
 // binding. Schema validation belongs to the RPC validators; category membership
-// is captured by the database's audit_action_category function.
+// is captured by the database's audit_action_category function, except the
+// human-actions view's bookkeeping exclusions, which come from auditkind.
 package auditfilter
 
 import (
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	auditv1 "lindm/gen/lindm/audit/v1"
+	"lindm/internal/auditkind"
 )
 
 // Selection is the normalized SQL input, not a second validation schema.
@@ -23,7 +25,9 @@ type Selection struct {
 	TargetDeviceID *uuid.UUID
 	OccurredFrom   pgtype.Timestamptz
 	OccurredUntil  pgtype.Timestamptz
-	Digest         [sha256.Size]byte
+	// Kinds the human-actions category omits even when a person caused them.
+	HumanExcludedActions []string
+	Digest               [sha256.Size]byte
 }
 
 // Normalize accepts a schema-validated filter. Absent and empty filters select
@@ -43,7 +47,7 @@ func Normalize(filter *auditv1.AuditFilter) (Selection, error) {
 	} else {
 		filter = proto.CloneOf(filter)
 	}
-	selection := Selection{Filter: filter}
+	selection := Selection{Filter: filter, HumanExcludedActions: auditkind.Strings(auditkind.HumanActionsExcluded()...)}
 	if filter.ActorId != nil {
 		id, err := uuid.Parse(filter.GetActorId())
 		if err != nil {

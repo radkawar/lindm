@@ -4,6 +4,7 @@ package device
 
 import (
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	auditv1 "lindm/gen/lindm/audit/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 )
 
@@ -189,6 +191,59 @@ func TestAuditCategoriesUseActualActionsAndDestructiveCapabilities(t *testing.T)
 	slices.Sort(got)
 	if !slices.Equal(got, actions) {
 		t.Fatalf("remote lifecycle selection = %v", got)
+	}
+}
+
+// Signing in and out are things a person did, but not decisions: the default
+// "Human actions" view must not list them, while "All actions" keeps them.
+func TestHumanActionsOmitSessionAndReadBookkeeping(t *testing.T) {
+	f := newEnrolled(t, 0)
+	person := insertPrincipal(t, f.ctx, f.conn, identity.RoleAdmin)
+	for _, kind := range []auditkind.Kind{auditkind.IdentityLogin, auditkind.IdentityCLILogin, auditkind.IdentityLogout, auditkind.ApprovalListed, auditkind.DeviceGroupSet} {
+		if _, err := f.conn.Exec(f.ctx, `INSERT INTO audit_events(actor_id,action,resource_id) VALUES($1,$2,'human-view')`, person.ID, kind.String()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list := func(category auditv1.AuditActionCategory) []string {
+		t.Helper()
+		page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{ActorId: new(person.ID.String()), ActionCategory: category}}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, event := range page.Msg.Events {
+			got = append(got, event.GetAction())
+		}
+		slices.Sort(got)
+		return got
+	}
+	if got := list(auditv1.AuditActionCategory_AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS); !slices.Equal(got, []string{"device.group_set"}) {
+		t.Fatalf("human actions = %v, want only the decision", got)
+	}
+	if got := list(auditv1.AuditActionCategory_AUDIT_ACTION_CATEGORY_UNSPECIFIED); len(got) != 5 {
+		t.Fatalf("all actions = %v, want every recorded kind", got)
+	}
+}
+
+// A device action row names what was requested, not only "device action".
+func TestAuditEventsNameTheDeviceActionCapability(t *testing.T) {
+	f := newDeviceActionFixture(t)
+	action := f.create(t, f.request(refreshActionSpec()))
+	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{TargetDeviceId: &f.deviceID}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, event := range page.Msg.Events {
+		switch {
+		case event.GetAction() == auditkind.DeviceActionCreate.String() && event.GetResourceId() == action.GetActionId():
+			found = event.GetDeviceActionCapability() == "device.refresh-inventory.v1"
+		case !strings.HasPrefix(event.GetAction(), "device_action.") && event.GetDeviceActionCapability() != "":
+			t.Fatalf("%s carries a device action capability %q", event.GetAction(), event.GetDeviceActionCapability())
+		}
+	}
+	if !found {
+		t.Fatalf("device_action.create for %s does not name device.refresh-inventory.v1: %v", action.GetActionId(), page.Msg.Events)
 	}
 }
 

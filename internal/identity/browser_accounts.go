@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -62,7 +63,7 @@ func (c *BrowserAccounts) CreateAccount(ctx context.Context, request *authv1.Cre
 		if err != nil {
 			return err
 		}
-		return c.service.insertAudit(ctx, q, &actor.ID, "identity.local_account_created", principalResource(enrollment.AccountID), "")
+		return c.service.insertAudit(ctx, q, &actor.ID, auditkind.IdentityLocalAccountCreated, principalResource(enrollment.AccountID), "")
 	})
 	if err != nil {
 		return nil, err
@@ -112,6 +113,6 @@ func (c *BrowserAccounts) UpdateAccount(ctx context.Context, request *authv1.Upd
 		if err := c.service.invalidateLocalAccount(ctx, q, id, role); err != nil {
 			return err
 		}
-		return c.service.insertSystemAudit(ctx, q, &actor.ID, "identity.local_account_updated", principalResource(id), "sessions and pending authority revoked")
+		return c.service.insertSystemAudit(ctx, q, &actor.ID, auditkind.IdentityLocalAccountUpdated, principalResource(id), "sessions and pending authority revoked")
 	})
 }

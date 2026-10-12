@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 	"lindm/internal/rpcreason"
@@ -119,7 +120,7 @@ func (s *Service) CreateProvisioningToken(ctx context.Context, req *connect.Requ
 		if err := q.InsertProvisioningToken(ctx, devicedb.InsertProvisioningTokenParams{ID: id, TokenHash: hash, CreatedBy: actor.ID, AuthorizationVersion: int64(authorization.Version()), CreatedAt: Timestamptz(now), ExpiresAt: Timestamptz(expires), MaxUses: int32(req.Msg.GetMaxUses()), ApprovalRequired: req.Msg.GetApprovalRequired(), Assignment: encoded, Reason: req.Msg.GetReason(), Name: req.Msg.GetName()}); err != nil {
 			return nil, MapErr(err)
 		}
-		if err := InsertAudit(ctx, q, &actor.ID, "provisioning_token.create", id.String(), req.Msg.GetReason()); err != nil {
+		if err := InsertAudit(ctx, q, &actor.ID, auditkind.ProvisioningTokenCreate, id.String(), req.Msg.GetReason()); err != nil {
 			return nil, MapErr(err)
 		}
 		if err := CompleteAdmin(ctx, q, actor.ID, "CreateProvisioningToken", requestID, id, uuid.Nil, expires); err != nil {
@@ -242,7 +243,7 @@ func (s *Service) RevokeProvisioningToken(ctx context.Context, req *connect.Requ
 			if err := q.RevokePendingProvisioningEnrollments(ctx, id); err != nil {
 				return err
 			}
-			if err := InsertAudit(ctx, q, &actor.ID, "provisioning_token.revoke", id.String(), req.Msg.GetReason()); err != nil {
+			if err := InsertAudit(ctx, q, &actor.ID, auditkind.ProvisioningTokenRevoke, id.String(), req.Msg.GetReason()); err != nil {
 				return err
 			}
 		}

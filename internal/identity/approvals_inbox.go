@@ -15,6 +15,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -125,7 +126,7 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped inbox")
+		return s.insertSystemAudit(ctx, q, &actor, auditkind.ApprovalListed, principalResource(actor), "scoped inbox")
 	})
 	if err != nil {
 		return nil, "", err
@@ -251,7 +252,7 @@ func (s *Service) CountOpenApprovals(ctx context.Context, actor uuid.UUID) (pend
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped open inbox count")
+		return s.insertSystemAudit(ctx, q, &actor, auditkind.ApprovalListed, principalResource(actor), "scoped open inbox count")
 	})
 	return counts.Pending, counts.ReadyToRun, err
 }

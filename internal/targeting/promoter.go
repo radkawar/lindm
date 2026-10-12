@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -204,5 +205,5 @@ func pauseRollout(ctx context.Context, q *targetingdb.Queries, row targetingdb.R
 	if err := q.InsertRolloutEvent(ctx, targetingdb.InsertRolloutEventParams{ID: uuid.New(), RolloutID: row.ID, Revision: row.Revision + 1, Reason: reason}); err != nil {
 		return err
 	}
-	return q.TargetingAudit(ctx, targetingdb.TargetingAuditParams{ID: uuid.New(), Action: "targeting.rollout.pause", ResourceID: row.ID.String(), Context: reason})
+	return q.TargetingAudit(ctx, targetingdb.TargetingAuditParams{ID: uuid.New(), Action: auditkind.TargetingRolloutPause.String(), ResourceID: row.ID.String(), Context: reason})
 }

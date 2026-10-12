@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/secrets"
 
 	"lindm/internal/device/core"
@@ -419,7 +420,7 @@ func (s *Service) mintResourceWork(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	}
 	// The audit append holds the deployment-wide chain head until commit, so it
 	// is the transaction's last statement.
-	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, "resource_action.mint", id, "source", "resource_assignment"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, &head.ActorID, auditkind.ResourceActionMint, id, "source", "resource_assignment"); err != nil {
 		return nil, nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {

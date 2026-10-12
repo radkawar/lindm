@@ -13,6 +13,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/auditfilter"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 )
@@ -94,7 +95,7 @@ func (s *Service) CreateEnrollmentGrant(ctx context.Context, req *connect.Reques
 		}); err != nil {
 			return err
 		}
-		if err := InsertAudit(ctx, q, &actor.ID, actionGrantCreate, grantID.String(), req.Msg.GetReason()); err != nil {
+		if err := InsertAudit(ctx, q, &actor.ID, auditkind.EnrollmentGrantCreate, grantID.String(), req.Msg.GetReason()); err != nil {
 			return err
 		}
 		return CompleteAdmin(ctx, q, actor.ID, methodCreateGrant, requestID, grantID, uuid.Nil, expiresAt)
@@ -166,7 +167,7 @@ func (s *Service) RevokeEnrollmentGrant(ctx context.Context, req *connect.Reques
 			if revoked != 1 {
 				return ErrInternalState
 			}
-			if err := InsertAudit(ctx, q, &actor.ID, actionGrantRevoke, grantID.String(), req.Msg.GetReason()); err != nil {
+			if err := InsertAudit(ctx, q, &actor.ID, auditkind.EnrollmentGrantRevoke, grantID.String(), req.Msg.GetReason()); err != nil {
 				return err
 			}
 		}
@@ -270,6 +271,7 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 		RowLimit: limit + 1, ActorID: selection.ActorID, TargetDeviceID: selection.TargetDeviceID,
 		ActionCategory: int16(selection.Filter.GetActionCategory()),
 		OccurredFrom:   selection.OccurredFrom, OccurredUntil: selection.OccurredUntil,
+		HumanExcludedActions: selection.HumanExcludedActions,
 	}
 	if req.Msg.GetPageToken() != "" {
 		cursor, err := decodeAuditCursor(req.Msg.GetPageToken(), actor.ID, selection.Digest)
@@ -313,16 +315,17 @@ func (s *Service) ListAuditEvents(ctx context.Context, req *connect.Request[admi
 			targetDeviceID = new(row.TargetDeviceID.String())
 		}
 		events = append(events, &adminv1.AuditEvent{
-			Id:               row.ID.String(),
-			OccurredAt:       timestamppb.New(occurred),
-			ActorId:          GenerationString(row.ActorID),
-			ActorDisplayName: row.ActorDisplayName,
-			Action:           row.Action,
-			ResourceId:       row.ResourceID,
-			Reason:           row.Reason,
-			TargetDeviceId:   targetDeviceID,
-			DeviceHostname:   row.DeviceHostname,
-			Details:          details,
+			Id:                     row.ID.String(),
+			OccurredAt:             timestamppb.New(occurred),
+			ActorId:                GenerationString(row.ActorID),
+			ActorDisplayName:       row.ActorDisplayName,
+			Action:                 row.Action,
+			ResourceId:             row.ResourceID,
+			Reason:                 row.Reason,
+			TargetDeviceId:         targetDeviceID,
+			DeviceHostname:         row.DeviceHostname,
+			Details:                details,
+			DeviceActionCapability: row.DeviceActionCapability,
 		})
 	}
 	return connect.NewResponse(&adminv1.ListAuditEventsResponse{Events: events, NextPageToken: next}), nil

@@ -17,6 +17,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
@@ -155,7 +156,7 @@ func (s *Service) issueOfflineEnrollmentAuthorization(ctx context.Context, tx pg
 	if err := q.InsertOfflineEnrollmentAuthorization(ctx, devicedb.InsertOfflineEnrollmentAuthorizationParams{ID: requestID, TokenID: token.ID, ActorID: actor.ID, RequestSha256: digest[:], AuthorizationEnvelope: document, ExpiresAt: Timestamptz(expires)}); err != nil {
 		return nil, MapErr(err)
 	}
-	if err := InsertAudit(ctx, q, &actor.ID, "enrollment.offline_authorization", requestID.String(), req.Msg.GetReason()); err != nil {
+	if err := InsertAudit(ctx, q, &actor.ID, auditkind.EnrollmentOfflineAuthorization, requestID.String(), req.Msg.GetReason()); err != nil {
 		return nil, MapErr(err)
 	}
 	if err := CompleteAdmin(ctx, q, actor.ID, "CreateOfflineEnrollmentAuthorization", requestID, requestID, uuid.Nil, expires); err != nil {
@@ -337,7 +338,7 @@ func (s *Service) ExportOfflineEnrollmentResponse(ctx context.Context, req *conn
 	if _, err := verifier.VerifyOfflineResponse(ctx, snapshot.Root, snapshot.Delegation, envelope, now); err != nil {
 		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "offline_enrollment_start_signer_not_delegated")
 	}
-	if err := InsertAudit(ctx, q, &actor.ID, "enrollment.offline_response", id.String(), req.Msg.GetReason()); err != nil {
+	if err := InsertAudit(ctx, q, &actor.ID, auditkind.EnrollmentOfflineResponse, id.String(), req.Msg.GetReason()); err != nil {
 		return nil, MapErr(err)
 	}
 	if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionManageEnrollment); err != nil {

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 )
 
@@ -120,7 +121,7 @@ func (s *Service) issueEnrollment(ctx context.Context, q *devicedb.Queries, gran
 	if consumed != 1 {
 		return nil, uuid.Nil, uuid.Nil, ErrInternalState
 	}
-	if err := InsertAudit(ctx, q, nil, actionDeviceEnroll, deviceID.String(), grant.Reason); err != nil {
+	if err := InsertAudit(ctx, q, nil, auditkind.DeviceEnroll, deviceID.String(), grant.Reason); err != nil {
 		return nil, uuid.Nil, uuid.Nil, err
 	}
 	return issued, deviceID, generation, nil

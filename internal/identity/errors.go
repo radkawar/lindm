@@ -34,15 +34,6 @@ const (
 	connectorEntra    = "entra"
 	deactivationSCIM  = "scim"
 
-	auditOwnerBootstrapped    = "identity.owner_bootstrapped"
-	auditLogin                = "identity.login"
-	auditLoginDenied          = "identity.login_denied"
-	auditLogout               = "identity.logout"
-	auditDisabled             = "identity.disabled"
-	auditReactivated          = "identity.reactivated"
-	auditLineageDenied        = "identity.lineage_denied"
-	auditAuthorizationChanged = "identity.authorization_changed"
-
 	reasonInitialOwner = "initial owner"
 	reasonDisabled     = "authoritative directory reported disabled"
 	reasonAbsent       = "authoritative directory user absent"

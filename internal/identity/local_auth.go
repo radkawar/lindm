@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -92,9 +93,9 @@ func (s *Service) beginLocalLogin(ctx context.Context, request *authv1.LocalLogi
 					return s.dbErr(err)
 				}
 			}
-			action := "identity.local_login_denied"
+			action := auditkind.IdentityLocalLoginDenied
 			if !s.localPrimary {
-				action = "identity.break_glass_denied"
+				action = auditkind.IdentityBreakGlassDenied
 			}
 			return s.insertSystemAudit(ctx, q, &account.ID, action, principalResource(account.ID), "local authentication denied")
 		}
@@ -203,9 +204,9 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 		if resultErr != nil && kind == "login" {
 			failureCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 			defer cancel()
-			action := "identity.local_mfa_denied"
+			action := auditkind.IdentityLocalMFADenied
 			if !s.localPrimary {
-				action = "identity.break_glass_denied"
+				action = auditkind.IdentityBreakGlassDenied
 			}
 			resultErr = errors.Join(resultErr, s.emergencyAudit(failureCtx, ceremony.AccountID, action, "", "WebAuthn ceremony denied"))
 		}
@@ -261,7 +262,7 @@ func (s *Service) finishLocalCeremony(ctx context.Context, request *authv1.WebAu
 					return s.dbErr(err)
 				}
 			}
-			return s.insertSystemAudit(ctx, q, &account.ID, "identity.local_mfa_denied", principalResource(account.ID), "WebAuthn verification denied")
+			return s.insertSystemAudit(ctx, q, &account.ID, auditkind.IdentityLocalMFADenied, principalResource(account.ID), "WebAuthn verification denied")
 		}
 		data, err := json.Marshal(credential)
 		if err != nil {
@@ -321,7 +322,7 @@ func (s *Service) completeLocalEnrollment(ctx context.Context, q *identitydb.Que
 	if err = q.SetLocalPassword(ctx, identitydb.SetLocalPasswordParams{ID: accountID, PasswordHash: ceremony.PasswordHash}); err != nil {
 		return s.dbErr(err)
 	}
-	return s.insertAudit(ctx, q, &accountID, "identity.local_enrolled", principalResource(accountID), "")
+	return s.insertAudit(ctx, q, &accountID, auditkind.IdentityLocalEnrolled, principalResource(accountID), "")
 }
 
 // startLocalSession records the verified credential's updated state, clears
@@ -339,11 +340,11 @@ func (s *Service) startLocalSession(ctx context.Context, q *identitydb.Queries, 
 	}
 	lifetime := 12 * time.Hour
 	reason := ""
-	action := auditLogin
+	action := auditkind.IdentityLogin
 	if !s.localPrimary {
 		lifetime = s.breakGlass.GetMaxSessionLifetime().AsDuration()
 		reason = ceremony.IncidentReason
-		action = "identity.break_glass_activated"
+		action = auditkind.IdentityBreakGlassActivated
 	}
 	if err = q.InsertLocalSession(ctx, identitydb.InsertLocalSessionParams{TokenHash: sessionHash(cookie), PrincipalID: accountID, ExpiresAt: pgStamp(now.Add(lifetime), true), BreakGlass: !s.localPrimary, IncidentReason: reason}); err != nil {
 		return "", s.dbErr(err)

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -253,7 +254,7 @@ func (s *Service) mintRecoveryHandoff(ctx context.Context, tx pgx.Tx, q *deviced
 	if err := q.MarkDeviceActionOutcomeUnknown(ctx, id); err != nil {
 		return nil, core.MapErr(err)
 	}
-	if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, "device_action.recovery_handoff", id, "authority", "fresh_two_human_boot_authority"); err != nil {
+	if err := core.DispatchSystemAudit(ctx, q, &action.ActorID, auditkind.DeviceActionRecoveryHandoff, id, "authority", "fresh_two_human_boot_authority"); err != nil {
 		return nil, core.MapErr(err)
 	}
 	if err := s.Identity.LockAndConsumeApproval(ctx, tx, pair, s.recoveryApprovalScope); err != nil {

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -202,7 +203,7 @@ func (s *Service) handleResetAccount(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
-		return s.insertSystemAudit(r.Context(), q, &actor.ID, "identity.local_credentials_reset", principalResource(id), "credentials, sessions and pending authority revoked")
+		return s.insertSystemAudit(r.Context(), q, &actor.ID, auditkind.IdentityLocalCredentialsReset, principalResource(id), "credentials, sessions and pending authority revoked")
 	})
 	if err != nil {
 		writeStatus(w, accountStatus(err))

@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -100,7 +101,7 @@ func (s *Service) createSCIM(ctx context.Context, q *identitydb.Queries, connect
 	if err != nil {
 		return identitydb.ScimResource{}, err
 	}
-	return row, s.insertSystemAudit(ctx, q, nil, "identity.scim_created", "scim/"+connectorID+"/"+id.String(), kind)
+	return row, s.insertSystemAudit(ctx, q, nil, auditkind.IdentitySCIMCreated, "scim/"+connectorID+"/"+id.String(), kind)
 }
 
 func (s *Service) updateSCIM(ctx context.Context, q *identitydb.Queries, connector scimConnector, row identitydb.ScimResource, document scimDocument, deleted bool) (identitydb.ScimResource, error) {
@@ -161,9 +162,9 @@ func (s *Service) updateSCIM(ctx context.Context, q *identitydb.Queries, connect
 	if err != nil {
 		return identitydb.ScimResource{}, err
 	}
-	action := "identity.scim_updated"
+	action := auditkind.IdentitySCIMUpdated
 	if deleted {
-		action = "identity.scim_deleted"
+		action = auditkind.IdentitySCIMDeleted
 	}
 	return updated, s.insertSystemAudit(ctx, q, nil, action, "scim/"+row.ConnectorID+"/"+row.ID.String(), row.ResourceType)
 }
@@ -191,7 +192,7 @@ func (s *Service) scimLifecycle(ctx context.Context, q *identitydb.Queries, id u
 	if active {
 		reason = "reactivated; authoritative refresh required"
 	}
-	return s.insertSystemAudit(ctx, q, &id, "identity.scim_lifecycle", principalResource(id), reason)
+	return s.insertSystemAudit(ctx, q, &id, auditkind.IdentitySCIMLifecycle, principalResource(id), reason)
 }
 
 func replaceSCIMMembers(ctx context.Context, q *identitydb.Queries, group identitydb.ScimResource, members []any) error {

@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/devicedb"
 )
 
@@ -50,7 +51,7 @@ func recordAgentUpdate(ctx context.Context, q *devicedb.Queries, principal Devic
 			details["native_phase"] = diagnostic.GetPhase()
 			details["exit_code"] = strconv.FormatInt(int64(diagnostic.GetExitCode()), 10)
 		}
-		if err := InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: id, Action: "device.agent_update.reported", ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, details); err != nil {
+		if err := InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: id, Action: auditkind.DeviceAgentUpdateReported.String(), ResourceID: principal.DeviceID.String(), TargetDeviceID: &principal.DeviceID}, details); err != nil {
 			return err
 		}
 		if err := q.InsertAgentUpdateEvent(ctx, devicedb.InsertAgentUpdateEventParams{ID: id, GenerationID: principal.GenerationID, SessionEpoch: int64(epoch), Status: encoded, ReceivedAt: Timestamptz(now)}); err != nil {

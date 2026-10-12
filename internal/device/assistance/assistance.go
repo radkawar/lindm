@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"github.com/google/uuid"
@@ -68,7 +69,7 @@ func endAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.Assis
 	row.State, row.EndedAt, row.EndCause, row.EndDetail, row.DeviceEnded = assistanceEnded, core.Timestamptz(now), int16(cause), detail, deviceEnded
 	row.OfferSdp, row.AnswerSdp = "", ""
 	*revoked = append(*revoked, *row)
-	return recordAssistanceAudit(ctx, q, actor, "assistance.end", *row, "", "cause", assistanceCauseName(cause), "detail", detail)
+	return recordAssistanceAudit(ctx, q, actor, auditkind.AssistanceEnd, *row, "", "cause", assistanceCauseName(cause), "detail", detail)
 }
 
 // enforceAssistance applies the server-side deadlines to an open session:
@@ -219,12 +220,12 @@ func sha256Fingerprint(value string) bool {
 
 // recordAssistanceAudit separates operator-authored reasons from server context.
 // Callers never pass SDP, relay credentials or other secrets.
-func recordAssistanceAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action string, row devicedb.AssistanceSession, reason string, pairs ...string) error {
+func recordAssistanceAudit(ctx context.Context, q *devicedb.Queries, actor *uuid.UUID, action auditkind.Kind, row devicedb.AssistanceSession, reason string, pairs ...string) error {
 	details := core.AuditDetails(pairs...)
 	details["mode"] = assistanceModeName(row.Mode)
 	details["duration_seconds"] = strconv.FormatInt(int64(row.EndsAt.Time.Sub(row.CreatedAt.Time)/time.Second), 10)
 	return core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
-		ID: uuid.New(), ActorID: actor, Action: action, ResourceID: row.ID.String(),
+		ID: uuid.New(), ActorID: actor, Action: action.String(), ResourceID: row.ID.String(),
 		Reason: reason, TargetDeviceID: &row.DeviceID,
 	}, details)
 }

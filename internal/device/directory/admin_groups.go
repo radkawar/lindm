@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -133,7 +134,7 @@ func (s *Service) SetDeviceGroup(ctx context.Context, req *connect.Request[admin
 		if err := q.InsertDeviceGroupMembers(ctx, devicedb.InsertDeviceGroupMembersParams{GroupID: groupID, DeviceIds: members}); err != nil {
 			return err
 		}
-		if err := core.InsertAudit(ctx, q, &actor.ID, "device.group_set", groupID.String(), req.Msg.GetReason()); err != nil {
+		if err := core.InsertAudit(ctx, q, &actor.ID, auditkind.DeviceGroupSet, groupID.String(), req.Msg.GetReason()); err != nil {
 			return err
 		}
 		return core.CompleteAdmin(ctx, q, actor.ID, method, requestID, uuid.Nil, uuid.Nil, time.Unix(0, 0).UTC())
@@ -182,7 +183,7 @@ func (s *Service) DeleteDeviceGroup(ctx context.Context, req *connect.Request[ad
 		if err := q.DeleteDeviceGroup(ctx, groupID); err != nil {
 			return err
 		}
-		if err := core.InsertAudit(ctx, q, &actor.ID, "device.group_delete", groupID.String(), req.Msg.GetReason()); err != nil {
+		if err := core.InsertAudit(ctx, q, &actor.ID, auditkind.DeviceGroupDelete, groupID.String(), req.Msg.GetReason()); err != nil {
 			return err
 		}
 		return core.CompleteAdmin(ctx, q, actor.ID, method, requestID, uuid.Nil, uuid.Nil, time.Unix(0, 0).UTC())

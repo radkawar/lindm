@@ -12,6 +12,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
@@ -181,7 +182,7 @@ func (s *Service) DeleteSecret(ctx context.Context, req *connect.Request[adminv1
 		if err := q.DeleteManagedSecret(ctx, devicedb.DeleteManagedSecretParams{ID: id, DeletedBy: &actor.ID}); err != nil {
 			return err
 		}
-		if err := core.DispatchAudit(ctx, q, &actor.ID, "secret.deleted", id, req.Msg.GetReason()); err != nil {
+		if err := core.DispatchAudit(ctx, q, &actor.ID, auditkind.SecretDeleted, id, req.Msg.GetReason()); err != nil {
 			return err
 		}
 		return core.CompleteAdmin(ctx, q, actor.ID, method, requestID, uuid.Nil, uuid.Nil, time.Unix(0, 0).UTC())

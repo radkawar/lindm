@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"github.com/google/uuid"
@@ -27,11 +28,10 @@ import (
 // missing device key: registration follows in the device's management cycle,
 // so the resource only waits, visibly pending, and mints once it registers.
 const (
-	secretBlockUnavailable    = "secret_unavailable"
-	secretBlockMismatch       = "secret_binding_mismatch"
-	SecretWaitDeviceKey       = "device_encryption_key_unavailable"
-	secretBlockUnauthorized   = "secret_delivery_unauthorized"
-	secretDeliveredAuditEvent = "secret.delivered"
+	secretBlockUnavailable  = "secret_unavailable"
+	secretBlockMismatch     = "secret_binding_mismatch"
+	SecretWaitDeviceKey     = "device_encryption_key_unavailable"
+	secretBlockUnauthorized = "secret_delivery_unauthorized"
 )
 
 // ResourceSecretDelivery is one sealed delivery ready to be signed and stored.
@@ -154,7 +154,7 @@ func StoreResourceSecrets(ctx context.Context, q *devicedb.Queries, actor *uuid.
 		if err := q.InsertResourceActionSecret(ctx, devicedb.InsertResourceActionSecretParams{ActionID: action, Ordinal: int16(i), SecretID: secret, Version: int64(version), RecipientKeySha256: binding.GetRecipientKeySha256(), Sealed: delivery.sealed}); err != nil {
 			return err
 		}
-		if err := core.DispatchSystemAudit(ctx, q, actor, secretDeliveredAuditEvent, action, "secret_id", secret.String(), "version", strconv.FormatUint(version, 10)); err != nil {
+		if err := core.DispatchSystemAudit(ctx, q, actor, auditkind.SecretDelivered, action, "secret_id", secret.String(), "version", strconv.FormatUint(version, 10)); err != nil {
 			return err
 		}
 	}

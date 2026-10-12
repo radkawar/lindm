@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
 )
 
@@ -147,7 +148,7 @@ func (s *Service) UpdateAuthorization(ctx context.Context, request *adminv1.Upda
 	if err != nil {
 		return nil, err
 	}
-	if err := q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{ID: uuid.New(), ActorID: &actor.ID, Action: "identity.authorization_updated", ResourceID: "authorization", Reason: request.GetReason(), Details: details}); err != nil {
+	if err := q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{ID: uuid.New(), ActorID: &actor.ID, Action: auditkind.IdentityAuthorizationUpdated.String(), ResourceID: "authorization", Reason: request.GetReason(), Details: details}); err != nil {
 		return nil, s.dbErr(err)
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -17,11 +17,9 @@ import { RpcError } from "@/components/ui/rpc-error";
 import type { PickerSlot } from "@/components/ui/search-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { useExactRequest } from "@/hooks/use-exact-request";
-import { usePrincipal } from "@/hooks/use-permissions";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
-import { canPermission } from "@/lib/permissions";
 import { reasonError } from "@/lib/reason";
 import { adminClient, clearCsrfToken } from "@/lib/rpc";
 import {
@@ -42,7 +40,6 @@ export function AuditExport({
   disabled: boolean;
 }) {
   const lifetime = useAuthLifetime();
-  const principal = usePrincipal();
   const client = useQueryClient();
   const navigate = useNavigate();
   const action = useExactRequest<CreateAuditExportRequest>();
@@ -50,7 +47,6 @@ export function AuditExport({
   const [scope, setScope] = useState(search);
   const [reason, setReason] = useState("");
   const [artifactId, setArtifactId] = useState("");
-  const authorized = canPermission(principal, "integrations.manage", true);
   const blocked = action.busy || action.ambiguous;
 
   function submit() {
@@ -95,12 +91,7 @@ export function AuditExport({
       <Button
         variant="outline"
         aria-haspopup="dialog"
-        disabled={!authorized || (disabled && !blocked)}
-        title={
-          !authorized
-            ? "Export requires unrestricted integration management permission."
-            : undefined
-        }
+        disabled={disabled && !blocked}
         onClick={() => {
           if (!blocked) {
             setScope(search);
@@ -112,11 +103,6 @@ export function AuditExport({
       >
         {blocked ? "Review pending export" : "Export filtered evidence"}
       </Button>
-      {!authorized ? (
-        <p className="text-xs text-muted-foreground">
-          Export requires unrestricted integration management permission.
-        </p>
-      ) : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
@@ -193,6 +179,7 @@ export function AuditExport({
               <Label htmlFor="audit-export-reason">Reason for export</Label>
               <Input
                 id="audit-export-reason"
+                data-freeform="audit reason"
                 required
                 value={reason}
                 disabled={blocked}

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 
+	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -17,8 +18,6 @@ import (
 	"lindm/internal/rpcreason"
 	"lindm/internal/secretseal"
 )
-
-const actionDeviceEncryptionKeyRegistered = "device_encryption_key.registered"
 
 var (
 	// errDeviceEncryptionKeyUnavailable: no key attested by a currently valid
@@ -88,7 +87,7 @@ func (s *Service) RegisterEncryptionKey(ctx context.Context, req *connect.Reques
 			}
 			return nil
 		}
-		return core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: actionDeviceEncryptionKeyRegistered, ResourceID: principal.GenerationID.String(), TargetDeviceID: &principal.DeviceID}, core.AuditDetails("key_sha256", hex.EncodeToString(keyID)))
+		return core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{ID: uuid.New(), Action: auditkind.DeviceEncryptionKeyRegistered.String(), ResourceID: principal.GenerationID.String(), TargetDeviceID: &principal.DeviceID}, core.AuditDetails("key_sha256", hex.EncodeToString(keyID)))
 	})
 	if err != nil {
 		return nil, core.MapErr(err)

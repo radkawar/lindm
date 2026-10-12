@@ -19,7 +19,7 @@ WHERE f.sequence <= sqlc.arg('snapshot_sequence')::bigint
   AND (sqlc.arg('action_category')::smallint IN (0, 4) OR f.action_category = sqlc.arg('action_category'))
   AND (sqlc.arg('action_category')::smallint <> 4
        OR (f.actor_id IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.id = f.event_id AND a.action = 'approval.listed')))
+           AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.id = f.event_id AND a.action = ANY(sqlc.arg('human_excluded_actions')::text[]))))
   AND (sqlc.narg('occurred_from')::timestamptz IS NULL OR f.occurred_at >= sqlc.narg('occurred_from'))
   AND (sqlc.narg('occurred_until')::timestamptz IS NULL OR f.occurred_at < sqlc.narg('occurred_until'))
   AND (sqlc.narg('cursor_id')::uuid IS NULL
