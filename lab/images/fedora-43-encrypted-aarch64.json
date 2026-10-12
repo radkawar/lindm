@@ -1,0 +1,18 @@
+{
+  "id": "fedora-server-encrypted-43-1.6-aarch64",
+  "distribution": "fedora",
+  "version": "43",
+  "architecture": "aarch64",
+  "edition": "Server-dvd-encrypted-lab",
+  "release": "43-1.6",
+  "imageFilename": "Fedora-Server-dvd-aarch64-43-1.6.iso",
+  "imageUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Server/aarch64/iso/Fedora-Server-dvd-aarch64-43-1.6.iso",
+  "checksumUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Server/aarch64/iso/Fedora-Server-43-1.6-aarch64-CHECKSUM",
+  "keyUrl": "https://fedoraproject.org/fedora.gpg",
+  "sha256": "cbe57647fe9cedf59b01ea72d4946a4da3c37090dd162d074cfffa1ffedc4874",
+  "signerFingerprint": "C6E7F081CF80E13146676E88829B606631645531",
+  "imageSizeBytes": "3358326784",
+  "checksumMode": "CHECKSUM_MODE_CLEARSIGNED",
+  "signerProvenanceUrl": "https://fedoraproject.org/security/",
+  "releaseProvenanceUrl": "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Server/aarch64/iso/"
+}

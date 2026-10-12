@@ -60,9 +60,12 @@ const (
 	reasonNoPasswordPins = "libpwquality/PAM/manager versions not measured on this release"
 	reasonOSPatch        = "OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release"
 	reasonReleaseUpgrade = "release upgrade is not implemented"
-	reasonDesignOnly     = "design-only: the declarative/image-based management model is not specified"
-	reasonELHost         = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
-	reasonEL8Packages    = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
+	// Fedora signs only its x86_64 kernels for shim (vmlinuz PE security
+	// directory: 43 x86_64 1896 bytes, 43 aarch64 empty).
+	reasonFedoraARMUnsignedKernel = "the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires"
+	reasonDesignOnly              = "design-only: the declarative/image-based management model is not specified"
+	reasonELHost                  = "EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10"
+	reasonEL8Packages             = "systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240"
 	// The release-upgrade lane drives ubuntu-release-upgrader's unattended
 	// frontend; Debian documents a manual sources rewrite plus apt full-upgrade.
 	reasonDebianUpgrade = "Debian has no unattended release upgrader (the documented path is a manual sources rewrite and apt full-upgrade); the lane drives only do-release-upgrade"
@@ -423,8 +426,8 @@ var registry = []*Release{
 	},
 	{
 		Key: "fedora-43", Name: "Fedora 43", Distribution: "Fedora", ID: "fedora", Version: Exact("43"), Variants: fedoraVar,
-		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Provisioning: cloudInitKickstart,
-		Desktop: Desktop{Name: "Workstation GNOME; KDE edition", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
+		Tier: Tier1, Page: "fedora.md", Family: FamilyRedHat, Architectures: both, Packages: dnf5, Systemd: 258, Provisioning: cloudInitKickstart,
+		FDE: "LUKS2 (anaconda LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "Workstation GNOME; KDE edition", Version: "GNOME 49", DisplayManager: "gdm", Lock: "GNOME Shell"}, Firewall: firewalld,
 		Advisory: Advisory{Feeds: []Feed{FeedRPMUpdateinfo}, Ecosystem: "Fedora 43",
 			Exports: map[Feed]AdvisoryExport{FeedRPMUpdateinfo: {
 				ArchitectureURLs: map[string]string{
@@ -440,14 +443,22 @@ var registry = []*Release{
 		Quirks: Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB},
 		// Fedora Cloud Base 43-1.6 (x86_64 and aarch64) ships / as root:root
 		// 0775 (Fedora 44 1.7: 0755); `filesystem` packages it 0555.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneAdvisories, LaneEnrollFromConsole},
-			RootPermissionsRepair: []string{"rpm", "--restore", "filesystem"}},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
+			RootPermissionsRepair: []string{"rpm", "--restore", "filesystem"},
+			// Encrypted goldens and provision-kickstart install from the signed Server DVD.
+			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
+			Kickstart: "F43", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/43/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-43-%s",
+			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}}},
 		// Fedora 43 (release and updates) carries dnf5 5.2.18.0, below the
 		// package provider's unprivileged-transaction floor (resources record
 		// "native dnf5 5.4.6.0 or newer required"); os.update.v1 runs dnf5 itself.
-		Supports: caps(agentCore, []Capability{Accounts, Sysctl, Definitions, Firewall, Advisories, OSUpdate}),
-		Gates: without(actionGates(string(Password), reasonNoPasswordPins,
+		Supports: caps(agentCore, []Capability{Accounts, Sysctl, Definitions, Firewall, Advisories, OSUpdate}, actionLanes),
+		Gates: without(gates(string(Password), reasonNoPasswordPins,
 			string(Packages), "Fedora 43 ships dnf5 5.2.18.0; the package provider requires 5.4.6.0 to store a transaction without privileges"), OSUpdate),
+		// kernel-core-6.17.1-300.fc43.aarch64's vmlinuz has no PE security
+		// directory; the encrypted Secure Boot golden never reached SSH
+		// (fedora-act43-arm-20261012T140712Z/recovery-sanitize-aarch64.json).
+		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: reasonFedoraARMUnsignedKernel}},
 	},
 	{
 		Key: "fedora-44", Name: "Fedora 44", Distribution: "Fedora", ID: "fedora", Version: Exact("44"), Variants: fedoraVar,
@@ -475,7 +486,7 @@ var registry = []*Release{
 		// unsigned aarch64 kernel (fedora44-mgrub-nvme-arm64-01/-02), and the
 		// encrypted golden itself never reaches SSH
 		// (fedora-recovery-arm-20261011T234650Z/recovery-nvme-aarch64.json).
-		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: "the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires"}},
+		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: reasonFedoraARMUnsignedKernel}},
 	},
 	{
 		Key: "fedora-atomic", Name: "Fedora Atomic Silverblue/Kinoite", Distribution: "Fedora Atomic", ID: "fedora", Version: Any(),

@@ -297,7 +297,7 @@ func TestEncryptedInstallerEFIOffset(t *testing.T) {
 }
 
 func TestEncryptedInstallerManifests(t *testing.T) {
-	for _, filename := range []string{"ubuntu-noble-encrypted-amd64.json", "fedora-44-encrypted-x86_64.json", "ubuntu-noble-encrypted-arm64.json", "fedora-44-encrypted-aarch64.json", "ubuntu-resolute-desktop-encrypted-amd64.json", "ubuntu-resolute-desktop-encrypted-arm64.json"} {
+	for _, filename := range []string{"ubuntu-noble-encrypted-amd64.json", "fedora-44-encrypted-x86_64.json", "ubuntu-noble-encrypted-arm64.json", "fedora-44-encrypted-aarch64.json", "fedora-43-encrypted-x86_64.json", "fedora-43-encrypted-aarch64.json", "ubuntu-resolute-desktop-encrypted-amd64.json", "ubuntu-resolute-desktop-encrypted-arm64.json"} {
 		manifest, err := LoadManifest("../../lab/images/" + filename)
 		if err != nil {
 			t.Fatal(err)
@@ -313,7 +313,7 @@ func TestEncryptedInstallerDesktopMediaRecipe(t *testing.T) {
 	for filename, want := range map[string]struct {
 		key     string
 		desktop bool
-	}{"ubuntu-resolute-desktop-encrypted-amd64.json": {"ubuntu-26.04", true}, "ubuntu-resolute-desktop-encrypted-arm64.json": {"ubuntu-26.04", true}, "ubuntu-noble-encrypted-amd64.json": {"ubuntu-24.04", false}, "fedora-44-encrypted-x86_64.json": {"fedora-44", false}} {
+	}{"ubuntu-resolute-desktop-encrypted-amd64.json": {"ubuntu-26.04", true}, "ubuntu-resolute-desktop-encrypted-arm64.json": {"ubuntu-26.04", true}, "ubuntu-noble-encrypted-amd64.json": {"ubuntu-24.04", false}, "fedora-44-encrypted-x86_64.json": {"fedora-44", false}, "fedora-43-encrypted-aarch64.json": {"fedora-43", false}} {
 		manifest, err := LoadManifest("../../lab/images/" + filename)
 		if err != nil {
 			t.Fatal(err)

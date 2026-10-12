@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Fedora 43                                                                                                             | Fedora 44                                                                                                                                                               |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                                           | implemented                                                                                                                                                             |
-| lifecycle         | implemented                                                                                                           | implemented                                                                                                                                                             |
-| dispatch          | implemented                                                                                                           | implemented                                                                                                                                                             |
-| packages          | gated: Fedora 43 ships dnf5 5.2.18.0; the package provider requires 5.4.6.0 to store a transaction without privileges | implemented                                                                                                                                                             |
-| accounts          | implemented                                                                                                           | implemented                                                                                                                                                             |
-| sysctl            | implemented                                                                                                           | implemented                                                                                                                                                             |
-| definitions       | implemented                                                                                                           | implemented                                                                                                                                                             |
-| password          | gated: libpwquality/PAM/manager versions not measured on this release                                                 | implemented                                                                                                                                                             |
-| firewall          | implemented                                                                                                           | implemented                                                                                                                                                             |
-| encryption        | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
-| wipe              | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
-| report-loss       | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
-| lock              | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
-| recovery-sanitize | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented; gated on aarch64: the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires |
-| self-update       | implemented                                                                                                           | implemented                                                                                                                                                             |
-| assistance        | gated: no maintained encrypted installer, native action prerequisites or graphical golden                             | implemented                                                                                                                                                             |
-| advisories        | implemented                                                                                                           | implemented                                                                                                                                                             |
-| os-update         | implemented                                                                                                           | implemented                                                                                                                                                             |
-| release-upgrade   | gated: release upgrade is not implemented                                                                             | gated: release upgrade is not implemented                                                                                                                               |
+| Capability        | Fedora 43                                                                                                                                                               | Fedora 44                                                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| lifecycle         | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| dispatch          | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| packages          | gated: Fedora 43 ships dnf5 5.2.18.0; the package provider requires 5.4.6.0 to store a transaction without privileges                                                   | implemented                                                                                                                                                             |
+| accounts          | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| sysctl            | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| definitions       | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| password          | gated: libpwquality/PAM/manager versions not measured on this release                                                                                                   | implemented                                                                                                                                                             |
+| firewall          | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| encryption        | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| wipe              | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| report-loss       | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| lock              | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| recovery-sanitize | implemented; gated on aarch64: the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires | implemented; gated on aarch64: the vendor aarch64 kernel has no Authenticode signature, so shim refuses it under the Secure Boot that original-device recovery requires |
+| self-update       | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| assistance        | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| advisories        | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| os-update         | implemented                                                                                                                                                             | implemented                                                                                                                                                             |
+| release-upgrade   | gated: release upgrade is not implemented                                                                                                                               | gated: release upgrade is not implemented                                                                                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -41,6 +41,11 @@ The pinned Fedora 43 Cloud Base Generic 43-1.6 inputs, exact size, digest and si
 are in [`lab/images/fedora-43-x86_64.json:2-17`](../../lab/images/fedora-43-x86_64.json#L2-L17)
 and [`lab/images/fedora-43-aarch64.json:2-17`](../../lab/images/fedora-43-aarch64.json#L2-L17)
 (both CHECKSUM files clearsigned by the Fedora 43 key `C6E7F081CF80E13146676E88829B606631645531`).
+The encrypted-installer and Kickstart lanes boot the signed Fedora 43 Server DVD
+43-1.6, pinned in [`lab/images/fedora-43-encrypted-x86_64.json`](../../lab/images/fedora-43-encrypted-x86_64.json)
+and [`lab/images/fedora-43-encrypted-aarch64.json`](../../lab/images/fedora-43-encrypted-aarch64.json)
+(same key); the installed root adds packages from the signed `releases/43/Everything`
+tree, as on Fedora 44.
 Fedora 44 encrypted Server with added GNOME packages is a distinct installation,
 not proof of the stock Workstation installer.
 
@@ -63,8 +68,15 @@ restores SELinux labels of `/etc/lindm` and its unit and runs no script from `/e
 so the first boot stays Enforcing. Anaconda keeps the profile, with the token, in
 `/root/anaconda-ks.cfg` and `/root/original-ks.cfg`; delete them after enrollment.
 Fedora 44 aarch64 passed both formats end to end
-([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
-Fedora 43 and x86_64 are offered without a provisioning record.
+([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12)).
+Fedora 43 aarch64 also passed both on `dgx20`: cloud-init from Cloud Base 43-1.6
+(`$HOME/.cache/lindm-matrix/fedora-prov4-arm-20261012T175625Z/fedora-43/provision-cloud-init-aarch64.json`,
+SHA-256 `25458939f96597b77a0d2255e418c25e34406717a2c6fd90819cbcb805bee15e`) and
+Kickstart from the Server DVD 43-1.6
+(`$HOME/.cache/lindm-matrix/fedora-prov6-arm-20261012T183959Z/fedora-43/provision-kickstart-aarch64.json`,
+SHA-256 `b76ffe7657afa4e59590472614bec07f3a46c41512733546d671af2a7b7be848`);
+each ended Enrolled after independent approval with `lindm-provision.service`
+successful and the token removed. x86_64 is offered without a provisioning record.
 
 Use native signed RPM delivery. The builder signs and independently verifies the
 RPM before publishing its digest
@@ -314,6 +326,23 @@ uses this explicitly non-Secure-Boot aarch64 GNOME tuple for Finance, installs t
 agent from the console's signed RPM repository, and performs the product TPM
 action on its own retained encrypted overlay. It does not change firmware
 security to obtain a pass or treat the demo as new platform qualification.
+
+Fedora 43 (systemd 258, GNOME 49) uses the same Anaconda LUKS2/LVM recipe from
+its own Server DVD. On aarch64 (`dgx20` KVM, AAVMF `2024.02-2ubuntu0.10`,
+swtpm2, **Secure Boot not enforced**) the matrix `encrypted` cell passed
+(`$HOME/.cache/lindm-matrix/fedora-act43-arm-20261012T140712Z/fedora-43/encrypted-aarch64.json`,
+SHA-256 `1bfa7d95d4ecb54bdb7560fbcf2e46ca8c85f09a6d606d58989f2ee88f4684a3`)
+and so did the live device-action cell (lock, quarantine, wipe and loss without
+recovery; `device-actions-aarch64.json` in that directory, SHA-256
+`ae7c067cb9fc8f27124cb4818d78ee4ea05218c62a6d2a755fa7243f21bc29c6`).
+Original-device recovery on Fedora 43 aarch64 is gated like Fedora 44: the
+release kernel `kernel-core-6.17.1-300.fc43.aarch64` (RPM SHA-256
+`9328e61443dcd71e5671806fbef4345eb15a988229b011340fac8b856315c3ee`) ships a
+`vmlinuz` with an empty PE security directory, while the x86_64 kernel of the
+same build carries a 1,896-byte Authenticode signature; under enforced Secure
+Boot the encrypted golden never reached SSH
+(`recovery-sanitize-aarch64.json` in that directory, SHA-256
+`14531ff8ad37a620002d4647f6a3435f0ce672b296808828dc115c7d1985ecb0`).
 
 Fedora dracut 108 separates the `systemd-cryptsetup` module from `crypt`
 ([`encrypted_installer_linux.go:205-213`](../../internal/vmlab/encrypted_installer_linux.go#L205-L213)).
@@ -674,8 +703,17 @@ the kernel with `bad shim signature`. This is not a missing firmware CA.
 The linked evidence preserves that failure and vendor PE inspection; no key
 enrollment, replacement kernel or capability-gate relaxation was used.
 Assistance starts from a passphrase-unlocked encrypted clone, not a prebound TPM
-token. Not qualified: aarch64 Secure Boot, KDE Plasma spin, X11, Fedora 43,
-Atomic desktops, physical displays and multi-user seats.
+token.
+
+Fedora 43 GNOME 49 passed the matrix assistance cell on aarch64 KVM (`dgx20`,
+same non-Secure-Boot AAVMF tuple): control, re-request, view, decline, portal
+cancel and lock, with GNOME Shell/Mutter `49.1-1.fc43`, portal
+`1.20.3-2.fc43`/portal-gnome `49.0-1.fc43`, PipeWire `1.4.8-2.fc43` and
+GStreamer good `1.26.6-1.fc43`:
+`$HOME/.cache/lindm-matrix/fedora-asst43-arm-20261012T175248Z/fedora-43/assistance-aarch64/assistance.json`,
+SHA-256 `0f4b6fc35fed597846adeda036648e115f8dc02fea570747142a60ea47de6248`.
+Not qualified: aarch64 Secure Boot, KDE Plasma spin, X11, Atomic desktops,
+physical displays and multi-user seats.
 
 ### Commercial assistance capability roadmap
 

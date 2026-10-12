@@ -263,7 +263,7 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 		entry("ubuntu-24.04", "enroll-from-console", "aarch64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now()),
 		entry("fedora-44", "lifecycle", "aarch64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now()),
 	}}}
-	for _, key := range []string{"ubuntu-24.04", "fedora-44", "rhel-9", "opensuse-tumbleweed"} {
+	for _, key := range []string{"ubuntu-24.04", "fedora-43", "fedora-44", "rhel-9", "opensuse-tumbleweed"} {
 		r := release(t, key)
 		in.Manifests = append(in.Manifests,
 			&Manifest{Image: &labv1.ImageManifest{Id: key + "-cloud", Edition: "cloud"}, Release: r, Architecture: "aarch64"},
@@ -276,10 +276,10 @@ func TestProvisioningCellsRequireTheirOwnFormatAndRecord(t *testing.T) {
 		noRecipe   []string
 		notOffered []string
 	}{
-		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}, []string{"opensuse-tumbleweed"}, nil},
-		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, nil, []string{"fedora-44", "rhel-9", "opensuse-tumbleweed"}},
-		{platform.LaneProvisionKickstart, installer, []string{"fedora-44", "rhel-9"}, nil, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
-		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, nil, []string{"ubuntu-24.04", "fedora-44", "rhel-9"}},
+		{platform.LaneProvisionCloudInit, cloud, []string{"ubuntu-24.04", "fedora-43", "fedora-44", "rhel-9"}, []string{"opensuse-tumbleweed"}, nil},
+		{platform.LaneProvisionAutoinstall, installer, []string{"ubuntu-24.04"}, nil, []string{"fedora-43", "fedora-44", "rhel-9", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionKickstart, installer, []string{"fedora-43", "fedora-44", "rhel-9"}, nil, []string{"ubuntu-24.04", "opensuse-tumbleweed"}},
+		{platform.LaneProvisionAutoYaST, installer, []string{"opensuse-tumbleweed"}, nil, []string{"ubuntu-24.04", "fedora-43", "fedora-44", "rhel-9"}},
 	} {
 		cell := &labv1.MatrixCell{Name: string(tc.lane), Title: string(tc.lane), Capabilities: []string{"lifecycle"}, Image: tc.image, Lane: string(tc.lane)}
 		for _, key := range tc.admit {
