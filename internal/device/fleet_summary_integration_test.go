@@ -384,6 +384,11 @@ func TestFleetSummaryPendingApprovalsRespectInboxAuthority(t *testing.T) {
 	}
 	if got := fleetSummary(t, f.svc, f.ownerCtx, 0); got.GetApprovals() == nil || got.GetApprovals().GetPendingApprovals() != 2 {
 		t.Fatalf("pending count included expired or decided requests: %v", got.GetApprovals())
+	} else if got.GetApprovals().GetReadyToRun() != 1 {
+		t.Fatalf("the requester's approved request is not ready to run: %v", got.GetApprovals())
+	}
+	if got := fleetSummary(t, f.svc, reviewerCtx, 0); got.GetApprovals() == nil || got.GetApprovals().GetReadyToRun() != 0 {
+		t.Fatalf("another requester's approved request counted as ready for the approver: %v", got.GetApprovals())
 	}
 	// Persisted account scopes drive the fresh inbox read. The fleet principal
 	// intentionally sees only the other device: these permissions are independent.

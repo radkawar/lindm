@@ -190,7 +190,11 @@ message AcceptAdvisoryFindingRequest {
   string device_id = 2 [(buf.validate.field).string.uuid = true];
   string finding_id = 3 [(buf.validate.field).string.uuid = true];
   string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
-  google.protobuf.Timestamp expires_at = 5 [(buf.validate.field).required = true];
+  // A risk acceptance that has already ended is refused when proposed or accepted.
+  google.protobuf.Timestamp expires_at = 5 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).timestamp.gt_now = true
+  ];
   string approval_id = 6 [
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
     (buf.validate.field).string.uuid = true

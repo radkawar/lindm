@@ -445,6 +445,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.ListApprovalsRequest{},
 		&adminv1.ApproveApprovalRequest{},
 		&adminv1.RejectApprovalRequest{},
+		&adminv1.WithdrawApprovalRequest{},
 		&adminv1.ListDeviceGroupsRequest{},
 		&adminv1.SetDeviceGroupRequest{},
 		&adminv1.DeleteDeviceGroupRequest{},

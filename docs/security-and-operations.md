@@ -679,6 +679,18 @@ expiry. A different human needs both scoped exception and approval permissions.
 Both people's authority is refreshed and fenced again when the requester creates
 the exception; approval consumption and the exception commit in one transaction.
 Changed payloads, self-approval, expired approvals and revoked authority are refused.
+Approvals report `evidence_state`: once the device's current evaluation no longer
+reports the exact finding (resolved, or superseded by newer inventory), the request
+reads as unavailable and approving it is refused with `approval_evidence_unavailable`;
+it can still be rejected. An expiry that has already passed is refused when the
+acceptance is proposed or accepted.
+
+Any approval's requester can withdraw it while it is still pending
+(`WithdrawApproval`, with an audited reason); withdrawal records no approver and
+the request can never be approved or used afterwards. Once approved, only the
+requester can run it: the inbox lists those first as **Ready for you to run**, the
+dashboard counts them (`ready_to_run`), and a device page shows its open
+revocation request with **Revoke now** for its requester.
 An exact retry retains the same request and approval; it does not create a second
 exception or bypass fresh authority.
 Returned exceptions use the database's microsecond timestamp precision, so the

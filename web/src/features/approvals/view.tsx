@@ -6,6 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
+  ApprovalEvidenceState,
   ApprovalSchema,
   ApprovalState,
   type Approval,
@@ -23,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
-import { canPermission, permissionLabels } from "@/lib/permissions";
+import { canPermission } from "@/lib/permissions";
 import { formatBytes } from "@/lib/bytes";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { revealedText } from "@/lib/reveal";
@@ -47,6 +48,7 @@ const APPROVAL_STATES: Record<ApprovalState, string> = {
   [ApprovalState.REJECTED]: "Rejected",
   [ApprovalState.CONSUMED]: "Completed",
   [ApprovalState.EXPIRED]: "Expired",
+  [ApprovalState.WITHDRAWN]: "Withdrawn",
 };
 
 const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> = {
@@ -189,15 +191,40 @@ function ApprovalGroups({
   approvals: Approval[];
   onReveal: (revealed: Revealed) => void;
 }) {
+  const principal = usePrincipal();
   // Open requests still await a decision or their requester's run. The server
-  // reports expiry as its own state and lists open requests first.
+  // reports expiry as its own state and lists open requests first. Approved
+  // requests only their requester can run lead, as that requester's next step.
+  const ready = approvals.filter(
+    (approval) =>
+      approval.state === ApprovalState.APPROVED && approval.requesterId === principal.id,
+  );
   const open = approvals.filter(
     (approval) =>
-      approval.state === ApprovalState.PENDING || approval.state === ApprovalState.APPROVED,
+      !ready.includes(approval) &&
+      (approval.state === ApprovalState.PENDING || approval.state === ApprovalState.APPROVED),
   );
-  const closed = approvals.filter((approval) => !open.includes(approval));
+  const closed = approvals.filter(
+    (approval) => !ready.includes(approval) && !open.includes(approval),
+  );
   return (
     <>
+      {ready.length > 0 ? (
+        <section className="grid min-w-0 gap-4" aria-labelledby="approvals-ready">
+          <h2 id="approvals-ready" className="text-base font-semibold">
+            Ready for you to run{" "}
+            <span className="font-normal text-muted-foreground">({ready.length})</span>
+          </h2>
+          {ready.map((approval) => (
+            <ApprovalCard
+              key={`${approval.id}:${approval.state}`}
+              approval={approval}
+              open
+              onReveal={onReveal}
+            />
+          ))}
+        </section>
+      ) : null}
       <section className="grid min-w-0 gap-4" aria-labelledby="approvals-open">
         <h2 id="approvals-open" className="text-base font-semibold">
           Open requests <span className="font-normal text-muted-foreground">({open.length})</span>
@@ -257,7 +284,7 @@ function ApprovalCard({
   const [failure, setFailure] = useState<RpcFailure | null>(null);
   const [completed, setCompleted] = useState(false);
   const [attempt, setAttempt] = useState<{
-    action: "approve" | "reject" | "execute";
+    action: "approve" | "reject" | "withdraw" | "execute";
     reason: string;
   } | null>(null);
   const actionRequest =
@@ -300,9 +327,17 @@ function ApprovalCard({
     !advisoryRequest ||
     (!!advisoryRequest.expiresAt &&
       timestampDate(advisoryRequest.expiresAt).getTime() > Date.now());
-  const advisoryReady = !advisoryRequest || (!!approval.advisoryFinding && exceptionUnexpired);
   const unexpired =
     !!approval.expiresAt && timestampDate(approval.expiresAt).getTime() > Date.now();
+  // The server decides whether bound evidence still holds and refuses approval
+  // when it does not; the card never infers it from a missing finding.
+  const evidenceGone =
+    unexpired &&
+    (approval.state === ApprovalState.PENDING || approval.state === ApprovalState.APPROVED) &&
+    approval.evidenceState === ApprovalEvidenceState.UNAVAILABLE;
+  const advisoryReady =
+    !advisoryRequest ||
+    (approval.evidenceState === ApprovalEvidenceState.CURRENT && exceptionUnexpired);
   const awaitingDecision = unexpired && approval.state === ApprovalState.PENDING;
   // The server refuses any decision by the requester; say so instead of hiding it.
   const ownRequest = awaitingDecision && principal.id === approval.requesterId;
@@ -314,6 +349,7 @@ function ApprovalCard({
     canPermission(principal, approval.permission);
   const ownRequestReasonId = useId();
   const decisionHintId = useId();
+  const evidenceGoneId = useId();
   const hostname = approval.deviceHostname.trim() || "Unnamed device";
   const consequence = open ? destructiveConsequence(approval, hostname) : "";
   const executionAllowed =
@@ -322,7 +358,7 @@ function ApprovalCard({
     principal.id === approval.requesterId &&
     canPermission(principal, approval.permission);
 
-  async function act(action: "approve" | "reject" | "execute") {
+  async function act(action: "approve" | "reject" | "withdraw" | "execute") {
     if (busy || lifetime.signal.aborted) return;
     const exact = attempt ?? { action, reason };
     setAttempt(exact);
@@ -337,6 +373,11 @@ function ApprovalCard({
         );
       } else if (exact.action === "reject") {
         await adminClient.rejectApproval(
+          { approvalId: approval.id, reason: exact.reason },
+          options,
+        );
+      } else if (exact.action === "withdraw") {
+        await adminClient.withdrawApproval(
           { approvalId: approval.id, reason: exact.reason },
           options,
         );
@@ -458,9 +499,11 @@ function ApprovalCard({
           ? "Approved"
           : exact.action === "reject"
             ? "Rejected"
-            : approval.payload.case === "acceptAdvisoryFinding"
-              ? "Risk accepted"
-              : "Action started",
+            : exact.action === "withdraw"
+              ? "Request withdrawn"
+              : approval.payload.case === "acceptAdvisoryFinding"
+                ? "Risk accepted"
+                : "Action started",
       );
       await client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
       // Approving, rejecting and running all change what Enrollment shows.
@@ -503,34 +546,9 @@ function ApprovalCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="break-words font-semibold">
           {effect}
-          {approval.deviceId ? ` on ${hostname}` : ""}
-        </h3>
-        <StatusBadge
-          status={
-            approval.state === ApprovalState.REJECTED
-              ? "destructive"
-              : approval.state === ApprovalState.EXPIRED
-                ? "warning"
-                : approval.state === ApprovalState.APPROVED
-                  ? "success"
-                  : approval.state === ApprovalState.PENDING
-                    ? "info"
-                    : "neutral"
-          }
-        >
-          {APPROVAL_STATES[approval.state] ?? "Unknown"}
-        </StatusBadge>
-      </div>
-      {consequence ? (
-        <p className="break-words text-sm font-medium text-destructive" data-slot="consequence">
-          {consequence}
-        </p>
-      ) : null}
-      <dl className="grid gap-4 break-words text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
-        <div>
-          <dt>Target</dt>
-          <dd>
-            {approval.deviceId ? (
+          {approval.deviceId ? (
+            <>
+              {" on "}
               <Link
                 to="/devices/$deviceId"
                 params={{ deviceId: approval.deviceId }}
@@ -539,78 +557,106 @@ function ApprovalCard({
               >
                 {hostname}
               </Link>
-            ) : approval.payload.case === "activateTargetPreview" ? (
-              "Assignment rollout"
-            ) : approval.payload.case === "approvePendingEnrollment" ? (
-              "Pending device enrollment"
-            ) : approval.payload.case === "revealSecret" ? (
-              `Secret, version ${approval.payload.value.version.toString()}`
-            ) : (
-              "Deployment"
-            )}
-          </dd>
-        </div>
+            </>
+          ) : approval.payload.case === "revealSecret" ? (
+            `, version ${approval.payload.value.version.toString()}`
+          ) : (
+            ""
+          )}
+        </h3>
+        <StatusBadge
+          status={
+            evidenceGone
+              ? "warning"
+              : approval.state === ApprovalState.REJECTED
+                ? "destructive"
+                : approval.state === ApprovalState.EXPIRED
+                  ? "warning"
+                  : approval.state === ApprovalState.APPROVED
+                    ? "success"
+                    : approval.state === ApprovalState.PENDING
+                      ? "info"
+                      : "neutral"
+          }
+        >
+          {evidenceGone ? "Invalid" : (APPROVAL_STATES[approval.state] ?? "Unknown")}
+        </StatusBadge>
+      </div>
+      {consequence ? (
+        <p className="break-words text-sm font-medium text-destructive" data-slot="consequence">
+          {consequence}
+        </p>
+      ) : null}
+      {evidenceGone ? (
+        <p id={evidenceGoneId} role="alert" className="text-sm">
+          Finding evidence is no longer available: the device no longer reports this finding, so
+          this request can't be approved. Reject it, and propose a new acceptance from the device if
+          the risk remains.
+        </p>
+      ) : null}
+      <dl
+        className="flex flex-wrap gap-x-4 gap-y-1 break-words text-sm text-muted-foreground [&_dd]:inline [&_dd]:text-foreground [&_dt]:inline"
+        data-slot="approval-facts"
+      >
         <div>
-          <dt>Permission</dt>
-          <dd>{permissionLabels[approval.permission] ?? "Other permission"}</dd>
-        </div>
-        <div>
-          <dt>Requester</dt>
+          <dt>Requester: </dt>
           <dd>{approval.requesterDisplayName.trim() || "Unknown"}</dd>
         </div>
-        {approval.approverId ? (
-          <div>
-            <dt>Decided by</dt>
-            <dd>{approval.approverDisplayName.trim() || "Unknown"}</dd>
-          </div>
-        ) : null}
         <div>
-          <dt>Created</dt>
+          <dt>Requested: </dt>
           <dd>
             <Timestamp value={approval.createdAt} />
           </dd>
         </div>
         <div>
-          <dt>Expires</dt>
+          <dt>{unexpired ? "Expires: " : "Expired: "}</dt>
           <dd>
             <Timestamp value={approval.expiresAt} />
-            {!unexpired ? " (expired)" : ""}
           </dd>
         </div>
-        {approval.decisionReason ? (
+        {approval.approverId ? (
           <div>
-            <dt>Decision reason</dt>
-            <dd className="whitespace-pre-wrap">{approval.decisionReason}</dd>
-          </div>
-        ) : null}
-        {actionRequest?.reason ? (
-          <div className="sm:col-span-2">
-            <dt>Request reason</dt>
-            <dd className="whitespace-pre-wrap">{actionRequest.reason}</dd>
+            <dt>Decided by: </dt>
+            <dd>{approval.approverDisplayName.trim() || "Unknown"}</dd>
           </div>
         ) : null}
       </dl>
+      {actionRequest?.reason || approval.decisionReason ? (
+        <dl className="grid gap-3 break-words text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
+          {actionRequest?.reason ? (
+            <div>
+              <dt>Request reason</dt>
+              <dd className="whitespace-pre-wrap">{actionRequest.reason}</dd>
+            </div>
+          ) : null}
+          {approval.decisionReason ? (
+            <div>
+              <dt>Decision reason</dt>
+              <dd className="whitespace-pre-wrap">{approval.decisionReason}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
       {approval.payload.case === "acceptAdvisoryFinding" ? (
-        <div className="grid gap-2 border border-warning/30 bg-warning/10 p-3 text-sm">
+        <div className="grid gap-2 border border-l-4 border-warning/40 p-3 text-sm">
           <p>This accepts risk on this device only; it does not fix the package.</p>
           {approval.advisoryFinding ? (
             <p>
               {approval.advisoryFinding.advisoryId}: {approval.advisoryFinding.packageName}{" "}
               {approval.advisoryFinding.installedVersion} ({approval.advisoryFinding.architecture})
             </p>
-          ) : (
-            <p role="alert">
-              Finding evidence is no longer available. Return to the device and investigate before
-              proposing a new exception.
-            </p>
-          )}
+          ) : null}
           <p className="whitespace-pre-wrap">Reason: {approval.payload.value.reason}</p>
           <p>
             Risk acceptance expires: <Timestamp value={approval.payload.value.expiresAt} />
           </p>
         </div>
       ) : null}
-      {actionRequest ? <DeviceActionSpecView spec={actionSpec} technicalDetails={false} /> : null}
+      {/* An open destructive request's consequence line already names its
+          target, size and mode; the exact storage identity stays in Details. */}
+      {actionRequest && !consequence ? (
+        <DeviceActionSpecView spec={actionSpec} technicalDetails={false} />
+      ) : null}
       {recovery ? (
         readiness.error ? (
           <RpcError failure={toRpcFailure(readiness.error)} />
@@ -635,8 +681,14 @@ function ApprovalCard({
           </label>
           <div className="flex flex-wrap gap-2">
             <Button
+              aria-describedby={
+                [evidenceGone ? evidenceGoneId : "", reason.trim() === "" ? decisionHintId : ""]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
               disabled={
                 busy ||
+                evidenceGone ||
                 (!recoveryReady && !(failure?.ambiguous && attempt?.action === "approve")) ||
                 (!advisoryReady && !(failure?.ambiguous && attempt?.action === "approve")) ||
                 reason.trim() === "" ||
@@ -648,6 +700,7 @@ function ApprovalCard({
             </Button>
             <Button
               variant="destructive"
+              aria-describedby={reason.trim() === "" ? decisionHintId : undefined}
               disabled={
                 busy || reason.trim() === "" || (attempt !== null && attempt.action !== "reject")
               }
@@ -658,19 +711,52 @@ function ApprovalCard({
           </div>
           {reason.trim() === "" ? (
             <p id={decisionHintId} className="text-sm text-muted-foreground">
-              Enter a decision reason to approve or reject. It is recorded in the audit log.
+              {evidenceGone
+                ? "Enter a decision reason to reject. It is recorded in the audit log."
+                : "Enter a decision reason to approve or reject. It is recorded in the audit log."}
             </p>
           ) : null}
         </div>
       ) : null}
       {!completed && ownRequest ? (
         <div className="grid gap-2">
-          <Button className="w-fit" disabled aria-describedby={ownRequestReasonId}>
-            Approve
+          <div className="flex flex-wrap items-center gap-2">
+            <Button className="w-fit" disabled aria-describedby={ownRequestReasonId}>
+              Approve
+            </Button>
+            <p id={ownRequestReasonId} className="text-sm text-muted-foreground">
+              You requested this; another admin must approve.
+            </p>
+          </div>
+          <label className="grid gap-2 text-sm font-medium">
+            Withdrawal reason
+            <Input
+              aria-label="Withdrawal reason"
+              aria-describedby={reason.trim() === "" ? decisionHintId : undefined}
+              data-freeform="audit reason for withdrawing the request"
+              value={reason}
+              disabled={busy || attempt !== null}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+          <Button
+            className="w-fit"
+            variant="outline"
+            aria-describedby={reason.trim() === "" ? decisionHintId : undefined}
+            disabled={
+              busy || reason.trim() === "" || (attempt !== null && attempt.action !== "withdraw")
+            }
+            onClick={() => void act("withdraw")}
+          >
+            {failure?.ambiguous && attempt?.action === "withdraw"
+              ? "Try again"
+              : "Withdraw request"}
           </Button>
-          <p id={ownRequestReasonId} className="text-sm text-muted-foreground">
-            You requested this; another admin must approve.
-          </p>
+          {reason.trim() === "" ? (
+            <p id={decisionHintId} className="text-sm text-muted-foreground">
+              Enter a reason to withdraw. It is recorded in the audit log.
+            </p>
+          ) : null}
         </div>
       ) : null}
       {advisoryRequest && !exceptionUnexpired ? (

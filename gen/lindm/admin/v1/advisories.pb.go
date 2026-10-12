@@ -1401,11 +1401,12 @@ func (x *ListAdvisoryFeedsResponse) GetFeeds() []*AdvisoryFeedStatus {
 }
 
 type AcceptAdvisoryFindingRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	DeviceId      string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	FindingId     string                 `protobuf:"bytes,3,opt,name=finding_id,json=findingId,proto3" json:"finding_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	DeviceId  string                 `protobuf:"bytes,2,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	FindingId string                 `protobuf:"bytes,3,opt,name=finding_id,json=findingId,proto3" json:"finding_id,omitempty"`
+	Reason    string                 `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	// A risk acceptance that has already ended is refused when proposed or accepted.
 	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
 	ApprovalId    string                 `protobuf:"bytes,6,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -1647,16 +1648,16 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\x12\x17\n" +
 	"\aos_name\x18\x10 \x01(\tR\x06osName\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
-	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xab\x02\n" +
+	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xb0\x02\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12%\n" +
 	"\tdevice_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12'\n" +
 	"\n" +
 	"finding_id\x18\x03 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tfindingId\x12!\n" +
-	"\x06reason\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12A\n" +
+	"\x06reason\x18\x04 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12F\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x12,\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\v\xbaH\b\xc8\x01\x01\xb2\x01\x02@\x01R\texpiresAt\x12,\n" +
 	"\vapproval_id\x18\x06 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\n" +
 	"approvalId\"`\n" +
 	"\x1dAcceptAdvisoryFindingResponse\x12?\n" +

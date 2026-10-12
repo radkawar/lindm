@@ -138,7 +138,7 @@ export function DashboardView() {
 
   // Workflow order, not a risk score. Never combine unlike populations.
   const next =
-    canApprove && approvals && approvals.pendingApprovals > 0n
+    canApprove && approvals && (approvals.pendingApprovals > 0n || approvals.readyToRun > 0n)
       ? "approvals"
       : canFixCoverage && uncovered > 0n
         ? "coverage"
@@ -254,22 +254,32 @@ export function DashboardView() {
                   }
                 >
                   {approvals ? (
-                    <p>
-                      {approvals.pendingApprovals > 0n ? (
-                        <>
+                    <>
+                      <p>
+                        {approvals.pendingApprovals > 0n ? (
+                          <>
+                            <strong className="font-semibold tabular-nums">
+                              {plural(
+                                approvals.pendingApprovals,
+                                "pending request",
+                                "pending requests",
+                              )}
+                            </strong>{" "}
+                            in your inbox.
+                          </>
+                        ) : (
+                          "No requests are waiting in your inbox."
+                        )}
+                      </p>
+                      {approvals.readyToRun > 0n ? (
+                        <p data-slot="approvals-ready">
                           <strong className="font-semibold tabular-nums">
-                            {plural(
-                              approvals.pendingApprovals,
-                              "pending request",
-                              "pending requests",
-                            )}
+                            {plural(approvals.readyToRun, "approved request", "approved requests")}
                           </strong>{" "}
-                          in your inbox.
-                        </>
-                      ) : (
-                        "No requests are waiting in your inbox."
-                      )}
-                    </p>
+                          ready for you to run.
+                        </p>
+                      ) : null}
+                    </>
                   ) : (
                     <Unavailable section="Approval summary" />
                   )}

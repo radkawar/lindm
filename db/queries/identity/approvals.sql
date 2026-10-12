@@ -31,6 +31,11 @@ UPDATE approval_requests SET state = sqlc.arg(state), approver_id = sqlc.arg(app
 WHERE id = sqlc.arg(id) AND state = 'pending' AND expires_at > clock_timestamp()
 RETURNING *;
 
+-- name: WithdrawApproval :one
+UPDATE approval_requests SET state = 'withdrawn', decision_reason = sqlc.arg(reason)
+WHERE id = sqlc.arg(id) AND requester_id = sqlc.arg(requester_id) AND state = 'pending' AND expires_at > clock_timestamp()
+RETURNING *;
+
 -- name: ConsumeApproval :execrows
 UPDATE approval_requests SET state = 'consumed', consumed_at = clock_timestamp()
 WHERE id = sqlc.arg(id) AND state = 'approved' AND expires_at > clock_timestamp();
@@ -75,6 +80,7 @@ WHERE (
     OR sqlc.arg(manage_unrestricted)::boolean
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, sqlc.arg(manage_scopes)::jsonb))
   )
+  AND (sqlc.narg(device_id)::uuid IS NULL OR a.device_id = sqlc.narg(device_id)::uuid)
 ORDER BY NOT (a.state IN ('pending', 'approved') AND a.expires_at > sqlc.arg(as_of)::timestamptz),
   CASE WHEN a.state IN ('pending', 'approved') AND a.expires_at > sqlc.arg(as_of)::timestamptz THEN a.expires_at END,
   CASE WHEN NOT (a.state IN ('pending', 'approved') AND a.expires_at > sqlc.arg(as_of)::timestamptz) THEN a.created_at END DESC,

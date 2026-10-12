@@ -65,12 +65,12 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 	}
 	response.RecentActions = response.RecentActions[:min(limit, len(response.RecentActions))]
 	if s.Identity != nil && !actor.ServiceAccount {
-		pending, err := s.Identity.CountPendingApprovals(ctx, actor.ID)
+		pending, ready, err := s.Identity.CountOpenApprovals(ctx, actor.ID)
 		if err != nil && !errors.Is(err, identity.ErrAuthorizationDenied) {
 			return nil, core.ApprovalError(err)
 		}
 		if err == nil {
-			response.Approvals = &adminv1.FleetApprovalSummary{PendingApprovals: uint64(pending)}
+			response.Approvals = &adminv1.FleetApprovalSummary{PendingApprovals: uint64(pending), ReadyToRun: uint64(ready)}
 		}
 	}
 	return core.NoStore(response), nil

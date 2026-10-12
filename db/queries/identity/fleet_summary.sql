@@ -1,7 +1,10 @@
--- name: CountVisiblePendingApprovals :one
--- Exact ListVisibleApprovals visibility, with pending/unexpired record filters.
-SELECT count(*)::bigint FROM approval_requests a
-WHERE a.state = 'pending' AND a.expires_at > CURRENT_TIMESTAMP
+-- name: CountVisibleOpenApprovals :one
+-- Exact ListVisibleApprovals visibility over unexpired open records: pending
+-- ones, and the actor's own approved requests that only they can run.
+SELECT count(*) FILTER (WHERE a.state = 'pending')::bigint AS pending,
+  count(*) FILTER (WHERE a.state = 'approved' AND a.requester_id = sqlc.arg(actor_id))::bigint AS ready_to_run
+FROM approval_requests a
+WHERE a.state IN ('pending', 'approved') AND a.expires_at > CURRENT_TIMESTAMP
   AND (
     a.permission = ANY(sqlc.arg(unrestricted_permissions)::text[])
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce(sqlc.arg(scopes)::jsonb -> a.permission, '[]'::jsonb)))

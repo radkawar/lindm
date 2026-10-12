@@ -3361,11 +3361,16 @@ Advisory risk acceptance can require two independent humans via
 `approvalRequiredPermissions: ["advisory_exceptions.manage"]`. Focused regressions
 are `TestAdvisoryExceptionRequiresExactIndependentApproval`,
 `TestAdvisoryApprovalConsumptionRollsBackWithInvalidExpiry`,
+`TestAdvisoryApprovalRefusedOnceFindingEvidenceIsGone`,
+`TestAdvisoryAcceptanceRefusesPastExpiry`,
 `TestAdvisoryApprovalBindsEveryAcceptanceField`,
 `TestAdvisoryExceptionReceiptMatchesPersistedPrecision`,
 `TestExceptionCanonicalExpiryDoesNotReissueApproval` and
 `TestExceptionProposalNeverAcceptsOrApproves`. These use controlled inventory or
-unit fixtures and are not native qualification.
+unit fixtures and are not native qualification. Requester withdrawal, the
+device-filtered inbox and the ready-to-run count are covered by
+`TestApprovalRequesterWithdraws`, `TestApprovalListFiltersByDevice` and
+`TestFleetSummaryPendingApprovalsRespectInboxAuthority`.
 
 The maintained disposable native scenario is `lab vm dispatch
 -advisory-exceptions -local-authority`, with the normal image, signed-package,

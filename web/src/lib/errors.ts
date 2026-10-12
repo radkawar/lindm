@@ -151,6 +151,13 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "This action is not enabled by this deployment's trust delegation.",
           action: "Ask an administrator to review the action's signing delegation.",
         };
+      case "approval_evidence_unavailable":
+        return {
+          tone: "warning",
+          title: "Evidence no longer available",
+          message: "The device no longer reports what this request was made for.",
+          action: "Reject this request. Propose a new one from the device if it still applies.",
+        };
       case "advisory_unavailable":
       case "execution_signing_unconfigured":
       case "execution_authority_unconfigured":

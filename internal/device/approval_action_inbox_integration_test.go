@@ -66,7 +66,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 				if len(page.Msg.GetApprovals()) != 1 || page.Msg.GetApprovals()[0].GetId() != created.GetId() {
 					t.Fatalf("eligible %s cannot see %s approval", actor.ID, field.Name())
 				}
-				count, err := f.svc.Identity.CountPendingApprovals(t.Context(), actor.ID)
+				count, _, err := f.svc.Identity.CountOpenApprovals(t.Context(), actor.ID)
 				if err != nil || count != 1 {
 					t.Fatalf("pending count=%d err=%v", count, err)
 				}
@@ -75,7 +75,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 				t.Fatal(err)
 			}
 			for _, actor := range []identity.Principal{owner, reviewer} {
-				count, err := f.svc.Identity.CountPendingApprovals(t.Context(), actor.ID)
+				count, _, err := f.svc.Identity.CountOpenApprovals(t.Context(), actor.ID)
 				if err != nil || count != 0 {
 					t.Fatalf("decided approval count=%d err=%v", count, err)
 				}
@@ -101,7 +101,7 @@ func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
 	if err != nil || len(page.Msg.GetApprovals()) != 0 {
 		t.Fatalf("missing fleet-read leaked approval projections: %v %v", page, err)
 	}
-	count, err := f.svc.Identity.CountPendingApprovals(t.Context(), reviewer.ID)
+	count, _, err := f.svc.Identity.CountOpenApprovals(t.Context(), reviewer.ID)
 	if err != nil || count != 0 {
 		t.Fatalf("missing fleet-read count=%d err=%v", count, err)
 	}
@@ -133,9 +133,9 @@ func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
 		if test.visible && (rows[0].ApprovalRequest.ID.String() != created.Msg.GetApproval().GetId() || rows[0].DeviceHostname == "") {
 			t.Fatal("authorized projected target disappeared")
 		}
-		count, err := q.CountVisiblePendingApprovals(t.Context(), identitydb.CountVisiblePendingApprovalsParams{ActorID: params.ActorID, UnrestrictedPermissions: params.UnrestrictedPermissions, Scopes: params.Scopes, RequiredScopes: params.RequiredScopes, ManageUnrestricted: params.ManageUnrestricted, ManageScopes: params.ManageScopes})
-		if err != nil || count != int64(want) {
-			t.Fatalf("independent read-scope count=%d want=%d err=%v", count, want, err)
+		counts, err := q.CountVisibleOpenApprovals(t.Context(), identitydb.CountVisibleOpenApprovalsParams{ActorID: params.ActorID, UnrestrictedPermissions: params.UnrestrictedPermissions, Scopes: params.Scopes, RequiredScopes: params.RequiredScopes, ManageUnrestricted: params.ManageUnrestricted, ManageScopes: params.ManageScopes})
+		if err != nil || counts.Pending != int64(want) {
+			t.Fatalf("independent read-scope count=%d want=%d err=%v", counts.Pending, want, err)
 		}
 	}
 }

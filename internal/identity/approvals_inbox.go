@@ -106,6 +106,13 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	}
 	visibility.AsOf = pgtype.Timestamptz{Time: now, Valid: true}
 	visibility.RowLimit = int32(limit + 1)
+	if request.GetDeviceId() != "" {
+		device, err := uuid.Parse(request.GetDeviceId())
+		if err != nil {
+			return nil, "", ErrApprovalInvalid
+		}
+		visibility.DeviceID = &device
+	}
 	var rows []identitydb.ListVisibleApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
 		for _, authorization := range authorizations {
@@ -216,18 +223,19 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 	return authorizations, visibility, err
 }
 
-// CountPendingApprovals counts unexpired pending records in the same authorized
-// inbox as ListApprovals. It is not a claim that each request can be approved:
+// CountOpenApprovals counts unexpired pending records, and the actor's own
+// approved requests ready for them to run, in the same authorized inbox as
+// ListApprovals. It is not a claim that each request can be approved or run:
 // consumption still performs the existing fresh requester/approver fences.
-func (s *Service) CountPendingApprovals(ctx context.Context, actor uuid.UUID) (int64, error) {
+func (s *Service) CountOpenApprovals(ctx context.Context, actor uuid.UUID) (pending, readyToRun int64, err error) {
 	if s == nil {
-		return 0, ErrApprovalInvalid
+		return 0, 0, ErrApprovalInvalid
 	}
 	authorizations, visibility, err := s.approvalInboxVisibility(ctx, actor)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	var count int64
+	var counts identitydb.CountVisibleOpenApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
 		for _, authorization := range authorizations {
 			if err := s.LockAuthorization(ctx, tx, authorization, authorization.permission); err != nil {
@@ -235,7 +243,7 @@ func (s *Service) CountPendingApprovals(ctx context.Context, actor uuid.UUID) (i
 			}
 		}
 		var err error
-		count, err = q.CountVisiblePendingApprovals(ctx, identitydb.CountVisiblePendingApprovalsParams{
+		counts, err = q.CountVisibleOpenApprovals(ctx, identitydb.CountVisibleOpenApprovalsParams{
 			ActorID: actor, UnrestrictedPermissions: visibility.UnrestrictedPermissions,
 			Scopes: visibility.Scopes, ManageUnrestricted: visibility.ManageUnrestricted, ManageScopes: visibility.ManageScopes,
 			RequiredScopes: visibility.RequiredScopes,
@@ -243,7 +251,7 @@ func (s *Service) CountPendingApprovals(ctx context.Context, actor uuid.UUID) (i
 		if err != nil {
 			return s.dbErr(err)
 		}
-		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped pending inbox count")
+		return s.insertSystemAudit(ctx, q, &actor, "approval.listed", principalResource(actor), "scoped open inbox count")
 	})
-	return count, err
+	return counts.Pending, counts.ReadyToRun, err
 }

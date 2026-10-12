@@ -21,7 +21,8 @@ export const task = {
 
 const timeout = 30_000;
 const OWN_REQUEST_REASON = "You requested this; another admin must approve";
-const OPEN_STATES = ["Pending", "Approved"];
+// Invalid: still pending on the server, but its evidence is gone (reject only).
+const OPEN_STATES = ["Pending", "Approved", "Invalid"];
 
 // One entry per approval card, in page order, read from the rendered card.
 async function cards(main) {

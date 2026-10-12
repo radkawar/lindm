@@ -180,6 +180,102 @@ func TestApprovalRejectExpiryAndVersions(t *testing.T) {
 	}
 }
 
+// Only the requester can withdraw, only while pending; a withdrawn request can
+// never be approved or used, and an exact retry is idempotent.
+func TestApprovalRequesterWithdraws(t *testing.T) {
+	ctx := t.Context()
+	pool, conn := testdb.Open(t)
+	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
+	ownerCtx := identity.WithPrincipal(ctx, owner)
+	reviewerCtx := approvalReviewer(t, svc, ctx)
+	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, ed25519Key(t))
+	request := &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: enrolled.Msg.GetDeviceId(), Reason: "retire selected device"}
+	created, err := svc.CreateApproval(ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_RevokeDevice{RevokeDevice: request}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := created.Msg.GetApproval().GetId()
+	withdraw := &adminv1.WithdrawApprovalRequest{ApprovalId: id, Reason: "Requested for the wrong device"}
+	if _, err := svc.WithdrawApproval(reviewerCtx, connect.NewRequest(withdraw)); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("another admin withdrew the request: %v", err)
+	}
+	withdrawn, err := svc.WithdrawApproval(ownerCtx, connect.NewRequest(withdraw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := withdrawn.Msg.GetApproval(); got.GetState() != adminv1.ApprovalState_APPROVAL_STATE_WITHDRAWN || got.GetDecisionReason() != withdraw.GetReason() || got.GetApproverId() != "" {
+		t.Fatalf("withdrawal not recorded: %v", got)
+	}
+	if replay, err := svc.WithdrawApproval(ownerCtx, connect.NewRequest(withdraw)); err != nil || replay.Msg.GetApproval().GetState() != adminv1.ApprovalState_APPROVAL_STATE_WITHDRAWN {
+		t.Fatalf("exact withdrawal retry: %v", err)
+	}
+	if _, err := svc.ApproveApproval(reviewerCtx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: id, Reason: "too late"})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("withdrawn request approved: %v", err)
+	}
+	request.ApprovalId = id
+	if _, err := svc.RevokeDevice(ownerCtx, connect.NewRequest(request)); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("withdrawn request used: %v", err)
+	}
+	var count int
+	if err := conn.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE action='approval.withdrawn' AND resource_id=$1", id).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("withdrawal audit=%d: %v", count, err)
+	}
+
+	// A decided request can no longer be withdrawn.
+	request = &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: enrolled.Msg.GetDeviceId(), Reason: "retire selected device"}
+	created, err = svc.CreateApproval(ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_RevokeDevice{RevokeDevice: request}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decided := created.Msg.GetApproval().GetId()
+	if _, err := svc.RejectApproval(reviewerCtx, connect.NewRequest(&adminv1.RejectApprovalRequest{ApprovalId: decided, Reason: "target must remain enrolled"})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.WithdrawApproval(ownerCtx, connect.NewRequest(&adminv1.WithdrawApprovalRequest{ApprovalId: decided, Reason: "Requested for the wrong device"})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		t.Fatalf("decided request withdrawn: %v", err)
+	}
+}
+
+// The device page reads its open requests through the same inbox, filtered to
+// that device only.
+func TestApprovalListFiltersByDevice(t *testing.T) {
+	ctx := t.Context()
+	pool, conn := testdb.Open(t)
+	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerCtx := identity.WithPrincipal(ctx, insertPrincipal(t, ctx, conn, identity.RoleOwner))
+	ids := map[string]string{}
+	for range 2 {
+		_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, ed25519Key(t))
+		device := enrolled.Msg.GetDeviceId()
+		created, err := svc.CreateApproval(ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_RevokeDevice{RevokeDevice: &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: device, Reason: "retire selected device"}}}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids[device] = created.Msg.GetApproval().GetId()
+	}
+	for device, id := range ids {
+		page, err := svc.ListApprovals(ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{DeviceId: device}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Msg.GetApprovals()) != 1 || page.Msg.GetApprovals()[0].GetId() != id {
+			t.Fatalf("device filter returned %v", page.Msg.GetApprovals())
+		}
+	}
+	if _, err := svc.ListApprovals(ownerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{DeviceId: "not-a-device"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("malformed device filter: %v", err)
+	}
+}
+
 func TestApprovalScopeInboxAndCreation(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)

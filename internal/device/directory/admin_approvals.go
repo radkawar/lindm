@@ -135,6 +135,39 @@ func (s *Service) RejectApproval(ctx context.Context, req *connect.Request[admin
 	return core.NoStore(&adminv1.RejectApprovalResponse{Approval: approval}), nil
 }
 
+// WithdrawApproval lets a human requester close their own pending request;
+// the identity layer refuses anyone else.
+func (s *Service) WithdrawApproval(ctx context.Context, req *connect.Request[adminv1.WithdrawApprovalRequest]) (*connect.Response[adminv1.WithdrawApprovalResponse], error) {
+	ctx, cancel := core.Bound(ctx)
+	defer cancel()
+	actor, ok := identity.PrincipalFromContext(ctx)
+	if !ok {
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	if actor.ServiceAccount {
+		return nil, core.ApprovalError(identity.ErrAuthorizationDenied)
+	}
+	if s.Identity == nil {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "authorization_unavailable")
+	}
+	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
+		return nil, core.Invalid("invalid_approval")
+	}
+	if err := s.Acquire(ctx); err != nil {
+		return nil, core.MapErr(err)
+	}
+	defer s.Release()
+	id, err := core.ParseUUID(req.Msg.GetApprovalId())
+	if err != nil {
+		return nil, core.Invalid("invalid_id")
+	}
+	approval, err := s.Identity.WithdrawApproval(ctx, actor.ID, id, req.Msg.GetReason())
+	if err != nil {
+		return nil, core.ApprovalError(err)
+	}
+	return core.NoStore(&adminv1.WithdrawApprovalResponse{Approval: approval}), nil
+}
+
 type approvalDecision interface {
 	proto.Message
 	GetApprovalId() string
@@ -167,7 +200,7 @@ func (s *Service) decideApproval(ctx context.Context, msg approvalDecision, appr
 	if err != nil {
 		return nil, core.Invalid("invalid_id")
 	}
-	approval, err := s.Identity.DecideApproval(ctx, actor.ID, id, approve, msg.GetReason(), s.ApprovalScope)
+	approval, err := s.Identity.DecideApproval(ctx, actor.ID, id, approve, msg.GetReason(), s.ApprovalScope, s.admitApproval)
 	if err != nil {
 		return nil, core.ApprovalError(err)
 	}

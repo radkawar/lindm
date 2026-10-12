@@ -43,6 +43,20 @@ enum ApprovalState {
   APPROVAL_STATE_REJECTED = 3;
   APPROVAL_STATE_CONSUMED = 4;
   APPROVAL_STATE_EXPIRED = 5;
+  // The requester withdrew it before any decision.
+  APPROVAL_STATE_WITHDRAWN = 6;
+}
+
+// Whether the evidence a request was proposed against still holds, decided by
+// the server when the approval is read. Approval is refused while unavailable;
+// rejection stays possible so the request can be closed.
+enum ApprovalEvidenceState {
+  // The request binds no retained evidence.
+  APPROVAL_EVIDENCE_STATE_UNSPECIFIED = 0;
+  APPROVAL_EVIDENCE_STATE_CURRENT = 1;
+  // The device's current evaluation no longer reports the bound evidence (for
+  // example, an advisory finding resolved or superseded by newer inventory).
+  APPROVAL_EVIDENCE_STATE_UNAVAILABLE = 2;
 }
 
 message Approval {
@@ -79,6 +93,7 @@ message Approval {
   lindm.policy.v1.TargetPreview target_preview = 25;
   // Exact finding identity when still retained; absence means evidence unavailable.
   AdvisoryFinding advisory_finding = 27;
+  ApprovalEvidenceState evidence_state = 28;
 }
 
 message CreateApprovalRequest {
@@ -107,6 +122,11 @@ message CreateApprovalResponse {
 message ListApprovalsRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
+  // Only requests targeting this device, within the same authorized inbox.
+  string device_id = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
 }
 message ListApprovalsResponse {
   repeated Approval approvals = 1;
@@ -126,5 +146,13 @@ message RejectApprovalRequest {
   string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
 }
 message RejectApprovalResponse {
+  Approval approval = 1;
+}
+// Only the requester may withdraw, and only while the request awaits a decision.
+message WithdrawApprovalRequest {
+  string approval_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message WithdrawApprovalResponse {
   Approval approval = 1;
 }

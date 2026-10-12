@@ -80,6 +80,9 @@ message FleetApprovalSummary {
   // Counted in identity's own fresh-authorization transaction, independently
   // of observed_at. Pending records may still fail approval authority fences.
   uint64 pending_approvals = 1;
+  // The caller's own approved, unexpired, unused requests in the same inbox:
+  // another admin approved them and only the requester can run them now.
+  uint64 ready_to_run = 2;
 }
 
 // Patch compliance of active devices from their latest published patch-status

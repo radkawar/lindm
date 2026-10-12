@@ -116,6 +116,9 @@ const (
 	// AdminServiceRejectApprovalProcedure is the fully-qualified name of the AdminService's
 	// RejectApproval RPC.
 	AdminServiceRejectApprovalProcedure = "/lindm.admin.v1.AdminService/RejectApproval"
+	// AdminServiceWithdrawApprovalProcedure is the fully-qualified name of the AdminService's
+	// WithdrawApproval RPC.
+	AdminServiceWithdrawApprovalProcedure = "/lindm.admin.v1.AdminService/WithdrawApproval"
 	// AdminServiceListAuditEventsProcedure is the fully-qualified name of the AdminService's
 	// ListAuditEvents RPC.
 	AdminServiceListAuditEventsProcedure = "/lindm.admin.v1.AdminService/ListAuditEvents"
@@ -305,6 +308,7 @@ type AdminServiceClient interface {
 	ListApprovals(context.Context, *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error)
 	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
 	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
+	WithdrawApproval(context.Context, *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	ListAuditActors(context.Context, *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error)
 	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
@@ -539,6 +543,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceRejectApprovalProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("RejectApproval")),
+			connect.WithClientOptions(opts...),
+		),
+		withdrawApproval: connect.NewClient[v1.WithdrawApprovalRequest, v1.WithdrawApprovalResponse](
+			httpClient,
+			baseURL+AdminServiceWithdrawApprovalProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("WithdrawApproval")),
 			connect.WithClientOptions(opts...),
 		),
 		listAuditEvents: connect.NewClient[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse](
@@ -892,6 +902,7 @@ type adminServiceClient struct {
 	listApprovals                        *connect.Client[v1.ListApprovalsRequest, v1.ListApprovalsResponse]
 	approveApproval                      *connect.Client[v1.ApproveApprovalRequest, v1.ApproveApprovalResponse]
 	rejectApproval                       *connect.Client[v1.RejectApprovalRequest, v1.RejectApprovalResponse]
+	withdrawApproval                     *connect.Client[v1.WithdrawApprovalRequest, v1.WithdrawApprovalResponse]
 	listAuditEvents                      *connect.Client[v1.ListAuditEventsRequest, v1.ListAuditEventsResponse]
 	listAuditActors                      *connect.Client[v1.ListAuditActorsRequest, v1.ListAuditActorsResponse]
 	listAuditDevices                     *connect.Client[v1.ListAuditDevicesRequest, v1.ListAuditDevicesResponse]
@@ -1087,6 +1098,11 @@ func (c *adminServiceClient) ApproveApproval(ctx context.Context, req *connect.R
 // RejectApproval calls lindm.admin.v1.AdminService.RejectApproval.
 func (c *adminServiceClient) RejectApproval(ctx context.Context, req *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error) {
 	return c.rejectApproval.CallUnary(ctx, req)
+}
+
+// WithdrawApproval calls lindm.admin.v1.AdminService.WithdrawApproval.
+func (c *adminServiceClient) WithdrawApproval(ctx context.Context, req *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error) {
+	return c.withdrawApproval.CallUnary(ctx, req)
 }
 
 // ListAuditEvents calls lindm.admin.v1.AdminService.ListAuditEvents.
@@ -1385,6 +1401,7 @@ type AdminServiceHandler interface {
 	ListApprovals(context.Context, *connect.Request[v1.ListApprovalsRequest]) (*connect.Response[v1.ListApprovalsResponse], error)
 	ApproveApproval(context.Context, *connect.Request[v1.ApproveApprovalRequest]) (*connect.Response[v1.ApproveApprovalResponse], error)
 	RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error)
+	WithdrawApproval(context.Context, *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error)
 	ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error)
 	ListAuditActors(context.Context, *connect.Request[v1.ListAuditActorsRequest]) (*connect.Response[v1.ListAuditActorsResponse], error)
 	ListAuditDevices(context.Context, *connect.Request[v1.ListAuditDevicesRequest]) (*connect.Response[v1.ListAuditDevicesResponse], error)
@@ -1615,6 +1632,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceRejectApprovalProcedure,
 		svc.RejectApproval,
 		connect.WithSchema(adminServiceMethods.ByName("RejectApproval")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceWithdrawApprovalHandler := connect.NewUnaryHandler(
+		AdminServiceWithdrawApprovalProcedure,
+		svc.WithdrawApproval,
+		connect.WithSchema(adminServiceMethods.ByName("WithdrawApproval")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceListAuditEventsHandler := connect.NewUnaryHandler(
@@ -1993,6 +2016,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceApproveApprovalHandler.ServeHTTP(w, r)
 		case AdminServiceRejectApprovalProcedure:
 			adminServiceRejectApprovalHandler.ServeHTTP(w, r)
+		case AdminServiceWithdrawApprovalProcedure:
+			adminServiceWithdrawApprovalHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditEventsProcedure:
 			adminServiceListAuditEventsHandler.ServeHTTP(w, r)
 		case AdminServiceListAuditActorsProcedure:
@@ -2218,6 +2243,10 @@ func (UnimplementedAdminServiceHandler) ApproveApproval(context.Context, *connec
 
 func (UnimplementedAdminServiceHandler) RejectApproval(context.Context, *connect.Request[v1.RejectApprovalRequest]) (*connect.Response[v1.RejectApprovalResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RejectApproval is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) WithdrawApproval(context.Context, *connect.Request[v1.WithdrawApprovalRequest]) (*connect.Response[v1.WithdrawApprovalResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.WithdrawApproval is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ListAuditEvents(context.Context, *connect.Request[v1.ListAuditEventsRequest]) (*connect.Response[v1.ListAuditEventsResponse], error) {

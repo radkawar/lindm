@@ -35,6 +35,8 @@ const (
 	ApprovalState_APPROVAL_STATE_REJECTED    ApprovalState = 3
 	ApprovalState_APPROVAL_STATE_CONSUMED    ApprovalState = 4
 	ApprovalState_APPROVAL_STATE_EXPIRED     ApprovalState = 5
+	// The requester withdrew it before any decision.
+	ApprovalState_APPROVAL_STATE_WITHDRAWN ApprovalState = 6
 )
 
 // Enum value maps for ApprovalState.
@@ -46,6 +48,7 @@ var (
 		3: "APPROVAL_STATE_REJECTED",
 		4: "APPROVAL_STATE_CONSUMED",
 		5: "APPROVAL_STATE_EXPIRED",
+		6: "APPROVAL_STATE_WITHDRAWN",
 	}
 	ApprovalState_value = map[string]int32{
 		"APPROVAL_STATE_UNSPECIFIED": 0,
@@ -54,6 +57,7 @@ var (
 		"APPROVAL_STATE_REJECTED":    3,
 		"APPROVAL_STATE_CONSUMED":    4,
 		"APPROVAL_STATE_EXPIRED":     5,
+		"APPROVAL_STATE_WITHDRAWN":   6,
 	}
 )
 
@@ -82,6 +86,61 @@ func (x ApprovalState) Number() protoreflect.EnumNumber {
 // Deprecated: Use ApprovalState.Descriptor instead.
 func (ApprovalState) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_approvals_proto_rawDescGZIP(), []int{0}
+}
+
+// Whether the evidence a request was proposed against still holds, decided by
+// the server when the approval is read. Approval is refused while unavailable;
+// rejection stays possible so the request can be closed.
+type ApprovalEvidenceState int32
+
+const (
+	// The request binds no retained evidence.
+	ApprovalEvidenceState_APPROVAL_EVIDENCE_STATE_UNSPECIFIED ApprovalEvidenceState = 0
+	ApprovalEvidenceState_APPROVAL_EVIDENCE_STATE_CURRENT     ApprovalEvidenceState = 1
+	// The device's current evaluation no longer reports the bound evidence (for
+	// example, an advisory finding resolved or superseded by newer inventory).
+	ApprovalEvidenceState_APPROVAL_EVIDENCE_STATE_UNAVAILABLE ApprovalEvidenceState = 2
+)
+
+// Enum value maps for ApprovalEvidenceState.
+var (
+	ApprovalEvidenceState_name = map[int32]string{
+		0: "APPROVAL_EVIDENCE_STATE_UNSPECIFIED",
+		1: "APPROVAL_EVIDENCE_STATE_CURRENT",
+		2: "APPROVAL_EVIDENCE_STATE_UNAVAILABLE",
+	}
+	ApprovalEvidenceState_value = map[string]int32{
+		"APPROVAL_EVIDENCE_STATE_UNSPECIFIED": 0,
+		"APPROVAL_EVIDENCE_STATE_CURRENT":     1,
+		"APPROVAL_EVIDENCE_STATE_UNAVAILABLE": 2,
+	}
+)
+
+func (x ApprovalEvidenceState) Enum() *ApprovalEvidenceState {
+	p := new(ApprovalEvidenceState)
+	*p = x
+	return p
+}
+
+func (x ApprovalEvidenceState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ApprovalEvidenceState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_approvals_proto_enumTypes[1].Descriptor()
+}
+
+func (ApprovalEvidenceState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_approvals_proto_enumTypes[1]
+}
+
+func (x ApprovalEvidenceState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ApprovalEvidenceState.Descriptor instead.
+func (ApprovalEvidenceState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_approvals_proto_rawDescGZIP(), []int{1}
 }
 
 type RevokeDeviceRequest struct {
@@ -247,7 +306,8 @@ type Approval struct {
 	// It is not a fresh membership evaluation or permission to execute.
 	TargetPreview *v11.TargetPreview `protobuf:"bytes,25,opt,name=target_preview,json=targetPreview,proto3" json:"target_preview,omitempty"`
 	// Exact finding identity when still retained; absence means evidence unavailable.
-	AdvisoryFinding *AdvisoryFinding `protobuf:"bytes,27,opt,name=advisory_finding,json=advisoryFinding,proto3" json:"advisory_finding,omitempty"`
+	AdvisoryFinding *AdvisoryFinding      `protobuf:"bytes,27,opt,name=advisory_finding,json=advisoryFinding,proto3" json:"advisory_finding,omitempty"`
+	EvidenceState   ApprovalEvidenceState `protobuf:"varint,28,opt,name=evidence_state,json=evidenceState,proto3,enum=lindm.admin.v1.ApprovalEvidenceState" json:"evidence_state,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -498,6 +558,13 @@ func (x *Approval) GetAdvisoryFinding() *AdvisoryFinding {
 		return x.AdvisoryFinding
 	}
 	return nil
+}
+
+func (x *Approval) GetEvidenceState() ApprovalEvidenceState {
+	if x != nil {
+		return x.EvidenceState
+	}
+	return ApprovalEvidenceState_APPROVAL_EVIDENCE_STATE_UNSPECIFIED
 }
 
 type isApproval_Payload interface {
@@ -849,9 +916,11 @@ func (x *CreateApprovalResponse) GetApproval() *Approval {
 }
 
 type ListApprovalsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PageSize  uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Only requests targeting this device, within the same authorized inbox.
+	DeviceId      string `protobuf:"bytes,3,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -896,6 +965,13 @@ func (x *ListApprovalsRequest) GetPageSize() uint32 {
 func (x *ListApprovalsRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListApprovalsRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
 	}
 	return ""
 }
@@ -1153,6 +1229,103 @@ func (x *RejectApprovalResponse) GetApproval() *Approval {
 	return nil
 }
 
+// Only the requester may withdraw, and only while the request awaits a decision.
+type WithdrawApprovalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ApprovalId    string                 `protobuf:"bytes,1,opt,name=approval_id,json=approvalId,proto3" json:"approval_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawApprovalRequest) Reset() {
+	*x = WithdrawApprovalRequest{}
+	mi := &file_lindm_admin_v1_approvals_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawApprovalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawApprovalRequest) ProtoMessage() {}
+
+func (x *WithdrawApprovalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_approvals_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawApprovalRequest.ProtoReflect.Descriptor instead.
+func (*WithdrawApprovalRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_approvals_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *WithdrawApprovalRequest) GetApprovalId() string {
+	if x != nil {
+		return x.ApprovalId
+	}
+	return ""
+}
+
+func (x *WithdrawApprovalRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type WithdrawApprovalResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Approval      *Approval              `protobuf:"bytes,1,opt,name=approval,proto3" json:"approval,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawApprovalResponse) Reset() {
+	*x = WithdrawApprovalResponse{}
+	mi := &file_lindm_admin_v1_approvals_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawApprovalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawApprovalResponse) ProtoMessage() {}
+
+func (x *WithdrawApprovalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_approvals_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawApprovalResponse.ProtoReflect.Descriptor instead.
+func (*WithdrawApprovalResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_approvals_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *WithdrawApprovalResponse) GetApproval() *Approval {
+	if x != nil {
+		return x.Approval
+	}
+	return nil
+}
+
 var File_lindm_admin_v1_approvals_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
@@ -1169,7 +1342,7 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x06update\x18\x01 \x01(\v2+.lindm.agent.v1.UpdateExecutionTrustRequestB\x06\xbaH\x03\xc8\x01\x01R\x06update\x12!\n" +
 	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\x12,\n" +
 	"\vapproval_id\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\n" +
-	"approvalId\"\x9d\x0e\n" +
+	"approvalId\"\xeb\x0e\n" +
 	"\bApproval\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12\x1f\n" +
@@ -1203,7 +1376,8 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x15approver_display_name\x18\x15 \x01(\tR\x13approverDisplayName\x12'\n" +
 	"\x0fdevice_hostname\x18\x16 \x01(\tR\x0edeviceHostname\x12E\n" +
 	"\x0etarget_preview\x18\x19 \x01(\v2\x1e.lindm.policy.v1.TargetPreviewR\rtargetPreview\x12J\n" +
-	"\x10advisory_finding\x18\x1b \x01(\v2\x1f.lindm.admin.v1.AdvisoryFindingR\x0fadvisoryFindingB\t\n" +
+	"\x10advisory_finding\x18\x1b \x01(\v2\x1f.lindm.admin.v1.AdvisoryFindingR\x0fadvisoryFinding\x12L\n" +
+	"\x0eevidence_state\x18\x1c \x01(\x0e2%.lindm.admin.v1.ApprovalEvidenceStateR\revidenceStateB\t\n" +
 	"\apayload\"\x9e\t\n" +
 	"\x15CreateApprovalRequest\x125\n" +
 	"\x10lifetime_seconds\x18\x01 \x01(\rB\n" +
@@ -1222,11 +1396,12 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"\x17accept_advisory_finding\x18\f \x01(\v2,.lindm.admin.v1.AcceptAdvisoryFindingRequestH\x00R\x15acceptAdvisoryFindingB\x10\n" +
 	"\apayload\x12\x05\xbaH\x02\b\x01\"N\n" +
 	"\x16CreateApprovalResponse\x124\n" +
-	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval\"f\n" +
+	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval\"\x90\x01\n" +
 	"\x14ListApprovalsRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\xa9\x01\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12(\n" +
+	"\tdevice_id\x18\x03 \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\bdeviceId\"\xa9\x01\n" +
 	"\x15ListApprovalsResponse\x126\n" +
 	"\tapprovals\x18\x01 \x03(\v2\x18.lindm.admin.v1.ApprovalR\tapprovals\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x120\n" +
@@ -1242,14 +1417,25 @@ const file_lindm_admin_v1_approvals_proto_rawDesc = "" +
 	"approvalId\x12!\n" +
 	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"N\n" +
 	"\x16RejectApprovalResponse\x124\n" +
-	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval*\xbe\x01\n" +
+	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval\"g\n" +
+	"\x17WithdrawApprovalRequest\x12)\n" +
+	"\vapproval_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\n" +
+	"approvalId\x12!\n" +
+	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"P\n" +
+	"\x18WithdrawApprovalResponse\x124\n" +
+	"\bapproval\x18\x01 \x01(\v2\x18.lindm.admin.v1.ApprovalR\bapproval*\xdc\x01\n" +
 	"\rApprovalState\x12\x1e\n" +
 	"\x1aAPPROVAL_STATE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16APPROVAL_STATE_PENDING\x10\x01\x12\x1b\n" +
 	"\x17APPROVAL_STATE_APPROVED\x10\x02\x12\x1b\n" +
 	"\x17APPROVAL_STATE_REJECTED\x10\x03\x12\x1b\n" +
 	"\x17APPROVAL_STATE_CONSUMED\x10\x04\x12\x1a\n" +
-	"\x16APPROVAL_STATE_EXPIRED\x10\x05B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x16APPROVAL_STATE_EXPIRED\x10\x05\x12\x1c\n" +
+	"\x18APPROVAL_STATE_WITHDRAWN\x10\x06*\x8e\x01\n" +
+	"\x15ApprovalEvidenceState\x12'\n" +
+	"#APPROVAL_EVIDENCE_STATE_UNSPECIFIED\x10\x00\x12#\n" +
+	"\x1fAPPROVAL_EVIDENCE_STATE_CURRENT\x10\x01\x12'\n" +
+	"#APPROVAL_EVIDENCE_STATE_UNAVAILABLE\x10\x02B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_approvals_proto_rawDescOnce sync.Once
@@ -1263,73 +1449,78 @@ func file_lindm_admin_v1_approvals_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_approvals_proto_rawDescData
 }
 
-var file_lindm_admin_v1_approvals_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_approvals_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_lindm_admin_v1_approvals_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_lindm_admin_v1_approvals_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_lindm_admin_v1_approvals_proto_goTypes = []any{
 	(ApprovalState)(0),                           // 0: lindm.admin.v1.ApprovalState
-	(*RevokeDeviceRequest)(nil),                  // 1: lindm.admin.v1.RevokeDeviceRequest
-	(*UpdateExecutionAuthorityRequest)(nil),      // 2: lindm.admin.v1.UpdateExecutionAuthorityRequest
-	(*Approval)(nil),                             // 3: lindm.admin.v1.Approval
-	(*CreateApprovalRequest)(nil),                // 4: lindm.admin.v1.CreateApprovalRequest
-	(*CreateApprovalResponse)(nil),               // 5: lindm.admin.v1.CreateApprovalResponse
-	(*ListApprovalsRequest)(nil),                 // 6: lindm.admin.v1.ListApprovalsRequest
-	(*ListApprovalsResponse)(nil),                // 7: lindm.admin.v1.ListApprovalsResponse
-	(*ApproveApprovalRequest)(nil),               // 8: lindm.admin.v1.ApproveApprovalRequest
-	(*ApproveApprovalResponse)(nil),              // 9: lindm.admin.v1.ApproveApprovalResponse
-	(*RejectApprovalRequest)(nil),                // 10: lindm.admin.v1.RejectApprovalRequest
-	(*RejectApprovalResponse)(nil),               // 11: lindm.admin.v1.RejectApprovalResponse
-	(*v1.UpdateExecutionTrustRequest)(nil),       // 12: lindm.agent.v1.UpdateExecutionTrustRequest
-	(*timestamppb.Timestamp)(nil),                // 13: google.protobuf.Timestamp
-	(*SetResourceAssignmentRequest)(nil),         // 14: lindm.admin.v1.SetResourceAssignmentRequest
-	(*CreateDeviceActionRequest)(nil),            // 15: lindm.admin.v1.CreateDeviceActionRequest
-	(*RevealRecoveryKeyRequest)(nil),             // 16: lindm.admin.v1.RevealRecoveryKeyRequest
-	(*ApprovePendingEnrollmentRequest)(nil),      // 17: lindm.admin.v1.ApprovePendingEnrollmentRequest
-	(*CreateRecoveryEnrollmentGrantRequest)(nil), // 18: lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
-	(*ActivateTargetPreviewRequest)(nil),         // 19: lindm.admin.v1.ActivateTargetPreviewRequest
-	(*RevealSecretRequest)(nil),                  // 20: lindm.admin.v1.RevealSecretRequest
-	(*RevealLocalAdminPasswordRequest)(nil),      // 21: lindm.admin.v1.RevealLocalAdminPasswordRequest
-	(*AcceptAdvisoryFindingRequest)(nil),         // 22: lindm.admin.v1.AcceptAdvisoryFindingRequest
-	(*v11.TargetPreview)(nil),                    // 23: lindm.policy.v1.TargetPreview
-	(*AdvisoryFinding)(nil),                      // 24: lindm.admin.v1.AdvisoryFinding
+	(ApprovalEvidenceState)(0),                   // 1: lindm.admin.v1.ApprovalEvidenceState
+	(*RevokeDeviceRequest)(nil),                  // 2: lindm.admin.v1.RevokeDeviceRequest
+	(*UpdateExecutionAuthorityRequest)(nil),      // 3: lindm.admin.v1.UpdateExecutionAuthorityRequest
+	(*Approval)(nil),                             // 4: lindm.admin.v1.Approval
+	(*CreateApprovalRequest)(nil),                // 5: lindm.admin.v1.CreateApprovalRequest
+	(*CreateApprovalResponse)(nil),               // 6: lindm.admin.v1.CreateApprovalResponse
+	(*ListApprovalsRequest)(nil),                 // 7: lindm.admin.v1.ListApprovalsRequest
+	(*ListApprovalsResponse)(nil),                // 8: lindm.admin.v1.ListApprovalsResponse
+	(*ApproveApprovalRequest)(nil),               // 9: lindm.admin.v1.ApproveApprovalRequest
+	(*ApproveApprovalResponse)(nil),              // 10: lindm.admin.v1.ApproveApprovalResponse
+	(*RejectApprovalRequest)(nil),                // 11: lindm.admin.v1.RejectApprovalRequest
+	(*RejectApprovalResponse)(nil),               // 12: lindm.admin.v1.RejectApprovalResponse
+	(*WithdrawApprovalRequest)(nil),              // 13: lindm.admin.v1.WithdrawApprovalRequest
+	(*WithdrawApprovalResponse)(nil),             // 14: lindm.admin.v1.WithdrawApprovalResponse
+	(*v1.UpdateExecutionTrustRequest)(nil),       // 15: lindm.agent.v1.UpdateExecutionTrustRequest
+	(*timestamppb.Timestamp)(nil),                // 16: google.protobuf.Timestamp
+	(*SetResourceAssignmentRequest)(nil),         // 17: lindm.admin.v1.SetResourceAssignmentRequest
+	(*CreateDeviceActionRequest)(nil),            // 18: lindm.admin.v1.CreateDeviceActionRequest
+	(*RevealRecoveryKeyRequest)(nil),             // 19: lindm.admin.v1.RevealRecoveryKeyRequest
+	(*ApprovePendingEnrollmentRequest)(nil),      // 20: lindm.admin.v1.ApprovePendingEnrollmentRequest
+	(*CreateRecoveryEnrollmentGrantRequest)(nil), // 21: lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
+	(*ActivateTargetPreviewRequest)(nil),         // 22: lindm.admin.v1.ActivateTargetPreviewRequest
+	(*RevealSecretRequest)(nil),                  // 23: lindm.admin.v1.RevealSecretRequest
+	(*RevealLocalAdminPasswordRequest)(nil),      // 24: lindm.admin.v1.RevealLocalAdminPasswordRequest
+	(*AcceptAdvisoryFindingRequest)(nil),         // 25: lindm.admin.v1.AcceptAdvisoryFindingRequest
+	(*v11.TargetPreview)(nil),                    // 26: lindm.policy.v1.TargetPreview
+	(*AdvisoryFinding)(nil),                      // 27: lindm.admin.v1.AdvisoryFinding
 }
 var file_lindm_admin_v1_approvals_proto_depIdxs = []int32{
-	12, // 0: lindm.admin.v1.UpdateExecutionAuthorityRequest.update:type_name -> lindm.agent.v1.UpdateExecutionTrustRequest
-	13, // 1: lindm.admin.v1.Approval.created_at:type_name -> google.protobuf.Timestamp
-	13, // 2: lindm.admin.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 0: lindm.admin.v1.UpdateExecutionAuthorityRequest.update:type_name -> lindm.agent.v1.UpdateExecutionTrustRequest
+	16, // 1: lindm.admin.v1.Approval.created_at:type_name -> google.protobuf.Timestamp
+	16, // 2: lindm.admin.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: lindm.admin.v1.Approval.state:type_name -> lindm.admin.v1.ApprovalState
-	1,  // 4: lindm.admin.v1.Approval.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
-	14, // 5: lindm.admin.v1.Approval.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
-	2,  // 6: lindm.admin.v1.Approval.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
-	15, // 7: lindm.admin.v1.Approval.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
-	16, // 8: lindm.admin.v1.Approval.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
-	17, // 9: lindm.admin.v1.Approval.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
-	18, // 10: lindm.admin.v1.Approval.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
-	19, // 11: lindm.admin.v1.Approval.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
-	20, // 12: lindm.admin.v1.Approval.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
-	21, // 13: lindm.admin.v1.Approval.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
-	22, // 14: lindm.admin.v1.Approval.accept_advisory_finding:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
-	23, // 15: lindm.admin.v1.Approval.target_preview:type_name -> lindm.policy.v1.TargetPreview
-	24, // 16: lindm.admin.v1.Approval.advisory_finding:type_name -> lindm.admin.v1.AdvisoryFinding
-	1,  // 17: lindm.admin.v1.CreateApprovalRequest.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
-	14, // 18: lindm.admin.v1.CreateApprovalRequest.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
-	2,  // 19: lindm.admin.v1.CreateApprovalRequest.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
-	15, // 20: lindm.admin.v1.CreateApprovalRequest.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
-	16, // 21: lindm.admin.v1.CreateApprovalRequest.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
-	17, // 22: lindm.admin.v1.CreateApprovalRequest.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
-	18, // 23: lindm.admin.v1.CreateApprovalRequest.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
-	19, // 24: lindm.admin.v1.CreateApprovalRequest.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
-	20, // 25: lindm.admin.v1.CreateApprovalRequest.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
-	21, // 26: lindm.admin.v1.CreateApprovalRequest.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
-	22, // 27: lindm.admin.v1.CreateApprovalRequest.accept_advisory_finding:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
-	3,  // 28: lindm.admin.v1.CreateApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	3,  // 29: lindm.admin.v1.ListApprovalsResponse.approvals:type_name -> lindm.admin.v1.Approval
-	3,  // 30: lindm.admin.v1.ApproveApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	3,  // 31: lindm.admin.v1.RejectApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
-	32, // [32:32] is the sub-list for method output_type
-	32, // [32:32] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	2,  // 4: lindm.admin.v1.Approval.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
+	17, // 5: lindm.admin.v1.Approval.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
+	3,  // 6: lindm.admin.v1.Approval.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
+	18, // 7: lindm.admin.v1.Approval.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
+	19, // 8: lindm.admin.v1.Approval.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
+	20, // 9: lindm.admin.v1.Approval.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
+	21, // 10: lindm.admin.v1.Approval.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
+	22, // 11: lindm.admin.v1.Approval.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
+	23, // 12: lindm.admin.v1.Approval.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
+	24, // 13: lindm.admin.v1.Approval.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
+	25, // 14: lindm.admin.v1.Approval.accept_advisory_finding:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
+	26, // 15: lindm.admin.v1.Approval.target_preview:type_name -> lindm.policy.v1.TargetPreview
+	27, // 16: lindm.admin.v1.Approval.advisory_finding:type_name -> lindm.admin.v1.AdvisoryFinding
+	1,  // 17: lindm.admin.v1.Approval.evidence_state:type_name -> lindm.admin.v1.ApprovalEvidenceState
+	2,  // 18: lindm.admin.v1.CreateApprovalRequest.revoke_device:type_name -> lindm.admin.v1.RevokeDeviceRequest
+	17, // 19: lindm.admin.v1.CreateApprovalRequest.set_resource_assignment:type_name -> lindm.admin.v1.SetResourceAssignmentRequest
+	3,  // 20: lindm.admin.v1.CreateApprovalRequest.update_execution_authority:type_name -> lindm.admin.v1.UpdateExecutionAuthorityRequest
+	18, // 21: lindm.admin.v1.CreateApprovalRequest.create_device_action:type_name -> lindm.admin.v1.CreateDeviceActionRequest
+	19, // 22: lindm.admin.v1.CreateApprovalRequest.reveal_recovery_key:type_name -> lindm.admin.v1.RevealRecoveryKeyRequest
+	20, // 23: lindm.admin.v1.CreateApprovalRequest.approve_pending_enrollment:type_name -> lindm.admin.v1.ApprovePendingEnrollmentRequest
+	21, // 24: lindm.admin.v1.CreateApprovalRequest.recover_device:type_name -> lindm.admin.v1.CreateRecoveryEnrollmentGrantRequest
+	22, // 25: lindm.admin.v1.CreateApprovalRequest.activate_target_preview:type_name -> lindm.admin.v1.ActivateTargetPreviewRequest
+	23, // 26: lindm.admin.v1.CreateApprovalRequest.reveal_secret:type_name -> lindm.admin.v1.RevealSecretRequest
+	24, // 27: lindm.admin.v1.CreateApprovalRequest.reveal_local_admin_password:type_name -> lindm.admin.v1.RevealLocalAdminPasswordRequest
+	25, // 28: lindm.admin.v1.CreateApprovalRequest.accept_advisory_finding:type_name -> lindm.admin.v1.AcceptAdvisoryFindingRequest
+	4,  // 29: lindm.admin.v1.CreateApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	4,  // 30: lindm.admin.v1.ListApprovalsResponse.approvals:type_name -> lindm.admin.v1.Approval
+	4,  // 31: lindm.admin.v1.ApproveApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	4,  // 32: lindm.admin.v1.RejectApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	4,  // 33: lindm.admin.v1.WithdrawApprovalResponse.approval:type_name -> lindm.admin.v1.Approval
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_approvals_proto_init() }
@@ -1375,8 +1566,8 @@ func file_lindm_admin_v1_approvals_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_approvals_proto_rawDesc), len(file_lindm_admin_v1_approvals_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   11,
+			NumEnums:      2,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -11,46 +11,54 @@ import (
 	"github.com/google/uuid"
 )
 
-const countVisiblePendingApprovals = `-- name: CountVisiblePendingApprovals :one
-SELECT count(*)::bigint FROM approval_requests a
-WHERE a.state = 'pending' AND a.expires_at > CURRENT_TIMESTAMP
+const countVisibleOpenApprovals = `-- name: CountVisibleOpenApprovals :one
+SELECT count(*) FILTER (WHERE a.state = 'pending')::bigint AS pending,
+  count(*) FILTER (WHERE a.state = 'approved' AND a.requester_id = $1)::bigint AS ready_to_run
+FROM approval_requests a
+WHERE a.state IN ('pending', 'approved') AND a.expires_at > CURRENT_TIMESTAMP
   AND (
-    a.permission = ANY($1::text[])
-    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($2::jsonb -> a.permission, '[]'::jsonb)))
+    a.permission = ANY($2::text[])
+    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($3::jsonb -> a.permission, '[]'::jsonb)))
   )
   AND NOT EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(coalesce($3::jsonb -> a.permission, '[]'::jsonb)) required
+    FROM jsonb_array_elements(coalesce($4::jsonb -> a.permission, '[]'::jsonb)) required
     WHERE a.device_id IS NULL
        OR NOT device_scope_matches(a.device_id, (required ->> 'unrestricted')::boolean, required -> 'scopes')
   )
   AND (
-    a.requester_id = $4
+    a.requester_id = $1
     OR $5::boolean
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $6::jsonb))
   )
 `
 
-type CountVisiblePendingApprovalsParams struct {
+type CountVisibleOpenApprovalsParams struct {
+	ActorID                 uuid.UUID
 	UnrestrictedPermissions []string
 	Scopes                  []byte
 	RequiredScopes          []byte
-	ActorID                 uuid.UUID
 	ManageUnrestricted      bool
 	ManageScopes            []byte
 }
 
-// Exact ListVisibleApprovals visibility, with pending/unexpired record filters.
-func (q *Queries) CountVisiblePendingApprovals(ctx context.Context, arg CountVisiblePendingApprovalsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countVisiblePendingApprovals,
+type CountVisibleOpenApprovalsRow struct {
+	Pending    int64
+	ReadyToRun int64
+}
+
+// Exact ListVisibleApprovals visibility over unexpired open records: pending
+// ones, and the actor's own approved requests that only they can run.
+func (q *Queries) CountVisibleOpenApprovals(ctx context.Context, arg CountVisibleOpenApprovalsParams) (CountVisibleOpenApprovalsRow, error) {
+	row := q.db.QueryRow(ctx, countVisibleOpenApprovals,
+		arg.ActorID,
 		arg.UnrestrictedPermissions,
 		arg.Scopes,
 		arg.RequiredScopes,
-		arg.ActorID,
 		arg.ManageUnrestricted,
 		arg.ManageScopes,
 	)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
+	var i CountVisibleOpenApprovalsRow
+	err := row.Scan(&i.Pending, &i.ReadyToRun)
+	return i, err
 }

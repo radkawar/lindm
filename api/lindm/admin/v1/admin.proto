@@ -59,6 +59,7 @@ service AdminService {
   rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
   rpc ApproveApproval(ApproveApprovalRequest) returns (ApproveApprovalResponse);
   rpc RejectApproval(RejectApprovalRequest) returns (RejectApprovalResponse);
+  rpc WithdrawApproval(WithdrawApprovalRequest) returns (WithdrawApprovalResponse);
   rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
   rpc ListAuditActors(ListAuditActorsRequest) returns (ListAuditActorsResponse);
   rpc ListAuditDevices(ListAuditDevicesRequest) returns (ListAuditDevicesResponse);

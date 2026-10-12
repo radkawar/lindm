@@ -271,11 +271,12 @@ WHERE (
     OR $10::boolean
     OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $11::jsonb))
   )
+  AND ($12::uuid IS NULL OR a.device_id = $12::uuid)
 ORDER BY NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz),
   CASE WHEN a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz THEN a.expires_at END,
   CASE WHEN NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz) THEN a.created_at END DESC,
   a.id
-LIMIT $12
+LIMIT $13
 `
 
 type ListVisibleApprovalsParams struct {
@@ -290,6 +291,7 @@ type ListVisibleApprovalsParams struct {
 	ActorID                 uuid.UUID
 	ManageUnrestricted      bool
 	ManageScopes            []byte
+	DeviceID                *uuid.UUID
 	RowLimit                int32
 }
 
@@ -316,6 +318,7 @@ func (q *Queries) ListVisibleApprovals(ctx context.Context, arg ListVisibleAppro
 		arg.ActorID,
 		arg.ManageUnrestricted,
 		arg.ManageScopes,
+		arg.DeviceID,
 		arg.RowLimit,
 	)
 	if err != nil {
@@ -362,6 +365,42 @@ SELECT id, requester_id, requester_version, action, permission, device_id, mutat
 
 func (q *Queries) LockApproval(ctx context.Context, id uuid.UUID) (ApprovalRequest, error) {
 	row := q.db.QueryRow(ctx, lockApproval, id)
+	var i ApprovalRequest
+	err := row.Scan(
+		&i.ID,
+		&i.RequesterID,
+		&i.RequesterVersion,
+		&i.Action,
+		&i.Permission,
+		&i.DeviceID,
+		&i.MutationID,
+		&i.Payload,
+		&i.PayloadSha256,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.State,
+		&i.ApproverID,
+		&i.ApproverVersion,
+		&i.DecisionReason,
+		&i.ConsumedAt,
+	)
+	return i, err
+}
+
+const withdrawApproval = `-- name: WithdrawApproval :one
+UPDATE approval_requests SET state = 'withdrawn', decision_reason = $1
+WHERE id = $2 AND requester_id = $3 AND state = 'pending' AND expires_at > clock_timestamp()
+RETURNING id, requester_id, requester_version, action, permission, device_id, mutation_id, payload, payload_sha256, created_at, expires_at, state, approver_id, approver_version, decision_reason, consumed_at
+`
+
+type WithdrawApprovalParams struct {
+	Reason      string
+	ID          uuid.UUID
+	RequesterID uuid.UUID
+}
+
+func (q *Queries) WithdrawApproval(ctx context.Context, arg WithdrawApprovalParams) (ApprovalRequest, error) {
+	row := q.db.QueryRow(ctx, withdrawApproval, arg.Reason, arg.ID, arg.RequesterID)
 	var i ApprovalRequest
 	err := row.Scan(
 		&i.ID,

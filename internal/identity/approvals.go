@@ -25,6 +25,11 @@ var ErrApprovalInvalid = errors.New("approval_invalid")
 // The caller must lock policy and principals before invoking it.
 type ApprovalScope func(context.Context, pgx.Tx, Principal, Permission, uuid.UUID) error
 
+// ApprovalAdmission checks, in the decision transaction after principals and
+// target scope are locked, that a pending request's bound evidence still holds.
+// It runs only before an approval; rejection never depends on evidence.
+type ApprovalAdmission func(context.Context, pgx.Tx, *adminv1.Approval) error
+
 type approvalBinding struct {
 	action     string
 	permission Permission
@@ -422,8 +427,8 @@ func (s *Service) LockAndConsumeApproval(ctx context.Context, tx pgx.Tx, pair *A
 	return s.insertSystemAudit(ctx, q, &actor, "approval.consumed", row.ID.String(), row.Action)
 }
 
-func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, approve bool, reason string, scope ApprovalScope) (*adminv1.Approval, error) {
-	if s == nil || scope == nil {
+func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, approve bool, reason string, scope ApprovalScope, admit ApprovalAdmission) (*adminv1.Approval, error) {
+	if s == nil || scope == nil || admit == nil {
 		return nil, ErrApprovalInvalid
 	}
 	validation := &adminv1.ApproveApprovalRequest{ApprovalId: id.String(), Reason: reason}
@@ -472,11 +477,68 @@ func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, appro
 			}
 			return ErrApprovalInvalid
 		}
+		if approve {
+			pending, err := approvalMessage(&approvalProjection{ApprovalRequest: current}, now)
+			if err != nil {
+				return err
+			}
+			if err := admit(ctx, tx, pending); err != nil {
+				return err
+			}
+		}
 		_, err = q.DecideApproval(ctx, identitydb.DecideApprovalParams{ID: id, State: state, ApproverID: &actor, ApproverVersion: int64(pair.approver.Version()), DecisionReason: reason})
 		if err != nil {
 			return s.dbErr(err)
 		}
 		if err := s.insertAudit(ctx, q, &actor, action, id.String(), reason); err != nil {
+			return err
+		}
+		projection, err = q.GetApprovalProjection(ctx, id)
+		return s.dbErr(err)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return approvalMessage(&projection, s.clock())
+}
+
+// WithdrawApproval lets the requester close their own pending request. It
+// needs no approval authority: withdrawal only removes the request's power,
+// is never a decision, and records no approver. An exact retry is idempotent.
+func (s *Service) WithdrawApproval(ctx context.Context, actor, id uuid.UUID, reason string) (*adminv1.Approval, error) {
+	if s == nil {
+		return nil, ErrApprovalInvalid
+	}
+	if err := s.rules.Validate(&adminv1.WithdrawApprovalRequest{ApprovalId: id.String(), Reason: reason}); err != nil {
+		return nil, ErrApprovalInvalid
+	}
+	var projection approvalProjection
+	err := s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
+		current, err := q.LockApproval(ctx, id)
+		if err != nil {
+			return ErrApprovalInvalid
+		}
+		if current.RequesterID != actor {
+			return ErrAuthorizationDenied
+		}
+		if current.State == "withdrawn" && current.DecisionReason == reason {
+			projection, err = q.GetApprovalProjection(ctx, id)
+			return s.dbErr(err)
+		}
+		now, err := s.authorizationTime(ctx, q)
+		if err != nil {
+			return err
+		}
+		if !now.Before(current.ExpiresAt.Time) {
+			return ErrAuthorizationExpired
+		}
+		if current.State != "pending" {
+			return ErrApprovalInvalid
+		}
+		if _, err := q.WithdrawApproval(ctx, identitydb.WithdrawApprovalParams{ID: id, RequesterID: actor, Reason: reason}); err != nil {
+			return s.dbErr(err)
+		}
+		if err := s.insertAudit(ctx, q, &actor, "approval.withdrawn", id.String(), reason); err != nil {
 			return err
 		}
 		projection, err = q.GetApprovalProjection(ctx, id)
@@ -510,6 +572,8 @@ func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Ap
 		out.State = adminv1.ApprovalState_APPROVAL_STATE_REJECTED
 	case "consumed":
 		out.State = adminv1.ApprovalState_APPROVAL_STATE_CONSUMED
+	case "withdrawn":
+		out.State = adminv1.ApprovalState_APPROVAL_STATE_WITHDRAWN
 	default:
 		return nil, ErrApprovalInvalid
 	}

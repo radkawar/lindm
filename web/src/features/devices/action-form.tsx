@@ -118,6 +118,7 @@ const approvalLabels: Record<ApprovalState, string> = {
   [ApprovalState.REJECTED]: "Rejected",
   [ApprovalState.CONSUMED]: "Used",
   [ApprovalState.EXPIRED]: "Expired",
+  [ApprovalState.WITHDRAWN]: "Withdrawn",
 };
 
 const actionSummaries: Record<DeviceActionKind, string> = {

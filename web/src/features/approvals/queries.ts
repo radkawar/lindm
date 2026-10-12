@@ -17,3 +17,21 @@ export function approvalsQueryOptions(lifetime: AuthLifetime, pageToken: string)
     retry: false,
   });
 }
+
+// The first page of one device's requests in the caller's inbox; open requests
+// sort first, so an open revocation is always on it.
+export function deviceApprovalsQueryOptions(lifetime: AuthLifetime, deviceId: string) {
+  return queryOptions({
+    queryKey: ["approvals", lifetime.generation, "device", deviceId] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const result = await adminClient.listApprovals(
+        { pageSize: 50, deviceId },
+        { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      return result;
+    },
+    retry: false,
+  });
+}

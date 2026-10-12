@@ -606,8 +606,11 @@ type FleetApprovalSummary struct {
 	// Counted in identity's own fresh-authorization transaction, independently
 	// of observed_at. Pending records may still fail approval authority fences.
 	PendingApprovals uint64 `protobuf:"varint,1,opt,name=pending_approvals,json=pendingApprovals,proto3" json:"pending_approvals,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// The caller's own approved, unexpired, unused requests in the same inbox:
+	// another admin approved them and only the requester can run them now.
+	ReadyToRun    uint64 `protobuf:"varint,2,opt,name=ready_to_run,json=readyToRun,proto3" json:"ready_to_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FleetApprovalSummary) Reset() {
@@ -643,6 +646,13 @@ func (*FleetApprovalSummary) Descriptor() ([]byte, []int) {
 func (x *FleetApprovalSummary) GetPendingApprovals() uint64 {
 	if x != nil {
 		return x.PendingApprovals
+	}
+	return 0
+}
+
+func (x *FleetApprovalSummary) GetReadyToRun() uint64 {
+	if x != nil {
+		return x.ReadyToRun
 	}
 	return 0
 }
@@ -1060,9 +1070,11 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\x0eother_findings\x18\x05 \x01(\x04R\rotherFindings\x12+\n" +
 	"\x11evaluated_devices\x18\x06 \x01(\x04R\x10evaluatedDevices\x12'\n" +
 	"\x0funknown_devices\x18\a \x01(\x04R\x0eunknownDevices\x12'\n" +
-	"\x0fpartial_devices\x18\b \x01(\x04R\x0epartialDevices\"C\n" +
+	"\x0fpartial_devices\x18\b \x01(\x04R\x0epartialDevices\"e\n" +
 	"\x14FleetApprovalSummary\x12+\n" +
-	"\x11pending_approvals\x18\x01 \x01(\x04R\x10pendingApprovals\"\x94\x03\n" +
+	"\x11pending_approvals\x18\x01 \x01(\x04R\x10pendingApprovals\x12 \n" +
+	"\fready_to_run\x18\x02 \x01(\x04R\n" +
+	"readyToRun\"\x94\x03\n" +
 	"\x11FleetPatchSummary\x12'\n" +
 	"\x0fpatched_devices\x18\x01 \x01(\x04R\x0epatchedDevices\x128\n" +
 	"\x18security_pending_devices\x18\x02 \x01(\x04R\x16securityPendingDevices\x126\n" +
