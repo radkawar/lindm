@@ -1,5 +1,6 @@
 import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import type { QueryClient } from "@tanstack/react-query";
+import { NotFoundContent } from "@/components/layout/not-found";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: () => (
@@ -12,5 +13,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       </a>
       <Outlet />
     </>
+  ),
+  notFoundComponent: () => (
+    <main id="main">
+      <NotFoundContent />
+    </main>
   ),
 });

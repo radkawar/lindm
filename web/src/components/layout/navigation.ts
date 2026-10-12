@@ -10,6 +10,7 @@ import {
   RocketIcon,
   SettingsIcon,
   ShieldAlertIcon,
+  ShieldUserIcon,
   UsersIcon,
   UserRoundCogIcon,
 } from "lucide-react";
@@ -90,7 +91,7 @@ export const navigation = [
   {
     to: "/authorization",
     label: "Authorization",
-    icon: LockKeyholeIcon,
+    icon: ShieldUserIcon,
     permission: "accounts.manage",
     group: "Administration",
   },

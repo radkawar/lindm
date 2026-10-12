@@ -4,7 +4,9 @@ import { ChevronDownIcon, ChevronsUpDownIcon, LogOutIcon, ShieldCheckIcon } from
 import { useState, type ReactNode } from "react";
 import type { SessionPrincipal } from "../../../gen/lindm/auth/v1/auth_pb";
 import { ThemeToggle } from "./theme-toggle";
+import { BreadcrumbTitleContext } from "./breadcrumb-title";
 import { navigation, visibleNavigation } from "./navigation";
+import { roleLabel } from "@/lib/roles";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Menu } from "@base-ui/react/menu";
@@ -53,11 +55,36 @@ export function ConsoleShell({
   commandPalette: ReactNode;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [recordTitle, setRecordTitle] = useState<string | null>(null);
   const currentPage = navigation.find(
     (item) => pathname === item.to || pathname.startsWith(`${item.to}/`),
   );
   const title = currentPage?.label ?? "Console";
   const isDetail = currentPage && pathname !== currentPage.to;
+  // Device sub-pages ("/devices/<id>/actions/...") link back to their device.
+  const deviceId = currentPage?.to === "/devices" ? pathname.split("/")[2] : undefined;
+  const subPage =
+    currentPage?.to === "/devices"
+      ? pathname.includes("/actions/new/")
+        ? "New action"
+        : pathname.includes("/actions/")
+          ? "Action status"
+          : pathname.includes("/assistance/")
+            ? "Remote assistance"
+            : pathname.includes("/recovery/")
+              ? "Recovery key"
+              : pathname.endsWith("/recovery-enrollment")
+                ? "Recover enrollment"
+                : null
+      : null;
+  const genericRecord =
+    currentPage?.to === "/devices"
+      ? "Device details"
+      : currentPage?.to === "/secrets"
+        ? "Secret details"
+        : pathname.endsWith("/new")
+          ? "Create profile"
+          : "Profile details";
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
@@ -96,7 +123,7 @@ export function ConsoleShell({
               <span className="grid min-w-0 flex-1 gap-1 text-left group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-medium">{userLabel}</span>
                 <span className="truncate text-xs text-sidebar-foreground/80">
-                  {role || "No role"}
+                  {roleLabel(role)}
                 </span>
               </span>
               <ChevronsUpDownIcon className="size-4 group-data-[collapsible=icon]:hidden" />
@@ -109,7 +136,7 @@ export function ConsoleShell({
                     {principal.breakGlass ? (
                       <StatusBadge status="warning">Break-glass session</StatusBadge>
                     ) : (
-                      <Badge variant="secondary">{role || "No role"}</Badge>
+                      <Badge variant="secondary">{roleLabel(role)}</Badge>
                     )}
                   </div>
                   <Menu.Item
@@ -143,26 +170,25 @@ export function ConsoleShell({
                   <BreadcrumbPage className="truncate">{title}</BreadcrumbPage>
                 )}
               </BreadcrumbItem>
+              {isDetail && subPage && recordTitle && deviceId ? (
+                <>
+                  <BreadcrumbSeparator className="hidden sm:block" />
+                  <BreadcrumbItem className="hidden min-w-0 sm:inline-flex">
+                    <BreadcrumbLink
+                      className="truncate"
+                      render={<Link to="/devices/$deviceId" params={{ deviceId }} />}
+                    >
+                      {recordTitle}
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                </>
+              ) : null}
               {isDetail ? (
                 <>
                   <BreadcrumbSeparator className="hidden sm:block" />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>
-                      {currentPage.to === "/devices"
-                        ? pathname.includes("/actions/new/")
-                          ? "New action"
-                          : pathname.includes("/actions/")
-                            ? "Action status"
-                            : pathname.includes("/recovery/")
-                              ? "Recovery key"
-                              : pathname.endsWith("/recovery-enrollment")
-                                ? "Recover enrollment"
-                                : "Device details"
-                        : currentPage.to === "/secrets"
-                          ? "Secret details"
-                          : pathname.endsWith("/new")
-                            ? "Create profile"
-                            : "Profile details"}
+                  <BreadcrumbItem className="min-w-0">
+                    <BreadcrumbPage className="truncate">
+                      {subPage ?? recordTitle ?? genericRecord}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
                 </>
@@ -174,7 +200,9 @@ export function ConsoleShell({
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+          <BreadcrumbTitleContext value={setRecordTitle}>{children}</BreadcrumbTitleContext>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

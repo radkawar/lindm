@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceActionStatusPage } from "@/features/devices/action-pages";
 import { canonicalUuid } from "@/lib/ids";
 
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/action
 
 function ActionStatusRoute() {
   const { deviceId, actionId } = Route.useParams();
+  useDeviceBreadcrumbTitle(deviceId);
   return (
     <DeviceActionStatusPage
       key={`${deviceId}:${actionId}`}

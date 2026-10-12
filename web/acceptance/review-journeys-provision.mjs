@@ -468,11 +468,14 @@ async function helpdesk(ctx) {
     "helpdesk-accounts",
     "Accounts / create local account",
     "no",
-    "The page combines identity settings, account creation and every account editor. The default role is admin and empty scope means all devices.",
+    "The page lists accounts with role, device access and sign-in state; creation opens a dialog whose default role is admin and whose empty scope means all devices.",
     "Start an invite-helpdesk task with least-privilege role, required named scope, permission summary and a private enrollment handoff.",
     "No account has been created. The audit will explicitly choose helpdesk and Engineering rather than accept broad defaults.",
   );
-  const form = formWithHeading(page, "Create account");
+  await page.getByRole("button", { name: "Create account", exact: true }).first().click();
+  const createDialog = page.getByRole("dialog", { name: "Create account", exact: true });
+  await visible(createDialog);
+  const form = createDialog.locator("form");
   const username = `helpdesk-review-${randomUUID().slice(0, 8)}`;
   await form.getByRole("textbox", { name: "Username", exact: true }).fill(username);
   await form.getByRole("combobox", { name: "Role", exact: true }).click();
@@ -485,7 +488,7 @@ async function helpdesk(ctx) {
     "Explain what helpdesk can do and cannot do before granting it; keep owner/admin grants clearly separate.",
     "The role choices are being inspected before creating any account.",
   );
-  const option = page.getByRole("option", { name: "helpdesk", exact: true });
+  const option = page.getByRole("option", { name: "Helpdesk", exact: true });
   if (!(await option.isVisible())) {
     await page.keyboard.press("Escape");
     await shot(
@@ -545,21 +548,26 @@ async function helpdesk(ctx) {
     "helpdesk-secret-dismissed",
     "Accounts / handoff dismissed",
     "partly",
-    "After dismissing the handoff, the operator returns to an undifferentiated wall of account forms.",
+    "After dismissing the handoff, the operator returns to the account list without an effective-access summary for the hire.",
     "Keep the newly invited helpdesk hire selected with limited-access evidence and an explicit awaiting-user-setup state.",
     "The shown-once secret is gone; no credential material was retained by this scenario.",
   );
   // Reload through the normal route to assert persistence, not a mutation toast.
   await ctx.visit("/accounts");
-  const saved = formWithHeading(page, username);
-  await visible(saved);
-  await visible(saved.getByText("Not set up yet", { exact: true }));
+  const row = page.getByRole("row").filter({ hasText: username });
+  await visible(row);
+  await visible(row.getByText("Waiting for setup", { exact: true }));
+  await visible(row.getByText("Limited to 1 group", { exact: true }));
+  await row.getByRole("button", { name: `Edit ${username}`, exact: true }).click();
+  const editDialog = page.getByRole("dialog", { name: `Edit ${username}`, exact: true });
+  await visible(editDialog);
+  const saved = editDialog.locator("form");
   await visible(saved.getByRole("button", { name: `Device groups 1 ${group.name}`, exact: true }));
   const role = (
     await saved.getByRole("combobox", { name: "Role", exact: true }).innerText()
   ).trim();
   if (
-    role !== "helpdesk" ||
+    role !== "Helpdesk" ||
     (await saved.getByRole("button", { name: /^Device groups \d+ / }).count()) !== 1 ||
     (await saved.getByRole("button", { name: /^Devices \d+ / }).count()) !== 0 ||
     (await saved
@@ -575,6 +583,8 @@ async function helpdesk(ctx) {
     (await saved.getByRole("heading", { name: /^Rule \d+$/ }).count()) !== 1
   )
     throw new Error("helpdesk_access_scope_not_limited");
+  await page.keyboard.press("Escape");
+  await editDialog.waitFor({ state: "hidden", timeout });
   await shot(
     ctx,
     "helpdesk-persisted-access",
@@ -582,12 +592,12 @@ async function helpdesk(ctx) {
     "partly",
     "The persisted group is named rather than a UUID, but the account still lacks a compact effective-access summary.",
     "Show the hire, helpdesk capabilities, Engineering member devices and pending setup as one compact account record.",
-    "After reload, the UI confirms helpdesk role, the single Engineering group rule and Not set up yet. This proves saved configuration, not a signed-in hire's authorization behavior.",
+    "After reload, the account row shows Helpdesk, Limited to 1 group and Waiting for setup, and its editor confirms the single Engineering group rule. This proves saved configuration, not a signed-in hire's authorization behavior.",
   );
   return {
     outcome: "completed",
     reason:
-      "Created a local helpdesk account limited to an isolated Engineering group and verified its persisted role/scope and Not set up yet state through UI. The one-time secret was masked and dismissed without retention. The real hire must receive a fresh privately delivered enrollment secret and complete their own password/authenticator setup; no real browser identity or signed-in authorization claim is made.",
+      "Created a local helpdesk account limited to an isolated Engineering group and verified its persisted role/scope and Waiting for setup state through UI. The one-time secret was masked and dismissed without retention. The real hire must receive a fresh privately delivered enrollment secret and complete their own password/authenticator setup; no real browser identity or signed-in authorization claim is made.",
   };
 }
 

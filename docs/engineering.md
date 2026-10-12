@@ -971,6 +971,20 @@ each starting from scroll position zero:
   popover (`components/ui/popover.tsx`) rather than expanding inline. The review runs
   Chromium with classic (non-overlay) scrollbars, so a scroll lock that drops the
   scrollbar would shift the page and fail.
+- conventions: at most one disclosure (`TechnicalDetails` or other `<details>`) per
+  card, list item, table row or dialog, kept for genuinely secondary data; one
+  Refresh per page, in the page header (no "Refresh" plus "Refresh X" pairs); no
+  disabled First/Next pair or standalone "Page size" control on a list that fits on
+  one page (use `ListPagination` from `web/src/components/ui/list-pagination.tsx`,
+  which renders nothing then); and no horizontally clipped table without the
+  `Table` primitive's visible scroll hint. Times use `Timestamp`
+  (`web/src/components/ui/timestamp.tsx`, "Oct 12, 10:18 AM BST · 4 min ago") or
+  `formatTimestamp` from `web/src/lib/time.ts`; the copy rules reject GMT offsets
+  and numeric dates such as "10/12/2026". At 390px a list page's first table row
+  (a table not preceded by a section heading) must start within the first screen:
+  fold list filters into `FilterPanel` (`web/src/components/ui/filter-panel.tsx`,
+  one "Filters · N active" toggle below the md breakpoint) and open decision forms
+  on demand rather than expanding them by default.
 
 Once per theme and viewport it also checks the Control-K and Command-K palette
 (open, search, Escape, focus restore) and saves device details to raise a real

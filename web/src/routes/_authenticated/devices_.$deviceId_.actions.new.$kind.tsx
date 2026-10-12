@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceActionCreatePage } from "@/features/devices/action-pages";
 import { complexActionKinds, type ComplexActionKind } from "@/features/devices/action-menu";
 import { canonicalUuid } from "@/lib/ids";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/action
 
 function ActionCreateRoute() {
   const { deviceId, kind } = Route.useParams();
+  useDeviceBreadcrumbTitle(deviceId);
   const { luksUuid } = Route.useSearch();
   return <DeviceActionCreatePage deviceId={deviceId} kind={kind} luksUuid={luksUuid} />;
 }

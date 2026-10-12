@@ -10,12 +10,20 @@ import {
   type SecretSummary,
 } from "../../../gen/lindm/admin/v1/secrets_pb";
 import { SecretRefSchema } from "../../../gen/lindm/resource/v1/common_pb";
+import { useBreadcrumbTitle } from "@/components/layout/breadcrumb-title";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -33,7 +41,7 @@ import { toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
-import { formatTimestamp } from "@/lib/time";
+import { Timestamp } from "@/components/ui/timestamp";
 import { MaterialField, purposeLabels, takeMaterial } from "./material";
 import { secretQueryOptions } from "./queries";
 import { SecretReveal } from "./reveal";
@@ -47,7 +55,11 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
   const secret = failure ? undefined : detail.data?.secret;
   const versions = failure ? [] : (detail.data?.versions ?? []);
   const [selected, setSelected] = useState<bigint | null>(null);
+  const [rotating, setRotating] = useState(false);
   const version = selected ?? secret?.currentVersion ?? 0n;
+  const canManage = canPermission(principal, "secrets.manage", true);
+  const canReveal = canPermission(principal, "secrets.reveal", true);
+  useBreadcrumbTitle(secret ? secret.displayName.trim() || "Unnamed secret" : undefined);
   return (
     <section className="flex min-w-0 flex-col gap-6" aria-busy={detail.isFetching}>
       <Link
@@ -61,13 +73,20 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
         title={secret?.displayName.trim() || "Secret"}
         description="Values stay hidden unless you reveal them."
         actions={
-          <Button
-            variant="outline"
-            disabled={detail.isFetching}
-            onClick={() => void detail.refetch()}
-          >
-            Refresh
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              disabled={detail.isFetching}
+              onClick={() => void detail.refetch()}
+            >
+              Refresh
+            </Button>
+            {secret && canManage ? (
+              <Button variant="outline" aria-haspopup="dialog" onClick={() => setRotating(true)}>
+                Rotate secret
+              </Button>
+            ) : null}
+          </>
         }
       />
       {failure ? <RpcError failure={failure} /> : null}
@@ -91,13 +110,15 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                 <div>
                   <dt>Created</dt>
                   <dd>
-                    {formatTimestamp(secret.createdAt).local} by{" "}
+                    <Timestamp value={secret.createdAt} /> by{" "}
                     {secret.createdByDisplayName.trim() || "unknown"}
                   </dd>
                 </div>
                 <div>
                   <dt>Updated</dt>
-                  <dd>{formatTimestamp(secret.updatedAt).local}</dd>
+                  <dd>
+                    <Timestamp value={secret.updatedAt} />
+                  </dd>
                 </div>
               </dl>
               <div className="mt-4">
@@ -106,12 +127,41 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                     { label: "Secret ID", value: secret.secretId },
                     { label: "Subject binding ID", value: secret.subjectBindingId },
                     { label: "Created by ID", value: secret.createdBy },
+                    {
+                      label: `Profile reference, version ${secret.currentVersion.toString()}`,
+                      value: secretReferenceJson(secret, secret.currentVersion),
+                    },
                   ]}
                 />
               </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                To send it to devices, select this secret in a{" "}
+                <Link to="/profiles" className="underline underline-offset-4">
+                  profile
+                </Link>{" "}
+                setting of the same type. Devices get a new version only after you update the
+                profile.
+              </p>
             </CardContent>
           </Card>
-          <SecretReferenceCard secret={secret} version={version} />
+          {canManage ? (
+            <Dialog open={rotating} onOpenChange={setRotating}>
+              <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Rotate {secret.displayName.trim() || "secret"}</DialogTitle>
+                  <DialogDescription>
+                    Saves version {(secret.currentVersion + 1n).toString()}. Devices keep the
+                    current version until you update the profile.
+                  </DialogDescription>
+                </DialogHeader>
+                <RotateSecretForm
+                  key={secret.currentVersion.toString()}
+                  secret={secret}
+                  onRotated={() => setRotating(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : null}
           <Card>
             <CardHeader>
               <CardTitle>Versions</CardTitle>
@@ -128,29 +178,36 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                       <TableHead>Created</TableHead>
                       <TableHead>Created by</TableHead>
                       <TableHead>Reason</TableHead>
-                      <TableHead>Selection</TableHead>
+                      {canReveal && versions.length > 1 ? <TableHead>Reveal</TableHead> : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {versions.map((entry) => (
                       <TableRow key={entry.version.toString()}>
-                        <TableCell>{entry.version.toString()}</TableCell>
-                        <TableCell>{formatTimestamp(entry.createdAt).local}</TableCell>
+                        <TableCell>
+                          {entry.version.toString()}
+                          {entry.version === secret.currentVersion ? (
+                            <span className="text-muted-foreground"> (current)</span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
+                          <Timestamp value={entry.createdAt} />
+                        </TableCell>
                         <TableCell>{entry.createdByDisplayName.trim() || "Unknown"}</TableCell>
                         <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
                           {entry.reason.trim() || "Not recorded"}
                         </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={entry.version === version}
-                            aria-pressed={entry.version === version}
-                            onClick={() => setSelected(entry.version)}
-                          >
-                            {entry.version === version ? "Selected" : "Select version"}
-                          </Button>
-                        </TableCell>
+                        {canReveal && versions.length > 1 ? (
+                          <TableCell>
+                            {entry.version === version ? (
+                              <span className="text-sm text-muted-foreground">Selected</span>
+                            ) : (
+                              <Button variant="outline" onClick={() => setSelected(entry.version)}>
+                                Select version {entry.version.toString()}
+                              </Button>
+                            )}
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -158,14 +215,15 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
               )}
             </CardContent>
           </Card>
-          {canPermission(principal, "secrets.manage", true) ? (
-            <RotateSecretForm key={secret.currentVersion.toString()} secret={secret} />
-          ) : null}
-          {canPermission(principal, "secrets.reveal", true) ? (
+          {canReveal ? (
             <Card>
               <CardHeader>
                 <CardTitle>Reveal version {version.toString()}</CardTitle>
-                <CardDescription>Select another version in the table to reveal it.</CardDescription>
+                {versions.length > 1 ? (
+                  <CardDescription>
+                    Select another version in the table to reveal it.
+                  </CardDescription>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <SecretReveal
@@ -183,8 +241,8 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
   );
 }
 
-function SecretReferenceCard({ secret, version }: { secret: SecretSummary; version: bigint }) {
-  const json = toJsonString(
+function secretReferenceJson(secret: SecretSummary, version: bigint): string {
+  return toJsonString(
     SecretRefSchema,
     create(SecretRefSchema, {
       secretId: secret.secretId,
@@ -192,42 +250,10 @@ function SecretReferenceCard({ secret, version }: { secret: SecretSummary; versi
       purpose: secret.purpose,
       subjectBindingId: secret.subjectBindingId,
     }),
-    { prettySpaces: 2 },
-  );
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Use version {version.toString()} in a profile</CardTitle>
-        <CardDescription>
-          Copy this and paste it into a profile field of the same type. Devices get a new version
-          only after you update the profile.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-md border p-3 text-xs">
-          {json}
-        </pre>
-        <Button
-          className="w-fit"
-          variant="outline"
-          onClick={() =>
-            void navigator.clipboard.writeText(json).then(
-              () => toast.success("Copied"),
-              () =>
-                toast.error("Couldn't copy", {
-                  description: "Select the text and copy it instead.",
-                }),
-            )
-          }
-        >
-          Copy
-        </Button>
-      </CardContent>
-    </Card>
   );
 }
 
-function RotateSecretForm({ secret }: { secret: SecretSummary }) {
+function RotateSecretForm({ secret, onRotated }: { secret: SecretSummary; onRotated: () => void }) {
   const lifetime = useAuthLifetime();
   const queryClient = useQueryClient();
   const id = useId();
@@ -261,6 +287,7 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
       failureTitle: "Secret rotation",
       onSuccess: async (response) => {
         setReason("");
+        onRotated();
         toast.success(`Version ${response.secret?.currentVersion.toString() ?? "unknown"} saved`, {
           description: "Update the profile to send it to devices.",
         });
@@ -275,54 +302,42 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Rotate secret</CardTitle>
-        <CardDescription>
-          Saves a new version {(secret.currentVersion + 1n).toString()}. Devices keep the current
-          version until you update the profile.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={submit} autoComplete="off">
-          <MaterialField id={`${id}-material`} purpose={secret.purpose} disabled={locked} />
-          <div className="grid gap-2">
-            <Label htmlFor={`${id}-reason`}>Reason</Label>
-            <Textarea
-              id={`${id}-reason`}
-              data-freeform="audit reason"
-              value={reason}
-              readOnly={locked}
-              onChange={(event) => setReason(event.target.value)}
-            />
-          </div>
-          {exact.invalid ? (
-            <p role="alert" className="text-sm text-destructive">
-              {exact.invalid}
+    <form className="grid gap-4" onSubmit={submit} autoComplete="off">
+      <MaterialField id={`${id}-material`} purpose={secret.purpose} disabled={locked} />
+      <div className="grid gap-2">
+        <Label htmlFor={`${id}-reason`}>Reason</Label>
+        <Textarea
+          id={`${id}-reason`}
+          data-freeform="audit reason"
+          value={reason}
+          readOnly={locked}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </div>
+      {exact.invalid ? (
+        <p role="alert" className="text-sm text-destructive">
+          {exact.invalid}
+        </p>
+      ) : null}
+      {exact.failure ? (
+        <RpcError failure={exact.failure} title="Secret not rotated">
+          {exact.ambiguous ? (
+            <p>
+              Refresh to see whether a new version was saved. Try again, or discard to start over.
             </p>
           ) : null}
-          {exact.failure ? (
-            <RpcError failure={exact.failure} title="Secret not rotated">
-              {exact.ambiguous ? (
-                <p>
-                  Refresh to see whether a new version was saved. Try again, or discard to start
-                  over.
-                </p>
-              ) : null}
-            </RpcError>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={exact.busy}>
-              {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Rotate secret"}
-            </Button>
-            {exact.ambiguous ? (
-              <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
-                Discard
-              </Button>
-            ) : null}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        </RpcError>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={exact.busy}>
+          {exact.busy ? "Storing…" : exact.ambiguous ? "Try again" : "Rotate secret"}
+        </Button>
+        {exact.ambiguous ? (
+          <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
+            Discard
+          </Button>
+        ) : null}
+      </div>
+    </form>
   );
 }

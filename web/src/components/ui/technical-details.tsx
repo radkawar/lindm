@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 import { cn } from "cn";
 
 // Collapsed support-facing identifiers and diagnostics. Primary UI text stays in
-// admin language; IDs and internal terms belong here only.
+// admin language; IDs and internal terms belong here only. At most one per card,
+// row or dialog (ui-review "details-per-card"): merge a card's identifiers into
+// one Details instead of adding a toggle per section, and never hide what the
+// operator needs to decide.
 export function TechnicalDetails({
   items,
   summary = "Details",

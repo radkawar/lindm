@@ -36,6 +36,16 @@
       "name": "raw byte count",
       "pattern": "\\b\\d{1,3}(?:[,.\\s\\u202f]\\d{3})+\\s*bytes?\\b|\\b\\d{4,}\\s*bytes?\\b",
       "flags": "i"
+    },
+    {
+      "name": "GMT offset instead of time zone name (use Timestamp)",
+      "pattern": "\\b(?:GMT|UTC)[+\\u2212-]\\d{1,2}(?::\\d{2})?\\b",
+      "flags": ""
+    },
+    {
+      "name": "numeric date instead of console date format (use Timestamp)",
+      "pattern": "\\b\\d{1,2}/\\d{1,2}/\\d{4}\\b",
+      "flags": ""
     }
   ],
   "rawByteValue": {

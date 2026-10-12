@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceRecoveryRevealPage } from "@/features/devices/action-pages";
 import { canonicalUuid } from "@/lib/ids";
 
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/recove
 
 function RecoveryRevealRoute() {
   const { deviceId, actionId } = Route.useParams();
+  useDeviceBreadcrumbTitle(deviceId);
   return (
     <DeviceRecoveryRevealPage
       key={`${deviceId}:${actionId}`}

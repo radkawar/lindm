@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { AssistanceViewerPage } from "@/features/assistance/viewer";
 import { deviceQueryOptions } from "@/features/devices/queries";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/assist
 
 function AssistanceViewerRoute() {
   const { deviceId, sessionId } = Route.useParams();
+  useDeviceBreadcrumbTitle(deviceId);
   const lifetime = useAuthLifetime();
   const device = useQuery(deviceQueryOptions(lifetime, deviceId));
   return (

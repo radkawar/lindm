@@ -2,12 +2,15 @@ import { createRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { bindRouter, queryClient } from "./query";
 import { routeTree } from "../routeTree.gen";
 import { Button } from "@/components/ui/button";
+import { NotFoundContent } from "@/components/layout/not-found";
 
 export const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: "intent",
   defaultErrorComponent: ConsoleRouteError,
+  // Inside the console shell, which already provides the main landmark.
+  defaultNotFoundComponent: NotFoundContent,
 });
 
 bindRouter(router);

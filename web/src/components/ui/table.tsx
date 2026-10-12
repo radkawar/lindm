@@ -6,32 +6,68 @@ import { cn } from "cn";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   const container = React.useRef<HTMLDivElement>(null);
-  const [scrollable, setScrollable] = React.useState(false);
+  const [overflow, setOverflow] = React.useState({
+    scrollable: false,
+    atStart: true,
+    atEnd: true,
+  });
   React.useEffect(() => {
     const node = container.current;
     if (!node) return;
-    const update = () => setScrollable(node.scrollWidth > node.clientWidth);
+    const update = () => {
+      const scrollable = node.scrollWidth > node.clientWidth + 1;
+      const atStart = node.scrollLeft <= 1;
+      const atEnd = node.scrollLeft + node.clientWidth >= node.scrollWidth - 1;
+      setOverflow((current) =>
+        current.scrollable === scrollable && current.atStart === atStart && current.atEnd === atEnd
+          ? current
+          : { scrollable, atStart, atEnd },
+      );
+    };
     const observer = new ResizeObserver(update);
     observer.observe(node);
     if (node.firstElementChild) observer.observe(node.firstElementChild);
+    node.addEventListener("scroll", update, { passive: true });
     update();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      node.removeEventListener("scroll", update);
+    };
   }, []);
-  // lindm: a horizontally scrolling table must be reachable and scrollable by keyboard.
+  // lindm: a horizontally scrolling table must be reachable and scrollable by keyboard,
+  // and must say so: a hint names the hidden columns and the clipped edge fades.
   return (
-    <div
-      ref={container}
-      data-slot="table-container"
-      tabIndex={scrollable ? 0 : undefined}
-      role={scrollable ? "region" : undefined}
-      aria-label={scrollable ? (props["aria-label"] ?? "Scrollable table") : undefined}
-      className="relative w-full min-w-0 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring"
-    >
-      <table
-        data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      />
+    <div data-slot="table-frame" className="grid w-full min-w-0 gap-1">
+      {overflow.scrollable ? (
+        <p
+          data-slot="table-scroll-hint"
+          aria-hidden="true"
+          className="flex items-center justify-end gap-1 text-xs text-muted-foreground"
+        >
+          {overflow.atEnd
+            ? "Scroll back for the first columns"
+            : "Scroll sideways for more columns"}
+          <span aria-hidden="true">{overflow.atEnd ? "←" : "→"}</span>
+        </p>
+      ) : null}
+      <div
+        ref={container}
+        data-slot="table-container"
+        tabIndex={overflow.scrollable ? 0 : undefined}
+        role={overflow.scrollable ? "region" : undefined}
+        aria-label={overflow.scrollable ? (props["aria-label"] ?? "Scrollable table") : undefined}
+        className={cn(
+          "relative w-full min-w-0 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring",
+          overflow.scrollable && !overflow.atEnd && "mask-r-from-[calc(100%-2.5rem)]",
+          overflow.scrollable && !overflow.atStart && "mask-l-from-[calc(100%-2.5rem)]",
+        )}
+      >
+        <table
+          data-slot="table"
+          className={cn("w-full caption-bottom text-sm", className)}
+          {...props}
+        />
+      </div>
     </div>
   );
 }

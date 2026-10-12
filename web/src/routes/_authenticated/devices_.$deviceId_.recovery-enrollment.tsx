@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceActionPage } from "@/features/devices/action-pages";
 import { RecoveryEnrollment } from "@/features/enrollment/recovery";
 import { canonicalUuid } from "@/lib/ids";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/recove
 
 function RecoveryEnrollmentRoute() {
   const { deviceId } = Route.useParams();
+  useDeviceBreadcrumbTitle(deviceId);
   return (
     <DeviceActionPage deviceId={deviceId} title="Recover device enrollment">
       {(device) => (

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ProfileDetailView } from "@/features/profiles/detail";
+import { useProfileBreadcrumbTitle } from "@/features/profiles/breadcrumb";
 import { profileRevisionQueryOptions } from "@/features/profiles/queries";
 import { parseProfileDetailSearch } from "@/features/profiles/search";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
@@ -43,6 +44,7 @@ function ProfileDetailRoute() {
   const { profileId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  useProfileBreadcrumbTitle(profileId);
   return (
     <ProfilePickerProvider
       pickers={{

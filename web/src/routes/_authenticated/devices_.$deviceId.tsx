@@ -1,4 +1,5 @@
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
+import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceFindings } from "@/features/advisories/device-findings";
 import { DeviceFindingsSummary } from "@/features/advisories/device-findings-summary";
 import { DeviceAssistanceCard } from "@/features/assistance/panel";
@@ -38,6 +39,7 @@ function DeviceDetailRoute() {
   const { deviceId } = Route.useParams();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
+  useDeviceBreadcrumbTitle(deviceId);
   return (
     <DeviceDetailView
       key={deviceId}

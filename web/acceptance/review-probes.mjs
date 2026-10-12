@@ -696,6 +696,111 @@ export function installProbes(rules) {
           elements: [describe(form)],
         }));
     },
+    // Console-wide conventions (docs/design.md, docs/engineering.md frontend):
+    // one Details disclosure per card, one Refresh per page, no paging controls
+    // for a list that fits on one page, and no silently clipped tables.
+    conventions(listPage = false) {
+      const findings = [];
+      const outsideDialog = (node) => !node.closest('[role="dialog"],[role="alertdialog"]');
+      const cards = new Map();
+      for (const details of document.querySelectorAll("details")) {
+        const summary = details.querySelector(":scope > summary");
+        if (!summary || !rendered(summary)) continue;
+        const card = details.parentElement?.closest(
+          '[data-slot="card"],article,li,tr,[role="dialog"],[role="alertdialog"]',
+        );
+        if (!card) continue;
+        cards.set(card, [...(cards.get(card) ?? []), summary]);
+      }
+      for (const [card, summaries] of cards) {
+        if (summaries.length < 2) continue;
+        findings.push({
+          check: "details-per-card",
+          message: `${summaries.length} disclosures in one card (${summaries.map((node) => `"${normalize(node.innerText)}"`).join(", ")}); keep at most one, for secondary data only`,
+          elements: [describe(card)],
+        });
+      }
+      const refreshes = [...document.querySelectorAll('button,[role="button"],a[href]')].filter(
+        (node) =>
+          rendered(node) &&
+          !srOnly(node) &&
+          outsideDialog(node) &&
+          /^refresh\b/i.test(normalize(node.innerText ?? "")),
+      );
+      if (refreshes.length > 1) {
+        findings.push({
+          check: "single-refresh",
+          message: `${refreshes.length} Refresh buttons on one page; keep one in the page header`,
+          elements: refreshes.map(describe),
+        });
+      }
+      const buttonNamed = (name) =>
+        [...document.querySelectorAll("button")].filter(
+          (node) => rendered(node) && outsideDialog(node) && normalize(node.innerText) === name,
+        );
+      for (const first of buttonNamed("First page")) {
+        const scope = first.parentElement;
+        const next = [...(scope?.querySelectorAll("button") ?? [])].find(
+          (node) => normalize(node.innerText) === "Next page",
+        );
+        if (first.disabled && next?.disabled) {
+          findings.push({
+            check: "single-page-pagination",
+            message:
+              "Disabled First page and Next page on a list that fits on one page; use ListPagination",
+            elements: [describe(scope)],
+          });
+        }
+      }
+      for (const node of document.querySelectorAll("label")) {
+        if (rendered(node) && outsideDialog(node) && normalize(node.innerText) === "Page size") {
+          findings.push({
+            check: "single-page-pagination",
+            message: 'Standalone "Page size" control; use ListPagination\'s Rows per page',
+            elements: [describe(node)],
+          });
+        }
+      }
+      for (const table of document.querySelectorAll("table")) {
+        if (!rendered(table)) continue;
+        let scroller = table.parentElement;
+        while (scroller && scroller !== document.body) {
+          const overflowX = getComputedStyle(scroller).overflowX;
+          if (overflowX === "auto" || overflowX === "scroll" || overflowX === "hidden") break;
+          scroller = scroller.parentElement;
+        }
+        if (!scroller || scroller === document.body) continue;
+        if (scroller.scrollWidth <= scroller.clientWidth + 1) continue;
+        const hint = scroller.parentElement?.querySelector(
+          ':scope > [data-slot="table-scroll-hint"]',
+        );
+        if (!hint || !rendered(hint)) {
+          findings.push({
+            check: "table-overflow-hint",
+            message: `Table is ${scroller.scrollWidth}px wide in a ${scroller.clientWidth}px column with no scroll hint`,
+            elements: [describe(table)],
+          });
+        }
+      }
+      // On a phone, a list page (review.mjs listRoutes) shows its first row on the
+      // first screen: filters fold into FilterPanel and decision forms open on demand.
+      if (listPage && innerWidth < 768) {
+        const main = document.querySelector("main") ?? document.body;
+        const table = [...main.querySelectorAll("table")].find(rendered);
+        const row = table && [...table.querySelectorAll("tbody tr")].find(rendered);
+        if (row) {
+          const top = row.getBoundingClientRect().top + scrollY;
+          if (top >= innerHeight) {
+            findings.push({
+              check: "mobile-first-screen",
+              message: `First list row starts at ${Math.round(top)}px, below the ${innerHeight}px first screen; fold filters into FilterPanel`,
+              elements: [describe(row)],
+            });
+          }
+        }
+      }
+      return findings;
+    },
     // A named button must be visible; when disabled it must reference a visible reason.
     expectButton(name) {
       const button = [...document.querySelectorAll('button,[role="button"]')].find(

@@ -12,6 +12,7 @@ import {
 } from "../../../gen/lindm/admin/v1/approvals_pb";
 import { CryptoEraseMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
@@ -19,6 +20,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission, permissionLabels } from "@/lib/permissions";
@@ -128,6 +130,11 @@ export function ApprovalsView() {
       <PageHeader
         title="Approval inbox"
         description="Approve or reject requests from other admins."
+        actions={
+          <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
+            Refresh
+          </Button>
+        }
       />
       {revealed ? (
         <section
@@ -146,14 +153,6 @@ export function ApprovalsView() {
           </Button>
         </section>
       ) : null}
-      <Button
-        className="w-fit"
-        variant="outline"
-        disabled={list.isFetching}
-        onClick={() => void list.refetch()}
-      >
-        Refresh approvals
-      </Button>
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading approvals…</span>
@@ -162,26 +161,23 @@ export function ApprovalsView() {
         </div>
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}
-      {list.data?.approvals.length === 0 ? <EmptyState title="No approvals waiting" /> : null}
+      {list.data?.approvals.length === 0 ? (
+        <EmptyState
+          title="No approvals waiting"
+          description="Destructive actions, secret reveals and risk acceptances that need a second admin appear here."
+        />
+      ) : null}
       {list.data && list.data.approvals.length > 0 ? (
         <ApprovalGroups approvals={list.data.approvals} onReveal={setRevealed} />
       ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant="outline"
-          disabled={pageToken === "" || list.isFetching}
-          onClick={() => setPageToken("")}
-        >
-          First page
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextPageToken || list.isFetching}
-          onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
+      <ListPagination
+        label="Approval pages"
+        onPrevious={pageToken === "" ? undefined : () => setPageToken("")}
+        onNext={
+          list.data?.nextPageToken ? () => setPageToken(list.data?.nextPageToken ?? "") : undefined
+        }
+        busy={list.isFetching}
+      />
     </section>
   );
 }
@@ -204,7 +200,7 @@ function ApprovalGroups({
     <>
       <section className="grid min-w-0 gap-4" aria-labelledby="approvals-open">
         <h2 id="approvals-open" className="text-base font-semibold">
-          Open requests
+          Open requests <span className="font-normal text-muted-foreground">({open.length})</span>
         </h2>
         {open.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -317,6 +313,7 @@ function ApprovalCard({
     canPermission(principal, "approvals.manage") &&
     canPermission(principal, approval.permission);
   const ownRequestReasonId = useId();
+  const decisionHintId = useId();
   const hostname = approval.deviceHostname.trim() || "Unnamed device";
   const consequence = open ? destructiveConsequence(approval, hostname) : "";
   const executionAllowed =
@@ -569,12 +566,14 @@ function ApprovalCard({
         ) : null}
         <div>
           <dt>Created</dt>
-          <dd>{formatTimestamp(approval.createdAt).local}</dd>
+          <dd>
+            <Timestamp value={approval.createdAt} />
+          </dd>
         </div>
         <div>
           <dt>Expires</dt>
           <dd>
-            {formatTimestamp(approval.expiresAt).local}
+            <Timestamp value={approval.expiresAt} />
             {!unexpired ? " (expired)" : ""}
           </dd>
         </div>
@@ -606,7 +605,9 @@ function ApprovalCard({
             </p>
           )}
           <p className="whitespace-pre-wrap">Reason: {approval.payload.value.reason}</p>
-          <p>Risk acceptance expires: {formatTimestamp(approval.payload.value.expiresAt).local}</p>
+          <p>
+            Risk acceptance expires: <Timestamp value={approval.payload.value.expiresAt} />
+          </p>
         </div>
       ) : null}
       {actionRequest ? <DeviceActionSpecView spec={actionSpec} technicalDetails={false} /> : null}
@@ -625,6 +626,7 @@ function ApprovalCard({
             Decision reason
             <Input
               aria-label="Approval decision reason"
+              aria-describedby={reason.trim() === "" ? decisionHintId : undefined}
               data-freeform="audit reason for the decision"
               value={reason}
               disabled={busy || attempt !== null}
@@ -654,6 +656,11 @@ function ApprovalCard({
               Reject
             </Button>
           </div>
+          {reason.trim() === "" ? (
+            <p id={decisionHintId} className="text-sm text-muted-foreground">
+              Enter a decision reason to approve or reject. It is recorded in the audit log.
+            </p>
+          ) : null}
         </div>
       ) : null}
       {!completed && ownRequest ? (

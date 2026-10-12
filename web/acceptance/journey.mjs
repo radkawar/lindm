@@ -352,7 +352,7 @@ async function waitApproval(ui, approvalId, accept, retry) {
     }
     if (Date.now() >= nextRefresh) {
       // Read-only list refetch; never a repeated decision or execution.
-      await ui.click({ role: "button", text: "Refresh approvals" });
+      await ui.click({ role: "button", text: "Refresh" });
       nextRefresh = Date.now() + 3_000;
     }
     await delay(250);

@@ -18,7 +18,7 @@ import {
 import { installProbes } from "./review-probes.mjs";
 import { contactSheet } from "./review-report.mjs";
 import { reviewEnrollmentFixtures } from "./review-enrollment.mjs";
-import { routeContracts, destructiveCoverage } from "./review-contracts.mjs";
+import { routeContracts, destructiveCoverage, listRoutes } from "./review-contracts.mjs";
 import { editManifest, editSheet, annotationTemplate } from "./review-edit-sheet.mjs";
 import { taskWalkthroughs, taskAuditSheet } from "./review-journeys.mjs";
 import { reviewAuthorization } from "./review-authorization.mjs";
@@ -587,6 +587,9 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   entry.checks.copy = { findings: await probe(page, "copy") };
   entry.checks.forms = { findings: await probe(page, "forms") };
   entry.checks.idInputs = { findings: await probe(page, "idInputs") };
+  entry.checks.conventions = {
+    findings: await probe(page, "conventions", listRoutes.includes(route.path)),
+  };
   entry.checks.pov = await probe(page, "pov", routeContracts[route.path] ?? null);
   entry.checks.expected = { findings: [] };
   for (const name of expectedButtons) {

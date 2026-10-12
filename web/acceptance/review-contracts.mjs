@@ -33,6 +33,9 @@ export const routeContracts = {
   "/devices/$deviceId/recovery-enrollment": structural,
 };
 
+// Pages whose job is a list: at 390px their first row must be on the first screen.
+export const listRoutes = ["/accounts", "/audit", "/devices", "/profiles", "/secrets"];
+
 export const requiredDestructiveCoverage = [
   { id: "revoke-device", routes: ["/devices", "/devices/$deviceId"] },
 ];
