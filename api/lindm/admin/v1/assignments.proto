@@ -29,6 +29,8 @@ message ResourceAssignment {
   google.protobuf.Timestamp assigned_at = 9;
   string reason = 10;
   uint32 reconcile_interval_seconds = 11;
+  // Current display name of actor_id, filled on read; never stored in the head.
+  string actor_display_name = 12 [(buf.validate.field).string.max_len = 256];
 }
 
 message SetResourceAssignmentRequest {

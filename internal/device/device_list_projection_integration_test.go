@@ -119,6 +119,15 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4,$3 FROM re
 			// The CTE types every time parameter, including those unused by a case.
 			exec("WITH times AS (SELECT $2::timestamptz,$3::timestamptz,$4::timestamptz) UPDATE resource_assignment_resources SET "+test.update+" WHERE assignment_id=$1", assignment.GetAssignmentId(), recent, older, stale)
 			assertProjection(t, test.want, test.verified)
+			// The compliance filter selects by the same worst state, before paging.
+			filtered := deviceProjectionPage(t, f.service, ctx, &adminv1.ListDevicesRequest{PageSize: 10, Filter: &adminv1.DeviceFilter{NamePrefix: "projection-", Compliance: []adminv1.DeviceCompliance{test.want}}})
+			if len(filtered.GetDevices()) != 1 || filtered.GetDevices()[0].GetId() != deviceID {
+				t.Fatalf("compliance filter %v: %v", test.want, filtered)
+			}
+			none := deviceProjectionPage(t, f.service, ctx, &adminv1.ListDevicesRequest{PageSize: 10, Filter: &adminv1.DeviceFilter{NamePrefix: "projection-", Compliance: []adminv1.DeviceCompliance{adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED}}})
+			if len(none.GetDevices()) != 1 || none.GetDevices()[0].GetId() != unassigned {
+				t.Fatalf("unassigned filter: %v", none)
+			}
 		})
 	}
 	all := deviceProjectionPage(t, f.service, f.adminCtx, &adminv1.ListDevicesRequest{PageSize: 10, Filter: request.Filter})

@@ -14,7 +14,11 @@ import {
   FleetActionOutcome,
   type FleetRecentAction,
 } from "../../../gen/lindm/admin/v1/fleet_summary_pb";
-import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
+import {
+  DeviceCompliance,
+  DeviceFilterSchema,
+  DevicePatchState,
+} from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
@@ -134,6 +138,24 @@ export function DashboardView() {
         )
       : undefined;
   const uncovered = findings?.unknownDevices ?? 0n;
+  // The same populations the queue counts, as device list filters.
+  const profileFilter = toJsonString(
+    DeviceFilterSchema,
+    create(DeviceFilterSchema, {
+      compliance: [DeviceCompliance.ATTENTION, DeviceCompliance.STALE, DeviceCompliance.UNKNOWN],
+    }),
+  );
+  const patchFilter = toJsonString(
+    DeviceFilterSchema,
+    create(DeviceFilterSchema, {
+      patchStates: [
+        DevicePatchState.SECURITY_PENDING,
+        DevicePatchState.RESTART_REQUIRED,
+        DevicePatchState.STALE,
+        DevicePatchState.UNREPORTED,
+      ],
+    }),
+  );
   const activity = data ? groupActivity(data.recentActions) : [];
 
   // Workflow order, not a risk score. Never combine unlike populations.
@@ -385,8 +407,12 @@ export function DashboardView() {
                 title="Profile items"
                 primary={next === "profiles"}
                 action={
-                  <Link to="/devices" className={queueLinkClass(next === "profiles")}>
-                    Inspect device services{" "}
+                  <Link
+                    to="/devices"
+                    search={{ pageSize: 50, pageToken: "", filter: profileFilter }}
+                    className={queueLinkClass(next === "profiles")}
+                  >
+                    Show devices with profile items to review{" "}
                     <ArrowUpRightIcon aria-hidden="true" className="size-4" />
                   </Link>
                 }
@@ -441,8 +467,12 @@ export function DashboardView() {
                 title="OS patch follow-up"
                 primary={next === "patch"}
                 action={
-                  <Link to="/devices" className={queueLinkClass(next === "patch")}>
-                    Inspect device patch status{" "}
+                  <Link
+                    to="/devices"
+                    search={{ pageSize: 50, pageToken: "", filter: patchFilter }}
+                    className={queueLinkClass(next === "patch")}
+                  >
+                    Show devices needing update follow-up{" "}
                     <ArrowUpRightIcon aria-hidden="true" className="size-4" />
                   </Link>
                 }

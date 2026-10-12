@@ -271,20 +271,26 @@ WITH keyed AS (
       AND ($12::timestamptz IS NULL OR d.last_seen_at >= $12::timestamptz)
       AND ($13::timestamptz IS NULL OR d.last_seen_at <= $13::timestamptz)
       AND d.metadata @> $14::jsonb
+      -- Worst profile-item rank (device_compliance_rank) in the requested set.
+      AND (cardinality($15::int[]) = 0
+          OR device_compliance_rank(d.id) = ANY($15::int[]))
+      -- Patch bucket as the fleet summary counts it: active devices only.
+      AND (cardinality($16::text[]) = 0
+          OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, $1::integer) = ANY($16::text[])))
 ), page AS MATERIALIZED (
     SELECT k.id, k.state, k.current_generation_id, k.hostname, k.os_id, k.os_version, k.architecture, k.enrolled_at, k.last_seen_at, k.open_snapshot_id, k.reserved_inventory_bytes, k.published_sequence, k.host_received_at, k.package_attempt_received_at, k.snapshot_received_at, k.revoked_at, k.revoked_by, k.revoke_reason, k.metadata, k.owner_principal_id, k.sort_last, k.sort_key
     FROM keyed k
-    WHERE NOT $15::boolean
-       OR k.sort_last > $16::boolean
-       OR (k.sort_last = $16::boolean AND (
-           (NOT $2::boolean AND (k.sort_key, k.id) > ($17::text COLLATE "C", $18::uuid))
-           OR ($2::boolean AND (k.sort_key, k.id) < ($17::text COLLATE "C", $18::uuid))))
+    WHERE NOT $17::boolean
+       OR k.sort_last > $18::boolean
+       OR (k.sort_last = $18::boolean AND (
+           (NOT $2::boolean AND (k.sort_key, k.id) > ($19::text COLLATE "C", $20::uuid))
+           OR ($2::boolean AND (k.sort_key, k.id) < ($19::text COLLATE "C", $20::uuid))))
     ORDER BY k.sort_last,
         CASE WHEN NOT $2::boolean THEN k.sort_key END COLLATE "C",
         CASE WHEN $2::boolean THEN k.sort_key END COLLATE "C" DESC,
         CASE WHEN NOT $2::boolean THEN k.id END,
         CASE WHEN $2::boolean THEN k.id END DESC
-    LIMIT $19::int
+    LIMIT $21::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
     d.state, d.enrolled_at, d.last_seen_at, d.published_sequence, d.sort_last, d.sort_key::text AS sort_key,
@@ -333,15 +339,8 @@ LEFT JOIN LATERAL (
     GROUP BY e.state, fs.id
 ) findings ON true
 CROSS JOIN LATERAL (
-    -- Explicit worst rank, independent of protobuf enum numbering:
-    -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.
-    SELECT coalesce(max(CASE
-        WHEN p.blocked_reason <> '' OR p.disposition IN (4, 5, 6, 7) OR p.applying OR p.dependency_attention THEN 5
-        WHEN p.last_verified_at IS NULL THEN 4
-        WHEN p.last_verified_at + make_interval(secs => LEAST(2 * p.reconcile_interval_seconds, p.verification_max_age_seconds)) <= CURRENT_TIMESTAMP THEN 3
-        WHEN p.drift_remediated THEN 2
-        ELSE 1
-    END), 0)::int AS compliance_rank,
+    -- Worst rank: see device_compliance_rank (migration 00041).
+    SELECT device_compliance_rank(d.id) AS compliance_rank,
     -- A recent proof must not hide another resource's older or missing proof.
     (CASE WHEN count(*) = count(p.last_verified_at) THEN min(p.last_verified_at) END)::timestamptz AS last_verified_at
     FROM integration_compliance_projection p
@@ -369,6 +368,8 @@ type SearchDevicesParams struct {
 	SeenFrom               pgtype.Timestamptz
 	SeenUntil              pgtype.Timestamptz
 	MetadataFilter         []byte
+	ComplianceRanks        []int32
+	PatchBuckets           []string
 	HasCursor              bool
 	CursorLast             bool
 	CursorKey              string
@@ -437,6 +438,8 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 		arg.SeenFrom,
 		arg.SeenUntil,
 		arg.MetadataFilter,
+		arg.ComplianceRanks,
+		arg.PatchBuckets,
 		arg.HasCursor,
 		arg.CursorLast,
 		arg.CursorKey,

@@ -134,13 +134,7 @@ SELECT * FROM recent ORDER BY issued_at DESC, id DESC, kind DESC LIMIT sqlc.arg(
 -- beyond the server receipt of the observation that carried the status.
 -- last_run_result 2 is lindm.agent.v1.PatchRunResult FAILED.
 WITH patch AS (
- SELECT CASE
-   WHEN p.generation_id IS NULL OR NOT p.available THEN 'unknown'
-   WHEN LEAST(p.observed_at, p.received_at) < CURRENT_TIMESTAMP - make_interval(secs => sqlc.arg('stale_after_seconds')::integer) THEN 'stale'
-   WHEN p.pending_security_updates > 0 THEN 'security_pending'
-   WHEN p.reboot_required THEN 'reboot_required'
-   ELSE 'patched'
- END AS bucket,
+ SELECT device_patch_bucket(d.current_generation_id, sqlc.arg('stale_after_seconds')::integer) AS bucket,
  COALESCE(p.pending_security_updates, 0)::bigint AS pending_security_updates,
  COALESCE(p.last_run_result, 0)::smallint AS last_run_result
  FROM devices d

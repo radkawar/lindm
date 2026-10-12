@@ -138,19 +138,6 @@ enum DeviceState {
   DEVICE_STATE_RECOVERY_HOLD = 4;
 }
 
-// List/export projection over current enrollment-generation assignment heads.
-// Worst-first precedence is ATTENTION, UNKNOWN, STALE, DRIFT_REMEDIATED,
-// COMPLIANT. No current-head resources is UNASSIGNED, never COMPLIANT.
-enum DeviceCompliance {
-  DEVICE_COMPLIANCE_UNSPECIFIED = 0;
-  DEVICE_COMPLIANCE_UNASSIGNED = 1;
-  DEVICE_COMPLIANCE_COMPLIANT = 2;
-  DEVICE_COMPLIANCE_DRIFT_REMEDIATED = 3;
-  DEVICE_COMPLIANCE_STALE = 4;
-  DEVICE_COMPLIANCE_UNKNOWN = 5;
-  DEVICE_COMPLIANCE_ATTENTION = 6;
-}
-
 message Device {
   reserved 7, 10;
   reserved "state", "inventory_sequence";

@@ -135,7 +135,7 @@ export function DeviceResources({
     ? "the system"
     : assignment.actorId === principal.id
       ? "you"
-      : "another administrator";
+      : assignment.actorDisplayName || "an administrator whose account was removed";
   // Work is minted only when the device asks for it, so a pending item with no
   // action means the device has not picked it up yet.
   const unpicked =
@@ -195,8 +195,8 @@ export function DeviceResources({
                     {assignment.profileName}, version {assignment.revisionNumber.toString()}
                   </p>
                   <p className="break-words text-muted-foreground">
-                    Assigned by {actor} on {formatTimestamp(assignment.assignedAt).local}. Checked
-                    every {Math.round(assignment.reconcileIntervalSeconds / 60)} minutes.
+                    Assigned by {actor} on {formatTimestamp(assignment.assignedAt).local}. Checked{" "}
+                    {checkInterval(assignment.reconcileIntervalSeconds)}.
                   </p>
                   <p className="whitespace-pre-wrap break-words text-muted-foreground">
                     Reason: {assignment.reason}
@@ -340,7 +340,10 @@ export function DeviceResources({
                             ) : null}
                           </TableCell>
                           <TableCell className="min-w-64 align-top">
-                            <ActionHistory action={resource.latestAction} />
+                            <ActionHistory
+                              action={resource.latestAction}
+                              resultShown={resource.disposition === ResourceDisposition.SUCCEEDED}
+                            />
                           </TableCell>
                         </>
                       )}
@@ -538,19 +541,42 @@ function FailureNote({ failure }: { failure: ResourceExecutionFailure | undefine
   return <p className="mt-1">Problem: {enumLabel(ResourceExecutionFailure[failure])}</p>;
 }
 
-function ActionHistory({ action }: { action: ResourceActionSummary | undefined }) {
+// "daily", "hourly", "every 15 minutes": how often the device re-checks items.
+function checkInterval(seconds: number) {
+  const minutes = Math.round(seconds / 60);
+  if (minutes > 0 && minutes % 1440 === 0)
+    return minutes === 1440 ? "daily" : `every ${minutes / 1440} days`;
+  if (minutes > 0 && minutes % 60 === 0)
+    return minutes === 60 ? "hourly" : `every ${minutes / 60} hours`;
+  return `every ${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+function ActionHistory({
+  action,
+  resultShown = false,
+}: {
+  action: ResourceActionSummary | undefined;
+  // The Result column already says the item succeeded; don't badge it twice.
+  resultShown?: boolean;
+}) {
   if (!action) return <p className="text-muted-foreground">No changes sent yet.</p>;
   const status = action.status;
+  const repeated =
+    resultShown &&
+    status?.state === ResourceExecutionState.SUCCEEDED &&
+    status.verification?.disposition !== VerificationDisposition.NOT_APPLICABLE;
   const checks =
     status?.verification?.checks.case === "systemdService"
       ? status.verification.checks.value
       : undefined;
   return (
     <div className="grid gap-1 whitespace-normal text-xs">
-      <ResourceExecutionStatus
-        state={status?.state}
-        verification={status?.verification?.disposition}
-      />
+      {repeated ? null : (
+        <ResourceExecutionStatus
+          state={status?.state}
+          verification={status?.verification?.disposition}
+        />
+      )}
       <FailureNote failure={status?.failure} />
       <p>Sent {formatTimestamp(action.issuedAt).local}</p>
       {status?.completedAt ? <p>Finished {formatTimestamp(status.completedAt).local}</p> : null}

@@ -36,6 +36,33 @@ func listedPosture(t *testing.T, f *enrolledFixture) *adminv1.Device {
 	return nil
 }
 
+// patchFiltered reports whether the device is listed under the patch filter.
+func patchFiltered(t *testing.T, f *enrolledFixture, states ...adminv1.DevicePatchState) bool {
+	t.Helper()
+	response, err := f.svc.ListDevices(f.ownerCtx, connect.NewRequest(&adminv1.ListDevicesRequest{PageSize: 200, Filter: &adminv1.DeviceFilter{PatchStates: states}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, device := range response.Msg.GetDevices() {
+		if device.GetId() == f.deviceID {
+			return true
+		}
+	}
+	return false
+}
+
+func assertPatchBucket(t *testing.T, f *enrolledFixture, want adminv1.DevicePatchState) {
+	t.Helper()
+	for state := range adminv1.DevicePatchState_name {
+		if state == 0 {
+			continue
+		}
+		if got := patchFiltered(t, f, adminv1.DevicePatchState(state)); got != (adminv1.DevicePatchState(state) == want) {
+			t.Fatalf("patch filter %v listed=%v, want bucket %v", adminv1.DevicePatchState(state), got, want)
+		}
+	}
+}
+
 func postureReport(t *testing.T, f *enrolledFixture, sequence uint64, storage *inventoryv1.StorageDetails, patch *agentv1.PatchStatusObservation) {
 	t.Helper()
 	report := hostObservation(f.generation, sequence, "posture")
@@ -51,6 +78,9 @@ func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
 	if device := listedPosture(t, f); device.GetRootEncryption() != adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_UNKNOWN || device.GetUpdates() != nil || device.GetFindings() != nil {
 		t.Fatalf("never-reported device acquired posture: %v", device)
 	}
+	// Patch buckets count enrolled devices only, as the fleet summary does; a
+	// device awaiting approval is in none.
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_UNSPECIFIED)
 
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	_, details := fixtureVirtioStorage()
@@ -69,11 +99,19 @@ func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
 	if device.GetRootEncryption() != adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_ENCRYPTED || !proto.Equal(device.GetUpdates(), wantUpdates) {
 		t.Fatalf("reported encrypted root and pending updates were not projected: %v", device)
 	}
+	// Security updates win over a pending restart, as the fleet summary counts them.
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_SECURITY_PENDING)
+	fleetSummaryExec(t, f, "UPDATE host_patch_status SET pending_security_updates=0 WHERE generation_id=$1", f.generation)
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_RESTART_REQUIRED)
+	fleetSummaryExec(t, f, "UPDATE host_patch_status SET reboot_required=false WHERE generation_id=$1", f.generation)
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_UP_TO_DATE)
+	fleetSummaryExec(t, f, "UPDATE host_patch_status SET pending_security_updates=2, reboot_required=true WHERE generation_id=$1", f.generation)
 	// Freshness never trusts the device clock beyond the server receipt (stale after six hours).
 	fleetSummaryExec(t, f, "UPDATE host_patch_status SET observed_at=CURRENT_TIMESTAMP+interval '1 year', received_at=CURRENT_TIMESTAMP-interval '7 hours' WHERE generation_id=$1", f.generation)
 	if updates := listedPosture(t, f).GetUpdates(); updates == nil || !updates.GetStale() || updates.GetPendingUpdates() != 7 {
 		t.Fatalf("old update status was not marked stale: %v", updates)
 	}
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_STALE)
 
 	// An explicit unencrypted root is NOT_ENCRYPTED; an unavailable update backend is unknown.
 	f.now = f.now.Add(inventory.SnapshotAttemptInterval)
@@ -86,6 +124,7 @@ func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
 	if device := listedPosture(t, f); device.GetRootEncryption() != adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_NOT_ENCRYPTED || device.GetUpdates() != nil {
 		t.Fatalf("unencrypted root or unavailable updates misreported: %v", device)
 	}
+	assertPatchBucket(t, f, adminv1.DevicePatchState_DEVICE_PATCH_STATE_UNREPORTED)
 
 	// Failed storage collection is unknown, never "not encrypted".
 	f.now = f.now.Add(inventory.SnapshotAttemptInterval)

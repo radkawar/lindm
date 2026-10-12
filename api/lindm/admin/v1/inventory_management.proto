@@ -100,6 +100,19 @@ message DeviceMetadata {
   }];
 }
 
+// List/export projection over current enrollment-generation assignment heads.
+// Worst-first precedence is ATTENTION, UNKNOWN, STALE, DRIFT_REMEDIATED,
+// COMPLIANT. No current-head resources is UNASSIGNED, never COMPLIANT.
+enum DeviceCompliance {
+  DEVICE_COMPLIANCE_UNSPECIFIED = 0;
+  DEVICE_COMPLIANCE_UNASSIGNED = 1;
+  DEVICE_COMPLIANCE_COMPLIANT = 2;
+  DEVICE_COMPLIANCE_DRIFT_REMEDIATED = 3;
+  DEVICE_COMPLIANCE_STALE = 4;
+  DEVICE_COMPLIANCE_UNKNOWN = 5;
+  DEVICE_COMPLIANCE_ATTENTION = 6;
+}
+
 // Device list order across all pages. Unspecified: newest enrollment first.
 enum DeviceSortField {
   DEVICE_SORT_FIELD_UNSPECIFIED = 0;
@@ -168,6 +181,42 @@ message DeviceFilter {
   // before evaluation time; zero disables it. It combines with the absolute
   // last_seen_from/last_seen_until bounds (all that are set must hold).
   uint32 last_seen_within_seconds = 9 [(buf.validate.field).uint32.lte = 31622400];
+  // Devices whose worst profile-item state (Device.compliance) is any of these;
+  // empty disables this filter.
+  repeated DeviceCompliance compliance = 10 [(buf.validate.field).repeated = {
+    max_items: 6
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: [0]
+      }
+    }
+  }];
+  // Enrolled devices whose latest patch status is in any of these buckets, as
+  // the fleet summary counts them; empty disables this filter.
+  repeated DevicePatchState patch_states = 11 [(buf.validate.field).repeated = {
+    max_items: 5
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: [0]
+      }
+    }
+  }];
+}
+
+// Patch bucket of a device's latest published patch status. Disjoint: stale
+// wins over pending counts, security updates over a pending restart.
+enum DevicePatchState {
+  DEVICE_PATCH_STATE_UNSPECIFIED = 0;
+  // No patch status reported, or the update backend was unavailable.
+  DEVICE_PATCH_STATE_UNREPORTED = 1;
+  DEVICE_PATCH_STATE_STALE = 2;
+  DEVICE_PATCH_STATE_SECURITY_PENDING = 3;
+  DEVICE_PATCH_STATE_RESTART_REQUIRED = 4;
+  DEVICE_PATCH_STATE_UP_TO_DATE = 5;
 }
 
 message SetDeviceMetadataRequest {

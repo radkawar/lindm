@@ -98,6 +98,12 @@ WITH keyed AS (
       AND (sqlc.narg('seen_from')::timestamptz IS NULL OR d.last_seen_at >= sqlc.narg('seen_from')::timestamptz)
       AND (sqlc.narg('seen_until')::timestamptz IS NULL OR d.last_seen_at <= sqlc.narg('seen_until')::timestamptz)
       AND d.metadata @> sqlc.arg('metadata_filter')::jsonb
+      -- Worst profile-item rank (device_compliance_rank) in the requested set.
+      AND (cardinality(sqlc.arg('compliance_ranks')::int[]) = 0
+          OR device_compliance_rank(d.id) = ANY(sqlc.arg('compliance_ranks')::int[]))
+      -- Patch bucket as the fleet summary counts it: active devices only.
+      AND (cardinality(sqlc.arg('patch_buckets')::text[]) = 0
+          OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, sqlc.arg('patch_stale_after_seconds')::integer) = ANY(sqlc.arg('patch_buckets')::text[])))
 ), page AS MATERIALIZED (
     SELECT k.*
     FROM keyed k
@@ -160,15 +166,8 @@ LEFT JOIN LATERAL (
     GROUP BY e.state, fs.id
 ) findings ON true
 CROSS JOIN LATERAL (
-    -- Explicit worst rank, independent of protobuf enum numbering:
-    -- attention > unknown > stale > drift_remediated > compliant; zero unassigned.
-    SELECT coalesce(max(CASE
-        WHEN p.blocked_reason <> '' OR p.disposition IN (4, 5, 6, 7) OR p.applying OR p.dependency_attention THEN 5
-        WHEN p.last_verified_at IS NULL THEN 4
-        WHEN p.last_verified_at + make_interval(secs => LEAST(2 * p.reconcile_interval_seconds, p.verification_max_age_seconds)) <= CURRENT_TIMESTAMP THEN 3
-        WHEN p.drift_remediated THEN 2
-        ELSE 1
-    END), 0)::int AS compliance_rank,
+    -- Worst rank: see device_compliance_rank (migration 00041).
+    SELECT device_compliance_rank(d.id) AS compliance_rank,
     -- A recent proof must not hide another resource's older or missing proof.
     (CASE WHEN count(*) = count(p.last_verified_at) THEN min(p.last_verified_at) END)::timestamptz AS last_verified_at
     FROM integration_compliance_projection p

@@ -311,6 +311,16 @@ func populateResourceStates(ctx context.Context, q *devicedb.Queries, head devic
 	if err := proto.Unmarshal(head.Document, response.Assignment); err != nil {
 		return core.MapErr(core.ErrInternalState)
 	}
+	// The recorded actor's current display name; empty when the account is gone.
+	if actor, err := uuid.Parse(response.Assignment.GetActorId()); err == nil {
+		names, err := q.ListDeviceActionActorNames(ctx, []uuid.UUID{actor})
+		if err != nil {
+			return core.MapErr(err)
+		}
+		for _, name := range names {
+			response.Assignment.ActorDisplayName = name.DisplayName
+		}
+	}
 	resources, err := q.ListAssignmentResources(ctx, head.ID)
 	if err != nil {
 		return core.MapErr(err)

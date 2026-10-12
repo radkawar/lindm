@@ -79,6 +79,70 @@ func (AttributeType) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{0}
 }
 
+// List/export projection over current enrollment-generation assignment heads.
+// Worst-first precedence is ATTENTION, UNKNOWN, STALE, DRIFT_REMEDIATED,
+// COMPLIANT. No current-head resources is UNASSIGNED, never COMPLIANT.
+type DeviceCompliance int32
+
+const (
+	DeviceCompliance_DEVICE_COMPLIANCE_UNSPECIFIED      DeviceCompliance = 0
+	DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED       DeviceCompliance = 1
+	DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT        DeviceCompliance = 2
+	DeviceCompliance_DEVICE_COMPLIANCE_DRIFT_REMEDIATED DeviceCompliance = 3
+	DeviceCompliance_DEVICE_COMPLIANCE_STALE            DeviceCompliance = 4
+	DeviceCompliance_DEVICE_COMPLIANCE_UNKNOWN          DeviceCompliance = 5
+	DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION        DeviceCompliance = 6
+)
+
+// Enum value maps for DeviceCompliance.
+var (
+	DeviceCompliance_name = map[int32]string{
+		0: "DEVICE_COMPLIANCE_UNSPECIFIED",
+		1: "DEVICE_COMPLIANCE_UNASSIGNED",
+		2: "DEVICE_COMPLIANCE_COMPLIANT",
+		3: "DEVICE_COMPLIANCE_DRIFT_REMEDIATED",
+		4: "DEVICE_COMPLIANCE_STALE",
+		5: "DEVICE_COMPLIANCE_UNKNOWN",
+		6: "DEVICE_COMPLIANCE_ATTENTION",
+	}
+	DeviceCompliance_value = map[string]int32{
+		"DEVICE_COMPLIANCE_UNSPECIFIED":      0,
+		"DEVICE_COMPLIANCE_UNASSIGNED":       1,
+		"DEVICE_COMPLIANCE_COMPLIANT":        2,
+		"DEVICE_COMPLIANCE_DRIFT_REMEDIATED": 3,
+		"DEVICE_COMPLIANCE_STALE":            4,
+		"DEVICE_COMPLIANCE_UNKNOWN":          5,
+		"DEVICE_COMPLIANCE_ATTENTION":        6,
+	}
+)
+
+func (x DeviceCompliance) Enum() *DeviceCompliance {
+	p := new(DeviceCompliance)
+	*p = x
+	return p
+}
+
+func (x DeviceCompliance) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeviceCompliance) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[1].Descriptor()
+}
+
+func (DeviceCompliance) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[1]
+}
+
+func (x DeviceCompliance) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeviceCompliance.Descriptor instead.
+func (DeviceCompliance) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{1}
+}
+
 // Device list order across all pages. Unspecified: newest enrollment first.
 type DeviceSortField int32
 
@@ -119,11 +183,11 @@ func (x DeviceSortField) String() string {
 }
 
 func (DeviceSortField) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_inventory_management_proto_enumTypes[1].Descriptor()
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[2].Descriptor()
 }
 
 func (DeviceSortField) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[1]
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[2]
 }
 
 func (x DeviceSortField) Number() protoreflect.EnumNumber {
@@ -132,7 +196,68 @@ func (x DeviceSortField) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceSortField.Descriptor instead.
 func (DeviceSortField) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{1}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{2}
+}
+
+// Patch bucket of a device's latest published patch status. Disjoint: stale
+// wins over pending counts, security updates over a pending restart.
+type DevicePatchState int32
+
+const (
+	DevicePatchState_DEVICE_PATCH_STATE_UNSPECIFIED DevicePatchState = 0
+	// No patch status reported, or the update backend was unavailable.
+	DevicePatchState_DEVICE_PATCH_STATE_UNREPORTED       DevicePatchState = 1
+	DevicePatchState_DEVICE_PATCH_STATE_STALE            DevicePatchState = 2
+	DevicePatchState_DEVICE_PATCH_STATE_SECURITY_PENDING DevicePatchState = 3
+	DevicePatchState_DEVICE_PATCH_STATE_RESTART_REQUIRED DevicePatchState = 4
+	DevicePatchState_DEVICE_PATCH_STATE_UP_TO_DATE       DevicePatchState = 5
+)
+
+// Enum value maps for DevicePatchState.
+var (
+	DevicePatchState_name = map[int32]string{
+		0: "DEVICE_PATCH_STATE_UNSPECIFIED",
+		1: "DEVICE_PATCH_STATE_UNREPORTED",
+		2: "DEVICE_PATCH_STATE_STALE",
+		3: "DEVICE_PATCH_STATE_SECURITY_PENDING",
+		4: "DEVICE_PATCH_STATE_RESTART_REQUIRED",
+		5: "DEVICE_PATCH_STATE_UP_TO_DATE",
+	}
+	DevicePatchState_value = map[string]int32{
+		"DEVICE_PATCH_STATE_UNSPECIFIED":      0,
+		"DEVICE_PATCH_STATE_UNREPORTED":       1,
+		"DEVICE_PATCH_STATE_STALE":            2,
+		"DEVICE_PATCH_STATE_SECURITY_PENDING": 3,
+		"DEVICE_PATCH_STATE_RESTART_REQUIRED": 4,
+		"DEVICE_PATCH_STATE_UP_TO_DATE":       5,
+	}
+)
+
+func (x DevicePatchState) Enum() *DevicePatchState {
+	p := new(DevicePatchState)
+	*p = x
+	return p
+}
+
+func (x DevicePatchState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DevicePatchState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[3].Descriptor()
+}
+
+func (DevicePatchState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[3]
+}
+
+func (x DevicePatchState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DevicePatchState.Descriptor instead.
+func (DevicePatchState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{3}
 }
 
 type DeviceExportFormat int32
@@ -168,11 +293,11 @@ func (x DeviceExportFormat) String() string {
 }
 
 func (DeviceExportFormat) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_inventory_management_proto_enumTypes[2].Descriptor()
+	return file_lindm_admin_v1_inventory_management_proto_enumTypes[4].Descriptor()
 }
 
 func (DeviceExportFormat) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[2]
+	return &file_lindm_admin_v1_inventory_management_proto_enumTypes[4]
 }
 
 func (x DeviceExportFormat) Number() protoreflect.EnumNumber {
@@ -181,7 +306,7 @@ func (x DeviceExportFormat) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use DeviceExportFormat.Descriptor instead.
 func (DeviceExportFormat) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{2}
+	return file_lindm_admin_v1_inventory_management_proto_rawDescGZIP(), []int{4}
 }
 
 type AttributeValue struct {
@@ -538,8 +663,14 @@ type DeviceFilter struct {
 	// before evaluation time; zero disables it. It combines with the absolute
 	// last_seen_from/last_seen_until bounds (all that are set must hold).
 	LastSeenWithinSeconds uint32 `protobuf:"varint,9,opt,name=last_seen_within_seconds,json=lastSeenWithinSeconds,proto3" json:"last_seen_within_seconds,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Devices whose worst profile-item state (Device.compliance) is any of these;
+	// empty disables this filter.
+	Compliance []DeviceCompliance `protobuf:"varint,10,rep,packed,name=compliance,proto3,enum=lindm.admin.v1.DeviceCompliance" json:"compliance,omitempty"`
+	// Enrolled devices whose latest patch status is in any of these buckets, as
+	// the fleet summary counts them; empty disables this filter.
+	PatchStates   []DevicePatchState `protobuf:"varint,11,rep,packed,name=patch_states,json=patchStates,proto3,enum=lindm.admin.v1.DevicePatchState" json:"patch_states,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeviceFilter) Reset() {
@@ -633,6 +764,20 @@ func (x *DeviceFilter) GetLastSeenWithinSeconds() uint32 {
 		return x.LastSeenWithinSeconds
 	}
 	return 0
+}
+
+func (x *DeviceFilter) GetCompliance() []DeviceCompliance {
+	if x != nil {
+		return x.Compliance
+	}
+	return nil
+}
+
+func (x *DeviceFilter) GetPatchStates() []DevicePatchState {
+	if x != nil {
+		return x.PatchStates
+	}
+	return nil
 }
 
 type SetDeviceMetadataRequest struct {
@@ -1123,7 +1268,7 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x05field\x18\x01 \x01(\x0e2\x1f.lindm.admin.v1.DeviceSortFieldB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05field\x12\x1e\n" +
 	"\n" +
 	"descending\x18\x02 \x01(\bR\n" +
-	"descending\"\xe7\x06\n" +
+	"descending\"\x98\b\n" +
 	"\fDeviceFilter\x12!\n" +
 	"\x05os_id\x18\x01 \x01(\tB\f\xbaH\tr\a\x18\x80 \xba\x01\x01\x00R\x04osId\x12+\n" +
 	"\n" +
@@ -1138,7 +1283,12 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"namePrefix\x121\n" +
 	"\ragent_release\x18\b \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\fagentRelease\x12C\n" +
 	"\x18last_seen_within_seconds\x18\t \x01(\rB\n" +
-	"\xbaH\a*\x05\x18\x80\x8a\x8a\x0fR\x15lastSeenWithinSeconds\x1a]\n" +
+	"\xbaH\a*\x05\x18\x80\x8a\x8a\x0fR\x15lastSeenWithinSeconds\x12U\n" +
+	"\n" +
+	"compliance\x18\n" +
+	" \x03(\x0e2 .lindm.admin.v1.DeviceComplianceB\x13\xbaH\x10\x92\x01\r\x10\x06\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\n" +
+	"compliance\x12X\n" +
+	"\fpatch_states\x18\v \x03(\x0e2 .lindm.admin.v1.DevicePatchStateB\x13\xbaH\x10\x92\x01\r\x10\x05\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\vpatchStates\x1a]\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x124\n" +
 	"\x05value\x18\x02 \x01(\v2\x1e.lindm.admin.v1.AttributeValueR\x05value:\x028\x01:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +
@@ -1183,12 +1333,27 @@ const file_lindm_admin_v1_inventory_management_proto_rawDesc = "" +
 	"\x15ATTRIBUTE_TYPE_STRING\x10\x01\x12\x16\n" +
 	"\x12ATTRIBUTE_TYPE_INT\x10\x02\x12\x17\n" +
 	"\x13ATTRIBUTE_TYPE_BOOL\x10\x03\x12\x17\n" +
-	"\x13ATTRIBUTE_TYPE_ENUM\x10\x04*\x9d\x01\n" +
+	"\x13ATTRIBUTE_TYPE_ENUM\x10\x04*\xfd\x01\n" +
+	"\x10DeviceCompliance\x12!\n" +
+	"\x1dDEVICE_COMPLIANCE_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cDEVICE_COMPLIANCE_UNASSIGNED\x10\x01\x12\x1f\n" +
+	"\x1bDEVICE_COMPLIANCE_COMPLIANT\x10\x02\x12&\n" +
+	"\"DEVICE_COMPLIANCE_DRIFT_REMEDIATED\x10\x03\x12\x1b\n" +
+	"\x17DEVICE_COMPLIANCE_STALE\x10\x04\x12\x1d\n" +
+	"\x19DEVICE_COMPLIANCE_UNKNOWN\x10\x05\x12\x1f\n" +
+	"\x1bDEVICE_COMPLIANCE_ATTENTION\x10\x06*\x9d\x01\n" +
 	"\x0fDeviceSortField\x12!\n" +
 	"\x1dDEVICE_SORT_FIELD_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aDEVICE_SORT_FIELD_HOSTNAME\x10\x01\x12\x1f\n" +
 	"\x1bDEVICE_SORT_FIELD_LAST_SEEN\x10\x02\x12&\n" +
-	"\"DEVICE_SORT_FIELD_OPERATING_SYSTEM\x10\x03*w\n" +
+	"\"DEVICE_SORT_FIELD_OPERATING_SYSTEM\x10\x03*\xec\x01\n" +
+	"\x10DevicePatchState\x12\"\n" +
+	"\x1eDEVICE_PATCH_STATE_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dDEVICE_PATCH_STATE_UNREPORTED\x10\x01\x12\x1c\n" +
+	"\x18DEVICE_PATCH_STATE_STALE\x10\x02\x12'\n" +
+	"#DEVICE_PATCH_STATE_SECURITY_PENDING\x10\x03\x12'\n" +
+	"#DEVICE_PATCH_STATE_RESTART_REQUIRED\x10\x04\x12!\n" +
+	"\x1dDEVICE_PATCH_STATE_UP_TO_DATE\x10\x05*w\n" +
 	"\x12DeviceExportFormat\x12$\n" +
 	" DEVICE_EXPORT_FORMAT_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DEVICE_EXPORT_FORMAT_CSV\x10\x01\x12\x1d\n" +
@@ -1206,49 +1371,53 @@ func file_lindm_admin_v1_inventory_management_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_inventory_management_proto_rawDescData
 }
 
-var file_lindm_admin_v1_inventory_management_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_lindm_admin_v1_inventory_management_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_lindm_admin_v1_inventory_management_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lindm_admin_v1_inventory_management_proto_goTypes = []any{
 	(AttributeType)(0),                       // 0: lindm.admin.v1.AttributeType
-	(DeviceSortField)(0),                     // 1: lindm.admin.v1.DeviceSortField
-	(DeviceExportFormat)(0),                  // 2: lindm.admin.v1.DeviceExportFormat
-	(*AttributeValue)(nil),                   // 3: lindm.admin.v1.AttributeValue
-	(*AttributeDefinition)(nil),              // 4: lindm.admin.v1.AttributeDefinition
-	(*DeviceMetadata)(nil),                   // 5: lindm.admin.v1.DeviceMetadata
-	(*DeviceSort)(nil),                       // 6: lindm.admin.v1.DeviceSort
-	(*DeviceFilter)(nil),                     // 7: lindm.admin.v1.DeviceFilter
-	(*SetDeviceMetadataRequest)(nil),         // 8: lindm.admin.v1.SetDeviceMetadataRequest
-	(*SetDeviceMetadataResponse)(nil),        // 9: lindm.admin.v1.SetDeviceMetadataResponse
-	(*SetAttributeDefinitionRequest)(nil),    // 10: lindm.admin.v1.SetAttributeDefinitionRequest
-	(*SetAttributeDefinitionResponse)(nil),   // 11: lindm.admin.v1.SetAttributeDefinitionResponse
-	(*ListAttributeDefinitionsRequest)(nil),  // 12: lindm.admin.v1.ListAttributeDefinitionsRequest
-	(*ListAttributeDefinitionsResponse)(nil), // 13: lindm.admin.v1.ListAttributeDefinitionsResponse
-	(*ExportDevicesRequest)(nil),             // 14: lindm.admin.v1.ExportDevicesRequest
-	(*ExportDevicesResponse)(nil),            // 15: lindm.admin.v1.ExportDevicesResponse
-	nil,                                      // 16: lindm.admin.v1.DeviceMetadata.AttributesEntry
-	nil,                                      // 17: lindm.admin.v1.DeviceFilter.AttributesEntry
-	(*timestamppb.Timestamp)(nil),            // 18: google.protobuf.Timestamp
+	(DeviceCompliance)(0),                    // 1: lindm.admin.v1.DeviceCompliance
+	(DeviceSortField)(0),                     // 2: lindm.admin.v1.DeviceSortField
+	(DevicePatchState)(0),                    // 3: lindm.admin.v1.DevicePatchState
+	(DeviceExportFormat)(0),                  // 4: lindm.admin.v1.DeviceExportFormat
+	(*AttributeValue)(nil),                   // 5: lindm.admin.v1.AttributeValue
+	(*AttributeDefinition)(nil),              // 6: lindm.admin.v1.AttributeDefinition
+	(*DeviceMetadata)(nil),                   // 7: lindm.admin.v1.DeviceMetadata
+	(*DeviceSort)(nil),                       // 8: lindm.admin.v1.DeviceSort
+	(*DeviceFilter)(nil),                     // 9: lindm.admin.v1.DeviceFilter
+	(*SetDeviceMetadataRequest)(nil),         // 10: lindm.admin.v1.SetDeviceMetadataRequest
+	(*SetDeviceMetadataResponse)(nil),        // 11: lindm.admin.v1.SetDeviceMetadataResponse
+	(*SetAttributeDefinitionRequest)(nil),    // 12: lindm.admin.v1.SetAttributeDefinitionRequest
+	(*SetAttributeDefinitionResponse)(nil),   // 13: lindm.admin.v1.SetAttributeDefinitionResponse
+	(*ListAttributeDefinitionsRequest)(nil),  // 14: lindm.admin.v1.ListAttributeDefinitionsRequest
+	(*ListAttributeDefinitionsResponse)(nil), // 15: lindm.admin.v1.ListAttributeDefinitionsResponse
+	(*ExportDevicesRequest)(nil),             // 16: lindm.admin.v1.ExportDevicesRequest
+	(*ExportDevicesResponse)(nil),            // 17: lindm.admin.v1.ExportDevicesResponse
+	nil,                                      // 18: lindm.admin.v1.DeviceMetadata.AttributesEntry
+	nil,                                      // 19: lindm.admin.v1.DeviceFilter.AttributesEntry
+	(*timestamppb.Timestamp)(nil),            // 20: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_inventory_management_proto_depIdxs = []int32{
 	0,  // 0: lindm.admin.v1.AttributeDefinition.type:type_name -> lindm.admin.v1.AttributeType
-	16, // 1: lindm.admin.v1.DeviceMetadata.attributes:type_name -> lindm.admin.v1.DeviceMetadata.AttributesEntry
-	1,  // 2: lindm.admin.v1.DeviceSort.field:type_name -> lindm.admin.v1.DeviceSortField
-	17, // 3: lindm.admin.v1.DeviceFilter.attributes:type_name -> lindm.admin.v1.DeviceFilter.AttributesEntry
-	18, // 4: lindm.admin.v1.DeviceFilter.last_seen_from:type_name -> google.protobuf.Timestamp
-	18, // 5: lindm.admin.v1.DeviceFilter.last_seen_until:type_name -> google.protobuf.Timestamp
-	5,  // 6: lindm.admin.v1.SetDeviceMetadataRequest.metadata:type_name -> lindm.admin.v1.DeviceMetadata
-	4,  // 7: lindm.admin.v1.SetAttributeDefinitionRequest.definition:type_name -> lindm.admin.v1.AttributeDefinition
-	4,  // 8: lindm.admin.v1.ListAttributeDefinitionsResponse.definitions:type_name -> lindm.admin.v1.AttributeDefinition
-	7,  // 9: lindm.admin.v1.ExportDevicesRequest.filter:type_name -> lindm.admin.v1.DeviceFilter
-	2,  // 10: lindm.admin.v1.ExportDevicesRequest.format:type_name -> lindm.admin.v1.DeviceExportFormat
-	6,  // 11: lindm.admin.v1.ExportDevicesRequest.sort:type_name -> lindm.admin.v1.DeviceSort
-	3,  // 12: lindm.admin.v1.DeviceMetadata.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
-	3,  // 13: lindm.admin.v1.DeviceFilter.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	18, // 1: lindm.admin.v1.DeviceMetadata.attributes:type_name -> lindm.admin.v1.DeviceMetadata.AttributesEntry
+	2,  // 2: lindm.admin.v1.DeviceSort.field:type_name -> lindm.admin.v1.DeviceSortField
+	19, // 3: lindm.admin.v1.DeviceFilter.attributes:type_name -> lindm.admin.v1.DeviceFilter.AttributesEntry
+	20, // 4: lindm.admin.v1.DeviceFilter.last_seen_from:type_name -> google.protobuf.Timestamp
+	20, // 5: lindm.admin.v1.DeviceFilter.last_seen_until:type_name -> google.protobuf.Timestamp
+	1,  // 6: lindm.admin.v1.DeviceFilter.compliance:type_name -> lindm.admin.v1.DeviceCompliance
+	3,  // 7: lindm.admin.v1.DeviceFilter.patch_states:type_name -> lindm.admin.v1.DevicePatchState
+	7,  // 8: lindm.admin.v1.SetDeviceMetadataRequest.metadata:type_name -> lindm.admin.v1.DeviceMetadata
+	6,  // 9: lindm.admin.v1.SetAttributeDefinitionRequest.definition:type_name -> lindm.admin.v1.AttributeDefinition
+	6,  // 10: lindm.admin.v1.ListAttributeDefinitionsResponse.definitions:type_name -> lindm.admin.v1.AttributeDefinition
+	9,  // 11: lindm.admin.v1.ExportDevicesRequest.filter:type_name -> lindm.admin.v1.DeviceFilter
+	4,  // 12: lindm.admin.v1.ExportDevicesRequest.format:type_name -> lindm.admin.v1.DeviceExportFormat
+	8,  // 13: lindm.admin.v1.ExportDevicesRequest.sort:type_name -> lindm.admin.v1.DeviceSort
+	5,  // 14: lindm.admin.v1.DeviceMetadata.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
+	5,  // 15: lindm.admin.v1.DeviceFilter.AttributesEntry.value:type_name -> lindm.admin.v1.AttributeValue
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_inventory_management_proto_init() }
@@ -1271,7 +1440,7 @@ func file_lindm_admin_v1_inventory_management_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_inventory_management_proto_rawDesc), len(file_lindm_admin_v1_inventory_management_proto_rawDesc)),
-			NumEnums:      3,
+			NumEnums:      5,
 			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,

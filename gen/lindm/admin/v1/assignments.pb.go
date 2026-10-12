@@ -179,8 +179,10 @@ type ResourceAssignment struct {
 	AssignedAt               *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=assigned_at,json=assignedAt,proto3" json:"assigned_at,omitempty"`
 	Reason                   string                 `protobuf:"bytes,10,opt,name=reason,proto3" json:"reason,omitempty"`
 	ReconcileIntervalSeconds uint32                 `protobuf:"varint,11,opt,name=reconcile_interval_seconds,json=reconcileIntervalSeconds,proto3" json:"reconcile_interval_seconds,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Current display name of actor_id, filled on read; never stored in the head.
+	ActorDisplayName string `protobuf:"bytes,12,opt,name=actor_display_name,json=actorDisplayName,proto3" json:"actor_display_name,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ResourceAssignment) Reset() {
@@ -288,6 +290,13 @@ func (x *ResourceAssignment) GetReconcileIntervalSeconds() uint32 {
 		return x.ReconcileIntervalSeconds
 	}
 	return 0
+}
+
+func (x *ResourceAssignment) GetActorDisplayName() string {
+	if x != nil {
+		return x.ActorDisplayName
+	}
+	return ""
 }
 
 type SetResourceAssignmentRequest struct {
@@ -1037,7 +1046,7 @@ var File_lindm_admin_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc5\x03\n" +
+	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xfd\x03\n" +
 	"\x12ResourceAssignment\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1053,7 +1062,8 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"assignedAt\x12\x16\n" +
 	"\x06reason\x18\n" +
 	" \x01(\tR\x06reason\x12<\n" +
-	"\x1areconcile_interval_seconds\x18\v \x01(\rR\x18reconcileIntervalSeconds\"\xdd\x05\n" +
+	"\x1areconcile_interval_seconds\x18\v \x01(\rR\x18reconcileIntervalSeconds\x126\n" +
+	"\x12actor_display_name\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x10actorDisplayName\"\xdd\x05\n" +
 	"\x1cSetResourceAssignmentRequest\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12K\n" +

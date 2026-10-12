@@ -5,7 +5,9 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Search, X } from "lucide-react";
 import {
+  DeviceCompliance,
   DeviceExportFormat,
+  DevicePatchState,
   DeviceFilterSchema,
   type DeviceFilter,
   type ExportDevicesRequest,
@@ -56,6 +58,25 @@ export function DeviceFilters({
   );
 }
 
+const complianceWords: Record<DeviceCompliance, string> = {
+  [DeviceCompliance.UNSPECIFIED]: "unknown",
+  [DeviceCompliance.UNASSIGNED]: "no profile",
+  [DeviceCompliance.COMPLIANT]: "compliant",
+  [DeviceCompliance.DRIFT_REMEDIATED]: "drift remediated",
+  [DeviceCompliance.STALE]: "not checked recently",
+  [DeviceCompliance.UNKNOWN]: "never checked",
+  [DeviceCompliance.ATTENTION]: "needs attention",
+};
+
+const patchWords: Record<DevicePatchState, string> = {
+  [DevicePatchState.UNSPECIFIED]: "unknown",
+  [DevicePatchState.UNREPORTED]: "not reported",
+  [DevicePatchState.STALE]: "old report",
+  [DevicePatchState.SECURITY_PENDING]: "security updates pending",
+  [DevicePatchState.RESTART_REQUIRED]: "restart required",
+  [DevicePatchState.UP_TO_DATE]: "up to date",
+};
+
 function FilterForm({
   filter,
   search,
@@ -68,7 +89,11 @@ function FilterForm({
   const [attributes, setAttributes] = useState(filter.attributes);
   const [error, setError] = useState("");
   const form = useRef<HTMLFormElement>(null);
-  function removeFacet(change: Partial<Pick<DeviceFilter, "namePrefix" | "osId" | "labels">>) {
+  function removeFacet(
+    change: Partial<
+      Pick<DeviceFilter, "namePrefix" | "osId" | "labels" | "compliance" | "patchStates">
+    >,
+  ) {
     const next = create(DeviceFilterSchema, { ...filter, ...change });
     onSearch({ ...search, filter: toJsonString(DeviceFilterSchema, next), pageToken: "" });
   }
@@ -85,6 +110,8 @@ function FilterForm({
         osId: filter.osId,
         osVersion: filter.osVersion,
         labels: filter.labels,
+        compliance: filter.compliance,
+        patchStates: filter.patchStates,
         attributes: readAttributeInputs(data, attributes),
         lastSeenFrom: from ? timestampFromDate(new Date(`${from}Z`)) : undefined,
         lastSeenUntil: until ? timestampFromDate(new Date(`${until}Z`)) : undefined,
@@ -162,7 +189,12 @@ function FilterForm({
           Clear
         </Button>
       </div>
-      {search.hostnameSearch || filter.namePrefix || filter.osId || filter.labels.length > 0 ? (
+      {search.hostnameSearch ||
+      filter.namePrefix ||
+      filter.osId ||
+      filter.labels.length > 0 ||
+      filter.compliance.length > 0 ||
+      filter.patchStates.length > 0 ? (
         <div
           className="flex flex-wrap items-center gap-2"
           role="group"
@@ -224,6 +256,36 @@ function FilterForm({
               <X className="size-3 shrink-0" aria-hidden="true" />
             </Button>
           ))}
+          {filter.compliance.length ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto min-h-7 max-w-full rounded-full bg-muted/40 px-2.5 py-1 text-left text-xs whitespace-normal"
+              aria-label="Remove profile state filter"
+              onClick={() => removeFacet({ compliance: [] })}
+            >
+              <span>
+                Profile: {filter.compliance.map((state) => complianceWords[state]).join(" or ")}
+              </span>
+              <X className="size-3 shrink-0" aria-hidden="true" />
+            </Button>
+          ) : null}
+          {filter.patchStates.length ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-auto min-h-7 max-w-full rounded-full bg-muted/40 px-2.5 py-1 text-left text-xs whitespace-normal"
+              aria-label="Remove update status filter"
+              onClick={() => removeFacet({ patchStates: [] })}
+            >
+              <span>
+                Updates: {filter.patchStates.map((state) => patchWords[state]).join(" or ")}
+              </span>
+              <X className="size-3 shrink-0" aria-hidden="true" />
+            </Button>
+          ) : null}
         </div>
       ) : null}
       <details

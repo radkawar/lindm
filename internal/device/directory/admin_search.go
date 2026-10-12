@@ -91,6 +91,43 @@ type deviceQuery struct {
 	hostnameSearch string
 }
 
+// complianceByRank is device_compliance_rank (migration 00041) as the API enum.
+var complianceByRank = [...]adminv1.DeviceCompliance{
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED,
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT,
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_DRIFT_REMEDIATED,
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_STALE,
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNKNOWN,
+	adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION,
+}
+
+func complianceRanks(states []adminv1.DeviceCompliance) []int32 {
+	ranks := make([]int32, 0, len(states))
+	for rank, state := range complianceByRank {
+		if slices.Contains(states, state) {
+			ranks = append(ranks, int32(rank))
+		}
+	}
+	return ranks
+}
+
+// patchBucketByState names device_patch_bucket (migration 00041) results.
+var patchBucketByState = map[adminv1.DevicePatchState]string{
+	adminv1.DevicePatchState_DEVICE_PATCH_STATE_UNREPORTED:       "unknown",
+	adminv1.DevicePatchState_DEVICE_PATCH_STATE_STALE:            "stale",
+	adminv1.DevicePatchState_DEVICE_PATCH_STATE_SECURITY_PENDING: "security_pending",
+	adminv1.DevicePatchState_DEVICE_PATCH_STATE_RESTART_REQUIRED: "reboot_required",
+	adminv1.DevicePatchState_DEVICE_PATCH_STATE_UP_TO_DATE:       "patched",
+}
+
+func patchBuckets(states []adminv1.DevicePatchState) []string {
+	buckets := make([]string, 0, len(states))
+	for _, state := range states {
+		buckets = append(buckets, patchBucketByState[state])
+	}
+	return buckets
+}
+
 // MaxDeviceSearchCursors bounds each actor's live search cursors.
 const MaxDeviceSearchCursors = 256
 
@@ -145,6 +182,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter, PatchStaleAfterSeconds: inventory.PatchStaleAfterSeconds,
 			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
 			AgentRelease: filter.GetAgentRelease(), HostnameSearch: query.hostnameSearch,
+			ComplianceRanks: complianceRanks(filter.GetCompliance()), PatchBuckets: patchBuckets(filter.GetPatchStates()),
 			SortField: int32(query.sort.GetField()), Descending: query.sort.GetDescending(),
 		}
 		if query.sort.GetField() == adminv1.DeviceSortField_DEVICE_SORT_FIELD_UNSPECIFIED {
@@ -336,23 +374,10 @@ func searchDevice(row devicedb.SearchDevicesRow, encryption adminv1.DeviceRootEn
 	if err := protojson.Unmarshal(row.Metadata, metadata); err != nil {
 		return nil, core.ErrInternalState
 	}
-	var compliance adminv1.DeviceCompliance
-	switch row.ComplianceRank {
-	case 0:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNASSIGNED
-	case 1:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_COMPLIANT
-	case 2:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_DRIFT_REMEDIATED
-	case 3:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_STALE
-	case 4:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_UNKNOWN
-	case 5:
-		compliance = adminv1.DeviceCompliance_DEVICE_COMPLIANCE_ATTENTION
-	default:
+	if row.ComplianceRank < 0 || int(row.ComplianceRank) >= len(complianceByRank) {
 		return nil, core.ErrInternalState
 	}
+	compliance := complianceByRank[row.ComplianceRank]
 	item := &adminv1.Device{
 		Id: row.ID.String(), EnrollmentGeneration: core.GenerationString(row.CurrentGenerationID),
 		Hostname: row.Hostname, OsId: row.OsID, OsVersion: row.OsVersion, OsName: platform.Identify(platform.OSRelease{ID: row.OsID, VersionID: row.OsVersion}).DisplayName(row.OsVersion), Architecture: row.Architecture,

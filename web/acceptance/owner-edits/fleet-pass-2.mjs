@@ -31,6 +31,30 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     1, "Dashboard has no Enroll a device entry");
   await capture("dashboard");
 
+  step("dashboard profile and patch links open the filtered device list");
+  for (const [name, chip, allowed] of [
+    ["Show devices with profile items to review", /^Profile: /, /^(Attention|Stale|Unknown)$/],
+    ["Show devices needing update follow-up", /^Updates: /, null],
+  ]) {
+    await visit("/dashboard");
+    await main.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+    const listed = page.getByRole("table", { name: /Enrolled devices/ });
+    await listed.waitFor({ timeout: 30_000 }).catch(() => {});
+    const applied = page.getByRole("group", { name: "Applied device filters" });
+    const chips = (await applied.getByRole("button").allInnerTexts()).map((text) => text.trim());
+    require(chips.some((text) =>
+      chip.test(text),
+    ), `${name}: no removable filter chip (${chips.join(", ")})`);
+    if (allowed) {
+      const headers = (await listed.locator("thead th").allInnerTexts()).map((text) => text.trim());
+      const column = headers.indexOf("Compliance");
+      for (const row of await listed.locator("tbody tr").all()) {
+        const cell = (await row.locator("td").nth(column).innerText()).trim();
+        require(allowed.test(cell), `${name}: listed a device with compliance "${cell}"`);
+      }
+    }
+  }
+
   step("device list fits the desktop viewport");
   await visit("/devices");
   const table = page.getByRole("table", { name: /Enrolled devices/ });
@@ -91,6 +115,26 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     // Leave without saving.
     await metadataCard.getByRole("button", { name: "Cancel", exact: true }).click();
   }
+
+  step("services: plain interval, named actor, one success badge per converged item");
+  await tab("Services");
+  await panel
+    .getByText("Assigned profile", { exact: true })
+    .waitFor({ timeout: 30_000 })
+    .catch(() => {});
+  const services = await panel.innerText();
+  require(!/every 1440 minutes/.test(services), "Services still says 'every 1440 minutes'");
+  require(!/another administrator/.test(
+    services,
+  ), "Services names the assigner 'another administrator'");
+  for (const row of await panel.locator("table").first().locator("tbody tr").all()) {
+    const cells = await row.locator("td").allInnerTexts();
+    if (cells.length < 4 || !/^Succeeded/.test(cells[2].trim())) continue;
+    require(!/^Succeeded/.test(
+      cells[3].trim(),
+    ), `Services row repeats Succeeded: ${cells[0].split("\n")[0]}`);
+  }
+  await capture("services");
 
   step("tab is kept in the URL");
   await tab("Encryption");

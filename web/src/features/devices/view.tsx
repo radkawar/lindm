@@ -12,11 +12,11 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  DeviceCompliance,
   DeviceRootEncryption,
   DeviceState,
   type Device,
 } from "../../../gen/lindm/admin/v1/admin_pb";
+import { DeviceCompliance } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { RpcError } from "@/components/ui/rpc-error";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";

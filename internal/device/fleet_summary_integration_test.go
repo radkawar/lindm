@@ -238,6 +238,19 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resou
 			}
 		})
 	}
+	// The assignment names its actor by current display name, read at request time.
+	detail, err := f.service.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec("UPDATE principals SET display_name='Avery Admin' WHERE id=$1", detail.Msg.GetAssignment().GetActorId())
+	detail, err = f.service.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: f.principal.DeviceID.String()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := detail.Msg.GetAssignment().GetActorDisplayName(); got != "Avery Admin" {
+		t.Fatalf("assignment actor display name: %q", got)
+	}
 	all := fleetSummary(t, f.service, f.adminCtx, 0)
 	if all.GetResourceCompliance().GetTotalResources() != 4 || all.GetResourceCompliance().GetAttentionResources() != 4 {
 		t.Fatalf("unrestricted current heads lost resources: %v", all.GetResourceCompliance())
