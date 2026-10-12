@@ -68,6 +68,10 @@ func (s *Store) Publish(ctx context.Context, tx pgx.Tx, request *adminv1.Publish
 	if err != nil {
 		return nil, profileInputError(ctx, err)
 	}
+	// Positions refer to the caller's order, before canonical resource sorting.
+	if err := Publishable(request.GetSpec()); err != nil {
+		return nil, err
+	}
 	requestID, err := uuid.Parse(request.GetRequestId())
 	if err != nil {
 		return nil, ErrProfileRejected

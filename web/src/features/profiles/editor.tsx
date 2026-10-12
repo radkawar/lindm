@@ -28,9 +28,11 @@ import {
   DESCRIPTION_MAX,
   MAX_RESOURCES,
   NAME_MAX,
+  NO_DRAFT_ERRORS,
   capturePayload,
   classifyPublishError,
   publishErrors,
+  publishRefusalErrors,
   draftFromPayload,
   draftFromSpec,
   emptyDraft,
@@ -38,6 +40,7 @@ import {
   newResource,
   removeResource,
   updateResource,
+  type DraftErrors,
   type DraftSpec,
   type PublishPayload,
 } from "./model";
@@ -67,7 +70,7 @@ export function ProfileEditor({
   const [reason, setReason] = useState("");
   const [requestId, setRequestId] = useState(newRequestId);
   const [expectedRevisionId, setExpectedRevisionId] = useState(initialExpectedRevisionId);
-  const [fieldErrors, setFieldErrors] = useState<string[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<DraftErrors>(NO_DRAFT_ERRORS);
   const [note, setNote] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -111,6 +114,16 @@ export function ProfileEditor({
     },
     onError: (error, payload) => {
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
+      // The server names the refused setting and stored nothing: return to the
+      // editable draft with the refusal on that setting.
+      const refusal = publishRefusalErrors(error);
+      if (refusal) {
+        clearAttempt(lifetime, payload.profileId);
+        setRequestId(newRequestId());
+        setFieldErrors(refusal);
+        toast.error("Not published", { description: "Fix the marked setting, then publish." });
+        return;
+      }
       const classified = classifyPublishError(error);
       settleAttempt(lifetime, payload.profileId, {
         status: classified.conflict
@@ -155,12 +168,12 @@ export function ProfileEditor({
     setExpectedRevisionId(nextExpected);
     setReason(nextReason);
     setRequestId(newRequestId());
-    setFieldErrors([]);
+    setFieldErrors(NO_DRAFT_ERRORS);
     clearAttempt(lifetime, profileId);
   }
 
   function changeDraft(next: DraftSpec) {
-    setFieldErrors([]);
+    setFieldErrors(NO_DRAFT_ERRORS);
     setDraft(next);
   }
 
@@ -182,7 +195,10 @@ export function ProfileEditor({
             }
             if (attempt) return;
             if (mode === "edit" && expectedRevisionId === undefined) {
-              setFieldErrors(["Load the latest version before publishing."]);
+              setFieldErrors({
+                profile: ["Load the latest version before publishing."],
+                settings: {},
+              });
               return;
             }
             try {
@@ -194,14 +210,17 @@ export function ProfileEditor({
                 draft,
               });
               const errors = publishErrors(payload);
-              if (errors.length > 0) {
+              if (errors.profile.length > 0 || Object.keys(errors.settings).length > 0) {
                 setFieldErrors(errors);
                 return;
               }
-              setFieldErrors([]);
+              setFieldErrors(NO_DRAFT_ERRORS);
               send(payload);
             } catch (error) {
-              setFieldErrors([error instanceof Error ? error.message : "A setting is invalid"]);
+              setFieldErrors({
+                profile: [error instanceof Error ? error.message : "A setting is invalid"],
+                settings: {},
+              });
             }
           }}
         >
@@ -251,6 +270,7 @@ export function ProfileEditor({
                 resource={resource}
                 resources={shown.resources}
                 locked={locked}
+                errors={fieldErrors.settings[index] ?? []}
                 onChange={(next) => changeDraft(updateResource(draft, next))}
                 onRemove={() => changeDraft(removeResource(draft, resource.resourceId))}
               />
@@ -280,20 +300,25 @@ export function ProfileEditor({
               value={shownReason}
               readOnly={locked}
               onChange={(event) => {
-                setFieldErrors([]);
+                setFieldErrors(NO_DRAFT_ERRORS);
                 setReason(event.target.value);
               }}
             />
           </div>
-          {fieldErrors.length > 0 ? (
+          {fieldErrors.profile.length > 0 || Object.keys(fieldErrors.settings).length > 0 ? (
             <div
               id="profile-draft-errors"
               role="alert"
               className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
             >
               <ul className="grid gap-1">
-                {fieldErrors.map((error) => (
+                {fieldErrors.profile.map((error) => (
                   <li key={error}>{error}</li>
+                ))}
+                {Object.keys(fieldErrors.settings).map((index) => (
+                  <li key={`setting-${index}`}>
+                    Setting {Number(index) + 1} needs changes before publishing.
+                  </li>
                 ))}
               </ul>
             </div>
@@ -412,7 +437,7 @@ export function ProfileEditor({
                     setExpectedRevisionId(published.revisionId);
                     setReason("");
                     setRequestId(newRequestId());
-                    setFieldErrors([]);
+                    setFieldErrors(NO_DRAFT_ERRORS);
                     setNote("Ready for your next change. Not published yet.");
                   }
                   clearAttempt(lifetime, profileId);

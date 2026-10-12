@@ -5,10 +5,15 @@ import (
 	"errors"
 	"log/slog"
 
+	validate "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	"connectrpc.com/connect"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/policy"
 	"lindm/internal/rpcreason"
 )
@@ -50,7 +55,10 @@ func MapErr(err error) error {
 }
 
 func ProfileError(err error) error {
+	var setting *policy.SettingError
 	switch {
+	case errors.As(err, &setting):
+		return settingViolation(setting)
 	case errors.Is(err, policy.ErrProfileRejected):
 		return Invalid("invalid_profile_request")
 	case errors.Is(err, policy.ErrProfileConflict):
@@ -63,5 +71,35 @@ func ProfileError(err error) error {
 		return rpcreason.Error(connect.CodeResourceExhausted, "profile_revision_capacity")
 	default:
 		return MapErr(err)
+	}
+}
+
+// settingViolation reports the refused setting in the same buf.validate shape
+// as schema violations, so clients locate it by its request field path.
+func settingViolation(setting *policy.SettingError) error {
+	failure := rpcreason.Error(connect.CodeInvalidArgument, policy.ErrSettingEmpty.Error())
+	request := (&adminv1.PublishProfileRevisionRequest{}).ProtoReflect().Descriptor()
+	spec := request.Fields().ByName("spec")
+	resources := spec.Message().Fields().ByName("resources")
+	desired := resources.Message().Fields().ByName("desired")
+	path := []*validate.FieldPathElement{pathElement(spec), pathElement(resources), pathElement(desired), pathElement(setting.State)}
+	path[1].Subscript = &validate.FieldPathElement_Index{Index: uint64(setting.Index)}
+	detail, err := connect.NewErrorDetail(&validate.Violations{Violations: []*validate.Violation{{
+		Field:   &validate.FieldPath{Elements: path},
+		RuleId:  proto.String(policy.ErrSettingEmpty.Error()),
+		Message: proto.String("setting has no effective content"),
+	}}})
+	if err != nil {
+		return failure
+	}
+	failure.AddDetail(detail)
+	return failure
+}
+
+func pathElement(field protoreflect.FieldDescriptor) *validate.FieldPathElement {
+	return &validate.FieldPathElement{
+		FieldNumber: proto.Int32(int32(field.Number())),
+		FieldName:   proto.String(string(field.Name())),
+		FieldType:   descriptorpb.FieldDescriptorProto_Type(field.Kind()).Enum(),
 	}
 }

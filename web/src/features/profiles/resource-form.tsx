@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "cn";
 import { type DraftResource } from "./model";
 import {
   desiredField,
@@ -21,6 +22,7 @@ export function ResourceFields({
   resource,
   resources,
   locked,
+  errors,
   onChange,
   onRemove,
 }: {
@@ -28,6 +30,7 @@ export function ResourceFields({
   resource: DraftResource;
   resources: DraftResource[];
   locked: boolean;
+  errors: string[];
   onChange: (next: DraftResource) => void;
   onRemove: () => void;
 }) {
@@ -60,7 +63,14 @@ export function ResourceFields({
     (entry) => !["resourceId", "desired"].includes(entry.jsonName),
   );
   return (
-    <fieldset disabled={locked} className="grid min-w-0 gap-4 border bg-muted/20 p-4">
+    <fieldset
+      disabled={locked}
+      aria-describedby={errors.length > 0 ? `${id}-errors` : undefined}
+      className={cn(
+        "grid min-w-0 gap-4 border bg-muted/20 p-4",
+        errors.length > 0 && "border-destructive",
+      )}
+    >
       <legend className="px-1 text-sm font-medium">Setting {index + 1}</legend>
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="button" variant="outline" size="sm" disabled={locked} onClick={onRemove}>
@@ -166,6 +176,17 @@ export function ResourceFields({
         <p className="text-sm text-muted-foreground">
           This setting type can't be edited here. It will be kept as is.
         </p>
+      ) : null}
+      {errors.length > 0 ? (
+        <ul
+          id={`${id}-errors`}
+          data-setting-errors
+          className="grid gap-1 border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+        >
+          {errors.map((error) => (
+            <li key={error}>{error}</li>
+          ))}
+        </ul>
       ) : null}
       <details className="min-w-0">
         <summary className="cursor-pointer py-1 text-sm font-medium">Advanced options</summary>

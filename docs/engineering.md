@@ -3580,6 +3580,10 @@ output uses the remote destination address, and forward uses ingress binding and
 the default ingress verdict. Rules sort by priority then UUID. Selector stages
 grow linearly with CIDR/port alternatives rather than their Cartesian product.
 IPv4/IPv6, TCP/UDP ranges and typed ICMP selectors compile to native expressions.
+A zone without any binding applies to all traffic, so publication refuses a present
+zone that has no interface, remote network or rule (`profile_setting_empty`, with the
+setting's request field path as a `buf.validate` violation). A deliberate catch-all
+lists `0.0.0.0/0` and `::/0`. Already-published revisions remain readable unchanged.
 
 The helper preserves its own management path using root-pinned TCP endpoints and
 DNS servers, established replies, loopback, DHCP on approved links, IPv6 neighbor

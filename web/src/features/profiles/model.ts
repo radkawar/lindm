@@ -6,9 +6,12 @@ import {
   toJsonString,
   type DescField,
 } from "@bufbuild/protobuf";
-import { createValidator } from "@bufbuild/protovalidate";
-import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
-import { ConnectError } from "@connectrpc/connect";
+import { createValidator, pathFromViolationProto, Violation } from "@bufbuild/protovalidate";
+import {
+  field as validationRules,
+  ViolationsSchema,
+} from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import { Code, ConnectError } from "@connectrpc/connect";
 import {
   PublishProfileRevisionRequestSchema,
   type PublishProfileRevisionRequest,
@@ -19,10 +22,12 @@ import {
   type ResourceProfile,
 } from "../../../gen/lindm/policy/v1/profile_pb";
 import { SSHServerDesiredSchema } from "../../../gen/lindm/resource/v1/accounts_pb";
+import { Presence } from "../../../gen/lindm/resource/v1/identity_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { initialState, object, replaceReference, withDerivedRef } from "./resource-draft";
+import { fieldLabel } from "./typed-fields";
 
 export const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 export const MAX_RESOURCES = editorBound(ResourceProfileSchema.field.resources);
@@ -124,38 +129,117 @@ export function updateResource(draft: DraftSpec, next: DraftResource): DraftSpec
   };
 }
 
-export function publishErrors(payload: PublishPayload): string[] {
+// Errors on one setting are shown on that setting; the rest belong to the profile.
+export type DraftErrors = { profile: string[]; settings: Record<number, string[]> };
+export const NO_DRAFT_ERRORS: DraftErrors = { profile: [], settings: {} };
+
+// The server refuses the same shape at publication (profile_setting_empty).
+const EMPTY_SETTING_RULE = "profile_setting_empty";
+const EMPTY_FIREWALL_ZONE =
+  "Add an interface, source network or rule. Without one, this zone's default traffic rules apply to all traffic on the device.";
+
+export function publishErrors(payload: PublishPayload): DraftErrors {
   const result = validator.validate(PublishProfileRevisionRequestSchema, payload);
-  if (result.kind === "invalid") {
-    return result.violations.flatMap((violation) => {
-      if (violation.field.at(-1) !== SSHServerDesiredSchema.field.bannerText)
-        return [violation.toString()];
-      const entry = violation.field.find((part) => part.kind === "list_sub");
-      const prefix = entry === undefined ? "" : `Setting ${entry.index + 1}: `;
-      if (violation.ruleId === "string.min_len")
-        return [`${prefix}Enter the notice shown before SSH sign-in.`];
-      if (violation.ruleId === "string.pattern") {
-        // The schema can report both required text and character rules for an
-        // empty notice. Present the actionable required-text error only.
-        if (
-          result.violations.some(
-            (other) =>
-              other.ruleId === "string.min_len" &&
-              other.field.length === violation.field.length &&
-              other.field.every((part, offset) => part === violation.field[offset]),
-          )
-        )
-          return [];
-        return [
-          `${prefix}Use plain text in the SSH login notice, without terminal control characters.`,
-        ];
-      }
-      return [`${prefix}SSH login notice: ${violation.message}`];
-    });
+  if (result.kind === "error") {
+    return { profile: [`Couldn't check the profile: ${result.error.message}`], settings: {} };
   }
-  if (result.kind === "error") return [`Couldn't check the profile: ${result.error.message}`];
+  const errors = draftErrors(result.kind === "invalid" ? result.violations : []);
+  payload.spec.resources.forEach((resource, index) => {
+    const state = resource.desired?.state;
+    if (
+      state?.case === "firewallZone" &&
+      state.value.presence === Presence.PRESENT &&
+      state.value.interfaces.length === 0 &&
+      state.value.sourceNetworks.length === 0 &&
+      state.value.rules.length === 0
+    ) {
+      errors.settings[index] = [...(errors.settings[index] ?? []), EMPTY_FIREWALL_ZONE];
+    }
+  });
   // Canonical resource identity, dependency cycles and ownership claims are checked by the server.
-  return [];
+  return errors;
+}
+
+// A definitive server refusal that names settings, in the same violation shape
+// as the schema check. Null when the refusal doesn't identify a setting.
+export function publishRefusalErrors(error: unknown): DraftErrors | null {
+  const connectError = ConnectError.from(error);
+  if (connectError.code !== Code.InvalidArgument) return null;
+  const violations = connectError.findDetails(ViolationsSchema).flatMap((detail) =>
+    detail.violations.flatMap((violation) => {
+      if (!violation.field) return [];
+      try {
+        const path = pathFromViolationProto(PublishProfileRevisionRequestSchema, violation.field);
+        return [new Violation(violation.message, violation.ruleId, path, [], violation.forKey)];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  const errors = draftErrors(violations);
+  return Object.keys(errors.settings).length > 0 ? errors : null;
+}
+
+function draftErrors(violations: Violation[]): DraftErrors {
+  const errors: DraftErrors = { profile: [], settings: {} };
+  for (const violation of violations) {
+    const entry = violation.field.find((part) => part.kind === "list_sub");
+    if (entry === undefined) {
+      errors.profile.push(violation.toString());
+      continue;
+    }
+    const message = settingMessage(violation, violations);
+    if (message === null) continue;
+    const existing = errors.settings[entry.index] ?? [];
+    if (!existing.includes(message)) errors.settings[entry.index] = [...existing, message];
+  }
+  return errors;
+}
+
+function settingMessage(violation: Violation, all: Violation[]): string | null {
+  const last = violation.field.at(-1);
+  if (last === SSHServerDesiredSchema.field.bannerText) {
+    if (violation.ruleId === "string.min_len") return "Enter the notice shown before SSH sign-in.";
+    if (violation.ruleId === "string.pattern") {
+      // The schema can report both required text and character rules for an
+      // empty notice. Present the actionable required-text error only.
+      const required = all.some(
+        (other) =>
+          other.ruleId === "string.min_len" &&
+          other.field.length === violation.field.length &&
+          other.field.every((part, offset) => part === violation.field[offset]),
+      );
+      return required
+        ? null
+        : "Use plain text in the SSH login notice, without terminal control characters.";
+    }
+    return `SSH login notice: ${violation.message}`;
+  }
+  if (violation.ruleId === EMPTY_SETTING_RULE) {
+    return last?.kind === "field" && last.localName === "firewallZone"
+      ? EMPTY_FIREWALL_ZONE
+      : "This setting doesn't manage anything yet. Fill in what it should change.";
+  }
+  if (/\.(managed_)?dimensions?$/.test(violation.ruleId)) {
+    return "This setting doesn't manage anything yet. Choose at least one option to manage.";
+  }
+  const label =
+    last?.kind === "field"
+      ? fieldLabel(last.jsonName)
+      : last?.kind === "oneof"
+        ? fieldLabel(last.localName)
+        : "";
+  if (label === "") return violation.message;
+  switch (violation.ruleId) {
+    case "required":
+    case "string.min_len":
+    case "bytes.min_len":
+      return `${label} is required.`;
+    case "repeated.min_items":
+      return `${label}: add at least one.`;
+    default:
+      return `${label}: ${violation.message}`;
+  }
 }
 
 export function capturePayload(input: {

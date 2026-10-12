@@ -31,6 +31,9 @@ func Plan(ctx context.Context, client adminv1connect.AdminServiceClient, spec *o
 		if err != nil {
 			return nil, fmt.Errorf("canonicalize profile: %w", err)
 		}
+		if err := policy.Publishable(profile.GetSpec()); err != nil {
+			return nil, fmt.Errorf("profile %q: %w", profile.GetSpec().GetName(), err)
+		}
 		profile.Spec = normalized
 	}
 	if err := p.authorization(ctx, client); err != nil {

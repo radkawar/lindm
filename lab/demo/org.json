@@ -516,7 +516,10 @@
                 "presence": "PRESENCE_PRESENT",
                 "defaultIngress": "FIREWALL_VERDICT_DROP",
                 "defaultEgress": "FIREWALL_VERDICT_ACCEPT",
-                "rules": []
+                "sourceNetworks": [
+                  { "networkAddress": "0.0.0.0", "prefixLength": 0 },
+                  { "networkAddress": "::", "prefixLength": 0 }
+                ]
               }
             },
             "ownership": {

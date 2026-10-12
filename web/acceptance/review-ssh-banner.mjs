@@ -41,7 +41,12 @@ export async function reviewSSHBanner({
       step = "reject empty notice";
       await page.getByRole("button", { name: "Publish profile", exact: true }).click();
       await page
-        .getByText("Setting 1: Enter the notice shown before SSH sign-in.", { exact: true })
+        .locator("[data-setting-errors]")
+        .getByText("Enter the notice shown before SSH sign-in.", { exact: true })
+        .waitFor();
+      await page
+        .locator("#profile-draft-errors")
+        .getByText("Setting 1 needs changes before publishing.", { exact: true })
         .waitFor();
       if (await page.getByRole("link", { name: "View this version", exact: true }).count())
         throw new Error("Empty banner published");

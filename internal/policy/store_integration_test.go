@@ -288,3 +288,59 @@ func TestProfileRetainedRevisionLookupAndTypedIdentityCorruption(t *testing.T) {
 		t.Fatalf("typed content tampering=%v", err)
 	}
 }
+
+// Owner pass 2 bug 1: a contentless firewall zone published as a new version.
+func TestProfilePublicationRefusesEmptySettingWithoutWriting(t *testing.T) {
+	f := newProfileFixture(t)
+	request := profileRequest()
+	first, err := f.publish(t.Context(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zoneID := uuid.NewString()
+	zone := proto.CloneOf(request.Spec.Resources[0])
+	zone.ResourceId = uuid.NewString()
+	zone.DependsOn = nil
+	zone.Desired = &resourcev1.ResourceDesiredState{
+		Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, CanonicalKey: zoneID},
+		State: &resourcev1.ResourceDesiredState_FirewallZone{FirewallZone: &resourcev1.FirewallZoneDesired{
+			ZoneId: zoneID, Presence: resourcev1.Presence_PRESENCE_PRESENT,
+			DefaultIngress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_DROP, DefaultEgress: resourcev1.FirewallVerdict_FIREWALL_VERDICT_ACCEPT,
+		}},
+	}
+	next := proto.CloneOf(request)
+	next.RequestId = uuid.NewString()
+	next.ExpectedRevisionId = proto.String(first.GetRevisionId())
+	next.Spec.Resources = append(next.Spec.Resources, zone)
+	var setting *SettingError
+	if _, err := f.publish(t.Context(), next); !errors.As(err, &setting) || setting.Index != len(next.Spec.Resources)-1 {
+		t.Fatalf("empty zone in a new version=%v", err)
+	}
+	profileID := uuid.MustParse(request.GetProfileId())
+	head, err := f.store.Get(t.Context(), profileID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proto.Equal(head, first) {
+		t.Fatal("refused publication advanced the catalog head")
+	}
+	created := &adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "publish empty zone", Spec: &policyv1.ResourceProfile{Name: "Empty zone", Resources: []*policyv1.ProfileResource{zone}}}
+	if _, err := f.publish(t.Context(), created); !errors.Is(err, ErrSettingEmpty) {
+		t.Fatalf("empty zone in a new profile=%v", err)
+	}
+	if _, err := f.store.Get(t.Context(), uuid.MustParse(created.GetProfileId()), nil); !errors.Is(err, ErrProfileNotFound) {
+		t.Fatalf("refused profile was created: %v", err)
+	}
+	var reservations int
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*) FROM profile_requests WHERE request_id = ANY($1)", []uuid.UUID{uuid.MustParse(next.GetRequestId()), uuid.MustParse(created.GetRequestId())}).Scan(&reservations); err != nil {
+		t.Fatal(err)
+	}
+	if reservations != 0 {
+		t.Fatalf("refused requests reserved their IDs: %d", reservations)
+	}
+	zone.GetDesired().GetFirewallZone().SourceNetworks = []*resourcev1.CIDR{{NetworkAddress: "0.0.0.0"}, {NetworkAddress: "::"}}
+	next.RequestId = uuid.NewString()
+	if _, err := f.publish(t.Context(), next); err != nil {
+		t.Fatalf("explicit catch-all zone refused: %v", err)
+	}
+}
