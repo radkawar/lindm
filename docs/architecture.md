@@ -1828,6 +1828,18 @@ accepted host observation reports a different `NativeDetails.capability_policy`.
 ATTENTION `outcome_unknown`; any other refusal `detail` is passed through as the
 reason; an unstarted provider UNSUPPORTED failure is `native_unsupported`.
 
+Rows and releases held for device-local tool or package state are re-dispatched
+too. These are the reasons `native_tool_outdated`, `native_tool_missing`,
+`unit_not_installed`, `existing_package_unverified` and `existing_package`. The
+trigger is a committed package snapshot whose content differs from the one it
+replaces (`ReleasePackageStateHolds`, in the `CommitPackageSnapshot`
+transaction). The comparison uses the two snapshots' batch digests. The agent
+encodes batches deterministically, so an unchanged periodic snapshot releases
+nothing. A generation's first snapshot always releases. For example, a stock
+Fedora 44 package row refused `native_tool_outdated` is dispatched again after
+an OS update run upgrades dnf5. Other reasons, such as `native_unsupported`,
+stay held.
+
 ### Release delivery and unattended updates
 
 `internal/releasebuild` constructs two clean isolated source/tool-cache builds of

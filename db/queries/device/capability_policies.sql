@@ -129,3 +129,40 @@ WHERE h.generation_id = sqlc.arg(generation_id)
   AND r.assignment_id = h.assignment_id
   AND r.disposition = 5
   AND r.reason LIKE 'capability\_%';
+
+-- Rows and releases the executor refused for device-local tool or package
+-- state (an outdated or missing native tool, a unit no package installed, a
+-- preinstalled package) are dispatched again once the device commits a
+-- package snapshot whose content differs from the one it replaces. The agent
+-- encodes batches deterministically (sorted packages, deterministic protobuf),
+-- so equal batch digests mean equal packages and an unchanged periodic
+-- snapshot releases nothing; the first snapshot of a generation always
+-- releases. Reports the number of assignment rows released.
+-- name: ReleasePackageStateHolds :execrows
+WITH changed AS (
+    SELECT sqlc.narg(previous_snapshot_id)::uuid IS NULL OR EXISTS (
+        (SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = sqlc.narg(previous_snapshot_id)::uuid
+         EXCEPT
+         SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = sqlc.arg(snapshot_id)::uuid)
+        UNION ALL
+        (SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = sqlc.arg(snapshot_id)::uuid
+         EXCEPT
+         SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = sqlc.narg(previous_snapshot_id)::uuid)
+    ) AS content_changed
+), releases AS (
+    UPDATE resource_releases
+    SET state = 'pending', reason = ''
+    WHERE generation_id = sqlc.arg(generation_id)
+      AND state = 'release_conflict'
+      AND reason IN ('native_tool_outdated', 'native_tool_missing', 'unit_not_installed', 'existing_package_unverified', 'existing_package')
+      AND (SELECT content_changed FROM changed)
+    RETURNING id
+)
+UPDATE resource_assignment_resources r
+SET disposition = 1, reason = ''
+FROM resource_assignment_heads h
+WHERE h.generation_id = sqlc.arg(generation_id)
+  AND r.assignment_id = h.assignment_id
+  AND r.disposition IN (5, 6)
+  AND r.reason IN ('native_tool_outdated', 'native_tool_missing', 'unit_not_installed', 'existing_package_unverified', 'existing_package')
+  AND (SELECT content_changed FROM changed);

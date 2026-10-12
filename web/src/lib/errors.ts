@@ -261,7 +261,7 @@ const DEVICE_CAUSES: Record<string, string> = {
   // The provider refuses as unsupported, so the row's status already says
   // Unsupported; these name why, with no second status word.
   native_tool_outdated:
-    "The device's system tool for this item is too old (on Fedora, dnf5 older than 5.4.6.0). Apply OS updates on the device first.",
+    "The device's system tool for this item is too old (on Fedora, dnf5 older than 5.4.6.0). Apply all OS updates on the device once: an OS update policy set to All updates, or Patch now with All updates. On Fedora a security-only policy doesn't update dnf5. lindm retries this item when the device's packages change.",
   native_tool_missing:
     "Blocked: a system tool this item needs isn't installed on the device. Install it on the device.",
   existing_package_unverified:

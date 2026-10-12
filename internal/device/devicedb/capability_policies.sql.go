@@ -440,6 +440,58 @@ func (q *Queries) ReleaseCapabilityHolds(ctx context.Context, generationID uuid.
 	return result.RowsAffected(), nil
 }
 
+const releasePackageStateHolds = `-- name: ReleasePackageStateHolds :execrows
+WITH changed AS (
+    SELECT $2::uuid IS NULL OR EXISTS (
+        (SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = $2::uuid
+         EXCEPT
+         SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = $3::uuid)
+        UNION ALL
+        (SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = $3::uuid
+         EXCEPT
+         SELECT batch_index, digest FROM snapshot_batches WHERE snapshot_id = $2::uuid)
+    ) AS content_changed
+), releases AS (
+    UPDATE resource_releases
+    SET state = 'pending', reason = ''
+    WHERE generation_id = $1
+      AND state = 'release_conflict'
+      AND reason IN ('native_tool_outdated', 'native_tool_missing', 'unit_not_installed', 'existing_package_unverified', 'existing_package')
+      AND (SELECT content_changed FROM changed)
+    RETURNING id
+)
+UPDATE resource_assignment_resources r
+SET disposition = 1, reason = ''
+FROM resource_assignment_heads h
+WHERE h.generation_id = $1
+  AND r.assignment_id = h.assignment_id
+  AND r.disposition IN (5, 6)
+  AND r.reason IN ('native_tool_outdated', 'native_tool_missing', 'unit_not_installed', 'existing_package_unverified', 'existing_package')
+  AND (SELECT content_changed FROM changed)
+`
+
+type ReleasePackageStateHoldsParams struct {
+	GenerationID       uuid.UUID
+	PreviousSnapshotID *uuid.UUID
+	SnapshotID         uuid.UUID
+}
+
+// Rows and releases the executor refused for device-local tool or package
+// state (an outdated or missing native tool, a unit no package installed, a
+// preinstalled package) are dispatched again once the device commits a
+// package snapshot whose content differs from the one it replaces. The agent
+// encodes batches deterministically (sorted packages, deterministic protobuf),
+// so equal batch digests mean equal packages and an unchanged periodic
+// snapshot releases nothing; the first snapshot of a generation always
+// releases. Reports the number of assignment rows released.
+func (q *Queries) ReleasePackageStateHolds(ctx context.Context, arg ReleasePackageStateHoldsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releasePackageStateHolds, arg.GenerationID, arg.PreviousSnapshotID, arg.SnapshotID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateCapabilityPolicy = `-- name: UpdateCapabilityPolicy :execrows
 UPDATE capability_policies
 SET capabilities = $1, sysctl_keys = $2, firewall = $3,

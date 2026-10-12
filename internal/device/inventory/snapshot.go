@@ -501,6 +501,11 @@ func (s *Service) publishSnapshot(ctx context.Context, q *devicedb.Queries, auth
 	if err := q.SetGenerationSnapshot(ctx, devicedb.SetGenerationSnapshotParams{CurrentSnapshotID: &row.ID, ID: authority.Generation.ID}); err != nil {
 		return err
 	}
+	// The previous snapshot was only superseded, so its batch digests still
+	// tell whether the device's package state changed.
+	if _, err := q.ReleasePackageStateHolds(ctx, devicedb.ReleasePackageStateHoldsParams{GenerationID: authority.Generation.ID, PreviousSnapshotID: authority.Generation.CurrentSnapshotID, SnapshotID: row.ID}); err != nil {
+		return err
+	}
 	state, err := activateIfPending(ctx, q, authority.Device)
 	if err != nil {
 		return err

@@ -119,7 +119,7 @@ const unavailableCauses: Record<string, string> = {
   firewall_restore_unit_disabled:
     "The firewall restore service (lindm-firewall-restore.service) isn't enabled on the device.",
   native_tool_outdated:
-    "The device's system tool for this is too old (on Fedora, dnf5 older than 5.4.6.0). Apply OS updates on the device first.",
+    "The device's system tool for this is too old (on Fedora, dnf5 older than 5.4.6.0). Apply all OS updates on the device once: an OS update policy set to All updates, or Patch now with All updates. On Fedora a security-only policy doesn't update dnf5.",
 };
 
 export function unavailableCause(detail: string): string {

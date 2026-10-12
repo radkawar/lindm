@@ -614,8 +614,9 @@ moved the lock to `/var/lib/dnf`. No option bypasses the read-only check in
 5.4.1.0, so the 44 release image's DNF5 cannot be used. The floor stays at the
 natively qualified 5.4.6.0 (Fedora 44 updates); 5.4.3.0–5.4.5.0 were not
 exercised. A stock Fedora 44 image refuses package rows with
-`native_tool_outdated` until DNF5 is updated; the console's copy for that detail
-says to apply OS updates on the device first. The OS update policy is the product
+`native_tool_outdated` until DNF5 is updated. The console's copy for that detail
+says to apply all OS updates on the device once, and that a security-only policy
+does not update dnf5. The OS update policy is the product
 path for that. It needs only `dnf5` and `rpm` (see below), so it converges on the
 stock image: Fedora-Server-dvd-aarch64-44-1.7 with the Workstation environment
 has `dnf5 5.4.1.0` and `dnf5-plugins 5.4.1.0` but no `dnf5-plugin-automatic`.
@@ -631,9 +632,10 @@ security advisory was for 5.4.0.0-2, which 5.4.1.0 already resolves.
 `dnf5 upgrade --security` skips advisories the installed version resolves
 (libdnf5 `filter_latest_unresolved_advisories`). Such a device needs one run
 that installs all updates: either a policy with selection all, or patch now
-with selection all where `allow_patch_now` is opted in. The capability-hold
-release (`ReleaseCapabilityHolds`) covers only `capability_*` reasons, so it
-does not re-dispatch a row already recorded `native_tool_outdated`. Native
+with selection all where `allow_patch_now` is opted in. A package row already
+recorded `native_tool_outdated` is dispatched again once the device commits a
+package snapshot with changed content, such as the one after that run
+([architecture](../architecture.md#server-issuance-of-capability-policies)). Native
 verification of this stock-image path is pending: on 2026-10-12 the local KVM
 host was busy with other lanes and the Sparks were down.
 
