@@ -5,13 +5,16 @@ package loadlab
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -61,7 +64,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	for _, device := range demo.Devices {
 		states[device.State]++
 	}
-	if len(demo.Devices) != 9 || states["enrolled"] != 6 || states["pending"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
+	if len(demo.Devices) != 10 || states["enrolled"] != 7 || states["pending"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes
@@ -233,4 +236,69 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	if err != nil || !targets.Msg.GetFresh() || targets.Msg.GetUnavailableReason() != "" || len(targets.Msg.GetTargets()) == 0 {
 		t.Fatalf("refreshed wipe storage: %v %v", targets, err)
 	}
+	// Owner pass 2: a console assignment on the present route device must make
+	// progress. Replacing the profile both adds items and releases removed ones;
+	// each item gets a terminal result and each release completes. Restoring the
+	// seeded profile re-adds items the device already ran once.
+	byName := map[string]*adminv1.ProfileSummary{}
+	for token := ""; ; {
+		profiles, err := admin.ListProfiles(ctx, connect.NewRequest(&adminv1.ListProfilesRequest{PageSize: 100, PageToken: token}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, profile := range profiles.Msg.GetProfiles() {
+			byName[profile.GetName()] = profile
+		}
+		if token = profiles.Msg.GetNextPageToken(); token == "" {
+			break
+		}
+	}
+	if byName["Server hardening"] == nil || byName["Workstation baseline"] == nil {
+		t.Fatalf("demo profiles: %d listed without the seeded profiles", len(byName))
+	}
+	assign := func(profile *adminv1.ProfileSummary) {
+		t.Helper()
+		current, err := admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: routes.DeviceID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: routes.DeviceID, ExpectedAssignmentId: proto.String(current.Msg.GetAssignment().GetAssignmentId()), Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(86400), Reason: "Assign " + profile.GetName() + " from the console"})); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.After(3 * demoPresenceInterval)
+		for {
+			state, err := admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: routes.DeviceID}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := state.Msg.GetAssignment().GetProfileId() == profile.GetProfileId() && len(state.Msg.GetResources()) == int(profile.GetResourceCount())
+			for _, item := range state.Msg.GetResources() {
+				disposition := item.GetDisposition()
+				done = done && item.GetLatestAction().GetStatus() != nil && disposition != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING && disposition != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_IN_PROGRESS
+			}
+			// Only "pending" releases are still in progress; a refused removal
+			// (release_conflict) is final and must not leave the device stuck.
+			for _, release := range state.Msg.GetReleases() {
+				done = done && release.GetState() != "pending"
+			}
+			if done {
+				return
+			}
+			select {
+			case <-poll.C:
+			case <-deadline:
+				var stuck []string
+				for _, item := range state.Msg.GetResources() {
+					action := item.GetLatestAction()
+					stuck = append(stuck, fmt.Sprintf("%s: %v reason=%q action=%q closed=%q state=%v", item.GetDesired().GetRef().GetCanonicalKey(), item.GetDisposition(), item.GetReason(), action.GetActionId(), action.GetClosedReason(), action.GetStatus().GetState()))
+				}
+				for _, release := range state.Msg.GetReleases() {
+					stuck = append(stuck, fmt.Sprintf("release %s: %s reason=%q completed=%v", release.GetRef().GetCanonicalKey(), release.GetState(), release.GetReason(), release.GetCompletedAt() != nil))
+				}
+				t.Fatalf("present device did not process the %s assignment: %s", profile.GetName(), strings.Join(stuck, "; "))
+			}
+		}
+	}
+	assign(byName["Server hardening"])
+	assign(byName["Workstation baseline"])
 }

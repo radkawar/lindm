@@ -175,10 +175,12 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	return s.demo, presence, nil
 }
 
-// checkIns polls the device's assistance state and action work, as an idle
-// agent does, until cancelled. Requested sessions stay unanswered: no user is
-// present. A requested inventory refresh completes, so console flows waiting for
-// fresh storage can finish; any other work is left to expire unstarted.
+// checkIns polls the device's assistance state, action work and resource
+// work, as an idle agent does, until cancelled. Requested sessions stay
+// unanswered: no user is present. A requested inventory refresh completes, so
+// console flows waiting for fresh storage can finish; any other action is left
+// to expire unstarted. Profile items assigned from the console run through the
+// simulated executor, so assignments and removals progress as on a live agent.
 func (s *demoSeed) checkIns(ctx context.Context, d *simulatedDevice) error {
 	ticker := time.NewTicker(demoPresenceInterval)
 	defer ticker.Stop()
@@ -189,6 +191,9 @@ func (s *demoSeed) checkIns(ctx context.Context, d *simulatedDevice) error {
 		if err == nil {
 			call, cancel = context.WithTimeout(ctx, time.Minute)
 			err = s.answerRefresh(call, d)
+			if err == nil {
+				err = s.drainResourceWork(call, d)
+			}
 			cancel()
 		}
 		if ctx.Err() != nil {
@@ -203,6 +208,28 @@ func (s *demoSeed) checkIns(ctx context.Context, d *simulatedDevice) error {
 		case <-ticker.C:
 		}
 	}
+}
+
+// demoResourceBatch bounds one check-in's resource work; anything left waits
+// for the next tick, as an agent's bounded poll does.
+const demoResourceBatch = 32
+
+// drainResourceWork completes assigned and released profile items through the
+// simulated executor until the server has no more resource work.
+func (s *demoSeed) drainResourceWork(ctx context.Context, d *simulatedDevice) error {
+	if err := s.syncTrust(ctx, d); err != nil {
+		return err
+	}
+	for range demoResourceBatch {
+		before := d.serviceReports
+		if err := s.dispatch(ctx, d); err != nil {
+			return err
+		}
+		if d.serviceReports == before && d.pending == nil {
+			return nil
+		}
+	}
+	return nil
 }
 
 // answerRefresh completes delivered, unstarted refresh-inventory work and

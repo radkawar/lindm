@@ -7,6 +7,7 @@ import {
 } from "../../../gen/lindm/resource/v1/resource_pb";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import {
   ResourceCompliance,
   ResourceDisposition,
@@ -53,11 +54,48 @@ const complianceLabels: Partial<Record<ResourceCompliance, string>> = {
   [ResourceCompliance.STALE]: "Not checked recently",
 };
 
+// Server release states (resource_releases.state). Only "pending" is still in
+// progress; the others are final until the item is assigned again.
+const releaseStateLabels: Record<string, string> = {
+  pending: "Removing",
+  released: "Removed",
+  release_conflict: "Not removed",
+  baseline_unknown: "Not removed",
+};
+
+const releaseReasonLabels: Record<string, string> = {
+  native_unsupported: "The device can't remove this kind of item, so it was left in place.",
+  precondition_failed:
+    "The item changed on the device since lindm set it, so it was left in place.",
+  native_tool_path_unprotected:
+    "The device's system tool for this item isn't protected, so lindm didn't run it. Nothing changed.",
+  native_package_manager_busy:
+    "Another package manager was running on the device. Nothing changed; assign the profile again to retry.",
+  outcome_unknown:
+    "The device couldn't confirm whether the item was removed. Check it on the device.",
+  release_failed: "The device couldn't remove this item. Check it on the device.",
+  resource_reassigned: "The new profile manages this item too, so it stays.",
+  cancelled_no_effect: "Removal was cancelled before the device changed anything.",
+  adoption_approval_required:
+    "lindm took this item over from an existing setting without a recorded approval, so it was left in place.",
+  ownership_baseline_unavailable:
+    "lindm has no record of the item before it took over, so it was left in place.",
+  resource_executor_not_available:
+    "The device's agent can't manage this kind of item, so it was left in place.",
+  resource_capability_evidence_unavailable:
+    "The device hasn't reported whether it supports this item, so it was left in place.",
+  resource_verification_not_available:
+    "The device can't verify this kind of item, so it was left in place.",
+};
+
 export function DeviceResources({
   deviceId,
+  lastContact,
   emptyAction,
 }: {
   deviceId: string;
+  // The device's last check-in, to explain items it has not picked up yet.
+  lastContact?: Timestamp;
   emptyAction?: ReactNode;
 }) {
   const lifetime = useAuthLifetime();
@@ -70,6 +108,13 @@ export function DeviceResources({
     : assignment.actorId === principal.id
       ? "you"
       : "another administrator";
+  // Work is minted only when the device asks for it, so a pending item with no
+  // action means the device has not picked it up yet.
+  const unpicked =
+    (state.data?.resources.filter(
+      (resource) => !resource.latestAction && resource.disposition === ResourceDisposition.PENDING,
+    ).length ?? 0) +
+    (state.data?.releases.filter((release) => release.state === "pending").length ?? 0);
   return (
     <Card className="min-w-0" aria-busy={state.isFetching}>
       <CardHeader>
@@ -129,6 +174,14 @@ export function DeviceResources({
               ) : (
                 <p>No profile assigned.</p>
               )}
+              {unpicked ? (
+                <p role="status" data-testid="resources-waiting-for-device">
+                  Waiting for the device to pick up {unpicked} {unpicked === 1 ? "item" : "items"}.{" "}
+                  {lastContact
+                    ? `It last checked in ${formatTimestamp(lastContact).local}.`
+                    : "It has not checked in yet."}
+                </p>
+              ) : null}
               <TechnicalDetails
                 items={[
                   { label: "Assignment ID", value: assignment?.assignmentId },
@@ -268,11 +321,22 @@ export function DeviceResources({
                           />
                         </TableCell>
                         <TableCell className="align-top">
-                          <StatusBadge status={release.completedAt ? "success" : "warning"}>
-                            {enumLabel(release.state)}
+                          <StatusBadge
+                            status={
+                              release.state === "released"
+                                ? "success"
+                                : release.state === "pending"
+                                  ? "info"
+                                  : "warning"
+                            }
+                          >
+                            {releaseStateLabels[release.state] ?? "Not removed"}
                           </StatusBadge>
                           {release.reason ? (
-                            <p className="mt-1 whitespace-normal">{release.reason}</p>
+                            <p className="mt-1 whitespace-normal">
+                              {releaseReasonLabels[release.reason] ??
+                                blockedReasonLabel(release.reason)}
+                            </p>
                           ) : null}
                         </TableCell>
                         <TableCell className="align-top">
@@ -281,7 +345,9 @@ export function DeviceResources({
                         <TableCell className="align-top">
                           {release.completedAt
                             ? formatTimestamp(release.completedAt).local
-                            : "Not yet"}
+                            : release.state === "pending"
+                              ? "Not yet"
+                              : "Stopped"}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -571,7 +637,7 @@ export function DeviceResourceComplianceBadge({ deviceId }: { deviceId: string }
   }
   const data = state.data;
   const resources = data?.resources ?? [];
-  const pendingReleases = data?.releases.some((release) => !release.completedAt) ?? false;
+  const pendingReleases = data?.releases.some((release) => release.state === "pending") ?? false;
   const attention = resources.some(
     (resource) => resource.compliance === ResourceCompliance.ATTENTION,
   );

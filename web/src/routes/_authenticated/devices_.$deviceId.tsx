@@ -1,5 +1,6 @@
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
+import { useQuery } from "@tanstack/react-query";
 import { DeviceFindings } from "@/features/advisories/device-findings";
 import { DeviceFindingsSummary } from "@/features/advisories/device-findings-summary";
 import { DeviceAssistanceCard } from "@/features/assistance/panel";
@@ -13,6 +14,7 @@ import { RevokeApprovalRequest } from "@/features/approvals/revoke";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
+import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/devices_/$deviceId")({
@@ -40,6 +42,8 @@ function DeviceDetailRoute() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   useDeviceBreadcrumbTitle(deviceId);
+  const lifetime = useAuthLifetime();
+  const device = useQuery(deviceQueryOptions(lifetime, deviceId));
   return (
     <DeviceDetailView
       key={deviceId}
@@ -50,6 +54,7 @@ function DeviceDetailRoute() {
       resources={(assignProfile) => (
         <DeviceResources
           deviceId={deviceId}
+          lastContact={device.data?.device?.lastSeenAt}
           emptyAction={
             assignProfile ? (
               <Button aria-haspopup="dialog" onClick={assignProfile}>
