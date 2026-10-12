@@ -46,7 +46,8 @@ func TestMatrixRecoveryCellUsesMeasuredGRUBWithoutOwnedBoot(t *testing.T) {
 
 // The recovery-sanitize cell selects measured GRUB from a declared stock GRUB
 // chain, except on an architecture whose signed GRUB records no measurements
-// (EL aarch64): there the owned-boot UKI fixture runs.
+// (EL aarch64) or whose kernel cannot bind the lab's TPM (Debian aarch64):
+// there the owned-boot UKI fixture runs.
 func TestMatrixRecoverySanitizeSkipsUnmeasuredGRUB(t *testing.T) {
 	cell := &labv1.MatrixCell{Name: "recovery-sanitize", Lane: "device-actions", Capabilities: []string{string(platform.RecoverySanitize)}, Args: []string{"-scenario=wipe", "-wipe-phase=recovery-nvme"}}
 	run := &matrixRun{root: t.TempDir(), cache: t.TempDir()}
@@ -57,6 +58,8 @@ func TestMatrixRecoverySanitizeSkipsUnmeasuredGRUB(t *testing.T) {
 		{"almalinux-10", "aarch64", ""},
 		{"ubuntu-24.04", "aarch64", "measured-grub"},
 		{"opensuse-tumbleweed", "aarch64", "measured-grub"},
+		{"debian-13", "x86_64", "measured-grub"},
+		{"debian-13", "aarch64", ""},
 	} {
 		release, ok := platform.Lookup(tc.key)
 		if !ok {

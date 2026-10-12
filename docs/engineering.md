@@ -1945,9 +1945,11 @@ unit. In the lab, `lab vm device-actions -recovery-boot-mode measured-grub` with
 runs the stock shim+GRUB fixture; the registry's `Lab.Guest.MeasuredBoot` holds
 the guest package recipe. `lab matrix run` selects measured GRUB for the
 `recovery-sanitize` cell of a release that declares `Quirks.RecoveryGRUB` or has
-no owned-boot fixture on that architecture. The exception is an architecture
+no owned-boot fixture on that architecture. The exceptions are an architecture
 listed in `Lab.MeasuredGRUBUnavailableOn`, where the signed GRUB records no
-measurements (EL aarch64); that cell runs the owned-boot UKI.
+measurements (EL aarch64), and one listed in `Lab.TPM.Unobservable`, whose guest
+kernel cannot bind the lab's TPM for the quote (Debian aarch64); those cells run
+the owned-boot UKI.
 
 Shared `VMHardwareOptions` selects x86_64/aarch64, KVM/TCG, UEFI or x86 legacy
 BIOS, TPM2 or TPM absence, virtio-blk/scsi, NVMe or SATA/AHCI, up to four extra

@@ -204,10 +204,12 @@ Recovery sanitize uses the BLS flavor of `RECOVERY_BOOT_MODE_MEASURED_GRUB` on
 x86_64: AlmaLinux 10.2 amd64 passed NVMe and SATA from the vendor cloud image
 ([verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains)).
 On aarch64 the signed `grubaa64.efi` of Rocky and AlmaLinux 9.8/10.2 records no
-PCR 8/9 event, so agent readiness refuses measured GRUB before approval. The
-owned-boot UKI fixture boots there but needs `systemd-ukify` on the Spark hosts,
-which they do not have yet. aarch64 SATA cannot boot at all, because AAVMF has no
-AHCI driver.
+PCR 8/9 event, so agent readiness refuses measured GRUB before approval; the
+matrix runs the owned-boot UKI fixture there instead
+(`Lab.MeasuredGRUBUnavailableOn`). Rocky and AlmaLinux 9.8/10.2 aarch64 NVMe
+passed in that mode on the Sparks after `9b4e6f5f`
+([verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)).
+aarch64 SATA cannot boot at all, because AAVMF has no AHCI driver.
 
 Rocky Linux and AlmaLinux 9 share RHEL 9's `systemd 252-67`, whose TPM2 unseal
 retry fails on a stale encryption session after a PCR change. The managed TPM2

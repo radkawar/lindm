@@ -804,9 +804,11 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	}
 	if slices.Contains(c.Spec.GetCapabilities(), string(platform.RecoverySanitize)) {
 		// A declared stock GRUB chain selects measured GRUB unless that
-		// architecture's signed GRUB records no measurements; then the
+		// architecture's signed GRUB records no measurements, or the guest
+		// kernel cannot bind the TPM the lab attaches there (Lab.TPM.Unobservable:
+		// measured recovery is proven by a fresh TPM quote); then the
 		// owned-boot UKI fixture is the only recovery path.
-		if c.Release.Quirks.RecoveryGRUB.Entries != "" && c.Release.Lab.MeasuredGRUBUnavailableFor(c.Architecture) == "" {
+		if c.Release.Quirks.RecoveryGRUB.Entries != "" && c.Release.Lab.MeasuredGRUBUnavailableFor(c.Architecture) == "" && !slices.Contains(c.Release.Lab.TPM.Unobservable, c.Architecture) {
 			args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
 		}
 		if c.Release.Quirks.RecoveryOwnerKey {

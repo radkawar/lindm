@@ -237,7 +237,10 @@ is not gated. The lab cannot present a TPM to either Debian arm64 kernel: QEMU
 `tpm-tis-i2c`, while `linux-image-6.1.0-50-arm64` and
 `linux-image-6.12.107+deb13-arm64` set `# CONFIG_TCG_TIS is not set` and
 `# CONFIG_TCG_TIS_I2C is not set` (only `CONFIG_TCG_CRB=y`). That is a lab-only
-limit: arm64 hardware with a CRB TPM binds `tpm_crb`. Evidence:
+limit: arm64 hardware with a CRB TPM binds `tpm_crb`. Because measured recovery
+is proven by a fresh TPM quote, the matrix qualifies Debian 13 arm64 through the
+owned-boot UKI fixture (`RECOVERY_BOOT_MODE_UKI`) wherever `Lab.TPM.Unobservable`
+lists the architecture; that NVMe cell passed on a Spark. Evidence:
 [verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12).
 
 ## Device actions
