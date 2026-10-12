@@ -240,7 +240,9 @@ is not gated. The lab cannot present a TPM to either Debian arm64 kernel: QEMU
 limit: arm64 hardware with a CRB TPM binds `tpm_crb`. Because measured recovery
 is proven by a fresh TPM quote, the matrix qualifies Debian 13 arm64 through the
 owned-boot UKI fixture (`RECOVERY_BOOT_MODE_UKI`) wherever `Lab.TPM.Unobservable`
-lists the architecture; that NVMe cell passed on a Spark. Evidence:
+lists the architecture; that NVMe cell passed on a Spark. The same limit gates
+the 30-boot unattended TPM2 unlock cell (`tpm-unattended-boots`) on Debian 12/13
+arm64 as lab-only. Evidence:
 [verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12).
 
 ## Device actions

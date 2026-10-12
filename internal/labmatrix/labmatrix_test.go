@@ -137,6 +137,28 @@ func TestPlanHonoursLaneArchitectures(t *testing.T) {
 	}
 }
 
+// A cell that needs a TPM is gated (lab-only) where the release's installed
+// kernel cannot bind the lab's TPM (Debian arm64), and runs elsewhere.
+func TestPlanGatesTPMCellsWhereTPMIsUnobservable(t *testing.T) {
+	debian := release(t, "debian-13")
+	encrypted := labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	boots := &labv1.MatrixCell{Name: "tpm-unattended-boots", Title: "TPM unattended boots", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions", Tpm: true}
+	in := &Inputs{
+		Manifests: []*Manifest{
+			{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "netinst"}, Release: debian, Architecture: "x86_64"},
+			{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "netinst"}, Release: debian, Architecture: "aarch64"},
+		},
+		Ledger: &labv1.MatrixLedger{},
+	}
+	got := map[string]*Cell{}
+	for _, c := range in.Plan([]*platform.Release{debian}, []*labv1.MatrixCell{boots}) {
+		got[c.Architecture] = c
+	}
+	if got["x86_64"].State != NotRun || got["aarch64"].State != Gated || !strings.Contains(got["aarch64"].Reason, "Lab.TPM.Unobservable") {
+		t.Fatalf("debian-13 TPM cell: x86_64 %v, aarch64 %v %q", got["x86_64"].State, got["aarch64"].State, got["aarch64"].Reason)
+	}
+}
+
 // A Debian netinst ISO boots both the plain installed golden and the
 // guided-LUKS encrypted golden, so encrypted cells are not "no image".
 func TestDebianNetinstServesEncryptedCells(t *testing.T) {

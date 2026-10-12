@@ -326,8 +326,12 @@ type MatrixCell struct {
 	// entries stay in the ledger as history and the cell is "not run" until it
 	// passes again.
 	MinimumRevision string `protobuf:"bytes,10,opt,name=minimum_revision,json=minimumRevision,proto3" json:"minimum_revision,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The lane needs a TPM the guest kernel binds (e.g. unattended TPM2
+	// unlock). The cell is gated on an architecture whose installed kernel
+	// cannot bind the TPM the lab attaches there (registry Lab.TPM.Unobservable).
+	Tpm           bool `protobuf:"varint,11,opt,name=tpm,proto3" json:"tpm,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MatrixCell) Reset() {
@@ -428,6 +432,13 @@ func (x *MatrixCell) GetMinimumRevision() string {
 		return x.MinimumRevision
 	}
 	return ""
+}
+
+func (x *MatrixCell) GetTpm() bool {
+	if x != nil {
+		return x.Tpm
+	}
+	return false
 }
 
 // MatrixLedger is the append-only record of matrix cell outcomes.
@@ -735,7 +746,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x1blab.matrix_secure_boot_args\x12@a Secure Boot cell needs secure_boot_args for every architecture\x1aa!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)\"7\n" +
 	"\n" +
 	"MatrixArgs\x12)\n" +
-	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xde\x05\n" +
+	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\x84\x06\n" +
 	"\n" +
 	"MatrixCell\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x04name\x12\x1f\n" +
@@ -750,8 +761,9 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\vsecure_boot\x18\t \x01(\bR\n" +
 	"secureBoot\x12C\n" +
 	"\x10minimum_revision\x18\n" +
-	" \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x0fminimumRevision:\xf3\x01\xbaH\xef\x01\x1a\xec\x01\n" +
-	"\x14lab.matrix_cell_lane\x12ia cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane\x1aithis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)\"U\n" +
+	" \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x0fminimumRevision\x12\x10\n" +
+	"\x03tpm\x18\v \x01(\bR\x03tpm:\x87\x02\xbaH\x83\x02\x1a\x80\x02\n" +
+	"\x14lab.matrix_cell_lane\x12pa cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane\x1avthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
 	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xd7\v\n" +

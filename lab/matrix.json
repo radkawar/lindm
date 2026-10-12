@@ -96,7 +96,8 @@
       "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
       "lane": "device-actions",
       "args": ["-scenario=encryption", "-encryption-phase=tpm", "-tpm-boots=30"],
-      "secureBoot": true
+      "secureBoot": true,
+      "tpm": true
     },
     {
       "name": "device-actions",

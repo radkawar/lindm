@@ -2847,6 +2847,10 @@ refuses it too). A `provision-*` cell whose installer format the row's
 `Release.Provisioning` does not declare is likewise `gated` as not applicable
 ("RELEASE does not provision via FORMAT", derived from the registry, e.g.
 autoinstall on Fedora); a declared format without a lane recipe stays `no lane`.
+A cell marked `tpm` (TPM unattended boots) is `gated` as lab-only on an
+architecture the row's `Lab.TPM.Unobservable` lists: the installed kernel there
+cannot bind the TPM the lab attaches (Debian arm64 builds neither `tpm_tis` nor
+`tpm_tis_i2c`, QEMU 8.2's arm `virt` TPMs).
 A cell without a maintained lane, or whose lane has no recipe in
 the row's `Lab.Lanes`, is `no lane`; a release without a pinned image for that
 architecture is `no image`; and a runnable cell without a ledger entry is

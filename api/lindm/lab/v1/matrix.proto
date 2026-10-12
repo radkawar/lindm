@@ -75,8 +75,8 @@ message MatrixArgs {
 message MatrixCell {
   option (buf.validate.message).cel = {
     id: "lab.matrix_cell_lane"
-    message: "a cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane"
-    expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)"
+    message: "a cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane"
+    expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)"
   };
 
   string name = 1 [(buf.validate.field).string = {
@@ -136,6 +136,10 @@ message MatrixCell {
   // entries stay in the ledger as history and the cell is "not run" until it
   // passes again.
   string minimum_revision = 10 [(buf.validate.field).string.pattern = "^([0-9a-f]{40})?$"];
+  // The lane needs a TPM the guest kernel binds (e.g. unattended TPM2
+  // unlock). The cell is gated on an architecture whose installed kernel
+  // cannot bind the TPM the lab attaches there (registry Lab.TPM.Unobservable).
+  bool tpm = 11;
 }
 
 // MatrixImage is the kind of pinned manifest a cell boots.

@@ -386,6 +386,10 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	if spec.GetCapabilityKinds() {
 		gated = len(c.Kinds) == 0
 	}
+	if spec.GetTpm() && slices.Contains(r.Lab.TPM.Unobservable, arch) {
+		reasons = appendUnique(reasons, "lab-only: the installed "+arch+" kernel cannot bind the TPM the lab attaches (Lab.TPM.Unobservable)")
+		gated = true
+	}
 	primaryEdition, recoveryEdition := "", ""
 	if slices.Contains(spec.GetCapabilities(), string(platform.RecoverySanitize)) {
 		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition
