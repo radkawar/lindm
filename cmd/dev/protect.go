@@ -20,9 +20,10 @@ Make the shared main checkout's tracked files read-only (a-w), so a tool that
 writes into it instead of a private worktree fails at once with EACCES rather
 than dirtying it and blocking every landing. Idempotent. While a landing or
 gate-commit holds the landing lock it does nothing and succeeds: that run
-re-protects when it ends. The post-merge and post-checkout hooks run it after
-git rewrites the main checkout's files, and dev status runs it when it finds
-writable tracked files.
+re-protects when it ends. dev status runs it when it finds writable tracked
+files. After git rewrites the main checkout's files, the post-merge and
+post-checkout hooks run the equivalent .githooks/protect, which builds
+nothing.
 `
 
 func runProtect(args []string) error {

@@ -17,7 +17,7 @@ import (
 	"lindm/internal/devlab/worktree"
 )
 
-const prePushUsage = `Usage: go run ./cmd/dev pre-push [-root DIR] [-timeout D] < git pre-push refs
+const prePushUsage = `Usage: go run ./cmd/devenv pre-push [-root DIR] [-timeout D] < git pre-push refs
 
 Git pre-push hook body (make pre-push). For each commit being pushed, as read
 from git's "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin,

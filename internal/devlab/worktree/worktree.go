@@ -16,13 +16,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
-	"lindm/internal/agent/nativeexec"
-	"lindm/internal/devlab"
+	"lindm/internal/devlab/project"
 	"lindm/internal/labexec"
 )
 
@@ -348,7 +348,7 @@ func (r *Repository) archive(ctx context.Context, status Status, now time.Time) 
 	if info, err := os.Stat(list); err != nil {
 		return dir, err
 	} else if info.Size() != 0 {
-		output := nativeexec.NewBuffer(64 << 10)
+		output := newBuffer(64 << 10)
 		args := []string{"-C", status.Path, "--null", "--no-recursion", "-T", list, "-cf", filepath.Join(dir, "untracked.tar")}
 		if err := labexec.Run(ctx, labexec.Command{Path: "tar", Args: args, Stdout: output, Stderr: output}); err != nil {
 			return dir, fmt.Errorf("tar untracked files: %w: %s", err, bytes.TrimSpace(output.Bytes()))
@@ -399,14 +399,14 @@ func composeUser(ctx context.Context, root string) (string, error) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return "", nil
 	}
-	stdout, stderr := nativeexec.NewBuffer(1<<20), nativeexec.NewBuffer(64<<10)
+	stdout, stderr := newBuffer(1<<20), newBuffer(64<<10)
 	if err := labexec.Run(ctx, labexec.Command{Path: "docker", Args: []string{"ps", "--format", `{{.Label "com.docker.compose.project"}}`}, Stdout: stdout, Stderr: stderr}); err != nil {
 		return "", fmt.Errorf("list running containers: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
 	}
-	project := devlab.ProjectName(root)
+	name := project.ComposeName(root)
 	for line := range strings.Lines(stdout.String()) {
-		if strings.TrimSpace(line) == project {
-			return "dev fixture " + project + " is running", nil
+		if strings.TrimSpace(line) == name {
+			return "dev fixture " + name + " is running", nil
 		}
 	}
 	return "", nil
@@ -429,15 +429,20 @@ func canonical(path string) string {
 	return absolute
 }
 
+// noHooks keeps repository hooks out of this package's git commands: they
+// operate on checkouts mid-landing, where a hook that builds the tree (the
+// main checkout's post-checkout) would fail and abort a rollback.
+var noHooks = []string{"-c", "core.hooksPath=/dev/null"}
+
 // git runs git in dir and returns bounded stdout.
 func git(ctx context.Context, dir string, args ...string) (string, error) {
 	return gitWith(ctx, dir, nil, nil, args...)
 }
 
-// gitWith runs git with extra environment and optional stdin.
+// gitWith runs git with extra environment and optional stdin, without hooks.
 func gitWith(ctx context.Context, dir string, env []string, stdin []byte, args ...string) (string, error) {
-	stdout, stderr := nativeexec.NewBuffer(maxGitOutput), nativeexec.NewBuffer(64<<10)
-	command := labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: stdout, Stderr: stderr}
+	stdout, stderr := newBuffer(maxGitOutput), newBuffer(64<<10)
+	command := labexec.Command{Path: "git", Args: append(slices.Clone(noHooks), args...), Dir: dir, Stdout: stdout, Stderr: stderr}
 	if env != nil {
 		command.Env = append(os.Environ(), env...)
 	}
@@ -460,9 +465,29 @@ func gitToFile(ctx context.Context, dir, path string, args ...string) (err error
 		return err
 	}
 	defer func() { err = errors.Join(err, file.Close()) }()
-	stderr := nativeexec.NewBuffer(64 << 10)
-	if err := labexec.Run(ctx, labexec.Command{Path: "git", Args: args, Dir: dir, Stdout: file, Stderr: stderr}); err != nil {
+	stderr := newBuffer(64 << 10)
+	if err := labexec.Run(ctx, labexec.Command{Path: "git", Args: append(slices.Clone(noHooks), args...), Dir: dir, Stdout: file, Stderr: stderr}); err != nil {
 		return fmt.Errorf("git %s in %s: %w: %s", strings.Join(args, " "), dir, err, bytes.TrimSpace(stderr.Bytes()))
 	}
 	return nil
 }
+
+// buffer retains the first limit bytes written to it.
+type buffer struct {
+	data      bytes.Buffer
+	limit     int
+	truncated bool
+}
+
+func newBuffer(limit int) *buffer { return &buffer{limit: limit} }
+
+func (b *buffer) Write(p []byte) (int, error) {
+	keep := min(len(p), b.limit-b.data.Len())
+	b.truncated = b.truncated || keep < len(p)
+	b.data.Write(p[:keep])
+	return len(p), nil
+}
+
+func (b *buffer) Bytes() []byte   { return b.data.Bytes() }
+func (b *buffer) String() string  { return b.data.String() }
+func (b *buffer) Truncated() bool { return b.truncated }

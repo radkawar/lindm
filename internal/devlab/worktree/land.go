@@ -336,8 +336,7 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		return err
 	}
 	defer func() { _ = os.Remove(r.landingPath()) }()
-	blank := change.Derivation.Blank
-	blanked, err := r.blankFiles(change.Files, blank)
+	blanked, err := r.blankFiles(change.Files, change.Derivation.Blank)
 	if err == nil {
 		err = r.Apply(ctx, change.Patch, false)
 	}
@@ -348,30 +347,9 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		}
 		return fmt.Errorf("refused, nothing applied (rebase the worktree onto %s): %w", Trunk, err)
 	}
-	// Restoration outlives an interrupted or expired landing. The patch was
-	// made between blanked documents, so it reverses only once their
-	// regenerated regions are blanked again.
 	restore := func(cause error) error {
-		cleanup, cancel := context.WithTimeout(context.Background(), time.Minute)
-		defer cancel()
-		_, resetErr := git(cleanup, r.Main, "reset", "--quiet", "--soft", prior)
-		if resetErr == nil {
-			_, resetErr = git(cleanup, r.Main, "reset", "--quiet")
-		}
-		if resetErr == nil {
-			resetErr = r.restoreDerived(cleanup, change.Derivation.Roots, prior)
-		}
-		if resetErr == nil {
-			_, resetErr = r.blankFiles(change.Files, blank)
-		}
-		if resetErr == nil {
-			resetErr = r.Apply(cleanup, change.Patch, true)
-		}
-		if resetErr == nil {
-			resetErr = r.restoreDerivedFiles(cleanup, change, prior)
-		}
-		if resetErr != nil {
-			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds the change: %w", cause, resetErr)
+		if err := r.rollback(change, prior); err != nil {
+			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds part of the change: %w", cause, err)
 		}
 		return fmt.Errorf("%w; rolled back", cause)
 	}
@@ -502,4 +480,52 @@ func LockHolder(path string) (holder string, held bool, err error) {
 		holder += "; record: " + strings.TrimSpace(string(recorded))
 	}
 	return holder, true, nil
+}
+
+// rollback returns the main checkout to prior after a failed landing, in
+// process and without hooks, so a tree whose applied sources do not compile
+// cannot stop it. It resets the branch and index, reverses the change's patch
+// (removing the files it added; the patch was made between blanked
+// documents, so their regenerated regions are blanked again first) or, if
+// the gate left a patched file unreversible, restores the patch's files to
+// prior directly, then restores merged files, regenerated document regions
+// and derived directories. Every step runs whatever an earlier one did, and
+// the failures are joined. Restoration outlives an interrupted or expired
+// landing. Re-protection is the caller's (Writable).
+func (r *Repository) rollback(change Change, prior string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	var failures []error
+	_, err := git(ctx, r.Main, "reset", "--quiet", "--soft", prior)
+	failures = append(failures, err)
+	_, err = git(ctx, r.Main, "reset", "--quiet")
+	failures = append(failures, err)
+	_, err = r.blankFiles(change.Files, change.Derivation.Blank)
+	if err == nil {
+		err = r.Apply(ctx, change.Patch, true)
+	}
+	if err != nil {
+		failures = append(failures, r.restorePaths(ctx, change.Files, prior))
+	}
+	failures = append(failures, r.restoreDerivedFiles(ctx, change, prior), r.restoreDerived(ctx, change.Derivation.Roots, prior))
+	return errors.Join(failures...)
+}
+
+// restorePaths returns each of names to its content at rev, removing those
+// rev lacks.
+func (r *Repository) restorePaths(ctx context.Context, names []string, rev string) error {
+	var present []string
+	var failures []error
+	for _, name := range names {
+		if _, err := git(ctx, r.Main, "cat-file", "-e", rev+":"+name); err == nil {
+			present = append(present, name)
+		} else if err := os.Remove(filepath.Join(r.Main, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			failures = append(failures, err)
+		}
+	}
+	if len(present) != 0 {
+		_, err := gitWith(ctx, r.Main, nil, []byte(strings.Join(present, "\x00")), "--literal-pathspecs", "checkout", "--quiet", rev, "--pathspec-from-file=-", "--pathspec-file-nul")
+		failures = append(failures, err)
+	}
+	return errors.Join(failures...)
 }

@@ -13,7 +13,7 @@ services:
       POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
     volumes:
       - postgres-data:/var/lib/postgresql
-      - ${LINDM_DEV_DIR:?run through go run ./cmd/dev up}/server.crt:/run/lindm-dev/server.crt:ro
+      - ${LINDM_DEV_DIR:?run through go run ./cmd/devenv up}/server.crt:/run/lindm-dev/server.crt:ro
       - ${LINDM_DEV_DIR}/server.key:/run/lindm-dev/server.key:ro
       - ${LINDM_DEV_DIR}/postgres-password:/run/lindm-dev/postgres-password:ro
       - ${LINDM_DEV_DIR}/database-init.sql:/run/lindm-dev/database-init.sql:ro
@@ -21,7 +21,7 @@ services:
     entrypoint: ["/bin/sh", "/opt/lindm/postgres-entrypoint.sh"]
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
-    user: "${LINDM_DEV_UID:?run through go run ./cmd/dev up}:0"
+    user: "${LINDM_DEV_UID:?run through go run ./cmd/devenv up}:0"
     command: ["start-dev", "--import-realm"]
     ports:
       - "127.0.0.1:18443:8443"

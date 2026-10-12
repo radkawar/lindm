@@ -27,6 +27,7 @@ linters:
             - "$all"
             - "!$test"
             - "!**/cmd/dev/**"
+            - "!**/cmd/devenv/**"
             - "!**/cmd/lab/**"
             - "!**/internal/devlab/**"
             - "!**/internal/vmlab/**"

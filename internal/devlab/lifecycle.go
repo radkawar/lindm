@@ -5,7 +5,6 @@ package devlab
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"lindm/internal/custody"
+	"lindm/internal/devlab/project"
 	"lindm/internal/labexec"
 )
 
@@ -106,12 +106,6 @@ func Reset(ctx context.Context, repoRoot string) error {
 	})
 }
 
-// ProjectName isolates Docker resources belonging to different checkouts.
-func ProjectName(repoRoot string) string {
-	digest := sha256.Sum256([]byte(repoRoot))
-	return fmt.Sprintf("lindm-dev-%x", digest[:6])
-}
-
 func locked(ctx context.Context, repoRoot string, operation func(string) error) (err error) {
 	root, err := filepath.Abs(repoRoot)
 	if err != nil {
@@ -179,7 +173,7 @@ func compose(ctx context.Context, root string, args ...string) error {
 		}
 	}
 	env = append(env, "LINDM_DEV_DIR="+FixturePath(root), "LINDM_DEV_UID="+strconv.Itoa(os.Geteuid()))
-	base := []string{"compose", "--project-name", ProjectName(root), "--file", filepath.Join(root, "deploy", "dev", "compose.yml")}
+	base := []string{"compose", "--project-name", project.ComposeName(root), "--file", filepath.Join(root, "deploy", "dev", "compose.yml")}
 	return command(ctx, root, env, "docker", append(base, args...)...)
 }
 

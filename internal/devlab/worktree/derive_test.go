@@ -74,7 +74,7 @@ func TestLandsMergeLedgersAndRegenerateDocuments(t *testing.T) {
 	gitT(t, repo.Main, "add", "ledger.txt", "doc.md")
 	gitT(t, repo.Main, "commit", "--quiet", "-m", "ledger")
 	gitT(t, repo.Main, "push", "--quiet", "--set-upstream", "lindm", Trunk)
-	derivation := Derivation{Merge: map[string]func(current, base, theirs []byte) ([]byte, error){"ledger.txt": mergeLines}, Blank: func(_ string, content []byte) []byte { return gendoc.Blank(content, "table") }}
+	derivation := Derivation{Merge: map[string]func(current, base, theirs []byte) ([]byte, error){"ledger.txt": mergeLines}, Blank: func(_ string, content []byte) []byte { return gendoc.Blank(content) }}
 	tree := func(name, record, from, to string) string {
 		t.Helper()
 		path, err := repo.Add(ctx, name, "HEAD", io.Discard)

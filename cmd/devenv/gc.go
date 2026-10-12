@@ -22,7 +22,7 @@ import (
 	"lindm/internal/platform"
 )
 
-const gcUsage = `Usage: go run ./cmd/dev gc [-dry-run] [-build-cache-age D] [-quiet D] [-matrix-root DIR] [-spark-min-free BYTES]
+const gcUsage = `Usage: go run ./cmd/devenv gc [-dry-run] [-build-cache-age D] [-quiet D] [-matrix-root DIR] [-spark-min-free BYTES]
 
 Reclaim disk space on this workstation, printing the bytes reclaimed per class:
 
@@ -45,9 +45,6 @@ lab readers take. Idempotent; concurrent runs and builds are safe. dev land
 runs it when the shared checkout's filesystem has under 200 GiB free, and lab
 admission runs the host classes before refusing a lane for lack of disk.
 `
-
-// landGCThreshold is the free space below which dev land collects first.
-const landGCThreshold = 200 << 30
 
 // gcOptions selects what one gc run removes.
 type gcOptions struct {
@@ -274,21 +271,4 @@ func manifestDigests(dir string, referenced map[string]bool) error {
 		}
 	}
 	return nil
-}
-
-// collectIfLow runs gc before a landing when the shared checkout's filesystem
-// is short of space; gc failures are reported, never fatal to the landing.
-func collectIfLow(ctx context.Context, repo *worktree.Repository) {
-	free, err := diskgc.Free(repo.Main)
-	if err != nil || free >= landGCThreshold {
-		return
-	}
-	fmt.Printf("land: %s free on %s (under %s); running dev gc first\n", diskgc.Size(free), repo.Main, diskgc.Size(landGCThreshold))
-	options, err := defaultGCOptions()
-	if err == nil {
-		err = collect(ctx, repo, options)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "land: gc incomplete (landing continues): %v\n", err)
-	}
 }

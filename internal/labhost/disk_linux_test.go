@@ -19,7 +19,7 @@ import (
 func TestDiskRefusalErrorAndIs(t *testing.T) {
 	refusal := &DiskRefusal{Host: "spark", Path: "/srv/lab", Free: 10 << 30, Need: LaneDiskBytes(2)}
 	message := refusal.Error()
-	for _, want := range []string{"spark", "/srv/lab", "10.0 GiB free", "needs 64.0 GiB", "go run ./cmd/dev gc"} {
+	for _, want := range []string{"spark", "/srv/lab", "10.0 GiB free", "needs 64.0 GiB", "go run ./cmd/devenv gc"} {
 		if !strings.Contains(message, want) {
 			t.Errorf("refusal %q does not name %q", message, want)
 		}

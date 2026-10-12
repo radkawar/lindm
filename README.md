@@ -86,7 +86,7 @@ beneath persisted data. Destructive reset is a separate, explicitly confirmed co
 see `go run ./cmd/dev help`. Fixed ports allow one running checkout at a time.
 
 When greenfield migrations edited in place leave the shared application schema stale,
-stop the shared server and run `go run ./cmd/dev recreate-database -confirm-delete`.
+stop the shared server and run `go run ./cmd/devenv recreate-database -confirm-delete`.
 This verifies the running checkout-owned PostgreSQL fixture over verified TLS and
 destroys **only `lindm`**, terminating its remaining connections. It recreates the
 initial database permissions, explicitly migrates as `lindm_migrator`, restores
@@ -280,7 +280,7 @@ The development fixture defaults to Keycloak to preserve the real SSO and
 `check-fresh` lanes. To create a fresh local-only fixture instead:
 
 ```sh
-go run ./cmd/dev up -authentication local
+go run ./cmd/devenv up -authentication local
 go run ./cmd/lindmd bootstrap-owner -config .cache/dev/server.json -username owner
 go run ./cmd/lindmd serve -config .cache/dev/server.json
 ```
@@ -297,7 +297,7 @@ repeating it never reissues an enrollment secret. `dev check` checks only the
 selected mode's dependencies. `init` and `up` accept `-authentication keycloak`
 (the default) or `local`; existing fixtures cannot switch modes. Version-1 fixtures
 and changed configs fail validation. Preserve their data or use the explicitly
-destructive `go run ./cmd/dev reset -confirm-delete` before generating a new one.
+destructive `go run ./cmd/devenv reset -confirm-delete` before generating a new one.
 Keycloak-specific lab checks reject a local fixture before contacting an IdP.
 
 An optional separate `breakGlass` policy restricts designated emergency local

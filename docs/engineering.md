@@ -1673,7 +1673,7 @@ extend server session lifetimes, or retry an approval mutation automatically.
 The deterministic regression uses a real prebuilt `lindmd`, real PostgreSQL in an
 owned disposable database, and Keycloak for the directory case. The production
 config rejects `search_path`, so this process fixture uses database isolation,
-not `testdb`'s in-process schema override. `go run ./cmd/dev test-integration`
+not `testdb`'s in-process schema override. `go run ./cmd/devenv test-integration`
 builds a release-stamped `lindmd` and sets `LINDM_NATIVE_SERVER_BINARY` and
 `LINDM_NATIVE_REPOSITORY` for every native-server regression (approvals, reveal
 authorization and release fixtures), so they run in the normal integration gate
@@ -2282,7 +2282,7 @@ lists exact calls, least privileges, disable/removal/deletion/outage scenarios a
 required timing evidence. The greenfield identity migration admits an `entra`
 deactivation source; no compatibility migration or cached-authority fallback exists.
 
-`go run ./cmd/dev test-integration -root .` runs that same live check before the
+`go run ./cmd/devenv test-integration -root .` runs that same live check before the
 real-PostgreSQL integration tests. It requires already-running development
 dependencies and does not start or migrate the public application schema.
 Unlike `make test-integration`, it does not invoke `dev-up`; use the direct command
@@ -2322,7 +2322,7 @@ then removes it. Prune never touches a worktree used by a live process (any
 before removal) or whose development Compose project is running, and ends with
 `git worktree prune`.
 
-`make signoff` (`go run ./cmd/dev signoff` after `dev-up`) is local CI for the
+`make signoff` (`go run ./cmd/devenv signoff` after `dev-up`) is local CI for the
 pushed HEAD, never the shared dirty tree. It refuses a HEAD that no
 remote-tracking branch contains, creates a temporary clean worktree at that SHA,
 runs `make check` there, runs `test-integration` with that worktree as `-code`
@@ -2334,7 +2334,7 @@ caches, writes evidence to `<main>/artifacts/acceptance-<ts>`, and posts the
 `acceptance` context. The temporary worktree is removed afterwards, also on
 failure or interrupt.
 
-The pre-push hook (`make pre-push`, `go run ./cmd/dev pre-push`) reads git's
+The pre-push hook (`make pre-push`, `go run ./cmd/devenv pre-push`) reads git's
 pushed refs and, for each pushed SHA without a green `signoff/unit` status, runs
 `make check` in a temporary clean worktree of that SHA, so the shared dirty tree
 never decides a push. Clean-worktree `make check` (pre-push and signoff) runs
@@ -2342,7 +2342,7 @@ golangci-lint with `--allow-parallel-runners` and a cache reserved for those
 gates (`~/.cache/lindm-clean-golangci`), so concurrent interactive lint runs
 neither block nor fail it.
 
-Integration runs (`dev test-integration` and `dev signoff`) pass heavy-job
+Integration runs (`devenv test-integration` and `devenv signoff`) pass heavy-job
 admission first and then take the exclusive host lock
 `~/.cache/lindm-integration.lock`, because every run shares the one fixed-port dev
 PostgreSQL. Queueing is bounded separately, at 3 hours, and prints the queued
@@ -2358,7 +2358,7 @@ slots (`max_connections` minus the `pg_stat_activity` count), printing changed
 wait reasons without consuming the suite deadline. The shared dev PostgreSQL
 runs with 400 connections and 512 MiB shared buffers; owned lab servers use
 four database connections plus two admin connections per replica.
-`dev test-integration`, `dev signoff` and `dev pre-push` run their race-enabled
+`devenv test-integration`, `devenv signoff` and `devenv pre-push` run their race-enabled
 suites (integration and clean-worktree `make check`) after heavy-job admission on
 the local lab host. Gates do not take a lab slot or queue in the lanes' FIFO,
 which would hold a signoff behind hours of lanes; they wait only for the host's
@@ -2388,7 +2388,7 @@ them) and committed with the landing, and a rollback restores them. Generated
 document regions are derived the same way: the patch is computed between base
 and worktree documents whose `generate-docs` blocks (the lab matrix table,
 platform tiers, support and capability tables) are emptied, applied to the
-shared documents emptied likewise, and `go run ./cmd/dev generate-docs`
+shared documents emptied likewise, and `go run ./cmd/devenv generate-docs`
 refills every block after code generation, so column widths that change with
 every ledger row no longer conflict. `lab/ledger.json` is merged as records,
 not text (`labmatrix.MergeLedger`): the entries the worktree adds to its base
@@ -2409,7 +2409,21 @@ touches `web/src` or `web/acceptance`, `make check-web` with
 `artifacts/`); `lab acceptance` accepts fewer than all three engines only with
 `-web-only`, so a release pass stays cross-browser), commits exactly the touched files with MSG and pushes to `main`'s
 upstream without hooks, since the gate just ran. A gate, commit or push failure
-restores the local branch and the checkout. Each landing first checks the main
+restores the local branch and the checkout: in process and with repository
+hooks disabled for every git command it runs (a hook that builds the tree
+fails while the applied sources do not compile), it resets the branch and
+index, reverses the patch (removing the files it added) or, when the gate left
+a patched file unreversible, restores the patch's files to the prior commit
+directly, then restores merged files, regenerated document regions and
+derived directories, and finally re-protects; each step runs whatever an
+earlier one did and the failures are reported together. `cmd/dev` (land,
+gate-commit, status, protect, worktree) imports only development tooling
+packages (`internal/devlab/{worktree,project}`, `internal/diskgc`,
+`internal/gendoc`, `internal/labexec`; a test enforces it), so it builds and
+rolls back while the shared tree is broken; run it from your private worktree,
+since every command acts on the shared checkout from anywhere. The fixture,
+signoff, pre-push, `generate-docs` and `gc`, which need product code, are
+`go run ./cmd/devenv`. Each landing first checks the main
 checkout's `node_modules` with `npm ls` and, when it drifts from
 `package-lock.json`, reinstalls it with a staged `npm ci` that is published
 atomically. A landing that changes `package.json` or `package-lock.json`
@@ -2433,9 +2447,11 @@ under the landing lock and protect again however they end (commit, refusal,
 rollback, failure, interrupt), including files the landing added.
 `go run ./cmd/dev protect` is idempotent and does nothing while another process
 holds the landing lock, whose run re-protects. The `post-merge` and
-`post-checkout` hooks run it in the main checkout only, because git recreates
-the files a pull or checkout changes with default (writable) permissions, and
-`dev status` runs it and names the tracked files it found writable. Directories
+`post-checkout` hooks run `.githooks/protect` in the main checkout only, because
+git recreates the files a pull or checkout changes with default (writable)
+permissions; it is plain shell (`flock` on the landing lock, `chmod a-w` on
+tracked regular files) and builds nothing. `dev status` protects too and names
+the tracked files it found writable. Directories
 and untracked files are not protected: `make check`, `acceptance-build` and
 `check-web` write only untracked outputs (`artifacts/`, `web/dist/`), and
 `signoff` and `pre-push` gate clean worktrees. `make generate` refuses in the
@@ -2445,7 +2461,7 @@ file with its mtime and the private worktrees whose working copy holds the
 same change (an identical file, or every line it adds and none it removes),
 likeliest first, so the agent that wrote into the shared tree is named.
 
-`go run ./cmd/dev gc [-dry-run]` reclaims disk on the workstation and prints the
+`go run ./cmd/devenv gc [-dry-run]` reclaims disk on the workstation and prints the
 bytes reclaimed per class: Go build cache entries untouched for 6 hours
 (`-build-cache-age`; the go command refreshes a used entry's mtime hourly and
 treats a missing one as a miss); the `inputs/` of finished `lab matrix` runs under
@@ -2916,7 +2932,7 @@ recorded outside `run`. A readable file is hashed (and must match `-sha256`);
 an unreadable one needs the documented digest and date and is stored unverified.
 `lab matrix report` regenerates the verification ledger's
 [Tier capability matrix](verification.md#tier-capability-matrix);
-`go run ./cmd/dev generate-docs -check` fails when it is stale. Commit the
+`go run ./cmd/devenv generate-docs -check` fails when it is stale. Commit the
 ledger and the regenerated table together.
 
 Rolling platforms additionally declare their requalification interval in the
@@ -4061,7 +4077,7 @@ format/lint/build/packaging. Shell recipes should compose tools, not contain a s
 implementation of business logic. CI calls the same targets as developers.
 
 For in-place greenfield migration edits, recover a stale shared development schema
-with `go run ./cmd/dev recreate-database -confirm-delete`, not a cluster reset.
+with `go run ./cmd/devenv recreate-database -confirm-delete`, not a cluster reset.
 Coordinate the shared server and any tests using schemas inside `lindm` first:
 the command terminates connections and deletes that entire database only. It verifies
 the running checkout-owned Compose PostgreSQL container, protected secret mount and

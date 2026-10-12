@@ -148,16 +148,50 @@ func Escape(s string) string {
 	return b.String()
 }
 
-// Blank returns doc with the content of each named generated block emptied,
-// the markers kept: the hand-written part of a document, against which a
-// change can be compared or applied whatever the generated content is. A name
-// whose markers are not present exactly once is left as it is (Sync reports
-// it).
-func Blank(doc []byte, names ...string) []byte {
-	for _, name := range names {
-		if blanked, err := Replace(doc, name, ""); err == nil {
-			doc = blanked
+// Blank returns doc with the content of every generated block emptied, the
+// markers kept: the hand-written part of a document, against which a change
+// can be compared or applied whatever the generated content is. A block is a
+// begin marker on a line of its own through the next end marker of the same
+// name on a line of its own; a marker quoted inside prose or code is not one.
+// It needs no registry, so it works on any revision of any document.
+func Blank(doc []byte) []byte {
+	out := make([]byte, 0, len(doc))
+	rest := doc
+	for {
+		start, name := nextBegin(rest)
+		if start < 0 {
+			return append(out, rest...)
 		}
+		open := start + len(begin(name))
+		closing := bytes.Index(rest[open:], []byte("\n"+end(name)+"\n"))
+		if closing < 0 {
+			return append(out, rest...)
+		}
+		out = append(out, rest[:open]...)
+		out = append(out, "\n\n"...)
+		rest = rest[open+closing+1:]
 	}
-	return doc
+}
+
+// nextBegin finds the next begin marker that is a whole line, returning its
+// offset and block name, or -1.
+func nextBegin(doc []byte) (int, string) {
+	const prefix, suffix = "<!-- BEGIN GENERATED ", " -->"
+	for offset := 0; ; {
+		i := bytes.Index(doc[offset:], []byte(prefix))
+		if i < 0 {
+			return -1, ""
+		}
+		start := offset + i
+		lineEnd := bytes.IndexByte(doc[start:], '\n')
+		if lineEnd < 0 {
+			return -1, ""
+		}
+		line := string(doc[start : start+lineEnd])
+		name, ok := strings.CutSuffix(strings.TrimPrefix(line, prefix), suffix)
+		if (start == 0 || doc[start-1] == '\n') && ok && name != "" && !strings.ContainsAny(name, " \t") {
+			return start, name
+		}
+		offset = start + len(prefix)
+	}
 }

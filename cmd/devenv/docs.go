@@ -55,19 +55,3 @@ func docBlocks(root string) ([]gendoc.Block, error) {
 	}
 	return append(blocks, matrix), nil
 }
-
-// blankGenerated empties the generate-docs blocks of the repository-relative
-// file name, so a landing patches and compares only its hand-written part.
-func blankGenerated(root string) (func(name string, content []byte) []byte, error) {
-	blocks, err := docBlocks(root)
-	if err != nil {
-		return nil, err
-	}
-	names := map[string][]string{}
-	for _, block := range blocks {
-		names[block.File] = append(names[block.File], block.Name)
-	}
-	return func(name string, content []byte) []byte {
-		return gendoc.Blank(content, names[name]...)
-	}, nil
-}

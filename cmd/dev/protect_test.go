@@ -67,3 +67,87 @@ func TestProtectSharedYieldsToALanding(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// TestProtectHookBuildsNothing runs the post-merge/post-checkout hook body in a
+// main checkout whose Go sources do not compile: it protects tracked regular
+// files anyway, leaves symlinks, untracked files and private worktrees alone,
+// and does nothing while a landing holds the lock.
+func TestProtectHookBuildsNothing(t *testing.T) {
+	hook, err := filepath.Abs(filepath.Join("..", "..", ".githooks", "protect"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v: %v: %s", args, err, out)
+		}
+	}
+	git := func(dir string, args ...string) {
+		t.Helper()
+		run(dir, append([]string{"git", "-c", "user.email=d@example.invalid", "-c", "user.name=d"}, args...)...)
+	}
+	write := func(name, content string, mode os.FileMode) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git(root, "init", "--quiet")
+	write("go.mod", "module example.test\n\ngo 1.26\n", 0o644)
+	write("broken.go", "package broken\n\nfunc F() int { return }\n", 0o644)
+	write("run.sh", "#!/bin/sh\n", 0o755)
+	write("with space.txt", "x\n", 0o644)
+	outside := filepath.Join(t.TempDir(), "outside.txt")
+	if err := os.WriteFile(outside, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	git(root, "add", ".")
+	git(root, "commit", "--quiet", "-m", "initial")
+	write("untracked.txt", "x\n", 0o644)
+	other := filepath.Join(t.TempDir(), "private")
+	git(root, "worktree", "add", "--quiet", "--detach", other)
+	perm := func(path string) os.FileMode {
+		t.Helper()
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return info.Mode().Perm()
+	}
+
+	run(other, hook)
+	if perm(filepath.Join(other, "broken.go"))&0o200 == 0 {
+		t.Fatal("the hook protected a private worktree")
+	}
+	repo, err := worktree.Open(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unlock, err := repo.Lock(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(root, hook)
+	if perm(filepath.Join(root, "broken.go")) != 0o644 {
+		t.Fatal("the hook protected files under a landing's lock")
+	}
+	if err := unlock(); err != nil {
+		t.Fatal(err)
+	}
+	run(root, hook)
+	for name, want := range map[string]os.FileMode{"broken.go": 0o444, "go.mod": 0o444, "run.sh": 0o555, "with space.txt": 0o444, "untracked.txt": 0o644} {
+		if got := perm(filepath.Join(root, name)); got != want {
+			t.Errorf("%s: mode %v, want %v", name, got, want)
+		}
+	}
+	if perm(outside) != 0o644 {
+		t.Fatal("the hook followed a tracked symlink out of the checkout")
+	}
+}

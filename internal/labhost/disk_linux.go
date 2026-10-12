@@ -36,7 +36,7 @@ type DiskRefusal struct {
 }
 
 func (r *DiskRefusal) Error() string {
-	return fmt.Sprintf("lab host %s: %s has %s free but the lane needs %s; free space with `go run ./cmd/dev gc` (stale lab runs, old build cache, unreferenced images) or remove unneeded files on that filesystem", r.Host, r.Path, gib(r.Free), gib(r.Need))
+	return fmt.Sprintf("lab host %s: %s has %s free but the lane needs %s; free space with `go run ./cmd/devenv gc` (stale lab runs, old build cache, unreferenced images) or remove unneeded files on that filesystem", r.Host, r.Path, gib(r.Free), gib(r.Need))
 }
 
 func (r *DiskRefusal) Is(target error) bool { return target == ErrInsufficientDisk }

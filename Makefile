@@ -47,7 +47,7 @@ bootstrap: tools
 # worktree and land; dev land reruns generate-code (the buf/sqlc part) under
 # the landing lock, so generated output derives from main plus the landing.
 generate: generate-code
-	go run ./cmd/dev generate-docs
+	go run ./cmd/devenv generate-docs
 
 generate-code: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
 	@test -w go.mod || { echo "make generate: tracked files here are read-only (the protected shared checkout); generate in a private worktree and land the output" >&2; exit 1; }
@@ -63,7 +63,7 @@ lint: web-assets $(BUF) $(GOLANGCI)
 	$(BUF) format --diff --exit-code
 	$(GOLANGCI) run $(GOLANGCI_RUN_FLAGS) $(GO_PACKAGES)
 	@diff="$$($(GOLANGCI) fmt --diff $(GO_DIRS))" && { test -z "$$diff" || { printf '%s\n' "$$diff"; exit 1; }; }
-	go run ./cmd/dev generate-docs -check
+	go run ./cmd/devenv generate-docs -check
 
 fmt: $(BUF) $(GOLANGCI)
 	npm run format
@@ -74,7 +74,7 @@ audit: web-assets $(GOVULNCHECK)
 	npm run audit:dependencies
 	$(GOVULNCHECK) $(GO_PACKAGES)
 
-# Each test binary gets the integration lock's 45m budget (cmd/dev
+# Each test binary gets the integration lock's 45m budget (cmd/devenv
 # integrationLockCap), as in the land gate: loaded hosts push the
 # internal/agent/executor race suite past go test's 10m default.
 test: web-assets
@@ -89,19 +89,19 @@ build: web-assets
 check: lint test audit
 
 test-integration: dev-up
-	go run ./cmd/dev test-integration
+	go run ./cmd/devenv test-integration
 
 dev-up: web-assets
-	go run ./cmd/dev up
+	go run ./cmd/devenv up
 
 dev-down:
-	go run ./cmd/dev down
+	go run ./cmd/devenv down
 
 dev-check:
-	go run ./cmd/dev check
+	go run ./cmd/devenv check
 
 dev-trust:
-	go run ./cmd/dev trust
+	go run ./cmd/devenv trust
 
 .PHONY: acceptance check-web acceptance-build browser-baseline ui-review
 ACCEPTANCE_EVIDENCE ?= $(CURDIR)/artifacts/acceptance-$(shell date -u +%Y%m%dT%H%M%SZ)
@@ -129,25 +129,21 @@ acceptance: acceptance-build
 ui-review: acceptance-build
 	artifacts/bin/lab console review -repo "$(UI_REVIEW_REPO)" -lindmd artifacts/bin/lindmd -evidence "$(UI_REVIEW_EVIDENCE)" $(UI_REVIEW_FLAGS)
 
-# Local CI (basecamp/gh-signoff): cmd/dev signoff refuses an unpushed HEAD,
+# Local CI (basecamp/gh-signoff): cmd/devenv signoff refuses an unpushed HEAD,
 # runs the gates in a temporary clean worktree of that SHA (integration and
 # acceptance against this checkout's dev fixture), then posts green statuses
 # with gh signoff create --commit SHA, so a signoff attests to exactly what is
 # on GitHub even while this tree is dirty. Contexts: unit (make check),
 # integration (real PostgreSQL) and acceptance.
-.PHONY: signoff signoff-acceptance pre-push protect
+.PHONY: signoff signoff-acceptance pre-push
 signoff: dev-up
-	go run ./cmd/dev signoff
+	go run ./cmd/devenv signoff
 
 signoff-acceptance:
-	go run ./cmd/dev signoff -acceptance -acceptance-flags "$(ACCEPTANCE_FLAGS)"
+	go run ./cmd/devenv signoff -acceptance -acceptance-flags "$(ACCEPTANCE_FLAGS)"
 
 # Git pre-push hook body: make check at each pushed SHA in a clean worktree,
 # skipped when that SHA already carries a green signoff/unit.
 pre-push:
-	go run ./cmd/dev pre-push
+	go run ./cmd/devenv pre-push
 
-# Git post-merge/post-checkout hook body in the main checkout: git recreates
-# the files it changes writable; make every tracked file read-only again.
-protect:
-	go run ./cmd/dev protect

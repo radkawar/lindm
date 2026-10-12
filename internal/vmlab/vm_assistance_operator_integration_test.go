@@ -21,7 +21,7 @@ import (
 func TestPersistentAssistanceOperatorAccountsAcrossResume(t *testing.T) {
 	binary, repository := os.Getenv("LINDM_NATIVE_SERVER_BINARY"), os.Getenv("LINDM_NATIVE_REPOSITORY")
 	if binary == "" || repository == "" {
-		t.Fatal("requires LINDM_NATIVE_SERVER_BINARY and LINDM_NATIVE_REPOSITORY; use go run ./cmd/dev test-integration")
+		t.Fatal("requires LINDM_NATIVE_SERVER_BINARY and LINDM_NATIVE_REPOSITORY; use go run ./cmd/devenv test-integration")
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 4*time.Minute)
 	defer cancel()

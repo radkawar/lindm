@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"lindm/internal/devlab/worktree"
+	"lindm/internal/gendoc"
 	"lindm/internal/labexec"
-	"lindm/internal/labmatrix"
 )
 
 const landUsage = `Usage: go run ./cmd/dev land -from WORKTREE -m MESSAGE [-paths a,b,...] [-timeout D]
@@ -94,7 +94,7 @@ func runLand(args []string) (resultErr error) {
 	// Collect before queueing for the lock, so a short disk never fails a
 	// gate halfway and no landing waits behind a collection.
 	if shared, err := worktree.Open(ctx, "."); err == nil {
-		collectIfLow(ctx, shared)
+		collectIfLow(ctx, shared.Main)
 	}
 	repo, unlock, err := lockedRepository(ctx)
 	if err != nil {
@@ -118,14 +118,10 @@ func land(ctx context.Context, repo *worktree.Repository, from string, limit []s
 	if err != nil {
 		return err
 	}
-	blank, err := blankGenerated(repo.Main)
-	if err != nil {
-		return err
-	}
 	derivation := worktree.Derivation{
 		Roots: roots,
-		Merge: map[string]func(current, base, theirs []byte) ([]byte, error){labmatrix.LedgerFile: labmatrix.MergeLedger},
-		Blank: blank,
+		Merge: map[string]func(current, base, theirs []byte) ([]byte, error){ledgerFile: mergeLedger},
+		Blank: func(_ string, content []byte) []byte { return gendoc.Blank(content) },
 	}
 	change, err := repo.Change(ctx, from, limit, derivation)
 	if err != nil {
@@ -154,7 +150,7 @@ func land(ctx context.Context, repo *worktree.Repository, from string, limit []s
 		}
 		// After code generation and the ledger merge: generated documents
 		// derive from both. The quick gate's generate-docs -check verifies.
-		if err := stream(ctx, repo.Main, nil, "go", "run", "./cmd/dev", "generate-docs"); err != nil {
+		if err := stream(ctx, repo.Main, nil, "go", "run", "./cmd/devenv", "generate-docs"); err != nil {
 			return fmt.Errorf("regenerate documents: %w", err)
 		}
 		return quickGate(ctx, repo.Main, slices.Concat(files, regenerated))
@@ -257,7 +253,7 @@ func quickGate(ctx context.Context, root string, files []string) error {
 	docs, markdown = existing(docs), existing(markdown)
 	lint := filepath.Join(root, ".tools", "bin", "golangci-lint")
 	// Generated docs read state many landings change; check them every time.
-	steps := [][]string{{"go", "build", "./..."}, {"go", "run", "./cmd/dev", "generate-docs", "-check"}}
+	steps := [][]string{{"go", "build", "./..."}, {"go", "run", "./cmd/devenv", "generate-docs", "-check"}}
 	if len(packages) != 0 {
 		steps = append(steps,
 			append([]string{lint, "run", "--allow-parallel-runners"}, packages...),
@@ -294,7 +290,7 @@ func quickGate(ctx context.Context, root string, files []string) error {
 		// -race), so a test binary gets the integration lock's budget, the
 		// bound any one suite is held to; the landing's -timeout still bounds
 		// the gate.
-		if err := stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1", "-timeout=" + integrationLockCap.String()}, affected...)...); err != nil {
+		if err := stream(ctx, root, nil, "go", append([]string{"test", "-race", "-count=1", "-timeout=" + raceTestTimeout.String()}, affected...)...); err != nil {
 			return err
 		}
 	}

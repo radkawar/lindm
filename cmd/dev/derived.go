@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -116,4 +118,87 @@ func regenerate(ctx context.Context, repo *worktree.Repository, change worktree.
 	}
 	fmt.Println(report)
 	return regenerated, nil
+}
+
+// ledgerFile is the lab matrix ledger, merged record by record.
+const ledgerFile = "lab/ledger.json"
+
+// maxLedgerBytes bounds a ledger read for merging.
+const maxLedgerBytes = 16 << 20
+
+// mergeLedger merges a worktree's change to the matrix ledger structurally,
+// so landings that each record entries compose: the entries theirs adds to
+// base are appended to current once and the entries theirs removes from base
+// are removed. Entries are compared as JSON records, independent of
+// formatting; validating them against the schema is the gate's (generate-docs
+// -check loads the ledger strictly). It needs no product packages, so a
+// landing that breaks the lab schema still merges and rolls back.
+func mergeLedger(current, base, theirs []byte) ([]byte, error) {
+	parse := func(name string, data []byte) ([]string, error) {
+		if len(bytes.TrimSpace(data)) == 0 {
+			return nil, nil
+		}
+		if len(data) > maxLedgerBytes {
+			return nil, fmt.Errorf("%s ledger exceeds %d bytes", name, maxLedgerBytes)
+		}
+		var ledger struct {
+			Entries []json.RawMessage `json:"entries"`
+		}
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&ledger); err != nil {
+			return nil, fmt.Errorf("decode %s ledger: %w", name, err)
+		}
+		entries := make([]string, 0, len(ledger.Entries))
+		for _, entry := range ledger.Entries {
+			var compact bytes.Buffer
+			if err := json.Compact(&compact, entry); err != nil {
+				return nil, fmt.Errorf("decode %s ledger: %w", name, err)
+			}
+			entries = append(entries, compact.String())
+		}
+		return entries, nil
+	}
+	merged, err := parse("current", current)
+	if err != nil {
+		return nil, err
+	}
+	before, err := parse("base", base)
+	if err != nil {
+		return nil, err
+	}
+	after, err := parse("their", theirs)
+	if err != nil {
+		return nil, err
+	}
+	// take removes one occurrence of entry, reporting whether there was one.
+	take := func(entries *[]string, entry string) bool {
+		if i := slices.Index(*entries, entry); i >= 0 {
+			*entries = slices.Delete(*entries, i, i+1)
+			return true
+		}
+		return false
+	}
+	removed := slices.Clone(before)
+	var added []string
+	for _, entry := range after {
+		if !take(&removed, entry) {
+			added = append(added, entry)
+		}
+	}
+	for _, entry := range removed {
+		take(&merged, entry)
+	}
+	for _, entry := range added {
+		if !slices.Contains(merged, entry) {
+			merged = append(merged, entry)
+		}
+	}
+	// The layout labmatrix.Marshal writes: two-space indented JSON.
+	var out bytes.Buffer
+	if err := json.Indent(&out, []byte(`{"entries":[`+strings.Join(merged, ",")+`]}`), "", "  "); err != nil {
+		return nil, err
+	}
+	out.WriteByte('\n')
+	return out.Bytes(), nil
 }

@@ -34,13 +34,13 @@ type dispatchDirectory struct {
 	name, user, group string
 }
 
-// devFixture is the running dev fixture that `go run ./cmd/dev test-integration`
+// devFixture is the running dev fixture that `go run ./cmd/devenv test-integration`
 // names; it need not lie inside the checkout under test.
 func devFixture(t *testing.T) string {
 	t.Helper()
 	repository := os.Getenv("LINDM_NATIVE_REPOSITORY")
 	if repository == "" {
-		t.Fatal("directory integration tests require LINDM_NATIVE_REPOSITORY; use go run ./cmd/dev test-integration")
+		t.Fatal("directory integration tests require LINDM_NATIVE_REPOSITORY; use go run ./cmd/devenv test-integration")
 	}
 	return filepath.Join(repository, ".cache", "dev")
 }

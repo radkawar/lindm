@@ -1,7 +1,4 @@
 #!/bin/sh
-set -eu
-# git recreates the files a merge or pull changes, writable; make the shared
-# main checkout's tracked files read-only again (go run ./cmd/dev protect).
-# Private worktrees stay writable.
-[ "$(git rev-parse --path-format=absolute --git-dir)" = "$(git rev-parse --path-format=absolute --git-common-dir)" ] || exit 0
-exec make --no-print-directory protect
+# git recreates the files a merge or pull changes writable; make the shared main
+# checkout's tracked files read-only again. Private worktrees stay writable.
+exec "$(dirname "$0")/protect"

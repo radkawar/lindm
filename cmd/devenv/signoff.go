@@ -18,7 +18,7 @@ import (
 	"lindm/internal/labexec"
 )
 
-const signoffUsage = `Usage: go run ./cmd/dev signoff [-acceptance] [options]
+const signoffUsage = `Usage: go run ./cmd/devenv signoff [-acceptance] [options]
 
 Local CI (gh-signoff) for the pushed HEAD of -root, never the shared dirty
 tree: it refuses an unpushed HEAD, qualifies a temporary clean worktree of

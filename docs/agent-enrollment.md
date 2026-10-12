@@ -887,7 +887,7 @@ owned database without force.
 ### Running the connected service-dispatch lane
 
 With the development PostgreSQL/Keycloak dependencies running, initialize the
-development enrollment trust with `go run ./cmd/dev trust` if it is absent (for
+development enrollment trust with `go run ./cmd/devenv trust` if it is absent (for
 example after a dev reset). Build current `artifacts/bin/lab` and
 `artifacts/bin/lindmd` binaries; the lab executable must be portable to the guest,
 so use `CGO_ENABLED=0 go build -trimpath -o artifacts/bin/lab ./cmd/lab`. Then run:

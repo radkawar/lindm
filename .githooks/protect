@@ -1,0 +1,13 @@
+#!/bin/sh
+# Make the shared main checkout's tracked regular files read-only (a-w) again
+# after git rewrote some (a merge, pull or checkout recreates the files it
+# changes writable); see go run ./cmd/dev protect. Plain shell, building
+# nothing: the tree it protects may hold sources that do not compile. Private
+# worktrees stay writable, and a landing in progress (holding the landing lock)
+# re-protects the tree itself when it ends.
+set -eu
+git_dir=$(git rev-parse --path-format=absolute --git-dir)
+[ "$git_dir" = "$(git rev-parse --path-format=absolute --git-common-dir)" ] || exit 0
+cd "$(git rev-parse --show-toplevel)"
+exec flock --nonblock --conflict-exit-code 0 "$git_dir/lindm-landing.lock" sh -c \
+	'git ls-files -s -z | grep -z "^100" | cut -z -f2- | xargs -0 -r chmod -f a-w -- || true'

@@ -20,7 +20,7 @@ func Open(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
 	t.Helper()
 	path := os.Getenv("LINDM_TEST_DATABASE_URL_FILE")
 	if path == "" {
-		t.Fatal("integration tests require LINDM_TEST_DATABASE_URL_FILE; use go run ./cmd/dev test-integration")
+		t.Fatal("integration tests require LINDM_TEST_DATABASE_URL_FILE; use go run ./cmd/devenv test-integration")
 	}
 	if _, err := custody.Owned(path, false); err != nil {
 		t.Fatalf("LINDM_TEST_DATABASE_URL_FILE: %v", err)

@@ -75,7 +75,7 @@ func validateCertificates(dir string) error {
 			return err
 		}
 		if time.Now().Before(cert.NotBefore) || !time.Now().Before(cert.NotAfter) {
-			return fmt.Errorf("%s certificate is not currently valid; stop the app, then run go run ./cmd/dev reset -confirm-delete and up to regenerate (this destroys lab data)", name)
+			return fmt.Errorf("%s certificate is not currently valid; stop the app, then run go run ./cmd/devenv reset -confirm-delete and up to regenerate (this destroys lab data)", name)
 		}
 		if name != "server" {
 			if !cert.IsCA {
