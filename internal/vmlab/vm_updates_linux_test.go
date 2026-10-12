@@ -54,13 +54,13 @@ func TestUpdateHardwareResolvedBeforePackageBuild(t *testing.T) {
 	if err := updateHardwareSupported(x86, nil, "amd64"); err != nil {
 		t.Fatalf("default x86_64 BIOS guest refused: %v", err)
 	}
-	// The registry admits only the natively qualified architecture.
-	amd, err := LoadManifest("../../lab/images/debian-12-amd64.json")
+	// The registry admits only releases with a natively qualified lane.
+	unqualified, err := LoadManifest("../../lab/images/rocky-8.10-x86_64.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := UpdateVM(context.Background(), amd, VMUpdateOptions{Repository: t.TempDir(), WorkDir: work}); err == nil || !strings.Contains(err.Error(), "no maintained vm updates lane") {
-		t.Fatalf("unqualified Debian 12 x86_64 update lane admitted: %v", err)
+	if _, err := UpdateVM(context.Background(), unqualified, VMUpdateOptions{Repository: t.TempDir(), WorkDir: work}); err == nil || !strings.Contains(err.Error(), "no maintained vm updates lane") {
+		t.Fatalf("unqualified Rocky Linux 8 update lane admitted: %v", err)
 	}
 }
 

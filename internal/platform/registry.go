@@ -296,9 +296,6 @@ var (
 	// reasonNoUkify: the owned-boot recovery fixture builds its ordinary UKI
 	// with the guest's ukify, which systemd 253 introduced.
 	reasonNoUkify = "no systemd-ukify (systemd 253+) for the owned-boot recovery fixture's ordinary UKI"
-	// The native self-update lane (`lab vm updates`) is qualified per guest
-	// architecture: aarch64 only on the arm64 KVM hosts.
-	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
 	// Vendor unattended installer formats; each must also exist in the
 	// release's installation media (see docs/agent-enrollment.md).
 	cloudInitOnly        = []Provisioning{ProvisionCloudInit}
@@ -318,14 +315,16 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "22.04", Quality: "1.4.4", PAM: "1.4.0", Manager: "1.4.0"}}, RecoveryGRUB: debianGRUB},
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
 				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
 				Drivers: []string{"tpm_tis", "tpm_crb"}}},
-		// Recovery sanitize is measured GRUB only (amd64; jammy's arm64 GRUB
-		// records no PCR 8/9 measurements, so readiness refuses there).
-		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		// Recovery sanitize is measured GRUB only, on amd64: jammy's signed
+		// grubaa64.efi embeds no tpm module (the amd64 build does), and the arm64
+		// vmlinuz is gzip-compressed, so neither recovery boot exists there.
+		Supports:          caps(agentCore, []Capability{Packages, Accounts, Sysctl, Firewall, Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: "jammy's signed grubaa64.efi (grub-efi-arm64-signed 1.187.12+2.06-2ubuntu14.8) embeds no tpm module, so it records no PCR 8/9 event for measured recovery, and the gzip-compressed arm64 vmlinuz with systemd 249 (no ukify) cannot form the owned recovery UKI"}},
 		// 249's verify has no --recursive-errors (systemd 250) and exits 0 on
 		// a candidate setting it ignores as invalid. A modelled 22.04→24.04
 		// do-release-upgrade completed natively, but owned resources then stayed
@@ -400,13 +399,14 @@ var registry = []*Release{
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
-		// Recovery sanitize is measured GRUB only, and amd64 only: the arm64
-		// kernel cannot bind QEMU virt's TPM, so readiness has no attestation.
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
-		Gates:    gates(string(ReleaseUpgrade), reasonDebianUpgrade, string(OSUpdate), reasonDebianOSUpdate),
+		// Recovery sanitize is measured GRUB only (systemd 252 has no ukify),
+		// on amd64: bookworm's signed grubaa64.efi embeds no tpm module.
+		Supports:          caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		ArchitectureGates: map[string]map[Capability]string{"aarch64": {RecoverySanitize: "bookworm's signed grubaa64.efi (grub-efi-arm64-signed 1+2.06+13+deb12u2) embeds no tpm module, so it records no PCR 8/9 event for measured recovery, and systemd 252 has no ukify for the owned recovery UKI"}},
+		Gates:             gates(string(ReleaseUpgrade), reasonDebianUpgrade, string(OSUpdate), reasonDebianOSUpdate),
 	},
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
@@ -416,7 +416,7 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, LaneArchitectures: updatesARM, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(string(ReleaseUpgrade), "no successor release: Debian 14 is not released", string(OSUpdate), reasonDebianOSUpdate),
@@ -528,7 +528,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
+		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor and
 		// architecture in verification.md; implemented capabilities stay
@@ -542,7 +542,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
+		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),
@@ -554,7 +554,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
+		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession9, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonELMajorUpgrade), OSUpdate),
@@ -565,7 +565,7 @@ var registry = []*Release{
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
 		Quirks:   withPins(elQuirks10, el10Pins),
-		Lab: Lab{Lanes: elRebuildLanes, LaneArchitectures: updatesARM, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
+		Lab: Lab{Lanes: elRebuildLanes, Installer: Anaconda, Session: elRebuildSession10, Guest: rhelGuest, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
 		Gates:    without(gates(string(ReleaseUpgrade), reasonNoEL11), OSUpdate),

@@ -117,18 +117,19 @@ func TestPlanStates(t *testing.T) {
 // A lane the registry restricts to other architectures is "no lane" there, even
 // with a pinned image, so the matrix never offers an unqualified run.
 func TestPlanHonoursLaneArchitectures(t *testing.T) {
-	debian := release(t, "debian-12")
+	debian := *release(t, "debian-12")
+	debian.Lab.LaneArchitectures = map[platform.LabLane][]string{platform.LaneUpdates: {"aarch64"}}
 	cloud := labv1.MatrixImage_MATRIX_IMAGE_CLOUD
 	updates := &labv1.MatrixCell{Name: "self-update", Title: "Self-update", Capabilities: []string{"self-update"}, Image: cloud, Lane: "updates"}
 	in := &Inputs{
 		Manifests: []*Manifest{
-			{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "server-cloudimg"}, Release: debian, Architecture: "x86_64"},
-			{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "server-cloudimg"}, Release: debian, Architecture: "aarch64"},
+			{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "server-cloudimg"}, Release: &debian, Architecture: "x86_64"},
+			{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "server-cloudimg"}, Release: &debian, Architecture: "aarch64"},
 		},
 		Ledger: &labv1.MatrixLedger{},
 	}
 	got := map[string]State{}
-	for _, c := range in.Plan([]*platform.Release{debian}, []*labv1.MatrixCell{updates}) {
+	for _, c := range in.Plan([]*platform.Release{&debian}, []*labv1.MatrixCell{updates}) {
 		got[c.Architecture] = c.State
 	}
 	if got["x86_64"] != NoLane || got["aarch64"] != NotRun {
