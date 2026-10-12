@@ -44,14 +44,15 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 	observation := req.Msg.GetObservation()
+	// The device only learns invalid_argument; the server log names the
+	// refusing stage and, for rules, the fields and rule IDs (never values), so
+	// a collector defect is diagnosable from one refusal.
 	if observation == nil || protodata.ValidateClosed(observation.ProtoReflect()) != nil {
+		slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "stage", "closed_message")
 		return nil, core.Invalid("observation")
 	}
 	if err := s.Rules.Validate(observation); err != nil {
-		// The device only learns invalid_argument; the server log names the
-		// refused fields and rules (never values) so a collector defect is
-		// diagnosable from one refusal.
-		slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "violations", violationPaths(err))
+		slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "stage", "rules", "violations", violationPaths(err))
 		return nil, core.Invalid("observation")
 	}
 	// Device detail also carries list projections and bounded administrator
@@ -68,6 +69,7 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 	}
 	digest, err := HostDigest(principal.GenerationID.String(), req.Msg.GetSequence(), observation)
 	if err != nil {
+		slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "stage", "digest")
 		return nil, core.Invalid("observation")
 	}
 	var accepted uint64
@@ -105,6 +107,7 @@ func (s *Service) ReportHostObservation(ctx context.Context, req *connect.Reques
 			}
 			fields, err := hostFields(observation)
 			if err != nil {
+				slog.WarnContext(ctx, "host observation refused", "device_id", principal.DeviceID, "stage", "host_fields")
 				return err
 			}
 			fields.GenerationID = principal.GenerationID

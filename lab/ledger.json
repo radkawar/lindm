@@ -10402,22 +10402,6 @@
       "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
     },
     {
-      "platform": "linuxmint-22.3",
-      "cell": "lifecycle",
-      "architecture": "x86_64",
-      "manifest": "linuxmint-22.3-cinnamon-amd64",
-      "verdict": "MATRIX_VERDICT_PASS",
-      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
-      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
-      "recorded": "2026-10-11T21:34:01.765236456Z",
-      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
-      "source": "MATRIX_SOURCE_IMPORT",
-      "verified": true,
-      "scope": "signed DEB 0.7.0→0.7.1; control-plane trust; local authority",
-      "reference": "#tier-1-parity-records-2026-10-11",
-      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
-    },
-    {
       "platform": "fedora-43",
       "cell": "assistance",
       "architecture": "x86_64",
@@ -10461,6 +10445,22 @@
       "manifestSha256": "d59c1259421c304c9674a3e991e188ce90e5b6012ad577d254fa85a7eac8514a",
       "recoveryManifest": "fedora-cloud-44-1.7-x86-64",
       "recoveryManifestSha256": "9a4370735711d45d829ac3f3fe5326d66b97450e4e8bc112dfd53755d2341f47"
+    },
+    {
+      "platform": "linuxmint-22.3",
+      "cell": "lifecycle",
+      "architecture": "x86_64",
+      "manifest": "linuxmint-22.3-cinnamon-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
+      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
+      "recorded": "2026-10-11T21:34:01.765236456Z",
+      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed DEB 0.7.0\u21920.7.1; control-plane trust; local authority",
+      "reference": "#tier-1-parity-records-2026-10-11",
+      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
     }
   ]
 }
