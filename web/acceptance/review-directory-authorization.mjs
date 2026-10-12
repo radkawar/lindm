@@ -71,6 +71,8 @@ export async function reviewDirectoryAuthorization({
     await settle(page);
     const prefix = `directory-authorization-${entry.theme}-${entry.viewport}-${entry.variant}`;
     entry.screenshots[name] = await screenshot(page, `${prefix}-${name}.png`, true);
+    // The scenario's first state is its edit-sheet capture.
+    entry.screenshots.full ??= entry.screenshots[name];
     const violations = await axe(page, null);
     entry.checks[`axe-${name}`] = {
       findings: violations
@@ -190,8 +192,9 @@ export async function reviewDirectoryAuthorization({
         entry.screenshots.failure = await screenshot(
           page,
           `directory-authorization-${theme}-${viewport.name}-owner-failure.png`,
-          false,
+          true,
         );
+        entry.screenshots.full ??= entry.screenshots.failure;
       } finally {
         owner.failSourceRead(false);
       }
@@ -270,8 +273,9 @@ export async function reviewDirectoryAuthorization({
         entry.screenshots.failure = await screenshot(
           page,
           `directory-authorization-${theme}-${viewport.name}-reader-failure.png`,
-          false,
+          true,
         );
+        entry.screenshots.full ??= entry.screenshots.failure;
       }
       entry.passed = Object.values(entry.checks).every((check) => check.findings.length === 0);
     }
@@ -288,8 +292,9 @@ export async function reviewDirectoryAuthorization({
     entry.screenshots.failure = await screenshot(
       reader.driver.page,
       "directory-authorization-reader-login-failure.png",
-      false,
+      true,
     );
+    entry.screenshots.full = entry.screenshots.failure;
   } finally {
     await reader.driver.close();
   }

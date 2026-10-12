@@ -8,6 +8,7 @@ export const routeContracts = {
   "/advisories": structural,
   "/approvals": structural,
   "/audit": structural,
+  "/authorization": structural,
   "/dashboard": { mode: "semantic", page: "dashboard", minimumMetrics: 1 },
   "/devices": structural,
   "/enrollment": structural,

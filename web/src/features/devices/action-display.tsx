@@ -12,6 +12,7 @@ import {
 import { OSUpdateRebootMode, UpdateSelection } from "../../../gen/lindm/resource/v1/software_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { exactBytes, formatBytes } from "@/lib/bytes";
 import { Fact } from "./observations";
 
 export type DeviceActionKind = NonNullable<DeviceActionSpec["action"]["case"]>;
@@ -76,41 +77,111 @@ export const sanitizeMethods = [
   SanitizeMethod.NVME_SANITIZE_CRYPTO_ERASE,
 ];
 
-export function StorageTargetView({ target }: { target: StorageTarget | undefined }) {
+export function StorageTargetView({
+  target,
+  technicalDetails = true,
+}: {
+  target: StorageTarget | undefined;
+  technicalDetails?: boolean;
+}) {
   if (!target) return <p>No storage target reported.</p>;
   return (
     <div className="grid gap-2">
-      <dl className="grid gap-2 text-sm sm:grid-cols-2">
-        <Fact label="Target">{target.luksUuid ? "Encrypted volume" : "Unencrypted disk"}</Fact>
-        <Fact label="Exact size (bytes)">{target.sizeBytes.toString()}</Fact>
-        {target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS ? (
-          <Fact label="Backing disk size (bytes)">{target.diskSizeBytes.toString()}</Fact>
-        ) : null}
-      </dl>
-      <TechnicalDetails
-        items={[
-          {
-            label: "Identity basis",
-            value:
-              target.identityBasis === StorageIdentityBasis.WWN_SERIAL
-                ? "WWN + serial"
-                : target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
-                  ? "Disk serial + GPT + LUKS"
-                  : "Not supported",
-          },
-          { label: "LUKS UUID", value: target.luksUuid },
-          { label: "WWN", value: target.wwn },
-          { label: "Serial", value: target.serial },
-          ...(target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
-            ? [{ label: "GPT disk GUID", value: target.gptDiskGuid }]
-            : []),
-        ]}
-      />
+      <StorageTargetFacts target={target} />
+      {technicalDetails ? <TechnicalDetails items={storageTargetDetailItems(target)} /> : null}
     </div>
   );
 }
 
-export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefined }) {
+// Primary target facts without their Details, for screens that merge diagnostics.
+export function StorageTargetFacts({ target }: { target: StorageTarget }) {
+  return (
+    <dl className="grid gap-2 text-sm sm:grid-cols-2">
+      <Fact label="Target">{target.luksUuid ? "Encrypted volume" : "Unencrypted disk"}</Fact>
+      <Fact label="Size">{formatBytes(target.sizeBytes)}</Fact>
+      {target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS ? (
+        <Fact label="Backing disk size">{formatBytes(target.diskSizeBytes)}</Fact>
+      ) : null}
+    </dl>
+  );
+}
+
+export function storageTargetDetailItems(target: StorageTarget) {
+  return [
+    {
+      label: "Identity basis",
+      value:
+        target.identityBasis === StorageIdentityBasis.WWN_SERIAL
+          ? "WWN + serial"
+          : target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
+            ? "Disk serial + GPT + LUKS"
+            : "Not supported",
+    },
+    { label: "Exact size", value: exactBytes(target.sizeBytes) },
+    ...(target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
+      ? [{ label: "Exact backing disk size", value: exactBytes(target.diskSizeBytes) }]
+      : []),
+    { label: "LUKS UUID", value: target.luksUuid },
+    { label: "WWN", value: target.wwn },
+    { label: "Serial", value: target.serial },
+    ...(target.identityBasis === StorageIdentityBasis.SERIAL_GPT_LUKS
+      ? [{ label: "GPT disk GUID", value: target.gptDiskGuid }]
+      : []),
+  ];
+}
+
+// Every Details item DeviceActionSpecView shows, for screens that render one
+// merged disclosure with `technicalDetails={false}`.
+export function deviceActionDetailItems(spec: DeviceActionSpec | undefined) {
+  const action = spec?.action;
+  const target = (value: StorageTarget | undefined, prefix = "") =>
+    value
+      ? storageTargetDetailItems(value).map((item) => ({ ...item, label: prefix + item.label }))
+      : [];
+  switch (action?.case) {
+    case "escrowRotate":
+      return [
+        ...target(action.value.target),
+        { label: "Escrow key ID", value: action.value.escrowKeyId },
+      ];
+    case "tpm2Bind":
+      return target(action.value.target);
+    case "cryptoErase":
+      return action.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER
+        ? action.value.targets.flatMap((value, index) =>
+            target(value, action.value.targets.length > 1 ? `Volume ${index + 1}: ` : ""),
+          )
+        : target(action.value.target);
+    case "sanitize":
+      return [
+        ...target(action.value.target),
+        ...(action.value.nvmeScope?.identity
+          ? [
+              {
+                label: "Exact namespace size",
+                value: exactBytes(action.value.nvmeScope.identity.namespaceSizeBytes),
+              },
+            ]
+          : []),
+      ];
+    case "localAdminPasswordRotate":
+      return [{ label: "Escrow key ID", value: action.value.escrowKeyId }];
+    case "releaseLock":
+      return [{ label: "Lock action ID", value: action.value.lockActionId }];
+    case "releaseQuarantine":
+      return [{ label: "Quarantine action ID", value: action.value.quarantineActionId }];
+    default:
+      return [];
+  }
+}
+
+export function DeviceActionSpecView({
+  spec,
+  technicalDetails = true,
+}: {
+  spec: DeviceActionSpec | undefined;
+  technicalDetails?: boolean;
+}) {
   if (!spec?.action.case) return <p>No action specification.</p>;
   const action = spec.action;
   return (
@@ -119,7 +190,7 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
       {action.case === "escrowRotate" ||
       action.case === "tpm2Bind" ||
       action.case === "sanitize" ? (
-        <StorageTargetView target={action.value.target} />
+        <StorageTargetView target={action.value.target} technicalDetails={technicalDetails} />
       ) : null}
       {action.case === "cryptoErase" ? (
         <div className="grid gap-3">
@@ -134,11 +205,11 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
           {action.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER ? (
             action.value.targets.map((target) => (
               <div key={target.luksUuid} className="rounded-md border p-3">
-                <StorageTargetView target={target} />
+                <StorageTargetView target={target} technicalDetails={technicalDetails} />
               </div>
             ))
           ) : (
-            <StorageTargetView target={action.value.target} />
+            <StorageTargetView target={action.value.target} technicalDetails={technicalDetails} />
           )}
         </div>
       ) : null}
@@ -149,7 +220,7 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
           </Fact>
         </dl>
       ) : null}
-      {action.case === "escrowRotate" ? (
+      {technicalDetails && action.case === "escrowRotate" ? (
         <TechnicalDetails items={[{ label: "Escrow key ID", value: action.value.escrowKeyId }]} />
       ) : null}
       {action.case === "tpm2Bind" ? <p>PCR policy: {action.value.pcrs.join(", ")}</p> : null}
@@ -197,7 +268,11 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
           <dl className="grid gap-2 text-sm">
             <Fact label="Account">{action.value.accountName}</Fact>
           </dl>
-          <TechnicalDetails items={[{ label: "Escrow key ID", value: action.value.escrowKeyId }]} />
+          {technicalDetails ? (
+            <TechnicalDetails
+              items={[{ label: "Escrow key ID", value: action.value.escrowKeyId }]}
+            />
+          ) : null}
         </>
       ) : null}
       {action.case === "lockSessions" ? (
@@ -216,9 +291,11 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
       {action.case === "releaseLock" ? (
         <>
           <p>Restores accounts locked by lindm. Screen locks stay in place.</p>
-          <TechnicalDetails
-            items={[{ label: "Lock action ID", value: action.value.lockActionId }]}
-          />
+          {technicalDetails ? (
+            <TechnicalDetails
+              items={[{ label: "Lock action ID", value: action.value.lockActionId }]}
+            />
+          ) : null}
         </>
       ) : null}
       {action.case === "quarantine" ? (
@@ -227,9 +304,11 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
       {action.case === "releaseQuarantine" ? (
         <>
           <p>Removes the network restrictions added by quarantine.</p>
-          <TechnicalDetails
-            items={[{ label: "Quarantine action ID", value: action.value.quarantineActionId }]}
-          />
+          {technicalDetails ? (
+            <TechnicalDetails
+              items={[{ label: "Quarantine action ID", value: action.value.quarantineActionId }]}
+            />
+          ) : null}
         </>
       ) : null}
       {action.case === "sanitize" ? (
@@ -264,8 +343,8 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
               <Fact label="Controller firmware">
                 {action.value.nvmeScope.identity.controllerFirmware}
               </Fact>
-              <Fact label="Namespace size (bytes)">
-                {action.value.nvmeScope.identity.namespaceSizeBytes.toString()}
+              <Fact label="Namespace size">
+                {formatBytes(action.value.nvmeScope.identity.namespaceSizeBytes)}
               </Fact>
               <Fact label="LBA data size shift (LBADS)">
                 {action.value.nvmeScope.identity.lbaDataSizeShift}
@@ -279,6 +358,16 @@ export function DeviceActionSpecView({ spec }: { spec: DeviceActionSpec | undefi
               : "Selected namespace only"}
           </Fact>
         </dl>
+      ) : null}
+      {technicalDetails && action.case === "sanitize" && action.value.nvmeScope?.identity ? (
+        <TechnicalDetails
+          items={[
+            {
+              label: "Exact namespace size",
+              value: exactBytes(action.value.nvmeScope.identity.namespaceSizeBytes),
+            },
+          ]}
+        />
       ) : null}
       {action.case === "sanitize" ? (
         action.value.recovery ? (
@@ -323,7 +412,7 @@ export function CryptoEraseVerificationView({
         <div key={result.target?.luksUuid} className="grid gap-2 rounded-md border p-3">
           <StorageTargetView target={result.target} />
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <Fact label="Header extent (bytes)">{result.headerBytes.toString()}</Fact>
+            <Fact label="Header extent">{formatBytes(result.headerBytes)}</Fact>
             <Fact label="LUKS erase">
               <StatusBadge status={result.nativeLuksErase ? "success" : "warning"}>
                 {result.nativeLuksErase ? "Confirmed" : "Not confirmed"}

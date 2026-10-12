@@ -17,6 +17,14 @@ export const annotationFields = {
   assignee: "Responsible person or team (assigned by you)",
 };
 
+// Every capture links one full-page screenshot under screenshots/. The generator
+// refuses to write a sheet the importer (review-import.mjs) would reject.
+export function screenshotReference(value) {
+  if (typeof value !== "string" || !/^screenshots\/[a-z0-9-]+\.png$/.test(value))
+    throw new Error("invalid_screenshot_reference");
+  return value;
+}
+
 export function editManifest(report) {
   const screens = new Map();
   const taskScreens = (report.walkthroughs?.results ?? []).flatMap((job) =>
@@ -42,22 +50,37 @@ export function editManifest(report) {
         variant: entry.variant ?? "",
         captures: [],
       });
+    const where = `${entry.route} ${entry.variant ?? ""} ${entry.theme} ${entry.viewport}`;
+    const reference = (value) => {
+      try {
+        return screenshotReference(value);
+      } catch {
+        throw new Error(`capture has no valid full-page screenshot: ${where}`);
+      }
+    };
     screens.get(id).captures.push({
       theme: entry.theme,
       viewport: entry.viewport,
-      screenshot: entry.screenshots.full,
-      dialogs: entry.screenshots.dialogs ?? [],
+      screenshot: reference(entry.screenshots.full),
+      dialogs: (entry.screenshots.dialogs ?? []).map(reference),
       machinePassed: entry.passed,
       coverage: entry.checks.pov?.mode ?? "unavailable",
     });
   }
-  return {
+  const manifest = {
     version: 1,
     runId: randomUUID(),
     startedAt: report.startedAt,
     contactSheet: "index.html",
     screens: [...screens.values()],
   };
+  if (
+    manifest.screens.length > 500 ||
+    manifest.screens.some((screen) => screen.captures.length > 16) ||
+    Buffer.byteLength(JSON.stringify(manifest)) > 1024 * 1024
+  )
+    throw new Error("edit manifest exceeds import bounds");
+  return manifest;
 }
 
 export function annotationTemplate(manifest) {

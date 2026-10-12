@@ -69,7 +69,7 @@ audit: web-assets $(GOVULNCHECK)
 
 test: web-assets
 	go test -race $(GO_PACKAGES)
-	node --test web/acceptance/assistance-startup.test.mjs
+	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/review-edit-sheet.test.mjs
 
 build: web-assets
 	go build -trimpath -o artifacts/bin/lindmd ./cmd/lindmd

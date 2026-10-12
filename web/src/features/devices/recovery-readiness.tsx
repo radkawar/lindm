@@ -1,10 +1,41 @@
 import type { RecoveryReadiness } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
+import { exactBytes, formatBytes } from "@/lib/bytes";
 import { Fact, ObservedTime } from "./observations";
 import { recoveryReadinessMessage, recoveryReadinessTone } from "@/lib/errors";
 
-export function RecoveryReadinessView({ readiness }: { readiness: RecoveryReadiness | undefined }) {
+// The Details items RecoveryReadinessView shows, for screens that render one
+// merged disclosure with `technicalDetails={false}`.
+export function recoveryReadinessDetailItems(readiness: RecoveryReadiness | undefined) {
+  const observation = readiness?.observation;
+  const observed = observation?.available === true;
+  return [
+    { label: "Boot partition UUID", value: observed ? observation.espUuid : undefined },
+    {
+      label: "Exact available space",
+      value: observed && readiness ? exactBytes(readiness.availableBytes) : undefined,
+    },
+    {
+      label: "Exact required space",
+      value:
+        readiness && readiness.neededBytes > 0n ? exactBytes(readiness.neededBytes) : undefined,
+    },
+    {
+      label: "Exact recovery image size",
+      value: readiness && readiness.imageSize > 0n ? exactBytes(readiness.imageSize) : undefined,
+    },
+    { label: "Reason code", value: readiness?.reason },
+  ];
+}
+
+export function RecoveryReadinessView({
+  readiness,
+  technicalDetails = true,
+}: {
+  readiness: RecoveryReadiness | undefined;
+  technicalDetails?: boolean;
+}) {
   const observation = readiness?.observation;
   const observed = observation?.available === true;
   const reason = readiness?.reason || "device_action_recovery_readiness_missing";
@@ -32,16 +63,16 @@ export function RecoveryReadinessView({ readiness }: { readiness: RecoveryReadin
         </Fact>
         <Fact label="Boot partition">{observed ? observation.espPath : "Not available"}</Fact>
         <Fact label="Available space">
-          {observed ? `${readiness!.availableBytes.toLocaleString()} bytes` : "Not available"}
+          {observed ? formatBytes(readiness!.availableBytes) : "Not available"}
         </Fact>
         <Fact label="Required space">
           {readiness && readiness.neededBytes > 0n
-            ? `${readiness.neededBytes.toLocaleString()} bytes`
+            ? formatBytes(readiness.neededBytes)
             : "Enter a recovery image"}
         </Fact>
         <Fact label="Recovery image size">
           {readiness && readiness.imageSize > 0n
-            ? `${readiness.imageSize.toLocaleString()} bytes`
+            ? formatBytes(readiness.imageSize)
             : "Not available"}
         </Fact>
         <Fact label="Secure Boot">
@@ -51,12 +82,9 @@ export function RecoveryReadinessView({ readiness }: { readiness: RecoveryReadin
           {observed ? (observation.ukiCapable ? "Supported" : "Not supported") : "Not available"}
         </Fact>
       </dl>
-      <TechnicalDetails
-        items={[
-          { label: "Boot partition UUID", value: observed ? observation.espUuid : undefined },
-          { label: "Reason code", value: readiness?.reason },
-        ]}
-      />
+      {technicalDetails ? (
+        <TechnicalDetails items={recoveryReadinessDetailItems(readiness)} />
+      ) : null}
     </section>
   );
 }

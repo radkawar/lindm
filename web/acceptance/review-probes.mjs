@@ -200,6 +200,25 @@ export function installProbes(rules) {
     })),
   ];
   const idInputPattern = new RegExp(rules.idInputPattern.pattern, rules.idInputPattern.flags);
+  const byteValue = new RegExp(rules.rawByteValue.value, rules.rawByteValue.flags);
+  const byteLabel = new RegExp(rules.rawByteValue.label, rules.rawByteValue.flags);
+  // A bare number names bytes through its nearest short labelled container
+  // (a fact row or list item) or, inside a table, its column header.
+  const bytesLabelled = (node) => {
+    const cell = node.closest("td,th");
+    if (cell) {
+      const table = cell.closest("table");
+      const header = table?.querySelectorAll("thead tr > *")[cell.cellIndex];
+      if (header && byteLabel.test(header.textContent ?? "")) return true;
+    }
+    for (let scope = node.parentElement; scope && scope !== document.body;) {
+      const text = normalize(scope.textContent ?? "");
+      if (text.length > 160) return false;
+      if (byteLabel.test(text)) return true;
+      scope = scope.parentElement;
+    }
+    return false;
+  };
   const visibleText = (node) => rendered(node) && !srOnly(node) && normalize(node.innerText ?? "");
   const enabledAction = (node) =>
     rendered(node) &&
@@ -437,6 +456,23 @@ export function installProbes(rules) {
           continue;
         if (!rendered(parent) || srOnly(parent) || excluded(parent)) continue;
         inspect(text.nodeValue, parent, "text");
+        if (byteValue.test(text.nodeValue) && bytesLabelled(parent)) {
+          const excerpt = normalize(parent.parentElement?.textContent ?? text.nodeValue).slice(
+            0,
+            120,
+          );
+          const id = `raw byte count:${excerpt}`;
+          if (!seen.has(id)) {
+            seen.add(id);
+            findings.push({
+              check: "copy",
+              rule: "raw byte count",
+              source: "text",
+              excerpt,
+              elements: [describe(parent)],
+            });
+          }
+        }
       }
       for (const node of document.querySelectorAll("[placeholder],[aria-label],[title]")) {
         if (!rendered(node) || excluded(node)) continue;

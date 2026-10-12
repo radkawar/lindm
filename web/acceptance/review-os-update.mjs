@@ -76,6 +76,7 @@ export async function reviewOSUpdate({ pages, combos, config, screenshot, axe, p
         message: `OS update authoring review failed: ${error.message}`,
         elements: [],
       });
+      entry.screenshots.full = await screenshot(page, `${prefix}-failure.png`, true);
     }
     entry.passed = Object.values(entry.checks).every((check) => check.findings.length === 0);
     results.push(entry);

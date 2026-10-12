@@ -94,7 +94,7 @@ export function MaterialField({
           ? "A yescrypt, SHA-512 or bcrypt hash, for example from mkpasswd. Never enter the plain password."
           : purpose === SecretPurpose.WIFI_PSK
             ? "8 to 63 characters, or 64 hexadecimal digits."
-            : "Up to 4096 bytes of text, saved exactly as entered."}{" "}
+            : "Up to 4 KiB of text, saved exactly as entered."}{" "}
         You'll need to enter it again if saving fails.
       </p>
     </div>

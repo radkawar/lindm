@@ -34,6 +34,8 @@ export async function reviewAuthorization({
       await page.evaluate(() => window.scrollTo(0, 0));
       await settle(page);
       entry.screenshots[name] = await screenshot(page, `${prefix}-${name}.png`, true);
+      // The scenario's first state is its edit-sheet capture.
+      entry.screenshots.full ??= entry.screenshots[name];
       const violations = await axe(page, null);
       entry.checks[`axe-${name}`] = {
         findings: violations
@@ -246,7 +248,8 @@ export async function reviewAuthorization({
         message: "Runtime authorization or organization account scenario did not complete",
         elements: [],
       });
-      entry.screenshots.failure = await screenshot(page, `${prefix}-failure.png`, false);
+      entry.screenshots.failure = await screenshot(page, `${prefix}-failure.png`, true);
+      entry.screenshots.full ??= entry.screenshots.failure;
     } finally {
       await page.unroute(updateRoute);
     }

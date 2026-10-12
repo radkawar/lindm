@@ -127,6 +127,7 @@ async function reviewEnrollment({
         if (dialog) dialog.scrollTop = 0;
       });
       await settle(page);
+      entry.screenshots.full = await screenshot(page, `${prefix}-full.png`, true);
       const violations = await axe(page, null);
       entry.checks.axe = {
         violations,
@@ -145,7 +146,9 @@ async function reviewEnrollment({
         message: "Enrollment review could not complete the named scenario",
         elements: [],
       });
-      entry.screenshots.failure = await screenshot(page, `${prefix}-failure.png`, false);
+      // The edit sheet requires a full-page capture of every scenario, failed ones included.
+      entry.screenshots.failure = await screenshot(page, `${prefix}-failure.png`, true);
+      entry.screenshots.full = entry.screenshots.failure;
     }
     entry.passed = Object.values(entry.checks).every((check) => check.findings.length === 0);
     results.push(entry);

@@ -18,6 +18,7 @@ import { adminClient, clearCsrfToken } from "@/lib/rpc";
 import { synchronizeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
+import { formatBytes } from "@/lib/bytes";
 import {
   ReportFormat,
   ReportKind,
@@ -351,7 +352,7 @@ function Artifacts() {
           />
           {artifact.state === "published" ? (
             <p className="text-sm">
-              {artifact.rowCount.toString()} rows · {artifact.byteCount.toString()} bytes · expires{" "}
+              {artifact.rowCount.toString()} rows · {formatBytes(artifact.byteCount)} · expires{" "}
               {formatTimestamp(artifact.expiresAt).local}
             </p>
           ) : artifact.state === "queued" || artifact.state === "building" ? (

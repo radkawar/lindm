@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Local owner-authored annotations -> private, actionable task records. No network,
 // issue tracker mutation, inferred approval or model-generated owner feedback.
-import { mkdir } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { lstat, mkdir } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { readPrivateJSON, writePrivateJSON } from "./private-files.mjs";
-import { annotationFields } from "./review-edit-sheet.mjs";
+import { annotationFields, screenshotReference } from "./review-edit-sheet.mjs";
 
 process.umask(0o077);
 
@@ -28,12 +28,6 @@ function text(value, max, empty = false) {
       throw new Error("invalid_text_field");
   }
   return value.trim();
-}
-
-function screenshot(value) {
-  if (typeof value !== "string" || !/^screenshots\/[a-z0-9-]+\.png$/.test(value))
-    throw new Error("invalid_screenshot_reference");
-  return value;
 }
 
 function manifestScreens(manifest) {
@@ -73,12 +67,24 @@ function manifestScreens(manifest) {
         capture.dialogs.length > 32
       )
         throw new Error("invalid_capture");
-      screenshot(capture.screenshot);
-      capture.dialogs.forEach(screenshot);
+      screenshotReference(capture.screenshot);
+      capture.dialogs.forEach(screenshotReference);
     }
     screens.set(screen.id, screen);
   }
   return screens;
+}
+
+// The generator writes a full-page screenshot for every capture; a sheet whose
+// evidence is missing beside it is not the canonical run evidence.
+async function requireScreenshots(manifestPath, screens) {
+  const directory = dirname(manifestPath);
+  for (const screen of screens.values())
+    for (const capture of screen.captures)
+      for (const path of [capture.screenshot, ...capture.dialogs]) {
+        const stat = await lstat(join(directory, path)).catch(() => null);
+        if (!stat?.isFile()) throw new Error("manifest_screenshot_missing");
+      }
 }
 
 try {
@@ -91,6 +97,7 @@ try {
     .map((path) => resolve(path));
   const manifest = await readPrivateJSON(manifestPath);
   const screens = manifestScreens(manifest);
+  await requireScreenshots(manifestPath, screens);
   const source = await readPrivateJSON(annotationsPath);
   object(source, ["version", "runId", "author", "annotations"]);
   if (

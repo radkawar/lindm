@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { formatBytes } from "@/lib/bytes";
 import { CollectionStatusText, Fact, isOptionalCollectionAbsence } from "./observations";
 
 type NativeField = ObservedString | ObservedBool | ObservedUint64 | ObservedStrings;
@@ -42,6 +43,8 @@ function NativeValue({
     return <span>{field.values.length ? field.values.join(", ") : "None observed"}</span>;
   }
   if (typeof field.value === "boolean") return <span>{field.value ? "Yes" : "No"}</span>;
+  if (unit === "bytes" && typeof field.value === "bigint")
+    return <span>{formatBytes(field.value)}</span>;
   return (
     <span>
       {typeof field.value === "bigint" ? field.value.toLocaleString() : field.value}
@@ -373,7 +376,7 @@ export function DeviceNativeDetails({
                 },
                 { header: "Type", field: (row) => row.type },
                 { header: "Parent", field: (row) => row.parent, optional: true },
-                { header: "Size (bytes)", field: (row) => row.sizeBytes },
+                { header: "Size", field: (row) => row.sizeBytes, unit: "bytes" },
                 { header: "Filesystem", field: (row) => row.filesystem, optional: true },
                 { header: "Mountpoint", field: (row) => row.mountpoint, optional: true },
                 { header: "Encryption", field: (row) => row.encryption },

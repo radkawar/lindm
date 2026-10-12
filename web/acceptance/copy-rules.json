@@ -31,8 +31,19 @@
       "name": "raw snake_case code",
       "pattern": "\\b[a-z]+(?:_[a-z]+)+\\b",
       "flags": ""
+    },
+    {
+      "name": "raw byte count",
+      "pattern": "\\b\\d{1,3}(?:[,.\\s\\u202f]\\d{3})+\\s*bytes?\\b|\\b\\d{4,}\\s*bytes?\\b",
+      "flags": "i"
     }
   ],
+  "rawByteValue": {
+    "$comment": "docs/design.md Numbers and units: a bare number of four or more digits is a raw byte count when its label, row or column header names bytes. Exact counts belong in Details.",
+    "value": "^\\s*\\d{1,3}(?:[,.\\s\\u202f]?\\d{3})+\\s*$",
+    "label": "\\bbytes?\\b",
+    "flags": "i"
+  },
   "idInputPattern": { "pattern": "\\b(?:ids?|uuids?)\\b", "flags": "i" },
   "excludedRegions": [
     "[data-slot=\"technical-details\"]",

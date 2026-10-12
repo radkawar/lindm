@@ -1,8 +1,9 @@
 # lindm design point of view
 
-**DRAFT. Owner to edit.** This is the working design contract, not a claim that
-current screens meet it. [Engineering](engineering.md#frontend-structure-and-framework)
-remains binding for security, accessibility and implementation.
+**Accepted by the owner on 2026-10-12** as the console design standard. It is the
+working design contract, not a claim that current screens meet it.
+[Engineering](engineering.md#frontend-structure-and-framework) remains binding for
+security, accessibility and implementation.
 
 ## First rule: screens are task-shaped, not API-shaped
 
@@ -79,6 +80,10 @@ control panel; never imply an old permission still grants access.
   title 16px semibold, body and controls 14px, supporting metadata 12px minimum.
   Sentence case. Tabular numerals for comparisons; monospace only for technical
   values. Long hostnames wrap, never displace the action.
+- **Numbers and units:** sizes use binary units with at most three significant
+  figures (“476 GiB”, “1.5 MiB”), never a raw byte count such as “510962909184”
+  in primary text. The exact byte count, when it matters for a decision, belongs
+  in Details. Counts name their noun (“3 pending updates”), not a bare number.
 - **Density:** one clear decision band, then evidence, then optional detail.
   Compact rows and 16–24px section spacing beat repeated padded boxes. On 390px,
   stack in decision order; do not shrink type or hide consequences to fit.
