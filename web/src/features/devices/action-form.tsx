@@ -1110,7 +1110,11 @@ export function DeviceActionForm({
             : blocker
               ? `${blockedControls} off until this is resolved: ${blocker.title.toLowerCase()}.`
               : "";
-  const reviewCheck = !attempt ? null : preflight?.state === "checking" ? (
+  // A refusal at Send stays on screen while its evidence is re-checked; only a
+  // first review check shows the bare progress line.
+  const rechecking = preflight?.state === "checking";
+  const reviewCheck = !attempt ? null : rechecking &&
+    !(attempt.status === "rejected" && blocker) ? (
     <p role="status" className="text-sm text-muted-foreground">
       Checking whether {deviceName} can take this action now…
     </p>
@@ -1182,11 +1186,16 @@ export function DeviceActionForm({
         pendingEvidence ? null : (
           <p>{blocker.action}</p>
         )}
+        {rechecking ? (
+          <p role="status" className="text-muted-foreground">
+            Checking again whether {deviceName} can take this action now…
+          </p>
+        ) : null}
         <Button
           type="button"
           variant="outline"
           className="w-fit"
-          disabled={busy}
+          disabled={busy || rechecking}
           onClick={() => void checkPreflight(attempt)}
         >
           Check again

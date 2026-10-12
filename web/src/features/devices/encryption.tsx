@@ -287,6 +287,18 @@ export function DeviceEncryptionPanel({
                     <StatusBadge status="warning">Not confirmed yet</StatusBadge>
                   )}
                 </Fact>
+                {/* Whether the escrowed key is still on the volume, in words; slot numbers stay in Details. */}
+                <Fact label="On the device">
+                  {escrowSlotPresent ? (
+                    "lindm's recovery key is in use"
+                  ) : verdictVolume?.occupiedKeyslots.length ? (
+                    <StatusBadge status="destructive">
+                      lindm&apos;s recovery key is no longer on this volume
+                    </StatusBadge>
+                  ) : (
+                    "Not reported by the device yet"
+                  )}
+                </Fact>
               </>
             ) : null}
             {observed ? (

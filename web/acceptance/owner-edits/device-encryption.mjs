@@ -1,5 +1,5 @@
 // Owner task: the route device's Encryption tab leads with one recoverability
-// verdict, its key-slot facts agree with the escrow record, a single volume has
+// verdict, it says in words whether lindm's recovery key is on the volume (slot numbers only in Details, agreeing with the escrow record), a single volume has
 // no picker, Reveal is a real button and sizes avoid raw byte counts. Read-only:
 // the secondary menu is opened and closed without choosing an action.
 export const task = {
@@ -8,7 +8,7 @@ export const task = {
   route: "/devices/$deviceId",
   priority: "high",
   acceptance:
-    "On ubuntu-ws-01 the tab opens with a single recoverability sentence; key-slot fields agree with the escrow record; no volume picker shown; Reveal is a button; no raw byte counts visible outside Details.",
+    "On ubuntu-ws-01 the tab opens with a single recoverability sentence; 'On the device: lindm's recovery key is in use' is shown while raw key slots appear only in Details and agree with the escrow record; no volume picker shown; Reveal is a button; no raw byte counts visible outside Details.",
 };
 
 const verdictPattern = /^(Recoverable|Not recoverable|Unknown): \S/;
@@ -43,24 +43,33 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     ), `Escrowed device verdict should name escrow age and TPM unlock state (got ${JSON.stringify(lines[0])})`);
   }
 
-  step("key-slot fields agree with escrow record");
-  // Primary facts only: Details holds technical identifiers, not slot claims.
-  const shown = await panel.locator("dt").evaluateAll((terms) =>
-    terms
-      .filter((term) => !term.closest("details"))
-      .map((term) => ({
-        label: term.textContent.trim(),
-        value: term.nextElementSibling?.textContent.trim() ?? "",
-      })),
+  step("escrowed key stated in words; slot numbers only in Details");
+  // Owner pass 2: raw slot numbers are diagnostics. The primary facts say whether
+  // lindm's recovery key is on the volume; Details keeps the slots, which must agree.
+  const facts = await panel.locator("dt").evaluateAll((terms) =>
+    terms.map((term) => ({
+      label: term.textContent.trim().replace(/:$/, ""),
+      value: term.nextElementSibling?.textContent.trim() ?? "",
+      details: !!term.closest("details"),
+    })),
   );
-  const escrowSlot = shown.find((fact) => fact.label === "Key slot")?.value ?? "";
+  const shown = facts.filter((fact) => !fact.details);
+  const hidden = facts.filter((fact) => fact.details);
+  const onDevice = shown.find((fact) => fact.label === "On the device")?.value ?? "";
   if (RecoveryActionID) {
-    require(/^\d+$/.test(escrowSlot), "Escrow record does not show its key slot");
+    require(onDevice ===
+      "lindm's recovery key is in use", `Escrow record does not say in words that lindm's recovery key is in use (got ${JSON.stringify(onDevice)})`);
+  }
+  for (const fact of shown)
+    require(!/slot/i.test(
+      fact.label,
+    ), `Raw key-slot fact '${fact.label}: ${fact.value}' is shown outside Details`);
+  const escrowSlot = hidden.find((fact) => fact.label === "Recovery key slot")?.value ?? "";
+  if (RecoveryActionID) {
+    require(/^\d+$/.test(escrowSlot), "Details does not keep the escrowed recovery key slot");
   }
   if (escrowSlot) {
-    for (const fact of shown.filter(
-      (item) => item.label !== "Key slot" && /key slots/i.test(item.label),
-    )) {
+    for (const fact of hidden.filter((item) => /^key slots/i.test(item.label))) {
       require(!/^none/i.test(
         fact.value,
       ), `'${fact.label}: ${fact.value}' contradicts escrowed recovery key slot ${escrowSlot}`);
