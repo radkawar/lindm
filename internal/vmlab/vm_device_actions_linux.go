@@ -364,6 +364,13 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		return result, err
 	}
 	defer func() { err = errors.Join(err, fixture.Close()) }()
+	// Runs before Close removes the log: a rejected device sync is only a
+	// reason code on the guest ("invalid_argument: constraint").
+	defer func() {
+		if err != nil && options.Encrypted.DiagnosticsDir != "" {
+			err = errors.Join(err, saveFixtureServerLog(fixture, options.Encrypted.DiagnosticsDir))
+		}
+	}()
 	result.Database = fixture.DatabaseName
 	delegation, err := fixture.ConfigureDeviceActions(ctx)
 	if err != nil {

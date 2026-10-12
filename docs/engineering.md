@@ -1784,7 +1784,10 @@ Collection uses a fresh pinned SSH connection and the read-only `action-status`
 RPC, never a raw protected journal copy, key file or LUKS header. Failed probes
 are recorded explicitly in private mode-0600 JSON referenced by the failure.
 Use `vm device-actions -diagnostics DIR` to keep those files in a caller-owned
-directory, including after cold boots. SSH-native runs return that explicit
+directory, including after cold boots. With `-diagnostics`, a failed lane also
+keeps the isolated lindmd's last 1 MiB of JSON log in a private file, so a
+device's bare reason code (for example `invalid_argument: constraint`) maps to
+the server's logged table, column and constraint. SSH-native runs return that explicit
 directory before removing their remote state; the default temporary directory
 is not retained across remote teardown. Diagnostics remain private observations,
 not passing qualification evidence.
