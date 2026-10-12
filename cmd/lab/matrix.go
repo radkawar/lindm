@@ -403,7 +403,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.repo, "repo", ".", "checkout with the running development fixture")
 	flags.StringVar(&run.cache, "cache", ".cache/lab/images", "verified image cache")
 	flags.StringVar(&run.redhatToken, "redhat-token-file", "", "protected Red Hat offline-token file; required for entitled releases")
-	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs, each owned mode0600: PLATFORM-ARCH.json (enroll-from-console) and PLATFORM-ARCH.provision.json (provision-*, public-host origin with approver)")
+	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs, each owned mode0600: PLATFORM-ARCH.json (enroll-from-console) and PLATFORM-ARCH.LANE.json per provision-* lane (public-host origin with approver; each lane needs its own fresh evidenceDirectory)")
 	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key recovery only: package-owned noSB bootstrap NVRAM template on the selected host")
@@ -847,7 +847,10 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		case "console-browser", "provision-browser":
 			config := c.Release.Key + "-" + c.Architecture + ".json"
 			if input == "provision-browser" {
-				config = c.Release.Key + "-" + c.Architecture + ".provision.json"
+				// One file per provision lane: a release offering two formats
+				// runs both lanes, and each capture refuses an existing
+				// evidence directory.
+				config = c.Release.Key + "-" + c.Architecture + "." + c.Spec.GetLane() + ".json"
 			}
 			args = append(args, "-repo", r.root, "-lab-binary", r.self, "-browser-config", filepath.Join(r.consoleBrowsers, config))
 			if r.consoleAdmin != "" {

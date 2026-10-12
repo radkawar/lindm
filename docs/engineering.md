@@ -2802,8 +2802,10 @@ from the shared transport CA. The fixture prints one-time secrets for
 browser runner (`mode: enroll`, `hostResolverRules: "MAP lindm-console.test
 127.0.0.1"`) into separate private credential files. A provision browser
 configuration is the owner configuration plus
-`"approver": {"username", "password", "credentialPath"}`; for the matrix, store it as
-`PLATFORM-ARCH.provision.json` in `-console-browser-config-dir`.
+`"approver": {"username", "password", "credentialPath"}`; for the matrix, store one
+per lane as `PLATFORM-ARCH.LANE.json` (for example
+`ubuntu-24.04-x86_64.provision-autoinstall.json`) in `-console-browser-config-dir`,
+each with its own not-yet-existing `evidenceDirectory`.
 
 Each lane captures the snippet in Chromium before the guest boots (the token is
 approval-required), then merges it only as `lab/matrix.json`'s cells allow:

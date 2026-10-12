@@ -285,7 +285,7 @@ func waitProvisionUnit(ctx context.Context, vm *guestVM, timeout time.Duration, 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
-		data, err := vm.run(ctx, "systemctl show --property=Id --property=LoadState --property=ActiveState --property=Result --property=ConditionResult "+provisionUnit+" lindm-executor.service", nil, 8192, 30*time.Second)
+		data, err := vm.run(ctx, "systemctl show --property=Id --property=LoadState --property=ActiveState --property=Result --property=ConditionResult --property=ConditionTimestampMonotonic "+provisionUnit+" lindm-executor.service", nil, 8192, 30*time.Second)
 		if err == nil {
 			units := map[string]map[string]string{}
 			for block := range strings.SplitSeq(strings.TrimSpace(string(data)), "\n\n") {
@@ -302,7 +302,11 @@ func waitProvisionUnit(ctx context.Context, vm *guestVM, timeout time.Duration, 
 			if state["LoadState"] != "loaded" {
 				return fmt.Errorf("the snippet's %s is not installed (LoadState=%s)", provisionUnit, state["LoadState"])
 			}
-			if active == "inactive" && state["ConditionResult"] == "no" {
+			// A unit systemd has not tried to start yet also reports
+			// ConditionResult=no; only an evaluated condition (non-zero
+			// timestamp) means it was skipped. The autoinstall snippet's
+			// unit is started by first-boot cloud-init, after this wait begins.
+			if active == "inactive" && state["ConditionResult"] == "no" && state["ConditionTimestampMonotonic"] != "" && state["ConditionTimestampMonotonic"] != "0" {
 				return fmt.Errorf("the snippet's %s skipped its start condition", provisionUnit)
 			}
 			if executor["ActiveState"] == "failed" {
