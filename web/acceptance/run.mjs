@@ -369,7 +369,7 @@ async function journey() {
   await saveCredential();
   // Sign out through the UI, then authenticate again. Never reuse/import a
   // session cookie as evidence of a working sign-in ceremony.
-  await step("owner_sign_out", () => signOut(ui));
+  await step("owner_sign_out", () => signOut(ui, config.origin));
   await step("owner_fresh_sign_in", () => signIn(ui, config));
   await saveCredential();
   if (["enroll", "credentials", "grant"].includes(config.mode)) {
@@ -431,9 +431,9 @@ async function journey() {
   if (config.mode === "approve-enrollment") {
     // Two humans in one browser: each signs in through the UI with only its
     // own passkey state loaded; no session or credential is shared.
-    await step("owner_sign_out_for_approver", () => signOut(ui));
+    await step("owner_sign_out_for_approver", () => signOut(ui, config.origin));
     await driver.authenticator(await savedCredentials(config.approver));
-    await step("approver_sign_in", () => signIn(ui, config.approver));
+    await step("approver_sign_in", () => signIn(ui, config.approver, config.origin));
     await saveCredential(config.approver);
     const pending = await step("find_pending_enrollment", () => findPendingEnrollment(ui, config));
     result.approval = {
@@ -446,7 +446,7 @@ async function journey() {
     await step("approve_device_enrollment", () => approvePendingEnrollment(ui, config, pending));
     result.approval.approved = true;
     await writePrivateJSON(config.resultPath, result);
-    await step("approver_sign_out", () => signOut(ui));
+    await step("approver_sign_out", () => signOut(ui, config.origin));
     await driver.authenticator(await savedCredentials(config));
     await step("owner_execute_sign_in", () => signIn(ui, config));
     await saveCredential();
@@ -458,7 +458,7 @@ async function journey() {
     );
     await writePrivateJSON(config.resultPath, result);
   }
-  await step("final_sign_out", () => signOut(ui));
+  await step("final_sign_out", () => signOut(ui, config.origin));
   result.passed = true;
 }
 

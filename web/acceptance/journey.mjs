@@ -14,17 +14,89 @@ export async function enroll(ui, config) {
   await ui.click({ role: "link", text: "Back to sign in" });
 }
 
-export async function signIn(ui, config) {
-  await ui.fill({ label: "Username" }, config.username);
-  await ui.fill({ label: "Password" }, config.password);
-  await ui.click({ role: "button", text: "Sign in locally" });
-  await ui.wait({ role: "heading", text: "Dashboard" });
+// Shared lab hosts add and remove VM and container links while lanes run;
+// Chromium then aborts in-flight requests (net::ERR_NETWORK_CHANGED), so a
+// sign-in shows "Result unknown" or a page never finishes loading. Only
+// idempotent steps (sign-in/out, page reads) are repeated, on a fresh
+// navigation and a bounded number of times, so a product failure still fails
+// every attempt. Decisions use the console's own same-request retry.
+const interruptedAttempts = 3;
+
+function interrupted(error) {
+  const message = String(error?.message ?? "");
+  return (
+    message === "ui_condition_timeout" ||
+    /net::ERR_(NETWORK_CHANGED|ABORTED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE)/.test(
+      message,
+    )
+  );
 }
 
-export async function signOut(ui) {
-  await ui.click({ css: 'button[aria-label^="Account menu for "]' });
-  await ui.click({ role: "menuitem", text: "Sign out" });
-  await ui.wait({ label: "Username" });
+// waitAny returns the index of the first query that becomes visible.
+async function waitAny(ui, queries) {
+  const deadline = Date.now() + ui.timeoutMs;
+  while (Date.now() < deadline) {
+    for (const [index, query] of queries.entries()) {
+      if (await ui.driver.find(query)) return index;
+    }
+    await delay(100);
+  }
+  throw new Error("ui_condition_timeout");
+}
+
+const dashboard = { role: "heading", text: "Dashboard" };
+const signInForm = { label: "Username" };
+
+// reopen reloads the console after an interrupted step and reports whether
+// the session is signed in.
+async function reopen(ui, origin) {
+  await ui.driver.goto(origin);
+  return (await waitAny(ui, [dashboard, signInForm])) === 0;
+}
+
+// signIn signs account in; origin (default the account's) lets an
+// interrupted attempt reopen the console.
+export async function signIn(ui, account, origin = account.origin) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await ui.fill(signInForm, account.username);
+      await ui.fill({ label: "Password" }, account.password);
+      await ui.click({ role: "button", text: "Sign in locally" });
+      await ui.wait(dashboard);
+      return;
+    } catch (error) {
+      if (!origin || attempt >= interruptedAttempts || !interrupted(error)) throw error;
+      // The sign-in may have completed before its response was lost.
+      if (await reopen(ui, origin)) return;
+    }
+  }
+}
+
+export async function signOut(ui, origin) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await ui.click({ css: 'button[aria-label^="Account menu for "]' });
+      await ui.click({ role: "menuitem", text: "Sign out" });
+      await ui.wait(signInForm);
+      return;
+    } catch (error) {
+      if (!origin || attempt >= interruptedAttempts || !interrupted(error)) throw error;
+      if (!(await reopen(ui, origin))) return;
+    }
+  }
+}
+
+// openPage navigates to a console page until its ready condition shows.
+async function openPage(ui, config, path, ready) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await ui.driver.goto(`${config.origin}${path}`);
+      await ui.wait(ready);
+      return;
+    } catch (error) {
+      if (attempt >= interruptedAttempts || !interrupted(error)) throw error;
+    }
+  }
 }
 
 async function credentialDetails(ui) {
@@ -199,6 +271,9 @@ function readCards(id) {
         (status) => status.textContent.trim() === "Done.",
       ),
       failed: !!node.querySelector('[role="alert"]'),
+      ambiguous: [...node.querySelectorAll('[role="alert"]')].some((alert) =>
+        alert.textContent.includes("Result unknown"),
+      ),
       payload: node.querySelector("pre")?.textContent ?? "",
       fields: Object.fromEntries(
         [...node.querySelectorAll("dt")].map((term) => [
@@ -214,8 +289,14 @@ function readCards(id) {
 export async function findPendingEnrollment(ui, config) {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
-    await ui.driver.goto(`${config.origin}/enrollment`);
-    await ui.click({ css: "summary", text: "Devices waiting for approval" });
+    try {
+      await ui.driver.goto(`${config.origin}/enrollment`);
+      await ui.click({ css: "summary", text: "Devices waiting for approval" });
+    } catch (error) {
+      // An interrupted page load is retried until the deadline.
+      if (!interrupted(error)) throw error;
+      continue;
+    }
     const settle = Math.min(deadline, Date.now() + 10_000);
     while (Date.now() < settle) {
       const cards = (await ui.driver.observe(readCards, config.installationId)).filter(
@@ -241,17 +322,28 @@ export async function findPendingEnrollment(ui, config) {
   throw new Error("pending_enrollment_not_found");
 }
 
-async function waitApproval(ui, approvalId, accept) {
+// waitApproval waits for the card to satisfy accept. An ambiguous decision
+// failure ("Result unknown") is retried through the console's own control,
+// which resubmits the same request, at most twice; any other failure ends it.
+async function waitApproval(ui, approvalId, accept, retry) {
   const deadline = Date.now() + 60_000;
   let nextRefresh = Date.now() + 3_000;
+  let retries = 0;
   while (Date.now() < deadline) {
     const cards = (await ui.driver.observe(readCards, approvalId)).filter(
       (card) => card.fields["Approval ID"] === approvalId,
     );
     if (cards.length > 1) throw new Error("approval_card_ambiguous");
     if (cards.length === 1) {
-      if (cards[0].failed) throw new Error("approval_action_failed");
       if (accept(cards[0])) return cards[0];
+      if (cards[0].failed) {
+        if (!cards[0].ambiguous || !retry || retries >= 2)
+          throw new Error("approval_action_failed");
+        retries++;
+        await retry();
+        await delay(1000);
+        continue;
+      }
     }
     if (Date.now() >= nextRefresh) {
       // Read-only list refetch; never a repeated decision or execution.
@@ -266,8 +358,7 @@ async function waitApproval(ui, approvalId, accept) {
 // The approver, a different human from the requester, approves exactly the
 // pending device's enrollment approval in the inbox.
 export async function approvePendingEnrollment(ui, config, pending) {
-  await ui.driver.goto(`${config.origin}/approvals`);
-  await ui.wait({ role: "heading", text: "Approval inbox" });
+  await openPage(ui, config, "/approvals", { role: "heading", text: "Approval inbox" });
   const card = await waitApproval(ui, pending.approvalId, (item) => item.state === "Pending");
   if (!card.title.startsWith("Approve device enrollment"))
     throw new Error("approval_not_device_enrollment");
@@ -284,7 +375,12 @@ export async function approvePendingEnrollment(ui, config, pending) {
     "Lab provisioning: approve this exact pending installation",
   );
   await ui.click({ role: "button", text: "Approve", within: pending.approvalId });
-  const decided = await waitApproval(ui, pending.approvalId, (item) => item.state === "Approved");
+  const decided = await waitApproval(
+    ui,
+    pending.approvalId,
+    (item) => item.state === "Approved",
+    () => ui.click({ role: "button", text: "Approve", within: pending.approvalId }),
+  );
   if (decided.fields["Decided by"] !== config.approver.username)
     throw new Error("approval_decider_mismatch");
   return { approved: true, decidedBy: decided.fields["Decided by"] };
@@ -292,8 +388,7 @@ export async function approvePendingEnrollment(ui, config, pending) {
 
 // The requester (token creator) runs the approved enrollment.
 export async function executeApprovedEnrollment(ui, config, pending) {
-  await ui.driver.goto(`${config.origin}/approvals`);
-  await ui.wait({ role: "heading", text: "Approval inbox" });
+  await openPage(ui, config, "/approvals", { role: "heading", text: "Approval inbox" });
   const card = await waitApproval(ui, pending.approvalId, (item) => item.state === "Approved");
   if (
     card.fields["Requester"] !== config.username ||
@@ -301,7 +396,12 @@ export async function executeApprovedEnrollment(ui, config, pending) {
   )
     throw new Error("approval_request_mismatch");
   await ui.click({ role: "button", text: "Run now", within: pending.approvalId });
-  await waitApproval(ui, pending.approvalId, (item) => item.done || item.state === "Completed");
+  await waitApproval(
+    ui,
+    pending.approvalId,
+    (item) => item.done || item.state === "Completed",
+    () => ui.click({ role: "button", text: "Try again", within: pending.approvalId }),
+  );
   return { requesterExecuted: true };
 }
 
