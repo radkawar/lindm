@@ -620,6 +620,7 @@ function ApprovalCard({
             Decision reason
             <Input
               aria-label="Approval decision reason"
+              data-freeform="audit reason for the decision"
               value={reason}
               disabled={busy || attempt !== null}
               onChange={(event) => setReason(event.target.value)}

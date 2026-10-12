@@ -155,6 +155,7 @@ export function Accounts({
         <Label htmlFor="new-username">Username</Label>
         <Input
           id="new-username"
+          data-freeform="new account username"
           required
           value={username}
           disabled={busy}

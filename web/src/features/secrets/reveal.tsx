@@ -230,6 +230,7 @@ export function SecretReveal({
       <Label htmlFor={`${idPrefix}-reason`}>Reason</Label>
       <Textarea
         id={`${idPrefix}-reason`}
+        data-freeform="audit reason"
         value={reason}
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
@@ -245,6 +246,7 @@ export function SecretReveal({
       </Label>
       <Input
         id={`${idPrefix}-confirmation`}
+        data-freeform="typed confirmation of the secret name"
         value={confirmation}
         onChange={(event) => setConfirmation(event.target.value)}
         readOnly={busy || request.current !== null}

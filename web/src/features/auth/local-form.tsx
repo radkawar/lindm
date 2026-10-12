@@ -121,6 +121,7 @@ export function LocalForm({
           <Label htmlFor="local-username">Username</Label>
           <Input
             id="local-username"
+            data-freeform="sign-in username; accounts are never listed before sign-in"
             autoComplete="username"
             required
             value={username}
@@ -146,6 +147,7 @@ export function LocalForm({
           <Label htmlFor="incident-reason">Reason for emergency sign-in (required)</Label>
           <Input
             id="incident-reason"
+            data-freeform="audit reason for emergency sign-in"
             value={reason}
             disabled={busy}
             onChange={(event) => setReason(event.target.value)}

@@ -439,6 +439,7 @@ function AuthorizationEditor({
               <label className="grid gap-2 text-sm font-medium">
                 Role name
                 <Input
+                  data-freeform="new custom role name"
                   required
                   maxLength={64}
                   pattern="[a-z][a-z0-9_.-]*"
@@ -587,6 +588,7 @@ function AuthorizationEditor({
         <label className="grid gap-2 text-sm font-medium">
           Reason
           <Textarea
+            data-freeform="audit reason"
             required
             maxLength={REASON_MAX_UNITS}
             value={reason}

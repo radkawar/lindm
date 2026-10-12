@@ -202,6 +202,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
             <Label htmlFor={`${id}-name`}>Display name</Label>
             <Input
               id={`${id}-name`}
+              data-freeform="new secret display name"
               value={displayName}
               readOnly={locked}
               maxLength={128}
@@ -223,6 +224,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
             <Label htmlFor={`${id}-reason`}>Reason</Label>
             <Textarea
               id={`${id}-reason`}
+              data-freeform="audit reason"
               value={reason}
               readOnly={locked}
               onChange={(event) => setReason(event.target.value)}

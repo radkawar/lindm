@@ -59,6 +59,7 @@ export function MaterialField({
         <Input
           key="password-hash"
           id={id}
+          data-freeform="password hash pasted by the administrator"
           name={MATERIAL_NAME}
           className="font-mono"
           autoComplete="off"
@@ -81,6 +82,7 @@ export function MaterialField({
         <Textarea
           key="opaque"
           id={id}
+          data-freeform="secret material pasted by the administrator"
           name={MATERIAL_NAME}
           className="font-mono"
           autoComplete="off"

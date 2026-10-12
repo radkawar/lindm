@@ -290,6 +290,7 @@ function RotateSecretForm({ secret }: { secret: SecretSummary }) {
             <Label htmlFor={`${id}-reason`}>Reason</Label>
             <Textarea
               id={`${id}-reason`}
+              data-freeform="audit reason"
               value={reason}
               readOnly={locked}
               onChange={(event) => setReason(event.target.value)}

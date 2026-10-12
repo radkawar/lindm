@@ -75,6 +75,7 @@ export function RevokeApprovalRequest({ deviceId }: { deviceId: string }) {
         Revocation reason
         <Input
           aria-label="Revocation reason"
+          data-freeform="audit reason for revocation"
           required
           value={reason}
           disabled={busy || payload !== null || approvalId !== ""}
