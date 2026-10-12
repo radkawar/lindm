@@ -839,6 +839,9 @@ async function main() {
       visit,
       settle,
       screenshot,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
     });
     for (const edit of report.ownerEdits)
       for (const finding of edit.findings)

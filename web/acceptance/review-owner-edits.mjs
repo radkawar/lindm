@@ -12,7 +12,9 @@ function slug(value) {
 }
 
 // Runs on one signed-in page, light desktop, before task walkthroughs add state.
-export async function reviewOwnerEdits({ page, config, visit, settle, screenshot }) {
+// protectSecret scrubs credentials a check creates (a second reviewer account)
+// from the evidence.
+export async function reviewOwnerEdits({ page, config, visit, settle, screenshot, protectSecret }) {
   const results = [];
   for (const edit of ownerEdits) {
     const { task } = edit;
@@ -37,6 +39,7 @@ export async function reviewOwnerEdits({ page, config, visit, settle, screenshot
         visit: (url) => visit(page, url),
         settle: () => settle(page),
         require,
+        protectSecret,
         capture,
         step: (name) => {
           step = name;
