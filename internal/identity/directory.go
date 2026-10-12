@@ -205,7 +205,7 @@ func (s *keycloakSource) adminGetOnce(ctx context.Context, path string) (_ []byt
 	req.Header.Set("Accept", "application/json")
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, ErrDirectoryUnavailable
+		return nil, 0, directoryUnavailable(ctx)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -213,6 +213,9 @@ func (s *keycloakSource) adminGetOnce(ctx context.Context, path string) (_ []byt
 		}
 	}()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDirectoryBody+1))
+	if ctx.Err() != nil {
+		return nil, 0, directoryUnavailable(ctx)
+	}
 	if err != nil {
 		return nil, resp.StatusCode, errDirectoryResponse
 	}

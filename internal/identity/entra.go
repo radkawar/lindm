@@ -217,7 +217,7 @@ func (s *entraSource) graphGetOnce(ctx context.Context, target, token string) (_
 	req.Header.Set("ConsistencyLevel", "eventual")
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, "", ErrDirectoryUnavailable
+		return nil, 0, "", directoryUnavailable(ctx)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -225,6 +225,9 @@ func (s *entraSource) graphGetOnce(ctx context.Context, target, token string) (_
 		}
 	}()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDirectoryBody+1))
+	if ctx.Err() != nil {
+		return nil, 0, "", directoryUnavailable(ctx)
+	}
 	if err != nil || len(body) > maxDirectoryBody {
 		return nil, resp.StatusCode, "", errDirectoryResponse
 	}

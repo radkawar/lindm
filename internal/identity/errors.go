@@ -1,6 +1,7 @@
 package identity
 
 import (
+	"context"
 	"errors"
 	"time"
 )
@@ -15,6 +16,18 @@ var (
 	errDirectoryResponse = errors.New("identity: directory response rejected")
 	errStaleObservation  = errors.New("identity: stale directory observation")
 )
+
+// directoryUnavailable is the error of a directory read that produced no
+// answer. Once the caller's context has ended, whatever the transport still
+// delivers (a response that raced the cancellation, or a body it cut short)
+// answers nobody, so it is never classified as a directory rejection; the
+// context's error is kept for callers that tell cancellation apart.
+func directoryUnavailable(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return errors.Join(ErrDirectoryUnavailable, err)
+	}
+	return ErrDirectoryUnavailable
+}
 
 const (
 	connectorKeycloak = "keycloak"

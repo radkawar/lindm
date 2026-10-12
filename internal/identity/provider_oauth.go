@@ -154,7 +154,7 @@ func (p *providerOAuth) once(ctx context.Context, method, target, form, token st
 	}
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return nil, 0, nil, ErrDirectoryUnavailable
+		return nil, 0, nil, directoryUnavailable(ctx)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -162,6 +162,9 @@ func (p *providerOAuth) once(ctx context.Context, method, target, form, token st
 		}
 	}()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDirectoryBody+1))
+	if ctx.Err() != nil {
+		return nil, 0, nil, directoryUnavailable(ctx)
+	}
 	if err != nil || len(body) > maxDirectoryBody {
 		return nil, resp.StatusCode, nil, errDirectoryResponse
 	}
