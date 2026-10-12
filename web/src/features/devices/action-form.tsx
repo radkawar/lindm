@@ -1178,7 +1178,8 @@ export function DeviceActionForm({
               )}
             </>
           )
-        ) : (
+        ) : // A named blocking action already says what to do.
+        pendingEvidence ? null : (
           <p>{blocker.action}</p>
         )}
         <Button

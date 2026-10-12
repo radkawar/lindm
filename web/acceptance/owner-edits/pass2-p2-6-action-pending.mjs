@@ -82,6 +82,9 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     require(!(await dialog
       .getByText("Something went wrong", { exact: true })
       .count()), "The pending refusal reads 'Something went wrong'");
+    const advice = text.match(/wait for it to finish/gi) ?? [];
+    require(advice.length ===
+      1, `The blocker repeats its advice ${advice.length} times: ${JSON.stringify(text)}`);
     await capture("pending-action-blocker");
 
     step("discard");
