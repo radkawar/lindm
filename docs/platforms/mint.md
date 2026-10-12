@@ -191,6 +191,8 @@ lanes use `OVMF_VARS_4M.ms.fd` with Secure Boot enforced.
 | Device actions `-scenario all` (encryption, wipe, lock/quarantine, TPM)              | pass                         | `device-actions-all-all-05.json`                      | `228af3db99b280d06a99e8bac155df00c702bb327be9018b8b53081388eadafd` |
 | Lock/release/quarantine (desktop-session lane)                                       | pass, lock `OUTCOME_UNKNOWN` | `sessions/mint/mint223-lock-quarantine-01.json`       | `dbba0024735008971ccfff6d2d9043ca31df42fcdc4b0d300e0b9249eb7f9f81` |
 | Assistance VIEW/CONTROL                                                              | unavailable                  | `sessions/mint/mint223-assistance-02/assistance.json` | `ab55da8ff567ac164ddd272238fe7564c7af8f7d49f8e2455cafe1cefcc26ad3` |
+| Recovery sanitize, Mint original, measured GRUB, NVMe format                         | pass                         | `device-actions-mint-original-recovery-nvme-07.json`  | `2ba33c1dbc2d0a2fc0c121382fd98865824e2b8839b76063d2964f3134c81e89` |
+| Recovery sanitize, Mint original, measured GRUB, SATA overwrite                      | pass                         | `device-actions-mint-original-recovery-sata-07b.json` | `ed05a68121abdece41bba98713216868a569b59ac9db3454a434c7a32bf7e321` |
 
 The device-action record covers encryption inventory (LUKS2 UUID, TPM 2.0,
 Secure Boot on, host oracle match), escrow (keyslot 1), audited reveal and custody
@@ -210,8 +212,14 @@ The first attempt (`device-actions-mint-original-recovery-sata-05.json`,
 `b1a6fcab4c8cdd9cbef78063262f963fcb829908acc6555fb1ebbf9d8d83abb3`) was refused
 with `recovery_readiness_measured_grub_unsupported`: the agent's readiness reads
 the GRUB chain from the os-release row's own quirks, and the Mint row had none.
-The row now declares Ubuntu's stock chain (`Quirks.RecoveryGRUB`, regression in
-`TestDerivativeUsesBaseTooling`); the qualifying rerun is not yet recorded.
+The row now declares Ubuntu's stock chain (`Quirks.RecoveryGRUB`, landed as
+`cc6a707e` with a regression in `TestDerivativeUsesBaseTooling`). The qualifying
+NVMe and SATA reruns above ran from main `9b4e6f5f` (`snap7`, lab `5119bcfd…`,
+lindmd `bad0b53e…`), which also carries the direct-ioctl NVMe sanitize. A SATA
+attempt from that snapshot (`device-actions-mint-original-recovery-sata-07.json`,
+`b7a98e67c1861de367ba39e25e1b17cdc2b5786a27430c5140093de2f447b7b5`) timed out
+waiting for recovery SSH at host load average 43–57; that is a contention window,
+not a product result, and the rerun passed.
 
 Records that do not qualify a cell, kept for attribution:
 
