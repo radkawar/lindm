@@ -766,7 +766,7 @@ each record in the [ledger](../verification.md#1-launch-platform-qualification):
 | Services       | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
 | Self-update    | pass                            | `~/.cache/lindm-arch-qualify/r10/arch/self-update-x86_64.json` / `2da464d722b05863dac4d481a65d9b3a29db35094c1b7d3c5c1789b73e2d6173`          |
 | Advisories     | pass (partial tracker coverage) | `~/.cache/lindm-arch-qualify/r11/arch/advisories-x86_64.json` / `7c47a9264f23f333dfce5d1dda4f631da102424f799a124c8050e86b8224b140`           |
-| Wipe/loss/lock | pass                            | `~/.cache/lindm-arch-qualify/r12/arch/device-actions-x86_64.json` / `deb8d134d8fa39d28e03338b6b15a193a9bfb2a0970d3a00522d4d0dac735794`       |
+| Wipe/loss/lock | pass                            | `~/.cache/lindm-arch-qualify/r17/arch/device-actions-x86_64.json` / `c91fc71e19657f0f2e2b25e57dc9dd4d2de193b01abb9fc8082d81f92b74f987`       |
 
 The os-update lane provisions its prerequisites at the image's Archive pin
 (2026-10-02) and gives the whole-system policy the registry's later
