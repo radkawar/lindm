@@ -199,9 +199,39 @@ export function installProbes(rules) {
       regex: new RegExp(item.pattern, item.flags ?? "i"),
     })),
   ];
+  const identifierRules = rules.identifiers.patterns.map((item) => ({
+    rule: item.name,
+    regex: new RegExp(item.pattern, "g"),
+  }));
+  const identifierAllow = new Set(rules.identifiers.allow);
+  const identifierScope = rules.identifiers.singleTokenScope;
   const idInputPattern = new RegExp(rules.idInputPattern.pattern, rules.idInputPattern.flags);
   const byteValue = new RegExp(rules.rawByteValue.value, rules.rawByteValue.flags);
   const byteLabel = new RegExp(rules.rawByteValue.label, rules.rawByteValue.flags);
+  const freeformExempt = new Set(rules.freeformInput.exemptTypes);
+  const domainLabel = new RegExp(rules.freeformInput.domainLabel, "i");
+  const searchLabel = new RegExp(rules.freeformInput.searchLabel, "i");
+  // Same normalization as normalizeLabel in web/eslint/freeform-input.mjs.
+  const normalizeLabel = (value) =>
+    value
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[\u2026:*?!.,;"'`_/-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/(?:^| )(?:optional|required)$/, "")
+      .trim();
+  // Accessible label sources of a form control, without the control's own value.
+  const labelSources = (node) => [
+    node.getAttribute("aria-label") ?? "",
+    ...(node.getAttribute("aria-labelledby") ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent ?? ""),
+    ...[...(node.labels ?? [])].map((label) => label.textContent ?? ""),
+    node.getAttribute("placeholder") ?? "",
+    node.getAttribute("name") ?? "",
+  ];
   // A bare number names bytes through its nearest short labelled container
   // (a fact row or list item) or, inside a table, its column header.
   const bytesLabelled = (node) => {
@@ -385,6 +415,22 @@ export function installProbes(rules) {
           }
         }
       }
+      // design.md Type: long hostnames and names wrap. A single-line ellipsis
+      // hides the identifying end of the value (seen with the seeded 70-character
+      // hostname). Multi-line clamps of descriptions are a summary pattern and
+      // are not judged; the one-line header breadcrumb repeats the page heading,
+      // which carries the full name.
+      for (const node of document.body.querySelectorAll("*")) {
+        if (!rendered(node) || srOnly(node) || !normalize(node.innerText ?? "")) continue;
+        if (node.closest('[data-slot="breadcrumb"]')) continue;
+        if (getComputedStyle(node).textOverflow !== "ellipsis") continue;
+        if (node.scrollWidth > node.clientWidth + 1)
+          findings.push({
+            check: "text-truncated",
+            message: "Text is cut off with an ellipsis; let long names wrap",
+            elements: [describe(node)],
+          });
+      }
       // Text drawn over a textless control (input, icon button) hides one of them.
       for (const control of interactive) {
         if (!control.node.matches(controlSelector) || normalize(control.node.innerText ?? ""))
@@ -436,16 +482,23 @@ export function installProbes(rules) {
     copy() {
       const findings = [];
       const seen = new Set();
-      const inspect = (value, node, source) => {
+      const report = (rule, value, index, length, node, source) => {
+        const start = Math.max(0, index - 40);
+        const excerpt = normalize(value.slice(start, index + length + 40));
+        const id = `${rule}:${excerpt}`;
+        if (seen.has(id)) return;
+        seen.add(id);
+        findings.push({ check: "copy", rule, source, excerpt, elements: [describe(node)] });
+      };
+      const inspect = (value, node, source, identifiers) => {
         for (const { rule, regex } of compiled) {
           const match = regex.exec(value);
-          if (!match) continue;
-          const start = Math.max(0, match.index - 40);
-          const excerpt = normalize(value.slice(start, match.index + match[0].length + 40));
-          const id = `${rule}:${excerpt}`;
-          if (seen.has(id)) continue;
-          seen.add(id);
-          findings.push({ check: "copy", rule, source, excerpt, elements: [describe(node)] });
+          if (match) report(rule, value, match.index, match[0].length, node, source);
+        }
+        if (!identifiers) return;
+        for (const { rule, regex } of identifierRules) {
+          const match = [...value.matchAll(regex)].find((item) => !identifierAllow.has(item[0]));
+          if (match) report(rule, value, match.index, match[0].length, node, source);
         }
       };
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -455,7 +508,8 @@ export function installProbes(rules) {
         if (!parent || !text.nodeValue.trim() || parent.closest("script,style,template,textarea"))
           continue;
         if (!rendered(parent) || srOnly(parent) || excluded(parent)) continue;
-        inspect(text.nodeValue, parent, "text");
+        const phrase = normalize(text.nodeValue).includes(" ");
+        inspect(text.nodeValue, parent, "text", phrase || !!parent.closest(identifierScope));
         if (byteValue.test(text.nodeValue) && bytesLabelled(parent)) {
           const excerpt = normalize(parent.parentElement?.textContent ?? text.nodeValue).slice(
             0,
@@ -478,7 +532,7 @@ export function installProbes(rules) {
         if (!rendered(node) || excluded(node)) continue;
         for (const attribute of ["placeholder", "aria-label", "title"]) {
           const value = node.getAttribute(attribute);
-          if (value) inspect(value, node, attribute);
+          if (value) inspect(value, node, attribute, true);
         }
       }
       return findings;
@@ -515,6 +569,41 @@ export function installProbes(rules) {
             elements: [describe(node)],
           });
         }
+      }
+      return findings;
+    },
+    // docs/engineering.md "Free-text inputs": a rendered text-like input either
+    // declares why its value is genuinely new (data-freeform) or is a picker. A
+    // label naming existing values fails even when declared. Picker and palette
+    // search boxes (cmdk) and read-only display fields are not entry fields.
+    freeform(root) {
+      const scope = root ? document.querySelector(root) : document;
+      const findings = [];
+      if (!scope) return findings;
+      for (const node of scope.querySelectorAll("input,textarea")) {
+        if (!rendered(node) || node.readOnly || node.matches("[cmdk-input]")) continue;
+        // Base UI selects keep an aria-hidden, untabbable native input for forms.
+        if (node.closest('[aria-hidden="true"]') && node.tabIndex < 0) continue;
+        if (node.tagName === "INPUT" && freeformExempt.has(node.type)) continue;
+        const sources = labelSources(node).map(normalizeLabel).filter(Boolean);
+        const label = normalize(sources[0] ?? "") || "unlabelled";
+        const search =
+          node.type === "search" ||
+          node.getAttribute("role") === "searchbox" ||
+          sources.some((value) => searchLabel.test(value));
+        const domain = search ? undefined : sources.find((value) => domainLabel.test(value));
+        if (domain)
+          findings.push({
+            check: "freeform-input",
+            message: `Free-text input "${domain}" refers to values that already exist. Use a searchable picker or a select.`,
+            elements: [describe(node)],
+          });
+        else if (!node.dataset.freeform?.trim())
+          findings.push({
+            check: "freeform-input",
+            message: `Free-text input "${label}" has no data-freeform declaration`,
+            elements: [describe(node)],
+          });
       }
       return findings;
     },

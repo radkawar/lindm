@@ -3,6 +3,7 @@ import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
+import lindm from "./web/eslint/freeform-input.mjs";
 
 const featureNames = [
   "auth",
@@ -47,6 +48,14 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    // docs/engineering.md "Free-text inputs". The excluded files are the shared
+    // primitives that forward props to the native element.
+    files: ["web/src/**/*.tsx"],
+    ignores: ["web/src/components/ui/{input,textarea,input-group,command,sidebar}.tsx"],
+    plugins: { lindm },
+    rules: { "lindm/freeform-input": "error" },
   },
   {
     files: ["web/src/{components,lib,hooks}/**/*.{ts,tsx}"],

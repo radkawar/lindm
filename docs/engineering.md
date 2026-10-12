@@ -182,6 +182,39 @@ Profile references without a listing API (approved home roots, artifacts, Nix
 catalogs and inputs, security tokens, certificate credentials and issuers, network
 connections, person bindings, external approved package sources) still take the
 issued reference as text, labelled by what it is; they need catalog APIs.
+
+**Free-text inputs.** A value that refers to something that already exists (devices
+and hostnames, packages and package managers, operating systems, architectures,
+statuses, kinds, groups, roles, profiles, accounts and actors, event types,
+advisories and CVEs, services, inventory paths, labels and tags, rollouts) is chosen,
+not typed: a `SearchPicker` (or `SuggestionPicker`) over real server values with
+prefix search and paging, or a `SelectField` populated from server facets or the
+platform registry for small enumerations. Free text remains only where the value is
+genuinely new (new names, reasons, messages, secrets, pasted documents, external
+endpoint URLs, numeric thresholds, prefix patterns), and each such control declares
+why with a non-empty `data-freeform="<reason>"` literal (a schema-driven form may
+call a reason helper per field; plain variables are rejected because they too
+easily carry operator input). ESLint rule
+`lindm/freeform-input` (`web/eslint/freeform-input.mjs`, tested by
+`web/eslint/freeform-input.test.mjs` in `make test`) enforces this over `web/src`
+for `Input`, `Textarea`, `InputGroupInput`, `InputGroupTextarea`, `SidebarInput` and
+native `input`/`textarea`, except the forwarding primitives in
+`components/ui/{input,textarea,input-group,command,sidebar}.tsx`. Exempt are
+non-text types (hidden, checkbox, radio, file, date/time, password, colour, range,
+buttons) and literal `readOnly` display fields; a computed `type` or `readOnly`
+still needs the declaration. The rule also rejects a control, declared or not,
+whose label (`aria-label`, `placeholder`, `name`, an associated `Label htmlFor` or
+an enclosing label) is exactly an existing-entity noun phrase: the
+`freeformInput.domainLabel` pattern in `web/acceptance/copy-rules.json`, matched on
+the normalized label (lowercase; parentheticals, “optional”/“required” and
+punctuation removed). Inventory nouns also match with a name, ID, prefix, version
+or filter suffix (“Package name”); console-created nouns (group, role, profile,
+rollout, tag, label, account, user) match only bare, so “Group name” for a new
+group remains free text. Qualified phrases such as “Hostname starts with” or
+“Local user name” do not match. Search boxes (`type="search"` or a label starting
+with “Search”) are exempt from the label check only. `lab console review` applies
+the same contract to rendered pages and opened dialogs (see Console UI review).
+
 Use commas, colons or periods rather than em or en dashes; ESLint checks string literals,
 template text and JSX text in handwritten `web/src` code. Distinguish unavailable,
 unknown, stale and empty results. A failed read must not look like an empty list or
@@ -1046,8 +1079,10 @@ capture. Every route and tab is checked in light and dark at 1440x900 and 390x84
 each starting from scroll position zero:
 
 - viewport and full-page screenshots;
-- layout: no horizontal overflow, no overlapping controls or text, and on desktop the
-  sidebar column spans the document;
+- layout: no horizontal overflow, no overlapping controls or text, no visible text
+  cut off by a single-line ellipsis (long hostnames and names wrap; multi-line
+  description clamps and the header breadcrumb, which repeats the wrapping page
+  heading, are not judged), and on desktop the sidebar column spans the document;
 - axe-core (exact-pinned dev dependency, WCAG 2.2 AA and best-practice rules): no
   serious or critical violations, including inside each opened dialog;
 - keyboard: the skip link is the first stop and lands in main content, Tab reaches
@@ -1059,7 +1094,15 @@ each starting from scroll position zero:
   this includes raw byte counts (“510962909184 bytes”, or a bare four-digit-plus
   number whose label, row or column header names bytes): format sizes with
   `formatBytes` from `web/src/lib/bytes.ts` and keep exact counts in Details
-  ([design](design.md#visual-editing-beyond-the-component-preset));
+  ([design](design.md#visual-editing-beyond-the-component-preset)), and code
+  identifiers: camelCase (`deviceId`, `osUpdatePolicy`) and PascalCase
+  (`DeviceGroup`) whole tokens, except the listed brand names (GitHub,
+  NetworkManager, PackageKit, iPhone; `macOS`, `OpenSSH`, `KeePassXC` and
+  `systemd-*` do not match). Tokens joined by `-`, `.`, `/`, `:`, `@` or `_` are
+  technical values and a lone token, such as a package name in a table cell, is
+  inventory data, so lone tokens are checked only in copy positions (labels,
+  headings, buttons, tabs, badges, card, dialog and alert titles and descriptions,
+  table headers, `dt`), and phrases, placeholders, aria-labels and titles always;
 - forms: every rendered form has an explicit submit button (console buttons default
   to `type="button"`);
 - ID inputs: reject rendered inputs, textareas, selects and comboboxes whose labels
@@ -1070,7 +1113,7 @@ each starting from scroll position zero:
   content must not move while it is open; Escape must close it. Pickers float in a
   popover (`components/ui/popover.tsx`) rather than expanding inline. The review runs
   Chromium with classic (non-overlay) scrollbars, so a scroll lock that drops the
-  scrollbar would shift the page and fail.
+  scrollbar would shift the page and fail;
 - conventions: at most one disclosure (`TechnicalDetails` or other `<details>`) per
   card, list item, table row or dialog, kept for genuinely secondary data; one
   Refresh per page, in the page header (no "Refresh" plus "Refresh X" pairs); no
@@ -1084,7 +1127,15 @@ each starting from scroll position zero:
   (a table not preceded by a section heading) must start within the first screen:
   fold list filters into `FilterPanel` (`web/src/components/ui/filter-panel.tsx`,
   one "Filters · N active" toggle below the md breakpoint) and open decision forms
-  on demand rather than expanding them by default.
+  on demand rather than expanding them by default;
+- free-text inputs: every rendered, editable text-like `input` or `textarea` on the page
+  and in each opened dialog carries a non-empty `data-freeform` declaration, and none
+  has an accessible label (aria-label, aria-labelledby, label, placeholder or name)
+  matching `freeformInput.domainLabel`, declared or not
+  ([Free-text inputs](#frontend-structure-and-framework)). cmdk search boxes of pickers
+  and the command palette, search boxes (label check only) and read-only fields are
+  exempt; this catches labels the source rule cannot resolve, such as profile fields
+  labelled from schema metadata.
 
 Modal dialogs and sheets lock the page through their backdrop
 (`components/ui/page-scroll-lock.tsx`): while one is open the page's scroll offset

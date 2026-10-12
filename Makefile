@@ -79,7 +79,7 @@ audit: web-assets $(GOVULNCHECK)
 # internal/agent/executor race suite past go test's 10m default.
 test: web-assets
 	go test -race -timeout 45m $(GO_PACKAGES)
-	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/review-edit-sheet.test.mjs
+	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/review-edit-sheet.test.mjs web/eslint/freeform-input.test.mjs
 
 build: web-assets
 	go build -trimpath -o artifacts/bin/lindmd ./cmd/lindmd

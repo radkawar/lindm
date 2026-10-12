@@ -371,6 +371,8 @@ async function checkDialog(page, opener, restoreKey, label, evidence) {
         elements: violation.nodes.map((node) => `${node.target}: ${node.summary}`),
       });
   }
+  for (const finding of await probe(page, "freeform", '[data-review-dialog="open"]'))
+    findings.push({ ...finding, check: "dialog-freeform-input" });
   if (dialog.modal) {
     const steps = Math.min(dialog.tabbables + 2, 40);
     for (const key of ["Tab", "Shift+Tab"]) {
@@ -612,6 +614,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   entry.checks.conventions = {
     findings: await probe(page, "conventions", listRoutes.includes(route.path)),
   };
+  entry.checks.freeform = { findings: await probe(page, "freeform") };
   entry.checks.pov = await probe(page, "pov", routeContracts[route.path] ?? null);
   entry.checks.expected = { findings: [] };
   for (const name of expectedButtons) {
