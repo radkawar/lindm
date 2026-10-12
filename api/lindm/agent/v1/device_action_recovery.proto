@@ -56,10 +56,12 @@ message RecoveryMeasuredBoot {
     max_len: 1024
   }];
   bytes kernel_sha256 = 2 [(buf.validate.field).bytes.len = 32];
-  // GRUB-relative vendor kernel path from the ordinary GRUB boot.
+  // GRUB-relative vendor kernel path from the ordinary GRUB boot: a
+  // vmlinuz-<release> image, or sdbootutil's ESP BLS linux-<digest> image
+  // (openSUSE GRUB2-BLS, nested under <entry-token>/<release>/).
   string kernel_path = 3 [
     (buf.validate.field).string.max_len = 255,
-    (buf.validate.field).string.pattern = "^/([A-Za-z0-9._+-]+/)*vmlinuz-[A-Za-z0-9._+-]+$"
+    (buf.validate.field).string.pattern = "^/([A-Za-z0-9._+-]+/)*(vmlinuz|linux)-[A-Za-z0-9._+-]+$"
   ];
   string kernel_options = 4 [
     (buf.validate.field).string.min_len = 1,

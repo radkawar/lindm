@@ -134,6 +134,13 @@ func TestRecoveryObservationAdmissionBoundaries(t *testing.T) {
 		{"tpm_attestation_unavailable", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) {
 			o.Available, o.Reason = false, "recovery_readiness_tpm_attestation_unavailable"
 		}, "device_action_recovery_attestation_unavailable"},
+		{"owner_key_required", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) {
+			o.Available, o.SecureBoot, o.Reason = false, false, "recovery_readiness_owner_key_required"
+		}, "device_action_recovery_owner_key_required"},
+		{"stale_owner_key_reason", func(o *agentv1.RecoveryReadinessObservation, _ *devicedb.GetHostObservationRow) {
+			o.Available, o.Reason = false, "recovery_readiness_owner_key_required"
+			o.ObservedAt = timestamppb.New(now.Add(-6 * time.Minute))
+		}, "device_action_recovery_readiness_stale"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

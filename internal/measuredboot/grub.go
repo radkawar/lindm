@@ -382,3 +382,11 @@ func uefiVariable(data []byte) ([16]byte, []byte, []byte, bool) {
 	nameEnd := header + 2*int(nameLength)
 	return guid, data[header:nameEnd], data[nameEnd:], true
 }
+
+// GRUBLoaderInfo reports whether a Boot Loader Interface LoaderInfo value names
+// GRUB. Upstream's bli module publishes PACKAGE_STRING ("GRUB 2.14"); the
+// openSUSE build publishes "GRUB2 2.14" (observed on Tumbleweed aarch64). The
+// value is a loader self-report, not an authentication of the boot chain.
+func GRUBLoaderInfo(loader string) bool {
+	return strings.HasPrefix(loader, "GRUB ") || strings.HasPrefix(loader, "GRUB2 ")
+}

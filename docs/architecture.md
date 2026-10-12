@@ -935,6 +935,14 @@ with more than one controller, or any absent or inconsistent attribute is an
 explicit `INVALID_OUTPUT` observation with a fixed `reason`, never a fallback to
 another source. The approved basis and all fields remain in the specification
 digest, native plan and result evidence.
+The root executor submits each native NVMe admin command (Identify, Format NVM,
+Sanitize, Sanitize Status log) as one `NVME_IOCTL_ADMIN_CMD` on the pinned
+namespace block descriptor, with a 60-second kernel command timeout. It does
+not run a helper. nvme-cli 3 (Arch and Tumbleweed) resolves devices only by
+their `/dev/nvme*` name and re-opens them, so it cannot honour a pinned
+descriptor. A generic Invalid Command Opcode or Invalid Field completion is an
+explicit unsupported refusal; any other status or submission error is an
+ordinary failure. Neither is evidence of erasure.
 
 The FLBAS format index is not part of the approval identity: sysfs does not export
 it, and the layout is bound without it. Approval binds data size (shift) and

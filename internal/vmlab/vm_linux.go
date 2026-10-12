@@ -226,10 +226,11 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	if err != nil {
 		return nil, err
 	}
+	hostPrivatePEM := string(pem.EncodeToMemory(private))
 	config := map[string]any{
 		"users":        []any{map[string]any{"name": labUser, "shell": "/bin/sh", "lock_passwd": true, "sudo": "ALL=(ALL) NOPASSWD:ALL", "ssh_authorized_keys": []string{strings.TrimSpace(string(ssh.MarshalAuthorizedKey(login.PublicKey())))}}},
 		"disable_root": true, "ssh_pwauth": false, "ssh_deletekeys": true,
-		"ssh_keys":       map[string]string{"ed25519_private": string(pem.EncodeToMemory(private)), "ed25519_public": strings.TrimSpace(string(ssh.MarshalAuthorizedKey(host.PublicKey())))},
+		"ssh_keys":       map[string]string{"ed25519_private": hostPrivatePEM, "ed25519_public": strings.TrimSpace(string(ssh.MarshalAuthorizedKey(host.PublicKey())))},
 		"ssh":            map[string]bool{"emit_keys_to_console": false},
 		"package_update": false, "package_upgrade": false,
 		// Inspection compares the vendor's actual hostname and does not
@@ -255,6 +256,16 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		bootcmd = append(bootcmd, []string{"systemctl", "disable", "--now", h.offlineRTCWaitUnit})
 		vm.usingOfflineRTC = true
 	}
+	if h.bootDiagnostics != nil {
+		// A failed network daemon can make the pinned SSH oracle unreachable.
+		// Retain bounded native journal errors and bus/network unit exits in the
+		// private console capture. Exit status details can have info priority;
+		// this observes failures without restarting or bypassing them.
+		bootcmd = append(bootcmd,
+			[]string{"journalctl", "--no-pager", "--boot", "--priority=warning", "--lines=80", "--output=short-monotonic"},
+			[]string{"journalctl", "--no-pager", "--boot", "--unit=dbus*", "--unit=NetworkManager*", "--lines=80", "--output=short-monotonic"},
+		)
+	}
 	if len(bootcmd) != 0 {
 		config["bootcmd"] = bootcmd
 	}
@@ -266,6 +277,9 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	}
 	if err != nil {
 		return nil, err
+	}
+	if h.bootDiagnostics != nil {
+		h.bootDiagnostics.rememberSecrets(string(userData), hostPrivatePEM)
 	}
 	err = os.WriteFile(filepath.Join(dir, "user-data"), userData, 0600)
 	clear(userData)
@@ -304,15 +318,27 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	if err != nil {
 		return nil, err
 	}
+	if err := vm.startProcess(ctx, args); err != nil {
+		return nil, err
+	}
+	vm.config = &ssh.ClientConfig{User: labUser, Auth: []ssh.AuthMethod{ssh.PublicKeys(login)}, HostKeyCallback: ssh.FixedHostKey(host.PublicKey()), HostKeyAlgorithms: []string{ssh.KeyAlgoED25519}, Timeout: 5 * time.Second}
+	return vm, nil
+}
+
+// startProcess also serves a powered-off owner-trust transition. The same
+// verified base descriptor, overlay, TPM, SSH keys and storage identities survive.
+func (vm *guestVM) startProcess(ctx context.Context, args []string) error {
 	// Not labexec: QEMU's Pdeathsig must be bound to a thread locked for the VM's lifetime.
-	vm.cmd = exec.CommandContext(ctx, "qemu-system-"+h.Architecture, args...)
-	vm.cmd.Dir = dir
-	vm.cmd.ExtraFiles = []*os.File{base}
+	vm.cmd = exec.CommandContext(ctx, "qemu-system-"+vm.hardware.Architecture, args...)
+	vm.cmd.Dir = vm.dir
+	vm.cmd.ExtraFiles = []*os.File{vm.base}
 	vm.cmd.Stdout, vm.cmd.Stderr = vm.log, vm.log
+	if vm.hardware.bootDiagnostics != nil {
+		vm.cmd.Stdout = vm.hardware.bootDiagnostics
+	}
 	vm.cmd.WaitDelay = 2 * time.Second
-	// Linux sends Pdeathsig when the creating thread dies, not merely when
-	// the Go process exits. Keep that OS thread alive for the child's lifetime.
 	vm.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	vm.waitErr = nil
 	started := make(chan error, 1)
 	done := make(chan struct{})
 	go func() {
@@ -326,11 +352,11 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		close(done)
 	}()
 	if err := <-started; err != nil {
-		return nil, fmt.Errorf("start QEMU: %w", err)
+		vm.done = nil
+		return fmt.Errorf("start QEMU: %w", err)
 	}
 	vm.done = done
-	vm.config = &ssh.ClientConfig{User: labUser, Auth: []ssh.AuthMethod{ssh.PublicKeys(login)}, HostKeyCallback: ssh.FixedHostKey(host.PublicKey()), HostKeyAlgorithms: []string{ssh.KeyAlgoED25519}, Timeout: 5 * time.Second}
-	return vm, nil
+	return nil
 }
 
 func (v *guestVM) processError() error {

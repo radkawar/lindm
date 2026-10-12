@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Arch Linux                                                                                                                         |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                                                        |
-| lifecycle         | implemented                                                                                                                        |
-| dispatch          | implemented                                                                                                                        |
-| packages          | implemented                                                                                                                        |
-| accounts          | implemented                                                                                                                        |
-| sysctl            | implemented                                                                                                                        |
-| definitions       | implemented                                                                                                                        |
-| password          | implemented                                                                                                                        |
-| firewall          | implemented                                                                                                                        |
-| encryption        | implemented                                                                                                                        |
-| wipe              | implemented                                                                                                                        |
-| report-loss       | implemented                                                                                                                        |
-| lock              | implemented                                                                                                                        |
-| recovery-sanitize | gated: official Arch media have no vendor Secure Boot trust; owner-key recovery and chosen bootloader require native qualification |
-| self-update       | implemented                                                                                                                        |
-| assistance        | implemented                                                                                                                        |
-| advisories        | implemented                                                                                                                        |
-| os-update         | implemented                                                                                                                        |
-| release-upgrade   | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade                                         |
+| Capability        | Arch Linux                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ |
+| inventory         | implemented                                                                                |
+| lifecycle         | implemented                                                                                |
+| dispatch          | implemented                                                                                |
+| packages          | implemented                                                                                |
+| accounts          | implemented                                                                                |
+| sysctl            | implemented                                                                                |
+| definitions       | implemented                                                                                |
+| password          | implemented                                                                                |
+| firewall          | implemented                                                                                |
+| encryption        | implemented                                                                                |
+| wipe              | implemented                                                                                |
+| report-loss       | implemented                                                                                |
+| lock              | implemented                                                                                |
+| recovery-sanitize | implemented                                                                                |
+| self-update       | implemented                                                                                |
+| assistance        | implemented                                                                                |
+| advisories        | implemented                                                                                |
+| os-update         | implemented                                                                                |
+| release-upgrade   | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -93,8 +93,10 @@ private and never add it to evidence or the ledger. Routine runs discard these
 consoles. This diagnostic does not change passphrase delivery, SSH authentication,
 firmware checks or readiness deadlines; a failed boot remains a failure.
 The encrypted installer recipes explicitly create an empty
-mode-0644 `/etc/machine-id` for the first boot, independently of the private
-credential umask. The encrypted Archive cache dimension is `archiso-v2`;
+mode-0644 `/etc/machine-id` for the first boot. Only the LUKS install key and
+the credential provisioning file are written under umask 077; `pacstrap`, the
+chroot's system files and boot/desktop provisioning run under umask 022 (see
+the D-Bus failure below). The encrypted Archive cache dimension is `archiso-v3`;
 failed earlier machines cannot be reused under the corrected recipe.
 
 The signed rolling resource prerequisite transaction uses the native exit status,
@@ -447,26 +449,151 @@ putting a disk key in them. The initramfs uses mkinitcpio's `systemd`/`sd-encryp
 hooks and includes the TPM drivers. Installation does not enroll a TPM token:
 the signed action must perform real `systemd-cryptenroll` and prove cold unlock.
 
-Official Arch media do not provide vendor Secure Boot trust. The installer
-therefore rejects a Secure-Boot-enabled firmware selection instead of silently
-disabling verification or inventing a shim chain. Owner-key recovery is a
-separate trust ceremony and qualification; an unsigned installation is not
-evidence that recovery readiness passed. The owner-boot fixture understands
-Arch's fixed kernel/initrd paths instead of synthesizing versioned filenames.
+Official Arch media do not provide vendor Secure Boot trust. Direct installation
+under enforced Secure Boot remains refused; an ISO download signature is not an
+EFI signature. The maintained owner-UKI recovery lane instead selects the explicit
+[`systemd-boot-lab` baseline](../../lab/images/arch-20261001-systemd-boot-x86_64.json).
+It installs an **unencrypted** root with the same ESP/XBOOTLDR layout from the
+authenticated archiso and pinned Archive date, initially using a separate
+package-owned non-Secure-Boot NVRAM template. This is not the encrypted golden,
+the arch-boxes cloud image, or a remapping of the owner's GRUB selection.
 
-In-band recovery readiness currently requires a writable FAT ESP, sufficient
-measured capacity, Secure Boot enabled with SetupMode disabled and the matching
-running systemd-boot ESP
-([`readiness_linux.go`](../../internal/agent/recoveryboot/readiness_linux.go):28-105).
-The recorded SeaBIOS guest does not satisfy this. A separately installed bootloader
-or encrypted volume needs its own evidence; do not alter the qualified kernel or
-boot topology merely to satisfy a check.
+After observing that baseline's noSB firmware and running systemd-boot, the lane
+builds the installed kernel/initramfs into a UKI, signs both UKI and systemd-boot
+with a fresh lab-private key, and verifies those signatures with `sbverify`.
+The private key stays on the lab host, never in the guest or evidence. Only after
+observed guest shutdown and successful QEMU exit does the lane replace its private
+NVRAM with a package-pinned enrolled-template derivative containing that exact
+public certificate in **db**. Existing PK, KEK, db trust and dbx revocations are
+preserved by the enrollment verifier. The host's firmware is never modified.
+The baseline cache stays unsigned/noSB; signer-specific disk overlays and NVRAM
+are run-only. Cache identity binds recipe revision, exact ISO and repository date,
+architecture, controller and bootstrap firmware bytes.
+
+The next boot is a real cold start of the same overlay, storage identity, TPM
+and SSH identity, not a separately enrolled recovery device. Evidence retains
+bootstrap/final firmware, public certificate DER/PEM SHA-256 fingerprints, signed
+loader and ordinary-UKI hashes, observed poweroff time and changed boot IDs.
+The running guest must expose the exact owner certificate in db, SecureBoot=1,
+SetupMode=0 and systemd-boot LoaderInfo before the ordinary original-device UKI
+recovery flow is admitted. The signed recovery UKI uses that same signer and
+the existing one-shot handoff, exact durable target allowlist, signed ready/grant,
+two independent humans, fresh TPM quote and measured-initramfs verification.
+No shim or fictional Arch vendor certificate is substituted.
+
+For qualification, run `lab vm device-actions` with the encrypted systemd-boot
+manifest as `-manifest`, the new unencrypted systemd-boot manifest above as
+`-recovery-manifest`, `-scenario wipe`, `-wipe-phase recovery-nvme` (and separately
+`recovery-sata`), `-secure-boot`, and `-bootstrap-firmware-vars` naming the
+package-owned noSB template. `-firmware-vars` names the separately enrolled
+Secure Boot template; both use the same explicitly pinned firmware code, package
+and version. Supply the ordinary lab/server binaries, repository and evidence
+paths. GRUB and encrypted recovery-manifest selections fail before acquisition;
+their native qualification remains distinct.
+
+The first owner-key lane failed during the ordinary image's first installed boot,
+before enrollment or owner-key installation: pinned SSH did not become ready.
+That failure is not recovery qualification. This unencrypted first-boot validation
+now retains a bounded, private, credential-redacted serial tail and separate QEMU
+stderr before deleting its disposable overlay. Its failure names the diagnostic
+file; encrypted boots do not enable this collection, and readiness deadlines,
+SSH host-key pins and firmware enforcement are unchanged.
+For an ordinary cloud-image readiness failure, `lab vm inspect -diagnostics DIR`
+uses the same bounded private boot capture. This lets an offline bootstrap
+failure be investigated without enabling distribution network access or extending
+the SSH deadline; the caller retains custody of the diagnostic directory.
+The diagnostic seed emits at most eighty current-boot journal warnings and eighty
+bus/network unit messages into that private capture. Exit statuses may have
+informational priority, so the unit selection does not discard them. This permits
+diagnosis without SSH and does not restart, disable or bypass a failed service.
+Native ordinary systemd-boot attempts reached userspace and started SSH but
+observed D-Bus broker failure and an unconfigured network. The retained bus
+messages showed `dbus-broker-launch` failing in `launcher_run_child` with
+`Permission denied` when the privilege-dropped broker read the machine ID. The
+cause was the installer's top-level umask 077: `pacstrap` creates `/etc` and
+`/var` with `mkdir -p -m`, which applies the caller's umask to the intermediate
+directories, and pacman does not change the mode of existing directories. Both
+directories were therefore root-only, and a mode-0644 `/etc/machine-id` alone
+could not fix it. The ordinary and encrypted recipes now write only the install
+key and the credential provisioning file under a subshell umask 077. Everything
+else runs under umask 022. The FAT `/boot` and ESP mounts set explicit
+`fmask=0077,dmask=0077` instead of inheriting the umask. Ordinary recipe
+revision 3 and encrypted `archiso-v3` invalidate the faulty disks.
+The ordinary installer script copies its stderr and failing line to the serial
+console. A failed ordinary install retains only a bounded, credential-redacted
+serial tail (`archiso-installer-failure`) in a private file. The encrypted
+installer never enables this capture.
+
+After these fixes, native runs on 2026-10-12 installed the revision-3 ordinary
+golden and booted it with working D-Bus and networking. They enrolled the device
+and moved it to the owner-enrolled firmware by a cold boot. Two further lab
+defects then surfaced and are fixed. First, the cold boot restarts swtpm on the
+same persistent TPM state, because QEMU's poweroff ends swtpm. Second, the
+recovery closure collects every ELF ingredient's literal `PT_INTERP`. Arch's
+helpers name `/lib64/ld-linux-x86-64.so.2`, but its `libc.so.6` names
+`/usr/lib/ld-linux-x86-64.so.2`. Arch's nvme-cli 3.1 cannot address a pinned
+descriptor, so native NVMe admin commands use `NVME_IOCTL_ADMIN_CMD` directly
+(see [architecture](../architecture.md)).
+
+Native qualification (2026-10-12): the x86_64 `recovery-sanitize` cell passed.
+The run used the original enrolled device and generation on the revision-3
+ordinary systemd-boot golden. The lab enrolled a short-lived owner signer into
+a private copy of the Microsoft-enrolled OVMF variables and cold-booted. It then
+signed systemd-boot, the ordinary UKI and the recovery UKI with that signer, and
+predicted PCR 11. Two humans approved the action, and the server verified a
+native NVMe user-data format of the original namespace.
+
+| Record                                                                                           | SHA-256                                                            |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `~/.cache/lindm-tier2-matrix/arch-recovery-final-r9-0c1dae2f/arch/recovery-sanitize-x86_64.json` | `9dceb84e427c18cd38f2bbbc004ac73d027771c1a768bc6e312b167b2c64c942` |
+
+This is an emulated QEMU NVMe, swtpm and package-pinned OVMF result with a lab
+signer. It is not a fleet signing key, a physical firmware enrollment or flash
+sanitization. The `recovery-sata` and `recovery-attestation-refusal` phases have
+no Arch record.
+
+The maintained qualification entry point is `lab matrix run -platform arch
+-architecture x86_64 -cells recovery-sanitize -bootstrap-firmware-vars
+<package-owned-noSB-vars> -evidence <new-directory>`. The cell's Secure Boot
+template comes from `lab/matrix.json` `secureBootArgs`; the lab enrolls its
+short-lived owner signer into a private copy. The matrix chooses the registry's explicit ordinary
+`systemd-boot-lab` recovery edition and matching encrypted topology, sets Secure
+Boot, and never remaps an explicitly selected GRUB manifest. It retains both
+manifest byte streams and their SHA-256, repository dates, closure and repomd
+digests in the ledger, so changing either boot input invalidates the old pass.
+The dedicated recovery baseline is not the default inventory/lifecycle image.
+
+Fleet owner trust is provisioned independently (for example with
+[sbctl](https://github.com/Foxboron/sbctl)); operators must maintain signed installed
+boot updates and sign the released recovery UKI with an actually enrolled db key.
+The lab's short-lived generated key is not a fleet signing key. Runtime readiness
+does not enroll keys or claim readiness from a platform name: it requires a
+writable FAT ESP with measured capacity, enforced Secure Boot and the matching
+running systemd-boot ESP. Stock noSB Arch must report:
+**“Secure Boot not enforced: recovery sanitize requires an enrolled owner key”.**
+Missing configuration, wrong loader/ESP, missing TPM proof, or wrong signing trust
+remain independent refusals, not reasons to relax firmware or action authority.
+
+The registry's `RecoveryOwnerKey` policy belongs to Arch's own row, not an
+inferred derivative bootloader. Even before an ESP is configured, the root
+executor can report disabled Secure Boot and the required UKI method without
+guessing a mount or granting readiness. Unreadable firmware remains unknown,
+not a fabricated disabled state. The control plane preserves the owner-key
+reason only for a fresh, boot-bound unavailable observation; the UI names the
+recovery method separately from availability and artifact admission.
+
+This source change is not a native pass. Security-owner review and the native
+positive/negative records are still required in the
+[verification ledger](../verification.md#tier-capability-matrix), including both
+controller methods, wrong/no owner trust, noSB, readiness method and the unchanged
+original-device destruction witnesses. Encrypted owner-Secure-Boot installation
+and GRUB recovery are not inferred from the unencrypted systemd-boot result.
 
 ## Device actions
 
 The matrix's live device-action cell uses `-scenario=wipe -wipe-phase=live-actions`.
 It requires native lock/quarantine, live-root erase and report-loss evidence,
-without depending on recovery sanitize. The separately gated recovery cell
+without depending on recovery sanitize. The separately qualified recovery cell
 cannot be promoted by those live results.
 
 There is no Arch-wide native lock, quarantine, escrow or sanitization claim in the

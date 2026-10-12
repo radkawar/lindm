@@ -36,6 +36,10 @@ type Lab struct {
 	// console enrollment keep the vendor mode and require the console's
 	// unprotected-tool-path alert instead.
 	RootPermissionsRepair []string
+	// RecoveryEdition selects an explicit ordinary recovery baseline instead
+	// of the normal cloud image. RecoveryInstallerEdition binds its matching
+	// encrypted topology; an explicit incompatible owner choice is refused.
+	RecoveryEdition, RecoveryInstallerEdition string
 	// Kickstart is the Anaconda kickstart syntax version, e.g. "F44".
 	// Repository and RepositoryKey are the immutable signed release tree and
 	// its key file that the installed root adds packages from; %s is the
@@ -365,6 +369,12 @@ type LabGuest struct {
 	// Kernel overrides the conventional /boot/vmlinuz-%s path. Like Initrd,
 	// it may be a fixed path or contain %s for the observed kernel release.
 	Kernel string
+	// KernelConfig names the installed configuration; %s is the observed
+	// kernel release. A .gz suffix means gzip-compressed configuration.
+	KernelConfig string
+	// KernelConfigModule is loaded only in the disposable lab guest before
+	// reading a kernel-provided configuration (for example IKCONFIG_PROC).
+	KernelConfigModule string
 	// CryptsetupConsole: the initramfs reports a rejected passphrase only in
 	// the journal, so the lab routes systemd-cryptsetup diagnostics to the
 	// console to observe it.

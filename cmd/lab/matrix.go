@@ -347,6 +347,7 @@ var matrixVersions = [2]string{"0.1.0", "0.1.1"}
 type matrixRun struct {
 	root, repo, cache, evidence, self, lindmd, agent, redhatToken, revision string
 	consoleBrowsers, consoleAdmin, consoleDevice                            string
+	bootstrapFirmwareVars                                                   string
 	signer                                                                  *packaging.SigningKey
 	archArgs, secureBootArgs                                                map[string]*labv1.MatrixArgs
 	airgap                                                                  map[string][]string
@@ -396,6 +397,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs, each owned mode0600: PLATFORM-ARCH.json (enroll-from-console) and PLATFORM-ARCH.provision.json (provision-*, public-host origin with approver)")
 	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
+	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key recovery only: package-owned noSB bootstrap NVRAM template on the selected host")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -655,6 +657,13 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 			return err
 		}
 	}
+	if c.Recovery != nil {
+		recoveryPin := base + ".recovery-manifest.json"
+		if err := retainMatrixManifest(filepath.Join(r.root, c.Recovery.Path), recoveryPin, c.Recovery.SHA256); err != nil {
+			return fmt.Errorf("%s: retain recovery manifest: %w", name, err)
+		}
+		args = labhost.SetFlag(args, "recovery-manifest", recoveryPin)
+	}
 	if slices.Contains(laneInputs[c.Spec.GetLane()], "evidence") {
 		record = filepath.Join(base, c.Spec.GetLane()+".json")
 	}
@@ -689,6 +698,13 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), ManifestSha256: c.Manifest.SHA256, RepositorySnapshotDate: c.Manifest.Image.GetRepositorySnapshotDate(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN, Verified: true}
 	entry.RepositoryClosureSha256 = c.Manifest.Image.GetRepositorySnapshotManifestSha256()
 	entry.RepositoryMetadataSha256 = c.Manifest.Image.GetRepositorySnapshotRepomdSha256()
+	if c.Recovery != nil {
+		entry.RecoveryManifest = c.Recovery.Image.GetId()
+		entry.RecoveryManifestSha256 = c.Recovery.SHA256
+		entry.RecoveryRepositorySnapshotDate = c.Recovery.Image.GetRepositorySnapshotDate()
+		entry.RecoveryRepositoryClosureSha256 = c.Recovery.Image.GetRepositorySnapshotManifestSha256()
+		entry.RecoveryRepositoryMetadataSha256 = c.Recovery.Image.GetRepositorySnapshotRepomdSha256()
+	}
 	if c.Spec.GetLane() == "advisories" && verdict == labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
 		entry.Scope, err = advisoryRecordScope(record)
 		if err != nil {
@@ -777,6 +793,17 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		}
 		args = append(args, secureBoot.GetArgs()...)
 	}
+	if slices.Contains(c.Spec.GetCapabilities(), string(platform.RecoverySanitize)) {
+		if c.Release.Quirks.RecoveryGRUB.Entries != "" {
+			args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
+		}
+		if c.Release.Quirks.RecoveryOwnerKey {
+			if r.bootstrapFirmwareVars == "" {
+				return nil, errors.New("owner-key matrix recovery requires -bootstrap-firmware-vars")
+			}
+			args = labhost.SetFlag(args, "bootstrap-firmware-vars", r.bootstrapFirmwareVars)
+		}
+	}
 	if c.Spec.GetCapabilityKinds() {
 		kinds := splitList(labhost.FlagValue(args, "kinds"))
 		for _, k := range c.Kinds {
@@ -832,7 +859,7 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			}
 		case "recovery-manifest":
 			if c.Recovery == nil {
-				return nil, errors.New("no same-release cloud recovery manifest is pinned")
+				return nil, errors.New("no same-release ordinary recovery manifest matches the selected topology")
 			}
 			args = append(args, "-recovery-manifest", filepath.Join(r.root, c.Recovery.Path))
 		case "packages":

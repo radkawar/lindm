@@ -11,7 +11,7 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strconv"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 
@@ -57,7 +57,7 @@ func ReadNVMeIdentifyScope(ctx context.Context, file *os.File, target *agentv1.S
 	if err != nil {
 		return nil, err
 	}
-	p := &Provider{run: runNative}
+	p := &Provider{admin: submitNVMeAdmin}
 	return p.readNVMeSanitizeScope(ctx, file, target, nsid)
 }
 
@@ -130,32 +130,94 @@ func (p *Provider) readNVMeSanitizeScope(ctx context.Context, file *os.File, tar
 	}, nil
 }
 
-// nvmeAdmin submits precisely one Linux NVME_IOCTL_ADMIN_CMD through nvme-cli's
-// documented admin-passthru interface. All opcodes/dwords are locally derived,
-// not caller argv. Unlike `nvme format`, passthru does not perform a controller
-// reset, namespace rescan or implicit second format. The inherited namespace fd
-// keeps the exact device pinned. CAP_SYS_ADMIN is required, not CAP_SYS_RAWIO;
-// no controller character-device or PCI configuration access is needed.
+// nvmeAdminCommand is struct nvme_passthru_cmd from linux/nvme_ioctl.h.
+type nvmeAdminCommand struct {
+	Opcode      uint8
+	Flags       uint8
+	Rsvd1       uint16
+	NSID        uint32
+	CDW2, CDW3  uint32
+	Metadata    uint64
+	Addr        uint64
+	MetadataLen uint32
+	DataLen     uint32
+	CDW10       uint32
+	CDW11       uint32
+	CDW12       uint32
+	CDW13       uint32
+	CDW14       uint32
+	CDW15       uint32
+	TimeoutMS   uint32
+	Result      uint32
+}
+
+const (
+	// nvmeIoctlAdminCmd is _IOWR('N', 0x41, struct nvme_passthru_cmd).
+	nvmeIoctlAdminCmd = 0xc0484e41
+	// nvmeAdminTimeoutMS is the kernel's per-command controller timeout.
+	nvmeAdminTimeoutMS = 60000
+	// nvmeAdminMaxBytes bounds a read-back buffer: Identify is 4 KiB and the
+	// sanitize log 512 bytes.
+	nvmeAdminMaxBytes = 4096
+)
+
+// nvmeAdminSubmitter submits one admin command and returns the NVMe completion
+// status (0 is success). data is the read-back buffer, empty for none.
+type nvmeAdminSubmitter func(file *os.File, command *nvmeAdminCommand, data []byte) (uint32, error)
+
+// submitNVMeAdmin issues NVME_IOCTL_ADMIN_CMD on the pinned namespace block
+// descriptor. The kernel routes it to the namespace's controller; no
+// controller character device or /dev path is reopened. nvme-cli 3 resolves a
+// device only by its /dev/nvme* name, so it cannot use a pinned descriptor.
+func submitNVMeAdmin(file *os.File, command *nvmeAdminCommand, data []byte) (uint32, error) {
+	if len(data) != 0 {
+		command.Addr, command.DataLen = uint64(uintptr(unsafe.Pointer(&data[0]))), uint32(len(data))
+	}
+	status, _, errno := unix.Syscall(unix.SYS_IOCTL, file.Fd(), nvmeIoctlAdminCmd, uintptr(unsafe.Pointer(command)))
+	runtime.KeepAlive(file)
+	runtime.KeepAlive(data)
+	if errno != 0 {
+		return 0, errno
+	}
+	return uint32(status), nil
+}
+
+// nvmeUnsupportedStatus reports an explicit generic Invalid Command Opcode or
+// Invalid Field in Command completion. The kernel returns the 15-bit status
+// field: SC in bits 0-7, SCT in bits 8-10.
+func nvmeUnsupportedStatus(status uint32) bool {
+	return status>>8&0x7 == 0 && (status&0xff == 0x01 || status&0xff == 0x02)
+}
+
+// nvmeAdmin submits precisely one Linux NVME_IOCTL_ADMIN_CMD. All opcodes and
+// dwords are locally derived, not caller argv. Unlike `nvme format`, it never
+// performs a controller reset, namespace rescan or implicit second format. The
+// namespace fd keeps the exact device pinned. CAP_SYS_ADMIN is required for
+// non-Identify commands, not CAP_SYS_RAWIO; no PCI configuration access.
 func (p *Provider) nvmeAdmin(ctx context.Context, file *os.File, opcode, nsid, cdw10 uint32, length int) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	args := []string{
-		"admin-passthru", descriptor(0),
-		"--opcode=" + strconv.FormatUint(uint64(opcode), 10),
-		"--namespace-id=" + strconv.FormatUint(uint64(nsid), 10),
-		"--cdw10=" + strconv.FormatUint(uint64(cdw10), 10),
-		"--timeout=60000",
+	if opcode > 0xff || length < 0 || length > nvmeAdminMaxBytes {
+		return nil, fmt.Errorf("%w: nvme_admin_command", ErrUnsupported)
 	}
+	command := nvmeAdminCommand{Opcode: uint8(opcode), NSID: nsid, CDW10: cdw10, TimeoutMS: nvmeAdminTimeoutMS}
+	var data []byte
 	if length != 0 {
-		args = append(args, "--data-len="+strconv.Itoa(length), "--read", "--raw-binary")
+		data = make([]byte, length)
 	}
-	data, err := p.run(ctx, nativeRequest{command: nvme, args: args, files: []*os.File{file}})
+	status, err := p.admin(file, &command, data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("nvme admin opcode %#x: %w", opcode, err)
 	}
-	if length != 0 && len(data) != length {
-		return nil, fmt.Errorf("%w: nvme_native_response_length", ErrNotVerified)
+	if status != 0 {
+		err := fmt.Errorf("nvme admin opcode %#x: nvme_status_%#x", opcode, status)
+		if nvmeUnsupportedStatus(status) {
+			// Preserve explicit emulated/firmware opcode refusal. A consumed
+			// command still remains outcome_unknown at the provider boundary.
+			err = errors.Join(ErrUnsupported, err)
+		}
+		return nil, err
 	}
 	return data, nil
 }

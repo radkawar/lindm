@@ -17,6 +17,26 @@ import (
 	"time"
 )
 
+func TestVMFirstBootDiagnosticsAreExplicitAndBounded(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		h := VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", StorageBus: "nvme"}
+		if enabled {
+			h.bootDiagnostics = newInstallerDiagnostics(t.TempDir(), installerFailureFirstBoot, h.Architecture, strings.Repeat("a", 64))
+		}
+		args, err := configuredVMArguments(h, t.TempDir(), "12345", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		serial := slices.Index(args, "-serial")
+		if serial < 0 || serial+1 >= len(args) {
+			t.Fatal("missing serial configuration")
+		}
+		if (args[serial+1] == "stdio") != enabled {
+			t.Fatal("ordinary guest serial privacy changed without explicit diagnostics")
+		}
+	}
+}
+
 func TestVMHardwareTPMExitPreservesQEMUDiagnostics(t *testing.T) {
 	tpm := &encryptedProcess{done: make(chan struct{}), log: new(vmLog)}
 	close(tpm.done)

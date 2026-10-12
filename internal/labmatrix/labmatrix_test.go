@@ -29,12 +29,34 @@ func TestRollingManifestPrefersNewestSnapshotButHonorsOwnerChoice(t *testing.T) 
 	old := &Manifest{Image: &labv1.ImageManifest{Id: "old", RepositorySnapshotDate: proto.String("2026-10-07")}, Release: r, Architecture: "x86_64"}
 	current := &Manifest{Image: &labv1.ImageManifest{Id: "current", RepositorySnapshotDate: proto.String("2026-10-09")}, Release: r, Architecture: "x86_64"}
 	in := &Inputs{Manifests: []*Manifest{old, current}}
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64"); got != current {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != current {
 		t.Fatal("historical path ordering hid the current rolling snapshot")
 	}
 	in.PreferredManifest = old.Image.GetId()
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64"); got != old {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != old {
 		t.Fatal("newer snapshot silently replaced an explicit owner choice")
+	}
+}
+
+func TestRecoveryManifestDoesNotReplaceOwnerBootTopology(t *testing.T) {
+	r := release(t, "arch")
+	ordinary := &Manifest{Image: &labv1.ImageManifest{Id: "cloud", RepositorySnapshotDate: proto.String("2026-10-02")}, Release: r, Architecture: "x86_64"}
+	recovery := &Manifest{Image: &labv1.ImageManifest{Id: "owner-uki", Edition: r.Lab.RecoveryEdition, RepositorySnapshotDate: proto.String("2026-10-03")}, Release: r, Architecture: "x86_64"}
+	grub := &Manifest{Image: &labv1.ImageManifest{Id: "owner-grub", Edition: "grub-encrypted-lab"}, Release: r, Architecture: "x86_64"}
+	uki := &Manifest{Image: &labv1.ImageManifest{Id: "encrypted-uki", Edition: r.Lab.RecoveryInstallerEdition}, Release: r, Architecture: "x86_64"}
+	in := &Inputs{Manifests: []*Manifest{recovery, ordinary, grub, uki}}
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != ordinary {
+		t.Fatal("dedicated recovery baseline silently replaced the ordinary rolling image")
+	}
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", r.Lab.RecoveryEdition); got != recovery {
+		t.Fatal("explicit owner-UKI recovery baseline was not selected")
+	}
+	in.PreferredManifest = grub.Image.Id
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, "x86_64", r.Lab.RecoveryInstallerEdition); got != nil {
+		t.Fatal("owner-selected GRUB was silently remapped to systemd-boot recovery")
+	}
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "aarch64", r.Lab.RecoveryEdition); got != nil {
+		t.Fatal("recovery baseline crossed architecture")
 	}
 }
 
@@ -302,5 +324,31 @@ func TestRollingSnapshotEvidenceIdentity(t *testing.T) {
 	fixed := &Cell{Release: release(t, "ubuntu-24.04"), State: NotRun}
 	if fixed.RequalificationDue(at) {
 		t.Fatal("fixed release entered rolling requalification lane")
+	}
+}
+
+func TestRollingRecoveryEvidenceBindsSecondaryManifest(t *testing.T) {
+	r := release(t, "arch")
+	at := time.Date(2026, 10, 11, 0, 0, 0, 0, time.UTC)
+	primary := &Manifest{SHA256: strings.Repeat("a", 64), Image: &labv1.ImageManifest{Id: "encrypted", RepositorySnapshotDate: proto.String("2026-10-02")}}
+	recovery := &Manifest{SHA256: strings.Repeat("b", 64), Image: &labv1.ImageManifest{Id: "owner-uki", RepositorySnapshotDate: proto.String("2026-10-02"), RepositorySnapshotManifestSha256: proto.String(strings.Repeat("c", 64)), RepositorySnapshotRepomdSha256: proto.String(strings.Repeat("d", 64))}}
+	c := &Cell{Release: r, Architecture: "x86_64", Spec: &labv1.MatrixCell{Name: "recovery-sanitize"}, Manifest: primary, Recovery: recovery}
+	e := entry(r.Key, c.Spec.Name, c.Architecture, labv1.MatrixVerdict_MATRIX_VERDICT_PASS, at)
+	e.Manifest, e.ManifestSha256, e.RepositorySnapshotDate = primary.Image.GetId(), primary.SHA256, primary.Image.GetRepositorySnapshotDate()
+	e.RecoveryManifest, e.RecoveryManifestSha256 = recovery.Image.Id, recovery.SHA256
+	e.RecoveryRepositorySnapshotDate = recovery.Image.GetRepositorySnapshotDate()
+	e.RecoveryRepositoryClosureSha256 = recovery.Image.GetRepositorySnapshotManifestSha256()
+	e.RecoveryRepositoryMetadataSha256 = recovery.Image.GetRepositorySnapshotRepomdSha256()
+	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{e}}}
+	if in.latest(c) != e {
+		t.Fatal("exact recovery qualification was lost")
+	}
+	for _, field := range []*string{&e.RecoveryManifest, &e.RecoveryManifestSha256, &e.RecoveryRepositorySnapshotDate, &e.RecoveryRepositoryClosureSha256, &e.RecoveryRepositoryMetadataSha256} {
+		value := *field
+		*field = ""
+		if in.latest(c) != nil {
+			t.Fatal("changed or unbound recovery input reused a rolling pass")
+		}
+		*field = value
 	}
 }

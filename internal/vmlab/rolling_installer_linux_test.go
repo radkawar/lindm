@@ -65,8 +65,37 @@ func TestTumbleweedEncryptedProfileKeepsLUKS2AndVendorBLS(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(string(payload), "sdbootutil --no-variables set-timeout 1\n") {
+		if !strings.Contains(string(payload), grubEnvSetScript("/boot/efi/EFI/opensuse/grubenv", "timeout", "1")) {
 			t.Fatal("grub2-bls menu timeout is not persisted on the ESP")
+		}
+	}
+}
+
+func TestTumbleweedOrdinaryGoldenContainsNativeMeasuredRecoveryTools(t *testing.T) {
+	login, private, public := encryptedInstallerTestKeys(t)
+	for _, arch := range []string{"x86_64", "aarch64"} {
+		version := tumbleweedInstallerTestVersion(arch)
+		release := platform.ForManifest("opensuse-tumbleweed", version)
+		recipe, err := tumbleweedInstallerRecipeWithEncryption(release, version, "/dev/vda", arch, strings.Repeat("a", 64), login, private, public, "", "", false, &tumbleweedSnapshotRepository{URL: tumbleweedTestRepository, CAPEM: []byte("test-only CA")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var profile struct {
+			Loader   string   `xml:"bootloader>loader_type"`
+			Packages []string `xml:"software>packages>package"`
+		}
+		if err := xml.Unmarshal(recipe, &profile); err != nil {
+			t.Fatal(err)
+		}
+		if profile.Loader != "grub2-bls" {
+			t.Fatal("ordinary recovery golden selected a different boot chain")
+		}
+		for _, inputs := range [][]string{release.Lab.Guest.Actions, release.Lab.Guest.MeasuredBoot} {
+			for _, pkg := range inputs {
+				if !slices.Contains(profile.Packages, pkg) {
+					t.Fatalf("ordinary golden omitted signed recovery prerequisite %s", pkg)
+				}
+			}
 		}
 	}
 }
@@ -139,6 +168,40 @@ func TestArchGoldenIdentitySeparatesOwnerBootloaderAndArchive(t *testing.T) {
 	}
 }
 
+func TestArchOrdinaryMachineIdentityIsPublicButCredentialsStayPrivate(t *testing.T) {
+	manifest, err := LoadManifest("../../lab/images/arch-20261001-systemd-boot-x86_64.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := archRecoveryInstallerImage(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	login, private, public := encryptedInstallerTestKeys(t)
+	recipe, err := image.recipe("/dev/nvme0n1", "x86_64", manifest.GetSha256(), login, private, public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for line := range strings.SplitSeq(string(recipe), "\n") {
+		const suffix = "' | base64 -d > /mnt/root/lindm-provision"
+		if !strings.HasSuffix(line, suffix) {
+			continue
+		}
+		encoded := strings.TrimSuffix(strings.TrimPrefix(line, "printf '%s' '"), suffix)
+		payload, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, required := range []string{"install -m 0644 /dev/null /etc/machine-id", "chmod 0600 /etc/ssh/ssh_host_ed25519_key", "chmod 0600 /home/lindm-lab/.ssh/authorized_keys"} {
+			if !strings.Contains(string(payload), required) {
+				t.Fatalf("ordinary installer lost explicit mode: %s", required)
+			}
+		}
+		return
+	}
+	t.Fatal("ordinary installer omitted its owned provisioning payload")
+}
+
 func TestArchEncryptedMachineIdentityIsPublicButCredentialsStayPrivate(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, edition := range []string{"systemd-boot-encrypted-lab", "grub-encrypted-lab"} {
@@ -185,6 +248,17 @@ func TestArchInstallersScopeCredentialUmask(t *testing.T) {
 		}
 		recipes[edition] = recipe
 	}
+	manifest, err := LoadManifest("../../lab/images/arch-20261001-systemd-boot-x86_64.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	image, err := archRecoveryInstallerImage(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recipes["systemd-boot-lab"], err = image.recipe("/dev/vda", "x86_64", manifest.GetSha256(), login, private, public); err != nil {
+		t.Fatal(err)
+	}
 	for edition, recipe := range recipes {
 		lines := strings.Split(string(recipe), "\n")
 		umask, depth := "", 0
@@ -192,7 +266,7 @@ func TestArchInstallersScopeCredentialUmask(t *testing.T) {
 			switch {
 			case line == "(":
 				depth++
-			case strings.HasSuffix(line, ")") && !strings.HasPrefix(line, "("):
+			case line == ")":
 				depth--
 			case depth == 0 && strings.HasPrefix(line, "umask "):
 				umask = line
@@ -359,6 +433,39 @@ func TestTumbleweedFinalProfilesRequireExactFullSnapshotKernel(t *testing.T) {
 		}
 		if _, _, err := tumbleweedSnapshotPackageSelection(release, "20261008", arch); err == nil {
 			t.Fatal("unrecorded snapshot admitted without exact kernel facts")
+		}
+	}
+}
+
+// Regression: YaST selected openconnect-lang for aarch64 GNOME although the
+// signed closure lacks it, and the encrypted desktop install stalled.
+func TestTumbleweedDesktopProfileTaboosPackagesOutsideClosure(t *testing.T) {
+	login, private, public := encryptedInstallerTestKeys(t)
+	for _, test := range []struct {
+		arch, desktop string
+		want          []string
+	}{
+		{"aarch64", "gnome", []string{"openconnect-lang"}},
+		{"aarch64", "", nil},
+		{"x86_64", "gnome", nil},
+	} {
+		version := tumbleweedInstallerTestVersion(test.arch)
+		passphrase := ""
+		if test.desktop != "" {
+			passphrase = "secret"
+		}
+		recipe, err := tumbleweedInstallerRecipeWithEncryption(platform.ForManifest("opensuse-tumbleweed", version), version, "/dev/vda", test.arch, strings.Repeat("a", 64), login, private, public, passphrase, test.desktop, false, &tumbleweedSnapshotRepository{URL: tumbleweedTestRepository, CAPEM: []byte("test-only CA")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var profile struct {
+			Taboo []string `xml:"software>remove-packages>package"`
+		}
+		if err := xml.Unmarshal(recipe, &profile); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(profile.Taboo, test.want) {
+			t.Fatalf("%s %q: removed packages %v, want %v", test.arch, test.desktop, profile.Taboo, test.want)
 		}
 	}
 }

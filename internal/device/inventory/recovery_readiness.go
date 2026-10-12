@@ -179,6 +179,9 @@ func RecoveryObservationReason(host devicedb.GetHostObservationRow, observation 
 	if observed.CheckValid() != nil || !ActionInventoryFresh(host, now) || observed.AsTime().After(now) || now.Sub(observed.AsTime()) > 5*time.Minute || host.BootIDStatus != int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS) || observation.GetBootId() == "" || observation.GetBootId() != host.BootIDValue {
 		return "device_action_recovery_readiness_stale"
 	}
+	if !observation.GetAvailable() && observation.GetReason() == "recovery_readiness_owner_key_required" {
+		return "device_action_recovery_owner_key_required"
+	}
 	if !observation.GetAvailable() && observation.GetReason() == "recovery_readiness_tpm_attestation_unavailable" {
 		return "device_action_recovery_attestation_unavailable"
 	}

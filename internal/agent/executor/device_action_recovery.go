@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -41,7 +42,7 @@ func (s *Service) PrepareDeviceActionRecovery(ctx context.Context, req *connect.
 	return noStore(response), nil
 }
 
-func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []byte) (*agentv1.PrepareDeviceActionRecoveryResponse, error) {
+func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []byte) (_ *agentv1.PrepareDeviceActionRecoveryResponse, err error) {
 	actionID, err := deviceAction.lookup(s, envelope)
 	if err != nil {
 		return nil, err
@@ -119,15 +120,23 @@ func (s *Service) prepareDeviceActionRecovery(ctx context.Context, envelope []by
 	if pending != nil {
 		public = pending.PublicKey()
 	} else {
-		offTarget, err := recovery.OpenJournal(stage.StateDirectory)
-		if err != nil {
-			return nil, err
+		offTarget, openErr := recovery.OpenJournal(stage.StateDirectory)
+		if openErr != nil {
+			return nil, openErr
 		}
 		defer func() { _ = offTarget.Close() }()
 		public, err = provisionRecoveryPublicKey(offTarget, platform, stage.StateDirectory)
 		if err != nil {
 			return nil, err
 		}
+		// Until a handoff binding this key is durably accepted, a failure
+		// leaves an unused key that would refuse every retry (observed:
+		// "action.key: file exists" after a refused handoff payload).
+		defer func() {
+			if err != nil {
+				err = errors.Join(err, removeUnboundRecoveryKey(stage.StateDirectory))
+			}
+		}()
 	}
 	var measured *agentv1.RecoveryMeasuredBoot
 	if stage.BootMode == agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB {
@@ -224,6 +233,15 @@ func provisionRecoveryPublicKey(offTarget *recovery.Journal, platform recoveryBo
 	public := bytes.Clone(key[ed25519.SeedSize:])
 	clear(key)
 	return public, nil
+}
+
+// removeUnboundRecoveryKey deletes the off-target key provisioned by a
+// preparation that failed before any handoff bound it.
+func removeUnboundRecoveryKey(directory string) error {
+	if err := os.Remove(filepath.Join(directory, "action.key")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove unbound recovery key: %w", err)
+	}
+	return nil
 }
 
 // acceptDeviceActionRecoveryLocked rechecks authority after native preflight

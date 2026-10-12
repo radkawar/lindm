@@ -28,8 +28,8 @@ import (
 // shim+GRUB chain with an unsigned lindm initramfs. Nothing here is authority:
 // the server verifies a fresh TPM quote before any start grant. The entry is
 // added where the vendor GRUB already reads entries (a Boot Loader Spec file
-// or grub.d's custom.cfg) and is selected only by GRUB's one-shot next_entry;
-// the BLS `~` prefix also sorts last, so the ordinary default is unchanged.
+// or grub.d's custom.cfg) and selected by that chain's native one-shot protocol.
+// The BLS `~` prefix sorts last, leaving the ordinary default unchanged.
 const (
 	blsEntryPrefix     = "~lindm-recovery-"
 	customEntryPrefix  = "lindm-recovery-"
@@ -59,16 +59,27 @@ type measuredLayout struct {
 // HostGRUBChain returns the registry's measured-recovery chain for this host's
 // own os-release row. An unlisted release has none.
 func HostGRUBChain() (platform.GRUBChain, error) {
-	file, err := os.Open("/etc/os-release")
+	release, err := HostRecoveryPlatform()
 	if err != nil {
 		return platform.GRUBChain{}, err
 	}
+	return release.Quirks.RecoveryGRUB, nil
+}
+
+// HostRecoveryPlatform identifies the host's own bounded os-release record.
+// Recovery callers share this lookup rather than inheriting a base distro's
+// boot or owner-key requirements.
+func HostRecoveryPlatform() (*platform.Release, error) {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		return nil, err
+	}
 	data, readErr := io.ReadAll(io.LimitReader(file, maximumOSRelease+1))
 	if err := errors.Join(readErr, file.Close()); err != nil {
-		return platform.GRUBChain{}, err
+		return nil, err
 	}
 	if len(data) > maximumOSRelease {
-		return platform.GRUBChain{}, errors.New("recoveryboot: os_release_too_large")
+		return nil, errors.New("recoveryboot: os_release_too_large")
 	}
 	fields := make(map[string]string)
 	for line := range strings.SplitSeq(string(data), "\n") {
@@ -76,10 +87,14 @@ func HostGRUBChain() (platform.GRUBChain, error) {
 			fields[key] = strings.Trim(value, "\"'")
 		}
 	}
-	return platform.Identify(platform.OSRelease{ID: fields["ID"], VersionID: fields["VERSION_ID"], VariantID: fields["VARIANT_ID"]}).Quirks.RecoveryGRUB, nil
+	return platform.Identify(platform.OSRelease{ID: fields["ID"], VersionID: fields["VERSION_ID"], VariantID: fields["VARIANT_ID"]}), nil
 }
 
 func validChain(chain platform.GRUBChain) bool {
+	if chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		return chain.Editenv == "" && chain.BootDirectory != "" &&
+			filepath.IsLocal(chain.ConfigDirectory) && strings.HasPrefix(chain.ConfigDirectory, "EFI/")
+	}
 	if chain.Editenv != "/usr/bin/grub2-editenv" && chain.Editenv != "/usr/bin/grub-editenv" {
 		return false
 	}
@@ -120,7 +135,7 @@ func measuredStageLayout(request StageRequest) (*measuredLayout, error) {
 	}
 	layout := &measuredLayout{chain: request.GRUB, bootDirectory: request.ESPPath}
 	switch request.GRUB.Entries {
-	case platform.GRUBBLS:
+	case platform.GRUBBLS, platform.GRUBBLSLoaderEntryOneShot:
 		layout.entryDir = filepath.Join(request.ESPPath, "loader", "entries")
 		layout.entryID = blsEntryPrefix + request.ActionID
 		layout.entryFile = filepath.Join(layout.entryDir, layout.entryID+".conf")
@@ -148,7 +163,10 @@ func measuredStageLayout(request StageRequest) (*measuredLayout, error) {
 	if !bytes.Equal(current.KernelSHA256, request.KernelSHA256) {
 		return nil, errors.New("recoveryboot: measured_kernel_changed")
 	}
-	kernelFile := filepath.Join(request.ESPPath, path.Base(current.KernelPath))
+	kernelFile, err := measuredKernelFile(request.ESPPath, request.GRUB, current.KernelPath)
+	if err != nil {
+		return nil, err
+	}
 	if err := matchesMeasuredKernel(kernelFile, request.KernelSHA256); err != nil {
 		return nil, fmt.Errorf("recoveryboot: vendor_kernel_unavailable: %w", err)
 	}
@@ -161,6 +179,9 @@ func measuredStageLayout(request StageRequest) (*measuredLayout, error) {
 	layout.binding = &agentv1.RecoveryMeasuredBoot{
 		KernelSha256: bytes.Clone(request.KernelSHA256), KernelPath: current.KernelPath,
 		KernelOptions: options, InitrdPath: path.Join(path.Dir(current.KernelPath), initrd),
+	}
+	if request.GRUB.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		layout.binding.InitrdPath = "/" + initrd
 	}
 	return layout, nil
 }
@@ -231,10 +252,13 @@ func measuredSnapshot(ctx context.Context, layout *measuredLayout, request Stage
 	hash := sha256.New()
 	var files []string
 	switch layout.chain.Entries {
-	case platform.GRUBBLS:
+	case platform.GRUBBLS, platform.GRUBBLSLoaderEntryOneShot:
 		entries, err := os.ReadDir(layout.entryDir)
 		if err != nil {
 			return nil, err
+		}
+		if len(entries) > 1024 {
+			return nil, errors.New("recoveryboot: too_many_boot_entries")
 		}
 		for _, entry := range entries {
 			name := filepath.Join(layout.entryDir, entry.Name())
@@ -272,16 +296,33 @@ func measuredSnapshot(ctx context.Context, layout *measuredLayout, request Stage
 			return nil, err
 		}
 	}
-	env, err := readGrubEnv(ctx, request.GrubEnv, layout.chain)
-	if err != nil {
-		return nil, err
-	}
-	for _, key := range []string{"next_entry", "saved_entry", "env_block"} {
-		if _, err := fmt.Fprintf(hash, "%s=%s\n", key, env[key]); err != nil {
+	if layout.chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		snapshot, err := loaderEntrySnapshot(layout.bootDirectory, layout.chain, readEFString)
+		if err != nil {
 			return nil, err
+		}
+		hash.Write(snapshot)
+	} else {
+		env, err := readGrubEnv(ctx, request.GrubEnv, layout.chain)
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range []string{"next_entry", "saved_entry", "env_block"} {
+			if _, err := fmt.Fprintf(hash, "%s=%s\n", key, env[key]); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if staged {
+		if layout.chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+			kernel, err := measuredKernelFile(layout.bootDirectory, layout.chain, layout.binding.GetKernelPath())
+			if err != nil {
+				return nil, err
+			}
+			if err := matchesMeasuredKernel(kernel, request.KernelSHA256); err != nil {
+				return nil, err
+			}
+		}
 		for _, file := range []Ingredient{{Source: layout.initrdFile, SHA256: request.ImageSHA256}, {Source: layout.entryFile, SHA256: digestBytes(layout.entry())}} {
 			if err := approved(file); err != nil {
 				return nil, fmt.Errorf("recoveryboot: staged_artifact_digest_changed: %w", err)
@@ -321,6 +362,11 @@ func preflightMeasured(ctx context.Context, request StageRequest) (*measuredLayo
 	if err := offTargetState(request.StateDirectory, request.TargetDevices); err != nil {
 		return nil, err
 	}
+	if request.GRUB.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		if _, err := loaderEntryTopology(request.ESPPath); err != nil {
+			return nil, err
+		}
+	}
 	if err := secureBootEnforced(); err != nil {
 		return nil, err
 	}
@@ -343,11 +389,11 @@ func preflightMeasured(ctx context.Context, request StageRequest) (*measuredLayo
 	if info.Size() != request.ImageSize {
 		return nil, errors.New("recoveryboot: image_size_mismatch")
 	}
-	env, err := readGrubEnv(ctx, request.GrubEnv, layout.chain)
+	oneShot, err := measuredOneShot(ctx, request)
 	if err != nil {
 		return nil, err
 	}
-	if env["next_entry"] != "" {
+	if oneShot != "" {
 		return nil, errors.New("recoveryboot: unrelated_oneshot_present")
 	}
 	if _, err := measuredSnapshot(ctx, layout, request, false); err != nil {
@@ -490,6 +536,19 @@ func (s *Staged) armMeasured(ctx context.Context, beforeArm func(context.Context
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if s.measured.chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		if err := native(ctx, nil, "bootctl", "--esp-path="+s.request.ESPPath, "set-oneshot", s.entry); err != nil {
+			return err
+		}
+		oneShot, err := measuredOneShot(ctx, s.request)
+		if err != nil {
+			return err
+		}
+		if oneShot != s.entry {
+			return errors.New("recoveryboot: oneshot_not_armed")
+		}
+		return nil
+	}
 	if s.request.GrubEnv == nil {
 		return errors.New("recoveryboot: grub_environment_runner_required")
 	}
@@ -507,14 +566,18 @@ func (s *Staged) armMeasured(ctx context.Context, beforeArm func(context.Context
 }
 
 func (s *Staged) rollbackMeasured(ctx context.Context) error {
-	env, err := readGrubEnv(ctx, s.request.GrubEnv, s.measured.chain)
+	oneShot, err := measuredOneShot(ctx, s.request)
 	if err != nil {
 		return err
 	}
-	switch env["next_entry"] {
+	switch oneShot {
 	case "":
 	case s.entry:
-		if _, err := s.request.GrubEnv(ctx, s.measured.chain.Editenv, "-", "unset", "next_entry"); err != nil {
+		if s.measured.chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+			if err := native(ctx, nil, "bootctl", "--esp-path="+s.request.ESPPath, "set-oneshot", ""); err != nil {
+				return err
+			}
+		} else if _, err := s.request.GrubEnv(ctx, s.measured.chain.Editenv, "-", "unset", "next_entry"); err != nil {
 			return err
 		}
 	default:
@@ -551,7 +614,7 @@ func ObserveMeasuredReadiness(ctx context.Context, bootDirectory string) (Readin
 		return result, errors.New("recovery_readiness_measured_grub_unsupported")
 	}
 	switch chain.Entries {
-	case platform.GRUBBLS:
+	case platform.GRUBBLS, platform.GRUBBLSLoaderEntryOneShot:
 		if err := rootDirectory(filepath.Join(bootDirectory, "loader", "entries")); err != nil {
 			return result, errors.New("recovery_readiness_bls_entries_unavailable")
 		}
@@ -561,6 +624,11 @@ func ObserveMeasuredReadiness(ctx context.Context, bootDirectory string) (Readin
 		config, err := custody.ReadRoot(filepath.Join(bootDirectory, chain.ConfigDirectory, "grub.cfg"), maximumBootEntry, false)
 		if err != nil || !bytes.Contains(config, []byte("/custom.cfg")) {
 			return result, errors.New("recovery_readiness_grub_custom_unavailable")
+		}
+	}
+	if chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		if result.ESPUUID, err = loaderEntryTopology(bootDirectory); err != nil {
+			return result, err
 		}
 	}
 	var filesystem unix.Statfs_t
@@ -589,11 +657,14 @@ func ObserveMeasuredReadiness(ctx context.Context, bootDirectory string) (Readin
 	if err := measuredboot.SecureBootEnabled(events); err != nil {
 		return result, errors.New("recovery_readiness_secure_boot_unmeasured")
 	}
-	if err := matchesMeasuredKernel(filepath.Join(bootDirectory, path.Base(current.KernelPath)), current.KernelSHA256); err != nil {
+	kernelFile, err := measuredKernelFile(bootDirectory, chain, current.KernelPath)
+	if err != nil || matchesMeasuredKernel(kernelFile, current.KernelSHA256) != nil {
 		return result, errors.New("recovery_readiness_vendor_kernel_changed")
 	}
-	if info, err := os.Stat(chain.Editenv); err != nil || !info.Mode().IsRegular() {
-		return result, errors.New("recovery_readiness_grub_editenv_required")
+	if chain.Entries != platform.GRUBBLSLoaderEntryOneShot {
+		if info, err := os.Stat(chain.Editenv); err != nil || !info.Mode().IsRegular() {
+			return result, errors.New("recovery_readiness_grub_editenv_required")
+		}
 	}
 	result.MeasuredKernelSHA256 = bytes.Clone(current.KernelSHA256)
 	return result, ctx.Err()

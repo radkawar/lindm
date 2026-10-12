@@ -29,6 +29,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/devlab"
+	"lindm/internal/platform"
 	"lindm/internal/rpcreason"
 	"lindm/internal/trust"
 )
@@ -83,8 +84,15 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	refusal := options.WipePhase == "recovery-attestation-refusal"
 	if measured {
 		evidence.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB.String()
-		evidence.Boundary = "Original device identity and generation, unmodified vendor cloud disk booting the firmware-enrolled Microsoft-signed vendor shim, vendor-signed GRUB and the vendor-signed kernel, unsigned lindm initramfs on /boot proven only by a fresh swtpm quote and event-log replay verified by the server, and off-target ext4 one-action custody. No firmware key, ESP, loader or kernel change. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization. Software TPM, not a physical TPM or EK-certified attestation key."
+		evidence.Boundary = "Original device identity and generation, unmodified vendor boot chain booting the firmware-enrolled Microsoft-signed vendor shim, vendor-signed GRUB and vendor-signed kernel, unsigned lindm initramfs on the registry-selected boot filesystem proven only by a fresh swtpm quote and event-log replay verified by the server, and off-target ext4 one-action custody. No firmware key, ESP capacity, loader or kernel replacement. NVMe format is emulated controller qualification; SATA overwrite is explicitly a rotational emulation method, not ATA secure erase or physical flash sanitization. Software TPM, not a physical TPM or EK-certified attestation key."
 	}
+	defer func() {
+		// A server-side refusal (for example a rejected inventory write) is
+		// visible only in the isolated lindmd log, removed with the run.
+		if err != nil && options.Encrypted.DiagnosticsDir != "" {
+			err = errors.Join(err, saveFixtureServerLog(fixture, options.Encrypted.DiagnosticsDir))
+		}
+	}()
 	if !options.Encrypted.Firmware.SecureBoot {
 		return evidence, errors.New("original signed recovery requires explicitly selected Secure Boot firmware")
 	}
@@ -103,8 +111,13 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		defer func() { err = errors.Join(err, signer.Close()) }()
 		firmware.OwnedDBCertificate = signer.certificate
 	}
+	bootstrapFirmware, err := recoveryBootstrapFirmware(options.RecoveryManifest, firmware, options.BootstrapFirmwareVars, options.RecoveryBootMode)
+	if err != nil {
+		return evidence, err
+	}
 	hardware := *options.Encrypted.Hardware
-	hardware.StorageBus, hardware.ExtraDisks, hardware.Desktop, hardware.Firmware = bus, 1, false, &firmware
+	hardware.StorageBus, hardware.ExtraDisks, hardware.Desktop, hardware.Firmware = bus, 1, false, &bootstrapFirmware
+	hardware.goldenDiagnosticsDir = options.Encrypted.DiagnosticsDir
 	if refusal {
 		hardware.TPM = false
 	} else if measured && !hardware.TPM {
@@ -114,6 +127,9 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	if err != nil {
 		return evidence, err
 	}
+	// Remote work directories are removed on exit; keep action diagnostics
+	// in the owner-chosen directory the lane returns.
+	vm.diagnosticsDir = options.Encrypted.DiagnosticsDir
 	poweredOff := false
 	defer func() {
 		if poweredOff {
@@ -136,6 +152,10 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		return evidence, err
 	}
 	entitlement := actionOwnedBootEntitlement{LabBinary: options.LabBinary, RedHatTokenFile: options.RedHatTokenFile}
+	if options.BootstrapFirmwareVars != "" {
+		entitlement.OwnerFirmware = &firmware
+		evidence.Boundary = "Original explicitly selected Arch systemd-boot installer disk and same durable target, unsigned archiso installed under observed noSB bootstrap firmware, lab-private owner signer in a disposable firmware db activated only after signed loader/UKI installation and observed shutdown, then a cold boot with enforced Secure Boot and exact owner certificate present in runtime db. This is not vendor shim trust, GRUB qualification, physical TPM evidence or physical media sanitization."
+	}
 	if measured {
 		evidence.Boot, evidence.StockBoot, err = provisionActionStockBoot(ctx, vm, options.RecoveryManifest, entitlement)
 	} else {
@@ -208,7 +228,8 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		runtime.CertificateSha256, runtime.BootMode = signer.certificateSHA256, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
 	}
 	runtime.BootstrapVerifiedAt = timestamppb.New(bootstrapVerifiedAt)
-	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem(), options.Ukify)
+	guest := platform.ForManifest(options.RecoveryManifest.GetDistribution(), options.RecoveryManifest.GetVersion()).Lab.Guest
+	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem(), options.Ukify, guest)
 	if err != nil {
 		return evidence, err
 	}
@@ -240,7 +261,12 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 		if err != nil {
 			return evidence, err
 		}
-		recoveryConfig = &agentv1.RecoveryBootConfig{ImageFile: imagePath, ImageSha256: artifact.SHA256, ImageSize: uint64(artifact.Size), EspDirectory: "/boot", StateDirectory: "/var/lib/lindm-recovery", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, KernelSha256: artifact.KernelSHA256, SerialConsole: serialConsole}
+		chain := platform.ForManifest(options.RecoveryManifest.GetDistribution(), options.RecoveryManifest.GetVersion()).Quirks.RecoveryGRUB
+		bootDirectory := chain.BootDirectory
+		if bootDirectory == "" {
+			return evidence, errors.New("measured recovery requires a registry boot directory")
+		}
+		recoveryConfig = &agentv1.RecoveryBootConfig{ImageFile: imagePath, ImageSha256: artifact.SHA256, ImageSize: uint64(artifact.Size), EspDirectory: bootDirectory, StateDirectory: "/var/lib/lindm-recovery", Custody: agentv1.RecoveryCustody_RECOVERY_CUSTODY_OFF_TARGET, BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, KernelSha256: artifact.KernelSHA256, SerialConsole: serialConsole}
 	} else {
 		imagePath, certificatePath := "/var/lib/lindm/executor/native-recovery.efi", "/var/lib/lindm/executor/native-recovery-signing.pem"
 		if err := uploadActionBootFile(ctx, vm, artifact.Path, imagePath); err != nil {

@@ -7,17 +7,18 @@ import (
 	"context"
 	"errors"
 	"os"
-	"slices"
 	"testing"
+	"unsafe"
 
+	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
-func TestNVMeAdminUsesClosedCommandAndExactInheritedDescriptor(t *testing.T) {
-	// An ordinary temporary file stands in for descriptor transport only; the
-	// injected runner does not invoke any native tool or ioctl.
+func TestNVMeAdminSubmitsClosedCommandOnPinnedDescriptor(t *testing.T) {
+	// An ordinary temporary file stands in for the pinned descriptor only; the
+	// injected submitter performs no ioctl.
 	file, err := os.CreateTemp(t.TempDir(), "descriptor")
 	if err != nil {
 		t.Fatal(err)
@@ -28,29 +29,62 @@ func TestNVMeAdminUsesClosedCommandAndExactInheritedDescriptor(t *testing.T) {
 		}
 	})
 	calls := 0
-	p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+	p := &Provider{admin: func(got *os.File, command *nvmeAdminCommand, data []byte) (uint32, error) {
 		calls++
-		want := []string{"admin-passthru", "/proc/self/fd/3", "--opcode=6", "--namespace-id=7", "--cdw10=0", "--timeout=60000", "--data-len=4096", "--read", "--raw-binary"}
-		if request.command != nvme || !slices.Equal(request.args, want) || len(request.files) != 1 || request.files[0] != file || len(request.input) != 0 {
-			t.Fatalf("unexpected native request: %+v", request)
+		want := nvmeAdminCommand{Opcode: 6, NSID: 7, TimeoutMS: nvmeAdminTimeoutMS}
+		if got != file || *command != want || len(data) != nvmeIdentifyBytes {
+			t.Fatalf("unexpected admin submission: %+v data=%d", *command, len(data))
 		}
-		return make([]byte, 4096), nil
+		data[0] = 0x5a
+		return 0, nil
 	}}
-	if _, err := p.nvmeAdmin(t.Context(), file, 6, 7, 0, 4096); err != nil || calls != 1 {
+	if data, err := p.nvmeAdmin(t.Context(), file, 6, 7, 0, nvmeIdentifyBytes); err != nil || calls != 1 || len(data) != nvmeIdentifyBytes || data[0] != 0x5a {
 		t.Fatalf("native read: %v, calls=%d", err, calls)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := p.nvmeAdmin(ctx, file, 6, 7, 0, 4096); !errors.Is(err, context.Canceled) || calls != 1 {
+	if _, err := p.nvmeAdmin(ctx, file, 6, 7, 0, nvmeIdentifyBytes); !errors.Is(err, context.Canceled) || calls != 1 {
 		t.Fatalf("canceled native read issued: %v, calls=%d", err, calls)
+	}
+	for _, length := range []int{-1, nvmeAdminMaxBytes + 1} {
+		if _, err := p.nvmeAdmin(t.Context(), file, 6, 7, 0, length); !errors.Is(err, ErrUnsupported) || calls != 1 {
+			t.Fatalf("unbounded read-back %d submitted: %v", length, err)
+		}
 	}
 }
 
-func TestNVMeAdminRejectsTruncatedAndOversizedReadback(t *testing.T) {
-	for _, size := range []int{0, 4095, 4097, outputLimit + 1} {
-		p := &Provider{run: func(context.Context, nativeRequest) ([]byte, error) { return make([]byte, size), nil }}
-		if _, err := p.nvmeAdmin(t.Context(), nil, 6, 1, 0, 4096); !errors.Is(err, ErrNotVerified) {
-			t.Fatalf("accepted native output of size %d: %v", size, err)
+// The ioctl argument must match struct nvme_passthru_cmd and its _IOWR number.
+func TestNVMeAdminCommandMatchesKernelABI(t *testing.T) {
+	const size = 72
+	if unsafe.Sizeof(nvmeAdminCommand{}) != size || unsafe.Offsetof(nvmeAdminCommand{}.Addr) != 24 || unsafe.Offsetof(nvmeAdminCommand{}.CDW10) != 40 || unsafe.Offsetof(nvmeAdminCommand{}.TimeoutMS) != 64 {
+		t.Fatal("nvmeAdminCommand layout differs from struct nvme_passthru_cmd")
+	}
+	if want := uint32(3)<<30 | size<<16 | 'N'<<8 | 0x41; nvmeIoctlAdminCmd != want {
+		t.Fatalf("NVME_IOCTL_ADMIN_CMD = %#x, want %#x", nvmeIoctlAdminCmd, want)
+	}
+}
+
+// Only an explicit generic Invalid Command Opcode/Field completion is
+// unsupported; any other status or submission error stays an ordinary failure.
+// Neither is evidence that erasure occurred.
+func TestNVMeAdminMapsCompletionStatus(t *testing.T) {
+	for _, test := range []struct {
+		status      uint32
+		err         error
+		unsupported bool
+	}{
+		{status: 0x01, unsupported: true},
+		{status: 0x02, unsupported: true},
+		{status: 0x4002, unsupported: true},
+		{status: 0x101},
+		{status: 0x06},
+		{err: unix.EIO},
+		{err: unix.EPERM},
+	} {
+		p := &Provider{admin: fakeNVMeAdmin(func(nvmeAdminCommand, int) ([]byte, uint32, error) { return nil, test.status, test.err })}
+		data, err := p.nvmeAdmin(t.Context(), nil, 0x84, 0, 2, 0)
+		if err == nil || data != nil || errors.Is(err, ErrUnsupported) != test.unsupported {
+			t.Fatalf("status %#x err %v: got %v", test.status, test.err, err)
 		}
 	}
 }
@@ -71,22 +105,20 @@ func TestNVMeScopeDiscoveryUsesReadOnlyNativeIdentity(t *testing.T) {
 				action.NvmeScope.Identity.Basis = agentv1.NvmeIdentityBasis_NVME_IDENTITY_BASIS_CONTROLLER_SERIAL_NSID
 			}
 			calls := 0
-			p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+			p := &Provider{admin: fakeNVMeAdmin(func(command nvmeAdminCommand, length int) ([]byte, uint32, error) {
 				calls++
-				if request.command != nvme || !slices.Contains(request.args, "--opcode=6") ||
-					!slices.Contains(request.args, "--read") || !slices.Contains(request.args, "--raw-binary") ||
-					!slices.Contains(request.args, "--data-len=4096") {
-					t.Fatalf("discovery issued non-Identify command: %+v", request)
+				if command.Opcode != 6 || length != nvmeIdentifyBytes {
+					t.Fatalf("discovery issued non-Identify command: %+v", command)
 				}
-				if calls == 1 && slices.Contains(request.args, "--namespace-id=0") && slices.Contains(request.args, "--cdw10=1") {
-					return controllerData, nil
+				if calls == 1 && command.NSID == 0 && command.CDW10 == 1 {
+					return controllerData, 0, nil
 				}
-				if calls == 2 && slices.Contains(request.args, "--namespace-id=1") && slices.Contains(request.args, "--cdw10=0") {
-					return namespaceData, nil
+				if calls == 2 && command.NSID == 1 && command.CDW10 == 0 {
+					return namespaceData, 0, nil
 				}
-				t.Fatalf("unexpected discovery command: %+v", request)
-				return nil, ErrUnsupported
-			}}
+				t.Fatalf("unexpected discovery command: %+v", command)
+				return nil, 0, ErrUnsupported
+			})}
 			scope, err := p.readNVMeSanitizeScope(t.Context(), nil, action.Target, 1)
 			if err != nil || calls != 2 || !proto.Equal(scope, action.NvmeScope) || scope.GetControllerWide() {
 				t.Fatalf("discovered scope: %v %v, calls=%d", scope, err, calls)
@@ -157,23 +189,5 @@ func TestNVMeSamplingRejectsShortReadAndCancellation(t *testing.T) {
 	cancel()
 	if samples, err := readNVMeSamples(ctx, bytes.NewReader(make([]byte, 4096)), 4096, nil); !errors.Is(err, context.Canceled) || samples.read != 0 {
 		t.Fatalf("canceled sampling: %v %d", err, samples.read)
-	}
-}
-
-func TestNVMeExplicitUnsupportedDiagnosticIsNotCompletionProof(t *testing.T) {
-	for _, text := range []string{
-		"NVMe status: INVALID_OPCODE: unsupported command",
-		"NVMe status: Invalid Command Opcode",
-		"NVMe status: INVALID_FIELD: unsupported field",
-		"NVMe status: Invalid Field in Command",
-	} {
-		if !nvmeUnsupportedDiagnostic([]byte(text)) {
-			t.Fatalf("explicit refusal not recognized: %q", text)
-		}
-	}
-	for _, text := range []string{"", "Permission denied", "Input/output error", "Connection timed out", "Success"} {
-		if nvmeUnsupportedDiagnostic([]byte(text)) {
-			t.Fatalf("unrelated native result mislabeled unsupported: %q", text)
-		}
 	}
 }

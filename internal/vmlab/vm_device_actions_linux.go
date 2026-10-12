@@ -42,6 +42,9 @@ type VMDeviceActionsOptions struct {
 	// system /usr/bin/ukify. Lab hosts without systemd-ukify (the Sparks)
 	// select a privately provisioned, digest-pinned copy.
 	Ukify string
+	// BootstrapFirmwareVars is the separately package-pinned noSB template for
+	// an unsigned installer. Final owner trust uses Encrypted.Firmware instead.
+	BootstrapFirmwareVars string
 }
 
 type VMDeviceActionsResult struct {
@@ -257,6 +260,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	}
 	if options.WipePhase == "recovery-attestation-refusal" && options.RecoveryBootMode != recoveryBootMeasured {
 		return nil, errors.New("attestation refusal phase requires recovery boot mode measured-grub")
+	}
+	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) {
+		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase")
 	}
 	if options.EncryptionPhase != "" && (options.Scenario != "encryption" || options.EncryptionPhase != "tpm") {
 		return nil, errors.New("encryption phase requires scenario encryption and phase tpm")

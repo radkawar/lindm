@@ -59,7 +59,8 @@ func ObserveReadiness(ctx context.Context, espPath string) (Readiness, error) {
 	if err != nil {
 		return result, err
 	}
-	result.SecureBoot, err = readinessSecureBoot(os.ReadFile)
+	release, platformErr := HostRecoveryPlatform()
+	result.SecureBoot, err = readinessSecureBootForPolicy(os.ReadFile, platformErr == nil && release.Quirks.RecoveryOwnerKey)
 	if err != nil {
 		return result, err
 	}
@@ -78,6 +79,40 @@ func ObserveReadiness(ctx context.Context, espPath string) (Readiness, error) {
 	}
 	result.UKICapable = true
 	return result, ctx.Err()
+}
+
+// ObserveUnconfiguredReadiness reports only the release's boot-trust
+// prerequisite. It never guesses an ESP or makes an unconfigured host ready.
+func ObserveUnconfiguredReadiness(ctx context.Context) (Readiness, error) {
+	result := Readiness{}
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
+	if os.Geteuid() != 0 {
+		return result, errors.New("recovery_readiness_root_required")
+	}
+	release, err := HostRecoveryPlatform()
+	if err != nil || !release.Quirks.RecoveryOwnerKey {
+		return result, errors.New("recovery_readiness_not_configured")
+	}
+	result.BootMode = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI
+	result.SecureBoot, err = readinessSecureBootForPolicy(os.ReadFile, true)
+	if err != nil {
+		return result, err
+	}
+	return result, errors.New("recovery_readiness_not_configured")
+}
+
+// ErrOwnerKeyRequired is the readiness refusal of a release whose UKI recovery
+// requires an owner-enrolled Secure Boot key while Secure Boot is off.
+var ErrOwnerKeyRequired = errors.New("recovery_readiness_owner_key_required")
+
+func readinessSecureBootForPolicy(read func(string) ([]byte, error), ownerKey bool) (bool, error) {
+	secure, err := readinessSecureBoot(read)
+	if err != nil && err.Error() == "recovery_readiness_secure_boot_required" && ownerKey {
+		return false, ErrOwnerKeyRequired
+	}
+	return secure, err
 }
 
 func readinessCapacity(filesystem unix.Statfs_t) (free, allocation uint64, err error) {

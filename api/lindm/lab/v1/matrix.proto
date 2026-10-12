@@ -204,6 +204,13 @@ message MatrixLedgerEntry {
   // exists, and the authenticated repository metadata it retains unchanged.
   string repository_closure_sha256 = 16 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
   string repository_metadata_sha256 = 17 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  // Exact ordinary original-device recovery input, independently retained from
+  // the encrypted image. A different loader or repository is a new qualification.
+  string recovery_manifest = 18 [(buf.validate.field).string.max_len = 100];
+  string recovery_manifest_sha256 = 19 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  string recovery_repository_snapshot_date = 20 [(buf.validate.field).string.pattern = "^([0-9]{4}-[0-9]{2}-[0-9]{2})?$"];
+  string recovery_repository_closure_sha256 = 21 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
+  string recovery_repository_metadata_sha256 = 22 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
 }
 
 // MatrixVerdict is a lane outcome.

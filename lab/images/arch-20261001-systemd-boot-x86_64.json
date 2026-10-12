@@ -1,0 +1,20 @@
+{
+  "id": "arch-20261001-systemd-boot-x86-64",
+  "distribution": "arch",
+  "version": "rolling",
+  "architecture": "x86_64",
+  "release": "2026.10.01",
+  "imageFilename": "archlinux-2026.10.01-x86_64.iso",
+  "imageUrl": "https://geo.mirror.pkgbuild.com/iso/2026.10.01/archlinux-2026.10.01-x86_64.iso",
+  "checksumUrl": "https://geo.mirror.pkgbuild.com/iso/2026.10.01/sha256sums.txt",
+  "signatureUrl": "https://geo.mirror.pkgbuild.com/iso/2026.10.01/archlinux-2026.10.01-x86_64.iso.sig",
+  "keyUrl": "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3E80CA1A8B89F69CBA57D98A76A5EF9054449A5C",
+  "sha256": "684ded26c63240ff4a41e8c25ee84ea6da233f557364821f13d12c2b0a9059a5",
+  "signerFingerprint": "3E80CA1A8B89F69CBA57D98A76A5EF9054449A5C",
+  "imageSizeBytes": "1640497152",
+  "checksumMode": "CHECKSUM_MODE_DETACHED_IMAGE",
+  "signerProvenanceUrl": "https://archlinux.org/download/",
+  "releaseProvenanceUrl": "https://geo.mirror.pkgbuild.com/iso/2026.10.01/",
+  "repositorySnapshotDate": "2026-10-02",
+  "edition": "systemd-boot-lab"
+}

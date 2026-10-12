@@ -124,6 +124,9 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 	if binary.Machine != machine || binary.Class != elf.ELFCLASS64 || (binary.Type != elf.ET_EXEC && binary.Type != elf.ET_DYN) {
 		return nil, errors.New("agent must be an executable ELF binary matching the manifest architecture")
 	}
+	if options.DiagnosticsDir != "" {
+		hardware.bootDiagnostics = newInstallerDiagnostics(options.DiagnosticsDir, installerFailureInspection, architecture, manifest.GetSha256())
+	}
 	vm, verified, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, &hardware)
 	if err != nil {
 		return nil, err
@@ -149,6 +152,9 @@ func InspectVM(ctx context.Context, manifest *labv1.ImageManifest, options VMIns
 		return nil, err
 	}
 	if err := vm.connect(ctx); err != nil {
+		if hardware.bootDiagnostics != nil {
+			return nil, hardware.bootDiagnostics.saveFailure(vm.dir, vm.log, err)
+		}
 		return nil, err
 	}
 	runtimeEvidence, err := vm.runtimeEvidence(ctx)

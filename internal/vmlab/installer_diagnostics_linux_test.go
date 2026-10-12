@@ -30,7 +30,7 @@ func TestInstallerFailureDiagnosticsBoundRedactAndPreserveCause(t *testing.T) {
 	if _, err := process.log.Write([]byte("QEMU diagnostic in " + dir)); err != nil {
 		t.Fatal(err)
 	}
-	failure := d.saveFailure(dir, process, context.DeadlineExceeded)
+	failure := d.saveFailure(dir, process.log, context.DeadlineExceeded)
 	if !errors.Is(failure, context.DeadlineExceeded) {
 		t.Fatal("installer failure lost the original deadline cause")
 	}

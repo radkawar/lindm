@@ -164,6 +164,11 @@ func TestTumbleweedAutoYaSTBindsOwnedDiskPinnedMediaAndCredentials(t *testing.T)
 					t.Fatalf("installed provisioning lost %q", want)
 				}
 			}
+			// Regression: fresh firmware variables lost YaST's grub2-bls timeout
+			// and the first boot waited at the GRUB menu until the SSH deadline.
+			if !bytes.Contains(payload, []byte(grubEnvSetScript("/boot/efi/EFI/opensuse/grubenv", "timeout", "1"))) {
+				t.Fatal("grub2-bls menu timeout is not persisted on the ESP")
+			}
 			const machineIDReset = "install -m 0644 /dev/null /etc/machine-id"
 			if !bytes.Contains(payload, []byte(machineIDReset)) {
 				t.Fatal("machine identity inherits private credential mode")
@@ -249,8 +254,8 @@ func TestTumbleweedSnapshotTrustWorksInReadOnlyInstallationSystem(t *testing.T) 
 	if err := xml.Unmarshal(recipe, &profile); err != nil {
 		t.Fatal(err)
 	}
-	if len(profile.Scripts) != 1 {
-		t.Fatalf("profile has %d pre-scripts, want the snapshot trust script", len(profile.Scripts))
+	if len(profile.Scripts) != 2 {
+		t.Fatalf("profile has %d pre-scripts, want the snapshot trust and machine-ID hook scripts", len(profile.Scripts))
 	}
 	// The inst-sys /etc/ssl/certs is a writable symlinked directory.
 	certs := filepath.Join(root, "etc", "ssl", "certs")
@@ -511,5 +516,66 @@ func TestTumbleweedRemasterPatchesEFIImageGRUB(t *testing.T) {
 		if !bytes.Contains(cfg, []byte("autoyast=cd:/lindm-seed/autoinst.xml")) || !bytes.Contains(cfg, []byte("default='Installation'")) {
 			t.Fatalf("%s grub.cfg not patched: %s", name, cfg)
 		}
+	}
+}
+
+// The target has no grub2-editenv: the POSIX writer must produce a block GRUB
+// accepts and must replace only its own variable.
+func TestGRUBEnvironmentScriptWritesValidBlock(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "EFI", "opensuse", "grubenv")
+	run := func(key, value string) {
+		t.Helper()
+		if out, err := exec.Command("/bin/sh", "-eu", "-c", grubEnvSetScript(file, key, value)).CombinedOutput(); err != nil {
+			t.Fatalf("%v: %s", err, out)
+		}
+	}
+	run("saved_entry", "a")
+	run("timeout", "5")
+	run("timeout", "1")
+	block, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "# GRUB Environment Block\nsaved_entry=a\ntimeout=1\n"
+	if len(block) != 1024 || !strings.HasPrefix(string(block), want) || strings.Trim(string(block[len(want):]), "#") != "" {
+		t.Fatalf("invalid GRUB environment block %q", block)
+	}
+}
+
+// Regression: YaST's bootloader_finish runs systemd-machine-id-setup after the
+// chroot provisioning script, so the golden shipped one machine ID for every
+// clone. The installation-system hook must leave an empty, readable identity.
+func TestTumbleweedMachineIDHookEmptiesIdentityAfterBootloader(t *testing.T) {
+	var profile struct {
+		Scripts []string `xml:"scripts>pre-scripts>script>source"`
+	}
+	if err := xml.Unmarshal([]byte(`<profile><scripts><pre-scripts>`+tumbleweedMachineIDHook+`</pre-scripts></scripts></profile>`), &profile); err != nil || len(profile.Scripts) != 1 {
+		t.Fatalf("hook script does not parse: %v", err)
+	}
+	root := t.TempDir()
+	rooted := func(script string) string {
+		return strings.NewReplacer("/var/lib/YaST2/", root+"/var/lib/YaST2/", "/mnt/", root+"/mnt/").Replace(script)
+	}
+	if out, err := exec.Command("/bin/sh", "-c", rooted(profile.Scripts[0])).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	hook := filepath.Join(root, "var/lib/YaST2/hooks/after_bootloader_finish_00_lindm-machine-id")
+	body, err := os.ReadFile(hook)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := filepath.Join(root, "mnt/etc/machine-id")
+	if err := os.MkdirAll(filepath.Dir(identity), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(identity, []byte("0123456789abcdef0123456789abcdef\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	// The pre-script rewrite above already rooted the hook's /mnt paths.
+	if out, err := exec.Command("/bin/sh", "-c", string(body)).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if info, err := os.Stat(identity); err != nil || info.Size() != 0 || info.Mode().Perm() != 0o644 {
+		t.Fatalf("hook left machine identity %v %v", info, err)
 	}
 }

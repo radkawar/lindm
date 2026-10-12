@@ -16,6 +16,9 @@ type RepositorySnapshotRecipe struct {
 	// SnapshotPackages binds exact native selectors to VERSION_ID and architecture.
 	// An unrecorded snapshot has no complete installer recipe.
 	SnapshotPackages map[string]map[string][]string
+	// DesktopTaboo names, per VERSION_ID and architecture, packages a desktop
+	// golden must not select because the signed closure omits them.
+	DesktopTaboo map[string]map[string][]string
 }
 
 // RepositorySnapshotInputs includes the maintained lane recipes as well as

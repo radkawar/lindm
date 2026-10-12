@@ -38,6 +38,13 @@ func (s *Service) GetRecoveryReadiness(ctx context.Context, req *connect.Request
 		observer = recoveryboot.ObserveMeasuredReadiness
 	}
 	observation := s.observeRecoveryReadiness(ctx, observer)
+	if observation.GetReason() == "recovery_readiness_not_configured" {
+		facts, prerequisiteErr := recoveryboot.ObserveUnconfiguredReadiness(ctx)
+		observation.BootMode, observation.SecureBoot = facts.BootMode, facts.SecureBoot
+		if errors.Is(prerequisiteErr, recoveryboot.ErrOwnerKeyRequired) {
+			observation.Reason = recoveryboot.ErrOwnerKeyRequired.Error()
+		}
+	}
 	if observation.GetBootId() == "" {
 		s.logRecoveryReadinessFailure(&rootInventoryError{stage: "readiness_boot_id", err: errors.Join(errInternal, errors.New(observation.GetReason()))})
 		return nil, mapError(errInternal)
@@ -123,7 +130,9 @@ func (s *Service) observeRecoveryReadiness(ctx context.Context, observe func(con
 			"recovery_readiness_boot_filesystem_unsupported", "recovery_readiness_tpm_attestation_unavailable",
 			"recovery_readiness_measured_grub_required", "recovery_readiness_secure_boot_unmeasured",
 			"recovery_readiness_vendor_kernel_changed", "recovery_readiness_grub_editenv_required",
-			"recovery_readiness_measured_grub_unsupported", "recovery_readiness_grub_custom_unavailable":
+			"recovery_readiness_measured_grub_unsupported", "recovery_readiness_grub_custom_unavailable",
+			"recovery_readiness_owner_key_required", "recovery_readiness_bootctl_required",
+			"recovery_readiness_grub_loader_interface_required", "recovery_readiness_loader_oneshot_unsupported":
 			result.Reason = err.Error()
 		default:
 			result.Reason = "recovery_readiness_observation_failed"

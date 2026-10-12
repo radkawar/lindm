@@ -11,6 +11,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/agent/recoverycustody"
+	"lindm/internal/platform"
 )
 
 // RecoveryBootConfig contains resolved root-local paths and pinned release
@@ -151,7 +152,9 @@ func (s *Service) recoveryStageRequest(intent *agentv1.DeviceActionIntent, boot 
 		if request.GRUB, err = chain(); err != nil {
 			return recoveryboot.StageRequest{}, fmt.Errorf("%w: recovery_grub_chain_unavailable: %w", errResourceRejected, err)
 		}
-		request.GrubEnv = s.grubEnvironment(cfg.ESPPath, request.GRUB)
+		if request.GRUB.Entries != platform.GRUBBLSLoaderEntryOneShot {
+			request.GrubEnv = s.grubEnvironment(cfg.ESPPath, request.GRUB)
+		}
 	}
 	return request, nil
 }

@@ -47,6 +47,19 @@ type VMHardwareOptions struct {
 	// rootRepair is the release's registry Lab.RootPermissionsRepair; stock
 	// acceptance guests keep the vendor mode.
 	rootRepair []string
+	// bootDiagnostics is private, opt-in first-boot validation of unencrypted images.
+	bootDiagnostics *installerDiagnostics
+	// goldenDiagnosticsDir is the private parent for failed installed-golden
+	// diagnostics; empty keeps them in the lane work directory. Lanes set it
+	// when the work directory is removed (remote hosts) before inspection.
+	goldenDiagnosticsDir string
+}
+
+func (h *VMHardwareOptions) goldenDiagnosticsParent(workDir string) string {
+	if h.goldenDiagnosticsDir != "" {
+		return h.goldenDiagnosticsDir
+	}
+	return workDir
 }
 
 func (h *VMHardwareOptions) offlineRTCEnabled() bool {
@@ -177,6 +190,17 @@ func (v *guestVM) prepareHardware(ctx context.Context) error {
 	if err := os.Mkdir(filepath.Join(v.dir, "tpm"), 0700); err != nil {
 		return err
 	}
+	return v.startTPM(ctx)
+}
+
+// startTPM starts swtpm on the guest's persistent TPM state directory. QEMU
+// shuts the emulated TPM down when it powers off, which ends swtpm, so a cold
+// boot of the same guest needs a new instance on the same state.
+func (v *guestVM) startTPM(ctx context.Context) error {
+	if err := os.Remove(filepath.Join(v.dir, "tpm.sock")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	var err error
 	v.tpm, err = startEncryptedProcess(ctx, v.dir, "swtpm", "socket", "--tpm2", "--tpmstate", "dir=tpm", "--ctrl", "type=unixio,path=tpm.sock,mode=0600", "--flags", "not-need-init")
 	if err != nil {
 		return err
@@ -220,7 +244,11 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 	if h.Architecture == "x86_64" && h.Firmware != nil && h.Firmware.SecureBoot {
 		machine += ",smm=on"
 	}
-	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", "unix:serial.sock,server=on,wait=off", "-monitor", "none", "-qmp", "unix:qmp.sock,server=on,wait=off", "-machine", machine, "-cpu", cpu, "-m", "2048", "-smp", "2"}
+	serial := "unix:serial.sock,server=on,wait=off"
+	if h.bootDiagnostics != nil {
+		serial = "stdio"
+	}
+	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", serial, "-monitor", "none", "-qmp", "unix:qmp.sock,server=on,wait=off", "-machine", machine, "-cpu", cpu, "-m", "2048", "-smp", "2"}
 	if h.offlineRTCEnabled() {
 		args = append(args, "-rtc", "base=utc,clock=host")
 	}

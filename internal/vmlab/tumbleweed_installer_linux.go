@@ -26,7 +26,7 @@ import (
 const tumbleweedInstallerEdition = "dvd"
 
 // Bump when the AutoYaST profile or machine layout changes.
-const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v9"
+const tumbleweedInstallerRecipeVersion = "opensuse-tumbleweed-dvd-autoyast-v10"
 
 // tumbleweedSSHDOrdering closes a vendor boot race. Tumbleweed starts sshd and
 // systemd-user-sessions in parallel once cloud-init's network stage finishes;
@@ -69,8 +69,8 @@ func tumbleweedInstallerImage(m *labv1.ImageManifest) (*installerImage, error) {
 		memoryMiB: 4096,
 		snapshot:  snapshot,
 		// The ordinary profile carries no unlock secret; a stalled AutoYaST
-		// dialog is otherwise invisible until the installer deadline.
-		consoleDiagnostics: true,
+		// dialog or failed first boot is otherwise invisible until a deadline.
+		consoleDiagnostics: true, firstBootDiagnostics: true,
 		recipe: func(disk, architecture, sourceDigest, login, hostPrivate, hostPublic string) ([]byte, error) {
 			return tumbleweedInstallerRecipeWithEncryption(release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, "", "", false, snapshot)
 		},
@@ -117,6 +117,9 @@ func tumbleweedInstallerRecipeWithEncryption(release *platform.Release, version,
 // never from ordinary/encrypted golden admission. It has no network repository
 // or cloud-init dependency; its fixed SSH identity exists only for this run.
 func tumbleweedInstallerProfile(release *platform.Release, version, disk, architecture, sourceDigest, login, hostPrivate, hostPublic, passphrase, desktop string, tpmBoot bool, snapshot *tumbleweedSnapshotRepository, captureOnly bool) ([]byte, error) {
+	if release == nil {
+		return nil, errors.New("AutoYaST requires platform facts")
+	}
 	if disk != "/dev/vda" && disk != "/dev/sda" && disk != "/dev/nvme0n1" {
 		return nil, errors.New("tumbleweed installer requires an owned guest root disk")
 	}
@@ -142,17 +145,17 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 	var addOn, preScript, trust, cloudPackages string
 	recommended, enhancedBase := "true", "<pattern>enhanced_base</pattern>"
 	if captureOnly {
-		if passphrase != "" || desktop != "" || tpmBoot || snapshot != nil || release == nil {
+		if passphrase != "" || desktop != "" || tpmBoot || snapshot != nil {
 			return nil, errors.New("capture bootstrap cannot select an encrypted, desktop or network installer")
 		}
 		recommended, enhancedBase = "false", ""
-		preScript = `<pre-scripts config:type="list"><script><filename>lindm-bootstrap-stage</filename><interpreter>shell</interpreter><source><![CDATA[` + tumbleweedInstallerStage("profile-pre") + `]]></source></script></pre-scripts>`
+		preScript = `<pre-scripts config:type="list"><script><filename>lindm-bootstrap-stage</filename><interpreter>shell</interpreter><source><![CDATA[` + tumbleweedInstallerStage("profile-pre") + `]]></source></script>` + tumbleweedMachineIDHook + `</pre-scripts>`
 	} else {
 		repository, before, ca, repositoryErr := tumbleweedInstallerRepository(snapshot)
 		if repositoryErr != nil {
 			return nil, repositoryErr
 		}
-		preScript, trust = before, ca
+		preScript, trust = strings.Replace(before, "</pre-scripts>", tumbleweedMachineIDHook+"</pre-scripts>", 1), ca
 		addOn = `<add-on><add_on_others config:type="list"><listentry><media_url>` + repository + `</media_url><alias>` + tumbleweedRepositoryAlias + `</alias><name>openSUSE Tumbleweed OSS (snapshot-bound)</name><priority config:type="integer">120</priority><ask_on_error config:type="boolean">false</ask_on_error></listentry></add_on_others></add-on>`
 		cloudPackages = "<package>cloud-init</package><package>cloud-init-config-suse</package>"
 	}
@@ -164,7 +167,6 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 	if !captureOnly {
 		provision += "install -d -m 0755 /etc/cloud/cloud.cfg.d\nprintf '%s\\n' 'datasource_list: [ NoCloud ]' 'network: {config: disabled}' > /etc/cloud/cloud.cfg.d/99-lindm-lab.cfg\n"
 	}
-	provision += "printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + "\n"
 	provision += "systemctl enable sshd.service\n"
 	if !captureOnly {
 		// SUSE's generator enables cloud-init.target; the stage units have
@@ -174,6 +176,8 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 	provision += "install -d -m 0755 " + path.Dir(tumbleweedSSHDOrdering) + "\nprintf '%s\\n' '[Unit]' 'After=systemd-user-sessions.service' > " + tumbleweedSSHDOrdering + "\n"
 	// The credential writer leaves umask 077. The first boot fills this public
 	// identity without changing its mode; unprivileged D-Bus must read it.
+	// bootloader_finish later runs systemd-machine-id-setup, so
+	// tumbleweedMachineIDHook empties it again after that step.
 	provision += "rm -f /etc/machine-id\ninstall -m 0644 /dev/null /etc/machine-id\n"
 	partitions, packages, loader := "", "", ""
 	pinnedPackages := ""
@@ -189,14 +193,30 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 		}
 		provision += "printf '%s\\n' 'repository-bootstrap-v1' > /etc/lindm-repository-bootstrap\n"
 		provision += tumbleweedInstallerStage("provision-complete")
+	} else {
+		loader = "<loader_type>grub2-bls</loader_type>"
+		// YaST's bootloader_finish runs after this chroot script and stores
+		// the profile timeout with `sdbootutil set-timeout`, which prefers the
+		// LoaderConfigTimeout EFI variable. The golden boots with fresh
+		// firmware variables, so its first boot waited at the GRUB menu
+		// (observed on aarch64; installed y2log shows the order). An earlier
+		// `sdbootutil --no-variables set-timeout` here wrote EFI/BOOT because
+		// EFI/<vendor> did not exist yet, and the target has no grub2-editenv.
+		// GRUB2-BLS loads the grubenv beside its grub.efi, and `sdbootutil
+		// install` does not remove an existing one, so create it in the registry's
+		// vendor directory now.
+		chain := release.Quirks.RecoveryGRUB
+		if chain.BootDirectory == "" || chain.ConfigDirectory == "" {
+			return nil, errors.New("tumbleweed GRUB2-BLS golden requires the registry vendor ESP directory")
+		}
+		provision += grubEnvSetScript(path.Join(chain.BootDirectory, chain.ConfigDirectory, "grubenv"), "timeout", "1")
+		for _, inputs := range [][]string{release.Lab.Guest.Actions, release.Lab.Guest.MeasuredBoot} {
+			for _, pkg := range inputs {
+				packages += "<package>" + pkg + "</package>\n"
+			}
+		}
 	}
 	if passphrase != "" {
-		loader = "<loader_type>grub2-bls</loader_type>"
-		// The profile's timeout did not survive into the golden: booted with
-		// fresh firmware variables, the first boot waited indefinitely at the
-		// GRUB menu (observed on aarch64). sdbootutil without EFI variables
-		// persists it in the vendor ESP grubenv, which GRUB2-BLS reads.
-		provision += "sdbootutil --no-variables set-timeout 1\n"
 		var escaped bytes.Buffer
 		if err := xml.EscapeText(&escaped, []byte(passphrase)); err != nil {
 			return nil, err
@@ -206,7 +226,7 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 <partition><mount>/boot</mount><filesystem config:type="symbol">ext4</filesystem><size>1G</size></partition>
 <partition><mount>/</mount><filesystem config:type="symbol">btrfs</filesystem><size>max</size><crypt_fs config:type="boolean">true</crypt_fs><crypt_method config:type="symbol">luks2</crypt_method><crypt_key>` + escaped.String() + `</crypt_key></partition>
 </partitions>`
-		for _, pkg := range append(append([]string{}, release.Lab.Guest.Actions...), release.Lab.Session.Desktops[desktop]...) {
+		for _, pkg := range release.Lab.Session.Desktops[desktop] {
 			packages += "<package>" + pkg + "</package>\n"
 		}
 		if tpmBoot {
@@ -221,9 +241,22 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
 		}
 	}
 	provision += pinnedPackages
-	target := "multi-user"
+	// AutoYaST reports a failed chroot-script line as a timed warning and
+	// continues (observed). The source marker is written last, so the
+	// installed source_marker probe refuses a partially provisioned golden.
+	provision += "printf '%s\\n' '" + sourceDigest + "' > " + installerSourceMarkerPath + "\n"
+	target, taboo := "multi-user", ""
 	if desktop != "" {
 		target = "graphical"
+		// The desktop pattern's locale recommendations can select packages
+		// absent from the signed snapshot closure (aarch64 GNOME:
+		// openconnect-lang); the installer then stalls. The registry lists them.
+		for _, pkg := range platform.RepositorySnapshotRecipes[release.ID].DesktopTaboo[version][architecture] {
+			taboo += "<package>" + pkg + "</package>"
+		}
+		if taboo != "" {
+			taboo = `<remove-packages config:type="list">` + taboo + `</remove-packages>`
+		}
 	}
 	// Base64 keeps credential bytes outside XML and shell token syntax.
 	script := "printf '%s' '" + base64.StdEncoding.EncodeToString([]byte(provision)) + "' | base64 -d > /tmp/lindm-provision && /bin/sh -eu /tmp/lindm-provision && rm -f /tmp/lindm-provision\n"
@@ -277,6 +310,7 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
       %[5]s
       %[7]s
     </packages>
+    %[13]s
   </software>
   <services-manager>
     <default_target>%[10]s</default_target>
@@ -319,7 +353,7 @@ func tumbleweedInstallerProfile(release *platform.Release, version, disk, archit
     </chroot-scripts>
   </scripts>
 </profile>
-`, disk, console, script, addOn, cloudPackages, partitions, packages, loader, preScript, target, recommended, enhancedBase)), nil
+`, disk, console, script, addOn, cloudPackages, partitions, packages, loader, preScript, target, recommended, enhancedBase, taboo)), nil
 }
 
 func tumbleweedInstallerRepository(snapshot *tumbleweedSnapshotRepository) (repository, preScript, provision string, err error) {
@@ -350,6 +384,16 @@ ln -s lindm-snapshot.pem "/etc/ssl/certs/$hash.0"
 ]]></source></script></pre-scripts>`
 	return escaped.String(), preScript, provision, nil
 }
+
+// tumbleweedMachineIDHook is an installation-system pre-script that installs a
+// YaST hook (hook_name_NN_*, /var/lib/YaST2/hooks) run after bootloader_finish.
+// That step runs systemd-machine-id-setup after the chroot provisioning script
+// (installed y2log), which would ship one machine ID in every clone.
+const tumbleweedMachineIDHook = `<script><filename>lindm-machine-id-hook</filename><interpreter>shell</interpreter><source><![CDATA[set -eu
+install -d /var/lib/YaST2/hooks
+printf '%s\n' '#!/bin/sh' 'set -eu' 'rm -f /mnt/etc/machine-id' 'install -m 0644 /dev/null /mnt/etc/machine-id' > /var/lib/YaST2/hooks/after_bootloader_finish_00_lindm-machine-id
+chmod 0755 /var/lib/YaST2/hooks/after_bootloader_finish_00_lindm-machine-id
+]]></source></script>`
 
 func tumbleweedInstallerStage(stage string) string {
 	return "printf '\\n%s\\n' 'LINDM_INSTALLER_STAGE=" + stage + "' > /dev/console\n"
@@ -382,4 +426,14 @@ func tumbleweedSnapshotPackageSelection(release *platform.Release, version, arch
 		check += "test \"$(rpm -q --qf '%{EPOCHNUM}:%{VERSION}-%{RELEASE}\\n' -- " + nativeQuote(name) + ")\" = " + nativeQuote(evr) + "\n"
 	}
 	return packages, check, nil
+}
+
+// grubEnvSetScript sets key=value in a GRUB environment block with POSIX
+// tools only, preserving other variables. GRUB reads exactly 1024 bytes that
+// start with its header line; the remainder is '#' padding.
+func grubEnvSetScript(file, key, value string) string {
+	env, staged := nativeQuote(file), nativeQuote(file+".lindm")
+	return "install -d " + nativeQuote(path.Dir(file)) + "\n" +
+		"{ printf '%s\\n' '# GRUB Environment Block'; if test -f " + env + "; then grep -v -e '^#' -e " + nativeQuote("^"+key+"=") + " " + env + " || :; fi; printf '%s\\n' " + nativeQuote(key+"="+value) + "; } > " + staged + "\n" +
+		"pad=$((1024 - $(wc -c < " + staged + ")))\ntest \"$pad\" -ge 0\nprintf '%*s' \"$pad\" '' | tr ' ' '#' >> " + staged + "\nmv " + staged + " " + env + "\n"
 }

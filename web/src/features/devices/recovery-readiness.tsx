@@ -1,4 +1,5 @@
 import type { RecoveryReadiness } from "../../../gen/lindm/admin/v1/device_actions_pb";
+import { RecoveryBootMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { exactBytes, formatBytes } from "@/lib/bytes";
@@ -39,6 +40,7 @@ export function RecoveryReadinessView({
   const observation = readiness?.observation;
   const observed = observation?.available === true;
   const reason = readiness?.reason || "device_action_recovery_readiness_missing";
+  const method = observation?.bootMode;
   return (
     <section className="grid gap-3 border p-4" aria-label="Recovery readiness">
       <div className="flex flex-wrap items-center gap-2">
@@ -60,6 +62,13 @@ export function RecoveryReadinessView({
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <Fact label="Reported">
           <ObservedTime value={observation?.observedAt} />
+        </Fact>
+        <Fact label="Recovery method">
+          {method === RecoveryBootMode.UKI
+            ? "Signed UKI (systemd-boot)"
+            : method === RecoveryBootMode.MEASURED_GRUB
+              ? "Measured GRUB"
+              : "Not available"}
         </Fact>
         <Fact label="Boot partition">{observed ? observation.espPath : "Not available"}</Fact>
         <Fact label="Available space">

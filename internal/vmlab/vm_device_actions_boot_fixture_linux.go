@@ -178,6 +178,8 @@ type actionOwnedBootEvidence struct {
 	OriginalTarget    actionNativeTarget `json:"original_unencrypted_target"`
 	StateTarget       actionNativeTarget `json:"off_target_state_target"`
 	RedHat            *VMRedHatEvidence  `json:"redhat,omitempty"`
+	BootstrapRuntime  *vmRuntimeEvidence `json:"bootstrap_runtime,omitempty"`
+	OwnerPoweroffAt   time.Time          `json:"owner_enrollment_poweroff_at,omitempty"`
 }
 
 func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTarget, *actionNativeTarget, error) {
@@ -228,6 +230,8 @@ func actionOwnedCloudTargets(ctx context.Context, vm *guestVM) (*actionNativeTar
 type actionOwnedBootEntitlement struct {
 	LabBinary       string
 	RedHatTokenFile string
+	// Only an explicit noSB installer baseline may transition to this firmware.
+	OwnerFirmware *EncryptedFirmwareOptions
 }
 
 // registerRHELOwnedBoot registers the disposable vendor guest only for the
@@ -271,6 +275,15 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	}
 	evidence.OriginalTarget, evidence.StateTarget = *root, *state
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	if entitlement.OwnerFirmware != nil {
+		evidence.BootstrapRuntime, err = vm.runtimeEvidence(ctx)
+		if err != nil {
+			return evidence, err
+		}
+		if _, err := observeActionSystemdLoader(ctx, vm); err != nil {
+			return evidence, err
+		}
+	}
 	install, err := labInstallCommand(release, release.Lab.Guest.OwnedBoot)
 	if err != nil || release.Lab.Guest.Initrd == "" {
 		return evidence, errors.Join(fmt.Errorf("owned boot fixture requires a maintained package recipe and initramfs path for %s", release.Name), err)
@@ -355,7 +368,12 @@ func provisionActionOwnedBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 	if configured.ExitCode != 0 {
 		return evidence, fmt.Errorf("install owned signed boot: guest exit %d: %s", configured.ExitCode, configured.Stderr)
 	}
-	if err := rebootLifecycleGuest(ctx, vm, evidence.OriginalBootID); err != nil {
+	if entitlement.OwnerFirmware != nil {
+		evidence.OwnerPoweroffAt, err = vm.coldBootOwnerFirmware(ctx, *entitlement.OwnerFirmware)
+	} else {
+		err = rebootLifecycleGuest(ctx, vm, evidence.OriginalBootID)
+	}
+	if err != nil {
 		return evidence, err
 	}
 	status, err := vm.runResult(ctx, "cat /proc/sys/kernel/random/boot_id; sudo -n bootctl --esp-path=/boot/efi status --no-pager", nil, 32<<10, 15*time.Second)
@@ -414,6 +432,11 @@ func observeActionOwnedFirmware(ctx context.Context, vm *guestVM) (string, error
 			return "", errors.New("owned firmware did not enforce Secure Boot user mode")
 		}
 	}
+	return observeActionSystemdLoader(ctx, vm)
+}
+
+func observeActionSystemdLoader(ctx context.Context, vm *guestVM) (string, error) {
+	const variables = "/sys/firmware/efi/efivars/"
 	raw, err := vm.run(ctx, "sudo -n cat "+nativeQuote(variables+"LoaderInfo-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f"), nil, 4096, 10*time.Second)
 	if err != nil {
 		return "", err

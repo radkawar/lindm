@@ -3,6 +3,8 @@ package recoveryboot
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"crypto/sha256"
 	"io"
 	"os"
 	"path/filepath"
@@ -75,6 +77,8 @@ func TestMeasuredChainRejectsUnlistedTools(t *testing.T) {
 		{Entries: platform.GRUBBLS, Editenv: "/tmp/grub2-editenv"},
 		{Entries: platform.GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "../grub"},
 		{Entries: "systemd-boot", Editenv: "/usr/bin/grub2-editenv"},
+		{Entries: platform.GRUBBLSLoaderEntryOneShot, BootDirectory: "/boot/efi", ConfigDirectory: "../EFI"},
+		{Entries: platform.GRUBBLSLoaderEntryOneShot, BootDirectory: "/boot/efi", ConfigDirectory: "EFI/vendor", Editenv: "/usr/bin/grub2-editenv"},
 	} {
 		if validChain(chain) {
 			t.Fatalf("unqualified chain accepted: %+v", chain)
@@ -83,6 +87,7 @@ func TestMeasuredChainRejectsUnlistedTools(t *testing.T) {
 	for _, chain := range []platform.GRUBChain{
 		{Entries: platform.GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"},
 		{Entries: platform.GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "grub"},
+		{Entries: platform.GRUBBLSLoaderEntryOneShot, BootDirectory: "/boot/efi", ConfigDirectory: "EFI/vendor"},
 	} {
 		if !validChain(chain) {
 			t.Fatalf("registry chain refused: %+v", chain)
@@ -158,5 +163,99 @@ func TestBootFilesystemUUIDAcceptsOnlyCanonicalSupportedFilesystems(t *testing.T
 		if _, err := parseBootFilesystemUUID(invalid); err == nil {
 			t.Fatalf("unsafe boot filesystem identity accepted: %q", invalid)
 		}
+	}
+}
+func TestLoaderEntryMeasuredKernelKeepsNestedESPPath(t *testing.T) {
+	chain := platform.GRUBChain{Entries: platform.GRUBBLSLoaderEntryOneShot}
+	got, err := measuredKernelFile("/boot/efi", chain, "/0123456789abcdef/7.2.9-1-default/linux")
+	if err != nil || got != "/boot/efi/0123456789abcdef/7.2.9-1-default/linux" {
+		t.Fatalf("nested kernel = %q, %v", got, err)
+	}
+	for _, bad := range []string{"linux", "/../linux", "/id/../linux", "/id//linux", "/id\\linux", "/"} {
+		if _, err := measuredKernelFile("/boot/efi", chain, bad); err == nil {
+			t.Fatalf("unsafe kernel path accepted: %q", bad)
+		}
+	}
+}
+
+func TestLoaderEntryStaleRecoveryEntryRefused(t *testing.T) {
+	dir := t.TempDir()
+	const action = "12345678-1234-1234-1234-123456789abc"
+	layout := &measuredLayout{chain: platform.GRUBChain{Entries: platform.GRUBBLSLoaderEntryOneShot}, entryDir: dir, entryFile: filepath.Join(dir, blsEntryPrefix+action+".conf")}
+	if err := os.WriteFile(filepath.Join(dir, blsEntryPrefix+"old-action.conf"), []byte("linux /old\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, staged := range []bool{false, true} {
+		if _, err := measuredSnapshot(context.Background(), layout, StageRequest{}, staged); err == nil || !strings.Contains(err.Error(), "foreign_last_sorted_entry") {
+			t.Fatalf("stale entry staged=%v: %v", staged, err)
+		}
+	}
+}
+
+func TestLoaderEntrySnapshotPreservesVendorAssetsAndBindsSelection(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("protected boot asset snapshot requires root")
+	}
+	// OpenRoot deliberately rejects /tmp's writable ancestors, including a
+	// sticky /tmp; exercise the real protected-path boundary under /run.
+	esp, err := os.MkdirTemp("/run", "lindm-recovery-loader-test-")
+	if os.IsPermission(err) {
+		t.Skip("protected /run fixture requires root filesystem access")
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(esp); err != nil {
+			t.Error(err)
+		}
+	})
+	chain := platform.GRUBChain{Entries: platform.GRUBBLSLoaderEntryOneShot, ConfigDirectory: "EFI/vendor"}
+	files := map[string][]byte{
+		"EFI/vendor/grub.efi":          []byte("unchanged signed vendor binary"),
+		"EFI/vendor/grubenv":           []byte("vendor-owned defaults"),
+		"EFI/BOOT/BOOTX64.EFI":         []byte("unchanged fallback shim"),
+		"loader/loader.conf":           []byte("default ordinary.conf\n"),
+		"loader/entries/ordinary.conf": []byte("linux /machine/kernel/linux\ninitrd /machine/kernel/initrd\n"),
+	}
+	for name, content := range files {
+		name = filepath.Join(esp, name)
+		if err := os.MkdirAll(filepath.Dir(name), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(name, content, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	selection := map[string]string{"LoaderEntryDefault": "ordinary.conf", "LoaderInfo": "GRUB 2.14"}
+	read := func(name, _ string) (string, error) { return selection[name], nil }
+	before, err := loaderEntrySnapshot(esp, chain, read)
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection["LoaderEntryOneShot"] = "unrelated-owner-entry"
+	after, err := loaderEntrySnapshot(esp, chain, read)
+	if err != nil || bytes.Equal(before, after) {
+		t.Fatalf("foreign one-shot was not bound: %v", err)
+	}
+	delete(selection, "LoaderEntryOneShot")
+	for name, content := range files {
+		got, err := os.ReadFile(filepath.Join(esp, name))
+		if err != nil || !bytes.Equal(got, content) {
+			t.Fatalf("owner asset changed: %s, %v", name, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(esp, "EFI/vendor/grubenv"), []byte("changed default"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	after, err = loaderEntrySnapshot(esp, chain, read)
+	if err != nil || bytes.Equal(before, after) || len(after) != sha256.Size {
+		t.Fatalf("vendor override was not bound: %v", err)
+	}
+	if err := os.Symlink("/etc/passwd", filepath.Join(esp, "EFI/vendor/linked")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loaderEntrySnapshot(esp, chain, read); err == nil {
+		t.Fatal("linked owner boot asset accepted")
 	}
 }

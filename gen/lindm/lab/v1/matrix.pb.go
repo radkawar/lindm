@@ -495,8 +495,15 @@ type MatrixLedgerEntry struct {
 	// exists, and the authenticated repository metadata it retains unchanged.
 	RepositoryClosureSha256  string `protobuf:"bytes,16,opt,name=repository_closure_sha256,json=repositoryClosureSha256,proto3" json:"repository_closure_sha256,omitempty"`
 	RepositoryMetadataSha256 string `protobuf:"bytes,17,opt,name=repository_metadata_sha256,json=repositoryMetadataSha256,proto3" json:"repository_metadata_sha256,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Exact ordinary original-device recovery input, independently retained from
+	// the encrypted image. A different loader or repository is a new qualification.
+	RecoveryManifest                 string `protobuf:"bytes,18,opt,name=recovery_manifest,json=recoveryManifest,proto3" json:"recovery_manifest,omitempty"`
+	RecoveryManifestSha256           string `protobuf:"bytes,19,opt,name=recovery_manifest_sha256,json=recoveryManifestSha256,proto3" json:"recovery_manifest_sha256,omitempty"`
+	RecoveryRepositorySnapshotDate   string `protobuf:"bytes,20,opt,name=recovery_repository_snapshot_date,json=recoveryRepositorySnapshotDate,proto3" json:"recovery_repository_snapshot_date,omitempty"`
+	RecoveryRepositoryClosureSha256  string `protobuf:"bytes,21,opt,name=recovery_repository_closure_sha256,json=recoveryRepositoryClosureSha256,proto3" json:"recovery_repository_closure_sha256,omitempty"`
+	RecoveryRepositoryMetadataSha256 string `protobuf:"bytes,22,opt,name=recovery_repository_metadata_sha256,json=recoveryRepositoryMetadataSha256,proto3" json:"recovery_repository_metadata_sha256,omitempty"`
+	unknownFields                    protoimpl.UnknownFields
+	sizeCache                        protoimpl.SizeCache
 }
 
 func (x *MatrixLedgerEntry) Reset() {
@@ -648,6 +655,41 @@ func (x *MatrixLedgerEntry) GetRepositoryMetadataSha256() string {
 	return ""
 }
 
+func (x *MatrixLedgerEntry) GetRecoveryManifest() string {
+	if x != nil {
+		return x.RecoveryManifest
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRecoveryManifestSha256() string {
+	if x != nil {
+		return x.RecoveryManifestSha256
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRecoveryRepositorySnapshotDate() string {
+	if x != nil {
+		return x.RecoveryRepositorySnapshotDate
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRecoveryRepositoryClosureSha256() string {
+	if x != nil {
+		return x.RecoveryRepositoryClosureSha256
+	}
+	return ""
+}
+
+func (x *MatrixLedgerEntry) GetRecoveryRepositoryMetadataSha256() string {
+	if x != nil {
+		return x.RecoveryRepositoryMetadataSha256
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_matrix_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
@@ -686,7 +728,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x14lab.matrix_cell_lane\x12ia cell names either a lane or the reason no maintained lane exists; arguments and Secure Boot need a lane\x1aithis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
-	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xc3\a\n" +
+	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\x90\v\n" +
 	"\x11MatrixLedgerEntry\x12%\n" +
 	"\bplatform\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\bplatform\x12\x1d\n" +
 	"\x04cell\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\x04cell\x12:\n" +
@@ -708,7 +750,12 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x0fmanifest_sha256\x18\x0e \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x0emanifestSha256\x12`\n" +
 	"\x18repository_snapshot_date\x18\x0f \x01(\tB&\xbaH#r!2\x1f^([0-9]{4}-[0-9]{2}-[0-9]{2})?$R\x16repositorySnapshotDate\x12T\n" +
 	"\x19repository_closure_sha256\x18\x10 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x17repositoryClosureSha256\x12V\n" +
-	"\x1arepository_metadata_sha256\x18\x11 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x18repositoryMetadataSha256*i\n" +
+	"\x1arepository_metadata_sha256\x18\x11 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x18repositoryMetadataSha256\x124\n" +
+	"\x11recovery_manifest\x18\x12 \x01(\tB\a\xbaH\x04r\x02\x18dR\x10recoveryManifest\x12R\n" +
+	"\x18recovery_manifest_sha256\x18\x13 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x16recoveryManifestSha256\x12q\n" +
+	"!recovery_repository_snapshot_date\x18\x14 \x01(\tB&\xbaH#r!2\x1f^([0-9]{4}-[0-9]{2}-[0-9]{2})?$R\x1erecoveryRepositorySnapshotDate\x12e\n" +
+	"\"recovery_repository_closure_sha256\x18\x15 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x1frecoveryRepositoryClosureSha256\x12g\n" +
+	"#recovery_repository_metadata_sha256\x18\x16 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R recoveryRepositoryMetadataSha256*i\n" +
 	"\vMatrixImage\x12\x1c\n" +
 	"\x18MATRIX_IMAGE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MATRIX_IMAGE_CLOUD\x10\x01\x12$\n" +

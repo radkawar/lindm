@@ -314,7 +314,9 @@ type RecoveryMeasuredBoot struct {
 	// Marshaled TPMT_PUBLIC of a restricted fixedTPM ECDSA P-256 signing key.
 	AttestationKeyPublic []byte `protobuf:"bytes,1,opt,name=attestation_key_public,json=attestationKeyPublic,proto3" json:"attestation_key_public,omitempty"`
 	KernelSha256         []byte `protobuf:"bytes,2,opt,name=kernel_sha256,json=kernelSha256,proto3" json:"kernel_sha256,omitempty"`
-	// GRUB-relative vendor kernel path from the ordinary GRUB boot.
+	// GRUB-relative vendor kernel path from the ordinary GRUB boot: a
+	// vmlinuz-<release> image, or sdbootutil's ESP BLS linux-<digest> image
+	// (openSUSE GRUB2-BLS, nested under <entry-token>/<release>/).
 	KernelPath    string `protobuf:"bytes,3,opt,name=kernel_path,json=kernelPath,proto3" json:"kernel_path,omitempty"`
 	KernelOptions string `protobuf:"bytes,4,opt,name=kernel_options,json=kernelOptions,proto3" json:"kernel_options,omitempty"`
 	// GRUB-relative staged initramfs path measured by the initrd command.
@@ -1485,12 +1487,12 @@ const file_lindm_agent_v1_device_action_recovery_proto_rawDesc = "" +
 	" \x01(\v2%.lindm.agent.v1.DeviceActionChallengeB\x06\xbaH\x03\xc8\x01\x01R\tchallenge\x12I\n" +
 	"\rmeasured_boot\x18\v \x01(\v2$.lindm.agent.v1.RecoveryMeasuredBootR\fmeasuredBoot:\x97\x05\xbaH\x93\x05\x1a\x9c\x03\n" +
 	"\x16recovery_handoff.scope\x12Dhandoff requires signed unencrypted recovery spec and bounded expiry\x1a\xbb\x02has(this.intent.spec.sanitize) && has(this.intent.spec.sanitize.recovery) && this.expires_at <= this.intent.expires_at && this.expires_at > this.intent.not_before && this.recovery_image_sha256 == this.intent.spec.sanitize.recovery.image_sha256 && this.media_sha256 == this.intent.spec.sanitize.recovery.media_sha256\x1a\xf1\x01\n" +
-	"\x1erecovery_handoff.measured_boot\x12Kmeasured GRUB recovery requires its measured binding and off-target custody\x1a\x81\x01(this.intent.spec.sanitize.recovery.boot_mode == 3) == has(this.measured_boot) && (!has(this.measured_boot) || this.custody == 1)\"\xfe\x02\n" +
+	"\x1erecovery_handoff.measured_boot\x12Kmeasured GRUB recovery requires its measured binding and off-target custody\x1a\x81\x01(this.intent.spec.sanitize.recovery.boot_mode == 3) == has(this.measured_boot) && (!has(this.measured_boot) || this.custody == 1)\"\x86\x03\n" +
 	"\x14RecoveryMeasuredBoot\x12@\n" +
 	"\x16attestation_key_public\x18\x01 \x01(\fB\n" +
 	"\xbaH\az\x05\x10\x01\x18\x80\bR\x14attestationKeyPublic\x12,\n" +
-	"\rkernel_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fkernelSha256\x12Z\n" +
-	"\vkernel_path\x18\x03 \x01(\tB9\xbaH6r4\x18\xff\x012/^/([A-Za-z0-9._+-]+/)*vmlinuz-[A-Za-z0-9._+-]+$R\n" +
+	"\rkernel_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fkernelSha256\x12b\n" +
+	"\vkernel_path\x18\x03 \x01(\tBA\xbaH>r<\x18\xff\x0127^/([A-Za-z0-9._+-]+/)*(vmlinuz|linux)-[A-Za-z0-9._+-]+$R\n" +
 	"kernelPath\x121\n" +
 	"\x0ekernel_options\x18\x04 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\rkernelOptions\x12g\n" +

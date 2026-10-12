@@ -189,6 +189,9 @@ type Quirks struct {
 	// SSHBannerUnit admits only the typed pre-authentication banner provider.
 	// Read the release's own row, not Native(): qualification is not inherited.
 	SSHBannerUnit string
+	// RecoveryOwnerKey requires an owner-enrolled Secure Boot key for UKI
+	// recovery. This is a loader policy of the release itself, not its base.
+	RecoveryOwnerKey bool
 }
 
 // GRUBEntries is the vendor GRUB menu source a one-shot entry is added to.
@@ -200,6 +203,10 @@ const (
 	// GRUBBLS: blscfg reads <boot>/loader/entries; next_entry names the
 	// entry file stem.
 	GRUBBLS GRUBEntries = "bls"
+	// GRUBBLSLoaderEntryOneShot: BLS entries and kernel paths are relative
+	// to the loader ESP, and the Boot Loader Interface EFI variable selects
+	// the entry once. This is not blscfg's grubenv next_entry protocol.
+	GRUBBLSLoaderEntryOneShot GRUBEntries = "bls-loader-entry-oneshot"
 	// GRUBCustomConfig: grub.d's 41_custom sources <boot>/<ConfigDirectory>/
 	// custom.cfg at boot without regenerating grub.cfg; next_entry names the
 	// menuentry --id.
@@ -209,6 +216,8 @@ const (
 // GRUBChain is the stock shim+GRUB facts measured recovery relies on.
 type GRUBChain struct {
 	Entries GRUBEntries
+	// BootDirectory is the mounted vendor boot filesystem used for staging.
+	BootDirectory string
 	// Editenv is the absolute path of the distribution's grub-editenv, which
 	// writes next_entry where the signed GRUB reads it (a grubenv file or the
 	// btrfs bootloader env_block).

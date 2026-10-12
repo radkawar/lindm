@@ -296,3 +296,18 @@ func TestFinalGRUBBootSkipsDigestBoundEcho(t *testing.T) {
 		t.Fatal("extra GRUB command between kernel_cmdline and initrd accepted")
 	}
 }
+
+func TestGRUBLoaderInfoAcceptsUpstreamAndOpenSUSENames(t *testing.T) {
+	for loader, want := range map[string]bool{
+		"GRUB 2.14":          true,
+		"GRUB2 2.14":         true,
+		"GRUB":               false,
+		"GRUBX 2.14":         false,
+		"systemd-boot 258.1": false,
+		"":                   false,
+	} {
+		if got := GRUBLoaderInfo(loader); got != want {
+			t.Errorf("GRUBLoaderInfo(%q) = %v, want %v", loader, got, want)
+		}
+	}
+}

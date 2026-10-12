@@ -14,7 +14,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags := flag.NewFlagSet("vm device-actions", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	manifestPath := flags.String("manifest", "", "signed encrypted installer manifest of a release whose registry row supports the selected device-action capabilities")
-	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud recovery image manifest")
+	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud image or explicit systemd-boot installer recovery baseline")
 	var options vmlab.VMDeviceActionsOptions
 	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")
 	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
@@ -42,6 +42,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
 	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland; empty is a headless server golden, refused for lock scenarios")
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack; false is accepted only with -wipe-phase lock-quarantine")
+	flags.StringVar(&options.BootstrapFirmwareVars, "bootstrap-firmware-vars", "", "Arch owner-UKI only: package-owned non-Secure-Boot template for unsigned archiso; final owner db is enrolled into -firmware-vars after shutdown")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, exclusively created then made read-only")
 	if err := flags.Parse(args); err != nil {
 		return err

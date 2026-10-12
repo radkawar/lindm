@@ -6,11 +6,22 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"os"
 	"testing"
 )
 
 // Pure protocol fixtures only. No NVMe device, ioctl, native executable or host
 // block device is opened by these tests; native qualification lives in vmlab.
+// fakeNVMeAdmin adapts a protocol fixture to the admin ioctl seam: reply's
+// bytes are copied into the read-back buffer. No device or ioctl is touched.
+func fakeNVMeAdmin(reply func(command nvmeAdminCommand, length int) ([]byte, uint32, error)) nvmeAdminSubmitter {
+	return func(_ *os.File, command *nvmeAdminCommand, data []byte) (uint32, error) {
+		out, status, err := reply(*command, len(data))
+		copy(data, out)
+		return status, err
+	}
+}
+
 func nvmeControllerFixture() []byte {
 	data := make([]byte, nvmeIdentifyBytes)
 	binary.LittleEndian.PutUint16(data[0:2], 0x1b36)

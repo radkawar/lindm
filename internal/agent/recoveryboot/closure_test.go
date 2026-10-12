@@ -28,7 +28,7 @@ func TestRecoveryHelpersFollowQualifiedOperations(t *testing.T) {
 		{
 			name:   "NVMe format",
 			target: &agentv1.QualifiedActionTarget{NativeSanitizeMethods: []agentv1.SanitizeMethod{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA}},
-			want:   []string{"usr/bin/lsblk", "usr/sbin/nvme"},
+			want:   []string{"usr/bin/lsblk"},
 		},
 		{
 			name:   "LUKS observation",
@@ -72,7 +72,7 @@ func TestRecoveryHelpersFollowQualifiedOperations(t *testing.T) {
 }
 
 func TestBuildClosureRequiresConfiguredMethodBeforeELFValidation(t *testing.T) {
-	runtime := &agentv1.RecoveryRuntimeConfig{BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, Provider: &agentv1.DeviceActionProviderConfig{Targets: []*agentv1.QualifiedActionTarget{{NativeSanitizeMethods: []agentv1.SanitizeMethod{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA}}}}}
+	runtime := &agentv1.RecoveryRuntimeConfig{BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI, Provider: &agentv1.DeviceActionProviderConfig{Targets: []*agentv1.QualifiedActionTarget{{AllowCryptoErase: true}}}}
 	data, err := protojson.Marshal(runtime)
 	if err != nil {
 		t.Fatal(err)
@@ -81,8 +81,8 @@ func TestBuildClosureRequiresConfiguredMethodBeforeELFValidation(t *testing.T) {
 	// These are ingredient declarations, not fake native executables. The build
 	// must reject the absent method helper before inspecting any ELF payload.
 	files := []Ingredient{{Destination: "usr/bin/lsblk", Executable: true}}
-	if err := validateBuildClosure(config, files, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI); err == nil || !strings.Contains(err.Error(), "required_native_helper_missing: usr/sbin/nvme") {
-		t.Fatalf("NVMe qualification accepted without its native helper: %v", err)
+	if err := validateBuildClosure(config, files, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI); err == nil || !strings.Contains(err.Error(), "required_native_helper_missing: usr/sbin/cryptsetup") {
+		t.Fatalf("crypto erase qualification accepted without its native helper: %v", err)
 	}
 	if err := validateBuildClosure(config, files, agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB); err == nil || !strings.Contains(err.Error(), "runtime_boot_mode_mismatch") {
 		t.Fatalf("UKI runtime configuration accepted in a measured build: %v", err)

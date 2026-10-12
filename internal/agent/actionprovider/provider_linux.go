@@ -62,6 +62,7 @@ type Provider struct {
 	recoveryCustody func(context.Context, *agentv1.DeviceActionSpec) error
 	localAdmin      *localAdminNative
 	run             nativeRunner
+	admin           nvmeAdminSubmitter
 	sessionNative   func(context.Context, string) ([]graphicalSession, error)
 	// lockWait overrides sessionLockAcknowledgement in tests.
 	lockWait    time.Duration
@@ -124,7 +125,7 @@ func New(options Options) (*Provider, error) {
 	if len(config.GetLocalAdminAccounts()) != 0 && (options.AccountJournal == nil || options.SealLocalAdmin == nil) {
 		return nil, fmt.Errorf("%w: escrow_custody_required", ErrUnsupported)
 	}
-	p := &Provider{config: proto.CloneOf(config), validate: validator, seal: options.SealRecovery, recoveryCustody: options.TrustedRecoveryCustody, run: runNative, gate: make(chan struct{}, 1), clock: time.Now}
+	p := &Provider{config: proto.CloneOf(config), validate: validator, seal: options.SealRecovery, recoveryCustody: options.TrustedRecoveryCustody, run: runNative, admin: submitNVMeAdmin, gate: make(chan struct{}, 1), clock: time.Now}
 	p.sessionNative = logindSessions
 	p.openPower = openLogindPower
 	p.openSystemd = openSystemd

@@ -26,13 +26,12 @@ const (
 	lsblk
 	systemctl
 	dmsetup
-	nvme
 	usermod
 	chage
 	chpasswd
 )
 
-var executable = [...]string{"/usr/sbin/cryptsetup", "/usr/bin/systemd-cryptenroll", "/usr/sbin/nft", "/usr/bin/lsblk", "/usr/bin/systemctl", "/usr/sbin/dmsetup", "/usr/sbin/nvme", "/usr/sbin/usermod", "/usr/bin/chage", "/usr/sbin/chpasswd"}
+var executable = [...]string{"/usr/sbin/cryptsetup", "/usr/bin/systemd-cryptenroll", "/usr/sbin/nft", "/usr/bin/lsblk", "/usr/bin/systemctl", "/usr/sbin/dmsetup", "/usr/sbin/usermod", "/usr/bin/chage", "/usr/sbin/chpasswd"}
 
 const outputLimit = 1 << 20
 
@@ -67,11 +66,6 @@ func runNative(ctx context.Context, request nativeRequest) ([]byte, error) {
 	if err != nil {
 		if request.command == cryptsetup && len(request.args) > 0 && request.args[0] == "luksDump" && bytes.Contains(result.Stderr, []byte("is not a valid LUKS device")) {
 			err = errors.Join(errNativeNotLUKS, err)
-		}
-		if request.command == nvme && nvmeUnsupportedDiagnostic(result.Stderr) {
-			// Preserve explicit emulated/firmware opcode refusal. A consumed
-			// command still remains outcome_unknown at the provider boundary.
-			err = errors.Join(ErrUnsupported, err)
 		}
 		return nil, fmt.Errorf("native %d failed: %w", request.command, err)
 	}
@@ -170,14 +164,4 @@ func (p *Provider) crypt(ctx context.Context, target *os.File, args []string, se
 		files = append(files, handle.file)
 	}
 	return p.run(ctx, nativeRequest{command: cryptsetup, args: args, files: files})
-}
-
-// nvme-cli's C-locale status spelling differs across maintained 2.x releases.
-// Only an explicit invalid opcode/field is unsupported, never an I/O timeout or
-// permission error. This classification is not evidence that erasure occurred.
-func nvmeUnsupportedDiagnostic(diagnostic []byte) bool {
-	return bytes.Contains(diagnostic, []byte("INVALID_OPCODE")) ||
-		bytes.Contains(diagnostic, []byte("Invalid Command Opcode")) ||
-		bytes.Contains(diagnostic, []byte("INVALID_FIELD")) ||
-		bytes.Contains(diagnostic, []byte("Invalid Field in Command"))
 }

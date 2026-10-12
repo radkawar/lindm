@@ -23,6 +23,10 @@ const installerSerialLimit = 64 << 10
 const (
 	installerFailureOffline  = "offline-dvd-installer-failure"
 	installerFailureSnapshot = "snapshot-dvd-installer-failure"
+	installerFailureArchISO  = "archiso-installer-failure"
+	// First-boot kinds retain an installed or inspected guest's console.
+	installerFailureFirstBoot  = "installed-image-first-boot-failure"
+	installerFailureInspection = "inspection-guest-boot-failure"
 )
 
 type installerStageObservation struct {
@@ -31,10 +35,11 @@ type installerStageObservation struct {
 }
 
 // Only unencrypted installer profiles may enable console diagnostics: the
-// offline capture bootstrap and the snapshot-bound ordinary golden. Serial
-// bytes stay in bounded memory until failure; credentials and opaque encoded
-// payloads are removed before writing the owner-only diagnostic file. Stage
-// observations survive tail truncation and are observations, not success.
+// offline capture bootstrap, the snapshot-bound ordinary golden and selected
+// unencrypted first boots. Serial bytes stay in bounded memory until failure;
+// credentials and opaque encoded payloads are removed before writing the
+// owner-only diagnostic file. Stage observations survive tail truncation and
+// are observations, not success.
 type installerDiagnostics struct {
 	mu           sync.Mutex
 	directory    string
@@ -54,6 +59,12 @@ func newInstallerDiagnostics(directory, kind, architecture, sourceDigest string,
 		directory = os.TempDir()
 	}
 	d := &installerDiagnostics{directory: directory, kind: kind, architecture: architecture, sourceDigest: sourceDigest, started: time.Now().UTC(), tail: nativeexec.NewTailBuffer(installerSerialLimit)}
+	d.rememberSecrets(secrets...)
+	return d
+}
+
+// rememberSecrets runs before the guest starts writing diagnostic output.
+func (d *installerDiagnostics) rememberSecrets(secrets ...string) {
 	for _, secret := range secrets {
 		if secret == "" {
 			continue
@@ -67,7 +78,6 @@ func newInstallerDiagnostics(directory, kind, architecture, sourceDigest string,
 			}
 		}
 	}
-	return d
 }
 
 func (d *installerDiagnostics) Write(p []byte) (int, error) {
@@ -134,7 +144,7 @@ func (d *installerDiagnostics) redact(text, dir string) string {
 	}, text)
 }
 
-func (d *installerDiagnostics) saveFailure(dir string, process *encryptedProcess, cause error) error {
+func (d *installerDiagnostics) saveFailure(dir string, processLog *vmLog, cause error) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.observeLine()
@@ -150,8 +160,8 @@ func (d *installerDiagnostics) saveFailure(dir string, process *encryptedProcess
 		}
 	}
 	stderr := ""
-	if process != nil {
-		stderr = process.log.diagnostic(dir)
+	if processLog != nil {
+		stderr = processLog.diagnostic(dir)
 	}
 	data, err := json.MarshalIndent(struct {
 		Kind         string                      `json:"kind"`

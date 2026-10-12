@@ -5,7 +5,6 @@ package actionprovider
 import (
 	"context"
 	"errors"
-	"slices"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -16,20 +15,20 @@ import (
 func TestNVMeFormatSubmitsOnlyApprovedMethodAfterDurableGate(t *testing.T) {
 	for _, test := range []struct {
 		method agentv1.SanitizeMethod
-		cdw10  string
+		cdw10  uint32
 	}{
-		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, "--cdw10=515"},
-		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_CRYPTO_ERASE, "--cdw10=1027"},
+		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, 515},
+		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_CRYPTO_ERASE, 1027},
 	} {
 		gates, rechecks, calls := 0, 0, 0
-		p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+		p := &Provider{admin: fakeNVMeAdmin(func(command nvmeAdminCommand, length int) ([]byte, uint32, error) {
 			calls++
-			want := []string{"admin-passthru", "/proc/self/fd/3", "--opcode=128", "--namespace-id=7", test.cdw10, "--timeout=60000"}
-			if gates != 1 || rechecks != 1 || request.command != nvme || !slices.Equal(request.args, want) {
-				t.Fatalf("unguarded or different method: %+v, gates=%d", request, gates)
+			want := nvmeAdminCommand{Opcode: 0x80, NSID: 7, CDW10: test.cdw10, TimeoutMS: nvmeAdminTimeoutMS}
+			if gates != 1 || rechecks != 1 || command != want || length != 0 {
+				t.Fatalf("unguarded or different method: %+v, gates=%d", command, gates)
 			}
-			return nil, nil
-		}}
+			return nil, 0, nil
+		})}
 		result := &agentv1.NVMeSanitizeVerification{}
 		gate := func(context.Context) error { gates++; return nil }
 		revalidate := func(context.Context) error {
@@ -51,7 +50,7 @@ func TestNVMeFormatSubmitsOnlyApprovedMethodAfterDurableGate(t *testing.T) {
 
 func TestNVMeDeniedGateNeverIssuesCommand(t *testing.T) {
 	calls := 0
-	p := &Provider{run: func(context.Context, nativeRequest) ([]byte, error) { calls++; return nil, nil }}
+	p := &Provider{admin: fakeNVMeAdmin(func(nvmeAdminCommand, int) ([]byte, uint32, error) { calls++; return nil, 0, nil })}
 	denied := errors.New("authority expired")
 	err := p.startNVMeCommand(t.Context(), nil, agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, 1, 0, func(context.Context) error { return denied }, func(context.Context) error {
 		t.Fatal("native recheck ran after denied gate")
@@ -66,13 +65,13 @@ func TestNVMeUncertainOrUnsupportedCommandNeverFallsBackOrRetries(t *testing.T) 
 	for _, nativeErr := range []error{context.Canceled, context.DeadlineExceeded, ErrUnsupported, errors.New("controller I/O failure")} {
 		for _, method := range []agentv1.SanitizeMethod{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_FORMAT_USER_DATA, agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE} {
 			calls := 0
-			p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+			p := &Provider{admin: fakeNVMeAdmin(func(command nvmeAdminCommand, _ int) ([]byte, uint32, error) {
 				calls++
-				if request.command != nvme {
+				if command.Opcode != 0x80 && command.Opcode != 0x84 {
 					t.Fatal("native method silently replaced")
 				}
-				return nil, nativeErr
-			}}
+				return nil, 0, nativeErr
+			})}
 			result := &agentv1.NVMeSanitizeVerification{}
 			err := p.startNVMeCommand(t.Context(), nil, method, 1, 0, func(context.Context) error { return nil }, func(context.Context) error { return nil }, result)
 			if !errors.Is(err, ErrOutcomeUnknown) || !errors.Is(err, nativeErr) || calls != 1 || result.GetNativeCommandCompleted() {
@@ -86,27 +85,27 @@ func TestNVMeSanitizeRequiresNativeCompletionLog(t *testing.T) {
 	for _, test := range []struct {
 		method   agentv1.SanitizeMethod
 		command  uint32
-		argument string
+		argument uint32
 	}{
-		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE, 2, "--cdw10=2"},
-		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE, 4, "--cdw10=4"},
+		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE, 2, 2},
+		{agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_CRYPTO_ERASE, 4, 4},
 	} {
 		for _, status := range []uint16{0x101, 1, 3, 0x104} {
 			calls := 0
-			p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+			p := &Provider{admin: fakeNVMeAdmin(func(command nvmeAdminCommand, length int) ([]byte, uint32, error) {
 				calls++
 				if calls == 1 {
-					want := []string{"admin-passthru", "/proc/self/fd/3", "--opcode=132", "--namespace-id=0", test.argument, "--timeout=60000"}
-					if !slices.Equal(request.args, want) {
-						t.Fatalf("wrong sanitize command: %v", request.args)
+					want := nvmeAdminCommand{Opcode: 0x84, CDW10: test.argument, TimeoutMS: nvmeAdminTimeoutMS}
+					if command != want || length != 0 {
+						t.Fatalf("wrong sanitize command: %+v", command)
 					}
-					return nil, nil
+					return nil, 0, nil
 				}
-				if !slices.Contains(request.args, "--opcode=2") || !slices.Contains(request.args, "--data-len=512") {
-					t.Fatalf("sanitization restarted instead of polling: %v", request.args)
+				if command.Opcode != 0x02 || length != nvmeSanitizeLogBytes {
+					t.Fatalf("sanitization restarted instead of polling: %+v", command)
 				}
-				return nvmeSanitizeLogFixture(0xffff, status, test.command), nil
-			}}
+				return nvmeSanitizeLogFixture(0xffff, status, test.command), 0, nil
+			})}
 			result := &agentv1.NVMeSanitizeVerification{}
 			err := p.startNVMeCommand(t.Context(), nil, test.method, 1, 0, func(context.Context) error { return nil }, func(context.Context) error { return nil }, result)
 			if calls != 2 || result.GetSanitizeStatus() != uint32(status) || result.GetSanitizeCommandDword10() != test.command {
@@ -127,17 +126,17 @@ func TestNVMeInterruptedPollingRetainsPartialEvidenceWithoutRestart(t *testing.T
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	calls := 0
-	p := &Provider{run: func(_ context.Context, request nativeRequest) ([]byte, error) {
+	p := &Provider{admin: fakeNVMeAdmin(func(command nvmeAdminCommand, _ int) ([]byte, uint32, error) {
 		calls++
 		if calls == 1 {
-			return nil, nil
+			return nil, 0, nil
 		}
-		if calls != 2 || !slices.Contains(request.args, "--opcode=2") {
-			t.Fatalf("unexpected command after consumption: %v", request.args)
+		if calls != 2 || command.Opcode != 0x02 {
+			t.Fatalf("unexpected command after consumption: %+v", command)
 		}
 		cancel()
-		return nvmeSanitizeLogFixture(1234, 2, 2), nil
-	}}
+		return nvmeSanitizeLogFixture(1234, 2, 2), 0, nil
+	})}
 	result := &agentv1.NVMeSanitizeVerification{}
 	err := p.startNVMeCommand(ctx, nil, agentv1.SanitizeMethod_SANITIZE_METHOD_NVME_SANITIZE_BLOCK_ERASE, 1, 0, func(context.Context) error { return nil }, func(context.Context) error { return nil }, result)
 	if !errors.Is(err, ErrOutcomeUnknown) || !errors.Is(err, context.Canceled) || calls != 2 || result.GetNativeCommandCompleted() || result.GetSanitizeStatus() != 2 || result.GetSanitizeProgress() != 1234 || result.GetSanitizeCommandDword10() != 2 {
@@ -174,7 +173,7 @@ func TestNVMeCommandRefusesIdentityChangesDuringDurableGate(t *testing.T) {
 				t.Fatal(err)
 			}
 			calls, gates, rechecks := 0, 0, 0
-			p := &Provider{run: func(context.Context, nativeRequest) ([]byte, error) { calls++; return nil, nil }}
+			p := &Provider{admin: fakeNVMeAdmin(func(nvmeAdminCommand, int) ([]byte, uint32, error) { calls++; return nil, 0, nil })}
 			gate := func(context.Context) error {
 				gates++
 				tc.mutate(action, controller, namespace, &nsid)

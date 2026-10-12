@@ -41,6 +41,8 @@ type recoveryBootBoundary struct {
 	armDeadline     time.Time
 	measured        *agentv1.RecoveryMeasuredBoot
 	staged          recoveryboot.StageRequest
+	// exclusiveKeys creates the key path exclusively, as the native boundary does.
+	exclusiveKeys bool
 }
 
 func (n *recoveryBootBoundary) Preflight(ctx context.Context, request recoveryboot.StageRequest) error {
@@ -49,8 +51,17 @@ func (n *recoveryBootBoundary) Preflight(ctx context.Context, request recoverybo
 	}
 	return nil
 }
-func (n *recoveryBootBoundary) ProvisionKey(string) (ed25519.PrivateKey, error) {
+func (n *recoveryBootBoundary) ProvisionKey(path string) (ed25519.PrivateKey, error) {
 	n.provisions.Add(1)
+	if n.exclusiveKeys {
+		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return nil, err
+		}
+		if err := file.Close(); err != nil {
+			return nil, err
+		}
+	}
 	return bytes.Clone(n.key), nil
 }
 
@@ -237,17 +248,35 @@ func TestRecoveryBootRequiresPurposeGrantAndDurableConsumption(t *testing.T) {
 }
 
 func TestMeasuredRecoveryHandoffBindsAttestationKeyIntoStaging(t *testing.T) {
+	for _, chain := range []platform.GRUBChain{
+		{Entries: platform.GRUBBLS, BootDirectory: "/boot", Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"},
+		{Entries: platform.GRUBBLSLoaderEntryOneShot, BootDirectory: "/boot/efi", ConfigDirectory: "EFI/vendor"},
+	} {
+		t.Run(string(chain.Entries), func(t *testing.T) {
+			testMeasuredRecoveryHandoffBinding(t, chain)
+		})
+	}
+}
+
+func testMeasuredRecoveryHandoffBinding(t *testing.T, chain platform.GRUBChain) {
+	t.Helper()
 	binding := &agentv1.RecoveryMeasuredBoot{AttestationKeyPublic: []byte("tpm-public-area"), KernelSha256: bytes.Repeat([]byte{4}, 32), KernelPath: "/boot/vmlinuz-6.19.10-300.fc44.x86_64", KernelOptions: "rdinit=/init panic=10 quiet lindm.recovery.action=fixture", InitrdPath: "/boot/lindm-recovery-12345678-1234-1234-1234-123456789abc.initrd"}
+	if chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		// Regression: openSUSE GRUB2-BLS boots sdbootutil's nested ESP image,
+		// which the signed handoff schema refused (observed on Tumbleweed).
+		binding.KernelPath = "/opensuse-tumbleweed/7.2.9-1-default/linux-0090333a44575441ead65e686edb1e6740ef4921"
+		binding.InitrdPath = "/lindm-recovery-12345678-1234-1234-1234-123456789abc.initrd"
+	}
 	f, native, intent := newRecoveryBootFixtureWithSetup(t, func(f *deviceActionFixture) {
 		cfg := f.svc.recoveryConfig
-		cfg.BootMode, cfg.CertificatePath, cfg.CertificateSHA256, cfg.ESPPath, cfg.KernelSHA256 = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, "", nil, "/boot", bytes.Repeat([]byte{4}, 32)
+		cfg.BootMode, cfg.CertificatePath, cfg.CertificateSHA256, cfg.ESPPath, cfg.KernelSHA256 = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, "", nil, chain.BootDirectory, bytes.Repeat([]byte{4}, 32)
 		boundary, ok := f.svc.recoveryBoot.(*recoveryBootBoundary)
 		if !ok {
 			t.Fatal("recovery fixture lacks its boot boundary")
 		}
 		boundary.measured = binding
 		f.svc.recoveryGRUB = func() (platform.GRUBChain, error) {
-			return platform.GRUBChain{Entries: platform.GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}, nil
+			return chain, nil
 		}
 	})
 	record, _ := deviceActionRow(t, f.svc, intent.GetActionId())
@@ -266,8 +295,9 @@ func TestMeasuredRecoveryHandoffBindsAttestationKeyIntoStaging(t *testing.T) {
 	if native.reboots.Load() != 1 || native.staged.BootMode != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || !bytes.Equal(native.staged.AttestationKeyPublic, binding.GetAttestationKeyPublic()) || !bytes.Equal(native.staged.KernelSHA256, binding.GetKernelSha256()) {
 		t.Fatalf("measured staging did not receive the signed attestation binding: %+v", native.staged)
 	}
-	if native.staged.GRUB.Entries != platform.GRUBBLS || native.staged.GrubEnv == nil {
-		t.Fatal("measured staging lacks the registry GRUB chain or the executor's editenv runner")
+	wantsGrubEnv := chain.Entries != platform.GRUBBLSLoaderEntryOneShot
+	if native.staged.GRUB != chain || (native.staged.GrubEnv != nil) != wantsGrubEnv {
+		t.Fatal("measured staging lacks the registry chain's native selection protocol")
 	}
 }
 
@@ -574,5 +604,43 @@ func TestRecoveryBootPostHashGateRejectsSuspendElapsedLifetime(t *testing.T) {
 	awaitDeviceAction(t, f.svc, intent.GetActionId(), agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN)
 	if native.arms.Load() != 0 || native.reboots.Load() != 0 {
 		t.Fatal("posthash CLOCK_BOOTTIME expiry reached native boot")
+	}
+}
+
+// Regression: a refused handoff after key provisioning left action.key behind,
+// and every retry of the same action then failed "file exists" (observed on
+// Tumbleweed). A failed preparation must leave no unbound key.
+func TestFailedRecoveryPreparationRemovesUnboundKey(t *testing.T) {
+	binding := &agentv1.RecoveryMeasuredBoot{AttestationKeyPublic: []byte("tpm-public-area"), KernelSha256: bytes.Repeat([]byte{4}, 32), KernelPath: "/boot/vmlinuz-6.19.10-300.fc44.x86_64", KernelOptions: "rdinit=/init panic=10 quiet lindm.recovery.action=fixture", InitrdPath: "/boot/lindm-recovery-12345678-1234-1234-1234-123456789abc.initrd"}
+	var native *recoveryBootBoundary
+	f, _, intent := newRecoveryBootFixtureWithSetup(t, func(f *deviceActionFixture) {
+		cfg := f.svc.recoveryConfig
+		cfg.BootMode, cfg.CertificatePath, cfg.CertificateSHA256, cfg.ESPPath, cfg.KernelSHA256 = agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB, "", nil, "/boot", bytes.Repeat([]byte{4}, 32)
+		var ok bool
+		if native, ok = f.svc.recoveryBoot.(*recoveryBootBoundary); !ok {
+			t.Fatal("recovery fixture lacks its boot boundary")
+		}
+		native.measured, native.exclusiveKeys = binding, true
+		f.svc.recoveryGRUB = func() (platform.GRUBChain, error) {
+			return platform.GRUBChain{Entries: platform.GRUBBLS, BootDirectory: "/boot", Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}, nil
+		}
+	})
+	if native.provisions.Load() != 1 {
+		t.Fatalf("fixture provisioned %d keys", native.provisions.Load())
+	}
+	key := filepath.Join(f.svc.recoveryConfig.StateDirectory, "action.key")
+	if err := os.Remove(key); err != nil {
+		t.Fatal(err)
+	}
+	// A second action whose measured preparation fails after provisioning.
+	native.measured = nil
+	second := f.actionIntent(t, 2, intent.GetSpec())
+	second.DelegationVersion = 2
+	envelope := mustSign(t, f.svc.authority, second, f.planKey)
+	if _, err := f.svc.PrepareDeviceActionRecovery(t.Context(), connect.NewRequest(&agentv1.PrepareDeviceActionRecoveryRequest{IntentEnvelope: envelope})); err == nil {
+		t.Fatal("measured preparation without a binding succeeded")
+	}
+	if _, err := os.Stat(key); !errors.Is(err, os.ErrNotExist) || native.provisions.Load() != 2 {
+		t.Fatalf("failed preparation left an unbound key: %v provisions=%d", err, native.provisions.Load())
 	}
 }

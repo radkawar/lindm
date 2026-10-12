@@ -46,6 +46,8 @@ type installerImage struct {
 	consoleDiagnostics bool
 	// diagnostics is the failure sink of an unencrypted capture or golden install.
 	diagnostics *installerDiagnostics
+	// firstBootDiagnostics retains only failed unencrypted installed boots.
+	firstBootDiagnostics bool
 	// snapshot is populated only for the Tumbleweed recipe before rendering.
 	snapshot *tumbleweedSnapshotRepository
 	// bindSources, when set, authenticates network installation sources
@@ -82,6 +84,8 @@ func installerImageFor(m *labv1.ImageManifest) (*installerImage, error) {
 	case omarchyInstallerEdition, omarchyEncryptedInstallerEdition:
 		// Installer-only media: the encrypted-lane edition is rejected here.
 		return omarchyInstallerImage(m)
+	case archRecoveryInstallerEdition:
+		return archRecoveryInstallerImage(m)
 	default:
 		return nil, nil
 	}
@@ -94,6 +98,9 @@ func installerImageFor(m *labv1.ImageManifest) (*installerImage, error) {
 func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installerImage, source *VerifiedImage, cacheDir, workDir string, hardware VMHardwareOptions) (_ *VerifiedImage, err error) {
 	if hardware.Firmware == nil {
 		return nil, fmt.Errorf("%s installer requires explicit UEFI firmware code, variables, package and version", spec.label)
+	}
+	if spec.installer == platform.ArchISO && hardware.Firmware.SecureBoot {
+		return nil, errors.New("official archiso is unsigned: install with explicit non-Secure-Boot bootstrap firmware before owner enrollment")
 	}
 	root, err := openCache(ctx, filepath.Join(cacheDir, spec.cache), true)
 	if err != nil {
@@ -191,7 +198,11 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			return nil, err
 		}
 		if spec.consoleDiagnostics {
-			spec.diagnostics = newInstallerDiagnostics(workDir, installerFailureSnapshot, hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic, string(recipe))
+			kind := installerFailureSnapshot
+			if spec.installer == platform.ArchISO {
+				kind = installerFailureArchISO
+			}
+			spec.diagnostics = newInstallerDiagnostics(hardware.goldenDiagnosticsParent(workDir), kind, hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic, string(recipe))
 		}
 	}
 	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", "24G"); err != nil {
@@ -218,7 +229,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			return nil, err
 		}
 	}
-	if err := validateInstalledImage(ctx, filepath.Join(dir, "image"), workDir, spec, hardware); err != nil {
+	if err := validateInstalledImage(ctx, filepath.Join(dir, "image"), workDir, source.SHA256, spec, hardware); err != nil {
 		return nil, err
 	}
 	image, err := openRegular(filepath.Join(dir, "image"))
@@ -363,7 +374,11 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 	var process *encryptedProcess
 	defer func() {
 		if err != nil && spec.diagnostics != nil {
-			err = spec.diagnostics.saveFailure(dir, process, err)
+			var processLog *vmLog
+			if process != nil {
+				processLog = process.log
+			}
+			err = spec.diagnostics.saveFailure(dir, processLog, err)
 		}
 	}()
 	process, err = startEncryptedProcessOutput(ctx, dir, nil, console, "qemu-system-"+hardware.Architecture, args...)
@@ -382,7 +397,7 @@ func runImageInstaller(ctx context.Context, dir, installer string, spec *install
 	}
 }
 
-func validateInstalledImage(ctx context.Context, path, workDir string, spec *installerImage, hardware VMHardwareOptions) (err error) {
+func validateInstalledImage(ctx context.Context, path, workDir, sourceDigest string, spec *installerImage, hardware VMHardwareOptions) (err error) {
 	base, err := openRegular(path)
 	if err != nil {
 		return err
@@ -391,11 +406,19 @@ func validateInstalledImage(ctx context.Context, path, workDir string, spec *ins
 	// Prove an installed boot and fresh pinned NoCloud SSH, not merely an
 	// installer process exit. Validation writes only a disposable overlay.
 	hardware.AllowNetwork, hardware.TPM, hardware.Desktop, hardware.ExtraDisks = false, false, false, 0
+	if spec.firstBootDiagnostics {
+		hardware.bootDiagnostics = newInstallerDiagnostics(hardware.goldenDiagnosticsParent(workDir), installerFailureFirstBoot, hardware.Architecture, sourceDigest)
+	}
 	vm, err := newConfiguredGuestVM(ctx, base, workDir, false, &hardware)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, vm.close()) }()
+	defer func() {
+		if err != nil && hardware.bootDiagnostics != nil {
+			err = hardware.bootDiagnostics.saveFailure(vm.dir, vm.log, err)
+		}
+	}()
 	if err := vm.connect(ctx); err != nil {
 		return fmt.Errorf("%s installed boot: %w", spec.label, err)
 	}

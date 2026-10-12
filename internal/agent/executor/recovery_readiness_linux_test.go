@@ -32,6 +32,10 @@ func TestRecoveryReadinessUnavailableIsExplicit(t *testing.T) {
 		{name: "unreadable", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("recovery_readiness_esp_unreadable"), reason: "recovery_readiness_esp_unreadable"},
 		{name: "unsupported", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, facts: recoveryboot.Readiness{ESPUUID: "1234-5678", AllocationUnitBytes: 4096}, reason: "recovery_readiness_unsupported"},
 		{name: "native_failure_redacted", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("private-config-path: credential contents"), reason: "recovery_readiness_observation_failed"},
+		{name: "owner_key_required", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, facts: recoveryboot.Readiness{BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_UKI}, err: errors.New("recovery_readiness_owner_key_required"), reason: "recovery_readiness_owner_key_required"},
+		{name: "loader_interface_required", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("recovery_readiness_grub_loader_interface_required"), reason: "recovery_readiness_grub_loader_interface_required"},
+		{name: "loader_oneshot_unsupported", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("recovery_readiness_loader_oneshot_unsupported"), reason: "recovery_readiness_loader_oneshot_unsupported"},
+		{name: "bootctl_required", config: &RecoveryBootConfig{ESPPath: "/boot/efi"}, err: errors.New("recovery_readiness_bootctl_required"), reason: "recovery_readiness_bootctl_required"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &Service{clock: func() time.Time { return now }, bootID: func() (string, error) { return boot, nil }, recoveryConfig: tc.config}

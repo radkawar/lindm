@@ -44,9 +44,9 @@ type StageRequest struct {
 	TrustedTPMCustody func(context.Context) error
 	CapsulePath       string
 	CapsuleSHA256     []byte
-	// BootMode selects UKI (systemd-boot ESP) or measured GRUB (ESPPath is
-	// /boot). Measured GRUB requires off-target custody, the host's registry
-	// GRUB chain and an executor-supplied grub-editenv runner.
+	// BootMode selects UKI or measured GRUB. ESPPath is the registry's
+	// vendor boot filesystem (/boot or the loader ESP). Measured GRUB needs
+	// off-target custody and the chain's native one-shot selection protocol.
 	BootMode             agentv1.RecoveryBootMode
 	KernelSHA256         []byte
 	SerialConsole        string

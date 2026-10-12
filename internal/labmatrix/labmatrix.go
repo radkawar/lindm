@@ -80,8 +80,8 @@ type Cell struct {
 	Architecture string
 	// Manifest is the image the lane boots; nil when none is pinned.
 	Manifest *Manifest
-	// Recovery is the same-release cloud image a device-action lane recovers
-	// into; nil when none is pinned.
+	// Recovery is the same-release, same-architecture ordinary image used by
+	// the original-device action lane; nil when none is pinned or required.
 	Recovery *Manifest
 	State    State
 	// Reason explains gated and no-lane states.
@@ -308,9 +308,13 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	if spec.GetCapabilityKinds() {
 		gated = len(c.Kinds) == 0
 	}
-	c.Manifest = in.manifest(r, spec.GetImage(), arch)
-	if spec.GetImage() == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
-		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch)
+	primaryEdition, recoveryEdition := "", ""
+	if slices.Contains(spec.GetCapabilities(), string(platform.RecoverySanitize)) {
+		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition
+	}
+	c.Manifest = in.manifest(r, spec.GetImage(), arch, primaryEdition)
+	if spec.GetLane() == "device-actions" || spec.GetImage() == labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER {
+		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch, recoveryEdition)
 	}
 	c.Entry = in.latest(c)
 	lane := platform.LabLane(spec.GetLane())
@@ -327,8 +331,8 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		c.State, c.Reason = NoLane, spec.GetNoLane()
 	case slices.Contains(platform.LabLanes, lane) && r.LabLaneOn(lane, arch) != nil:
 		c.State, c.Reason = NoLane, r.LabLaneOn(lane, arch).Error()
-	case c.Manifest == nil:
-		c.State = NoImage
+	case c.Manifest == nil || (spec.GetLane() == "device-actions" && c.Recovery == nil):
+		c.State, c.Reason = NoImage, "no matching primary and ordinary recovery image for the selected topology"
 	case c.Entry == nil:
 		c.State = NotRun
 	case c.Entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_PASS:
@@ -341,14 +345,23 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 
 // manifest selects the explicit owner choice, otherwise the newest pinned
 // repository date for rolling releases. Fixed releases retain path ordering.
-func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch string) *Manifest {
+func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch, edition string) *Manifest {
 	var selected *Manifest
 	for _, m := range in.Manifests {
 		if m.Release.Key != r.Key || m.Architecture != arch || !m.serves(kind) {
 			continue
 		}
 		if m.Image.GetId() == in.PreferredManifest {
+			if edition != "" && m.Image.GetEdition() != edition {
+				return nil
+			}
 			return m
+		}
+		if edition != "" && m.Image.GetEdition() != edition {
+			continue
+		}
+		if edition == "" && r.Lab.RecoveryEdition != "" && m.Image.GetEdition() == r.Lab.RecoveryEdition {
+			continue
 		}
 		if selected == nil || (r.Native().RequalificationDays != 0 && m.Image.GetRepositorySnapshotDate() > selected.Image.GetRepositorySnapshotDate()) {
 			selected = m
@@ -368,6 +381,13 @@ func (in *Inputs) latest(c *Cell) *labv1.MatrixLedgerEntry {
 		if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||
 			e.GetManifest() != c.Manifest.Image.GetId() || e.GetManifestSha256() != c.Manifest.SHA256 ||
 			e.GetRepositorySnapshotDate() != c.Manifest.Image.GetRepositorySnapshotDate()) {
+			continue
+		}
+		if c.Release.Native().RequalificationDays != 0 && c.Recovery != nil &&
+			(e.GetRecoveryManifest() != c.Recovery.Image.GetId() || e.GetRecoveryManifestSha256() != c.Recovery.SHA256 ||
+				e.GetRecoveryRepositorySnapshotDate() != c.Recovery.Image.GetRepositorySnapshotDate() ||
+				e.GetRecoveryRepositoryClosureSha256() != c.Recovery.Image.GetRepositorySnapshotManifestSha256() ||
+				e.GetRecoveryRepositoryMetadataSha256() != c.Recovery.Image.GetRepositorySnapshotRepomdSha256()) {
 			continue
 		}
 		if out == nil || !e.GetRecorded().AsTime().Before(out.GetRecorded().AsTime()) {

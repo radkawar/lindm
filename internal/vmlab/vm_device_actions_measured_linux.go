@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +32,8 @@ type actionStockBootEvidence struct {
 	LoaderInfo        string `json:"running_loader_info"`
 	ESPAvailableBytes uint64 `json:"unchanged_vendor_esp_available_bytes"`
 	BootFilesystem    string `json:"boot_filesystem"`
+	BootDirectory     string `json:"vendor_boot_directory"`
+	OneShotProtocol   string `json:"oneshot_protocol"`
 	EventLogSHA256    string `json:"ordinary_event_log_sha256,omitempty"`
 	// EventLog is the ordinary boot's TCG log, retained so a release's GRUB
 	// measurement form can become a parser fixture.
@@ -46,6 +49,14 @@ type actionStockBootEvidence struct {
 func provisionActionStockBoot(ctx context.Context, vm *guestVM, manifest *labv1.ImageManifest, entitlement actionOwnedBootEntitlement) (_ *actionOwnedBootEvidence, _ *actionStockBootEvidence, err error) {
 	evidence, stock := &actionOwnedBootEvidence{}, &actionStockBootEvidence{TPMPresent: vm.hardware.TPM}
 	release := platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion())
+	chain := release.Quirks.RecoveryGRUB
+	if chain.BootDirectory == "" {
+		return evidence, stock, errors.New("measured recovery requires a registry boot directory")
+	}
+	stock.BootDirectory, stock.OneShotProtocol = chain.BootDirectory, "grubenv-next_entry"
+	if chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+		stock.OneShotProtocol = "LoaderEntryOneShot"
+	}
 	install, err := labInstallCommand(release, release.Lab.Guest.MeasuredBoot)
 	if err != nil {
 		return evidence, stock, fmt.Errorf("measured GRUB fixture requires a maintained package recipe: %w", err)
@@ -78,6 +89,12 @@ func provisionActionStockBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 		return evidence, stock, errors.New("invalid original guest boot identity")
 	}
 	evidence.OriginalBootID, evidence.ConvertedBootID, evidence.KernelRelease = fields[0], fields[0], fields[1]
+	if release.Lab.Guest.Kernel != "" {
+		evidence.KernelPath, err = recoveryKernelConfigPath(release.Lab.Guest.Kernel, evidence.KernelRelease)
+		if err != nil {
+			return evidence, stock, err
+		}
+	}
 	stateUUID := uuid.NewString()
 	evidence.StateUUID = stateUUID
 	configure := "mkfs.ext4 -F -U " + nativeQuote(stateUUID) + " " + nativeQuote(state.Path) + "; install -d -m0700 /var/lib/lindm-recovery; mount -t ext4 -o nosuid,nodev,noexec " + nativeQuote(state.Path) + " /var/lib/lindm-recovery; chmod 0700 /var/lib/lindm-recovery; printf '%s\\n' " + nativeQuote("UUID="+stateUUID+" /var/lib/lindm-recovery ext4 defaults,nosuid,nodev,noexec 0 2") + " >> /etc/fstab"
@@ -92,7 +109,7 @@ func provisionActionStockBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 		return evidence, stock, err
 	}
 	evidence.LoaderInfo, evidence.SecureBoot, evidence.SetupMode = stock.LoaderInfo, true, false
-	observed, err := vm.run(ctx, "df -B1 --output=avail /boot/efi | tail -n 1; findmnt --noheadings --output FSTYPE --target /boot", nil, 4096, 10*time.Second)
+	observed, err := vm.run(ctx, "df -B1 --output=avail /boot/efi | tail -n 1; findmnt --noheadings --output FSTYPE --target "+nativeQuote(chain.BootDirectory), nil, 4096, 10*time.Second)
 	if err != nil {
 		return evidence, stock, err
 	}
@@ -109,8 +126,16 @@ func provisionActionStockBoot(ctx context.Context, vm *guestVM, manifest *labv1.
 		if err != nil {
 			return evidence, stock, fmt.Errorf("observe ordinary measured-boot event log: %w", err)
 		}
-		if _, err := measuredboot.ParseEventLog(log); err != nil {
+		events, err := measuredboot.ParseEventLog(log)
+		if err != nil {
 			return evidence, stock, fmt.Errorf("ordinary measured-boot event log: %w", err)
+		}
+		if chain.Entries == platform.GRUBBLSLoaderEntryOneShot {
+			loaded, err := measuredboot.FinalGRUBBoot(events)
+			if err != nil {
+				return evidence, stock, fmt.Errorf("ordinary loader-interface measured kernel: %w", err)
+			}
+			evidence.KernelPath = filepath.Join(chain.BootDirectory, loaded.KernelPath)
 		}
 		digest := sha256.Sum256(log)
 		stock.EventLogSHA256, stock.EventLog = hex.EncodeToString(digest[:]), log
@@ -158,8 +183,8 @@ func observeStockFirmware(ctx context.Context, vm *guestVM) (string, error) {
 		wide[i] = binary.LittleEndian.Uint16(raw[4+2*i:])
 	}
 	loader := strings.TrimRight(string(utf16.Decode(wide)), "\x00")
-	if !strings.HasPrefix(loader, "GRUB ") {
-		return "", errors.New("stock guest did not boot vendor GRUB")
+	if !measuredboot.GRUBLoaderInfo(loader) {
+		return "", fmt.Errorf("stock guest did not boot vendor GRUB: LoaderInfo %q", loader)
 	}
 	return loader, nil
 }

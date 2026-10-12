@@ -23,6 +23,7 @@ import (
 	"lindm/internal/agent/recoveryboot"
 	"lindm/internal/labexec"
 	"lindm/internal/packaging"
+	"lindm/internal/platform"
 )
 
 // Inputs come from the installed signed distro and lindm packages in this guest,
@@ -33,7 +34,7 @@ import (
 // actionVendorKernel(workDir) for its offline release descriptor.
 // A nonempty ukify is the lab host's private pinned copy (remote hosts without
 // systemd-ukify); it runs as the lab user, outside the product's /usr custody.
-func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte, ukify string) (*recoveryboot.Artifact, error) {
+func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir string, signer *actionBootSigner, boot *actionOwnedBootEvidence, runtime *agentv1.RecoveryRuntimeConfig, root, bootstrap, serverCA []byte, ukify string, guest platform.LabGuest) (*recoveryboot.Artifact, error) {
 	measured := signer == nil
 	request := recoveryboot.BuildRequest{OutputDirectory: filepath.Join(workDir, "recovery-build"), StateUUID: boot.StateUUID, SourceDateEpoch: time.Now().Unix(), BootMode: agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB}
 	if ukify != "" {
@@ -54,9 +55,24 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 	}
 	// The initramfs is compressed before UKI signing. Its decompressor and FAT
 	// charset modules must come from the same installed kernel as the image.
-	kernelConfig, err := vm.run(ctx, "cat "+nativeQuote("/boot/config-"+boot.KernelRelease), nil, 1<<20, 10*time.Second)
+	configPath, err := recoveryKernelConfigPath(guest.KernelConfig, boot.KernelRelease)
+	if err != nil {
+		return nil, err
+	}
+	if guest.KernelConfigModule != "" {
+		if _, err := vm.run(ctx, "sudo -n modprobe -- "+nativeQuote(guest.KernelConfigModule), nil, 4096, 15*time.Second); err != nil {
+			return nil, fmt.Errorf("load recovery kernel configuration module: %w", err)
+		}
+	}
+	kernelConfig, err := vm.run(ctx, "cat "+nativeQuote(configPath), nil, 1<<20, 10*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("read recovery kernel configuration: %w", err)
+	}
+	if strings.HasSuffix(configPath, ".gz") {
+		kernelConfig, err = recoveryKernelConfigGZIP(kernelConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if !strings.Contains("\n"+string(kernelConfig)+"\n", "\nCONFIG_RD_GZIP=y\n") {
 		return nil, errors.New("qualified recovery kernel requires built-in gzip initramfs decompression")
@@ -150,17 +166,14 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 	if err := addPublic("nsswitch.conf", "etc/nsswitch.conf", []byte("hosts: files dns\n")); err != nil {
 		return nil, err
 	}
-	for _, destination := range recoveryboot.RequiredNativeHelpers(runtime) {
-		helper := "/" + destination
-		in, err := collect(helper, strings.TrimPrefix(helper, "/"), true)
+	// The closure resolves each ELF's PT_INTERP literally, libraries included:
+	// glibc's libc.so.6 is itself executable. ldd prints only the helper's
+	// loader alias (observed on Arch: helpers use /lib64/ld-linux-x86-64.so.2
+	// while libc.so.6 names /usr/lib/ld-linux-x86-64.so.2).
+	requireInterpreter := func(source string) error {
+		image, err := elf.Open(source)
 		if err != nil {
-			return nil, err
-		}
-		request.Files = append(request.Files, in)
-		collected[helper] = true
-		image, err := elf.Open(in.Source)
-		if err != nil {
-			return nil, err
+			return err
 		}
 		var interpreterPath string
 		for _, segment := range image.Progs {
@@ -169,11 +182,36 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 			}
 			interpreter, readErr := io.ReadAll(io.LimitReader(segment.Open(), 4097))
 			if readErr != nil {
-				return nil, errors.Join(readErr, image.Close())
+				return errors.Join(readErr, image.Close())
 			}
 			interpreterPath = strings.TrimSuffix(string(interpreter), "\x00")
 		}
 		if err := image.Close(); err != nil {
+			return err
+		}
+		if interpreterPath == "" || collected[interpreterPath] {
+			return nil
+		}
+		if filepath.Clean(interpreterPath) != interpreterPath || !filepath.IsAbs(interpreterPath) {
+			return errors.New("noncanonical native interpreter path")
+		}
+		loader, err := collect(interpreterPath, strings.TrimPrefix(interpreterPath, "/"), true)
+		if err != nil {
+			return err
+		}
+		request.Files = append(request.Files, loader)
+		collected[interpreterPath] = true
+		return nil
+	}
+	for _, destination := range recoveryboot.RequiredNativeHelpers(runtime) {
+		helper := "/" + destination
+		in, err := collect(helper, strings.TrimPrefix(helper, "/"), true)
+		if err != nil {
+			return nil, err
+		}
+		request.Files = append(request.Files, in)
+		collected[helper] = true
+		if err := requireInterpreter(in.Source); err != nil {
 			return nil, err
 		}
 		libraries, err := vm.run(ctx, "LC_ALL=C ldd "+nativeQuote(helper), nil, 64<<10, 15*time.Second)
@@ -190,12 +228,15 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 			if filepath.Clean(field) != field {
 				return nil, errors.New("noncanonical native library path")
 			}
-			library, err := collect(field, strings.TrimPrefix(field, "/"), field == interpreterPath)
+			library, err := collect(field, strings.TrimPrefix(field, "/"), false)
 			if err != nil {
 				return nil, err
 			}
 			request.Files = append(request.Files, library)
 			collected[field] = true
+			if err := requireInterpreter(library.Source); err != nil {
+				return nil, err
+			}
 		}
 	}
 	// Keep only the distro-signed modules needed by this exact emulated tuple.
@@ -292,6 +333,37 @@ func buildActionRecoveryArtifact(ctx context.Context, vm *guestVM, workDir strin
 }
 
 func actionVendorKernel(workDir string) string { return filepath.Join(workDir, "vendor-kernel") }
+
+func recoveryKernelConfigPath(template, release string) (string, error) {
+	if release == "" || release == "." || release == ".." || len(release) > 256 {
+		return "", errors.New("invalid recovery kernel release")
+	}
+	for _, char := range release {
+		if (char < 'a' || char > 'z') && (char < 'A' || char > 'Z') && (char < '0' || char > '9') && !strings.ContainsRune("._+-", char) {
+			return "", errors.New("invalid recovery kernel release")
+		}
+	}
+	path := strings.ReplaceAll(template, "%s", release)
+	if !filepath.IsAbs(path) || filepath.Clean(path) != path || strings.ContainsAny(path, "%\x00\r\n") {
+		return "", errors.New("registry recovery kernel configuration path required")
+	}
+	return path, nil
+}
+
+func recoveryKernelConfigGZIP(data []byte) ([]byte, error) {
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("open recovery kernel configuration: %w", err)
+	}
+	config, readErr := io.ReadAll(io.LimitReader(reader, (1<<20)+1))
+	if err := errors.Join(readErr, reader.Close()); err != nil {
+		return nil, fmt.Errorf("read recovery kernel configuration: %w", err)
+	}
+	if len(config) > 1<<20 {
+		return nil, errors.New("recovery kernel configuration exceeds limit")
+	}
+	return config, nil
+}
 
 // measuredVendorKernel writes the kernel image GRUB measures: the file itself,
 // or a gzip-compressed kernel's decompressed image. The returned digest is

@@ -7,27 +7,27 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | openSUSE Tumbleweed                                                                                      | openSUSE Leap 16.0                                                                                      | SLES 15                                                                                                 | SLED 15                                                                                                 |
-| ----------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                              | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
-| lifecycle         | implemented                                                                                              | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| dispatch          | implemented                                                                                              | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| packages          | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| accounts          | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| sysctl            | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| definitions       | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| password          | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| firewall          | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| encryption        | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| wipe              | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| report-loss       | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| lock              | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| recovery-sanitize | gated: grub2-bls ESP topology: measured-GRUB one-shot/staging unimplemented; no Tumbleweed PCR 8/9 proof | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| self-update       | implemented                                                                                              | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| assistance        | implemented                                                                                              | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
-| advisories        | implemented                                                                                              | implemented                                                                                             | implemented                                                                                             | gated: SLED is not mapped by the SUSE CSAF feed                                                         |
-| os-update         | implemented                                                                                              | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
-| release-upgrade   | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade               | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               |
+| Capability        | openSUSE Tumbleweed                                                                        | openSUSE Leap 16.0                                                                                      | SLES 15                                                                                                 | SLED 15                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                | implemented                                                                                             | implemented                                                                                             | implemented                                                                                             |
+| lifecycle         | implemented                                                                                | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| dispatch          | implemented                                                                                | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| packages          | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| accounts          | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| sysctl            | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| definitions       | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| password          | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| firewall          | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| encryption        | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| wipe              | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| report-loss       | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| lock              | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| recovery-sanitize | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| self-update       | implemented                                                                                | implemented                                                                                             | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| assistance        | implemented                                                                                | gated: not implemented for openSUSE Leap 16.0                                                           | gated: not implemented for SLES 15                                                                      | gated: not implemented for SLED 15                                                                      |
+| advisories        | implemented                                                                                | implemented                                                                                             | implemented                                                                                             | gated: SLED is not mapped by the SUSE CSAF feed                                                         |
+| os-update         | implemented                                                                                | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
+| release-upgrade   | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               | gated: release upgrade is not implemented                                                               |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -335,9 +335,14 @@ package name from those registry pins, rather than relying on an implicit
 chroot must report exactly the pinned RPM epoch, version and release; the
 ordinary first-boot probes repeat that check. A mismatch fails closed instead of
 accepting a different DVD kernel. Final recipe identity is
-`opensuse-tumbleweed-dvd-autoyast-v9`. It resets `/etc/machine-id` explicitly
+`opensuse-tumbleweed-dvd-autoyast-v10`. It resets `/etc/machine-id` explicitly
 to an empty mode-0644 file, rather than inheriting the credential writer's
 umask 077; unprivileged D-Bus must be able to read the first-boot identity.
+YaST's `bootloader_finish` runs `systemd-machine-id-setup` after the chroot
+provisioning script (installed `y2log`), which shipped one machine ID in every
+v9 clone. An installation-system pre-script therefore installs a YaST hook,
+`after_bootloader_finish_00_lindm-machine-id` in `/var/lib/YaST2/hooks`, that
+empties the target identity again after that step.
 SSH private keys and source markers retain their separate private modes.
 In the DVD installation system `/etc/pki/trust/anchors` is read-only squashfs
 and `update-ca-certificates` is absent, so v7's snapshot-trust pre-script
@@ -350,12 +355,19 @@ links into writable tmpfs and its libzypp verifies against, under the OpenSSL
 subject hash the installation system's own `openssl` computes. The installed
 system still receives the anchor and runs `update-ca-certificates`. A failed
 ordinary golden install now retains a bounded, credential-redacted serial tail
-(`snapshot-dvd-installer-failure`) in the private lab work directory.
-v9 adds `sdbootutil --no-variables set-timeout 1` to the encrypted (grub2-bls)
-provisioning: YaST's profile timeout did not survive into a golden booted with
-fresh firmware variables, whose first boot then waited at the GRUB menu
-indefinitely (observed on aarch64 by the recovery lane); the timeout now lives
-in the vendor ESP `grubenv` that GRUB2-BLS reads.
+(`snapshot-dvd-installer-failure`) in the private lab work directory, and a
+failed first installed boot of that golden retains the same bounded console plus
+journal warnings (`installed-image-first-boot-failure`).
+AutoYaST reports a failed chroot provisioning command as a warning that times
+out after 10 seconds, and the installation then continues. Provisioning
+therefore writes the source marker as its last command, so the installed
+`source_marker` probe refuses a partially provisioned golden.
+A desktop profile also lists the registry's per-snapshot `DesktopTaboo`
+packages under `<remove-packages>`. YaST's `en_US` locale selection recommends
+`openconnect-lang` with the GNOME pattern, and the 20261007 aarch64 closure,
+solved without requested locales, does not contain it. The installer refusal
+accounting named it as the only gap, and the encrypted aarch64 GNOME install
+stalled on it.
 The encrypted golden identity also includes this AutoYaST recipe revision,
 so a corrected installer cannot reuse an earlier encrypted disk merely because
 its ISO and repository closure are unchanged.
@@ -622,18 +634,123 @@ are retained with SHA-256 in encrypted smoke evidence. Their presence alone
 does not prove that GRUB measured the required final command and kernel into
 PCRs 8/9.
 
-Recovery sanitization remains explicitly gated: **grub2-bls ESP topology:
-measured-GRUB one-shot/staging unimplemented; no Tumbleweed PCR 8/9 proof**.
-Implementing that path requires the genuine ESP and `LoaderEntryOneShot`
-contract, measured event-log proof and explicit FAT crash-durability handling;
-relabeling this platform as Fedora BLS is not supported.
+Measured original-device recovery has a separate registry
+`bls-loader-entry-oneshot` adapter on x86_64 and aarch64. It stages an
+action-named initramfs and a last-sorted BLS entry on the vendor ESP, reusing the
+exact measured kernel at its original nested ESP path. It never flattens a
+machine-ID/kernel-version path into `/boot`, writes Fedora's `next_entry`,
+regenerates GRUB configuration or replaces shim, GRUB, a kernel, firmware keys
+or an owner entry. The registry supplies the boot directory and vendor EFI
+configuration directory; distribution detection has no parallel distro table.
+Kernel configuration is read from the registry-selected
+`/usr/lib/modules/<release>/config` path. Existing Fedora/EL and Debian-family
+recipes retain `/boot/config-<release>`; Arch selects its bounded compressed
+`/proc/config.gz` after loading the registry's `configs` module. These acquisition
+facts do not relax the required kernel configuration checks or establish a
+native recovery pass.
 
-Current in-band recovery readiness requires a writable FAT ESP, measured capacity,
-Secure Boot enabled outside SetupMode, the running systemd-boot loader and its
-matching ESP identity
-([`readiness_linux.go`](../../internal/agent/recoveryboot/readiness_linux.go):28-105).
-UEFI alone, a vendor bootloader or a large-enough filesystem does not satisfy that
-contract. Do not replace vendor boot assets or resize an ESP to manufacture a pass.
+Before arming, the adapter binds all BLS/loader configuration, vendor and fallback
+EFI assets, optional vendor `grubenv` overrides and persistent/default EFI
+selection variables into a bounded snapshot. It checks the kernel, staged
+initramfs and entry digests again at the durable arm boundary. Data and containing
+directories are synchronized before `bootctl set-oneshot` writes
+`LoaderEntryOneShot`, and the variable must read back exactly. Rollback clears
+only its own pending selection and removes only its digest-matching additions.
+An interrupted stage, stale recovery entry or owner asset change refuses the
+next handoff instead of overwriting or adopting it. FAT synchronization is not
+a claim of hardware power-loss atomicity; interrupted-stage and rollback native
+records remain required.
+
+Readiness requires the running GRUB's Boot Loader Interface one-shot feature,
+a `LoaderInfo` naming GRUB (upstream publishes `GRUB 2.14`; the openSUSE
+build publishes `GRUB2 2.14`, observed on aarch64, and both are accepted; this
+self-report is not chain authentication), the matching `LoaderDevicePartUUID`, a writable FAT ESP with measured capacity,
+Secure Boot enabled outside SetupMode, a usable TPM resource manager and the
+strict final measured kernel sequence. A separate XBOOTLDR kernel is not
+silently mapped onto the ESP. Missing prerequisites report their actual reason,
+not a platform-level implementation gate. `udev` supplies `bootctl`; the signed
+snapshot closure must also retain the native GRUB2-BLS/shim, kernel, TPM, kmod,
+zstd, e2fsprogs and nvme-cli inputs. No recovery transaction installs moving
+repository packages or enrolls a fictional vendor key.
+The ordinary and encrypted AutoYaST goldens both install the registry's action
+and measured-recovery package lists from that closure and explicitly select
+the vendor GRUB2-BLS loader. Recovery does not discover missing tools halfway
+through an authorized handoff or silently fetch them from moving repositories.
+The profile's GRUB menu timeout did not reach the golden. Booted with fresh
+firmware variables, the first aarch64 boot waited at the GRUB2-BLS menu until the
+SSH deadline (retained private first-boot console). The installed `y2log` shows
+the order: the chroot provisioning script runs first, then `bootloader_finish`
+runs `sdbootutil install`, `add-all-kernels` and `set-timeout -- 1`. That
+`set-timeout` stores `LoaderConfigTimeout` in the installer's NVRAM, which the
+golden does not keep. v9's `sdbootutil --no-variables set-timeout 1` in the
+chroot script ran before `EFI/opensuse` existed and so wrote the removable
+`EFI/BOOT` directory. GRUB2-BLS reads the `grubenv` beside its running
+`grub.efi` in `EFI/opensuse`, so that write had no effect on the ordinary golden.
+The target has no `grub2-editenv`. Provisioning therefore writes the
+1024-byte environment block with POSIX tools into the registry's vendor
+directory, `/boot/efi/EFI/opensuse/grubenv`, before the loader is installed, and
+`sdbootutil install` does not remove it. The measured adapter binds that file as
+owner state and never rewrites it.
+Recipe revision 10 invalidates the earlier golden caches, so the
+recovery-specific loader and tools cannot alias a revision-9 parity disk.
+The offline solver bootstrap still installs its separate minimal DVD package list.
+
+The registry admits this adapter, and
+`lab matrix run -platform opensuse-tumbleweed -cells recovery-sanitize` qualifies
+it per architecture. A pass requires retained ordinary/recovery TPM logs and a
+verified ledger entry.
+The matrix selects measured GRUB from the release's own registry row, requires
+Secure Boot, and retains both exact image manifests and repository digest pins.
+The package-owned Microsoft-enrolled template comes from `lab/matrix.json`
+`secureBootArgs` on the scheduled host; the lane never modifies host firmware or
+replaces vendor boot assets. Failed golden or action diagnostics return
+privately in `<cell>-diagnostics` beside the evidence record.
+
+The measurement source contract is upstream GRUB 2.14 `blsuki.c`,
+`loader/efi/linux.c` and `commands/tpm.c`, plus the maintained
+[openSUSE source revision](https://api.opensuse.org/public/source/openSUSE:Factory/grub2?rev=50cc75c719472639997e054ccf17fc06).
+Its BLS entry generates `linux`, then `initrd`. The existing verifier requires,
+in order, the final PCR 8 linux command, PCR 9 kernel bytes, PCR 8 kernel
+command line, PCR 8 single-initrd command and PCR 9 initramfs bytes. Device
+prefixes must agree or all be absent. Only the kernel EFI stub's recognized,
+digest-bound load-options and initrd events may follow. The source-model BLS
+regressions do not replace a captured event log and do not relax this sequence.
+The TPM quote must still cover PCRs 4, 7, 8 and 9, have a valid restricted-key
+signature, replay the bounded log and bind the fresh challenge and signed
+BOOTED receipt. Signed ready/grant authority, exact durable target identity,
+original-target allowlisting and independent human approval remain unchanged.
+
+Native qualification (2026-10-12): the `recovery-sanitize` cell passed on both
+architectures. Each run used the original enrolled device and generation on the
+v10 ordinary GRUB2-BLS golden, under Microsoft-enrolled Secure Boot with swtpm.
+The recovery initramfs was staged on the vendor ESP and selected through
+`LoaderEntryOneShot`. The vendor shim, GRUB2-BLS and kernel booted it. The
+server verified a fresh quote and event-log replay, and two humans approved a
+native NVMe user-data format of the original namespace with the
+`controller-serial-nsid` basis.
+
+| Architecture               | Snapshot | Record                                                                                                              | SHA-256                                                            |
+| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| aarch64 (dgx21 KVM, AAVMF) | 20261007 | `~/.cache/lindm-tier2-matrix/tw-arm-recovery-final-r16-23249a91/opensuse-tumbleweed/recovery-sanitize-aarch64.json` | `e5f34964970c99835394334f8f859baef54f3523084c490504921e864d2fe0fd` |
+| x86_64 (local KVM, OVMF)   | 20261009 | `~/.cache/lindm-tier2-matrix/tw-recovery-final-r10-23249a91/opensuse-tumbleweed/recovery-sanitize-x86_64.json`      | `c8c9130f1fbebc93cbcc30e5f5707f9e761a831d5f9bab609995a3f923d97f71` |
+
+The captured ordinary event logs are verifier fixtures in
+`internal/measuredboot/testdata/tumbleweed-*-stock.eventlog`. The unchanged
+strict parser accepts them: linux → kernel file → `kernel_cmdline` → initrd →
+initrd file, for sdbootutil's nested
+`/opensuse-tumbleweed/<release>/linux-<digest>` image. The measured kernel digest
+equals each record's `recovery_vendor_kernel_sha256`. The running loader reports
+`LoaderInfo` `GRUB2 2.14`.
+
+The signed handoff's `kernel_path` admits `linux-<digest>` alongside
+`vmlinuz-<release>`. Native NVMe admin commands use `NVME_IOCTL_ADMIN_CMD` on the
+pinned descriptor, because Tumbleweed's nvme-cli 3.1 cannot address a
+descriptor (see [architecture](../architecture.md)).
+
+These are emulated QEMU NVMe and swtpm results, not physical TPM, firmware or
+flash sanitization. The `recovery-sata` and `recovery-attestation-refusal`
+phases have no Tumbleweed record. The [verification ledger](../verification.md#tier-capability-matrix)
+is authoritative.
 
 ## Device actions
 

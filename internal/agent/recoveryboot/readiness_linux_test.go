@@ -77,6 +77,41 @@ func TestReadinessSecureBootRejectsUnreadableAndUnsupportedFirmware(t *testing.T
 	}
 }
 
+func TestOwnerKeyReadinessPreservesUnknownFirmwareAndRequiresEnforcement(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		ownerKey      bool
+		secure, setup byte
+		readErr       error
+		reason        string
+	}{
+		{name: "enforced", ownerKey: true, secure: 1},
+		{name: "owner_key_not_enforced", ownerKey: true, reason: "recovery_readiness_owner_key_required"},
+		{name: "owner_setup_mode", ownerKey: true, secure: 1, setup: 1, reason: "recovery_readiness_owner_key_required"},
+		{name: "unknown_firmware", ownerKey: true, readErr: unix.EACCES, reason: "recovery_readiness_secure_boot_unavailable"},
+		{name: "vendor_policy_unchanged", reason: "recovery_readiness_secure_boot_required"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			secure, err := readinessSecureBootForPolicy(func(path string) ([]byte, error) {
+				value := tc.secure
+				if path == efivars+"SetupMode-"+globalGUID {
+					value = tc.setup
+				} else if path != efivars+"SecureBoot-"+globalGUID {
+					t.Fatal("owner-key readiness read outside the fixed firmware variables")
+				}
+				return []byte{0, 0, 0, 0, value}, tc.readErr
+			}, tc.ownerKey)
+			if tc.reason == "" {
+				if err != nil || !secure {
+					t.Fatalf("enforced owner boot was rejected: %v", err)
+				}
+			} else if err == nil || err.Error() != tc.reason || secure {
+				t.Fatalf("boot policy was misreported: secure=%v err=%v", secure, err)
+			}
+		})
+	}
+}
+
 func TestReadinessESPIdentityWithoutDeviceLinks(t *testing.T) {
 	const partition = "1e3c984b-74ac-426e-ad7d-f789af4da7c0"
 	const metadata = "I:12345\nE:ID_FS_TYPE=vfat\nE:ID_FS_UUID=1234-ABCD\nE:ID_PART_ENTRY_UUID=" + partition + "\nE:ID_PART_ENTRY_NUMBER=15\n"

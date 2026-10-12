@@ -45,6 +45,11 @@ var RepositorySnapshotRecipes = map[string]RepositorySnapshotRecipe{
 			"20261007": {"aarch64": {"kernel-default=7.2.9-1.1"}},
 			"20261009": {"x86_64": {"kernel-default=7.2.9-1.1"}},
 		},
+		// YaST's en_US locale selection recommends it with the GNOME pattern;
+		// the 20261007 aarch64 closure, solved without RequestedLocales, lacks it.
+		DesktopTaboo: map[string]map[string][]string{
+			"20261007": {"aarch64": {"openconnect-lang"}},
+		},
 	},
 }
 
@@ -147,8 +152,8 @@ var (
 	elQuirks9  = Quirks{AccountChroot: true, SystemdFloor: 252, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
 	elQuirks10 = Quirks{AccountChroot: true, SystemdFloor: 255, PAMManager: PAMManagerAuthselect, RecoveryGRUB: blsGRUB}
 	// Stock shim+GRUB chains for measured original-device recovery.
-	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2"}
-	debianGRUB  = GRUBChain{Entries: GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "grub"}
+	blsGRUB     = GRUBChain{Entries: GRUBBLS, Editenv: "/usr/bin/grub2-editenv", ConfigDirectory: "grub2", BootDirectory: "/boot"}
+	debianGRUB  = GRUBChain{Entries: GRUBCustomConfig, Editenv: "/usr/bin/grub-editenv", ConfigDirectory: "grub", BootDirectory: "/boot"}
 	el9Pins     = []PasswordPins{{Version: "9.8", Quality: "1.4.4", PAM: "1.5.1", Manager: "1.2.6"}}
 	el10Pins    = []PasswordPins{{Version: "10.2", Quality: "1.4.5", PAM: "1.6.1", Manager: "1.5.2"}}
 	osvFeed     = []Feed{FeedOSV}
@@ -181,6 +186,7 @@ var (
 		FirstLoginMarkers: []string{"gnome-initial-setup/upgrade-26.04-done"},
 	}
 	ubuntuGuest = LabGuest{
+		KernelConfig: "/boot/config-%s",
 		Initrd:       "/boot/initrd.img-%s",
 		Actions:      []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "dnsutils", "curl"},
 		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
@@ -200,7 +206,8 @@ var (
 		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell", "mutter"},
 	}
 	fedoraGuest = LabGuest{
-		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true,
+		KernelConfig: "/boot/config-%s",
+		Initrd:       "/boot/initramfs-%s.img", CryptsetupConsole: true,
 		Actions:      []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl"},
 		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
@@ -216,7 +223,8 @@ var (
 		GDMConfig:            "/etc/gdm/custom.conf", Name: "gnome",
 	}
 	rhelGuest = LabGuest{
-		Initrd: "/boot/initramfs-%s.img", CryptsetupConsole: true, OwnedBootHostonly: true,
+		KernelConfig: "/boot/config-%s",
+		Initrd:       "/boot/initramfs-%s.img", CryptsetupConsole: true, OwnedBootHostonly: true,
 		Actions:      []string{"cryptsetup", "nftables", "iproute", "iputils", "systemd-udev", "tpm2-tools", "bind-utils", "curl", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		OwnedBoot:    []string{"systemd-boot-unsigned", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 		MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
@@ -255,6 +263,7 @@ var (
 		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gstreamer1.0-tools", "gnome-shell"},
 	}
 	debianGuest = LabGuest{
+		KernelConfig: "/boot/config-%s",
 		Initrd:       "/boot/initrd.img-%s",
 		Actions:      []string{"cryptsetup", "nftables", "iproute2", "iputils-ping", "tpm2-tools", "bind9-dnsutils", "curl"},
 		OwnedBoot:    []string{"systemd-boot", "systemd-boot-efi", "systemd-ukify", "cryptsetup-bin", "dmsetup", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
@@ -264,7 +273,8 @@ var (
 	// the journal (bookworm's 252 prints it on the console), so the lab routes
 	// its diagnostics to the console like Fedora/EL.
 	debianTrixieGuest = LabGuest{
-		Initrd: debianGuest.Initrd, CryptsetupConsole: true,
+		KernelConfig: debianGuest.KernelConfig,
+		Initrd:       debianGuest.Initrd, CryptsetupConsole: true,
 		Actions: debianGuest.Actions, OwnedBoot: debianGuest.OwnedBoot, MeasuredBoot: debianGuest.MeasuredBoot,
 	}
 	// Debian's arm64 kernels build TPM CRB but not the TIS platform driver,
@@ -607,7 +617,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: []Feed{FeedArchASA}, Ecosystem: "Arch Linux rolling", Partial: "tracker omits historical and non-repository packages", Exports: map[Feed]AdvisoryExport{
 			FeedArchASA: {URL: "https://security.archlinux.org/issues/all.json", Format: "arch-json", MaxAgeSeconds: 86400},
 		}},
-		Quirks:  Quirks{SystemdFloor: 255, PAMManager: PAMManagerNative, Password: []PasswordPins{{Version: "", Quality: "1.4.5-7", PAM: "1.7.3-1", Manager: "20260616-1"}}},
+		Quirks:  Quirks{SystemdFloor: 255, PAMManager: PAMManagerNative, RecoveryOwnerKey: true, Password: []PasswordPins{{Version: "", Quality: "1.4.5-7", PAM: "1.7.3-1", Manager: "20260616-1"}}},
 		FDE:     "LUKS2; systemd-cryptenroll with mkinitcpio sd-encrypt",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); owner-chosen bootloader", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
@@ -619,21 +629,22 @@ var registry = []*Release{
 			// images' 2026-10-02 pin) is the os-update policy's later target.
 			OSUpdateTargets:   map[string]RollingTarget{"x86_64": {Date: "2026-10-09"}},
 			InstallerPackages: []string{"base", "linux", "linux-firmware", "mkinitcpio", "cryptsetup", "systemd", "tpm2-tss", "tpm2-tools", "openssh", "sudo", "networkmanager", "grub", "dosfstools"},
+			RecoveryEdition:   "systemd-boot-lab", RecoveryInstallerEdition: "systemd-boot-encrypted-lab",
 			Session: LabSession{
 				Desktops:  map[string][]string{"gnome": {"gnome-shell", "gdm", "gnome-session", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gst-plugin-pipewire", "gst-plugins-good"}},
 				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
 				Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "gnome-shell", "mutter"},
 			},
 			Guest: LabGuest{
+				KernelConfig: "/proc/config.gz", KernelConfigModule: "configs",
 				Kernel: "/boot/vmlinuz-linux", Initrd: "/boot/initramfs-linux.img",
 				Actions:      []string{"cryptsetup", "tpm2-tools", "tpm2-tss", "nftables", "iproute2", "iputils", "bind", "curl", "python", "libpwquality"},
 				OwnedBoot:    []string{"systemd", "systemd-ukify", "cryptsetup", "device-mapper", "nvme-cli", "e2fsprogs", "kmod", "zstd"},
 				MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd"},
 			},
 		},
-		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
-		Gates: without(gates(string(RecoverySanitize), "official Arch media have no vendor Secure Boot trust; owner-key recovery and chosen bootloader require native qualification",
-			string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
+		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate, RecoverySanitize}),
+		Gates:    without(gates(string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
 	},
 	{
 		Key: "omarchy-4.0.4", Name: "Omarchy 4.0.4", Distribution: "Omarchy", ID: "omarchy", Version: Exact("4.0.4"),
@@ -673,10 +684,12 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: []Feed{FeedSUSEOVAL, FeedSUSECSAF}, Ecosystem: "cpe:/o:opensuse:tumbleweed", PURLNamespace: "suse", OVALPlatform: "openSUSE Tumbleweed", OVALReleasePackage: "openSUSE-release", Partial: "vendor package assessments do not cover all rolling or third-party packages", Exports: map[Feed]AdvisoryExport{
 			FeedSUSEOVAL: {URL: "https://ftp.suse.com/pub/projects/security/oval/opensuse.tumbleweed.xml.gz", Format: "suse-oval", MaxAgeSeconds: 604800, MaxArchiveBytes: 67108864},
 		}},
-		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig, Password: []PasswordPins{
-			{Version: "20261007", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
-			{Version: "20261009", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
-		}},
+		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamConfig,
+			RecoveryGRUB: GRUBChain{Entries: GRUBBLSLoaderEntryOneShot, ConfigDirectory: "EFI/opensuse", BootDirectory: "/boot/efi"},
+			Password: []PasswordPins{
+				{Version: "20261007", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
+				{Version: "20261009", Quality: "1.4.5-5.7", PAM: "1.7.3-1.1", Manager: "2.14+git.20260216-1.4"},
+			}},
 		FDE:     "LUKS2 (AutoYaST); systemd-cryptenroll with dracut",
 		Desktop: Desktop{Name: "GNOME Wayland (maintained); KDE separately qualified", DisplayManager: "gdm", Lock: "GNOME Shell"},
 		Lab: Lab{
@@ -693,13 +706,13 @@ var registry = []*Release{
 				GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},
 				Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good", "gnome-shell", "mutter"},
 			},
-			Guest: LabGuest{Initrd: "/boot/initrd-%s",
-				Actions: []string{"cryptsetup", "udev", "tpm2.0-tools", "libtss2-esys0", "nftables", "iproute2", "iputils", "bind-utils", "curl", "python313", "libpwquality-tools"},
+			Guest: LabGuest{Initrd: "/boot/initrd-%s", KernelConfig: "/usr/lib/modules/%s/config",
+				Actions:      []string{"cryptsetup", "udev", "tpm2.0-tools", "libtss2-esys0", "nftables", "iproute2", "iputils", "bind-utils", "curl", "python313", "libpwquality-tools"},
+				MeasuredBoot: []string{"nvme-cli", "e2fsprogs", "kmod", "zstd", "tpm2.0-tools", "udev"},
 			},
 		},
-		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate}),
-		Gates: without(gates(string(RecoverySanitize), "grub2-bls ESP topology: measured-GRUB one-shot/staging unimplemented; no Tumbleweed PCR 8/9 proof",
-			string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
+		Supports: caps(agentCore, hostResources, []Capability{Advisories, Password, Encryption, Wipe, ReportLoss, Lock, Assistance, OSUpdate, RecoverySanitize}),
+		Gates:    without(gates(string(ReleaseUpgrade), "rolling whole-system snapshot update; use os-update, not a numbered release upgrade"), OSUpdate),
 	},
 	{
 		Key: "opensuse-leap-16.0", Name: "openSUSE Leap 16.0", Distribution: "openSUSE Leap", ID: "opensuse-leap", Version: Exact("16.0"),

@@ -76,6 +76,8 @@ const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
     "Recovery readiness is stale. Refresh inventory before continuing.",
   device_action_recovery_readiness_unsupported:
     "This device does not report the required recovery capability.",
+  device_action_recovery_owner_key_required:
+    "Secure Boot not enforced: recovery sanitize requires an enrolled owner key",
   device_action_recovery_artifact_required:
     "Select the configured signed recovery image to check required space.",
   device_action_recovery_artifact_unavailable:
