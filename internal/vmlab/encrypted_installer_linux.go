@@ -22,17 +22,11 @@ import (
 	"lindm/internal/platform"
 )
 
-// encryptedDesktopMediaEdition is the manifest edition of a vendor Ubuntu desktop
-// ISO. Its installer is ubuntu-desktop-bootstrap over the subiquity autoinstall
-// backend, and the installed system, GNOME included, comes from the media's
-// squashfs layers rather than from packages installed over the network.
-const encryptedDesktopMediaEdition = "desktop-encrypted-lab"
-
 // encryptedMedia is the release and installer layout of one encrypted
 // installer manifest.
 type encryptedMedia struct {
 	release *platform.Release
-	// desktop selects the encryptedDesktopMediaEdition recipe.
+	// desktop selects the platform.DesktopInstallerEdition recipe.
 	desktop  bool
 	manifest *labv1.ImageManifest
 	snapshot *tumbleweedSnapshotRepository
@@ -40,7 +34,7 @@ type encryptedMedia struct {
 
 // encryptedInstallerMedia maps a manifest to its installer recipe layout.
 func encryptedInstallerMedia(m *labv1.ImageManifest) encryptedMedia {
-	return encryptedMedia{release: platform.ForManifest(m.GetDistribution(), m.GetVersion()), desktop: m.GetEdition() == encryptedDesktopMediaEdition, manifest: m}
+	return encryptedMedia{release: platform.ForManifest(m.GetDistribution(), m.GetVersion()), desktop: m.GetEdition() == platform.DesktopInstallerEdition, manifest: m}
 }
 
 // encryptedInstallerDracutKernels rebuilds every installed kernel's initrd at

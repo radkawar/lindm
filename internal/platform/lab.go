@@ -167,6 +167,14 @@ func ProvisionLane(p Provisioning) (LabLane, bool) {
 	}
 }
 
+// DesktopInstallerEdition is the manifest edition of a vendor Ubuntu desktop
+// ISO. Its installer is ubuntu-desktop-bootstrap over the subiquity autoinstall
+// backend, and the installed system, GNOME included, comes from the media's
+// squashfs layers rather than from packages installed over the network, so
+// installer provisioning lanes, which qualify the server install a snippet
+// targets, never boot it.
+const DesktopInstallerEdition = "desktop-encrypted-lab"
+
 // LaneProvisioning is the provisioning format a provision lane qualifies.
 func LaneProvisioning(l LabLane) (Provisioning, bool) {
 	format := Provisioning(strings.TrimPrefix(string(l), "provision-"))

@@ -394,15 +394,18 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		reasons = appendUnique(reasons, "Secure Boot unavailable: "+reason+" (Lab.SecureBootUnavailable)")
 		gated = true
 	}
-	primaryEdition, recoveryEdition := "", ""
+	primaryEdition, recoveryEdition, excludedEdition := "", "", ""
 	if slices.Contains(spec.GetCapabilities(), string(platform.RecoverySanitize)) {
 		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition
 	}
-	c.Manifest = in.manifest(r, spec.GetImage(), arch, primaryEdition)
+	if format, ok := platform.LaneProvisioning(platform.LabLane(spec.GetLane())); ok && format != platform.ProvisionCloudInit {
+		excludedEdition = platform.DesktopInstallerEdition
+	}
+	c.Manifest = in.manifest(r, spec.GetImage(), arch, primaryEdition, excludedEdition)
 	// Only the device-actions lane takes -recovery-manifest; assistance and
 	// provision-* also boot encrypted installers but reject the flag.
 	if spec.GetLane() == "device-actions" {
-		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch, recoveryEdition)
+		c.Recovery = in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, arch, recoveryEdition, "")
 	}
 	var superseded bool
 	c.Entry, superseded = in.latest(c)
@@ -437,19 +440,20 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 
 // manifest selects the explicit owner choice, otherwise the newest pinned
 // repository date for rolling releases. Fixed releases retain path ordering.
-func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch, edition string) *Manifest {
+// An excluded edition is never selected, even as the owner's choice.
+func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch, edition, excluded string) *Manifest {
 	var selected *Manifest
 	for _, m := range in.Manifests {
 		if m.Release.Key != r.Key || m.Architecture != arch || !m.serves(kind) {
 			continue
 		}
 		if m.Image.GetId() == in.PreferredManifest {
-			if edition != "" && m.Image.GetEdition() != edition {
+			if (edition != "" && m.Image.GetEdition() != edition) || (excluded != "" && m.Image.GetEdition() == excluded) {
 				return nil
 			}
 			return m
 		}
-		if edition != "" && m.Image.GetEdition() != edition {
+		if (edition != "" && m.Image.GetEdition() != edition) || (excluded != "" && m.Image.GetEdition() == excluded) {
 			continue
 		}
 		if edition == "" && r.Lab.RecoveryEdition != "" && m.Image.GetEdition() == r.Lab.RecoveryEdition {

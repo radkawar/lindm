@@ -52,6 +52,14 @@ SHA-256 `601e30fbf5d97759367c632e2c33630665039b7e2158fd068403da3ccf1bda1f`,
 6,482,409,472 bytes), bound to the signed `releases.ubuntu.com/26.04.1/SHA256SUMS`
 and the Ubuntu CD image key `843938DF228D22F7B3742BC0D94AA3F0EFE21092`, as the
 Noble live-server manifests are. All three passed `lab images fetch` on 2026-10-11.
+`provision-autoinstall` never boots desktop media (its installer copies squashfs
+layers instead of the server install a provisioning snippet targets), so the lane
+uses the 26.04.1 live-server ISOs
+([amd64](../../lab/images/ubuntu-resolute-encrypted-amd64.json#L1), SHA-256
+`cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927`;
+[arm64](../../lab/images/ubuntu-resolute-encrypted-arm64.json#L1), SHA-256
+`af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168`), bound to the
+same signed `SHA256SUMS` and key; both passed `lab images fetch` on 2026-10-12.
 A verified image is an input, not a successful installation, desktop, encryption or
 agent lifecycle result.
 
@@ -217,7 +225,9 @@ the token, in `/var/log/installer/autoinstall-user-data` and under
 `/etc/cloud/cloud.cfg.d/`; delete those copies after enrollment. On 24.04 arm64
 both formats passed end to end from the console clipboard through independent
 approval to **Enrolled** ([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
-22.04, 26.04 and amd64 are offered but have no provisioning record.
+cloud-init also passed on 24.04 amd64 and on 26.04 amd64 and arm64 (matrix
+ledger, 9021e6a2). 22.04 and the other autoinstall cells are offered but have no
+passing provisioning record.
 
 Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
 signature check. Authentication is signed `InRelease` → hashed `Packages` → archive

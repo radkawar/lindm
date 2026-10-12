@@ -31,11 +31,11 @@ func TestRollingManifestPrefersNewestSnapshotButHonorsOwnerChoice(t *testing.T) 
 	old := &Manifest{Image: &labv1.ImageManifest{Id: "old", RepositorySnapshotDate: proto.String("2026-10-07")}, Release: r, Architecture: "x86_64"}
 	current := &Manifest{Image: &labv1.ImageManifest{Id: "current", RepositorySnapshotDate: proto.String("2026-10-09")}, Release: r, Architecture: "x86_64"}
 	in := &Inputs{Manifests: []*Manifest{old, current}}
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != current {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", "", ""); got != current {
 		t.Fatal("historical path ordering hid the current rolling snapshot")
 	}
 	in.PreferredManifest = old.Image.GetId()
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != old {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", "", ""); got != old {
 		t.Fatal("newer snapshot silently replaced an explicit owner choice")
 	}
 }
@@ -47,18 +47,38 @@ func TestRecoveryManifestDoesNotReplaceOwnerBootTopology(t *testing.T) {
 	grub := &Manifest{Image: &labv1.ImageManifest{Id: "owner-grub", Edition: "grub-encrypted-lab"}, Release: r, Architecture: "x86_64"}
 	uki := &Manifest{Image: &labv1.ImageManifest{Id: "encrypted-uki", Edition: r.Lab.RecoveryInstallerEdition}, Release: r, Architecture: "x86_64"}
 	in := &Inputs{Manifests: []*Manifest{recovery, ordinary, grub, uki}}
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", ""); got != ordinary {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", "", ""); got != ordinary {
 		t.Fatal("dedicated recovery baseline silently replaced the ordinary rolling image")
 	}
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", r.Lab.RecoveryEdition); got != recovery {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "x86_64", r.Lab.RecoveryEdition, ""); got != recovery {
 		t.Fatal("explicit owner-UKI recovery baseline was not selected")
 	}
 	in.PreferredManifest = grub.Image.Id
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, "x86_64", r.Lab.RecoveryInstallerEdition); got != nil {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, "x86_64", r.Lab.RecoveryInstallerEdition, ""); got != nil {
 		t.Fatal("owner-selected GRUB was silently remapped to systemd-boot recovery")
 	}
-	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "aarch64", r.Lab.RecoveryEdition); got != nil {
+	if got := in.manifest(r, labv1.MatrixImage_MATRIX_IMAGE_CLOUD, "aarch64", r.Lab.RecoveryEdition, ""); got != nil {
 		t.Fatal("recovery baseline crossed architecture")
+	}
+}
+
+func TestInstallerProvisioningNeverBootsDesktopMedia(t *testing.T) {
+	r := release(t, "ubuntu-26.04")
+	desktop := &Manifest{Image: &labv1.ImageManifest{Id: "desktop", Edition: platform.DesktopInstallerEdition}, Release: r, Architecture: "x86_64"}
+	server := &Manifest{Image: &labv1.ImageManifest{Id: "server", Edition: "live-server-encrypted-lab"}, Release: r, Architecture: "x86_64"}
+	in := &Inputs{Manifests: []*Manifest{desktop, server}}
+	cell := func(name, lane string) *Cell {
+		return in.cell(r, &labv1.MatrixCell{Name: name, Lane: lane, Image: labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER}, "x86_64")
+	}
+	if got := cell("encrypted", "device-actions").Manifest; got != desktop {
+		t.Fatal("desktop media lost its place as the release's encrypted installer")
+	}
+	if got := cell("provision-autoinstall", string(platform.LaneProvisionAutoinstall)).Manifest; got != server {
+		t.Fatal("autoinstall provisioning booted desktop media")
+	}
+	in.PreferredManifest = desktop.Image.Id
+	if got := cell("provision-autoinstall", string(platform.LaneProvisionAutoinstall)).Manifest; got != nil {
+		t.Fatal("an owner-preferred desktop image was used for installer provisioning")
 	}
 }
 
