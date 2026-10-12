@@ -752,9 +752,10 @@ func retainMatrixManifest(source, destination, expected string) (err error) {
 func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	lane := c.Spec.GetLane()
 	args := append([]string{"vm", lane}, c.Spec.GetArgs()...)
-	// A release without the owned-boot UKI fixture qualifies recovery only
-	// through measured GRUB; vmlab refuses the owned fixture for it.
-	if lane == "device-actions" && strings.HasPrefix(labhost.FlagValue(args, "wipe-phase"), "recovery-") && c.Release.Lab.OwnedBootUnavailable != "" {
+	// A release (or guest architecture) without the owned-boot UKI fixture
+	// qualifies recovery only through measured GRUB; vmlab refuses the owned
+	// fixture for it.
+	if lane == "device-actions" && strings.HasPrefix(labhost.FlagValue(args, "wipe-phase"), "recovery-") && c.Release.Lab.OwnedBootUnavailableFor(c.Architecture) != "" {
 		args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
 	}
 	args = append(args, "-manifest", filepath.Join(r.root, c.Manifest.Path), "-cache", r.cache)

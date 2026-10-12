@@ -305,6 +305,9 @@ fresh authenticated inventory/session and signed downgrade refusal:
 `7716aa65b6d846dd935f2b087fa7a019563d33f124efda2e39ee81adc5da860c`.
 This is one-source, differently stamped package qualification, not historical release
 compatibility, arbitrary dependency management or physical power-loss evidence.
+The same lane passed natively on aarch64 (dgx20 KVM, AAVMF) for 24.04 and 26.04
+through `lab matrix run`, so the registry admits it on both architectures
+([records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)).
 
 ### Air-gapped offline bundles
 
@@ -407,7 +410,11 @@ arm64, GRUB measures the gzip `vmlinuz` decompressed, and the release's
 NVMe, plus additional arm64 NVMe on `dgx21`. Ubuntu 22.04 amd64 (signed GRUB
 2.06, kernel 5.15) passed SATA and NVMe; its NVMe needs the sysfs-derived NVMe
 approval scope. 22.04's recovery sanitize is measured GRUB only, because its lab
-owned-boot UKI fixture lacks ukify. Jammy's arm64 GRUB records no PCR 8/9
+owned-boot UKI fixture lacks ukify. On 24.04 aarch64 the owned-boot fixture is
+refused too (`Lab.OwnedBootUnavailableOn`): the signed arm64 `vmlinuz` is a
+gzip-compressed Image that GRUB unpacks, which `ukify` cannot scrape or embed, so
+the matrix runs measured GRUB there and that NVMe cell passed with Secure Boot
+enforced. Jammy's arm64 GRUB records no PCR 8/9
 measurements, so readiness refuses there. Record hashes are in
 [verification](../verification.md#measured-grub-recovery-on-stock-vendor-boot-chains).
 Ubuntu 26.04.1 amd64 NVMe and SATA also passed
@@ -943,6 +950,16 @@ This proves feed publication, not authenticated device-findings evaluation or
 scheduled refresh in the already running server. The record explicitly leaves those
 and new rejection UI fields pending the approved bundled restart. Keep feed and
 inventory freshness independent, as required by [verification](../verification.md).
+
+The native `advisories` matrix lane (`lab vm advisories`) runs on 24.04 and 26.04:
+it refreshes the registry's OSV `all.zip` export through the production pipeline,
+waits for the server's evaluation of the enrolled agent's snapshot, requires every
+finding to name an installed dpkg package, and cross-checks a real vulnerable/fixed
+pair from the publication with native `dpkg --compare-versions` (vendor versions are
+positional shell data). The registry's 4 GiB archive allowance sizes the lab refresh
+(45 minutes; a first fetch at 0.6 MB/s takes over 20). Qualified on aarch64 for
+both releases ([records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)):
+native matching, not complete device coverage.
 
 ## Lab
 

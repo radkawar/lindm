@@ -51,6 +51,9 @@ type Lab struct {
 	// fixture cannot run on this release. Recovery sanitize itself may still
 	// be qualified through measured GRUB, which needs no ukify.
 	OwnedBootUnavailable string
+	// OwnedBootUnavailableOn holds such reasons for single guest architectures
+	// (x86_64, aarch64) where the fixture works on the others.
+	OwnedBootUnavailableOn map[string]string
 	// Updater is the vendor's own background package updater. The lab stops it
 	// for stable package truth, and the resources lane drives it on purpose
 	// to hold the native package lock while a package change arrives.
@@ -98,6 +101,15 @@ func (r *Release) LabLane(l LabLane) error {
 		return nil
 	}
 	return fmt.Errorf("platform: no maintained vm %s lane for %s", l, r.Name)
+}
+
+// OwnedBootUnavailableFor is why the owned UKI recovery fixture cannot run for
+// the guest architecture (either spelling), or "" when it can.
+func (l Lab) OwnedBootUnavailableFor(architecture string) string {
+	if l.OwnedBootUnavailable != "" {
+		return l.OwnedBootUnavailable
+	}
+	return l.OwnedBootUnavailableOn[kernelArchitecture(architecture)]
 }
 
 // LabLaneOn is LabLane for one guest architecture; it accepts the Debian

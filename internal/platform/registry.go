@@ -254,6 +254,8 @@ var (
 	// EL rows cite the 9.8/10.2 minors their records exercised.
 	updatesX86 = map[LabLane][]string{LaneUpdates: x86}
 	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
+	// The native advisories lane (`lab vm advisories`) per guest architecture.
+	advisoriesARM = map[LabLane][]string{LaneAdvisories: {"aarch64"}}
 )
 
 var registry = []*Release{
@@ -292,9 +294,12 @@ var registry = []*Release{
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate, SSHBannerUnit: "ssh.service",
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole},
-			LaneArchitectures: updatesX86, Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
-			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole},
+			LaneArchitectures: advisoriesARM, Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
+			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
+			// Image that GRUB unpacks; systemd 255's stub cannot embed it in a UKI.
+			OwnedBootUnavailableOn: map[string]string{"aarch64": "the arm64 vendor kernel is a gzip-compressed Image that systemd-stub cannot embed in the owned ordinary UKI"},
+			TPM:                    LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		// ReleaseUpgrade: do-release-upgrade to UpgradeTo, `lab vm resources -phase release-upgrade`.
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade}, actionLanes),
 		Gates:    without(gates(), OSUpdate, ReleaseUpgrade),
@@ -310,8 +315,8 @@ var registry = []*Release{
 		// The 26.04 desktop ISO carries dracut 110, systemd-cryptsetup and the
 		// TSS2 libraries, but not tpm2-tools, whose tpm2 binary dracut's
 		// tpm2-tss module requires.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneEnrollFromConsole},
-			LaneArchitectures: updatesX86, Installer: Subiquity, Session: ubuntuResoluteSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneServices, LaneAdvisories, LaneEnrollFromConsole},
+			LaneArchitectures: advisoriesARM, Installer: Subiquity, Session: ubuntuResoluteSession, Guest: ubuntuResoluteGuest, TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"tpm2-tools"}}},
 		// Recovery sanitize is qualified through measured GRUB (recovery-*-grub-03):
 		// on the stock 105 MiB cloud ESP the owned UKI holds the vendor kernel plus
 		// the non-hostonly dracut initrd (72 MB), so UKI mode is refused natively

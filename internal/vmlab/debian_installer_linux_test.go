@@ -222,10 +222,10 @@ func TestDebianBookwormRecoveryIsMeasuredOnly(t *testing.T) {
 		t.Fatal("debian-12 missing from the registry")
 	}
 	for _, phase := range []string{"recovery-nvme", "recovery-sata"} {
-		if err := ownedBootFixtureAvailable(bookworm, "wipe", phase, ""); err == nil {
+		if err := ownedBootFixtureAvailable(bookworm, "x86_64", "wipe", phase, ""); err == nil {
 			t.Fatalf("Debian 12 admitted the owned-boot %s fixture without ukify", phase)
 		}
-		if err := ownedBootFixtureAvailable(bookworm, "wipe", phase, recoveryBootMeasured); err != nil {
+		if err := ownedBootFixtureAvailable(bookworm, "x86_64", "wipe", phase, recoveryBootMeasured); err != nil {
 			t.Fatalf("Debian 12 measured %s refused: %v", phase, err)
 		}
 	}

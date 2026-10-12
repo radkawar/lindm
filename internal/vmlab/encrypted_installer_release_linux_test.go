@@ -174,11 +174,20 @@ func TestUbuntuJammyTPMBootCarriesTSS2WithoutTPM2TSSModule(t *testing.T) {
 	// Jammy's recovery sanitize is measured GRUB only: its owned-boot UKI
 	// fixture is refused for lack of ukify, the measured lane is admitted.
 	jammy := releaseMedia("ubuntu", "22.04").release
-	if err := ownedBootFixtureAvailable(jammy, "wipe", "recovery-nvme", ""); err == nil {
+	if err := ownedBootFixtureAvailable(jammy, "x86_64", "wipe", "recovery-nvme", ""); err == nil {
 		t.Fatal("Jammy admitted to the owned-boot recovery fixture without ukify")
 	}
-	if err := errors.Join(jammy.Gate(platform.RecoverySanitize), ownedBootFixtureAvailable(jammy, "wipe", "recovery-sata", recoveryBootMeasured), ownedBootFixtureAvailable(jammy, "wipe", "lock-quarantine", "")); err != nil {
+	if err := errors.Join(jammy.Gate(platform.RecoverySanitize), ownedBootFixtureAvailable(jammy, "x86_64", "wipe", "recovery-sata", recoveryBootMeasured), ownedBootFixtureAvailable(jammy, "x86_64", "wipe", "lock-quarantine", "")); err != nil {
 		t.Fatalf("Jammy measured recovery or unrelated lanes refused: %v", err)
+	}
+	// Noble's arm64 vendor kernel is a gzip-compressed Image: only its owned
+	// UKI fixture is refused, on that architecture alone.
+	noble := releaseMedia("ubuntu", "24.04").release
+	if err := ownedBootFixtureAvailable(noble, "arm64", "wipe", "recovery-nvme", ""); err == nil {
+		t.Fatal("Noble arm64 admitted to the owned-boot recovery fixture with a compressed kernel")
+	}
+	if err := errors.Join(ownedBootFixtureAvailable(noble, "aarch64", "wipe", "recovery-nvme", recoveryBootMeasured), ownedBootFixtureAvailable(noble, "x86_64", "wipe", "recovery-nvme", "")); err != nil {
+		t.Fatalf("Noble measured arm64 or owned x86_64 recovery refused: %v", err)
 	}
 }
 

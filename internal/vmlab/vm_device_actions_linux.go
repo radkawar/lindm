@@ -271,7 +271,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 			return nil, err
 		}
 	}
-	if err := ownedBootFixtureAvailable(release, options.Scenario, options.WipePhase, options.RecoveryBootMode); err != nil {
+	if err := ownedBootFixtureAvailable(release, manifest.GetArchitecture(), options.Scenario, options.WipePhase, options.RecoveryBootMode); err != nil {
 		return nil, err
 	}
 	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
@@ -819,11 +819,13 @@ func recoveryReleaseMatches(target, recovery *platform.Release) error {
 }
 
 // ownedBootFixtureAvailable refuses the owned systemd-boot UKI recovery fixture
-// where the release cannot build its ordinary UKI; measured GRUB lanes run.
-func ownedBootFixtureAvailable(release *platform.Release, scenario, wipePhase, bootMode string) error {
+// where the release cannot build its ordinary UKI on the guest architecture;
+// measured GRUB lanes run.
+func ownedBootFixtureAvailable(release *platform.Release, architecture, scenario, wipePhase, bootMode string) error {
 	recovery := scenario == "all" || (scenario == "wipe" && (wipePhase == "" || wipePhase == "recovery-nvme" || wipePhase == "recovery-sata"))
-	if !recovery || bootMode == recoveryBootMeasured || release.Lab.OwnedBootUnavailable == "" {
+	reason := release.Lab.OwnedBootUnavailableFor(architecture)
+	if !recovery || bootMode == recoveryBootMeasured || reason == "" {
 		return nil
 	}
-	return fmt.Errorf("platform: owned-boot recovery fixture unavailable on %s: %s; use -recovery-boot-mode %s", release.Name, release.Lab.OwnedBootUnavailable, recoveryBootMeasured)
+	return fmt.Errorf("platform: owned-boot recovery fixture unavailable on %s %s: %s; use -recovery-boot-mode %s", release.Name, architecture, reason, recoveryBootMeasured)
 }
