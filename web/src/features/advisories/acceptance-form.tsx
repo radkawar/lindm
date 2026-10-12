@@ -171,6 +171,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
             required
             value={reason}
             onChange={(event) => setReason(event.target.value)}
+            data-freeform="risk acceptance reason"
           />
           <Label htmlFor={`expiry-${findingId}`}>Expires (local time)</Label>
           <Input
