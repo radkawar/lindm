@@ -37,11 +37,19 @@ let activeStep = "configuration";
 const result = { engine: "unknown", passed: false, steps: [], screenshots: [] };
 
 function failure(error) {
+  const message = String(error?.message ?? "");
+  // A browser/driver error is named by its fixed class only, never by its
+  // free text (which can quote page or request content).
+  const browserError =
+    /net::ERR_[A-Z_]+|Execution context was destroyed|Target page, context or browser has been closed|Timeout \d+ms exceeded/.exec(
+      message,
+    )?.[0] ?? "";
   return {
     step: activeStep,
-    code: /^[a-z][a-z0-9_]+$/.test(error?.message ?? "") ? error.message : "browser_journey_failed",
+    code: /^[a-z][a-z0-9_]+$/.test(message) ? message : "browser_journey_failed",
     transportCode: error?.code ?? error?.cause?.code ?? "",
     errorType: error?.name ?? "Error",
+    ...(browserError ? { browserError } : {}),
   };
 }
 
