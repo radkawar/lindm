@@ -5542,6 +5542,21 @@
       "source": "MATRIX_SOURCE_RUN",
       "verified": true,
       "manifestSha256": "9a4370735711d45d829ac3f3fe5326d66b97450e4e8bc112dfd53755d2341f47"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "advisories",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/ults-x86-x3-20261011T230734Z/ubuntu-24.04/advisories-x86_64.json",
+      "sha256": "e560806713b5519dc0396a0b628646782f90969acd291100290720f93849599f",
+      "recorded": "2026-10-12T04:17:58.423223820Z",
+      "revision": "0a25c88ab05aa3d76b53c78a75101f1d898d483d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "scope": "native feed matching; not complete device coverage",
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56"
     }
   ]
 }

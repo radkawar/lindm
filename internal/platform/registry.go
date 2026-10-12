@@ -268,8 +268,6 @@ var (
 	// architecture: x86_64 on the local host, aarch64 on the arm64 KVM hosts.
 	updatesX86 = map[LabLane][]string{LaneUpdates: x86}
 	updatesARM = map[LabLane][]string{LaneUpdates: {"aarch64"}}
-	// The native advisories lane (`lab vm advisories`) per guest architecture.
-	advisoriesARM = map[LabLane][]string{LaneAdvisories: {"aarch64"}}
 )
 
 var registry = []*Release{
@@ -313,7 +311,7 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		ModuleBlocklist: ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole},
-			LaneArchitectures: advisoriesARM, Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
+			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
 			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
 			// Image that GRUB unpacks; systemd 255's stub cannot embed it in a UKI.
 			OwnedBootUnavailableOn: map[string]string{"aarch64": "the arm64 vendor kernel is a gzip-compressed Image that systemd-stub cannot embed in the owned ordinary UKI"},

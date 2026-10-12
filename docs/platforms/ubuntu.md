@@ -980,8 +980,8 @@ waits for the server's evaluation of the enrolled agent's snapshot, requires eve
 finding to name an installed dpkg package, and cross-checks a real vulnerable/fixed
 pair from the publication with native `dpkg --compare-versions` (vendor versions are
 positional shell data). The registry's 4 GiB archive allowance sizes the lab refresh
-(45 minutes; a first fetch at 0.6 MB/s takes over 20). Qualified on both
-architectures for 26.04 and on aarch64 for 24.04
+(45 minutes, for slow controller links; the recorded refreshes took 89–307 s).
+Qualified on both architectures for both releases
 ([records](../verification.md#ubuntu-24042604-matrix-completion-2026-10-12)):
 native matching, not complete device coverage.
 
