@@ -89,23 +89,22 @@ export function AttributeFields({
                     { value: "false", label: "False" },
                   ]}
                 />
+              ) : field.case === "enumValue" && definition ? (
+                <SelectField
+                  id={`attribute:${key}`}
+                  name={`attribute:${key}`}
+                  defaultValue={field.value || definition.enumValues[0]}
+                  disabled={disabled}
+                  options={definition.enumValues.map((value) => ({ value, label: value }))}
+                />
               ) : (
-                <>
-                  <Input
-                    id={`attribute:${key}`}
-                    name={`attribute:${key}`}
-                    defaultValue={field.value?.toString() ?? ""}
-                    inputMode={field.case === "intValue" ? "numeric" : "text"}
-                    list={field.case === "enumValue" ? `enum:${key}` : undefined}
-                  />
-                  {field.case === "enumValue" && definition ? (
-                    <datalist id={`enum:${key}`}>
-                      {definition.enumValues.map((value) => (
-                        <option key={value} value={value} />
-                      ))}
-                    </datalist>
-                  ) : null}
-                </>
+                <Input
+                  id={`attribute:${key}`}
+                  name={`attribute:${key}`}
+                  defaultValue={field.value?.toString() ?? ""}
+                  inputMode={field.case === "intValue" ? "numeric" : "text"}
+                  data-freeform="custom attribute value; any text or number the definition allows"
+                />
               )}
             </div>
             <Button

@@ -38,6 +38,7 @@ import {
   OSUpdateRebootPolicySchema,
   UpdateSelection,
 } from "../../../gen/lindm/resource/v1/software_pb";
+import { X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,6 +94,7 @@ import {
   validateRequest,
   type FieldError,
 } from "@/lib/validation";
+import { LocalUserPicker } from "./local-users";
 import {
   ObservedStorageTargetPicker,
   observedStorageSelections,
@@ -278,13 +280,13 @@ export function DeviceActionForm({
   const [refreshOpen, setRefreshOpen] = useState(false);
   const [refreshActionId, setRefreshActionId] = useState("");
   const [retireSlot, setRetireSlot] = useState("");
-  const [pcrs, setPcrs] = useState("");
+  const [pcrs, setPcrs] = useState<number[]>([]);
   const [endpoints, setEndpoints] = useState("");
   const [quarantineId, setQuarantineId] = useState("");
   const [lockId, setLockId] = useState("");
   const [terminateSessions, setTerminateSessions] = useState(false);
   const [accountSelection, setAccountSelection] = useState("none");
-  const [usernames, setUsernames] = useState("");
+  const [usernames, setUsernames] = useState<string[]>([]);
   const [powerDelay, setPowerDelay] = useState("");
   const [powerMessage, setPowerMessage] = useState("");
   const [patchSelection, setPatchSelection] = useState(UpdateSelection.SECURITY);
@@ -559,23 +561,19 @@ export function DeviceActionForm({
             case: kind,
             value: create(TPM2BindActionSchema, {
               target,
-              pcrs: pcrs
-                .split(/[\s,]+/)
-                .filter(Boolean)
-                .map(Number),
+              pcrs: [...pcrs].sort((a, b) => a - b),
             }),
           };
           break;
         case "lockSessions":
-          if (accountSelection === "explicit" && !usernames.split(/[\s,]+/).some(Boolean))
-            throw new Error("Enter at least one local username.");
+          if (accountSelection === "explicit" && usernames.length === 0)
+            throw new Error("Choose at least one local account.");
           spec.action = {
             case: kind,
             value: create(LockSessionsActionSchema, {
               terminateSessions,
               allHumanAccounts: accountSelection === "all",
-              usernames:
-                accountSelection === "explicit" ? usernames.split(/[\s,]+/).filter(Boolean) : [],
+              usernames: accountSelection === "explicit" ? usernames : [],
             }),
           };
           break;
@@ -1211,6 +1209,7 @@ export function DeviceActionForm({
                     id={`${prefix}-power-message`}
                     value={powerMessage}
                     onChange={(event) => setPowerMessage(event.target.value)}
+                    data-freeform="message shown to the device's signed-in user"
                   />
                 </>
               ) : null}
@@ -1266,6 +1265,7 @@ export function DeviceActionForm({
                         inputMode="numeric"
                         value={patchRebootDelay}
                         onChange={(event) => setPatchRebootDelay(event.target.value)}
+                        data-freeform="reboot delay in minutes"
                       />
                       <Label htmlFor={`${prefix}-patch-notice`}>User notice (optional)</Label>
                       <Input
@@ -1273,6 +1273,7 @@ export function DeviceActionForm({
                         maxLength={256}
                         value={patchRebootNotice}
                         onChange={(event) => setPatchRebootNotice(event.target.value)}
+                        data-freeform="message shown to the device's signed-in user"
                       />
                     </>
                   ) : null}
@@ -1357,24 +1358,59 @@ export function DeviceActionForm({
               ) : null}
               {kind === "escrowRotate" ? (
                 <>
-                  <Label htmlFor={`${prefix}-slot`}>Old key slot to remove (optional)</Label>
-                  <Input
+                  <Label htmlFor={`${prefix}-slot`}>Old recovery key to remove</Label>
+                  <SelectField
                     id={`${prefix}-slot`}
-                    inputMode="numeric"
                     value={retireSlot}
-                    onChange={(event) => setRetireSlot(event.target.value)}
+                    disabled={busy}
+                    onValueChange={setRetireSlot}
+                    options={[
+                      { value: "", label: "Keep every existing key" },
+                      ...(encryption.data?.observation?.lindmKeyslots ?? []).map((slot) => ({
+                        value: String(slot),
+                        label:
+                          encryption.data?.escrow?.keyslot === slot
+                            ? `Key slot ${slot}: the recovery key stored on the server now`
+                            : `Key slot ${slot}: an earlier lindm recovery key`,
+                      })),
+                    ]}
                   />
+                  {encryption.data && !encryption.data.observation?.lindmKeyslots.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      The device reported no lindm recovery keys on this volume, so none can be
+                      removed.
+                    </p>
+                  ) : null}
                 </>
               ) : null}
               {kind === "tpm2Bind" ? (
                 <>
-                  <Label htmlFor={`${prefix}-pcrs`}>PCR indices (comma separated)</Label>
-                  <Input
-                    id={`${prefix}-pcrs`}
-                    required
-                    value={pcrs}
-                    onChange={(event) => setPcrs(event.target.value)}
-                  />
+                  <fieldset className="grid gap-2" disabled={busy}>
+                    <legend className="text-sm font-medium">TPM measurements to bind (PCRs)</legend>
+                    <p className="text-sm text-muted-foreground">
+                      The volume unlocks only while every chosen measurement is unchanged. PCR 7
+                      (Secure Boot state) is the usual choice.
+                    </p>
+                    <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
+                      {Array.from({ length: 24 }, (_, pcr) => (
+                        <label key={pcr} className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="checkbox"
+                            className="accent-primary"
+                            checked={pcrs.includes(pcr)}
+                            onChange={(event) =>
+                              setPcrs(
+                                event.target.checked
+                                  ? [...pcrs, pcr]
+                                  : pcrs.filter((value) => value !== pcr),
+                              )
+                            }
+                          />
+                          {pcr}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
                 </>
               ) : null}
               {kind === "lockSessions" ? (
@@ -1400,19 +1436,50 @@ export function DeviceActionForm({
                     onValueChange={setAccountSelection}
                     options={[
                       { value: "none", label: "None, lock sessions only" },
-                      { value: "explicit", label: "Specific usernames" },
+                      { value: "explicit", label: "Specific local accounts" },
                       { value: "all", label: "All local user accounts" },
                     ]}
                   />
                   {accountSelection === "explicit" ? (
                     <>
-                      <Label htmlFor={`${prefix}-usernames`}>Local usernames (one per line)</Label>
-                      <Textarea
-                        id={`${prefix}-usernames`}
-                        required
-                        value={usernames}
-                        onChange={(event) => setUsernames(event.target.value)}
+                      <LocalUserPicker
+                        deviceId={deviceId}
+                        label="Add a local account"
+                        placeholder="Choose an account"
+                        value=""
+                        disabled={busy}
+                        ineligible={(user) =>
+                          user.uid === 0n
+                            ? "Can't be blocked: root logins stay available"
+                            : undefined
+                        }
+                        onChange={(name) => {
+                          if (name && !usernames.includes(name)) setUsernames([...usernames, name]);
+                        }}
                       />
+                      {usernames.length ? (
+                        <ul className="flex flex-wrap gap-2" aria-label="Accounts to block">
+                          {usernames.map((name) => (
+                            <li key={name}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 rounded-full bg-muted/40 px-2.5 text-xs"
+                                aria-label={`Remove ${name}`}
+                                onClick={() =>
+                                  setUsernames(usernames.filter((value) => value !== name))
+                                }
+                              >
+                                {name}
+                                <X className="size-3 shrink-0" aria-hidden="true" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No accounts chosen yet.</p>
+                      )}
                     </>
                   ) : null}
                   {currentLockId ? (
@@ -1437,6 +1504,7 @@ export function DeviceActionForm({
                     required
                     value={endpoints}
                     onChange={(event) => setEndpoints(event.target.value)}
+                    data-freeform="management IP addresses that stay reachable"
                   />
                 </>
               ) : null}
@@ -1518,6 +1586,7 @@ export function DeviceActionForm({
                         required
                         value={recoveryImageSha256}
                         onChange={(event) => setRecoveryImageSha256(event.target.value)}
+                        data-freeform="pasted SHA-256 digest of the recovery image"
                       />
                       <Label htmlFor={`${prefix}-recovery-boot`}>Boot method</Label>
                       <SelectField
@@ -1570,6 +1639,7 @@ export function DeviceActionForm({
                     required
                     value={confirmation}
                     onChange={(event) => setConfirmation(event.target.value)}
+                    data-freeform="typed confirmation of the device name"
                   />
                 </div>
               ) : null}
@@ -1579,6 +1649,7 @@ export function DeviceActionForm({
                 required
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
+                data-freeform="audit reason for this action"
               />
               {missing.length ? (
                 <p id={`${prefix}-missing`} className="text-sm text-muted-foreground">

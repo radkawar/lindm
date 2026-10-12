@@ -9,6 +9,7 @@ import * as deviceList from "./device-list.mjs";
 import * as deviceListSearch from "./device-list-search.mjs";
 import * as deviceOverview from "./device-overview.mjs";
 import * as deviceEncryption from "./device-encryption.mjs";
+import * as recordedChoices from "./recorded-choices.mjs";
 import * as deviceActions from "./device-actions.mjs";
 import * as assistanceRecord from "./assistance-record.mjs";
 import * as revealApproval from "./pass2-reveal-approval.mjs";
@@ -45,6 +46,7 @@ export const ownerEdits = [
   deviceOverview,
   pass2SafetyUndo,
   deviceEncryption,
+  recordedChoices,
   deviceActions,
   assistanceRecord,
   revealApproval,

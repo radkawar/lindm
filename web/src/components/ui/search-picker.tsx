@@ -22,6 +22,8 @@ export type PickerOption = {
   label: string;
   description?: string;
   keywords?: string[];
+  // Shown but not selectable; description must say why.
+  disabled?: boolean;
 };
 
 // cmdk owns active-descendant navigation, arrow keys, Home/End and Enter selection.
@@ -114,6 +116,7 @@ export function SearchPicker({
                   value={option.value}
                   keywords={[option.label, option.description ?? "", ...(option.keywords ?? [])]}
                   data-checked={value === option.value}
+                  disabled={option.disabled}
                   onSelect={() => {
                     setChosen(option);
                     onChange(option.value);

@@ -441,6 +441,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.ListAdvisorySummaryRequest{},
 		&adminv1.ListAdvisoryFeedsRequest{},
 		&adminv1.AcceptAdvisoryFindingRequest{},
+		&adminv1.SuggestValuesRequest{},
 		&adminv1.CreateApprovalRequest{},
 		&adminv1.ListApprovalsRequest{},
 		&adminv1.ApproveApprovalRequest{},

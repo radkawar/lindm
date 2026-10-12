@@ -223,6 +223,7 @@ function DefinitionForm({
             defaultValue={definition.key}
             readOnly={definition.key !== ""}
             required
+            data-freeform="name of a new attribute definition"
           />
         </div>
         <div className="grid gap-1.5">
@@ -248,12 +249,18 @@ function DefinitionForm({
               name="enum"
               defaultValue={definition.enumValues.join("\n")}
               required
+              data-freeform="allowed values chosen for a new enum definition"
             />
           </div>
         ) : null}
         <div className="grid gap-1.5">
           <Label htmlFor="definition-reason">Reason</Label>
-          <Textarea id="definition-reason" name="reason" required />
+          <Textarea
+            id="definition-reason"
+            name="reason"
+            required
+            data-freeform="audit reason for this change"
+          />
         </div>
       </fieldset>
       {captured ? (

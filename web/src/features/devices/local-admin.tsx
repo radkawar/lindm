@@ -38,6 +38,7 @@ import { adminClient } from "@/lib/rpc";
 import { LocalAdminPasswordReveal } from "./local-admin-reveal";
 import { RevealApprovalNote } from "@/components/ui/reveal-approval-note";
 import { Fact, ObservedTime } from "./observations";
+import { LocalUserPicker } from "./local-users";
 import { localAdminPasswordQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
 
@@ -298,24 +299,29 @@ function LocalAdminPolicyForm({
   return (
     <form className="grid gap-3 border p-3" onSubmit={submit} autoComplete="off">
       <h3 className="font-semibold">{policy ? "Change policy" : "Set up policy"}</h3>
+      <p className="text-sm text-muted-foreground">
+        Choose an existing local account other than root. The device changes its password only if
+        the account is also listed in the device&apos;s agent settings.
+      </p>
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="grid gap-2">
-          <Label htmlFor={`${id}-account`}>Local account</Label>
-          <Input
-            id={`${id}-account`}
-            value={account}
-            readOnly={locked}
-            maxLength={32}
-            spellCheck={false}
-            onChange={(event) => setAccount(event.target.value)}
-          />
-        </div>
+        <LocalUserPicker
+          deviceId={deviceId}
+          label="Local account"
+          placeholder="Choose an account"
+          value={account}
+          disabled={locked}
+          onChange={setAccount}
+          ineligible={(user) =>
+            user.uid === 0n ? "Can't be managed: root's password is never changed" : undefined
+          }
+        />
         <div className="grid gap-2">
           <Label htmlFor={`${id}-interval`}>Change every (days, 1 to 365)</Label>
           <Input
             id={`${id}-interval`}
             type="number"
             inputMode="numeric"
+            data-freeform="rotation interval in days"
             min={1}
             max={365}
             step={1}
@@ -333,15 +339,13 @@ function LocalAdminPolicyForm({
             min={0}
             max={24}
             step={1}
+            data-freeform="delay in hours after a reveal"
             value={delayHours}
             readOnly={locked}
             onChange={(event) => setDelayHours(event.target.value)}
           />
         </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Can&apos;t be root. The account must also be allowed in the device&apos;s agent settings.
-      </p>
       <div className="grid gap-2">
         <Label htmlFor={`${id}-reason`}>Reason</Label>
         <Textarea
@@ -349,6 +353,7 @@ function LocalAdminPolicyForm({
           value={reason}
           readOnly={locked}
           onChange={(event) => setReason(event.target.value)}
+          data-freeform="audit reason for this change"
         />
       </div>
       <ExactRequestResult exact={exact} title="Couldn't save policy" />
@@ -408,6 +413,7 @@ function LocalAdminRotationRequest({ deviceId }: { deviceId: string }) {
         value={reason}
         readOnly={exact.busy || exact.ambiguous}
         onChange={(event) => setReason(event.target.value)}
+        data-freeform="audit reason for this change"
       />
       <ExactRequestResult exact={exact} title="Couldn't request password change" />
       <div className="flex flex-wrap gap-2">
@@ -467,6 +473,7 @@ function LocalAdminPolicyRemoval({ deviceId }: { deviceId: string }) {
         value={reason}
         readOnly={exact.busy || exact.ambiguous}
         onChange={(event) => setReason(event.target.value)}
+        data-freeform="audit reason for this change"
       />
       <ExactRequestResult exact={exact} title="Couldn't remove policy" />
       <div className="flex flex-wrap gap-2">

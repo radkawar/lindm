@@ -103,6 +103,9 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ListAdvisorySummary":                  {identity.PermissionReadFleet, readers, false},
 		"ListAdvisoryFeeds":                    {identity.PermissionReadFleet, readers, true},
 		"AcceptAdvisoryFinding":                {identity.PermissionManageAdvisoryExceptions, admins, false},
+		// Per field: device fields read fleet.read within scope (the zero request
+		// is checked as one); DIRECTORY_GROUP requires unrestricted accounts.manage.
+		"SuggestValues": {identity.PermissionReadFleet, readers, false},
 		// Secrets are deployment-global: mutations require an unrestricted grant at
 		// entry; reveal re-checks unrestricted authority inside its fenced transaction.
 		"CreateSecret": {identity.PermissionManageSecrets, admins, true},

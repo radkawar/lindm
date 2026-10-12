@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from "react";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
@@ -12,6 +12,7 @@ import { adminClient } from "@/lib/rpc";
 import { toRpcFailure } from "@/lib/errors";
 import { deviceQueryOptions, devicesQueryOptions } from "./queries";
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 
 function devicePickerGroupsQueryOptions(lifetime: AuthLifetime) {
   return queryOptions({
@@ -83,23 +84,67 @@ export function DevicePicker({
             .join(" · "),
         }))}
         note="Showing up to 100 devices per page. Hostname prefix and operating system search the server; group narrows this page."
+        footer={
+          query.isPending || query.error || cursor.token || query.data?.nextPageToken ? (
+            <>
+              {query.isPending ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                  Loading devices…
+                </p>
+              ) : null}
+              {query.error ? (
+                <RpcError failure={toRpcFailure(query.error)}>
+                  <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+                    Retry devices
+                  </Button>
+                </RpcError>
+              ) : null}
+              {cursor.token || query.data?.nextPageToken ? (
+                <div className="flex flex-wrap gap-2">
+                  {cursor.token ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={props.disabled || query.isFetching}
+                      onClick={() => setCursor({ filter: key, token: "" })}
+                    >
+                      First devices
+                    </Button>
+                  ) : null}
+                  {query.data?.nextPageToken ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={props.disabled || query.isFetching}
+                      onClick={() =>
+                        setCursor({ filter: key, token: query.data?.nextPageToken ?? "" })
+                      }
+                    >
+                      More devices
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : undefined
+        }
       >
-        {query.isPending ? <p role="status">Loading devices…</p> : null}
-        {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
         {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
       </SearchPicker>
       <details>
         <summary className="cursor-pointer text-xs text-muted-foreground">Filter devices</summary>
         <div className="mt-2 grid gap-2">
-          <label className="grid gap-1 text-sm">
-            Operating system
-            <Input
-              value={os}
-              onChange={(event) => setOS(event.target.value)}
-              disabled={props.disabled}
-              placeholder="For example, ubuntu"
-            />
-          </label>
+          <SuggestionPicker
+            label="Operating system"
+            field={SuggestionField.OS_ID}
+            placeholder="Any operating system"
+            note="Operating systems your devices report."
+            value={os}
+            onChange={setOS}
+            disabled={props.disabled}
+          />
           {groups.error ? <RpcError failure={toRpcFailure(groups.error)} /> : null}
           {canReadGroups ? (
             <SearchPicker
@@ -116,28 +161,6 @@ export function DevicePicker({
           ) : null}
         </div>
       </details>
-      <div className="flex gap-2">
-        {cursor.token ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setCursor({ filter: key, token: "" })}
-          >
-            First devices
-          </Button>
-        ) : null}
-        {query.data?.nextPageToken ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={props.disabled || query.isFetching}
-            onClick={() => setCursor({ filter: key, token: query.data?.nextPageToken ?? "" })}
-          >
-            More devices
-          </Button>
-        ) : null}
-      </div>
     </div>
   );
 }

@@ -241,6 +241,7 @@ export function LocalAdminPasswordReveal({
         value={reason}
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
+        data-freeform="audit reason for revealing the password"
       />
       {device.error ? <RpcError failure={toRpcFailure(device.error)} /> : null}
       <Label htmlFor={`laps-reveal-confirmation-${actionId}`}>
@@ -255,6 +256,7 @@ export function LocalAdminPasswordReveal({
         onChange={(event) => setConfirmation(event.target.value)}
         readOnly={busy || request.current !== null}
         autoComplete="off"
+        data-freeform="typed confirmation of the account and device"
       />
       <TechnicalDetails
         items={[

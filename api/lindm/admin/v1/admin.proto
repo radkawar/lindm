@@ -20,6 +20,7 @@ import "lindm/admin/v1/offline_enrollment.proto";
 import "lindm/admin/v1/profiles.proto";
 import "lindm/admin/v1/provisioning.proto";
 import "lindm/admin/v1/secrets.proto";
+import "lindm/admin/v1/suggestions.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
 import "lindm/agent/v1/trust.proto";
@@ -116,6 +117,8 @@ service AdminService {
   rpc ListAdvisorySummary(ListAdvisorySummaryRequest) returns (ListAdvisorySummaryResponse);
   rpc ListAdvisoryFeeds(ListAdvisoryFeedsRequest) returns (ListAdvisoryFeedsResponse);
   rpc AcceptAdvisoryFinding(AcceptAdvisoryFindingRequest) returns (AcceptAdvisoryFindingResponse);
+  // Recorded values for choosing instead of typing; authorization is per field.
+  rpc SuggestValues(SuggestValuesRequest) returns (SuggestValuesResponse);
 }
 
 enum DeviceState {

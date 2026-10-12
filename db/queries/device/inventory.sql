@@ -461,3 +461,16 @@ WHERE expires_at <= sqlc.arg('now');
 DELETE FROM package_page_cursors
 WHERE snapshot_id = sqlc.arg('snapshot_id')
   AND expires_at <= sqlc.arg('now');
+
+-- name: DeleteStaleHostInventoryValues :exec
+-- Removes values of one kind that a successful collection no longer reports.
+DELETE FROM host_inventory_values
+WHERE generation_id = sqlc.arg('generation_id')
+  AND kind = sqlc.arg('kind')
+  AND NOT (value = ANY(sqlc.arg('values')::text[]));
+
+-- name: InsertHostInventoryValues :exec
+INSERT INTO host_inventory_values (generation_id, kind, value)
+SELECT sqlc.arg('generation_id'), sqlc.arg('kind'), v
+FROM unnest(sqlc.arg('values')::text[]) AS v
+ON CONFLICT DO NOTHING;

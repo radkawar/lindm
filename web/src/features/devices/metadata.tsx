@@ -2,18 +2,21 @@ import { create } from "@bufbuild/protobuf";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 import {
   DeviceMetadataSchema,
   SetDeviceMetadataRequestSchema,
   type DeviceMetadata,
   type SetDeviceMetadataRequest,
 } from "../../../gen/lindm/admin/v1/inventory_management_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import type { PickerSlot } from "@/components/ui/search-picker";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
@@ -117,6 +120,7 @@ function MetadataForm({
   const canEditLabels = canPermission(principal, "accounts.manage", true);
   const queryClient = useQueryClient();
   const [attributes, setAttributes] = useState(metadata.attributes);
+  const [labels, setLabels] = useState(metadata.labels);
   const [ownerKind, setOwnerKind] = useState(metadata.owner.case ?? "");
   const [ownerPrincipalId, setOwnerPrincipalId] = useState(
     metadata.owner.case === "ownerPrincipalId" ? metadata.owner.value : "",
@@ -165,11 +169,7 @@ function MetadataForm({
             const data = new FormData(event.currentTarget);
             const ownerText = String(data.get("owner") ?? "").trim();
             const value = create(DeviceMetadataSchema, {
-              labels: canEditLabels
-                ? String(data.get("labels") ?? "")
-                    .split(/\s+/)
-                    .filter(Boolean)
-                : metadata.labels,
+              labels: canEditLabels ? labels : metadata.labels,
               owner:
                 ownerKind === "ownerPrincipalId"
                   ? { case: "ownerPrincipalId", value: ownerPrincipalId }
@@ -225,17 +225,53 @@ function MetadataForm({
               name="owner"
               defaultValue={metadata.owner.case === "ownerText" ? metadata.owner.value : ""}
               required
+              data-freeform="owner's name for someone without a console account"
             />
           </div>
         ) : null}
-        <div className="grid gap-1.5">
-          <Label htmlFor="metadata-labels">Labels (space-separated)</Label>
-          <Input
-            id="metadata-labels"
-            name="labels"
-            defaultValue={metadata.labels.join(" ")}
-            readOnly={!canEditLabels}
-          />
+        <div className="grid gap-2">
+          {canEditLabels ? (
+            <SuggestionPicker
+              label="Add a label"
+              field={SuggestionField.DEVICE_LABEL}
+              placeholder="Choose or type a label"
+              note="Labels already used on your devices. Type a new one to create it."
+              allowTyped
+              typedDescription="New label"
+              value=""
+              disabled={captured !== null}
+              onChange={(label) => {
+                if (label && !labels.includes(label)) setLabels([...labels, label]);
+              }}
+            />
+          ) : (
+            <span className="text-sm font-medium">Labels</span>
+          )}
+          {labels.length ? (
+            <ul className="flex flex-wrap gap-2" aria-label="Labels">
+              {labels.map((label) => (
+                <li key={label}>
+                  {canEditLabels ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 max-w-72 rounded-full bg-muted/40 px-2.5 text-xs"
+                      aria-label={`Remove label ${label}`}
+                      onClick={() => setLabels(labels.filter((value) => value !== label))}
+                    >
+                      <span className="truncate">{label}</span>
+                      <X className="size-3 shrink-0" aria-hidden="true" />
+                    </Button>
+                  ) : (
+                    <span className="rounded-full border px-2.5 py-1 text-xs">{label}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No labels.</p>
+          )}
         </div>
         {!canEditLabels ? (
           <p className="text-sm text-muted-foreground">
@@ -246,7 +282,12 @@ function MetadataForm({
         <AttributeFields attributes={attributes} onChange={setAttributes} />
         <div className="grid gap-1.5">
           <Label htmlFor="metadata-reason">Reason</Label>
-          <Textarea id="metadata-reason" name="reason" required />
+          <Textarea
+            id="metadata-reason"
+            name="reason"
+            required
+            data-freeform="audit reason for this change"
+          />
         </div>
       </fieldset>
       {captured ? (

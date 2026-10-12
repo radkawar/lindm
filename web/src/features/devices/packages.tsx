@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   CollectionStatus,
   type ModuleObservation,
 } from "../../../gen/lindm/inventory/v1/observation_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ui/select-field";
+import { ListPagination } from "@/components/ui/list-pagination";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import {
   Table,
   TableBody,
@@ -24,7 +24,6 @@ import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { PAGE_SIZES, type PageSize } from "@/lib/list-search";
-import { formatTimestamp } from "@/lib/time";
 import type { PackageSearch } from "./package-search";
 import { devicePackagesQueryOptions } from "./queries";
 import { CollectionStatusBadge, Fact } from "./observations";
@@ -45,12 +44,20 @@ export function DevicePackages({
   const packages = useQuery(devicePackagesQueryOptions(lifetime, deviceId, search));
   const failure = packages.error ? toRpcFailure(packages.error) : null;
   const data = failure ? undefined : packages.data;
-  const [manager, setManager] = useState(search.manager);
-  const [namePrefix, setNamePrefix] = useState(search.namePrefix);
   const pagination = useListPagination(search, (next) => onSearch({ ...search, ...next }));
-  const expiry = formatTimestamp(data?.cursorExpiresAt);
   const pageToken = data?.pageToken;
   const freshResponse = packages.isFetchedAfterMount && !packages.isFetching;
+  const filtered = search.manager !== "" || search.namePrefix !== "";
+  // Module evidence only matters where a package is modular or its module
+  // collection failed; unreported, not-applicable and non-modular rows would
+  // fill a column with "Not reported" or "None".
+  const showModules = (data?.packages ?? []).some(({ module }) =>
+    module?.status === CollectionStatus.SUCCESS
+      ? module.modular
+      : module !== undefined &&
+        module.status !== CollectionStatus.UNSPECIFIED &&
+        module.status !== CollectionStatus.NOT_APPLICABLE,
+  );
 
   useEffect(() => {
     // The first response must also become an immutable cursor. Re-fetching an
@@ -75,66 +82,36 @@ export function DevicePackages({
     <Card aria-busy={packages.isFetching}>
       <CardHeader>
         <CardTitle>Installed packages</CardTitle>
-        <CardDescription>
-          From the device&apos;s latest package list. Results expire after 15 minutes.
-        </CardDescription>
+        <CardDescription>From the device&apos;s latest package list.</CardDescription>
       </CardHeader>
       <CardContent className="flex min-w-0 flex-col gap-4">
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSearch({ ...search, manager, namePrefix, pageToken: "" });
-            if (
-              search.pageToken === "" &&
-              manager === search.manager &&
-              namePrefix === search.namePrefix
-            )
-              void packages.refetch();
-          }}
-        >
-          <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor="package-manager">Package manager</Label>
-            <Input
-              id="package-manager"
-              value={manager}
-              onChange={(event) => setManager(event.target.value)}
-              maxLength={64}
-              placeholder="All managers"
-            />
-          </div>
-          <div className="grid min-w-0 gap-1.5">
-            <Label htmlFor="package-prefix">Name starts with</Label>
-            <Input
-              id="package-prefix"
-              value={namePrefix}
-              onChange={(event) => setNamePrefix(event.target.value)}
-              maxLength={512}
-              placeholder="All names"
-            />
-          </div>
-          <Button type="submit">Search</Button>
-        </form>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            disabled={packages.isFetching}
-            onClick={() => void packages.refetch()}
-          >
-            Refresh
-          </Button>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <SuggestionPicker
+            label="Package manager"
+            field={SuggestionField.PACKAGE_MANAGER}
+            deviceId={deviceId}
+            placeholder="All managers"
+            note="Package managers in this device's latest package list."
+            value={search.manager}
+            onChange={(manager) => onSearch({ ...search, manager, pageToken: "" })}
+          />
+          <SuggestionPicker
+            label="Package name starts with"
+            field={SuggestionField.PACKAGE_NAME}
+            deviceId={deviceId}
+            manager={search.manager || undefined}
+            placeholder="All names"
+            note="Names in this device's latest package list, 50 at a time. Choose “Use” to match every name starting with what you typed."
+            allowTyped
+            typedDescription="Every package name starting with this text"
+            value={search.namePrefix}
+            onChange={(namePrefix) => onSearch({ ...search, namePrefix, pageToken: "" })}
+          />
+        </div>
+        <div>
           <Button variant="outline" disabled={packages.isFetching} onClick={latest}>
             Show latest list
           </Button>
-          <Label htmlFor="package-page-size">Page size</Label>
-          <SelectField
-            id="package-page-size"
-            value={search.pageSize}
-            onValueChange={(value) => {
-              onSearch({ ...search, pageSize: Number(value) as PageSize });
-            }}
-            options={PAGE_SIZES.map((size) => ({ value: size, label: size }))}
-          />
         </div>
         {failure ? (
           <RpcError failure={failure} title="Couldn't load packages">
@@ -144,17 +121,6 @@ export function DevicePackages({
         {packages.isPending ? <p role="status">Loading packages…</p> : null}
         {data ? (
           <>
-            <p className="text-sm text-muted-foreground">
-              Results expire{" "}
-              {expiry.date ? (
-                <time dateTime={expiry.utc} title={expiry.utc}>
-                  {expiry.local}
-                </time>
-              ) : (
-                expiry.local
-              )}
-              .
-            </p>
             <TechnicalDetails
               items={[
                 { label: "Snapshot ID", value: data.snapshotId },
@@ -169,8 +135,24 @@ export function DevicePackages({
             ) : null}
             {data.packages.length === 0 ? (
               <EmptyState
-                title="No matching packages"
-                description="Try a different name or package manager."
+                title={filtered ? "No packages match these filters" : "This package list is empty"}
+                description={
+                  filtered
+                    ? "Choose another name or package manager, or clear the filters."
+                    : "The device reported no installed packages in this list."
+                }
+                action={
+                  filtered ? (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        onSearch({ ...search, manager: "", namePrefix: "", pageToken: "" })
+                      }
+                    >
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
               />
             ) : (
               <Table>
@@ -181,7 +163,7 @@ export function DevicePackages({
                     <TableHead>Architecture</TableHead>
                     <TableHead>Manager</TableHead>
                     <TableHead>Source package</TableHead>
-                    <TableHead>Module</TableHead>
+                    {showModules ? <TableHead>Module</TableHead> : null}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -192,13 +174,20 @@ export function DevicePackages({
                       <TableCell>{record.architecture || "Not reported"}</TableCell>
                       <TableCell>{record.manager}</TableCell>
                       <TableCell>
-                        {record.sourceName
-                          ? `${record.sourceName} ${record.sourceVersion}`
-                          : "Not reported"}
+                        {record.sourceName ? (
+                          <>
+                            {record.sourceName}{" "}
+                            <span className="font-mono text-xs">{record.sourceVersion}</span>
+                          </>
+                        ) : (
+                          "Not reported"
+                        )}
                       </TableCell>
-                      <TableCell className="whitespace-normal">
-                        <PackageModuleEvidence module={record.module} />
-                      </TableCell>
+                      {showModules ? (
+                        <TableCell className="whitespace-normal">
+                          <PackageModuleEvidence module={record.module} />
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -206,22 +195,20 @@ export function DevicePackages({
             )}
           </>
         ) : null}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            disabled={pagination.previousLabel !== "Previous page" || packages.isFetching}
-            onClick={pagination.previous}
-          >
-            Previous page
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!data?.nextPageToken || packages.isFetching}
-            onClick={() => pagination.next(data?.nextPageToken ?? "")}
-          >
-            Next page
-          </Button>
-        </div>
+        <ListPagination
+          label="Package pages"
+          previousLabel="Previous page"
+          onPrevious={
+            pagination.previousLabel === "Previous page" ? pagination.previous : undefined
+          }
+          onNext={
+            data?.nextPageToken ? () => pagination.next(data?.nextPageToken ?? "") : undefined
+          }
+          busy={packages.isFetching}
+          pageSize={search.pageSize}
+          pageSizes={PAGE_SIZES}
+          onPageSizeChange={(size) => onSearch({ ...search, pageSize: size as PageSize })}
+        />
       </CardContent>
     </Card>
   );

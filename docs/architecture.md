@@ -1824,6 +1824,26 @@ array. CSV cells neutralize spreadsheet formula prefixes after leading whitespac
 and control characters. Exports neither bypass device scopes nor become an
 unbounded dump of the device database.
 
+Console filters and forms choose recorded values instead of free text through
+`SuggestValues`: OS ID/version, architecture, labels and agent release from device
+rows; package names (fleet-wide over current published snapshots, or one device's)
+and one device's package managers; local account names, login shells, Flatpak
+application IDs and snap names from each device's latest host observation; advisory
+and CVE IDs from devices' latest finding sets; and identity-provider group paths seen
+at sign-in. Each page holds at most 100
+values matching an ASCII case-insensitive literal prefix in (lowercase, exact) byte
+order, resumes strictly after the previous page's last value and counts devices
+(accounts for groups). OS IDs carry the platform registry's distribution name and
+versions narrowed to one OS ID its release name, so operators choose "Ubuntu 24.04
+LTS" rather than raw os-release values. Device fields use the caller's `fleet.read`
+device scope; group paths require unrestricted `accounts.manage`. Fleet-wide package
+names and host values walk (lowercase value, value, owner) indexes from one exclusive
+start key, so a page reads its matching entries rather than every retained row. Host
+values live in `host_inventory_values`, replaced with every accepted host observation
+(a failed collection leaves its kind empty, as the device page shows it); devices
+appear there from their next host report after the upgrade. Services and file paths
+are not offered: the agent inventories neither.
+
 A mutating transaction writes domain state, its audit event and outbox intent together.
 Workers claim bounded batches with `FOR UPDATE SKIP LOCKED`, lease deadlines and
 fencing tokens. Stale workers cannot commit completion after a new lease. External

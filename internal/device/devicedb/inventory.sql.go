@@ -143,6 +143,25 @@ func (q *Queries) DeleteSnapshotPackages(ctx context.Context, snapshotID uuid.UU
 	return err
 }
 
+const deleteStaleHostInventoryValues = `-- name: DeleteStaleHostInventoryValues :exec
+DELETE FROM host_inventory_values
+WHERE generation_id = $1
+  AND kind = $2
+  AND NOT (value = ANY($3::text[]))
+`
+
+type DeleteStaleHostInventoryValuesParams struct {
+	GenerationID uuid.UUID
+	Kind         int16
+	Values       []string
+}
+
+// Removes values of one kind that a successful collection no longer reports.
+func (q *Queries) DeleteStaleHostInventoryValues(ctx context.Context, arg DeleteStaleHostInventoryValuesParams) error {
+	_, err := q.db.Exec(ctx, deleteStaleHostInventoryValues, arg.GenerationID, arg.Kind, arg.Values)
+	return err
+}
+
 const expireStagingSnapshot = `-- name: ExpireStagingSnapshot :exec
 UPDATE package_snapshots
 SET state = 'expired',
@@ -455,6 +474,24 @@ func (q *Queries) GetSnapshotBatch(ctx context.Context, arg GetSnapshotBatchPara
 		&i.Stored,
 	)
 	return i, err
+}
+
+const insertHostInventoryValues = `-- name: InsertHostInventoryValues :exec
+INSERT INTO host_inventory_values (generation_id, kind, value)
+SELECT $1, $2, v
+FROM unnest($3::text[]) AS v
+ON CONFLICT DO NOTHING
+`
+
+type InsertHostInventoryValuesParams struct {
+	GenerationID uuid.UUID
+	Kind         int16
+	Values       []string
+}
+
+func (q *Queries) InsertHostInventoryValues(ctx context.Context, arg InsertHostInventoryValuesParams) error {
+	_, err := q.db.Exec(ctx, insertHostInventoryValues, arg.GenerationID, arg.Kind, arg.Values)
+	return err
 }
 
 const insertPackageCursor = `-- name: InsertPackageCursor :exec

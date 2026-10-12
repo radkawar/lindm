@@ -247,6 +247,7 @@ export function RecoveryKeyReveal({
         value={reason}
         readOnly={busy || request.current !== null}
         onChange={(event) => setReason(event.target.value)}
+        data-freeform="audit reason for revealing the recovery key"
       />
       <Label htmlFor={`reveal-confirmation-${actionId}`}>Type the device name to confirm</Label>
       <p className="break-all text-sm">{confirmationName}</p>
@@ -256,6 +257,7 @@ export function RecoveryKeyReveal({
         onChange={(event) => setConfirmation(event.target.value)}
         readOnly={busy || request.current !== null}
         autoComplete="off"
+        data-freeform="typed confirmation of the device name"
       />
       <TechnicalDetails
         items={[

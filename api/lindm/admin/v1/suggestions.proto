@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// Recorded values an administrator can choose instead of typing them. Device
+// fields read the caller's fleet.read device scope; DIRECTORY_GROUP requires an
+// unrestricted accounts.manage grant. Values are observations, never authority.
+enum SuggestionField {
+  SUGGESTION_FIELD_UNSPECIFIED = 0;
+  // Device os-release ID (devices.os_id), e.g. "ubuntu".
+  SUGGESTION_FIELD_OS_ID = 1;
+  // Device os-release VERSION_ID; os_id narrows it to one operating system.
+  SUGGESTION_FIELD_OS_VERSION = 2;
+  // Device machine architecture as reported by the host, e.g. "x86_64".
+  SUGGESTION_FIELD_ARCHITECTURE = 3;
+  // Labels assigned in device metadata.
+  SUGGESTION_FIELD_DEVICE_LABEL = 4;
+  // Agent release reported by each device's current enrollment generation.
+  SUGGESTION_FIELD_AGENT_RELEASE = 5;
+  // Package names in current published package snapshots; manager narrows them.
+  SUGGESTION_FIELD_PACKAGE_NAME = 6;
+  // Package managers in one device's current snapshot. Requires device_id.
+  SUGGESTION_FIELD_PACKAGE_MANAGER = 7;
+  // Identity-provider group paths recorded at account sign-in.
+  SUGGESTION_FIELD_DIRECTORY_GROUP = 8;
+  // Advisory IDs listed by in-scope devices' latest advisory evaluations.
+  SUGGESTION_FIELD_ADVISORY_ID = 9;
+  // CVE IDs named by in-scope devices' latest advisory findings.
+  SUGGESTION_FIELD_CVE_ID = 10;
+  // Local account names in each device's latest host evidence.
+  SUGGESTION_FIELD_LOCAL_USER_NAME = 11;
+  // Login shells of those local accounts.
+  SUGGESTION_FIELD_LOGIN_SHELL = 12;
+  // Installed Flatpak application IDs, e.g. "org.mozilla.firefox".
+  SUGGESTION_FIELD_FLATPAK_APP = 13;
+  // Installed snap names.
+  SUGGESTION_FIELD_SNAP_NAME = 14;
+}
+
+message SuggestValuesRequest {
+  SuggestionField field = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // ASCII case-insensitive literal prefix; empty lists every value.
+  string prefix = 2 [(buf.validate.field).string = {
+    max_len: 512
+    not_contains: "\000"
+  }];
+  // Narrows device-derived fields to one device the caller may read.
+  // Not accepted for DIRECTORY_GROUP.
+  string device_id = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  // Exact os_id narrowing OS_VERSION; rejected for other fields.
+  string os_id = 4 [(buf.validate.field).string = {
+    max_len: 4096
+    not_contains: "\000"
+  }];
+  // Exact manager narrowing PACKAGE_NAME; rejected for other fields.
+  string manager = 5 [(buf.validate.field).string = {
+    max_len: 64
+    not_contains: "\000"
+  }];
+  // Zero selects 50.
+  uint32 page_size = 6 [(buf.validate.field).uint32.lte = 100];
+  // next_after of the previous page; values sort by lowercase, then exact text.
+  string after = 7 [(buf.validate.field).string = {
+    max_len: 4096
+    not_contains: "\000"
+  }];
+}
+
+message Suggestion {
+  string value = 1;
+  // Devices currently reporting the value; accounts for DIRECTORY_GROUP.
+  uint64 count = 2;
+  // Platform registry display name: the distribution for OS_ID ("Ubuntu") and
+  // the release for OS_VERSION narrowed by os_id ("Ubuntu 24.04 LTS"). Empty
+  // for other fields and for values the registry does not know.
+  string label = 3;
+}
+
+message SuggestValuesResponse {
+  repeated Suggestion suggestions = 1 [(buf.validate.field).repeated.max_items = 100];
+  // Empty when no further values match.
+  string next_after = 2;
+}

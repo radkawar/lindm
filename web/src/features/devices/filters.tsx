@@ -11,11 +11,13 @@ import {
   type ExportDevicesRequest,
   ExportDevicesRequestSchema,
 } from "../../../gen/lindm/admin/v1/inventory_management_pb";
+import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
+import { SuggestionPicker } from "@/components/ui/suggestion-picker";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -65,42 +67,48 @@ function FilterForm({
 }) {
   const [attributes, setAttributes] = useState(filter.attributes);
   const [error, setError] = useState("");
+  const form = useRef<HTMLFormElement>(null);
   function removeFacet(change: Partial<Pick<DeviceFilter, "namePrefix" | "osId" | "labels">>) {
     const next = create(DeviceFilterSchema, { ...filter, ...change });
     onSearch({ ...search, filter: toJsonString(DeviceFilterSchema, next), pageToken: "" });
   }
+  // Recorded-value choices apply at once, together with whatever else is typed
+  // in the form, so choosing an OS never discards an unsubmitted hostname.
+  function apply(change: Partial<Pick<DeviceFilter, "osId" | "osVersion" | "labels">> = {}) {
+    if (!form.current) return;
+    try {
+      const data = new FormData(form.current);
+      const from = String(data.get("seen-from") ?? "");
+      const until = String(data.get("seen-until") ?? "");
+      const next = create(DeviceFilterSchema, {
+        namePrefix: filter.namePrefix,
+        osId: filter.osId,
+        osVersion: filter.osVersion,
+        labels: filter.labels,
+        attributes: readAttributeInputs(data, attributes),
+        lastSeenFrom: from ? timestampFromDate(new Date(`${from}Z`)) : undefined,
+        lastSeenUntil: until ? timestampFromDate(new Date(`${until}Z`)) : undefined,
+        ...change,
+      });
+      validateRequest(DeviceFilterSchema, next);
+      setError("");
+      onSearch({
+        ...search,
+        filter: toJsonString(DeviceFilterSchema, next),
+        hostnameSearch: String(data.get("hostname-search") ?? "").trim(),
+        pageToken: "",
+      });
+    } catch (failure) {
+      setError(toRpcFailure(failure).message);
+    }
+  }
   return (
     <form
+      ref={form}
       className="grid gap-3 border bg-card p-4"
       onSubmit={(event) => {
         event.preventDefault();
-        try {
-          const data = new FormData(event.currentTarget);
-          const from = String(data.get("seen-from") ?? "");
-          const until = String(data.get("seen-until") ?? "");
-          const next = create(DeviceFilterSchema, {
-            namePrefix: filter.namePrefix,
-            osId: String(data.get("os") ?? "").trim(),
-            osVersion: String(data.get("version") ?? "").trim(),
-            labels: String(data.get("labels") ?? "")
-              .split(/\s+/)
-              .filter(Boolean),
-            attributes: readAttributeInputs(data, attributes),
-            lastSeenFrom: from ? timestampFromDate(new Date(`${from}Z`)) : undefined,
-            lastSeenUntil: until ? timestampFromDate(new Date(`${until}Z`)) : undefined,
-          });
-          validateRequest(DeviceFilterSchema, next);
-          setError("");
-          const hostnameSearch = String(data.get("hostname-search") ?? "").trim();
-          onSearch({
-            ...search,
-            filter: toJsonString(DeviceFilterSchema, next),
-            hostnameSearch,
-            pageToken: "",
-          });
-        } catch (failure) {
-          setError(toRpcFailure(failure).message);
-        }
+        apply();
       }}
     >
       <div className="flex flex-wrap items-end gap-3">
@@ -122,17 +130,27 @@ function FilterForm({
             />
           </div>
         </div>
-        <div className="grid min-w-44 flex-1 gap-1.5">
-          <Label htmlFor="filter-os">Operating system</Label>
-          <Input id="filter-os" name="os" defaultValue={filter.osId} placeholder="e.g. ubuntu" />
+        <div className="min-w-44 flex-1">
+          <SuggestionPicker
+            label="Operating system"
+            field={SuggestionField.OS_ID}
+            placeholder="Any operating system"
+            note="Operating systems your devices report."
+            value={filter.osId}
+            onChange={(osId) => apply({ osId, osVersion: "" })}
+          />
         </div>
-        <div className="grid min-w-52 flex-1 gap-1.5">
-          <Label htmlFor="filter-labels">Labels</Label>
-          <Input
-            id="filter-labels"
-            name="labels"
-            defaultValue={filter.labels.join(" ")}
-            placeholder="Space-separated"
+        <div className="min-w-52 flex-1">
+          <SuggestionPicker
+            label="Add a label"
+            field={SuggestionField.DEVICE_LABEL}
+            placeholder="Choose a label"
+            note="Labels assigned to your devices. Devices must have every chosen label."
+            value=""
+            onChange={(label) => {
+              if (label && !filter.labels.includes(label))
+                apply({ labels: [...filter.labels, label] });
+            }}
           />
         </div>
         <Button type="submit">Search</Button>
@@ -224,15 +242,16 @@ function FilterForm({
           Times are UTC.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="grid gap-1.5">
-            <Label htmlFor="filter-version">OS version</Label>
-            <Input
-              id="filter-version"
-              name="version"
-              defaultValue={filter.osVersion}
-              placeholder="All versions"
-            />
-          </div>
+          <SuggestionPicker
+            label="OS version"
+            field={SuggestionField.OS_VERSION}
+            osId={filter.osId}
+            placeholder={filter.osId ? "Any version" : "Choose an operating system first"}
+            note="Versions of the chosen operating system that your devices report."
+            disabled={!filter.osId}
+            value={filter.osVersion}
+            onChange={(osVersion) => apply({ osVersion })}
+          />
           <div className="grid gap-1.5">
             <Label htmlFor="filter-from">Last seen from (UTC)</Label>
             <Input
