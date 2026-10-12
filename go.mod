@@ -32,6 +32,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
 	github.com/sigstore/sigstore v1.10.6
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.60.0
@@ -86,7 +87,6 @@ require (
 	github.com/wlynxg/anet v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa // indirect
 	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect

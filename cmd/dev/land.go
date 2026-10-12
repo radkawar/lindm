@@ -34,7 +34,10 @@ protect again however they end (commit, refusal, rollback, interrupt).
                change. Apply WORKTREE's complete change
                against main (commits since its merge base, staged, unstaged and
                untracked files, renames and deletions; -paths limits it). A
-               conflict refuses with nothing applied. Run the quick gate on the
+               conflict refuses with nothing applied. Generator output (the
+               out directories of buf.gen.yaml and sqlc.yaml) is derived: it
+               is left out of the patch and regenerated in the shared tree by
+               make generate-code, so proto/SQL landings compose. Run the quick gate on the
                touched files: go build ./..., golangci-lint run (default and
                integration tags) and fmt on touched packages, buf format/lint
                when protos changed, prettier and markdownlint on touched
@@ -97,11 +100,18 @@ func runLand(args []string) (resultErr error) {
 // land applies, gates, commits and pushes the worktree's change; the caller
 // holds the landing lock with the tracked files writable.
 func land(ctx context.Context, repo *worktree.Repository, from string, limit []string, message string) error {
-	change, err := repo.Change(ctx, from, limit)
+	// Generator output is derived: it is regenerated from main plus the
+	// change rather than applied, so two landings that both change protos or
+	// queries compose instead of conflicting on each other's output.
+	roots, err := derivedRoots(repo.Main, from)
 	if err != nil {
 		return err
 	}
-	if len(change.Files) == 0 {
+	change, err := repo.Change(ctx, from, limit, roots)
+	if err != nil {
+		return err
+	}
+	if len(change.Files) == 0 && len(change.Derived) == 0 {
 		return fmt.Errorf("%s has no change against %s", from, worktree.Trunk)
 	}
 	// Every worktree links the shared install, so it must match the lock the
@@ -110,7 +120,7 @@ func land(ctx context.Context, repo *worktree.Repository, from string, limit []s
 	if err := syncNodeModules(ctx, repo.Main, false); err != nil {
 		return err
 	}
-	fmt.Printf("land: %d files from %s (base %.12s); gating in %s\n", len(change.Files), from, change.Base, repo.Main)
+	fmt.Printf("land: %d files from %s (base %.12s), %d generated files there held out for regeneration; gating in %s\n", len(change.Files), from, change.Base, len(change.Derived), repo.Main)
 	manifests := slices.ContainsFunc(change.Files, func(file string) bool { return file == "package.json" || file == "package-lock.json" })
 	if err := repo.Land(ctx, change, message, func(files []string) error {
 		if manifests {
@@ -118,7 +128,11 @@ func land(ctx context.Context, repo *worktree.Repository, from string, limit []s
 				return err
 			}
 		}
-		return quickGate(ctx, repo.Main, files)
+		regenerated, err := regenerate(ctx, repo, change)
+		if err != nil {
+			return err
+		}
+		return quickGate(ctx, repo.Main, slices.Concat(files, regenerated))
 	}); err != nil {
 		if manifests {
 			// The rollback restored the previous manifests; match them again.

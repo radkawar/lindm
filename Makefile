@@ -1,4 +1,4 @@
-.PHONY: bootstrap tools generate web-assets lint fmt audit check build test test-integration dev-up dev-down dev-check dev-trust
+.PHONY: bootstrap tools generate generate-code web-assets lint fmt audit check build test test-integration dev-up dev-down dev-check dev-trust
 .DEFAULT_GOAL := check
 
 export GOTOOLCHAIN := go1.26.9
@@ -42,14 +42,17 @@ bootstrap: tools
 	npm ci --ignore-scripts
 	npm run hooks:install
 
-# Fails in the shared main checkout by design: its tracked files are read-only
-# outside landings (go run ./cmd/dev protect). Generate in a private worktree
-# and land the output.
-generate: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
+# Both fail in the shared main checkout by design: its tracked files are
+# read-only outside landings (go run ./cmd/dev protect). Generate in a private
+# worktree and land; dev land reruns generate-code (the buf/sqlc part) under
+# the landing lock, so generated output derives from main plus the landing.
+generate: generate-code
+	go run ./cmd/dev generate-docs
+
+generate-code: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
 	@test -w go.mod || { echo "make generate: tracked files here are read-only (the protected shared checkout); generate in a private worktree and land the output" >&2; exit 1; }
 	$(BUF) generate
 	$(SQLC) generate
-	go run ./cmd/dev generate-docs
 
 web-assets:
 	npm run build:web

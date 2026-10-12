@@ -106,7 +106,7 @@ func TestWritableReprotectsAfterEveryLandingOutcome(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(path, "landed.txt"), []byte("work\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	change, err := repo.Change(ctx, path, nil)
+	change, err := repo.Change(ctx, path, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

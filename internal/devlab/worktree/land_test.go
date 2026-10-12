@@ -34,7 +34,7 @@ func TestChangeAppliesAtomicallyAndReverses(t *testing.T) {
 	write(path, "new.txt", "untracked\n")
 	before := gitT(t, path, "status", "--porcelain")
 
-	change, err := repo.Change(ctx, path, nil)
+	change, err := repo.Change(ctx, path, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,10 +69,10 @@ func TestChangeAppliesAtomicallyAndReverses(t *testing.T) {
 	if status := gitT(t, repo.Main, "status", "--porcelain"); status != "" {
 		t.Fatalf("reverse left %q", status)
 	}
-	if limited, err := repo.Change(ctx, path, []string{"new.txt"}); err != nil || !slices.Equal(limited.Files, []string{"new.txt"}) {
+	if limited, err := repo.Change(ctx, path, []string{"new.txt"}, nil); err != nil || !slices.Equal(limited.Files, []string{"new.txt"}) {
 		t.Fatalf("path-limited change %v: %v", limited.Files, err)
 	}
-	if _, err := repo.Change(ctx, t.TempDir(), nil); err == nil {
+	if _, err := repo.Change(ctx, t.TempDir(), nil, nil); err == nil {
 		t.Fatal("computed a change for an unregistered directory")
 	}
 }
@@ -118,7 +118,7 @@ func TestLandCommitsPushesAndRollsBack(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(path, "landed.txt"), []byte("work\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	change, err := repo.Change(ctx, path, nil)
+	change, err := repo.Change(ctx, path, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

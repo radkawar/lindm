@@ -2319,7 +2319,15 @@ upstream; local commits ahead of it (an unpushed `gate-commit`) are pushed with
 the landing. It computes the worktree's complete change against its merge base with
 `main` using a scratch index (commits, staged, unstaged and untracked non-ignored
 files, renames and deletions; the worktree's own index is untouched) and applies
-it atomically with `git apply`: a conflict refuses with nothing applied. It then
+it atomically with `git apply`: a conflict refuses with nothing applied. Generator
+output is derived, not applied: the `out` directories declared by `buf.gen.yaml`
+and `sqlc.yaml` (in `main` and in the worktree) are excluded from the patch, the
+generated files the worktree deleted are removed (sqlc never deletes stale
+output), and `make generate-code` (buf and sqlc) regenerates them in the shared
+tree under the lock. Two landings that both change protos or queries therefore
+compose instead of the later one failing its apply check on the earlier one's
+output; the regenerated files are gated (the build, lint and race tests cover
+them) and committed with the landing, and a rollback restores them. It then
 runs the quick gate on the touched files in the shared tree (build, golangci-lint
 run for both tags and fmt on touched packages, buf when protos changed,
 prettier/markdownlint on touched docs and web files, a refusal of any added

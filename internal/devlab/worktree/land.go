@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -106,36 +108,67 @@ func hold(file *os.File) (unlock func() error) {
 type Change struct {
 	Source string   // worktree the change comes from
 	Base   string   // merge base with Trunk
-	Patch  []byte   // binary patch with rename detection
+	Patch  []byte   // binary patch with rename detection, outside DerivedRoots
 	Files  []string // every path the patch creates, modifies or deletes
+	// DerivedRoots are generator output directories. The worktree's own
+	// output there is not applied: a landing regenerates it in the main
+	// checkout from main plus Patch, so landings that both change generator
+	// inputs compose instead of conflicting on each other's output.
+	DerivedRoots []string
+	// Derived lists the worktree's changed paths under DerivedRoots, and
+	// DerivedDeleted those it deleted, which Land removes before the gate
+	// regenerates: generators that never delete stale output (sqlc) would
+	// otherwise keep them.
+	Derived, DerivedDeleted []string
 }
 
 // Change computes the change of the worktree at path, limited to paths when
-// any are given. The worktree's own index is never modified.
-func (r *Repository) Change(ctx context.Context, path string, paths []string) (Change, error) {
-	change := Change{Source: path}
+// any are given, with its output under the derived roots (repository-relative
+// directories) held out of the patch. The worktree's own index is never
+// modified.
+func (r *Repository) Change(ctx context.Context, path string, paths, derived []string) (Change, error) {
+	change := Change{Source: path, DerivedRoots: derived}
 	if _, ok, err := r.registered(ctx, path); err != nil || !ok {
 		return change, errors.Join(err, fmt.Errorf("%s is not a registered worktree of %s", path, r.Main))
 	}
 	err := r.snapshot(ctx, path, paths, func(base string, git gitFunc, scope []string) error {
 		change.Base = base
-		patch, err := git(append([]string{"diff", "--cached", "--binary", "--find-renames", base}, scope...)...)
+		applied := slices.Clone(scope)
+		for _, root := range derived {
+			applied = append(applied, ":(exclude)"+root)
+		}
+		patch, err := git(append([]string{"diff", "--cached", "--binary", "--find-renames", base}, applied...)...)
 		if err != nil {
 			return err
 		}
-		names, err := git(append([]string{"diff", "--cached", "--name-only", "--no-renames", "-z", base}, scope...)...)
+		statuses, err := git(append([]string{"diff", "--cached", "--name-status", "--no-renames", "-z", base}, scope...)...)
 		if err != nil {
 			return err
 		}
 		change.Patch = []byte(patch)
-		for name := range strings.SplitSeq(names, "\x00") {
-			if name != "" {
+		fields := strings.Split(statuses, "\x00")
+		for i := 0; i+1 < len(fields); i += 2 {
+			status, name := fields[i], fields[i+1]
+			switch {
+			case !underAny(name, derived):
 				change.Files = append(change.Files, name)
+			case status == "D":
+				change.DerivedDeleted = append(change.DerivedDeleted, name)
+				fallthrough
+			default:
+				change.Derived = append(change.Derived, name)
 			}
 		}
 		return nil
 	})
 	return change, err
+}
+
+// underAny reports whether the repository-relative path lies in one of roots.
+func underAny(path string, roots []string) bool {
+	return slices.ContainsFunc(roots, func(root string) bool {
+		return path == root || strings.HasPrefix(path, root+"/")
+	})
 }
 
 // gitFunc runs git in a worktree against its scratch snapshot index.
@@ -175,8 +208,12 @@ func (r *Repository) snapshot(ctx context.Context, path string, paths []string, 
 }
 
 // Apply applies patch to the main checkout's working tree, or reverses it.
-// git apply is atomic: on any conflict nothing is written.
+// git apply is atomic: on any conflict nothing is written. An empty patch (a
+// change only to derived files) applies trivially.
 func (r *Repository) Apply(ctx context.Context, patch []byte, reverse bool) error {
+	if len(patch) == 0 {
+		return nil
+	}
 	args := []string{"apply", "--whitespace=nowarn"}
 	if reverse {
 		args = append(args, "--reverse")
@@ -205,10 +242,12 @@ func (r *Repository) registered(ctx context.Context, path string) (Entry, bool, 
 // upstream, holding nothing back for a later batch commit. Call it under the
 // landing lock. It refuses unless the main checkout is on Trunk, has no
 // uncommitted change and contains its freshly fetched upstream; local commits
-// ahead of upstream are pushed with the landing. It applies the
-// change atomically, runs gate on the touched files, commits exactly those
-// files with message, and pushes; any failure restores the checkout and the
-// local branch to their prior state.
+// ahead of upstream are pushed with the landing. It applies the change
+// atomically, removes the derived files the worktree deleted, and runs gate on
+// the touched files; the gate regenerates the derived roots. It commits the
+// touched files and every derived file the gate changed with message, and
+// pushes; any failure restores the checkout, its derived roots included, and
+// the local branch to their prior state.
 func (r *Repository) Land(ctx context.Context, change Change, message string, gate func(files []string) error) error {
 	if strings.TrimSpace(message) == "" {
 		return errors.New("land requires a commit message")
@@ -263,15 +302,31 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		if resetErr == nil {
 			_, resetErr = git(cleanup, r.Main, "reset", "--quiet")
 		}
+		if resetErr == nil {
+			resetErr = r.restoreDerived(cleanup, change.DerivedRoots, prior)
+		}
 		if err := errors.Join(resetErr, r.Apply(cleanup, change.Patch, true)); err != nil {
 			return fmt.Errorf("%w; ROLLBACK FAILED, the shared checkout still holds the change: %w", cause, err)
 		}
 		return fmt.Errorf("%w; rolled back", cause)
 	}
+	for _, name := range change.DerivedDeleted {
+		if err := os.Remove(filepath.Join(r.Main, name)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return restore(err)
+		}
+	}
 	if err := gate(change.Files); err != nil {
 		return restore(fmt.Errorf("gate failed: %w", err))
 	}
-	if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, change.Files...)...); err != nil {
+	derived, err := r.DerivedChanges(ctx, change)
+	if err != nil {
+		return restore(err)
+	}
+	files := slices.Concat(change.Files, derived) // disjoint: Files lie outside the derived roots
+	if len(files) == 0 {
+		return restore(fmt.Errorf("nothing to land: %s changes only derived files, and regenerating them changed nothing on %s", change.Source, Trunk))
+	}
+	if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, files...)...); err != nil {
 		return restore(err)
 	}
 	// The gate has just run; hooks would only repeat it.
@@ -286,12 +341,15 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 
 // Landing describes the dev land in progress in the main checkout.
 type Landing struct {
-	Owner     string    `json:"owner"`
-	PID       int       `json:"pid"`
-	Worktree  string    `json:"worktree"`
-	Message   string    `json:"message"`
-	Files     []string  `json:"files"`
-	StartedAt time.Time `json:"started_at"`
+	Owner    string   `json:"owner"`
+	PID      int      `json:"pid"`
+	Worktree string   `json:"worktree"`
+	Message  string   `json:"message"`
+	Files    []string `json:"files"`
+	// DerivedRoots are regenerated by the landing; their changed files are
+	// its own, not stray edits.
+	DerivedRoots []string  `json:"derived_roots,omitempty"`
+	StartedAt    time.Time `json:"started_at"`
 	// Stale is set by CurrentLanding when no process holds the landing lock,
 	// i.e. the lander died before removing its marker.
 	Stale bool `json:"stale,omitempty"`
@@ -302,7 +360,7 @@ func (r *Repository) landingPath() string {
 }
 
 func (r *Repository) writeLanding(change Change, message string) error {
-	data, err := json.MarshalIndent(Landing{Owner: owner(change.Source), PID: os.Getpid(), Worktree: change.Source, Message: message, Files: change.Files, StartedAt: time.Now().UTC()}, "", "  ")
+	data, err := json.MarshalIndent(Landing{Owner: owner(change.Source), PID: os.Getpid(), Worktree: change.Source, Message: message, Files: change.Files, DerivedRoots: change.DerivedRoots, StartedAt: time.Now().UTC()}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -340,7 +398,11 @@ func (l *Landing) String() string {
 	if l.Stale {
 		state = "STALE marker (no lander holds the lock)"
 	}
-	return fmt.Sprintf("landing %s since %s by %s (pid %d) from %s: %q, %d files: %s", state, l.StartedAt.Format(time.RFC3339), l.Owner, l.PID, l.Worktree, l.Message, len(l.Files), strings.Join(l.Files, " "))
+	line := fmt.Sprintf("landing %s since %s by %s (pid %d) from %s: %q, %d files: %s", state, l.StartedAt.Format(time.RFC3339), l.Owner, l.PID, l.Worktree, l.Message, len(l.Files), strings.Join(l.Files, " "))
+	if len(l.DerivedRoots) != 0 {
+		line += fmt.Sprintf("; plus generator output it regenerates under %s", strings.Join(l.DerivedRoots, " "))
+	}
+	return line
 }
 
 // LockHolder reports whether a process holds the flock on path, naming the
