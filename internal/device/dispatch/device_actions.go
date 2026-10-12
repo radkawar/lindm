@@ -43,12 +43,23 @@ func actionRequest(row devicedb.DeviceAction) (*adminv1.CreateDeviceActionReques
 	}
 	return request, nil
 }
-func actionMessage(row devicedb.DeviceAction) (*adminv1.DeviceAction, error) {
+
+// expiredUnstarted reports an action the device never started before its
+// expiry. Start admission refuses it from then on, so it is closed in effect
+// even before a later create or start attempt records the closure.
+func expiredUnstarted(row devicedb.DeviceAction, now time.Time) bool {
+	return row.ClosedReason == "" && !row.OutcomeUnknown && len(row.StartGrantEnvelope) == 0 && len(row.StatusDocument) == 0 && !now.Before(row.ExpiresAt.Time)
+}
+
+func actionMessage(row devicedb.DeviceAction, now time.Time) (*adminv1.DeviceAction, error) {
 	intent, err := core.ActionIntent(row)
 	if err != nil {
 		return nil, err
 	}
 	result := &adminv1.DeviceAction{ActionId: row.ID.String(), DeviceId: row.DeviceID.String(), EnrollmentGeneration: row.GenerationID.String(), Spec: intent.GetSpec(), ActorId: row.ActorID.String(), CreatedAt: timestamppb.New(row.IssuedAt.Time), ExpiresAt: timestamppb.New(row.ExpiresAt.Time), ClosedReason: row.ClosedReason}
+	if expiredUnstarted(row, now) {
+		result.ClosedReason = "expired_unstarted"
+	}
 	if len(row.StatusDocument) > 0 {
 		result.Status = new(agentv1.DeviceActionStatus)
 		if err := proto.Unmarshal(row.StatusDocument, result.Status); err != nil {

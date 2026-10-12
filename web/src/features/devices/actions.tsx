@@ -61,6 +61,8 @@ export function actionOutcome(action: DeviceAction): { tone: StatusTone; label: 
   const state = action.status?.state;
   if (state === DeviceActionState.OUTCOME_UNKNOWN || action.closedReason === "outcome_unknown")
     return { tone: "warning", label: "Outcome unknown, don't retry" };
+  if (state === undefined && action.closedReason === "expired_unstarted")
+    return { tone: "neutral", label: "Expired before the device received it" };
   if (state === undefined) return { tone: "info", label: "Sent, waiting for device" };
   return {
     tone:
@@ -81,6 +83,8 @@ type Restriction = {
   confirmed: boolean;
   action: DeviceAction | undefined;
   until?: Timestamp;
+  // The newest undo of this restriction expired before the device received it.
+  expiredRelease?: DeviceAction;
 };
 
 function verifiedSuccess(action: DeviceAction | undefined) {
@@ -107,8 +111,18 @@ function useDeviceRestrictions(deviceId: string) {
   });
   const lockAction = listedLock ?? (lockQuery.error ? undefined : lockQuery.data);
   const restrictions: Restriction[] = [];
+  // Newest first: the newest undo of a restriction still in force did not take effect.
+  const expiredRelease = (kind: DeviceActionKind) => {
+    const release = data?.actions.find((item) => item.spec?.action.case === kind);
+    return release?.closedReason === "expired_unstarted" && !release.status ? release : undefined;
+  };
   if (data?.sessionsLocked)
-    restrictions.push({ kind: "lock", action: lockAction, confirmed: verifiedSuccess(lockAction) });
+    restrictions.push({
+      kind: "lock",
+      action: lockAction,
+      confirmed: verifiedSuccess(lockAction),
+      expiredRelease: expiredRelease("releaseLock"),
+    });
   if (data?.quarantined) {
     // Newest first: the newest quarantine on this page set the current fence.
     const action = data.actions.find((item) => item.spec?.action.case === "quarantine");
@@ -117,6 +131,7 @@ function useDeviceRestrictions(deviceId: string) {
       action,
       confirmed: verifiedSuccess(action),
       until: data.quarantineUntil,
+      expiredRelease: expiredRelease("releaseQuarantine"),
     });
   }
   return {
@@ -127,8 +142,16 @@ function useDeviceRestrictions(deviceId: string) {
 }
 
 const restrictionNames = {
-  lock: { confirmed: "Accounts locked", sent: "Account lock sent" },
-  quarantine: { confirmed: "Network quarantined", sent: "Network quarantine sent" },
+  lock: {
+    confirmed: "Accounts locked",
+    sent: "Account lock sent",
+    still: "Accounts are still locked",
+  },
+  quarantine: {
+    confirmed: "Network quarantined",
+    sent: "Network quarantine sent",
+    still: "The network is still quarantined",
+  },
 } as const;
 const releaseKinds: Record<Restriction["kind"], DeviceActionKind> = {
   lock: "releaseLock",
@@ -145,6 +168,13 @@ function RestrictionText({ restriction }: { restriction: Restriction }) {
       Ends <ObservedClock value={restriction.until} />.
     </>
   ) : null;
+  if (restriction.expiredRelease) {
+    return (
+      <p data-expired-release>
+        {names.still}. The undo request expired before the device received it.{until}
+      </p>
+    );
+  }
   if (!action) {
     return (
       <p>
@@ -203,7 +233,7 @@ export function DeviceRestrictions({
                   aria-label={actionLabels[kind]}
                   onClick={() => setRelease(kind)}
                 >
-                  Undo
+                  {restriction.expiredRelease ? "Undo again" : "Undo"}
                 </Button>
               ) : null}
             </div>
@@ -344,7 +374,7 @@ function DeviceActionRow({ action }: { action: DeviceAction }) {
   const outcome = actionOutcome(action);
   const what = action.spec?.action.case ? actionLabels[action.spec.action.case] : "Unknown action";
   return (
-    <details data-device-action-row className="group">
+    <details data-device-action-row data-action-id={action.actionId} className="group">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm hover:bg-muted/50 focus-visible:outline focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden="true"

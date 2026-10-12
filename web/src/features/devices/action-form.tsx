@@ -88,6 +88,7 @@ import {
   deviceStorageTargetsQueryOptions,
 } from "./action-queries";
 import { deviceQueryOptions } from "./queries";
+import { ObservedClock } from "./observations";
 import {
   formErrorMessage,
   requestProblem,
@@ -1037,6 +1038,38 @@ export function DeviceActionForm({
       : refusalReason === "device_action_offline" && lastContact
         ? `${deviceName} last checked in ${lastContact}.`
         : "";
+  // The open action the server named; a new action waits until it ends.
+  const blockingAction =
+    refusalReason === "device_action_pending"
+      ? attempt?.status === "rejected"
+        ? attempt.failure?.blockingAction
+        : checked?.blockingAction
+      : undefined;
+  const blockingKind = blockingAction?.spec?.action.case;
+  const pendingEvidence = blockingAction ? (
+    <span data-blocking-action={blockingAction.actionId}>
+      Another action is still running on this device (
+      {blockingKind ? actionLabels[blockingKind] : "an action"}, sent{" "}
+      <ObservedClock value={blockingAction.createdAt} />
+      ). Wait for it to finish or let it expire
+      {blockingAction.status ? (
+        ""
+      ) : (
+        <>
+          {" "}
+          at <ObservedClock value={blockingAction.expiresAt} />
+        </>
+      )}
+      .{" "}
+      <Link
+        to="/devices/$deviceId/actions/$actionId"
+        params={{ deviceId, actionId: blockingAction.actionId }}
+        className="underline"
+      >
+        View action
+      </Link>
+    </span>
+  ) : null;
   const canRefreshInventory =
     canPermission(principal, actionPermissions.refreshInventory) &&
     canPermission(principal, "fleet.read");
@@ -1084,7 +1117,7 @@ export function DeviceActionForm({
     >
       <AlertTitle>{blocker.title}</AlertTitle>
       <AlertDescription className="grid gap-2">
-        <p>{blockerEvidence || blocker.message}</p>
+        <p>{pendingEvidence ?? (blockerEvidence || blocker.message)}</p>
         {inventoryBlockers[refusalReason] && canRefreshInventory ? (
           refreshResult === "waiting" ? (
             <p role="status">

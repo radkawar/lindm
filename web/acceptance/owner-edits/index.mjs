@@ -57,6 +57,8 @@ import * as fleetPass2 from "./fleet-pass-2.mjs";
 import * as pass2P2Approvals from "./pass2-p2-approvals.mjs";
 import * as groups from "./groups.mjs";
 import * as groupsDynamicCreate from "./groups-dynamic-create.mjs";
+import * as pass2ActionsHistory from "./pass2-p2-actions-history.mjs";
+import * as pass2ActionPending from "./pass2-p2-6-action-pending.mjs";
 
 export const ownerEdits = [
   dashboard,
@@ -68,6 +70,8 @@ export const ownerEdits = [
   recordedChoices,
   pass2RevokedDevice,
   deviceActions,
+  pass2ActionsHistory,
+  pass2ActionPending,
   assistanceRecord,
   revealApproval,
   assistanceGate,

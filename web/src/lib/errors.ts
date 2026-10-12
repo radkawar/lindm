@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { DeviceActionSchema, type DeviceAction } from "../../gen/lindm/admin/v1/device_actions_pb";
 import { requestProblem, type FieldError } from "@/lib/validation";
 
 export type RpcFailure = {
@@ -11,6 +12,8 @@ export type RpcFailure = {
   ambiguous: boolean;
   // Set only for a request the browser refused to send; nothing reached the server.
   fields?: readonly FieldError[];
+  // The open action behind a device_action_pending refusal, when the server named it.
+  blockingAction?: DeviceAction;
 };
 
 const AMBIGUOUS: Record<number, true> = {
@@ -76,6 +79,7 @@ export function toRpcFailure(error: unknown): RpcFailure {
     unauthenticated: connectError.code === Code.Unauthenticated,
     denied: connectError.code === Code.PermissionDenied,
     ambiguous,
+    blockingAction: connectError.findDetails(DeviceActionSchema)[0],
   };
 }
 
@@ -99,6 +103,12 @@ const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
     "Select the configured signed recovery image to check required space.",
   device_action_recovery_artifact_unavailable:
     "The signed recovery image is unavailable. Ask an administrator to check the recovery release.",
+  device_action_recovery_attestation_unavailable:
+    "The device can't prove its boot state with its TPM, so recovery can't be verified.",
+  device_action_recovery_boot_mode_mismatch:
+    "The device now boots differently from when recovery was prepared. Prepare recovery again.",
+  device_action_recovery_kernel_mismatch:
+    "The device's kernel changed since recovery was prepared. Prepare recovery again.",
   device_action_esp_insufficient:
     "Unsupported: ESP capacity. The signed recovery image does not fit the available EFI system partition space. Use separately qualified external recovery media with an on-site operator; do not remove ordinary boot files or resize the ESP to bypass this gate.",
 };
@@ -199,6 +209,10 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "device_action_recovery_readiness_unsupported":
       case "device_action_recovery_artifact_required":
       case "device_action_recovery_artifact_unavailable":
+      case "device_action_recovery_owner_key_required":
+      case "device_action_recovery_attestation_unavailable":
+      case "device_action_recovery_boot_mode_mismatch":
+      case "device_action_recovery_kernel_mismatch":
         return {
           tone: recoveryReadinessTone(failure.reason),
           title: "Recovery is not ready",
@@ -354,7 +368,72 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "This device was re-enrolled, revoked or hasn't connected since enrolling.",
           action: "Reload the device page before trying again.",
         };
+      case "device_revoked":
+        return {
+          tone: "neutral",
+          title: "Device revoked",
+          message: "This device was revoked, so it is read-only.",
+          action: "Recover its enrollment from the Encryption tab to manage it again.",
+        };
+      case "device_quarantined":
+        return {
+          tone: "warning",
+          title: "Device is quarantined",
+          message: "Only undoing the network quarantine can be sent while it is in force.",
+          action: "Undo the quarantine first, or wait for it to end.",
+        };
+      case "device_lock_release_required":
+        return {
+          tone: "warning",
+          title: "Accounts are already locked",
+          message: "A new lock can't be sent while the current one is in force.",
+          action: "Undo the current account lock first.",
+        };
+      case "device_action_lock_changed":
+      case "device_action_lock_binding_rejected":
+        return {
+          tone: "warning",
+          title: "Account lock changed",
+          message: "The lock this undo refers to is no longer the device's current lock.",
+          action: "Reload the device page and undo the lock it shows now.",
+        };
+      case "device_action_session_lock_unsupported":
+        return {
+          tone: "neutral",
+          title: "Screen lock not supported",
+          message: "This device can't lock screens on their own; it can only lock accounts.",
+          action: "Choose the accounts to lock instead.",
+        };
+      case "device_action_escrow_scope_incomplete":
+        return {
+          tone: "warning",
+          title: "Not every encrypted volume is included",
+          message: "This erase must include every volume whose recovery key lindm holds.",
+          action: "Select all the device's encrypted volumes, then review again.",
+        };
+      case "escrow_key_rejected":
+        return {
+          tone: "warning",
+          title: "Recovery key settings changed",
+          message: "The server's key for storing recovery keys changed after this page loaded.",
+          action: "Reload the page and start the action again.",
+        };
+      case "authorization_unavailable":
+        return {
+          tone: "neutral",
+          title: "Capability not configured",
+          message: "This capability is not enabled on the server.",
+          action: "Ask an administrator to review the server configuration.",
+        };
     }
+  }
+  if (failure.code === Code.ResourceExhausted && failure.reason === "device_action_capacity") {
+    return {
+      tone: "warning",
+      title: "Action history is full",
+      message: "This device has reached the number of actions the server keeps for it.",
+      action: "Ask an administrator to re-enroll the device to start a new history.",
+    };
   }
   if (failure.code === Code.PermissionDenied) {
     if (failure.reason === "recent_step_up_required") {

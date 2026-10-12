@@ -104,6 +104,7 @@ func (s *Service) PreflightDeviceAction(ctx context.Context, req *connect.Reques
 	}
 	response.CheckedAt = timestamppb.New(now)
 	response.BlockedReason = rpcreason.Get(err)
+	response.BlockingAction = blockingAction(err)
 	return core.NoStore(response), nil
 }
 

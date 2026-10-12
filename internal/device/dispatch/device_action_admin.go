@@ -100,7 +100,11 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 		if old.ActorID != actor.ID || !bytes.Equal(old.RequestDigest, digest) {
 			return nil, core.MapErr(core.ErrIdempotencyConflict)
 		}
-		action, err := actionMessage(old)
+		now, err := core.DispatchClock(ctx, q)
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+		action, err := actionMessage(old, now)
 		if err != nil {
 			return nil, core.MapErr(err)
 		}
@@ -201,7 +205,7 @@ func (s *Service) requireActionPreconditions(ctx context.Context, q *devicedb.Qu
 		return &open, "outcome_unknown", nil
 	}
 	if open.OutcomeUnknown || len(open.StartGrantEnvelope) > 0 || now.Before(open.ExpiresAt.Time) {
-		return nil, "", rpcreason.Error(connect.CodeFailedPrecondition, "device_action_pending")
+		return nil, "", pendingActionError(ctx, q, open, now)
 	}
 	return &open, "expired_unstarted", nil
 }
@@ -277,7 +281,7 @@ func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
-	action, err := actionMessage(row)
+	action, err := actionMessage(row, now)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -324,13 +328,13 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
+	now, err := core.DispatchClock(ctx, q)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
 	response := &adminv1.GetDeviceActionsResponse{}
 	restriction, restrictionErr := q.GetDeviceActionRestriction(ctx, id)
 	if restrictionErr == nil {
-		now, err := core.DispatchClock(ctx, q)
-		if err != nil {
-			return nil, core.MapErr(err)
-		}
 		response.SessionsLocked = restriction.SessionsLocked
 		if restriction.LockActionID != nil {
 			response.LockActionId = restriction.LockActionID.String()
@@ -351,7 +355,7 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 		if len(response.Actions) == int(params.PageLimit)-1 {
 			break
 		}
-		action, err := actionMessage(row)
+		action, err := actionMessage(row, now)
 		if err != nil {
 			return nil, core.MapErr(err)
 		}
@@ -404,7 +408,11 @@ func (s *Service) GetDeviceAction(ctx context.Context, req *connect.Request[admi
 	if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionReadFleet, row.DeviceID); err != nil {
 		return nil, core.MapErr(err)
 	}
-	action, err := actionMessage(row)
+	now, err := core.DispatchClock(ctx, q)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
+	action, err := actionMessage(row, now)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -417,4 +425,41 @@ func (s *Service) GetDeviceAction(ctx context.Context, req *connect.Request[admi
 		return nil, core.MapErr(err)
 	}
 	return core.NoStore(&adminv1.GetDeviceActionResponse{Action: action}), nil
+}
+
+// pendingActionError names the open action blocking a new one: its kind,
+// actor and send time travel as a DeviceAction error detail.
+func pendingActionError(ctx context.Context, q *devicedb.Queries, open devicedb.DeviceAction, now time.Time) error {
+	err := rpcreason.Error(connect.CodeFailedPrecondition, "device_action_pending")
+	action, messageErr := actionMessage(open, now)
+	if messageErr != nil {
+		return core.MapErr(messageErr)
+	}
+	names, namesErr := actionActorNames(ctx, q, open)
+	if namesErr != nil {
+		return core.MapErr(namesErr)
+	}
+	action.ActorDisplayName = names[open.ActorID]
+	detail, detailErr := connect.NewErrorDetail(action)
+	if detailErr != nil {
+		return core.MapErr(detailErr)
+	}
+	err.AddDetail(detail)
+	return err
+}
+
+// blockingAction returns the open action a pendingActionError names, if any.
+func blockingAction(err error) *adminv1.DeviceAction {
+	var connectErr *connect.Error
+	if !errors.As(err, &connectErr) {
+		return nil
+	}
+	for _, detail := range connectErr.Details() {
+		if value, valueErr := detail.Value(); valueErr == nil {
+			if action, ok := value.(*adminv1.DeviceAction); ok {
+				return action
+			}
+		}
+	}
+	return nil
 }

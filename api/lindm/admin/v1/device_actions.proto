@@ -75,6 +75,9 @@ message PreflightDeviceActionResponse {
   google.protobuf.Timestamp inventory_received_at = 4;
   // Maximum host inventory age this action accepts; 0 when it needs none.
   uint32 inventory_max_age_seconds = 5;
+  // The open action behind a device_action_pending refusal, as GetDeviceAction
+  // returns it; unset for every other result.
+  DeviceAction blocking_action = 6;
 }
 message GetDeviceActionsRequest {
   string device_id = 1 [(buf.validate.field).string.uuid = true];

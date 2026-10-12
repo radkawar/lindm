@@ -518,8 +518,17 @@ func (s *demoSeed) richDevice(ctx context.Context, d *simulatedDevice) error {
 	if _, err := s.assistance(ctx, d, false); err != nil {
 		return fmt.Errorf("decline demo assistance: %w", err)
 	}
-	if _, err := s.deviceAction(ctx, d, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{AllHumanAccounts: true}}}); err != nil {
+	lockID, err := s.deviceAction(ctx, d, &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_LockSessions{LockSessions: &agentv1.LockSessionsAction{AllHumanAccounts: true}}})
+	if err != nil {
 		return fmt.Errorf("lock demo sessions: %w", err)
+	}
+	// An undo the device never picks up: it expires unstarted, leaving the
+	// accounts locked, as when a device goes quiet after an undo is sent.
+	if _, err := d.client.GetSyncState(ctx, connect.NewRequest(&devicev1.GetSyncStateRequest{SessionEpoch: d.epoch})); err != nil {
+		return fmt.Errorf("refresh demo contact: %w", err)
+	}
+	if _, err := s.owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(&adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, Spec: &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{LockActionId: lockID}}}, ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Second)), Reason: "Console demo undo that expires unstarted"})); err != nil {
+		return fmt.Errorf("send demo undo: %w", err)
 	}
 	// The erase stays a pending approval for a second human; no action exists.
 	wipe := &adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, ExpiresAt: timestamppb.New(time.Now().Add(10 * time.Minute)), Reason: "Laptop reported stolen; erase its disk encryption keys",
