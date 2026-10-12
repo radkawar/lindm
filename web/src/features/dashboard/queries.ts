@@ -12,7 +12,8 @@ export function fleetSummaryQueryOptions(lifetime: AuthLifetime) {
     staleTime: 0,
     queryFn: async ({ signal }) => {
       const response = await adminClient.getFleetSummary(
-        { recentActionLimit: 10 },
+        // The server maximum, so grouping by kind covers as much history as one snapshot allows.
+        { recentActionLimit: 20 },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

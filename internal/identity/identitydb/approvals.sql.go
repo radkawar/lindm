@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const consumeApproval = `-- name: ConsumeApproval :execrows
@@ -244,26 +245,44 @@ LEFT JOIN local_accounts requester_account ON requester_account.id = requester.i
 LEFT JOIN principals approver ON approver.id = a.approver_id
 LEFT JOIN local_accounts approver_account ON approver_account.id = approver.id
 LEFT JOIN devices d ON d.id = a.device_id
-WHERE a.id > $1::uuid
+WHERE (
+    $1::boolean
+    OR (NOT $2::boolean AND (
+      NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz)
+      OR (a.expires_at, a.id) > ($4::timestamptz, $5::uuid)
+    ))
+    OR ($2::boolean
+      AND NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz)
+      AND (a.created_at < $4::timestamptz
+        OR (a.created_at = $4::timestamptz AND a.id > $5::uuid)))
+  )
   AND (
-    a.permission = ANY($2::text[])
-    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($3::jsonb -> a.permission, '[]'::jsonb)))
+    a.permission = ANY($6::text[])
+    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, coalesce($7::jsonb -> a.permission, '[]'::jsonb)))
   )
   AND NOT EXISTS (
     SELECT 1
-    FROM jsonb_array_elements(coalesce($4::jsonb -> a.permission, '[]'::jsonb)) required
+    FROM jsonb_array_elements(coalesce($8::jsonb -> a.permission, '[]'::jsonb)) required
     WHERE a.device_id IS NULL
        OR NOT device_scope_matches(a.device_id, (required ->> 'unrestricted')::boolean, required -> 'scopes')
   )
   AND (
-    a.requester_id = $5
-    OR $6::boolean
-    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $7::jsonb))
+    a.requester_id = $9
+    OR $10::boolean
+    OR (a.device_id IS NOT NULL AND device_scope_matches(a.device_id, false, $11::jsonb))
   )
-ORDER BY a.id LIMIT $8
+ORDER BY NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz),
+  CASE WHEN a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz THEN a.expires_at END,
+  CASE WHEN NOT (a.state IN ('pending', 'approved') AND a.expires_at > $3::timestamptz) THEN a.created_at END DESC,
+  a.id
+LIMIT $12
 `
 
 type ListVisibleApprovalsParams struct {
+	FirstPage               bool
+	AfterClosed             bool
+	AsOf                    pgtype.Timestamptz
+	AfterAt                 pgtype.Timestamptz
 	AfterID                 uuid.UUID
 	UnrestrictedPermissions []string
 	Scopes                  []byte
@@ -281,8 +300,15 @@ type ListVisibleApprovalsRow struct {
 	DeviceHostname       string
 }
 
+// Open requests (pending or approved, unexpired at as_of) come first, nearest
+// expiry first; closed ones follow, newest first. The keyset (open, time, id)
+// matches this order exactly; id breaks ties so every row has one position.
 func (q *Queries) ListVisibleApprovals(ctx context.Context, arg ListVisibleApprovalsParams) ([]ListVisibleApprovalsRow, error) {
 	rows, err := q.db.Query(ctx, listVisibleApprovals,
+		arg.FirstPage,
+		arg.AfterClosed,
+		arg.AsOf,
+		arg.AfterAt,
 		arg.AfterID,
 		arg.UnrestrictedPermissions,
 		arg.Scopes,

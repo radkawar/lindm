@@ -113,9 +113,13 @@ provider and physical qualification.
 
 ### Enrollment history and onboarding instructions
 
-`ListEnrollmentGrants` accepts bounded `page_size` (at most 200) and `page_token`
-and returns `grants` and `next_page_token`. Follow the returned cursor rather than
-inferring that the first page is the complete history. Each grant exposes its ID,
+`ListEnrollmentGrants` accepts bounded `page_size` (at most 200), `page_token` and an
+optional `view` (`ACTIVE`: unused, unexpired and not revoked; `INACTIVE`: every other
+grant; unset lists all) and returns `grants`, `next_page_token` and whole-history
+`active_count`/`inactive_count` evaluated at the same instant, independent of view and
+cursor. Follow the returned cursor rather than inferring that the first page is the
+complete history. The console lists active codes by default and loads the inactive
+view only when "Show used and expired" is opened. Each grant exposes its ID,
 creation/expiry times, creator principal ID and current creator display name,
 maximum/used counts, and typed `ACTIVE`, `CONSUMED`, `EXPIRED` or `REVOKED` status.
 Consumed grants also project the current device ID, hostname and labels. Labels
@@ -228,7 +232,8 @@ The server must have current PLAN and START delegates explicitly authorized for
 `enrollment.offline.v1`; service-execution or TLS keys do not implicitly grant that
 capability. The device receives its independently trusted execution root and
 root-signed deployment bootstrap through the installation channel. In Enrollment,
-create an offline authorization for a provisioning token and the exact bootstrap
+follow "Enroll devices at offline sites" and create an offline authorization for a
+provisioning token and the exact bootstrap
 root version/digest. The exported authorization contains no reusable token secret;
 it is still a sensitive, bounded enrollment capability. Validity is bounded by
 the token's remaining lifetime as well as signing authority, not merely the

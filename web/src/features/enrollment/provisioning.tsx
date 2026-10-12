@@ -267,7 +267,7 @@ export function IssueProvisioningToken({
               disabled={busy || captured !== null || completed}
             />
             <MultiPicker
-              label="Profile revisions"
+              label="Profile versions"
               values={profileRevisionIds}
               onChange={setProfileRevisionIds}
               picker={profileRevisionPicker}
@@ -407,7 +407,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           ) : null}
           <dt className="text-muted-foreground">Group IDs</dt>
           <dd>{token.groupIds.join(", ") || "None"}</dd>
-          <dt className="text-muted-foreground">Profile revision IDs</dt>
+          <dt className="text-muted-foreground">Profile version IDs</dt>
           <dd>{token.profileRevisionIds.join(", ") || "None"}</dd>
           <dt className="text-muted-foreground">Device settings</dt>
           <dd>

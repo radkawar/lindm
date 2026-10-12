@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"math"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -31,18 +32,23 @@ func (s *Service) ListEnrollmentGrants(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	limit := PageLimit(req.Msg.GetPageSize())
+	now := s.Now()
 	var rows []devicedb.ListEnrollmentGrantsRow
+	var counts devicedb.CountEnrollmentGrantsRow
 	err = s.WithinUnrestrictedAuthorization(ctx, actor, identity.PermissionManageEnrollment, func(ctx context.Context, q *devicedb.Queries) error {
 		var err error
-		rows, err = q.ListEnrollmentGrants(ctx, devicedb.ListEnrollmentGrantsParams{AfterID: after, RowLimit: limit + 1})
+		rows, err = q.ListEnrollmentGrants(ctx, devicedb.ListEnrollmentGrantsParams{AfterID: after, View: int32(req.Msg.GetView()), Now: Timestamptz(now), RowLimit: limit + 1})
+		if err != nil {
+			return err
+		}
+		counts, err = q.CountEnrollmentGrants(ctx, Timestamptz(now))
 		return err
 	})
 	if err != nil {
 		return nil, MapErr(err)
 	}
-	response := new(adminv1.ListEnrollmentGrantsResponse)
+	response := &adminv1.ListEnrollmentGrantsResponse{ActiveCount: grantCount(counts.Active), InactiveCount: grantCount(counts.Inactive)}
 	var budget ResponsePageBudget
-	now := s.Now()
 	for _, row := range rows {
 		item := &adminv1.EnrollmentGrant{
 			GrantId: row.ID.String(), Status: adminv1.EnrollmentGrantStatus_ENROLLMENT_GRANT_STATUS_ACTIVE,
@@ -81,4 +87,8 @@ func (s *Service) ListEnrollmentGrants(ctx context.Context, req *connect.Request
 		response.Grants = append(response.Grants, item)
 	}
 	return NoStore(response), nil
+}
+
+func grantCount(n int64) uint32 {
+	return uint32(min(max(n, 0), math.MaxUint32))
 }

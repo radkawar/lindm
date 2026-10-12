@@ -87,4 +87,13 @@ LEFT JOIN principals creator ON creator.id = g.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
 LEFT JOIN devices d ON d.id = g.device_id
 WHERE g.id > sqlc.arg(after_id)::uuid
+  AND (sqlc.arg(view)::integer = 0
+    OR (sqlc.arg(view)::integer = 1) = (g.consumed_at IS NULL AND g.revoked_at IS NULL AND g.expires_at > sqlc.arg(now)::timestamptz))
 ORDER BY g.id LIMIT sqlc.arg(row_limit);
+
+-- name: CountEnrollmentGrants :one
+-- Active matches ListEnrollmentGrants view 1: unused, unexpired and not revoked.
+SELECT
+    count(*) FILTER (WHERE consumed_at IS NULL AND revoked_at IS NULL AND expires_at > sqlc.arg(now)::timestamptz)::bigint AS active,
+    count(*) FILTER (WHERE NOT (consumed_at IS NULL AND revoked_at IS NULL AND expires_at > sqlc.arg(now)::timestamptz))::bigint AS inactive
+FROM enrollment_grants;

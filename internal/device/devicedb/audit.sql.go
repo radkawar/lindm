@@ -154,7 +154,9 @@ LEFT JOIN principals p ON p.id = f.actor_id
 WHERE f.sequence <= $1::bigint
   AND ($2::uuid IS NULL OR f.actor_id = $2)
   AND ($3::uuid IS NULL OR f.target_device_id = $3)
-  AND ($4::smallint = 0 OR f.action_category = $4)
+  AND ($4::smallint IN (0, 4) OR f.action_category = $4)
+  AND ($4::smallint <> 4
+       OR (f.actor_id IS NOT NULL AND a.action <> 'approval.listed'))
   AND ($5::timestamptz IS NULL OR f.occurred_at >= $5)
   AND ($6::timestamptz IS NULL OR f.occurred_at < $6)
   AND ($7::uuid IS NULL

@@ -4,6 +4,8 @@ package device
 
 import (
 	"context"
+	"encoding/base64"
+	"slices"
 	"testing"
 	"time"
 
@@ -234,6 +236,80 @@ func TestApprovalScopeInboxAndCreation(t *testing.T) {
 	}
 	if _, err := svc.ListApprovals(auditorCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{})); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("no action grant inbox: %v", err)
+	}
+}
+
+// The inbox lists open requests first, nearest expiry first, then closed ones,
+// newest first; every page size walks the same order once.
+func TestApprovalInboxOrderAndPaging(t *testing.T) {
+	ctx := t.Context()
+	pool, conn := testdb.Open(t)
+	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := insertPrincipal(t, ctx, conn, identity.RoleOwner)
+	ownerCtx := identity.WithPrincipal(ctx, owner)
+	reviewerCtx := approvalReviewer(t, svc, ctx)
+	_, _, _, enrolled := enrollDevice(t, ctx, svc, ownerCtx, ed25519Key(t))
+	create := func(lifetime uint32) string {
+		t.Helper()
+		created, err := svc.CreateApproval(ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: lifetime, Payload: &adminv1.CreateApprovalRequest_RevokeDevice{RevokeDevice: &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: enrolled.Msg.GetDeviceId(), Reason: "ordered inbox retirement"}}}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return created.Msg.GetApproval().GetId()
+	}
+	reject := func(id string) {
+		t.Helper()
+		if _, err := svc.RejectApproval(reviewerCtx, connect.NewRequest(&adminv1.RejectApprovalRequest{ApprovalId: id, Reason: "ordered inbox rejection"})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	olderClosed := create(3600)
+	reject(olderClosed)
+	late := create(900)
+	soon := create(300)
+	approved := create(600)
+	if _, err := svc.ApproveApproval(reviewerCtx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: approved, Reason: "ordered inbox approval"})); err != nil {
+		t.Fatal(err)
+	}
+	newerClosed := create(3600)
+	reject(newerClosed)
+	// A pending row past its expiry is closed even though its state is pending.
+	expired := create(3600)
+	if _, err := conn.Exec(ctx, "UPDATE approval_requests SET expires_at=created_at + interval '1 microsecond' WHERE id=$1", expired); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{soon, approved, late, expired, newerClosed, olderClosed}
+	for _, size := range []uint32{1, 2, 4, 50} {
+		var got []string
+		token := ""
+		for pages := 0; ; pages++ {
+			if pages > len(want) {
+				t.Fatalf("page size %d did not terminate", size)
+			}
+			page, err := svc.ListApprovals(reviewerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{PageSize: size, PageToken: token}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, approval := range page.Msg.GetApprovals() {
+				got = append(got, approval.GetId())
+			}
+			token = page.Msg.GetNextPageToken()
+			if token == "" {
+				break
+			}
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("page size %d order = %v, want %v", size, got, want)
+		}
+	}
+	for _, token := range []string{"not-a-token", base64.RawURLEncoding.EncodeToString(make([]byte, 16)), base64.RawURLEncoding.EncodeToString(append([]byte{2}, make([]byte, 24)...))} {
+		if _, err := svc.ListApprovals(reviewerCtx, connect.NewRequest(&adminv1.ListApprovalsRequest{PageSize: 1, PageToken: token})); err == nil {
+			t.Fatalf("malformed page token %q accepted", token)
+		}
 	}
 }
 

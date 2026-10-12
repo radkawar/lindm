@@ -16,7 +16,10 @@ JOIN report_audit_rows r ON r.sequence = f.sequence
 WHERE f.sequence <= sqlc.arg('snapshot_sequence')::bigint
   AND (sqlc.narg('actor_id')::uuid IS NULL OR f.actor_id = sqlc.narg('actor_id'))
   AND (sqlc.narg('target_device_id')::uuid IS NULL OR f.target_device_id = sqlc.narg('target_device_id'))
-  AND (sqlc.arg('action_category')::smallint = 0 OR f.action_category = sqlc.arg('action_category'))
+  AND (sqlc.arg('action_category')::smallint IN (0, 4) OR f.action_category = sqlc.arg('action_category'))
+  AND (sqlc.arg('action_category')::smallint <> 4
+       OR (f.actor_id IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.id = f.event_id AND a.action = 'approval.listed')))
   AND (sqlc.narg('occurred_from')::timestamptz IS NULL OR f.occurred_at >= sqlc.narg('occurred_from'))
   AND (sqlc.narg('occurred_until')::timestamptz IS NULL OR f.occurred_at < sqlc.narg('occurred_until'))
   AND (sqlc.narg('cursor_id')::uuid IS NULL

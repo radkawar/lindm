@@ -49,6 +49,26 @@ func (q *Queries) ConsumeEnrollmentGrant(ctx context.Context, arg ConsumeEnrollm
 	return result.RowsAffected(), nil
 }
 
+const countEnrollmentGrants = `-- name: CountEnrollmentGrants :one
+SELECT
+    count(*) FILTER (WHERE consumed_at IS NULL AND revoked_at IS NULL AND expires_at > $1::timestamptz)::bigint AS active,
+    count(*) FILTER (WHERE NOT (consumed_at IS NULL AND revoked_at IS NULL AND expires_at > $1::timestamptz))::bigint AS inactive
+FROM enrollment_grants
+`
+
+type CountEnrollmentGrantsRow struct {
+	Active   int64
+	Inactive int64
+}
+
+// Active matches ListEnrollmentGrants view 1: unused, unexpired and not revoked.
+func (q *Queries) CountEnrollmentGrants(ctx context.Context, now pgtype.Timestamptz) (CountEnrollmentGrantsRow, error) {
+	row := q.db.QueryRow(ctx, countEnrollmentGrants, now)
+	var i CountEnrollmentGrantsRow
+	err := row.Scan(&i.Active, &i.Inactive)
+	return i, err
+}
+
 const getGrantByHashForUpdate = `-- name: GetGrantByHashForUpdate :one
 SELECT
     id,
@@ -217,11 +237,15 @@ LEFT JOIN principals creator ON creator.id = g.created_by
 LEFT JOIN local_accounts account ON account.id = creator.id
 LEFT JOIN devices d ON d.id = g.device_id
 WHERE g.id > $1::uuid
-ORDER BY g.id LIMIT $2
+  AND ($2::integer = 0
+    OR ($2::integer = 1) = (g.consumed_at IS NULL AND g.revoked_at IS NULL AND g.expires_at > $3::timestamptz))
+ORDER BY g.id LIMIT $4
 `
 
 type ListEnrollmentGrantsParams struct {
 	AfterID  uuid.UUID
+	View     int32
+	Now      pgtype.Timestamptz
 	RowLimit int32
 }
 
@@ -240,7 +264,12 @@ type ListEnrollmentGrantsRow struct {
 }
 
 func (q *Queries) ListEnrollmentGrants(ctx context.Context, arg ListEnrollmentGrantsParams) ([]ListEnrollmentGrantsRow, error) {
-	rows, err := q.db.Query(ctx, listEnrollmentGrants, arg.AfterID, arg.RowLimit)
+	rows, err := q.db.Query(ctx, listEnrollmentGrants,
+		arg.AfterID,
+		arg.View,
+		arg.Now,
+		arg.RowLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

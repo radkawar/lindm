@@ -102,6 +102,52 @@ message AdvisorySummary {
   uint64 unknown_devices = 5;
   repeated string cves = 6;
 }
+
+// Why an active device's current exposure is unknown. Each value names the
+// stable AdvisoryFreshness.reason code of the same spelling; UNSPECIFIED is a
+// reason this API version does not name.
+enum AdvisoryUncheckedReason {
+  ADVISORY_UNCHECKED_REASON_UNSPECIFIED = 0;
+  // Not yet evaluated against its current inventory and source generation.
+  ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING = 1;
+  ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE = 2;
+  ADVISORY_UNCHECKED_REASON_INVENTORY_STALE = 3;
+  ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED = 4;
+  ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED = 5;
+  // No enabled source applies to the device's OS release and architecture.
+  ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE = 6;
+  ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE = 7;
+  ADVISORY_UNCHECKED_REASON_FEED_STALE = 8;
+  // The selected source is not a complete snapshot of the release's advisories.
+  ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE = 9;
+  ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING = 10;
+  ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED = 11;
+  ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE = 12;
+  ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED = 13;
+  ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE = 14;
+  ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE = 15;
+  ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED = 16;
+  ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID = 17;
+  ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED = 18;
+  ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN = 19;
+  ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS = 20;
+  ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED = 21;
+}
+
+// Active devices counted in unknown_devices that share one reason, OS release
+// and selected source, using the device findings read-path precedence.
+message AdvisoryUncheckedGroup {
+  AdvisoryUncheckedReason reason = 1 [(buf.validate.field).enum.defined_only = true];
+  // Selected source; empty when none applies or the device is not evaluated.
+  string feed_id = 2;
+  // Device os-release identity; empty values mean not yet known.
+  string os_id = 3;
+  string os_version = 4;
+  // Platform registry display name, e.g. "Fedora 44"; empty when unregistered.
+  string os_name = 5;
+  uint64 devices = 6;
+}
+
 message ListAdvisorySummaryResponse {
   repeated AdvisorySummary advisories = 1;
   string next_page_token = 2;
@@ -109,6 +155,9 @@ message ListAdvisorySummaryResponse {
   uint64 evaluated_devices = 4;
   // Devices whose current evaluation covers only part of their packages.
   uint64 partial_devices = 5;
+  // The twenty largest groups, ordered by device count descending. Counts are
+  // exact; unknown_devices minus their sum is in groups not listed.
+  repeated AdvisoryUncheckedGroup unchecked_groups = 6 [(buf.validate.field).repeated.max_items = 20];
 }
 
 message ListAdvisoryFeedsRequest {}
@@ -128,6 +177,9 @@ message AdvisoryFeedStatus {
   repeated lindm.advisory.v1.FeedArtifact artifacts = 13;
   google.protobuf.Timestamp snapshot_at = 14;
   repeated lindm.advisory.v1.RejectedRecord rejected_records = 15;
+  // Platform registry display name of distro/release, e.g. "Fedora 44"; empty
+  // when the release is not registered.
+  string os_name = 16;
 }
 message ListAdvisoryFeedsResponse {
   repeated AdvisoryFeedStatus feeds = 1;

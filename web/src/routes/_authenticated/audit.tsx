@@ -39,7 +39,7 @@ function AuditRouteError({ error }: ErrorComponentProps) {
         {cause instanceof Error ? cause.message : "The audit log could not be loaded."}
       </p>
       <p>
-        Resetting clears this link's filters and shows all audit events you are authorized to read.
+        Resetting clears this link's filters and shows the human actions you are authorized to read.
       </p>
       <Button className="w-fit" render={<Link to="/audit" search={{}} replace />}>
         Reset audit filters

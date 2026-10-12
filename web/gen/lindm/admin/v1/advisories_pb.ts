@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/advisories.proto.
  */
 export const file_lindm_admin_v1_advisories: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hZHZpc29yaWVzLnByb3RvEg5saW5kbS5hZG1pbi52MSKWAQoRQWR2aXNvcnlFeGNlcHRpb24SEAoIYWN0b3JfaWQYASABKAkSDgoGcmVhc29uGAIgASgJEi8KC2FjY2VwdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKCAwoPQWR2aXNvcnlGaW5kaW5nEgoKAmlkGAEgASgJEhMKC2Fkdmlzb3J5X2lkGAIgASgJEgwKBGN2ZXMYAyADKAkSFAoMcGFja2FnZV9uYW1lGAQgASgJEhkKEWluc3RhbGxlZF92ZXJzaW9uGAUgASgJEhUKDWZpeGVkX3ZlcnNpb24YBiABKAkSFAoMYXJjaGl0ZWN0dXJlGAcgASgJEhAKCHNldmVyaXR5GAggASgJEjAKDHB1Ymxpc2hlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoFc3RhdGUYCiABKA4yJC5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmdTdGF0ZRI0CglleGNlcHRpb24YCyABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbhIPCgdmZWVkX2lkGAwgASgJEhIKCnNvdXJjZV91cmwYDSABKAkSDgoGcmVhc29uGA4gASgJIocDChFBZHZpc29yeUZyZXNobmVzcxIzCgVzdGF0ZRgBIAEoDjIkLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmluZGluZ1N0YXRlEg4KBnJlYXNvbhgCIAEoCRITCgtzbmFwc2hvdF9pZBgDIAEoCRIwCgxpbnZlbnRvcnlfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjgKFGludmVudG9yeV9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIzCg9mZWVkX2NoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2ZlZWRfZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHZmVlZF9pZBgIIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAkgASgJEhoKEnVuY292ZXJlZF9wYWNrYWdlcxgKIAEoBCJzChlMaXN0RGV2aWNlRmluZGluZ3NSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJcGFnZV9zaXplGAIgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiACCKeAQoaTGlzdERldmljZUZpbmRpbmdzUmVzcG9uc2USMQoIZmluZGluZ3MYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmcSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEjQKCWZyZXNobmVzcxgDIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RnJlc2huZXNzInwKIkxpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglwYWdlX3NpemUYAiABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAIIlcKEFVuY292ZXJlZFBhY2thZ2USDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJEhQKDGFyY2hpdGVjdHVyZRgDIAEoCRIOCgZyZWFzb24YBCABKAkiqAEKI0xpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1Jlc3BvbnNlEjIKCHBhY2thZ2VzGAEgAygLMiAubGluZG0uYWRtaW4udjEuVW5jb3ZlcmVkUGFja2FnZRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkSNAoJZnJlc2huZXNzGAMgASgLMiEubGluZG0uYWRtaW4udjEuQWR2aXNvcnlGcmVzaG5lc3MiVwoaTGlzdEFkdmlzb3J5U3VtbWFyeVJlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiACCKTAQoPQWR2aXNvcnlTdW1tYXJ5EhMKC2Fkdmlzb3J5X2lkGAEgASgJEhAKCHNldmVyaXR5GAIgASgJEhgKEGFmZmVjdGVkX2RldmljZXMYAyABKAQSGAoQYWNjZXB0ZWRfZGV2aWNlcxgEIAEoBBIXCg91bmtub3duX2RldmljZXMYBSABKAQSDAoEY3ZlcxgGIAMoCSK4AQobTGlzdEFkdmlzb3J5U3VtbWFyeVJlc3BvbnNlEjMKCmFkdmlzb3JpZXMYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhcKD3Vua25vd25fZGV2aWNlcxgDIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgEIAEoBBIXCg9wYXJ0aWFsX2RldmljZXMYBSABKAQiGgoYTGlzdEFkdmlzb3J5RmVlZHNSZXF1ZXN0Iu8DChJBZHZpc29yeUZlZWRTdGF0dXMSCgoCaWQYASABKAkSDgoGZGlzdHJvGAIgASgJEg8KB3JlbGVhc2UYAyABKAkSEgoKc291cmNlX3VybBgEIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAUgASgJEi4KCmNoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCmV4cGlyZXNfYXQYByABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDGF0dGVtcHRlZF9hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDQoFZXJyb3IYCSABKAkSDQoFZnJlc2gYCiABKAgSFgoOYWR2aXNvcnlfY291bnQYCyABKAQSFwoPcGxhdGZvcm1fc3RyZWFtGAwgASgJEjIKCWFydGlmYWN0cxgNIAMoCzIfLmxpbmRtLmFkdmlzb3J5LnYxLkZlZWRBcnRpZmFjdBIvCgtzbmFwc2hvdF9hdBgOIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOwoQcmVqZWN0ZWRfcmVjb3JkcxgPIAMoCzIhLmxpbmRtLmFkdmlzb3J5LnYxLlJlamVjdGVkUmVjb3JkIk4KGUxpc3RBZHZpc29yeUZlZWRzUmVzcG9uc2USMQoFZmVlZHMYASADKAsyIi5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZlZWRTdGF0dXMi7AEKHEFjY2VwdEFkdmlzb3J5RmluZGluZ1JlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIcCgpmaW5kaW5nX2lkGAMgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARI2CgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEiAKC2FwcHJvdmFsX2lkGAYgASgJQgu6SAjYAQFyA7ABASJVCh1BY2NlcHRBZHZpc29yeUZpbmRpbmdSZXNwb25zZRI0CglleGNlcHRpb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbiryAQoUQWR2aXNvcnlGaW5kaW5nU3RhdGUSJgoiQURWSVNPUllfRklORElOR19TVEFURV9VTlNQRUNJRklFRBAAEiMKH0FEVklTT1JZX0ZJTkRJTkdfU1RBVEVfQUZGRUNURUQQARIjCh9BRFZJU09SWV9GSU5ESU5HX1NUQVRFX0FDQ0VQVEVEEAISIgoeQURWSVNPUllfRklORElOR19TVEFURV9VTktOT1dOEAMSIAocQURWSVNPUllfRklORElOR19TVEFURV9DTEVBUhAEEiIKHkFEVklTT1JZX0ZJTkRJTkdfU1RBVEVfUEFSVElBTBAFQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_advisory_v1_feed, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hZHZpc29yaWVzLnByb3RvEg5saW5kbS5hZG1pbi52MSKWAQoRQWR2aXNvcnlFeGNlcHRpb24SEAoIYWN0b3JfaWQYASABKAkSDgoGcmVhc29uGAIgASgJEi8KC2FjY2VwdGVkX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCKCAwoPQWR2aXNvcnlGaW5kaW5nEgoKAmlkGAEgASgJEhMKC2Fkdmlzb3J5X2lkGAIgASgJEgwKBGN2ZXMYAyADKAkSFAoMcGFja2FnZV9uYW1lGAQgASgJEhkKEWluc3RhbGxlZF92ZXJzaW9uGAUgASgJEhUKDWZpeGVkX3ZlcnNpb24YBiABKAkSFAoMYXJjaGl0ZWN0dXJlGAcgASgJEhAKCHNldmVyaXR5GAggASgJEjAKDHB1Ymxpc2hlZF9hdBgJIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMwoFc3RhdGUYCiABKA4yJC5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmdTdGF0ZRI0CglleGNlcHRpb24YCyABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbhIPCgdmZWVkX2lkGAwgASgJEhIKCnNvdXJjZV91cmwYDSABKAkSDgoGcmVhc29uGA4gASgJIocDChFBZHZpc29yeUZyZXNobmVzcxIzCgVzdGF0ZRgBIAEoDjIkLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RmluZGluZ1N0YXRlEg4KBnJlYXNvbhgCIAEoCRITCgtzbmFwc2hvdF9pZBgDIAEoCRIwCgxpbnZlbnRvcnlfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjgKFGludmVudG9yeV9leHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIzCg9mZWVkX2NoZWNrZWRfYXQYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjMKD2ZlZWRfZXhwaXJlc19hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASDwoHZmVlZF9pZBgIIAEoCRIVCg1zb3VyY2Vfc2hhMjU2GAkgASgJEhoKEnVuY292ZXJlZF9wYWNrYWdlcxgKIAEoBCJzChlMaXN0RGV2aWNlRmluZGluZ3NSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJcGFnZV9zaXplGAIgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiACCKeAQoaTGlzdERldmljZUZpbmRpbmdzUmVzcG9uc2USMQoIZmluZGluZ3MYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZpbmRpbmcSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEjQKCWZyZXNobmVzcxgDIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5RnJlc2huZXNzInwKIkxpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIbCglwYWdlX3NpemUYAiABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAIIlcKEFVuY292ZXJlZFBhY2thZ2USDAoEbmFtZRgBIAEoCRIPCgd2ZXJzaW9uGAIgASgJEhQKDGFyY2hpdGVjdHVyZRgDIAEoCRIOCgZyZWFzb24YBCABKAkiqAEKI0xpc3REZXZpY2VVbmNvdmVyZWRQYWNrYWdlc1Jlc3BvbnNlEjIKCHBhY2thZ2VzGAEgAygLMiAubGluZG0uYWRtaW4udjEuVW5jb3ZlcmVkUGFja2FnZRIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkSNAoJZnJlc2huZXNzGAMgASgLMiEubGluZG0uYWRtaW4udjEuQWR2aXNvcnlGcmVzaG5lc3MiVwoaTGlzdEFkdmlzb3J5U3VtbWFyeVJlcXVlc3QSGwoJcGFnZV9zaXplGAEgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAIgASgJQgi6SAVyAxiACCKTAQoPQWR2aXNvcnlTdW1tYXJ5EhMKC2Fkdmlzb3J5X2lkGAEgASgJEhAKCHNldmVyaXR5GAIgASgJEhgKEGFmZmVjdGVkX2RldmljZXMYAyABKAQSGAoQYWNjZXB0ZWRfZGV2aWNlcxgEIAEoBBIXCg91bmtub3duX2RldmljZXMYBSABKAQSDAoEY3ZlcxgGIAMoCSKxAQoWQWR2aXNvcnlVbmNoZWNrZWRHcm91cBJBCgZyZWFzb24YASABKA4yJy5saW5kbS5hZG1pbi52MS5BZHZpc29yeVVuY2hlY2tlZFJlYXNvbkIIukgFggECEAESDwoHZmVlZF9pZBgCIAEoCRINCgVvc19pZBgDIAEoCRISCgpvc192ZXJzaW9uGAQgASgJEg8KB29zX25hbWUYBSABKAkSDwoHZGV2aWNlcxgGIAEoBCKEAgobTGlzdEFkdmlzb3J5U3VtbWFyeVJlc3BvbnNlEjMKCmFkdmlzb3JpZXMYASADKAsyHy5saW5kbS5hZG1pbi52MS5BZHZpc29yeVN1bW1hcnkSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhcKD3Vua25vd25fZGV2aWNlcxgDIAEoBBIZChFldmFsdWF0ZWRfZGV2aWNlcxgEIAEoBBIXCg9wYXJ0aWFsX2RldmljZXMYBSABKAQSSgoQdW5jaGVja2VkX2dyb3VwcxgGIAMoCzImLmxpbmRtLmFkbWluLnYxLkFkdmlzb3J5VW5jaGVja2VkR3JvdXBCCLpIBZIBAhAUIhoKGExpc3RBZHZpc29yeUZlZWRzUmVxdWVzdCKABAoSQWR2aXNvcnlGZWVkU3RhdHVzEgoKAmlkGAEgASgJEg4KBmRpc3RybxgCIAEoCRIPCgdyZWxlYXNlGAMgASgJEhIKCnNvdXJjZV91cmwYBCABKAkSFQoNc291cmNlX3NoYTI1NhgFIAEoCRIuCgpjaGVja2VkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxhdHRlbXB0ZWRfYXQYCCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWVycm9yGAkgASgJEg0KBWZyZXNoGAogASgIEhYKDmFkdmlzb3J5X2NvdW50GAsgASgEEhcKD3BsYXRmb3JtX3N0cmVhbRgMIAEoCRIyCglhcnRpZmFjdHMYDSADKAsyHy5saW5kbS5hZHZpc29yeS52MS5GZWVkQXJ0aWZhY3QSLwoLc25hcHNob3RfYXQYDiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjsKEHJlamVjdGVkX3JlY29yZHMYDyADKAsyIS5saW5kbS5hZHZpc29yeS52MS5SZWplY3RlZFJlY29yZBIPCgdvc19uYW1lGBAgASgJIk4KGUxpc3RBZHZpc29yeUZlZWRzUmVzcG9uc2USMQoFZmVlZHMYASADKAsyIi5saW5kbS5hZG1pbi52MS5BZHZpc29yeUZlZWRTdGF0dXMi7AEKHEFjY2VwdEFkdmlzb3J5RmluZGluZ1JlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIcCgpmaW5kaW5nX2lkGAMgASgJQgi6SAVyA7ABARIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARI2CgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEiAKC2FwcHJvdmFsX2lkGAYgASgJQgu6SAjYAQFyA7ABASJVCh1BY2NlcHRBZHZpc29yeUZpbmRpbmdSZXNwb25zZRI0CglleGNlcHRpb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5BZHZpc29yeUV4Y2VwdGlvbiryAQoUQWR2aXNvcnlGaW5kaW5nU3RhdGUSJgoiQURWSVNPUllfRklORElOR19TVEFURV9VTlNQRUNJRklFRBAAEiMKH0FEVklTT1JZX0ZJTkRJTkdfU1RBVEVfQUZGRUNURUQQARIjCh9BRFZJU09SWV9GSU5ESU5HX1NUQVRFX0FDQ0VQVEVEEAISIgoeQURWSVNPUllfRklORElOR19TVEFURV9VTktOT1dOEAMSIAocQURWSVNPUllfRklORElOR19TVEFURV9DTEVBUhAEEiIKHkFEVklTT1JZX0ZJTkRJTkdfU1RBVEVfUEFSVElBTBAFKvwJChdBZHZpc29yeVVuY2hlY2tlZFJlYXNvbhIpCiVBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1VOU1BFQ0lGSUVEEAASMAosQURWSVNPUllfVU5DSEVDS0VEX1JFQVNPTl9FVkFMVUFUSU9OX1BFTkRJTkcQARIzCi9BRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX0lOVkVOVE9SWV9VTkFWQUlMQUJMRRACEi0KKUFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fSU5WRU5UT1JZX1NUQUxFEAMSPAo4QURWSVNPUllfVU5DSEVDS0VEX1JFQVNPTl9IT1NUX0lOVkVOVE9SWV9TVEFMRV9PUl9GQUlMRUQQBBI3CjNBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1BBQ0tBR0VfQ09MTEVDVElPTl9GQUlMRUQQBRIuCipBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX0ZFRURfVU5BVkFJTEFCTEUQBhI+CjpBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1JIRUxfUExBVEZPUk1fU1RSRUFNX1VOQVZBSUxBQkxFEAcSKAokQURWSVNPUllfVU5DSEVDS0VEX1JFQVNPTl9GRUVEX1NUQUxFEAgSMwovQURWSVNPUllfVU5DSEVDS0VEX1JFQVNPTl9GRUVEX1BBUlRJQUxfQ09WRVJBR0UQCRI9CjlBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1NPVVJDRV9QQUNLQUdFX0lERU5USVRZX01JU1NJTkcQChI8CjhBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1BBQ0tBR0VfQVJDSElURUNUVVJFX1VOQ09WRVJFRBALEjgKNEFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fUEFDS0FHRV9PUklHSU5fVU5BVkFJTEFCTEUQDBI6CjZBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX1BBQ0tBR0VfVkVSU0lPTl9VTlJFQ09HTklaRUQQDRJACjxBRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX05BVElWRV9NT0RVTEVfSURFTlRJVFlfVU5BVkFJTEFCTEUQDhJCCj5BRFZJU09SWV9VTkNIRUNLRURfUkVBU09OX05BVElWRV9QQUNLQUdFX0lOU1RBTkNFU19VTkFWQUlMQUJMRRAPEkIKPkFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fTkFUSVZFX1BST0RVQ1RfUFJFRElDQVRFX1VOU0FUSVNGSUVEEBASNQoxQURWSVNPUllfVU5DSEVDS0VEX1JFQVNPTl9BRFZJU09SWV9SRUNPUkRfSU5WQUxJRBAREjQKMEFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fU09VUkNFX1JFQ09SRF9SRUpFQ1RFRBASEjcKM0FEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fVkVORE9SX0FTU0VTU01FTlRfVU5LTk9XThATEj0KOUFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fVkVORE9SX01PRFVMRV9CSU5ESU5HX0FNQklHVU9VUxAUEjgKNEFEVklTT1JZX1VOQ0hFQ0tFRF9SRUFTT05fTUFUQ0hJTkdfQ0FQQUNJVFlfRVhDRUVERUQQFUIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_advisory_v1_feed, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AdvisoryException
@@ -404,6 +404,57 @@ export const AdvisorySummarySchema: GenMessage<AdvisorySummary> = /*@__PURE__*/
   messageDesc(file_lindm_admin_v1_advisories, 9);
 
 /**
+ * Active devices counted in unknown_devices that share one reason, OS release
+ * and selected source, using the device findings read-path precedence.
+ *
+ * @generated from message lindm.admin.v1.AdvisoryUncheckedGroup
+ */
+export type AdvisoryUncheckedGroup = Message<"lindm.admin.v1.AdvisoryUncheckedGroup"> & {
+  /**
+   * @generated from field: lindm.admin.v1.AdvisoryUncheckedReason reason = 1;
+   */
+  reason: AdvisoryUncheckedReason;
+
+  /**
+   * Selected source; empty when none applies or the device is not evaluated.
+   *
+   * @generated from field: string feed_id = 2;
+   */
+  feedId: string;
+
+  /**
+   * Device os-release identity; empty values mean not yet known.
+   *
+   * @generated from field: string os_id = 3;
+   */
+  osId: string;
+
+  /**
+   * @generated from field: string os_version = 4;
+   */
+  osVersion: string;
+
+  /**
+   * Platform registry display name, e.g. "Fedora 44"; empty when unregistered.
+   *
+   * @generated from field: string os_name = 5;
+   */
+  osName: string;
+
+  /**
+   * @generated from field: uint64 devices = 6;
+   */
+  devices: bigint;
+};
+
+/**
+ * Describes the message lindm.admin.v1.AdvisoryUncheckedGroup.
+ * Use `create(AdvisoryUncheckedGroupSchema)` to create a new message.
+ */
+export const AdvisoryUncheckedGroupSchema: GenMessage<AdvisoryUncheckedGroup> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_advisories, 10);
+
+/**
  * @generated from message lindm.admin.v1.ListAdvisorySummaryResponse
  */
 export type ListAdvisorySummaryResponse = Message<"lindm.admin.v1.ListAdvisorySummaryResponse"> & {
@@ -433,6 +484,14 @@ export type ListAdvisorySummaryResponse = Message<"lindm.admin.v1.ListAdvisorySu
    * @generated from field: uint64 partial_devices = 5;
    */
   partialDevices: bigint;
+
+  /**
+   * The twenty largest groups, ordered by device count descending. Counts are
+   * exact; unknown_devices minus their sum is in groups not listed.
+   *
+   * @generated from field: repeated lindm.admin.v1.AdvisoryUncheckedGroup unchecked_groups = 6;
+   */
+  uncheckedGroups: AdvisoryUncheckedGroup[];
 };
 
 /**
@@ -440,7 +499,7 @@ export type ListAdvisorySummaryResponse = Message<"lindm.admin.v1.ListAdvisorySu
  * Use `create(ListAdvisorySummaryResponseSchema)` to create a new message.
  */
 export const ListAdvisorySummaryResponseSchema: GenMessage<ListAdvisorySummaryResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 10);
+  messageDesc(file_lindm_admin_v1_advisories, 11);
 
 /**
  * @generated from message lindm.admin.v1.ListAdvisoryFeedsRequest
@@ -453,7 +512,7 @@ export type ListAdvisoryFeedsRequest = Message<"lindm.admin.v1.ListAdvisoryFeeds
  * Use `create(ListAdvisoryFeedsRequestSchema)` to create a new message.
  */
 export const ListAdvisoryFeedsRequestSchema: GenMessage<ListAdvisoryFeedsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 11);
+  messageDesc(file_lindm_admin_v1_advisories, 12);
 
 /**
  * @generated from message lindm.admin.v1.AdvisoryFeedStatus
@@ -533,6 +592,14 @@ export type AdvisoryFeedStatus = Message<"lindm.admin.v1.AdvisoryFeedStatus"> & 
    * @generated from field: repeated lindm.advisory.v1.RejectedRecord rejected_records = 15;
    */
   rejectedRecords: RejectedRecord[];
+
+  /**
+   * Platform registry display name of distro/release, e.g. "Fedora 44"; empty
+   * when the release is not registered.
+   *
+   * @generated from field: string os_name = 16;
+   */
+  osName: string;
 };
 
 /**
@@ -540,7 +607,7 @@ export type AdvisoryFeedStatus = Message<"lindm.admin.v1.AdvisoryFeedStatus"> & 
  * Use `create(AdvisoryFeedStatusSchema)` to create a new message.
  */
 export const AdvisoryFeedStatusSchema: GenMessage<AdvisoryFeedStatus> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 12);
+  messageDesc(file_lindm_admin_v1_advisories, 13);
 
 /**
  * @generated from message lindm.admin.v1.ListAdvisoryFeedsResponse
@@ -557,7 +624,7 @@ export type ListAdvisoryFeedsResponse = Message<"lindm.admin.v1.ListAdvisoryFeed
  * Use `create(ListAdvisoryFeedsResponseSchema)` to create a new message.
  */
 export const ListAdvisoryFeedsResponseSchema: GenMessage<ListAdvisoryFeedsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 13);
+  messageDesc(file_lindm_admin_v1_advisories, 14);
 
 /**
  * @generated from message lindm.admin.v1.AcceptAdvisoryFindingRequest
@@ -599,7 +666,7 @@ export type AcceptAdvisoryFindingRequest = Message<"lindm.admin.v1.AcceptAdvisor
  * Use `create(AcceptAdvisoryFindingRequestSchema)` to create a new message.
  */
 export const AcceptAdvisoryFindingRequestSchema: GenMessage<AcceptAdvisoryFindingRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 14);
+  messageDesc(file_lindm_admin_v1_advisories, 15);
 
 /**
  * @generated from message lindm.admin.v1.AcceptAdvisoryFindingResponse
@@ -616,7 +683,7 @@ export type AcceptAdvisoryFindingResponse = Message<"lindm.admin.v1.AcceptAdviso
  * Use `create(AcceptAdvisoryFindingResponseSchema)` to create a new message.
  */
 export const AcceptAdvisoryFindingResponseSchema: GenMessage<AcceptAdvisoryFindingResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_advisories, 15);
+  messageDesc(file_lindm_admin_v1_advisories, 16);
 
 /**
  * UNKNOWN means the inventory, source coverage or advisory feed cannot establish
@@ -663,4 +730,135 @@ export enum AdvisoryFindingState {
  */
 export const AdvisoryFindingStateSchema: GenEnum<AdvisoryFindingState> = /*@__PURE__*/
   enumDesc(file_lindm_admin_v1_advisories, 0);
+
+/**
+ * Why an active device's current exposure is unknown. Each value names the
+ * stable AdvisoryFreshness.reason code of the same spelling; UNSPECIFIED is a
+ * reason this API version does not name.
+ *
+ * @generated from enum lindm.admin.v1.AdvisoryUncheckedReason
+ */
+export enum AdvisoryUncheckedReason {
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Not yet evaluated against its current inventory and source generation.
+   *
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING = 1;
+   */
+  EVALUATION_PENDING = 1,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE = 2;
+   */
+  INVENTORY_UNAVAILABLE = 2,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_INVENTORY_STALE = 3;
+   */
+  INVENTORY_STALE = 3,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED = 4;
+   */
+  HOST_INVENTORY_STALE_OR_FAILED = 4,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED = 5;
+   */
+  PACKAGE_COLLECTION_FAILED = 5,
+
+  /**
+   * No enabled source applies to the device's OS release and architecture.
+   *
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE = 6;
+   */
+  FEED_UNAVAILABLE = 6,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE = 7;
+   */
+  RHEL_PLATFORM_STREAM_UNAVAILABLE = 7,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_FEED_STALE = 8;
+   */
+  FEED_STALE = 8,
+
+  /**
+   * The selected source is not a complete snapshot of the release's advisories.
+   *
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE = 9;
+   */
+  FEED_PARTIAL_COVERAGE = 9,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING = 10;
+   */
+  SOURCE_PACKAGE_IDENTITY_MISSING = 10,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED = 11;
+   */
+  PACKAGE_ARCHITECTURE_UNCOVERED = 11,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE = 12;
+   */
+  PACKAGE_ORIGIN_UNAVAILABLE = 12,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED = 13;
+   */
+  PACKAGE_VERSION_UNRECOGNIZED = 13,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE = 14;
+   */
+  NATIVE_MODULE_IDENTITY_UNAVAILABLE = 14,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE = 15;
+   */
+  NATIVE_PACKAGE_INSTANCES_UNAVAILABLE = 15,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED = 16;
+   */
+  NATIVE_PRODUCT_PREDICATE_UNSATISFIED = 16,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID = 17;
+   */
+  ADVISORY_RECORD_INVALID = 17,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED = 18;
+   */
+  SOURCE_RECORD_REJECTED = 18,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN = 19;
+   */
+  VENDOR_ASSESSMENT_UNKNOWN = 19,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS = 20;
+   */
+  VENDOR_MODULE_BINDING_AMBIGUOUS = 20,
+
+  /**
+   * @generated from enum value: ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED = 21;
+   */
+  MATCHING_CAPACITY_EXCEEDED = 21,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.AdvisoryUncheckedReason.
+ */
+export const AdvisoryUncheckedReasonSchema: GenEnum<AdvisoryUncheckedReason> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_advisories, 1);
 

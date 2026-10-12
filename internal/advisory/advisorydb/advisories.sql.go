@@ -972,6 +972,81 @@ func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySumma
 	return items, nil
 }
 
+const listAdvisoryUncheckedGroups = `-- name: ListAdvisoryUncheckedGroups :many
+WITH unchecked AS (
+ SELECT d.os_id,d.os_version,coalesce(e.feed_id,'') AS feed_id,
+  CASE
+   WHEN e.device_id IS NULL THEN 'evaluation_pending'
+   WHEN e.feed_id<>'' AND (af.id IS NULL OR NOT af.enabled OR af.revision IS DISTINCT FROM e.feed_revision) THEN 'evaluation_pending'
+   WHEN e.feed_id<>'' AND NOT coalesce(af.expires_at>CURRENT_TIMESTAMP,false) THEN 'feed_stale'
+   WHEN e.snapshot_id IS DISTINCT FROM g.current_snapshot_id OR e.host_received_at IS DISTINCT FROM d.host_received_at THEN 'evaluation_pending'
+   WHEN pa.status IS DISTINCT FROM 1 THEN 'package_collection_failed'
+   WHEN e.expires_at<=CURRENT_TIMESTAMP THEN 'inventory_stale'
+   WHEN e.state='unknown' AND e.reason<>'' THEN e.reason
+   WHEN e.feed_id='' THEN 'feed_unavailable'
+   ELSE 'evaluation_pending'
+  END AS reason
+ FROM devices d
+ LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+ LEFT JOIN package_attempts pa ON pa.generation_id=g.id
+ LEFT JOIN advisory_evaluations e ON e.device_id=d.id
+ LEFT JOIN advisory_feeds af ON af.id=e.feed_id
+ WHERE d.state='active' AND device_scope_matches(d.id,$1::boolean,$2::jsonb)
+  AND NOT coalesce(e.state IN ('evaluated','partial') AND e.expires_at>CURRENT_TIMESTAMP
+   AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
+   AND e.host_received_at=d.host_received_at AND pa.status=1
+   AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP,false)
+)
+SELECT reason::text AS reason,feed_id::text AS feed_id,os_id,os_version,count(*)::bigint AS devices
+FROM unchecked
+GROUP BY reason,feed_id,os_id,os_version
+ORDER BY devices DESC,reason,feed_id,os_id,os_version
+LIMIT 20
+`
+
+type ListAdvisoryUncheckedGroupsParams struct {
+	ScopeUnrestricted bool
+	Scopes            []byte
+}
+
+type ListAdvisoryUncheckedGroupsRow struct {
+	Reason    string
+	FeedID    string
+	OsID      string
+	OsVersion string
+	Devices   int64
+}
+
+// The unknown complement of CountAdvisoryDevices in the same population, each
+// device labelled with the reason Service.freshness reports for it (its later
+// checks override earlier ones, so they come first here). Bounded output,
+// exact group counts; the caller derives the unlisted remainder.
+func (q *Queries) ListAdvisoryUncheckedGroups(ctx context.Context, arg ListAdvisoryUncheckedGroupsParams) ([]ListAdvisoryUncheckedGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryUncheckedGroups, arg.ScopeUnrestricted, arg.Scopes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdvisoryUncheckedGroupsRow{}
+	for rows.Next() {
+		var i ListAdvisoryUncheckedGroupsRow
+		if err := rows.Scan(
+			&i.Reason,
+			&i.FeedID,
+			&i.OsID,
+			&i.OsVersion,
+			&i.Devices,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAdvisoryUncoveredPackages = `-- name: ListAdvisoryUncoveredPackages :many
 SELECT p.position,p.name,p.version,p.architecture,r.reason::text AS reason
 FROM snapshot_packages p

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -517,6 +518,71 @@ func TestAdvisoryUnscopedRejectionAndManifestCapacity(t *testing.T) {
 	}
 	if before.Revision != after.Revision || !bytes.Equal(before.SourceManifest, after.SourceManifest) || before.ExpiresAt != after.ExpiresAt {
 		t.Fatal("oversized manifest replaced or renewed the last valid publication")
+	}
+}
+
+// The fleet's grouped unchecked causes are exactly the reasons the device
+// findings view reports for each unknown device, over the same population.
+func TestAdvisoryUncheckedGroupsMatchDeviceFreshness(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "ubuntu", "24.04", "ubuntu-USN-6859-1.json")
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	ubuntu := &inventoryv1.Package{Name: "openssh-server", Version: "1:9.6p1-3ubuntu13.3", Manager: "dpkg", Architecture: "amd64", SourceName: "openssh", SourceVersion: "1:9.6p1-3ubuntu13.3"}
+	debian := &inventoryv1.Package{Name: "openssh-server", Version: "1:9.2p1-2+deb12u3", Manager: "dpkg", Architecture: "amd64", SourceName: "openssh", SourceVersion: "1:9.2p1-2+deb12u3"}
+	type device struct {
+		id              uuid.UUID
+		osID, osVersion string
+		wantReason      string
+	}
+	devices := []device{
+		{seedInventory(t, pool, "ubuntu", "24.04", ubuntu), "ubuntu", "24.04", "feed_partial_coverage"},
+		{seedInventory(t, pool, "ubuntu", "24.04", ubuntu), "ubuntu", "24.04", "feed_partial_coverage"},
+		{seedInventory(t, pool, "ubuntu", "24.04", ubuntu), "ubuntu", "24.04", "inventory_stale"},
+		{seedInventory(t, pool, "debian", "12", debian), "debian", "12", "feed_unavailable"},
+	}
+	if err := drainEvaluations(t.Context(), s); err != nil {
+		t.Fatal(err)
+	}
+	// One evaluation outlived its inventory; one device was never evaluated.
+	mustExec(t, t.Context(), pool, "UPDATE advisory_evaluations SET expires_at=now()-interval '1 second' WHERE device_id=$1", devices[2].id)
+	devices = append(devices, device{seedInventory(t, pool, "ubuntu", "24.04", ubuntu), "ubuntu", "24.04", evaluationPending})
+	want := make(map[string]uint64)
+	for _, d := range devices {
+		out, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: d.id.String()}, true, []byte("[]"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != d.wantReason {
+			t.Fatalf("fixture device %s/%s did not reach %s: %v", d.osID, d.osVersion, d.wantReason, out.GetFreshness())
+		}
+		want[d.wantReason+"/"+out.GetFreshness().GetFeedId()+"/"+d.osID+"/"+d.osVersion]++
+	}
+	summary, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, true, []byte("[]"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := make(map[string]uint64)
+	total := uint64(0)
+	for _, group := range summary.GetUncheckedGroups() {
+		reason := strings.ToLower(strings.TrimPrefix(group.GetReason().String(), "ADVISORY_UNCHECKED_REASON_"))
+		got[reason+"/"+group.GetFeedId()+"/"+group.GetOsId()+"/"+group.GetOsVersion()] += group.GetDevices()
+		total += group.GetDevices()
+		if wantName := map[string]string{"ubuntu": "Ubuntu 24.04 LTS", "debian": "Debian 12"}[group.GetOsId()]; group.GetOsName() != wantName {
+			t.Fatalf("group OS name %q, want %q", group.GetOsName(), wantName)
+		}
+	}
+	if !maps.Equal(got, want) || total != summary.GetUnknownDevices() || total != uint64(len(devices)) {
+		t.Fatalf("unchecked groups %v (total %d of %d unknown) differ from device freshness %v", got, total, summary.GetUnknownDevices(), want)
+	}
+	hidden, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, false, []byte("[]"))
+	if err != nil || len(hidden.GetUncheckedGroups()) != 0 {
+		t.Fatalf("unchecked groups leaked out-of-scope devices: %v %v", hidden, err)
+	}
+	status, err := s.Feeds(t.Context())
+	if err != nil || len(status.GetFeeds()) != 1 || status.Feeds[0].GetOsName() != "Ubuntu 24.04 LTS" {
+		t.Fatalf("feed OS name: %v %v", status, err)
 	}
 }
 

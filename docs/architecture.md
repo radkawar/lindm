@@ -470,7 +470,11 @@ action authority over the target. Service accounts and the requester cannot supp
 the second person. Consumption rechecks both principals, versions, scope, payload and
 expiry in the action transaction and is one-use. A changed target or restored grant
 does not revive an old approval. The inbox retains the exact request for review and
-execution; rejection, expiry and consumption remain distinct states.
+execution; rejection, expiry and consumption remain distinct states. It lists open
+(pending or approved, unexpired) requests first, nearest expiry first, then closed
+ones newest first, keyset-paged on that order with the approval ID as tie-break.
+The console shows a requester's own pending request with Approve disabled and the
+reason, since the server refuses any decision by the requester.
 
 The existing worker boundary is `identity.Service.AuthorizeFresh`, followed by
 `LockAuthorization(ctx, tx, authorization, requiredPermission)` in the mutation
@@ -1924,9 +1928,13 @@ SHA-256 over feed, advisory, package, installed version and architecture —
 within the device's context. Risk acceptances are per-device overlays keyed by
 (device, finding key). Fleet summaries and the advisory summary weight set
 rollups by bound fresh/stale device counts and subtract each device's active
-exceptions, so they never scan per-device findings. Findings reports page by
-(device, finding). Unbound sets are pruned after 15 minutes, at most 20 per
-minute; a binding that races a prune fails its foreign-key check and retries.
+exceptions, so they never scan per-device findings. The advisory summary also
+groups its unknown devices by the reason the device findings read would report
+(same precedence), OS release and selected source: the 20 largest groups with
+exact counts, so the console names each cause and its remedy without per-device
+reads. Findings reports page by (device, finding). Unbound sets are pruned
+after 15 minutes, at most 20 per minute; a binding that races a prune fails its
+foreign-key check and retries.
 Migration `00019` converts existing exceptions to finding keys from their
 materialized findings, removes (with an audit event) exceptions whose finding
 no longer exists, drops per-device findings and evaluations, and lets the

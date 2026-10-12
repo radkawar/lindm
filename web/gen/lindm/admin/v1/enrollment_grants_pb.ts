@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/enrollment_grants.proto.
  */
 export const file_lindm_admin_v1_enrollment_grants: GenFile = /*@__PURE__*/
-  fileDesc("CiZsaW5kbS9hZG1pbi92MS9lbnJvbGxtZW50X2dyYW50cy5wcm90bxIObGluZG0uYWRtaW4udjEingMKD0Vucm9sbG1lbnRHcmFudBIQCghncmFudF9pZBgBIAEoCRI1CgZzdGF0dXMYAiABKA4yJS5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50R3JhbnRTdGF0dXMSEAoIbWF4X3VzZXMYAyABKA0SEgoKdXNlZF9jb3VudBgEIAEoDRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjcmVhdGVkX2J5GAcgASgJEhwKFGNyZWF0b3JfZGlzcGxheV9uYW1lGAggASgJEhoKEmNvbnN1bWVkX2RldmljZV9pZBgJIAEoCRIgChhjb25zdW1lZF9kZXZpY2VfaG9zdG5hbWUYCiABKAkSDgoGbGFiZWxzGAsgAygJEgwKBG5hbWUYDCABKAkSLgoKcmV2b2tlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiWAobTGlzdEVucm9sbG1lbnRHcmFudHNSZXF1ZXN0EhsKCXBhZ2Vfc2l6ZRgBIAEoDUIIukgFKgMYyAESHAoKcGFnZV90b2tlbhgCIAEoCUIIukgFcgMYgAQiaAocTGlzdEVucm9sbG1lbnRHcmFudHNSZXNwb25zZRIvCgZncmFudHMYASADKAsyHy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50R3JhbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJKtQBChVFbnJvbGxtZW50R3JhbnRTdGF0dXMSJwojRU5ST0xMTUVOVF9HUkFOVF9TVEFUVVNfVU5TUEVDSUZJRUQQABIiCh5FTlJPTExNRU5UX0dSQU5UX1NUQVRVU19BQ1RJVkUQARIkCiBFTlJPTExNRU5UX0dSQU5UX1NUQVRVU19DT05TVU1FRBACEiMKH0VOUk9MTE1FTlRfR1JBTlRfU1RBVFVTX0VYUElSRUQQAxIjCh9FTlJPTExNRU5UX0dSQU5UX1NUQVRVU19SRVZPS0VEEARCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp]);
+  fileDesc("CiZsaW5kbS9hZG1pbi92MS9lbnJvbGxtZW50X2dyYW50cy5wcm90bxIObGluZG0uYWRtaW4udjEingMKD0Vucm9sbG1lbnRHcmFudBIQCghncmFudF9pZBgBIAEoCRI1CgZzdGF0dXMYAiABKA4yJS5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50R3JhbnRTdGF0dXMSEAoIbWF4X3VzZXMYAyABKA0SEgoKdXNlZF9jb3VudBgEIAEoDRIuCgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBISCgpjcmVhdGVkX2J5GAcgASgJEhwKFGNyZWF0b3JfZGlzcGxheV9uYW1lGAggASgJEhoKEmNvbnN1bWVkX2RldmljZV9pZBgJIAEoCRIgChhjb25zdW1lZF9kZXZpY2VfaG9zdG5hbWUYCiABKAkSDgoGbGFiZWxzGAsgAygJEgwKBG5hbWUYDCABKAkSLgoKcmV2b2tlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAilQEKG0xpc3RFbnJvbGxtZW50R3JhbnRzUmVxdWVzdBIbCglwYWdlX3NpemUYASABKA1CCLpIBSoDGMgBEhwKCnBhZ2VfdG9rZW4YAiABKAlCCLpIBXIDGIAEEjsKBHZpZXcYAyABKA4yIy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50R3JhbnRWaWV3Qgi6SAWCAQIQASKWAQocTGlzdEVucm9sbG1lbnRHcmFudHNSZXNwb25zZRIvCgZncmFudHMYASADKAsyHy5saW5kbS5hZG1pbi52MS5FbnJvbGxtZW50R3JhbnQSFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhQKDGFjdGl2ZV9jb3VudBgDIAEoDRIWCg5pbmFjdGl2ZV9jb3VudBgEIAEoDSrUAQoVRW5yb2xsbWVudEdyYW50U3RhdHVzEicKI0VOUk9MTE1FTlRfR1JBTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASIgoeRU5ST0xMTUVOVF9HUkFOVF9TVEFUVVNfQUNUSVZFEAESJAogRU5ST0xMTUVOVF9HUkFOVF9TVEFUVVNfQ09OU1VNRUQQAhIjCh9FTlJPTExNRU5UX0dSQU5UX1NUQVRVU19FWFBJUkVEEAMSIwofRU5ST0xMTUVOVF9HUkFOVF9TVEFUVVNfUkVWT0tFRBAEKoIBChNFbnJvbGxtZW50R3JhbnRWaWV3EiUKIUVOUk9MTE1FTlRfR1JBTlRfVklFV19VTlNQRUNJRklFRBAAEiAKHEVOUk9MTE1FTlRfR1JBTlRfVklFV19BQ1RJVkUQARIiCh5FTlJPTExNRU5UX0dSQU5UX1ZJRVdfSU5BQ1RJVkUQAkIiWiBsaW5kbS9nZW4vbGluZG0vYWRtaW4vdjE7YWRtaW52MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * Public administrative metadata only; bearer credentials and their hashes are never listed.
@@ -111,6 +111,11 @@ export type ListEnrollmentGrantsRequest = Message<"lindm.admin.v1.ListEnrollment
    * @generated from field: string page_token = 2;
    */
   pageToken: string;
+
+  /**
+   * @generated from field: lindm.admin.v1.EnrollmentGrantView view = 3;
+   */
+  view: EnrollmentGrantView;
 };
 
 /**
@@ -133,6 +138,18 @@ export type ListEnrollmentGrantsResponse = Message<"lindm.admin.v1.ListEnrollmen
    * @generated from field: string next_page_token = 2;
    */
   nextPageToken: string;
+
+  /**
+   * Whole-history counts at the same instant as the page, independent of view and cursor.
+   *
+   * @generated from field: uint32 active_count = 3;
+   */
+  activeCount: number;
+
+  /**
+   * @generated from field: uint32 inactive_count = 4;
+   */
+  inactiveCount: number;
 };
 
 /**
@@ -177,4 +194,34 @@ export enum EnrollmentGrantStatus {
  */
 export const EnrollmentGrantStatusSchema: GenEnum<EnrollmentGrantStatus> = /*@__PURE__*/
   enumDesc(file_lindm_admin_v1_enrollment_grants, 0);
+
+/**
+ * Active means unused, unexpired and not revoked; inactive is every other grant.
+ *
+ * @generated from enum lindm.admin.v1.EnrollmentGrantView
+ */
+export enum EnrollmentGrantView {
+  /**
+   * Lists every grant.
+   *
+   * @generated from enum value: ENROLLMENT_GRANT_VIEW_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ENROLLMENT_GRANT_VIEW_ACTIVE = 1;
+   */
+  ACTIVE = 1,
+
+  /**
+   * @generated from enum value: ENROLLMENT_GRANT_VIEW_INACTIVE = 2;
+   */
+  INACTIVE = 2,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.EnrollmentGrantView.
+ */
+export const EnrollmentGrantViewSchema: GenEnum<EnrollmentGrantView> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_enrollment_grants, 1);
 

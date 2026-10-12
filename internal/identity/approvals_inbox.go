@@ -3,11 +3,14 @@ package identity
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -27,25 +30,62 @@ func approvalScopesJSON(scopes []*authv1.DeviceScope) ([]byte, error) {
 	return json.Marshal(documents)
 }
 
+// approvalOpen matches ListVisibleApprovals' ordering predicate: an open request
+// still awaits a decision or its requester's run, and has not expired.
+func approvalOpen(row *identitydb.ApprovalRequest, now time.Time) bool {
+	return (row.State == "pending" || row.State == "approved") && now.Before(row.ExpiresAt.Time)
+}
+
+// An inbox page token is the keyset position of a page's last row: one
+// open/closed byte, the ordering time (expiry when open, creation when closed)
+// in Unix microseconds, then the approval ID.
+const (
+	approvalPageTokenSize = 1 + 8 + 16
+	// 10000-01-01T00:00:00Z: no real approval time reaches it; tampered tokens stop here.
+	approvalPageTimeLimit = 253402300800 * 1_000_000
+)
+
+func approvalPageToken(row *identitydb.ApprovalRequest, now time.Time) string {
+	var raw [approvalPageTokenSize]byte
+	at := row.ExpiresAt.Time
+	if !approvalOpen(row, now) {
+		raw[0] = 1
+		at = row.CreatedAt.Time
+	}
+	binary.BigEndian.PutUint64(raw[1:9], uint64(at.UnixMicro()))
+	copy(raw[9:], row.ID[:])
+	return base64.RawURLEncoding.EncodeToString(raw[:])
+}
+
+func parseApprovalPageToken(token string, params *identitydb.ListVisibleApprovalsParams) error {
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil || len(raw) != approvalPageTokenSize || raw[0] > 1 {
+		return ErrApprovalInvalid
+	}
+	micros := int64(binary.BigEndian.Uint64(raw[1:9]))
+	if micros < 0 || micros >= approvalPageTimeLimit {
+		return ErrApprovalInvalid
+	}
+	id, err := uuid.FromBytes(raw[9:])
+	if err != nil {
+		return ErrApprovalInvalid
+	}
+	params.FirstPage = false
+	params.AfterClosed = raw[0] == 1
+	params.AfterAt = pgtype.Timestamptz{Time: time.UnixMicro(micros).UTC(), Valid: true}
+	params.AfterID = id
+	return nil
+}
+
 // ListApprovals applies action and inbox-management scopes in SQL before keyset
 // pagination. Hidden requests cannot affect page sizes, tokens or audit contents.
+// Open requests come first, nearest expiry first; closed ones follow, newest first.
 func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *adminv1.ListApprovalsRequest) ([]*adminv1.Approval, string, error) {
 	if s == nil || request == nil {
 		return nil, "", ErrApprovalInvalid
 	}
 	if err := s.rules.Validate(request); err != nil {
 		return nil, "", ErrApprovalInvalid
-	}
-	after := uuid.Nil
-	if request.GetPageToken() != "" {
-		raw, err := base64.RawURLEncoding.DecodeString(request.GetPageToken())
-		if err != nil {
-			return nil, "", ErrApprovalInvalid
-		}
-		after, err = uuid.FromBytes(raw)
-		if err != nil {
-			return nil, "", ErrApprovalInvalid
-		}
 	}
 	limit := int(request.GetPageSize())
 	if limit == 0 {
@@ -55,7 +95,16 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	if err != nil {
 		return nil, "", err
 	}
-	visibility.AfterID = after
+	// One instant orders the page, encodes its token and labels expiry, at the
+	// microsecond precision PostgreSQL stores.
+	now := s.clock().Truncate(time.Microsecond)
+	visibility.FirstPage = true
+	if request.GetPageToken() != "" {
+		if err := parseApprovalPageToken(request.GetPageToken(), &visibility); err != nil {
+			return nil, "", err
+		}
+	}
+	visibility.AsOf = pgtype.Timestamptz{Time: now, Valid: true}
 	visibility.RowLimit = int32(limit + 1)
 	var rows []identitydb.ListVisibleApprovalsRow
 	err = s.approvalTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
@@ -76,13 +125,12 @@ func (s *Service) ListApprovals(ctx context.Context, actor uuid.UUID, request *a
 	}
 	next := ""
 	if len(rows) > limit {
-		last := rows[limit-1].ApprovalRequest.ID
-		next = base64.RawURLEncoding.EncodeToString(last[:])
+		next = approvalPageToken(&rows[limit-1].ApprovalRequest, now)
 		rows = rows[:limit]
 	}
 	out := make([]*adminv1.Approval, 0, len(rows))
 	for i := range rows {
-		item, err := approvalMessage((*approvalProjection)(&rows[i]), s.clock())
+		item, err := approvalMessage((*approvalProjection)(&rows[i]), now)
 		if err != nil {
 			return nil, "", err
 		}

@@ -6,6 +6,11 @@ import { parseListSearch, type ListSearch } from "@/lib/list-search";
 import { AuditActionCategory, AuditFilterSchema } from "../../../gen/lindm/audit/v1/filter_pb";
 
 export const AUDIT_VIEWS = [
+  {
+    value: "human",
+    label: "Human actions",
+    category: AuditActionCategory.HUMAN_ACTIONS,
+  },
   { value: "all", label: "All actions", category: AuditActionCategory.UNSPECIFIED },
   {
     value: "recovery-key-reveals",
@@ -23,6 +28,9 @@ export const AUDIT_VIEWS = [
     category: AuditActionCategory.REMOTE_SESSIONS,
   },
 ] as const;
+
+/** Opening the log shows decisions people made, not read-only or system churn. */
+export const DEFAULT_AUDIT_VIEW: AuditSearch["view"] = "human";
 
 export type AuditSearch = ListSearch & {
   view: (typeof AUDIT_VIEWS)[number]["value"];
@@ -52,7 +60,7 @@ function calendarDate(value: unknown): string {
 }
 
 export function parseAuditSearch(search: Partial<AuditSearch> & SearchSchemaInput): AuditSearch {
-  const view = search.view ?? "all";
+  const view = search.view ?? DEFAULT_AUDIT_VIEW;
   if (!AUDIT_VIEWS.some((item) => item.value === view))
     throw new Error("Choose a known audit view.");
   const from = calendarDate(search.from);

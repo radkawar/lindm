@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"lindm/internal/device/inventory"
@@ -15,6 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
 )
@@ -151,15 +153,75 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 	}
 	response.RecentActions = make([]*adminv1.FleetRecentAction, 0, len(actions))
 	for _, row := range actions {
+		outcome, err := recentActionOutcome(row)
+		if err != nil {
+			return nil, err
+		}
 		response.RecentActions = append(response.RecentActions, &adminv1.FleetRecentAction{
 			ActionId: row.ID.String(), DeviceId: row.DeviceID.String(), Capability: row.Capability,
 			CreatedAt: core.ProtoTime(row.IssuedAt), ExpiresAt: core.ProtoTime(row.ExpiresAt),
 			StartAuthorizedAt: core.ProtoTime(row.StartAuthorizedAt), ClosedAt: core.ProtoTime(row.ClosedAt),
 			ClosedReason: row.ClosedReason, OutcomeUnknown: row.OutcomeUnknown,
-			Kind: row.Kind, ResourceId: row.ResourceID, Unit: row.Unit,
+			Kind: row.Kind, ResourceId: row.ResourceID, Unit: row.Unit, Outcome: outcome,
 		})
 	}
 	return response, nil
+}
+
+// recentActionOutcome reports success or failure only from the device's own
+// status document; server closures without a conclusive report are never
+// presented as success.
+func recentActionOutcome(row devicedb.FleetSummaryRecentActionsRow) (adminv1.FleetActionOutcome, error) {
+	reported := len(row.StatusDocument) > 0
+	if reported && row.Kind == "resource" {
+		status := new(agentv1.ResourceExecutionStatus)
+		if err := proto.Unmarshal(row.StatusDocument, status); err != nil {
+			return 0, core.ErrInternalState
+		}
+		switch status.GetState() {
+		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_SUCCEEDED, nil
+		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_FAILED, nil
+		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
+		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_EXPIRED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_EXPIRED, nil
+		case agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUPERSEDED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_CANCELLED, nil
+		}
+	} else if reported {
+		status := new(agentv1.DeviceActionStatus)
+		if err := proto.Unmarshal(row.StatusDocument, status); err != nil {
+			return 0, core.ErrInternalState
+		}
+		switch status.GetState() {
+		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_SUCCEEDED, nil
+		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_FAILED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_FAILED, nil
+		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
+		case agentv1.DeviceActionState_DEVICE_ACTION_STATE_EXPIRED:
+			return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_EXPIRED, nil
+		}
+	}
+	closed := row.ClosedAt.Valid
+	switch {
+	case closed && strings.HasPrefix(row.ClosedReason, "expired") && !row.StartAuthorizedAt.Valid && !reported:
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_EXPIRED, nil
+	case closed && (row.OutcomeUnknown || row.StartAuthorizedAt.Valid || reported):
+		// Closed after the device may have acted, without a conclusive report.
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
+	case closed:
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_CANCELLED, nil
+	case row.Kind == "device" && row.OutcomeUnknown:
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
+	case row.StartAuthorizedAt.Valid || reported:
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING, nil
+	default:
+		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_WAITING, nil
+	}
 }
 
 // maxRecentActions is the request validation bound; the population keeps that

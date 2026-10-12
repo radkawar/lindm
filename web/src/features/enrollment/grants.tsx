@@ -1,10 +1,12 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   EnrollmentGrantStatus,
+  EnrollmentGrantView,
   type EnrollmentGrant,
+  type ListEnrollmentGrantsResponse,
 } from "../../../gen/lindm/admin/v1/enrollment_grants_pb";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,18 +40,87 @@ const grantStatusLabels: Record<EnrollmentGrantStatus, string> = {
 
 export function EnrollmentGrants() {
   const lifetime = useAuthLifetime();
-  const [pageToken, setPageToken] = useState("");
-  const list = useQuery(enrollmentGrantsQueryOptions(lifetime, pageToken));
+  const client = useQueryClient();
+  const historyId = useId();
+  const [activePage, setActivePage] = useState("");
+  const [historyPage, setHistoryPage] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const active = useQuery(
+    enrollmentGrantsQueryOptions(lifetime, EnrollmentGrantView.ACTIVE, activePage),
+  );
+  const history = useQuery({
+    ...enrollmentGrantsQueryOptions(lifetime, EnrollmentGrantView.INACTIVE, historyPage),
+    enabled: showHistory,
+  });
+  const historyCount = active.data?.inactiveCount;
   return (
     <section className="grid gap-4" aria-label="One-time enrollment grants">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          One-time codes you created, including used and expired ones.
-        </p>
-        <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
+        <p className="text-sm text-muted-foreground">Codes that can still enroll a device.</p>
+        <Button
+          variant="outline"
+          disabled={active.isFetching || history.isFetching}
+          onClick={() =>
+            void client.invalidateQueries({ queryKey: ["enrollment-grants", lifetime.generation] })
+          }
+        >
           Refresh
         </Button>
       </div>
+      <GrantList
+        list={active}
+        pageToken={activePage}
+        onPage={setActivePage}
+        empty={
+          <EmptyState
+            title="No active one-time codes"
+            description="Use Create one-time code above to make one."
+          />
+        }
+      />
+      {historyCount !== undefined && (historyCount > 0 || showHistory) ? (
+        <Button
+          variant="ghost"
+          className="w-fit"
+          aria-expanded={showHistory}
+          aria-controls={historyId}
+          onClick={() => setShowHistory((shown) => !shown)}
+        >
+          {`${showHistory ? "Hide" : "Show"} used and expired (${historyCount})`}
+        </Button>
+      ) : null}
+      <section
+        id={historyId}
+        aria-label="Used and expired codes"
+        className="grid gap-4"
+        hidden={!showHistory}
+      >
+        {showHistory ? (
+          <GrantList
+            list={history}
+            pageToken={historyPage}
+            onPage={setHistoryPage}
+            empty={<EmptyState title="No used, expired or revoked codes" />}
+          />
+        ) : null}
+      </section>
+    </section>
+  );
+}
+
+function GrantList({
+  list,
+  pageToken,
+  onPage,
+  empty,
+}: {
+  list: UseQueryResult<ListEnrollmentGrantsResponse>;
+  pageToken: string;
+  onPage: (pageToken: string) => void;
+  empty: ReactNode;
+}) {
+  return (
+    <>
       {list.isPending ? (
         <div role="status" className="grid gap-3">
           <span className="text-sm text-muted-foreground">Loading codes…</span>
@@ -57,32 +128,29 @@ export function EnrollmentGrants() {
         </div>
       ) : null}
       {list.error ? <RpcError failure={toRpcFailure(list.error)} /> : null}
-      {!list.error && list.data?.grants.length === 0 ? (
-        <EmptyState
-          title="No one-time codes yet"
-          description="Use Enroll one device now above to create one."
-        />
-      ) : null}
+      {!list.error && list.data?.grants.length === 0 ? empty : null}
       {!list.error
         ? list.data?.grants.map((grant) => <GrantRow key={grant.grantId} grant={grant} />)
         : null}
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          disabled={!pageToken || list.isFetching}
-          onClick={() => setPageToken("")}
-        >
-          First page
-        </Button>
-        <Button
-          variant="outline"
-          disabled={!list.data?.nextPageToken || list.isFetching}
-          onClick={() => setPageToken(list.data?.nextPageToken ?? "")}
-        >
-          Next page
-        </Button>
-      </div>
-    </section>
+      {pageToken || list.data?.nextPageToken ? (
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            disabled={!pageToken || list.isFetching}
+            onClick={() => onPage("")}
+          >
+            First page
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!list.data?.nextPageToken || list.isFetching}
+            onClick={() => onPage(list.data?.nextPageToken ?? "")}
+          >
+            Next page
+          </Button>
+        </div>
+      ) : null}
+    </>
   );
 }
 

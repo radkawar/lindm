@@ -34,11 +34,22 @@ message EnrollmentGrant {
   google.protobuf.Timestamp revoked_at = 13;
 }
 
+// Active means unused, unexpired and not revoked; inactive is every other grant.
+enum EnrollmentGrantView {
+  // Lists every grant.
+  ENROLLMENT_GRANT_VIEW_UNSPECIFIED = 0;
+  ENROLLMENT_GRANT_VIEW_ACTIVE = 1;
+  ENROLLMENT_GRANT_VIEW_INACTIVE = 2;
+}
 message ListEnrollmentGrantsRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
+  EnrollmentGrantView view = 3 [(buf.validate.field).enum.defined_only = true];
 }
 message ListEnrollmentGrantsResponse {
   repeated EnrollmentGrant grants = 1;
   string next_page_token = 2;
+  // Whole-history counts at the same instant as the page, independent of view and cursor.
+  uint32 active_count = 3;
+  uint32 inactive_count = 4;
 }

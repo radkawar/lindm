@@ -102,10 +102,12 @@ WHERE d.state = 'active'
 -- name: FleetSummaryRecentActions :many
 -- Scope filtering precedes both branch limits and the final mixed-action limit.
 -- Project only bounded metadata, never action documents, attestations or secrets.
+-- status_document is read only so the server can derive the outcome word; it is
+-- never returned to clients.
 WITH recent_device AS (
  SELECT a.id, a.device_id, a.capability, a.issued_at, a.expires_at,
   a.start_authorized_at, a.closed_at, a.closed_reason, a.outcome_unknown,
-  'device'::text AS kind, ''::text AS resource_id, ''::text AS unit
+  'device'::text AS kind, ''::text AS resource_id, ''::text AS unit, a.status_document
  FROM device_actions a
  WHERE device_scope_matches(a.device_id, sqlc.arg('scope_unrestricted')::boolean, sqlc.arg('scopes')::jsonb)
  ORDER BY a.issued_at DESC, a.id DESC LIMIT sqlc.arg('row_limit')
@@ -113,7 +115,8 @@ WITH recent_device AS (
  SELECT a.id, a.device_id, ''::text AS capability, a.issued_at, a.expires_at,
   a.start_authorized_at, a.closed_at, a.closed_reason,
   (a.start_authorized_at IS NOT NULL AND a.closed_at IS NULL)::boolean AS outcome_unknown,
-  'resource'::text AS kind, a.resource_id::text AS resource_id, r.canonical_key AS unit
+  'resource'::text AS kind, a.resource_id::text AS resource_id, r.canonical_key AS unit,
+  a.status_document
  FROM resource_actions a
  JOIN resource_assignment_resources r ON r.assignment_id = a.assignment_id AND r.resource_id = a.resource_id
  WHERE device_scope_matches(a.device_id, sqlc.arg('scope_unrestricted')::boolean, sqlc.arg('scopes')::jsonb)

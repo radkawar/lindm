@@ -23,6 +23,74 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type FleetActionOutcome int32
+
+const (
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_UNSPECIFIED FleetActionOutcome = 0
+	// Issued; no device report yet and not closed.
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_WAITING FleetActionOutcome = 1
+	// Device reported it queued or is running the action.
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING   FleetActionOutcome = 2
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_SUCCEEDED FleetActionOutcome = 3
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_FAILED    FleetActionOutcome = 4
+	// Started but no conclusive result, or the device reported an unknown outcome.
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN FleetActionOutcome = 5
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_EXPIRED FleetActionOutcome = 6
+	// Closed by the server before any conclusive device result (cancelled, superseded).
+	FleetActionOutcome_FLEET_ACTION_OUTCOME_CANCELLED FleetActionOutcome = 7
+)
+
+// Enum value maps for FleetActionOutcome.
+var (
+	FleetActionOutcome_name = map[int32]string{
+		0: "FLEET_ACTION_OUTCOME_UNSPECIFIED",
+		1: "FLEET_ACTION_OUTCOME_WAITING",
+		2: "FLEET_ACTION_OUTCOME_RUNNING",
+		3: "FLEET_ACTION_OUTCOME_SUCCEEDED",
+		4: "FLEET_ACTION_OUTCOME_FAILED",
+		5: "FLEET_ACTION_OUTCOME_UNKNOWN",
+		6: "FLEET_ACTION_OUTCOME_EXPIRED",
+		7: "FLEET_ACTION_OUTCOME_CANCELLED",
+	}
+	FleetActionOutcome_value = map[string]int32{
+		"FLEET_ACTION_OUTCOME_UNSPECIFIED": 0,
+		"FLEET_ACTION_OUTCOME_WAITING":     1,
+		"FLEET_ACTION_OUTCOME_RUNNING":     2,
+		"FLEET_ACTION_OUTCOME_SUCCEEDED":   3,
+		"FLEET_ACTION_OUTCOME_FAILED":      4,
+		"FLEET_ACTION_OUTCOME_UNKNOWN":     5,
+		"FLEET_ACTION_OUTCOME_EXPIRED":     6,
+		"FLEET_ACTION_OUTCOME_CANCELLED":   7,
+	}
+)
+
+func (x FleetActionOutcome) Enum() *FleetActionOutcome {
+	p := new(FleetActionOutcome)
+	*p = x
+	return p
+}
+
+func (x FleetActionOutcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (FleetActionOutcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_fleet_summary_proto_enumTypes[0].Descriptor()
+}
+
+func (FleetActionOutcome) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_fleet_summary_proto_enumTypes[0]
+}
+
+func (x FleetActionOutcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use FleetActionOutcome.Descriptor instead.
+func (FleetActionOutcome) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP(), []int{0}
+}
+
 type GetFleetSummaryRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Zero selects ten. The newest authorized actions are returned, not a sample
@@ -704,8 +772,11 @@ type FleetRecentAction struct {
 	// "device" for imperative actions; "resource" for resource actions.
 	Kind string `protobuf:"bytes,10,opt,name=kind,proto3" json:"kind,omitempty"`
 	// Present only for resource actions.
-	ResourceId    string `protobuf:"bytes,11,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	Unit          string `protobuf:"bytes,12,opt,name=unit,proto3" json:"unit,omitempty"`
+	ResourceId string `protobuf:"bytes,11,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Unit       string `protobuf:"bytes,12,opt,name=unit,proto3" json:"unit,omitempty"`
+	// Server-derived from the latest device-reported status and the closure.
+	// SUCCEEDED only when the device's status document reports success.
+	Outcome       FleetActionOutcome `protobuf:"varint,13,opt,name=outcome,proto3,enum=lindm.admin.v1.FleetActionOutcome" json:"outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -822,6 +893,13 @@ func (x *FleetRecentAction) GetUnit() string {
 		return x.Unit
 	}
 	return ""
+}
+
+func (x *FleetRecentAction) GetOutcome() FleetActionOutcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return FleetActionOutcome_FLEET_ACTION_OUTCOME_UNSPECIFIED
 }
 
 type GetFleetSummaryResponse struct {
@@ -993,7 +1071,7 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\x0funknown_devices\x18\x05 \x01(\x04R\x0eunknownDevices\x128\n" +
 	"\x18pending_security_updates\x18\x06 \x01(\x04R\x16pendingSecurityUpdates\x12,\n" +
 	"\x12failed_run_devices\x18\a \x01(\x04R\x10failedRunDevices\x12.\n" +
-	"\x13stale_after_seconds\x18\b \x01(\rR\x11staleAfterSeconds\"\xff\x03\n" +
+	"\x13stale_after_seconds\x18\b \x01(\rR\x11staleAfterSeconds\"\xbd\x04\n" +
 	"\x11FleetRecentAction\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1e\n" +
@@ -1012,7 +1090,8 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	" \x01(\tR\x04kind\x12\x1f\n" +
 	"\vresource_id\x18\v \x01(\tR\n" +
 	"resourceId\x12\x12\n" +
-	"\x04unit\x18\f \x01(\tR\x04unit\"\xa5\x05\n" +
+	"\x04unit\x18\f \x01(\tR\x04unit\x12<\n" +
+	"\aoutcome\x18\r \x01(\x0e2\".lindm.admin.v1.FleetActionOutcomeR\aoutcome\"\xa5\x05\n" +
 	"\x17GetFleetSummaryResponse\x12;\n" +
 	"\vobserved_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"observedAt\x12C\n" +
@@ -1023,7 +1102,16 @@ const file_lindm_admin_v1_fleet_summary_proto_rawDesc = "" +
 	"\bfindings\x18\x06 \x01(\v2#.lindm.admin.v1.FleetFindingSummaryR\bfindings\x12B\n" +
 	"\tapprovals\x18\a \x01(\v2$.lindm.admin.v1.FleetApprovalSummaryR\tapprovals\x12H\n" +
 	"\x0erecent_actions\x18\b \x03(\v2!.lindm.admin.v1.FleetRecentActionR\rrecentActions\x12L\n" +
-	"\x10patch_compliance\x18\t \x01(\v2!.lindm.admin.v1.FleetPatchSummaryR\x0fpatchComplianceB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x10patch_compliance\x18\t \x01(\v2!.lindm.admin.v1.FleetPatchSummaryR\x0fpatchCompliance*\xab\x02\n" +
+	"\x12FleetActionOutcome\x12$\n" +
+	" FLEET_ACTION_OUTCOME_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cFLEET_ACTION_OUTCOME_WAITING\x10\x01\x12 \n" +
+	"\x1cFLEET_ACTION_OUTCOME_RUNNING\x10\x02\x12\"\n" +
+	"\x1eFLEET_ACTION_OUTCOME_SUCCEEDED\x10\x03\x12\x1f\n" +
+	"\x1bFLEET_ACTION_OUTCOME_FAILED\x10\x04\x12 \n" +
+	"\x1cFLEET_ACTION_OUTCOME_UNKNOWN\x10\x05\x12 \n" +
+	"\x1cFLEET_ACTION_OUTCOME_EXPIRED\x10\x06\x12\"\n" +
+	"\x1eFLEET_ACTION_OUTCOME_CANCELLED\x10\aB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_fleet_summary_proto_rawDescOnce sync.Once
@@ -1037,41 +1125,44 @@ func file_lindm_admin_v1_fleet_summary_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_fleet_summary_proto_rawDescData
 }
 
+var file_lindm_admin_v1_fleet_summary_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_lindm_admin_v1_fleet_summary_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_lindm_admin_v1_fleet_summary_proto_goTypes = []any{
-	(*GetFleetSummaryRequest)(nil),         // 0: lindm.admin.v1.GetFleetSummaryRequest
-	(*FleetLifecycleSummary)(nil),          // 1: lindm.admin.v1.FleetLifecycleSummary
-	(*FleetContactSummary)(nil),            // 2: lindm.admin.v1.FleetContactSummary
-	(*FleetOSCount)(nil),                   // 3: lindm.admin.v1.FleetOSCount
-	(*FleetOSSummary)(nil),                 // 4: lindm.admin.v1.FleetOSSummary
-	(*FleetResourceComplianceSummary)(nil), // 5: lindm.admin.v1.FleetResourceComplianceSummary
-	(*FleetFindingSummary)(nil),            // 6: lindm.admin.v1.FleetFindingSummary
-	(*FleetApprovalSummary)(nil),           // 7: lindm.admin.v1.FleetApprovalSummary
-	(*FleetPatchSummary)(nil),              // 8: lindm.admin.v1.FleetPatchSummary
-	(*FleetRecentAction)(nil),              // 9: lindm.admin.v1.FleetRecentAction
-	(*GetFleetSummaryResponse)(nil),        // 10: lindm.admin.v1.GetFleetSummaryResponse
-	(*timestamppb.Timestamp)(nil),          // 11: google.protobuf.Timestamp
+	(FleetActionOutcome)(0),                // 0: lindm.admin.v1.FleetActionOutcome
+	(*GetFleetSummaryRequest)(nil),         // 1: lindm.admin.v1.GetFleetSummaryRequest
+	(*FleetLifecycleSummary)(nil),          // 2: lindm.admin.v1.FleetLifecycleSummary
+	(*FleetContactSummary)(nil),            // 3: lindm.admin.v1.FleetContactSummary
+	(*FleetOSCount)(nil),                   // 4: lindm.admin.v1.FleetOSCount
+	(*FleetOSSummary)(nil),                 // 5: lindm.admin.v1.FleetOSSummary
+	(*FleetResourceComplianceSummary)(nil), // 6: lindm.admin.v1.FleetResourceComplianceSummary
+	(*FleetFindingSummary)(nil),            // 7: lindm.admin.v1.FleetFindingSummary
+	(*FleetApprovalSummary)(nil),           // 8: lindm.admin.v1.FleetApprovalSummary
+	(*FleetPatchSummary)(nil),              // 9: lindm.admin.v1.FleetPatchSummary
+	(*FleetRecentAction)(nil),              // 10: lindm.admin.v1.FleetRecentAction
+	(*GetFleetSummaryResponse)(nil),        // 11: lindm.admin.v1.GetFleetSummaryResponse
+	(*timestamppb.Timestamp)(nil),          // 12: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_fleet_summary_proto_depIdxs = []int32{
-	3,  // 0: lindm.admin.v1.FleetOSSummary.groups:type_name -> lindm.admin.v1.FleetOSCount
-	11, // 1: lindm.admin.v1.FleetRecentAction.created_at:type_name -> google.protobuf.Timestamp
-	11, // 2: lindm.admin.v1.FleetRecentAction.expires_at:type_name -> google.protobuf.Timestamp
-	11, // 3: lindm.admin.v1.FleetRecentAction.start_authorized_at:type_name -> google.protobuf.Timestamp
-	11, // 4: lindm.admin.v1.FleetRecentAction.closed_at:type_name -> google.protobuf.Timestamp
-	11, // 5: lindm.admin.v1.GetFleetSummaryResponse.observed_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: lindm.admin.v1.GetFleetSummaryResponse.lifecycle:type_name -> lindm.admin.v1.FleetLifecycleSummary
-	2,  // 7: lindm.admin.v1.GetFleetSummaryResponse.contact:type_name -> lindm.admin.v1.FleetContactSummary
-	4,  // 8: lindm.admin.v1.GetFleetSummaryResponse.operating_systems:type_name -> lindm.admin.v1.FleetOSSummary
-	5,  // 9: lindm.admin.v1.GetFleetSummaryResponse.resource_compliance:type_name -> lindm.admin.v1.FleetResourceComplianceSummary
-	6,  // 10: lindm.admin.v1.GetFleetSummaryResponse.findings:type_name -> lindm.admin.v1.FleetFindingSummary
-	7,  // 11: lindm.admin.v1.GetFleetSummaryResponse.approvals:type_name -> lindm.admin.v1.FleetApprovalSummary
-	9,  // 12: lindm.admin.v1.GetFleetSummaryResponse.recent_actions:type_name -> lindm.admin.v1.FleetRecentAction
-	8,  // 13: lindm.admin.v1.GetFleetSummaryResponse.patch_compliance:type_name -> lindm.admin.v1.FleetPatchSummary
-	14, // [14:14] is the sub-list for method output_type
-	14, // [14:14] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	4,  // 0: lindm.admin.v1.FleetOSSummary.groups:type_name -> lindm.admin.v1.FleetOSCount
+	12, // 1: lindm.admin.v1.FleetRecentAction.created_at:type_name -> google.protobuf.Timestamp
+	12, // 2: lindm.admin.v1.FleetRecentAction.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 3: lindm.admin.v1.FleetRecentAction.start_authorized_at:type_name -> google.protobuf.Timestamp
+	12, // 4: lindm.admin.v1.FleetRecentAction.closed_at:type_name -> google.protobuf.Timestamp
+	0,  // 5: lindm.admin.v1.FleetRecentAction.outcome:type_name -> lindm.admin.v1.FleetActionOutcome
+	12, // 6: lindm.admin.v1.GetFleetSummaryResponse.observed_at:type_name -> google.protobuf.Timestamp
+	2,  // 7: lindm.admin.v1.GetFleetSummaryResponse.lifecycle:type_name -> lindm.admin.v1.FleetLifecycleSummary
+	3,  // 8: lindm.admin.v1.GetFleetSummaryResponse.contact:type_name -> lindm.admin.v1.FleetContactSummary
+	5,  // 9: lindm.admin.v1.GetFleetSummaryResponse.operating_systems:type_name -> lindm.admin.v1.FleetOSSummary
+	6,  // 10: lindm.admin.v1.GetFleetSummaryResponse.resource_compliance:type_name -> lindm.admin.v1.FleetResourceComplianceSummary
+	7,  // 11: lindm.admin.v1.GetFleetSummaryResponse.findings:type_name -> lindm.admin.v1.FleetFindingSummary
+	8,  // 12: lindm.admin.v1.GetFleetSummaryResponse.approvals:type_name -> lindm.admin.v1.FleetApprovalSummary
+	10, // 13: lindm.admin.v1.GetFleetSummaryResponse.recent_actions:type_name -> lindm.admin.v1.FleetRecentAction
+	9,  // 14: lindm.admin.v1.GetFleetSummaryResponse.patch_compliance:type_name -> lindm.admin.v1.FleetPatchSummary
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_fleet_summary_proto_init() }
@@ -1084,13 +1175,14 @@ func file_lindm_admin_v1_fleet_summary_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_fleet_summary_proto_rawDesc), len(file_lindm_admin_v1_fleet_summary_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_lindm_admin_v1_fleet_summary_proto_goTypes,
 		DependencyIndexes: file_lindm_admin_v1_fleet_summary_proto_depIdxs,
+		EnumInfos:         file_lindm_admin_v1_fleet_summary_proto_enumTypes,
 		MessageInfos:      file_lindm_admin_v1_fleet_summary_proto_msgTypes,
 	}.Build()
 	File_lindm_admin_v1_fleet_summary_proto = out.File

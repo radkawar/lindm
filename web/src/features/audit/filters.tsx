@@ -3,7 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PickerSlot } from "@/components/ui/search-picker";
-import { AUDIT_VIEWS, auditRangeLabel, lastCalendarWeek, type AuditSearch } from "./search";
+import {
+  AUDIT_VIEWS,
+  DEFAULT_AUDIT_VIEW,
+  auditRangeLabel,
+  lastCalendarWeek,
+  type AuditSearch,
+} from "./search";
 
 export function AuditFilters({
   search,
@@ -41,7 +47,9 @@ export function AuditFilters({
             onChange={(actorId) => onChange({ actorId })}
           />
           {!search.actorId ? (
-            <p className="text-xs text-muted-foreground">All actors, including the system</p>
+            <p className="text-xs text-muted-foreground">
+              {search.view === "human" ? "All people" : "All actors, including the system"}
+            </p>
           ) : null}
         </div>
         <div className="grid content-start gap-1">
@@ -76,7 +84,9 @@ export function AuditFilters({
       <Button
         className="w-fit"
         variant="ghost"
-        onClick={() => onChange({ view: "all", actorId: "", deviceId: "", from: "", through: "" })}
+        onClick={() =>
+          onChange({ view: DEFAULT_AUDIT_VIEW, actorId: "", deviceId: "", from: "", through: "" })
+        }
       >
         Clear filters
       </Button>

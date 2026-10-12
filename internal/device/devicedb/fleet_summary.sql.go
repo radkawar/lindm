@@ -322,7 +322,7 @@ const fleetSummaryRecentActions = `-- name: FleetSummaryRecentActions :many
 WITH recent_device AS (
  SELECT a.id, a.device_id, a.capability, a.issued_at, a.expires_at,
   a.start_authorized_at, a.closed_at, a.closed_reason, a.outcome_unknown,
-  'device'::text AS kind, ''::text AS resource_id, ''::text AS unit
+  'device'::text AS kind, ''::text AS resource_id, ''::text AS unit, a.status_document
  FROM device_actions a
  WHERE device_scope_matches(a.device_id, $2::boolean, $3::jsonb)
  ORDER BY a.issued_at DESC, a.id DESC LIMIT $1
@@ -330,17 +330,18 @@ WITH recent_device AS (
  SELECT a.id, a.device_id, ''::text AS capability, a.issued_at, a.expires_at,
   a.start_authorized_at, a.closed_at, a.closed_reason,
   (a.start_authorized_at IS NOT NULL AND a.closed_at IS NULL)::boolean AS outcome_unknown,
-  'resource'::text AS kind, a.resource_id::text AS resource_id, r.canonical_key AS unit
+  'resource'::text AS kind, a.resource_id::text AS resource_id, r.canonical_key AS unit,
+  a.status_document
  FROM resource_actions a
  JOIN resource_assignment_resources r ON r.assignment_id = a.assignment_id AND r.resource_id = a.resource_id
  WHERE device_scope_matches(a.device_id, $2::boolean, $3::jsonb)
  ORDER BY a.issued_at DESC, a.id DESC LIMIT $1
 ), recent AS (
- SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit FROM recent_device
+ SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit, status_document FROM recent_device
  UNION ALL
- SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit FROM recent_service
+ SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit, status_document FROM recent_service
 )
-SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit FROM recent ORDER BY issued_at DESC, id DESC, kind DESC LIMIT $1
+SELECT id, device_id, capability, issued_at, expires_at, start_authorized_at, closed_at, closed_reason, outcome_unknown, kind, resource_id, unit, status_document FROM recent ORDER BY issued_at DESC, id DESC, kind DESC LIMIT $1
 `
 
 type FleetSummaryRecentActionsParams struct {
@@ -362,10 +363,13 @@ type FleetSummaryRecentActionsRow struct {
 	Kind              string
 	ResourceID        string
 	Unit              string
+	StatusDocument    []byte
 }
 
 // Scope filtering precedes both branch limits and the final mixed-action limit.
 // Project only bounded metadata, never action documents, attestations or secrets.
+// status_document is read only so the server can derive the outcome word; it is
+// never returned to clients.
 func (q *Queries) FleetSummaryRecentActions(ctx context.Context, arg FleetSummaryRecentActionsParams) ([]FleetSummaryRecentActionsRow, error) {
 	rows, err := q.db.Query(ctx, fleetSummaryRecentActions, arg.RowLimit, arg.ScopeUnrestricted, arg.Scopes)
 	if err != nil {
@@ -388,6 +392,7 @@ func (q *Queries) FleetSummaryRecentActions(ctx context.Context, arg FleetSummar
 			&i.Kind,
 			&i.ResourceID,
 			&i.Unit,
+			&i.StatusDocument,
 		); err != nil {
 			return nil, err
 		}

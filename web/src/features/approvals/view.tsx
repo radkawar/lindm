@@ -3,13 +3,14 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   ApprovalSchema,
   ApprovalState,
   type Approval,
 } from "../../../gen/lindm/admin/v1/approvals_pb";
+import { CryptoEraseMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -21,13 +22,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission, permissionLabels } from "@/lib/permissions";
+import { formatBytes } from "@/lib/bytes";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { approvalsQueryOptions } from "./queries";
-import { actionLabels, DeviceActionSpecView } from "@/features/devices/action-display";
-import { RecoveryReadinessView } from "@/features/devices/recovery-readiness";
+import {
+  actionLabels,
+  deviceActionDetailItems,
+  DeviceActionSpecView,
+} from "@/features/devices/action-display";
+import {
+  recoveryReadinessDetailItems,
+  RecoveryReadinessView,
+} from "@/features/devices/recovery-readiness";
 
 const APPROVAL_STATES: Record<ApprovalState, string> = {
   [ApprovalState.UNSPECIFIED]: "Unknown",
@@ -51,6 +60,40 @@ const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> 
   revealLocalAdminPassword: "Reveal local-admin password",
   acceptAdvisoryFinding: "Accept advisory risk",
 };
+
+// One line naming what an approved destructive request irreversibly does to
+// which device; empty for requests that are not destructive.
+function destructiveConsequence(approval: Approval, hostname: string): string {
+  const payload = approval.payload;
+  if (payload.case === "revokeDevice")
+    return `Cuts ${hostname} off from management · its device certificate stops working · undoing it needs a recovery enrollment`;
+  if (payload.case !== "createDeviceAction") return "";
+  const action = payload.value.spec?.action;
+  if (action?.case === "cryptoErase") {
+    const live = action.value.mode === CryptoEraseMode.LIVE_ROOT_HEADER;
+    let targets = action.value.targets;
+    if (!live) targets = action.value.target ? [action.value.target] : [];
+    const total = formatBytes(targets.reduce((sum, target) => sum + target.sizeBytes, 0n));
+    const scope =
+      targets.length === 0
+        ? ""
+        : targets.length === 1
+          ? ` · ${total} volume`
+          : ` · ${targets.length} volumes, ${total} in total`;
+    return `Erases all data on ${hostname}${scope}${live ? " · powers it off" : ""} · cannot be undone`;
+  }
+  if (action?.case === "sanitize") {
+    const size =
+      action.value.target?.sizeBytes ?? action.value.nvmeScope?.identity?.namespaceSizeBytes;
+    const scope = action.value.nvmeScope?.controllerWide
+      ? "every namespace on the disk controller"
+      : size === undefined
+        ? "the selected disk"
+        : `${formatBytes(size)} disk`;
+    return `Erases all data on ${hostname} · ${scope} · cannot be undone`;
+  }
+  return "";
+}
 
 // Revealed bytes stay in page memory only and are zeroized on dismissal.
 type Revealed = { label: string; secret: Uint8Array; note: string };
@@ -120,13 +163,9 @@ export function ApprovalsView() {
       ) : null}
       {failure ? <RpcError failure={failure} /> : null}
       {list.data?.approvals.length === 0 ? <EmptyState title="No approvals waiting" /> : null}
-      {list.data?.approvals.map((approval) => (
-        <ApprovalCard
-          key={`${approval.id}:${approval.state}`}
-          approval={approval}
-          onReveal={setRevealed}
-        />
-      ))}
+      {list.data && list.data.approvals.length > 0 ? (
+        <ApprovalGroups approvals={list.data.approvals} onReveal={setRevealed} />
+      ) : null}
       <div className="flex flex-wrap gap-2">
         <Button
           variant="outline"
@@ -147,11 +186,71 @@ export function ApprovalsView() {
   );
 }
 
+function ApprovalGroups({
+  approvals,
+  onReveal,
+}: {
+  approvals: Approval[];
+  onReveal: (revealed: Revealed) => void;
+}) {
+  // Open requests still await a decision or their requester's run. The server
+  // reports expiry as its own state and lists open requests first.
+  const open = approvals.filter(
+    (approval) =>
+      approval.state === ApprovalState.PENDING || approval.state === ApprovalState.APPROVED,
+  );
+  const closed = approvals.filter((approval) => !open.includes(approval));
+  return (
+    <>
+      <section className="grid min-w-0 gap-4" aria-labelledby="approvals-open">
+        <h2 id="approvals-open" className="text-base font-semibold">
+          Open requests
+        </h2>
+        {open.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nothing on this page is waiting for a decision.
+          </p>
+        ) : null}
+        {open.map((approval) => (
+          <ApprovalCard
+            key={`${approval.id}:${approval.state}`}
+            approval={approval}
+            open
+            onReveal={onReveal}
+          />
+        ))}
+      </section>
+      {closed.length > 0 ? (
+        <details className="min-w-0">
+          <summary className="w-fit cursor-pointer py-1">
+            <h2 className="inline text-base font-semibold">Recent decisions</h2>{" "}
+            <span className="text-sm text-muted-foreground">
+              {closed.length === 1 ? "1 request" : `${closed.length} requests`}
+            </span>
+          </summary>
+          <div className="mt-4 grid min-w-0 gap-4">
+            {closed.map((approval) => (
+              <ApprovalCard
+                key={`${approval.id}:${approval.state}`}
+                approval={approval}
+                open={false}
+                onReveal={onReveal}
+              />
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
 function ApprovalCard({
   approval,
+  open,
   onReveal,
 }: {
   approval: Approval;
+  open: boolean;
   onReveal: (revealed: Revealed) => void;
 }) {
   const principal = usePrincipal();
@@ -208,13 +307,18 @@ function ApprovalCard({
   const advisoryReady = !advisoryRequest || (!!approval.advisoryFinding && exceptionUnexpired);
   const unexpired =
     !!approval.expiresAt && timestampDate(approval.expiresAt).getTime() > Date.now();
+  const awaitingDecision = unexpired && approval.state === ApprovalState.PENDING;
+  // The server refuses any decision by the requester; say so instead of hiding it.
+  const ownRequest = awaitingDecision && principal.id === approval.requesterId;
   const decisionAllowed =
-    unexpired &&
-    approval.state === ApprovalState.PENDING &&
+    awaitingDecision &&
+    !ownRequest &&
     !principal.serviceAccount &&
-    principal.id !== approval.requesterId &&
     canPermission(principal, "approvals.manage") &&
     canPermission(principal, approval.permission);
+  const ownRequestReasonId = useId();
+  const hostname = approval.deviceHostname.trim() || "Unnamed device";
+  const consequence = open ? destructiveConsequence(approval, hostname) : "";
   const executionAllowed =
     unexpired &&
     approval.state === ApprovalState.APPROVED &&
@@ -395,10 +499,10 @@ function ApprovalCard({
   return (
     <article className="grid min-w-0 gap-4 border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="break-words font-semibold">
+        <h3 className="break-words font-semibold">
           {effect}
-          {approval.deviceId ? ` on ${approval.deviceHostname.trim() || "Unnamed device"}` : ""}
-        </h2>
+          {approval.deviceId ? ` on ${hostname}` : ""}
+        </h3>
         <StatusBadge
           status={
             approval.state === ApprovalState.REJECTED
@@ -415,6 +519,11 @@ function ApprovalCard({
           {APPROVAL_STATES[approval.state] ?? "Unknown"}
         </StatusBadge>
       </div>
+      {consequence ? (
+        <p className="break-words text-sm font-medium text-destructive" data-slot="consequence">
+          {consequence}
+        </p>
+      ) : null}
       <dl className="grid gap-4 break-words text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
         <div>
           <dt>Target</dt>
@@ -426,7 +535,7 @@ function ApprovalCard({
                 search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
                 className="underline underline-offset-4"
               >
-                {approval.deviceHostname.trim() || "Unnamed device"}
+                {hostname}
               </Link>
             ) : approval.payload.case === "activateTargetPreview" ? (
               "Assignment rollout"
@@ -447,12 +556,12 @@ function ApprovalCard({
           <dt>Requester</dt>
           <dd>{approval.requesterDisplayName.trim() || "Unknown"}</dd>
         </div>
-        <div>
-          <dt>Decided by</dt>
-          <dd>
-            {approval.approverId ? approval.approverDisplayName.trim() || "Unknown" : "Not decided"}
-          </dd>
-        </div>
+        {approval.approverId ? (
+          <div>
+            <dt>Decided by</dt>
+            <dd>{approval.approverDisplayName.trim() || "Unknown"}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Created</dt>
           <dd>{formatTimestamp(approval.createdAt).local}</dd>
@@ -464,10 +573,12 @@ function ApprovalCard({
             {!unexpired ? " (expired)" : ""}
           </dd>
         </div>
-        <div>
-          <dt>Decision reason</dt>
-          <dd>{approval.decisionReason || "Not decided"}</dd>
-        </div>
+        {approval.decisionReason ? (
+          <div>
+            <dt>Decision reason</dt>
+            <dd className="whitespace-pre-wrap">{approval.decisionReason}</dd>
+          </div>
+        ) : null}
         {actionRequest?.reason ? (
           <div className="sm:col-span-2">
             <dt>Request reason</dt>
@@ -493,39 +604,16 @@ function ApprovalCard({
           <p>Risk acceptance expires: {formatTimestamp(approval.payload.value.expiresAt).local}</p>
         </div>
       ) : null}
-      {actionRequest ? <DeviceActionSpecView spec={actionSpec} /> : null}
+      {actionRequest ? <DeviceActionSpecView spec={actionSpec} technicalDetails={false} /> : null}
       {recovery ? (
         readiness.error ? (
           <RpcError failure={toRpcFailure(readiness.error)} />
         ) : readiness.isPending ? (
           <p role="status">Checking recovery readiness…</p>
         ) : (
-          <RecoveryReadinessView readiness={currentReadiness} />
+          <RecoveryReadinessView readiness={currentReadiness} technicalDetails={false} />
         )
       ) : null}
-      <TechnicalDetails
-        items={[
-          { label: "Approval ID", value: approval.id },
-          { label: "Device ID", value: approval.deviceId },
-          ...(approval.payload.case === "revealSecret"
-            ? [{ label: "Secret ID", value: approval.payload.value.secretId }]
-            : []),
-          { label: "Requester ID", value: approval.requesterId },
-          { label: "Approver ID", value: approval.approverId },
-          { label: "Action", value: approval.action },
-          { label: "Permission", value: approval.permission },
-          {
-            label: "Payload SHA-256",
-            value: Array.from(approval.payloadSha256, (byte) =>
-              byte.toString(16).padStart(2, "0"),
-            ).join(""),
-          },
-        ]}
-      >
-        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
-          {toJsonString(ApprovalSchema, approval, { prettySpaces: 2 })}
-        </pre>
-      </TechnicalDetails>
       {!completed && decisionAllowed ? (
         <div className="grid gap-2">
           <label className="grid gap-2 text-sm font-medium">
@@ -560,6 +648,16 @@ function ApprovalCard({
               Reject
             </Button>
           </div>
+        </div>
+      ) : null}
+      {!completed && ownRequest ? (
+        <div className="grid gap-2">
+          <Button className="w-fit" disabled aria-describedby={ownRequestReasonId}>
+            Approve
+          </Button>
+          <p id={ownRequestReasonId} className="text-sm text-muted-foreground">
+            You requested this; another admin must approve.
+          </p>
         </div>
       ) : null}
       {advisoryRequest && !exceptionUnexpired ? (
@@ -599,6 +697,31 @@ function ApprovalCard({
           ) : null}
         </RpcError>
       ) : null}
+      <TechnicalDetails
+        items={[
+          { label: "Approval ID", value: approval.id },
+          { label: "Device ID", value: approval.deviceId },
+          ...(approval.payload.case === "revealSecret"
+            ? [{ label: "Secret ID", value: approval.payload.value.secretId }]
+            : []),
+          { label: "Requester ID", value: approval.requesterId },
+          { label: "Approver ID", value: approval.approverId },
+          { label: "Action", value: approval.action },
+          { label: "Permission", value: approval.permission },
+          {
+            label: "Payload SHA-256",
+            value: Array.from(approval.payloadSha256, (byte) =>
+              byte.toString(16).padStart(2, "0"),
+            ).join(""),
+          },
+          ...deviceActionDetailItems(actionSpec),
+          ...(recovery ? recoveryReadinessDetailItems(currentReadiness) : []),
+        ]}
+      >
+        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs">
+          {toJsonString(ApprovalSchema, approval, { prettySpaces: 2 })}
+        </pre>
+      </TechnicalDetails>
     </article>
   );
 }

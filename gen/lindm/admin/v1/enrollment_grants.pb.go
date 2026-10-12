@@ -78,6 +78,57 @@ func (EnrollmentGrantStatus) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_enrollment_grants_proto_rawDescGZIP(), []int{0}
 }
 
+// Active means unused, unexpired and not revoked; inactive is every other grant.
+type EnrollmentGrantView int32
+
+const (
+	// Lists every grant.
+	EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_UNSPECIFIED EnrollmentGrantView = 0
+	EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_ACTIVE      EnrollmentGrantView = 1
+	EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_INACTIVE    EnrollmentGrantView = 2
+)
+
+// Enum value maps for EnrollmentGrantView.
+var (
+	EnrollmentGrantView_name = map[int32]string{
+		0: "ENROLLMENT_GRANT_VIEW_UNSPECIFIED",
+		1: "ENROLLMENT_GRANT_VIEW_ACTIVE",
+		2: "ENROLLMENT_GRANT_VIEW_INACTIVE",
+	}
+	EnrollmentGrantView_value = map[string]int32{
+		"ENROLLMENT_GRANT_VIEW_UNSPECIFIED": 0,
+		"ENROLLMENT_GRANT_VIEW_ACTIVE":      1,
+		"ENROLLMENT_GRANT_VIEW_INACTIVE":    2,
+	}
+)
+
+func (x EnrollmentGrantView) Enum() *EnrollmentGrantView {
+	p := new(EnrollmentGrantView)
+	*p = x
+	return p
+}
+
+func (x EnrollmentGrantView) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EnrollmentGrantView) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_enrollment_grants_proto_enumTypes[1].Descriptor()
+}
+
+func (EnrollmentGrantView) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_enrollment_grants_proto_enumTypes[1]
+}
+
+func (x EnrollmentGrantView) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EnrollmentGrantView.Descriptor instead.
+func (EnrollmentGrantView) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_grants_proto_rawDescGZIP(), []int{1}
+}
+
 // Public administrative metadata only; bearer credentials and their hashes are never listed.
 type EnrollmentGrant struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
@@ -225,6 +276,7 @@ type ListEnrollmentGrantsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	View          EnrollmentGrantView    `protobuf:"varint,3,opt,name=view,proto3,enum=lindm.admin.v1.EnrollmentGrantView" json:"view,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -273,10 +325,20 @@ func (x *ListEnrollmentGrantsRequest) GetPageToken() string {
 	return ""
 }
 
+func (x *ListEnrollmentGrantsRequest) GetView() EnrollmentGrantView {
+	if x != nil {
+		return x.View
+	}
+	return EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_UNSPECIFIED
+}
+
 type ListEnrollmentGrantsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Grants        []*EnrollmentGrant     `protobuf:"bytes,1,rep,name=grants,proto3" json:"grants,omitempty"`
 	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	// Whole-history counts at the same instant as the page, independent of view and cursor.
+	ActiveCount   uint32 `protobuf:"varint,3,opt,name=active_count,json=activeCount,proto3" json:"active_count,omitempty"`
+	InactiveCount uint32 `protobuf:"varint,4,opt,name=inactive_count,json=inactiveCount,proto3" json:"inactive_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -325,6 +387,20 @@ func (x *ListEnrollmentGrantsResponse) GetNextPageToken() string {
 	return ""
 }
 
+func (x *ListEnrollmentGrantsResponse) GetActiveCount() uint32 {
+	if x != nil {
+		return x.ActiveCount
+	}
+	return 0
+}
+
+func (x *ListEnrollmentGrantsResponse) GetInactiveCount() uint32 {
+	if x != nil {
+		return x.InactiveCount
+	}
+	return 0
+}
+
 var File_lindm_admin_v1_enrollment_grants_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_enrollment_grants_proto_rawDesc = "" +
@@ -349,20 +425,27 @@ const file_lindm_admin_v1_enrollment_grants_proto_rawDesc = "" +
 	"\x06labels\x18\v \x03(\tR\x06labels\x12\x12\n" +
 	"\x04name\x18\f \x01(\tR\x04name\x129\n" +
 	"\n" +
-	"revoked_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\"m\n" +
+	"revoked_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\"\xb0\x01\n" +
 	"\x1bListEnrollmentGrantsRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\x7f\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12A\n" +
+	"\x04view\x18\x03 \x01(\x0e2#.lindm.admin.v1.EnrollmentGrantViewB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04view\"\xc9\x01\n" +
 	"\x1cListEnrollmentGrantsResponse\x127\n" +
 	"\x06grants\x18\x01 \x03(\v2\x1f.lindm.admin.v1.EnrollmentGrantR\x06grants\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*\xd4\x01\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12!\n" +
+	"\factive_count\x18\x03 \x01(\rR\vactiveCount\x12%\n" +
+	"\x0einactive_count\x18\x04 \x01(\rR\rinactiveCount*\xd4\x01\n" +
 	"\x15EnrollmentGrantStatus\x12'\n" +
 	"#ENROLLMENT_GRANT_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eENROLLMENT_GRANT_STATUS_ACTIVE\x10\x01\x12$\n" +
 	" ENROLLMENT_GRANT_STATUS_CONSUMED\x10\x02\x12#\n" +
 	"\x1fENROLLMENT_GRANT_STATUS_EXPIRED\x10\x03\x12#\n" +
-	"\x1fENROLLMENT_GRANT_STATUS_REVOKED\x10\x04B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x1fENROLLMENT_GRANT_STATUS_REVOKED\x10\x04*\x82\x01\n" +
+	"\x13EnrollmentGrantView\x12%\n" +
+	"!ENROLLMENT_GRANT_VIEW_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cENROLLMENT_GRANT_VIEW_ACTIVE\x10\x01\x12\"\n" +
+	"\x1eENROLLMENT_GRANT_VIEW_INACTIVE\x10\x02B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_enrollment_grants_proto_rawDescOnce sync.Once
@@ -376,26 +459,28 @@ func file_lindm_admin_v1_enrollment_grants_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_enrollment_grants_proto_rawDescData
 }
 
-var file_lindm_admin_v1_enrollment_grants_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_lindm_admin_v1_enrollment_grants_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_lindm_admin_v1_enrollment_grants_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lindm_admin_v1_enrollment_grants_proto_goTypes = []any{
 	(EnrollmentGrantStatus)(0),           // 0: lindm.admin.v1.EnrollmentGrantStatus
-	(*EnrollmentGrant)(nil),              // 1: lindm.admin.v1.EnrollmentGrant
-	(*ListEnrollmentGrantsRequest)(nil),  // 2: lindm.admin.v1.ListEnrollmentGrantsRequest
-	(*ListEnrollmentGrantsResponse)(nil), // 3: lindm.admin.v1.ListEnrollmentGrantsResponse
-	(*timestamppb.Timestamp)(nil),        // 4: google.protobuf.Timestamp
+	(EnrollmentGrantView)(0),             // 1: lindm.admin.v1.EnrollmentGrantView
+	(*EnrollmentGrant)(nil),              // 2: lindm.admin.v1.EnrollmentGrant
+	(*ListEnrollmentGrantsRequest)(nil),  // 3: lindm.admin.v1.ListEnrollmentGrantsRequest
+	(*ListEnrollmentGrantsResponse)(nil), // 4: lindm.admin.v1.ListEnrollmentGrantsResponse
+	(*timestamppb.Timestamp)(nil),        // 5: google.protobuf.Timestamp
 }
 var file_lindm_admin_v1_enrollment_grants_proto_depIdxs = []int32{
 	0, // 0: lindm.admin.v1.EnrollmentGrant.status:type_name -> lindm.admin.v1.EnrollmentGrantStatus
-	4, // 1: lindm.admin.v1.EnrollmentGrant.expires_at:type_name -> google.protobuf.Timestamp
-	4, // 2: lindm.admin.v1.EnrollmentGrant.created_at:type_name -> google.protobuf.Timestamp
-	4, // 3: lindm.admin.v1.EnrollmentGrant.revoked_at:type_name -> google.protobuf.Timestamp
-	1, // 4: lindm.admin.v1.ListEnrollmentGrantsResponse.grants:type_name -> lindm.admin.v1.EnrollmentGrant
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 1: lindm.admin.v1.EnrollmentGrant.expires_at:type_name -> google.protobuf.Timestamp
+	5, // 2: lindm.admin.v1.EnrollmentGrant.created_at:type_name -> google.protobuf.Timestamp
+	5, // 3: lindm.admin.v1.EnrollmentGrant.revoked_at:type_name -> google.protobuf.Timestamp
+	1, // 4: lindm.admin.v1.ListEnrollmentGrantsRequest.view:type_name -> lindm.admin.v1.EnrollmentGrantView
+	2, // 5: lindm.admin.v1.ListEnrollmentGrantsResponse.grants:type_name -> lindm.admin.v1.EnrollmentGrant
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_enrollment_grants_proto_init() }
@@ -408,7 +493,7 @@ func file_lindm_admin_v1_enrollment_grants_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_enrollment_grants_proto_rawDesc), len(file_lindm_admin_v1_enrollment_grants_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,

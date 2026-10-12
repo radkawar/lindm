@@ -235,7 +235,7 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 		if err := proto.Unmarshal(row.SourceManifest, &manifest); err != nil {
 			return nil, err
 		}
-		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, RejectedRecords: manifest.RejectedRecords, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
+		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, OsName: registeredName(platform.ForFeed(row.Distro, row.Release)), PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, RejectedRecords: manifest.RejectedRecords, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
 	}
 	return out, nil
 }
@@ -269,6 +269,13 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 		return nil, err
 	}
 	out := &adminv1.ListAdvisorySummaryResponse{UnknownDevices: uint64(counts.Total - counts.Evaluated - counts.Partial), EvaluatedDevices: uint64(counts.Evaluated), PartialDevices: uint64(counts.Partial)}
+	groups, err := q.ListAdvisoryUncheckedGroups(ctx, advisorydb.ListAdvisoryUncheckedGroupsParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		out.UncheckedGroups = append(out.UncheckedGroups, &adminv1.AdvisoryUncheckedGroup{Reason: uncheckedReason(group.Reason), FeedId: group.FeedID, OsId: group.OsID, OsVersion: group.OsVersion, OsName: registeredName(platform.Identify(platform.OSRelease{ID: group.OsID, VersionID: group.OsVersion})), Devices: uint64(group.Devices)})
+	}
 	if len(rows) > int(limit) {
 		last := rows[limit-1]
 		out.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte(last.AdvisoryID + "\x00" + last.Severity))
@@ -281,6 +288,25 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 		return nil, err
 	}
 	return out, nil
+}
+
+// uncheckedReason maps a stable freshness reason code to its API enum value;
+// a code this API version does not name stays UNSPECIFIED, never another cause.
+func uncheckedReason(reason string) adminv1.AdvisoryUncheckedReason {
+	value, ok := adminv1.AdvisoryUncheckedReason_value["ADVISORY_UNCHECKED_REASON_"+strings.ToUpper(reason)]
+	if !ok || reason == "" || strings.ToLower(reason) != reason {
+		return adminv1.AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_UNSPECIFIED
+	}
+	return adminv1.AdvisoryUncheckedReason(value)
+}
+
+// registeredName is the platform registry display name, or empty for a release
+// the registry does not know (never its diagnostic placeholder name).
+func registeredName(release *platform.Release) string {
+	if !release.Known() {
+		return ""
+	}
+	return release.Name
 }
 
 // ListUncovered pages the installed packages of a PARTIAL evaluation that the

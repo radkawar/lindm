@@ -14,6 +14,9 @@ enum AuditActionCategory {
   AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS = 1;
   AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS = 2;
   AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS = 3;
+  // Actions taken by a person: excludes system events (no actor) and
+  // read-only access bookkeeping such as listing the approvals inbox.
+  AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS = 4;
 }
 
 // Every supplied field narrows the selection. Labels never establish authority.

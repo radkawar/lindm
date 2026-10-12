@@ -32,6 +32,9 @@ const (
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS AuditActionCategory = 1
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS  AuditActionCategory = 2
 	AuditActionCategory_AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS      AuditActionCategory = 3
+	// Actions taken by a person: excludes system events (no actor) and
+	// read-only access bookkeeping such as listing the approvals inbox.
+	AuditActionCategory_AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS AuditActionCategory = 4
 )
 
 // Enum value maps for AuditActionCategory.
@@ -41,12 +44,14 @@ var (
 		1: "AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS",
 		2: "AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS",
 		3: "AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS",
+		4: "AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS",
 	}
 	AuditActionCategory_value = map[string]int32{
 		"AUDIT_ACTION_CATEGORY_UNSPECIFIED":          0,
 		"AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS": 1,
 		"AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS":  2,
 		"AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS":      3,
+		"AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS":        4,
 	}
 )
 
@@ -169,12 +174,13 @@ const file_lindm_audit_v1_filter_proto_rawDesc = "" +
 	"\x0eoccurred_until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\"\xbaH\x1f\xb2\x01\x1c\"\r\b\xff\x82\xd1\xff\xaf\a\x10\xff\x93\xeb\xdc\x032\v\b\x80\x92\xb8Ø\xfe\xff\xff\xff\x01R\roccurredUntil:\xae\x01\xbaH\xaa\x01\x1a\xa7\x01\n" +
 	"\x17audit_filter.time_range\x12)occurred_from must precede occurred_until\x1aa!has(this.occurred_from) || !has(this.occurred_until) || this.occurred_from < this.occurred_untilB\v\n" +
 	"\t_actor_idB\x13\n" +
-	"\x11_target_device_id*\xc6\x01\n" +
+	"\x11_target_device_id*\xef\x01\n" +
 	"\x13AuditActionCategory\x12%\n" +
 	"!AUDIT_ACTION_CATEGORY_UNSPECIFIED\x10\x00\x12.\n" +
 	"*AUDIT_ACTION_CATEGORY_RECOVERY_KEY_REVEALS\x10\x01\x12-\n" +
 	")AUDIT_ACTION_CATEGORY_DESTRUCTIVE_ACTIONS\x10\x02\x12)\n" +
-	"%AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS\x10\x03B\"Z lindm/gen/lindm/audit/v1;auditv1b\x06proto3"
+	"%AUDIT_ACTION_CATEGORY_REMOTE_SESSIONS\x10\x03\x12'\n" +
+	"#AUDIT_ACTION_CATEGORY_HUMAN_ACTIONS\x10\x04B\"Z lindm/gen/lindm/audit/v1;auditv1b\x06proto3"
 
 var (
 	file_lindm_audit_v1_filter_proto_rawDescOnce sync.Once

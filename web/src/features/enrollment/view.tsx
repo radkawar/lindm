@@ -44,6 +44,7 @@ export function EnrollmentView({
   const [method, setMethod] = useState<"grant" | "provisioning" | null>(null);
   const [credential, setCredential] = useState<EnrollmentCredential | null>(null);
   const [activeTab, setActiveTab] = useState<"grants" | "tokens">("grants");
+  const [offline, setOffline] = useState(false);
   const tabId = useId();
   const [tokenFormVersion, setTokenFormVersion] = useState(0);
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -65,6 +66,7 @@ export function EnrollmentView({
         title="Enroll a device"
         description="Choose how you want to add devices to your fleet."
       />
+      <PendingEnrollments />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -105,6 +107,17 @@ export function EnrollmentView({
           </CardContent>
         </Card>
       </div>
+      <p className="text-sm text-muted-foreground">
+        Device without network access?{" "}
+        <Button
+          variant="link"
+          className="h-auto p-0 align-baseline"
+          aria-haspopup="dialog"
+          onClick={() => setOffline(true)}
+        >
+          Enroll devices at offline sites
+        </Button>
+      </p>
       <Dialog open={method === "grant"} onOpenChange={(open) => setMethod(open ? "grant" : null)}>
         <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
           <IssueGrant onIssued={issued} onCancel={() => setMethod(null)} />
@@ -191,22 +204,18 @@ export function EnrollmentView({
           <ProvisioningTokens />
         </section>
       </section>
-      <details className="border p-4">
-        <summary className="w-fit cursor-pointer text-sm font-medium">
-          Devices waiting for approval
-        </summary>
-        <div className="mt-4">
-          <PendingEnrollments />
-        </div>
-      </details>
-      <details className="border p-4">
-        <summary className="w-fit cursor-pointer text-sm font-medium">
-          Enroll devices at offline sites
-        </summary>
-        <div className="mt-4">
+      <Dialog open={offline} onOpenChange={setOffline}>
+        <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Enroll devices at offline sites</DialogTitle>
+            <DialogDescription>
+              For devices without network access. Move files by removable media, keep them readable
+              by root only (mode 0600), and do not edit them.
+            </DialogDescription>
+          </DialogHeader>
           <OfflineEnrollment />
-        </div>
-      </details>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

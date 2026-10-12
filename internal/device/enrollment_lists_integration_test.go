@@ -142,6 +142,29 @@ func TestEnrollmentGrantListPaginationAndInactiveStates(t *testing.T) {
 	if _, err := f.service.ListEnrollmentGrants(f.ownerCtx, connect.NewRequest(&adminv1.ListEnrollmentGrantsRequest{PageToken: "invalid-cursor"})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("invalid grant cursor: %v", err)
 	}
+	views := map[adminv1.EnrollmentGrantView]int{
+		adminv1.EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_UNSPECIFIED: 3,
+		adminv1.EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_ACTIVE:      1,
+		adminv1.EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_INACTIVE:    2,
+	}
+	for view, size := range views {
+		response, err := f.service.ListEnrollmentGrants(f.ownerCtx, connect.NewRequest(&adminv1.ListEnrollmentGrantsRequest{View: view}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.Msg.GetActiveCount() != 1 || response.Msg.GetInactiveCount() != 2 || len(response.Msg.GetGrants()) != size {
+			t.Fatalf("view %v: counts %d/%d, %d grants", view, response.Msg.GetActiveCount(), response.Msg.GetInactiveCount(), len(response.Msg.GetGrants()))
+		}
+		for _, grant := range response.Msg.GetGrants() {
+			active := grant.GetStatus() == adminv1.EnrollmentGrantStatus_ENROLLMENT_GRANT_STATUS_ACTIVE
+			if (view == adminv1.EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_ACTIVE && !active) || (view == adminv1.EnrollmentGrantView_ENROLLMENT_GRANT_VIEW_INACTIVE && active) {
+				t.Fatalf("view %v listed grant with status %v", view, grant.GetStatus())
+			}
+		}
+	}
+	if _, err := f.service.ListEnrollmentGrants(f.ownerCtx, connect.NewRequest(&adminv1.ListEnrollmentGrantsRequest{View: adminv1.EnrollmentGrantView(99)})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("undefined grant view: %v", err)
+	}
 }
 
 func TestProvisioningTokenListCreatorProjection(t *testing.T) {

@@ -119,6 +119,24 @@ message FleetRecentAction {
   // Present only for resource actions.
   string resource_id = 11;
   string unit = 12;
+  // Server-derived from the latest device-reported status and the closure.
+  // SUCCEEDED only when the device's status document reports success.
+  FleetActionOutcome outcome = 13;
+}
+
+enum FleetActionOutcome {
+  FLEET_ACTION_OUTCOME_UNSPECIFIED = 0;
+  // Issued; no device report yet and not closed.
+  FLEET_ACTION_OUTCOME_WAITING = 1;
+  // Device reported it queued or is running the action.
+  FLEET_ACTION_OUTCOME_RUNNING = 2;
+  FLEET_ACTION_OUTCOME_SUCCEEDED = 3;
+  FLEET_ACTION_OUTCOME_FAILED = 4;
+  // Started but no conclusive result, or the device reported an unknown outcome.
+  FLEET_ACTION_OUTCOME_UNKNOWN = 5;
+  FLEET_ACTION_OUTCOME_EXPIRED = 6;
+  // Closed by the server before any conclusive device result (cancelled, superseded).
+  FLEET_ACTION_OUTCOME_CANCELLED = 7;
 }
 
 message GetFleetSummaryResponse {

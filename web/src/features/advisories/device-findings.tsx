@@ -18,6 +18,7 @@ import {
   AdvisoryPaging,
   advisoryReasonText,
   findingStateLabel,
+  publishedSeverity,
   unexpired,
   useFreshnessClock,
 } from "./display";
@@ -171,21 +172,22 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                 </div>
                 <div>
                   <dt className="inline font-medium">Severity: </dt>
-                  <dd className="inline">{finding.severity || "Unknown"}</dd>
+                  <dd className="inline">
+                    {publishedSeverity(finding.severity) || "Not published"}
+                  </dd>
                 </div>
-                <div>
-                  <dt className="inline font-medium">CVEs: </dt>
-                  <dd className="inline">{finding.cves.join(", ") || "None"}</dd>
-                </div>
+                {finding.cves.length ? (
+                  <div>
+                    <dt className="inline font-medium">CVEs: </dt>
+                    <dd className="inline">{finding.cves.join(", ")}</dd>
+                  </div>
+                ) : null}
                 <div>
                   <dt className="inline font-medium">Published: </dt>
                   <dd className="inline">{formatTimestamp(finding.publishedAt).local}</dd>
                 </div>
-                <div className="break-all">
-                  <dt className="inline font-medium">Source: </dt>
-                  <dd className="inline">{finding.sourceUrl || "Unknown"}</dd>
-                </div>
               </dl>
+              <TechnicalDetails items={[{ label: "Source URL", value: finding.sourceUrl }]} />
               {finding.exception ? (
                 <div className="space-y-2 border bg-muted/30 p-3 text-sm">
                   <p>

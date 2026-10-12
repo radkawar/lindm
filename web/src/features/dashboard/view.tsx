@@ -1,23 +1,18 @@
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-  ActivityIcon,
-  ArrowUpRightIcon,
-  InfoIcon,
-  RefreshCwIcon,
-  ServerIcon,
-  Settings2Icon,
-} from "lucide-react";
+import { ArrowUpRightIcon, InfoIcon, RefreshCwIcon, ServerIcon, Settings2Icon } from "lucide-react";
 import type { ReactNode } from "react";
-import type { FleetRecentAction } from "../../../gen/lindm/admin/v1/fleet_summary_pb";
+import {
+  FleetActionOutcome,
+  type FleetRecentAction,
+} from "../../../gen/lindm/admin/v1/fleet_summary_pb";
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { TechnicalDetails } from "@/components/ui/technical-details";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -43,27 +38,65 @@ const actionLabels: Record<string, string> = {
   "device.local-admin-rotate.v1": "Rotate managed local-admin password",
 };
 
-const osNames: Record<string, string> = {
-  almalinux: "AlmaLinux",
-  arch: "Arch Linux",
-  centos: "CentOS",
-  debian: "Debian",
-  fedora: "Fedora",
-  linuxmint: "Linux Mint",
-  opensuse: "openSUSE",
-  "opensuse-leap": "openSUSE Leap",
-  "opensuse-tumbleweed": "openSUSE Tumbleweed",
-  pop: "Pop!_OS",
-  rhel: "Red Hat Enterprise Linux",
-  rocky: "Rocky Linux",
-  sles: "SUSE Linux Enterprise",
-  ubuntu: "Ubuntu",
+// Outcome words come from the server's reading of the device's own status
+// report; success is never inferred from a closure alone.
+const outcomeWords: Record<FleetActionOutcome, { word: string; tone: StatusTone; rank: number }> = {
+  [FleetActionOutcome.FAILED]: { word: "failed", tone: "destructive", rank: 0 },
+  [FleetActionOutcome.UNKNOWN]: { word: "unknown", tone: "warning", rank: 1 },
+  [FleetActionOutcome.UNSPECIFIED]: { word: "unknown", tone: "warning", rank: 1 },
+  [FleetActionOutcome.EXPIRED]: { word: "expired", tone: "warning", rank: 2 },
+  [FleetActionOutcome.RUNNING]: { word: "running", tone: "info", rank: 3 },
+  [FleetActionOutcome.WAITING]: { word: "waiting", tone: "info", rank: 4 },
+  [FleetActionOutcome.CANCELLED]: { word: "cancelled", tone: "neutral", rank: 5 },
+  [FleetActionOutcome.SUCCEEDED]: { word: "succeeded", tone: "success", rank: 6 },
 };
 
-function osLabel(osId: string, osVersion: string): string {
-  if (!osId && !osVersion) return "Not reported yet";
-  const name = osId ? (osNames[osId] ?? osId) : "Unknown OS";
-  return osVersion ? `${name} ${osVersion}` : name;
+type ActivityGroup = {
+  key: string;
+  label: string;
+  resource: boolean;
+  actions: FleetRecentAction[];
+  outcomes: { word: string; tone: StatusTone; rank: number; count: number }[];
+};
+
+// One row per action kind: every profile-item change is one kind, each device
+// capability is its own kind. Rows with failures sort first, then by severity of
+// their worst outcome, then by newest action.
+function groupActivity(actions: FleetRecentAction[]): ActivityGroup[] {
+  const groups = new Map<string, ActivityGroup>();
+  for (const action of actions) {
+    const resource = action.kind === "resource";
+    const key = resource ? "resource" : `device:${action.capability}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        label: resource
+          ? "Profile item changes"
+          : (actionLabels[action.capability] ?? "Device action"),
+        resource,
+        actions: [],
+        outcomes: [],
+      };
+      groups.set(key, group);
+    }
+    group.actions.push(action);
+    const outcome = outcomeWords[action.outcome] ?? outcomeWords[FleetActionOutcome.UNKNOWN];
+    const counted = group.outcomes.find((entry) => entry.word === outcome.word);
+    if (counted) counted.count += 1;
+    else group.outcomes.push({ ...outcome, count: 1 });
+  }
+  const rows = [...groups.values()];
+  for (const row of rows) row.outcomes.sort((a, b) => a.rank - b.rank);
+  // Map insertion order is newest-first because the server returns newest first.
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => a.row.outcomes[0].rank - b.row.outcomes[0].rank || a.index - b.index)
+    .map(({ row }) => row);
+}
+
+function plural(count: bigint | number, one: string, many: string) {
+  return `${count.toString()} ${count === 1n || count === 1 ? one : many}`;
 }
 
 export function DashboardView() {
@@ -74,9 +107,7 @@ export function DashboardView() {
   const failure = summary.error ? toRpcFailure(summary.error) : null;
   // A failed refresh must not present a previous response as current evidence.
   const data = canReadFleet && !failure ? summary.data : undefined;
-  const lifecycle = data?.lifecycle;
   const contact = data?.contact;
-  const operatingSystems = data?.operatingSystems;
   const compliance = data?.resourceCompliance;
   const findings = data?.findings;
   const approvals = data?.approvals;
@@ -91,67 +122,38 @@ export function DashboardView() {
           }),
         )
       : undefined;
+  const uncovered = findings?.unknownDevices ?? 0n;
+  const activity = data ? groupActivity(data.recentActions) : [];
 
-  const osRows = operatingSystems
-    ? operatingSystems.groups.map(
-        (group) => [osLabel(group.osId, group.osVersion), group.devices] as [string, bigint],
-      )
-    : [];
-  if (operatingSystems && operatingSystems.otherDevices > 0n) {
-    osRows.push(["Other", operatingSystems.otherDevices]);
-  }
-  const complianceRows: [string, bigint][] = compliance
-    ? [
-        ["Compliant", compliance.compliantResources],
-        ["Drift fixed", compliance.driftRemediatedResources],
-        ["Needs attention", compliance.attentionResources],
-        ["Not checked recently", compliance.staleResources],
-        ["Unknown", compliance.unknownResources],
-      ]
-    : [];
-
-  const patchRows: [string, bigint][] = patch
-    ? [
-        ["Patched", patch.patchedDevices],
-        ["Security pending", patch.securityPendingDevices],
-        ["Reboot required", patch.rebootRequiredDevices],
-        [`Stale (over ${patch.staleAfterSeconds / 3600} hours)`, patch.staleDevices],
-        ["Unknown", patch.unknownDevices],
-      ]
-    : [];
-  const findingRows: [string, bigint][] = findings
-    ? [
-        ["Critical", findings.criticalFindings],
-        ["High", findings.highFindings],
-        ["Medium", findings.mediumFindings],
-        ["Low", findings.lowFindings],
-        ["Other", findings.otherFindings],
-      ]
-    : [];
   // Workflow order, not a risk score. Never combine unlike populations.
   const next =
     approvals && approvals.pendingApprovals > 0n
       ? "approvals"
-      : contact && contact.staleDevices > 0n && staleFilter
-        ? "contact"
-        : compliance &&
-            (compliance.attentionResources > 0n ||
-              compliance.staleResources > 0n ||
-              compliance.unknownResources > 0n)
-          ? "profiles"
-          : findings &&
-              (findings.unknownDevices > 0n ||
-                findings.partialDevices > 0n ||
-                findingRows.some(([, count]) => count > 0n))
-            ? "findings"
-            : patch &&
-                (patch.securityPendingDevices > 0n ||
-                  patch.rebootRequiredDevices > 0n ||
-                  patch.staleDevices > 0n ||
-                  patch.unknownDevices > 0n ||
-                  patch.failedRunDevices > 0n)
-              ? "patch"
-              : "devices";
+      : uncovered > 0n
+        ? "coverage"
+        : contact && contact.staleDevices > 0n && staleFilter
+          ? "contact"
+          : compliance &&
+              (compliance.attentionResources > 0n ||
+                compliance.staleResources > 0n ||
+                compliance.unknownResources > 0n)
+            ? "profiles"
+            : findings &&
+                (findings.partialDevices > 0n ||
+                  findings.criticalFindings > 0n ||
+                  findings.highFindings > 0n ||
+                  findings.mediumFindings > 0n ||
+                  findings.lowFindings > 0n ||
+                  findings.otherFindings > 0n)
+              ? "findings"
+              : patch &&
+                  (patch.securityPendingDevices > 0n ||
+                    patch.rebootRequiredDevices > 0n ||
+                    patch.staleDevices > 0n ||
+                    patch.unknownDevices > 0n ||
+                    patch.failedRunDevices > 0n)
+                ? "patch"
+                : "devices";
 
   return (
     <section
@@ -214,7 +216,7 @@ export function DashboardView() {
                 )}
               </p>
             </div>
-            <div className="divide-y border-y">
+            <div className="divide-y border-y" data-testid="needs-review">
               <WorkItem
                 title="Approval requests"
                 primary={next === "approvals"}
@@ -245,6 +247,32 @@ export function DashboardView() {
                     checked again at approval.
                   </Help>
                 </div>
+              </WorkItem>
+              <WorkItem
+                title={
+                  !findings
+                    ? "Vulnerability coverage"
+                    : uncovered > 0n
+                      ? `${plural(uncovered, "device has", "devices have")} no vulnerability coverage`
+                      : "Every active device has vulnerability coverage"
+                }
+                primary={next === "coverage"}
+                action={
+                  <Link to="/advisories" className={queueLinkClass(next === "coverage")}>
+                    {uncovered > 0n ? "See why and fix coverage" : "Review advisory sources"}{" "}
+                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {findings ? (
+                  <p className="text-xs text-muted-foreground">
+                    {uncovered > 0n
+                      ? "No advisory source has checked these devices' packages, so their exposure is unknown, not zero. Advisories explains the cause and how to add coverage."
+                      : `${plural(findings.partialDevices, "device is", "devices are")} only partly checked.`}
+                  </p>
+                ) : (
+                  <Unavailable section="Advisory coverage" />
+                )}
               </WorkItem>
               <WorkItem
                 title="Stale contact"
@@ -326,7 +354,7 @@ export function DashboardView() {
                 )}
               </WorkItem>
               <WorkItem
-                title="Security findings and coverage"
+                title="Security findings"
                 primary={next === "findings"}
                 action={
                   <Link to="/advisories" className={queueLinkClass(next === "findings")}>
@@ -339,23 +367,19 @@ export function DashboardView() {
                   <>
                     <p>
                       <strong className="font-semibold tabular-nums">
-                        {findings.unknownDevices.toString()}
+                        {findings.criticalFindings.toString()}
                       </strong>{" "}
-                      active devices not checked · {findings.partialDevices.toString()} partly
-                      checked · {findings.evaluatedDevices.toString()} checked.
+                      critical findings · {findings.highFindings.toString()} high findings.
                     </p>
-                    <p>
-                      {findings.criticalFindings.toString()} critical findings ·{" "}
-                      {findings.highFindings.toString()} high findings.
+                    <p className="text-xs text-muted-foreground">
+                      Counts findings on{" "}
+                      {plural(findings.evaluatedDevices, "checked device", "checked devices")}.
+                      Accepted findings are excluded; zero findings does not mean no exposure.
                     </p>
                   </>
                 ) : (
                   <Unavailable section="Advisory summary" />
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Missing advisory coverage can hide exposure. Review sources and affected devices;
-                  zero findings does not mean no exposure.
-                </p>
               </WorkItem>
               <WorkItem
                 title="OS patch follow-up"
@@ -403,56 +427,66 @@ export function DashboardView() {
                 Latest recorded activity
               </h2>
               <p className="text-xs text-muted-foreground">
-                Up to ten newest actions in your device scopes. Sent is not proof of completion;
-                open a device for results.
+                The {plural(data.recentActions.length, "newest action", "newest actions")} in your
+                device scopes, grouped by kind. Outcomes are what devices reported; open a device
+                for details.
               </p>
             </div>
-            {data.recentActions.length ? (
-              <ul className="divide-y border-y">
-                {data.recentActions.map((action) => (
-                  <li
-                    key={`${action.kind}:${action.actionId}`}
-                    className="flex items-start gap-3 py-3"
-                  >
-                    <span className="flex size-8 shrink-0 items-center justify-center bg-muted text-muted-foreground">
-                      {action.kind === "resource" ? (
-                        <Settings2Icon className="size-4" aria-hidden="true" />
-                      ) : action.kind === "device" ? (
-                        <ServerIcon className="size-4" aria-hidden="true" />
-                      ) : (
-                        <ActivityIcon className="size-4" aria-hidden="true" />
-                      )}
-                    </span>
-                    <div className="grid min-w-0 flex-1 gap-1">
-                      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                        <span className="break-words text-sm font-medium">
-                          {action.kind === "resource"
-                            ? `Profile item · ${action.unit || "Unnamed item"}`
-                            : (actionLabels[action.capability] ?? "Device action")}
-                        </span>
-                        <ActionRecord action={action} />
+            {activity.length ? (
+              <ul className="divide-y border-y" data-testid="activity-groups">
+                {activity.map((group) => {
+                  const latest = group.actions[0];
+                  const devices = new Set(group.actions.map((action) => action.deviceId)).size;
+                  return (
+                    <li
+                      key={group.key}
+                      data-activity-kind={group.key}
+                      className="flex items-start gap-3 py-3"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center bg-muted text-muted-foreground">
+                        {group.resource ? (
+                          <Settings2Icon className="size-4" aria-hidden="true" />
+                        ) : (
+                          <ServerIcon className="size-4" aria-hidden="true" />
+                        )}
+                      </span>
+                      <div className="grid min-w-0 flex-1 gap-1">
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                          <span className="break-words text-sm font-medium">
+                            {group.label}{" "}
+                            <span
+                              className="font-normal text-muted-foreground"
+                              data-activity-count=""
+                            >
+                              · {plural(group.actions.length, "action", "actions")}
+                            </span>
+                          </span>
+                          <span className="flex flex-wrap gap-1" data-activity-outcomes="">
+                            {group.outcomes.map((outcome) => (
+                              <StatusBadge key={outcome.word} status={outcome.tone}>
+                                {outcome.count} {outcome.word}
+                              </StatusBadge>
+                            ))}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          <span>
+                            {plural(devices, "device", "devices")} · latest{" "}
+                            {formatTimestamp(latest.createdAt).local}
+                          </span>
+                          <Link
+                            to="/devices/$deviceId"
+                            params={{ deviceId: latest.deviceId }}
+                            search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
+                            className={linkClass}
+                          >
+                            {devices === 1 ? "Open device" : "Open latest device"}
+                          </Link>
+                        </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                        <Link
-                          to="/devices/$deviceId"
-                          params={{ deviceId: action.deviceId }}
-                          search={{ pageSize: 50, pageToken: "", manager: "", namePrefix: "" }}
-                          className={linkClass}
-                        >
-                          Open device
-                        </Link>
-                        <span>{formatTimestamp(action.createdAt).local}</span>
-                        <TechnicalDetails
-                          items={[
-                            { label: "Action ID", value: action.actionId },
-                            { label: "Capability", value: action.capability },
-                            { label: "Closed reason", value: action.closedReason },
-                          ]}
-                        />
-                      </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <EmptyState
@@ -460,159 +494,6 @@ export function DashboardView() {
                 description="This is an action history, not confirmation that devices need no work."
               />
             )}
-          </section>
-
-          <section aria-labelledby="supporting-evidence-title" className="grid gap-3">
-            <div>
-              <h2 id="supporting-evidence-title" className="text-base font-semibold">
-                Supporting fleet evidence
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Exact counts in your authorized device scopes, not trends or a risk ranking.
-              </p>
-            </div>
-            <div className="divide-y border-y">
-              <Evidence
-                title="Enrollment and contact"
-                action={
-                  <Link to="/devices" className={linkClass}>
-                    Browse device records
-                  </Link>
-                }
-              >
-                {lifecycle ? (
-                  <>
-                    <p className="text-sm">
-                      {lifecycle.totalDevices.toString()} devices in total. Enrolled does not mean
-                      healthy.
-                    </p>
-                    <CountList
-                      rows={[
-                        ["Waiting to enroll", lifecycle.pendingDevices],
-                        ["Enrolled", lifecycle.activeDevices],
-                        ["Revoked", lifecycle.revokedDevices],
-                        ["Recovery hold", lifecycle.recoveryHoldDevices],
-                      ]}
-                    />
-                  </>
-                ) : (
-                  <Unavailable section="Enrollment state" />
-                )}
-                {contact ? (
-                  <CountList
-                    rows={[
-                      [
-                        `Seen within ${contact.staleAfterSeconds / 3600} hours`,
-                        contact.recentDevices,
-                      ],
-                      [
-                        `Last seen over ${contact.staleAfterSeconds / 3600} hours ago`,
-                        contact.staleDevices,
-                      ],
-                      ["No recorded check-in", contact.unknownDevices],
-                    ]}
-                  />
-                ) : (
-                  <Unavailable section="Contact" />
-                )}
-              </Evidence>
-              <Evidence
-                title="Service compliance · profile items"
-                action={
-                  <Link to="/devices" className={linkClass}>
-                    Inspect device services
-                  </Link>
-                }
-              >
-                {compliance ? (
-                  <>
-                    <p className="text-sm">
-                      {compliance.totalResources.toString()} assigned profile items, not devices.
-                    </p>
-                    <CountList rows={complianceRows} />
-                    <p className="text-xs text-muted-foreground">
-                      {compliance.unassignedDevices.toString()} devices without a profile; not
-                      counted as compliant.
-                    </p>
-                  </>
-                ) : (
-                  <Unavailable section="Service compliance" />
-                )}
-              </Evidence>
-              <Evidence
-                title="Patch compliance · active devices"
-                action={
-                  <Link to="/devices" className={linkClass}>
-                    Inspect device patch status
-                  </Link>
-                }
-              >
-                {patch ? (
-                  <>
-                    <CountList rows={patchRows} />
-                    <p className="text-sm">
-                      {patch.pendingSecurityUpdates.toString()} pending security updates ·{" "}
-                      {patch.failedRunDevices.toString()} devices whose last update run failed.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Categories are disjoint. Reboot required means no security updates pending.
-                      Pending updates and failed runs count fresh statuses only. Native
-                      package-cache telemetry, not proof of installation; unknown includes
-                      unavailable reports.
-                    </p>
-                  </>
-                ) : (
-                  <Unavailable section="Patch compliance" />
-                )}
-              </Evidence>
-              <Evidence
-                title="Open findings · severity and coverage"
-                action={
-                  <Link to="/advisories" className={linkClass}>
-                    Review advisories and sources
-                  </Link>
-                }
-              >
-                {findings ? (
-                  <>
-                    <CountList rows={findingRows} />
-                    <p className="text-sm">
-                      Active devices checked: {findings.evaluatedDevices.toString()} · partly
-                      checked: {findings.partialDevices.toString()} · not checked:{" "}
-                      {findings.unknownDevices.toString()}.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Counts findings, not devices. Accepted findings are excluded. Missing coverage
-                      can hide exposure even when all severity counts are zero.
-                    </p>
-                  </>
-                ) : (
-                  <Unavailable section="Advisory" />
-                )}
-              </Evidence>
-              <Evidence
-                title="Operating systems · devices by version"
-                action={
-                  <Link to="/devices" className={linkClass}>
-                    Browse and filter devices
-                  </Link>
-                }
-              >
-                {operatingSystems ? (
-                  osRows.length ? (
-                    <CountList rows={osRows} />
-                  ) : (
-                    <p className="text-sm">No devices in this OS summary.</p>
-                  )
-                ) : (
-                  <Unavailable section="Operating system" />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Latest reported OS and version. The twenty largest groups are shown; Other is the
-                  exact remainder.
-                </p>
-              </Evidence>
-            </div>
           </section>
         </>
       ) : null}
@@ -657,26 +538,6 @@ function WorkItem({
   );
 }
 
-function Evidence({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div data-review-metric="" className="py-3">
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">{title}</summary>
-        <div className="mt-3 grid max-w-2xl gap-3">{children}</div>
-      </details>
-      <div className="mt-1">{action}</div>
-    </div>
-  );
-}
-
 function Help({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Tooltip>
@@ -691,55 +552,10 @@ function Help({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function CountList({ rows }: { rows: [string, bigint][] }) {
-  return (
-    <dl className="grid gap-2 text-sm">
-      {rows.map(([label, count]) => (
-        <div key={label} className="flex items-center justify-between gap-3">
-          <dt className="text-muted-foreground">{label}</dt>
-          <dd className="font-medium tabular-nums">{count.toString()}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 function Unavailable({ section }: { section: string }) {
   return (
     <p data-review-state="blocked" className="text-sm text-muted-foreground">
       {section} unavailable. Review the linked evidence; no zero is assumed.
     </p>
-  );
-}
-
-function ActionRecord({ action }: { action: FleetRecentAction }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger className="inline-flex min-h-6 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <StatusBadge
-          status={action.outcomeUnknown ? "warning" : action.closedAt ? "neutral" : "info"}
-        >
-          {action.outcomeUnknown
-            ? "Result unknown"
-            : action.closedAt
-              ? "Closed"
-              : action.kind === "resource" && action.closedReason
-                ? "Cancelling"
-                : action.startAuthorizedAt
-                  ? "Started"
-                  : "Sent"}
-        </StatusBadge>
-      </TooltipTrigger>
-      <TooltipContent className="max-w-sm">
-        <div className="grid gap-1 break-all">
-          <p>Expires {formatTimestamp(action.expiresAt).local}</p>
-          {action.closedAt ? (
-            <p>Closed {formatTimestamp(action.closedAt).local}</p>
-          ) : action.startAuthorizedAt ? (
-            <p>Started {formatTimestamp(action.startAuthorizedAt).local}</p>
-          ) : null}
-        </div>
-      </TooltipContent>
-    </Tooltip>
   );
 }

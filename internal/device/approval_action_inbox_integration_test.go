@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -116,7 +118,7 @@ func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		params := identitydb.ListVisibleApprovalsParams{ActorID: reviewer.ID, AfterID: uuid.Nil, RowLimit: 50, UnrestrictedPermissions: []string{string(identity.PermissionManageInventory)}, Scopes: []byte("{}"), RequiredScopes: required, ManageUnrestricted: true, ManageScopes: []byte("[]")}
+		params := identitydb.ListVisibleApprovalsParams{ActorID: reviewer.ID, FirstPage: true, AsOf: pgtype.Timestamptz{Time: time.Now(), Valid: true}, RowLimit: 50, UnrestrictedPermissions: []string{string(identity.PermissionManageInventory)}, Scopes: []byte("{}"), RequiredScopes: required, ManageUnrestricted: true, ManageScopes: []byte("[]")}
 		rows, err := q.ListVisibleApprovals(t.Context(), params)
 		if err != nil {
 			t.Fatal(err)

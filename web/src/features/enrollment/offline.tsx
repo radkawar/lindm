@@ -15,7 +15,6 @@ import {
   type OfflineEnrollmentRequestFile,
 } from "../../../gen/lindm/agent/v1/offline_enrollment_pb";
 import { ExecutionRootSchema } from "../../../gen/lindm/agent/v1/trust_pb";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,13 +31,6 @@ import { downloadEnrollmentFile } from "./download";
 export function OfflineEnrollment() {
   return (
     <section className="grid gap-4" aria-label="Offline enrollment">
-      <Alert>
-        <AlertTitle>Offline enrollment</AlertTitle>
-        <AlertDescription>
-          For devices without network access. Move files by removable media, keep them readable by
-          root only (mode 0600), and do not edit them.
-        </AlertDescription>
-      </Alert>
       <OfflineAuthorization />
       <OfflineExchange />
     </section>

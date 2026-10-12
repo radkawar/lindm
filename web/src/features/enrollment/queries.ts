@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { EnrollmentGrantView } from "../../../gen/lindm/admin/v1/enrollment_grants_pb";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { adminClient } from "@/lib/rpc";
 
@@ -34,13 +35,17 @@ export function pendingEnrollmentsQueryOptions(lifetime: AuthLifetime, pageToken
   });
 }
 
-export function enrollmentGrantsQueryOptions(lifetime: AuthLifetime, pageToken: string) {
+export function enrollmentGrantsQueryOptions(
+  lifetime: AuthLifetime,
+  view: EnrollmentGrantView,
+  pageToken: string,
+) {
   return queryOptions({
-    queryKey: ["enrollment-grants", lifetime.generation, pageToken] as const,
+    queryKey: ["enrollment-grants", lifetime.generation, view, pageToken] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
       const result = await adminClient.listEnrollmentGrants(
-        { pageSize: 50, pageToken },
+        { pageSize: 50, pageToken, view },
         { signal: AbortSignal.any([signal, lifetime.signal]), timeoutMs: 30_000 },
       );
       lifetime.signal.throwIfAborted();

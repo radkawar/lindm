@@ -87,6 +87,118 @@ func (AdvisoryFindingState) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{0}
 }
 
+// Why an active device's current exposure is unknown. Each value names the
+// stable AdvisoryFreshness.reason code of the same spelling; UNSPECIFIED is a
+// reason this API version does not name.
+type AdvisoryUncheckedReason int32
+
+const (
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_UNSPECIFIED AdvisoryUncheckedReason = 0
+	// Not yet evaluated against its current inventory and source generation.
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING             AdvisoryUncheckedReason = 1
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE          AdvisoryUncheckedReason = 2
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_INVENTORY_STALE                AdvisoryUncheckedReason = 3
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED AdvisoryUncheckedReason = 4
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED      AdvisoryUncheckedReason = 5
+	// No enabled source applies to the device's OS release and architecture.
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE                 AdvisoryUncheckedReason = 6
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE AdvisoryUncheckedReason = 7
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_FEED_STALE                       AdvisoryUncheckedReason = 8
+	// The selected source is not a complete snapshot of the release's advisories.
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE                AdvisoryUncheckedReason = 9
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING      AdvisoryUncheckedReason = 10
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED       AdvisoryUncheckedReason = 11
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE           AdvisoryUncheckedReason = 12
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED         AdvisoryUncheckedReason = 13
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE   AdvisoryUncheckedReason = 14
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE AdvisoryUncheckedReason = 15
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED AdvisoryUncheckedReason = 16
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID              AdvisoryUncheckedReason = 17
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED               AdvisoryUncheckedReason = 18
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN            AdvisoryUncheckedReason = 19
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS      AdvisoryUncheckedReason = 20
+	AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED           AdvisoryUncheckedReason = 21
+)
+
+// Enum value maps for AdvisoryUncheckedReason.
+var (
+	AdvisoryUncheckedReason_name = map[int32]string{
+		0:  "ADVISORY_UNCHECKED_REASON_UNSPECIFIED",
+		1:  "ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING",
+		2:  "ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE",
+		3:  "ADVISORY_UNCHECKED_REASON_INVENTORY_STALE",
+		4:  "ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED",
+		5:  "ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED",
+		6:  "ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE",
+		7:  "ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE",
+		8:  "ADVISORY_UNCHECKED_REASON_FEED_STALE",
+		9:  "ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE",
+		10: "ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING",
+		11: "ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED",
+		12: "ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE",
+		13: "ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED",
+		14: "ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE",
+		15: "ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE",
+		16: "ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED",
+		17: "ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID",
+		18: "ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED",
+		19: "ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN",
+		20: "ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS",
+		21: "ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED",
+	}
+	AdvisoryUncheckedReason_value = map[string]int32{
+		"ADVISORY_UNCHECKED_REASON_UNSPECIFIED":                          0,
+		"ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING":                   1,
+		"ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE":                2,
+		"ADVISORY_UNCHECKED_REASON_INVENTORY_STALE":                      3,
+		"ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED":       4,
+		"ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED":            5,
+		"ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE":                     6,
+		"ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE":     7,
+		"ADVISORY_UNCHECKED_REASON_FEED_STALE":                           8,
+		"ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE":                9,
+		"ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING":      10,
+		"ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED":       11,
+		"ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE":           12,
+		"ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED":         13,
+		"ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE":   14,
+		"ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE": 15,
+		"ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED": 16,
+		"ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID":              17,
+		"ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED":               18,
+		"ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN":            19,
+		"ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS":      20,
+		"ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED":           21,
+	}
+)
+
+func (x AdvisoryUncheckedReason) Enum() *AdvisoryUncheckedReason {
+	p := new(AdvisoryUncheckedReason)
+	*p = x
+	return p
+}
+
+func (x AdvisoryUncheckedReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AdvisoryUncheckedReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_advisories_proto_enumTypes[1].Descriptor()
+}
+
+func (AdvisoryUncheckedReason) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_advisories_proto_enumTypes[1]
+}
+
+func (x AdvisoryUncheckedReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AdvisoryUncheckedReason.Descriptor instead.
+func (AdvisoryUncheckedReason) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{1}
+}
+
 type AdvisoryException struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ActorId       string                 `protobuf:"bytes,1,opt,name=actor_id,json=actorId,proto3" json:"actor_id,omitempty"`
@@ -866,6 +978,95 @@ func (x *AdvisorySummary) GetCves() []string {
 	return nil
 }
 
+// Active devices counted in unknown_devices that share one reason, OS release
+// and selected source, using the device findings read-path precedence.
+type AdvisoryUncheckedGroup struct {
+	state  protoimpl.MessageState  `protogen:"open.v1"`
+	Reason AdvisoryUncheckedReason `protobuf:"varint,1,opt,name=reason,proto3,enum=lindm.admin.v1.AdvisoryUncheckedReason" json:"reason,omitempty"`
+	// Selected source; empty when none applies or the device is not evaluated.
+	FeedId string `protobuf:"bytes,2,opt,name=feed_id,json=feedId,proto3" json:"feed_id,omitempty"`
+	// Device os-release identity; empty values mean not yet known.
+	OsId      string `protobuf:"bytes,3,opt,name=os_id,json=osId,proto3" json:"os_id,omitempty"`
+	OsVersion string `protobuf:"bytes,4,opt,name=os_version,json=osVersion,proto3" json:"os_version,omitempty"`
+	// Platform registry display name, e.g. "Fedora 44"; empty when unregistered.
+	OsName        string `protobuf:"bytes,5,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
+	Devices       uint64 `protobuf:"varint,6,opt,name=devices,proto3" json:"devices,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvisoryUncheckedGroup) Reset() {
+	*x = AdvisoryUncheckedGroup{}
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvisoryUncheckedGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvisoryUncheckedGroup) ProtoMessage() {}
+
+func (x *AdvisoryUncheckedGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvisoryUncheckedGroup.ProtoReflect.Descriptor instead.
+func (*AdvisoryUncheckedGroup) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AdvisoryUncheckedGroup) GetReason() AdvisoryUncheckedReason {
+	if x != nil {
+		return x.Reason
+	}
+	return AdvisoryUncheckedReason_ADVISORY_UNCHECKED_REASON_UNSPECIFIED
+}
+
+func (x *AdvisoryUncheckedGroup) GetFeedId() string {
+	if x != nil {
+		return x.FeedId
+	}
+	return ""
+}
+
+func (x *AdvisoryUncheckedGroup) GetOsId() string {
+	if x != nil {
+		return x.OsId
+	}
+	return ""
+}
+
+func (x *AdvisoryUncheckedGroup) GetOsVersion() string {
+	if x != nil {
+		return x.OsVersion
+	}
+	return ""
+}
+
+func (x *AdvisoryUncheckedGroup) GetOsName() string {
+	if x != nil {
+		return x.OsName
+	}
+	return ""
+}
+
+func (x *AdvisoryUncheckedGroup) GetDevices() uint64 {
+	if x != nil {
+		return x.Devices
+	}
+	return 0
+}
+
 type ListAdvisorySummaryResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Advisories       []*AdvisorySummary     `protobuf:"bytes,1,rep,name=advisories,proto3" json:"advisories,omitempty"`
@@ -874,13 +1075,16 @@ type ListAdvisorySummaryResponse struct {
 	EvaluatedDevices uint64                 `protobuf:"varint,4,opt,name=evaluated_devices,json=evaluatedDevices,proto3" json:"evaluated_devices,omitempty"`
 	// Devices whose current evaluation covers only part of their packages.
 	PartialDevices uint64 `protobuf:"varint,5,opt,name=partial_devices,json=partialDevices,proto3" json:"partial_devices,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The twenty largest groups, ordered by device count descending. Counts are
+	// exact; unknown_devices minus their sum is in groups not listed.
+	UncheckedGroups []*AdvisoryUncheckedGroup `protobuf:"bytes,6,rep,name=unchecked_groups,json=uncheckedGroups,proto3" json:"unchecked_groups,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ListAdvisorySummaryResponse) Reset() {
 	*x = ListAdvisorySummaryResponse{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -892,7 +1096,7 @@ func (x *ListAdvisorySummaryResponse) String() string {
 func (*ListAdvisorySummaryResponse) ProtoMessage() {}
 
 func (x *ListAdvisorySummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[10]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -905,7 +1109,7 @@ func (x *ListAdvisorySummaryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAdvisorySummaryResponse.ProtoReflect.Descriptor instead.
 func (*ListAdvisorySummaryResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{10}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListAdvisorySummaryResponse) GetAdvisories() []*AdvisorySummary {
@@ -943,6 +1147,13 @@ func (x *ListAdvisorySummaryResponse) GetPartialDevices() uint64 {
 	return 0
 }
 
+func (x *ListAdvisorySummaryResponse) GetUncheckedGroups() []*AdvisoryUncheckedGroup {
+	if x != nil {
+		return x.UncheckedGroups
+	}
+	return nil
+}
+
 type ListAdvisoryFeedsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -951,7 +1162,7 @@ type ListAdvisoryFeedsRequest struct {
 
 func (x *ListAdvisoryFeedsRequest) Reset() {
 	*x = ListAdvisoryFeedsRequest{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -963,7 +1174,7 @@ func (x *ListAdvisoryFeedsRequest) String() string {
 func (*ListAdvisoryFeedsRequest) ProtoMessage() {}
 
 func (x *ListAdvisoryFeedsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[11]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -976,7 +1187,7 @@ func (x *ListAdvisoryFeedsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAdvisoryFeedsRequest.ProtoReflect.Descriptor instead.
 func (*ListAdvisoryFeedsRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{11}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{12}
 }
 
 type AdvisoryFeedStatus struct {
@@ -996,13 +1207,16 @@ type AdvisoryFeedStatus struct {
 	Artifacts       []*v1.FeedArtifact     `protobuf:"bytes,13,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
 	SnapshotAt      *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
 	RejectedRecords []*v1.RejectedRecord   `protobuf:"bytes,15,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Platform registry display name of distro/release, e.g. "Fedora 44"; empty
+	// when the release is not registered.
+	OsName        string `protobuf:"bytes,16,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AdvisoryFeedStatus) Reset() {
 	*x = AdvisoryFeedStatus{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1014,7 +1228,7 @@ func (x *AdvisoryFeedStatus) String() string {
 func (*AdvisoryFeedStatus) ProtoMessage() {}
 
 func (x *AdvisoryFeedStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[12]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1027,7 +1241,7 @@ func (x *AdvisoryFeedStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdvisoryFeedStatus.ProtoReflect.Descriptor instead.
 func (*AdvisoryFeedStatus) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{12}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AdvisoryFeedStatus) GetId() string {
@@ -1135,6 +1349,13 @@ func (x *AdvisoryFeedStatus) GetRejectedRecords() []*v1.RejectedRecord {
 	return nil
 }
 
+func (x *AdvisoryFeedStatus) GetOsName() string {
+	if x != nil {
+		return x.OsName
+	}
+	return ""
+}
+
 type ListAdvisoryFeedsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Feeds         []*AdvisoryFeedStatus  `protobuf:"bytes,1,rep,name=feeds,proto3" json:"feeds,omitempty"`
@@ -1144,7 +1365,7 @@ type ListAdvisoryFeedsResponse struct {
 
 func (x *ListAdvisoryFeedsResponse) Reset() {
 	*x = ListAdvisoryFeedsResponse{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1156,7 +1377,7 @@ func (x *ListAdvisoryFeedsResponse) String() string {
 func (*ListAdvisoryFeedsResponse) ProtoMessage() {}
 
 func (x *ListAdvisoryFeedsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[13]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1169,7 +1390,7 @@ func (x *ListAdvisoryFeedsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAdvisoryFeedsResponse.ProtoReflect.Descriptor instead.
 func (*ListAdvisoryFeedsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{13}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListAdvisoryFeedsResponse) GetFeeds() []*AdvisoryFeedStatus {
@@ -1193,7 +1414,7 @@ type AcceptAdvisoryFindingRequest struct {
 
 func (x *AcceptAdvisoryFindingRequest) Reset() {
 	*x = AcceptAdvisoryFindingRequest{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1205,7 +1426,7 @@ func (x *AcceptAdvisoryFindingRequest) String() string {
 func (*AcceptAdvisoryFindingRequest) ProtoMessage() {}
 
 func (x *AcceptAdvisoryFindingRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[14]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1218,7 +1439,7 @@ func (x *AcceptAdvisoryFindingRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptAdvisoryFindingRequest.ProtoReflect.Descriptor instead.
 func (*AcceptAdvisoryFindingRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{14}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *AcceptAdvisoryFindingRequest) GetRequestId() string {
@@ -1272,7 +1493,7 @@ type AcceptAdvisoryFindingResponse struct {
 
 func (x *AcceptAdvisoryFindingResponse) Reset() {
 	*x = AcceptAdvisoryFindingResponse{}
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1284,7 +1505,7 @@ func (x *AcceptAdvisoryFindingResponse) String() string {
 func (*AcceptAdvisoryFindingResponse) ProtoMessage() {}
 
 func (x *AcceptAdvisoryFindingResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[15]
+	mi := &file_lindm_admin_v1_advisories_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1297,7 +1518,7 @@ func (x *AcceptAdvisoryFindingResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptAdvisoryFindingResponse.ProtoReflect.Descriptor instead.
 func (*AcceptAdvisoryFindingResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{15}
+	return file_lindm_admin_v1_advisories_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *AcceptAdvisoryFindingResponse) GetException() *AdvisoryException {
@@ -1384,7 +1605,15 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x10affected_devices\x18\x03 \x01(\x04R\x0faffectedDevices\x12)\n" +
 	"\x10accepted_devices\x18\x04 \x01(\x04R\x0facceptedDevices\x12'\n" +
 	"\x0funknown_devices\x18\x05 \x01(\x04R\x0eunknownDevices\x12\x12\n" +
-	"\x04cves\x18\x06 \x03(\tR\x04cves\"\x85\x02\n" +
+	"\x04cves\x18\x06 \x03(\tR\x04cves\"\xe3\x01\n" +
+	"\x16AdvisoryUncheckedGroup\x12I\n" +
+	"\x06reason\x18\x01 \x01(\x0e2'.lindm.admin.v1.AdvisoryUncheckedReasonB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06reason\x12\x17\n" +
+	"\afeed_id\x18\x02 \x01(\tR\x06feedId\x12\x13\n" +
+	"\x05os_id\x18\x03 \x01(\tR\x04osId\x12\x1d\n" +
+	"\n" +
+	"os_version\x18\x04 \x01(\tR\tosVersion\x12\x17\n" +
+	"\aos_name\x18\x05 \x01(\tR\x06osName\x12\x18\n" +
+	"\adevices\x18\x06 \x01(\x04R\adevices\"\xe2\x02\n" +
 	"\x1bListAdvisorySummaryResponse\x12?\n" +
 	"\n" +
 	"advisories\x18\x01 \x03(\v2\x1f.lindm.admin.v1.AdvisorySummaryR\n" +
@@ -1392,8 +1621,9 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +
 	"\x0funknown_devices\x18\x03 \x01(\x04R\x0eunknownDevices\x12+\n" +
 	"\x11evaluated_devices\x18\x04 \x01(\x04R\x10evaluatedDevices\x12'\n" +
-	"\x0fpartial_devices\x18\x05 \x01(\x04R\x0epartialDevices\"\x1a\n" +
-	"\x18ListAdvisoryFeedsRequest\"\x95\x05\n" +
+	"\x0fpartial_devices\x18\x05 \x01(\x04R\x0epartialDevices\x12[\n" +
+	"\x10unchecked_groups\x18\x06 \x03(\v2&.lindm.admin.v1.AdvisoryUncheckedGroupB\b\xbaH\x05\x92\x01\x02\x10\x14R\x0funcheckedGroups\"\x1a\n" +
+	"\x18ListAdvisoryFeedsRequest\"\xae\x05\n" +
 	"\x12AdvisoryFeedStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06distro\x18\x02 \x01(\tR\x06distro\x12\x18\n" +
@@ -1414,7 +1644,8 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\tartifacts\x18\r \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactR\tartifacts\x12;\n" +
 	"\vsnapshot_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"snapshotAt\x12L\n" +
-	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"U\n" +
+	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\x12\x17\n" +
+	"\aos_name\x18\x10 \x01(\tR\x06osName\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
 	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xab\x02\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +
@@ -1436,7 +1667,31 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x1fADVISORY_FINDING_STATE_ACCEPTED\x10\x02\x12\"\n" +
 	"\x1eADVISORY_FINDING_STATE_UNKNOWN\x10\x03\x12 \n" +
 	"\x1cADVISORY_FINDING_STATE_CLEAR\x10\x04\x12\"\n" +
-	"\x1eADVISORY_FINDING_STATE_PARTIAL\x10\x05B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\x1eADVISORY_FINDING_STATE_PARTIAL\x10\x05*\xfc\t\n" +
+	"\x17AdvisoryUncheckedReason\x12)\n" +
+	"%ADVISORY_UNCHECKED_REASON_UNSPECIFIED\x10\x00\x120\n" +
+	",ADVISORY_UNCHECKED_REASON_EVALUATION_PENDING\x10\x01\x123\n" +
+	"/ADVISORY_UNCHECKED_REASON_INVENTORY_UNAVAILABLE\x10\x02\x12-\n" +
+	")ADVISORY_UNCHECKED_REASON_INVENTORY_STALE\x10\x03\x12<\n" +
+	"8ADVISORY_UNCHECKED_REASON_HOST_INVENTORY_STALE_OR_FAILED\x10\x04\x127\n" +
+	"3ADVISORY_UNCHECKED_REASON_PACKAGE_COLLECTION_FAILED\x10\x05\x12.\n" +
+	"*ADVISORY_UNCHECKED_REASON_FEED_UNAVAILABLE\x10\x06\x12>\n" +
+	":ADVISORY_UNCHECKED_REASON_RHEL_PLATFORM_STREAM_UNAVAILABLE\x10\a\x12(\n" +
+	"$ADVISORY_UNCHECKED_REASON_FEED_STALE\x10\b\x123\n" +
+	"/ADVISORY_UNCHECKED_REASON_FEED_PARTIAL_COVERAGE\x10\t\x12=\n" +
+	"9ADVISORY_UNCHECKED_REASON_SOURCE_PACKAGE_IDENTITY_MISSING\x10\n" +
+	"\x12<\n" +
+	"8ADVISORY_UNCHECKED_REASON_PACKAGE_ARCHITECTURE_UNCOVERED\x10\v\x128\n" +
+	"4ADVISORY_UNCHECKED_REASON_PACKAGE_ORIGIN_UNAVAILABLE\x10\f\x12:\n" +
+	"6ADVISORY_UNCHECKED_REASON_PACKAGE_VERSION_UNRECOGNIZED\x10\r\x12@\n" +
+	"<ADVISORY_UNCHECKED_REASON_NATIVE_MODULE_IDENTITY_UNAVAILABLE\x10\x0e\x12B\n" +
+	">ADVISORY_UNCHECKED_REASON_NATIVE_PACKAGE_INSTANCES_UNAVAILABLE\x10\x0f\x12B\n" +
+	">ADVISORY_UNCHECKED_REASON_NATIVE_PRODUCT_PREDICATE_UNSATISFIED\x10\x10\x125\n" +
+	"1ADVISORY_UNCHECKED_REASON_ADVISORY_RECORD_INVALID\x10\x11\x124\n" +
+	"0ADVISORY_UNCHECKED_REASON_SOURCE_RECORD_REJECTED\x10\x12\x127\n" +
+	"3ADVISORY_UNCHECKED_REASON_VENDOR_ASSESSMENT_UNKNOWN\x10\x13\x12=\n" +
+	"9ADVISORY_UNCHECKED_REASON_VENDOR_MODULE_BINDING_AMBIGUOUS\x10\x14\x128\n" +
+	"4ADVISORY_UNCHECKED_REASON_MATCHING_CAPACITY_EXCEEDED\x10\x15B\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_advisories_proto_rawDescOnce sync.Once
@@ -1450,60 +1705,64 @@ func file_lindm_admin_v1_advisories_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_advisories_proto_rawDescData
 }
 
-var file_lindm_admin_v1_advisories_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_advisories_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_lindm_admin_v1_advisories_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_lindm_admin_v1_advisories_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_lindm_admin_v1_advisories_proto_goTypes = []any{
 	(AdvisoryFindingState)(0),                   // 0: lindm.admin.v1.AdvisoryFindingState
-	(*AdvisoryException)(nil),                   // 1: lindm.admin.v1.AdvisoryException
-	(*AdvisoryFinding)(nil),                     // 2: lindm.admin.v1.AdvisoryFinding
-	(*AdvisoryFreshness)(nil),                   // 3: lindm.admin.v1.AdvisoryFreshness
-	(*ListDeviceFindingsRequest)(nil),           // 4: lindm.admin.v1.ListDeviceFindingsRequest
-	(*ListDeviceFindingsResponse)(nil),          // 5: lindm.admin.v1.ListDeviceFindingsResponse
-	(*ListDeviceUncoveredPackagesRequest)(nil),  // 6: lindm.admin.v1.ListDeviceUncoveredPackagesRequest
-	(*UncoveredPackage)(nil),                    // 7: lindm.admin.v1.UncoveredPackage
-	(*ListDeviceUncoveredPackagesResponse)(nil), // 8: lindm.admin.v1.ListDeviceUncoveredPackagesResponse
-	(*ListAdvisorySummaryRequest)(nil),          // 9: lindm.admin.v1.ListAdvisorySummaryRequest
-	(*AdvisorySummary)(nil),                     // 10: lindm.admin.v1.AdvisorySummary
-	(*ListAdvisorySummaryResponse)(nil),         // 11: lindm.admin.v1.ListAdvisorySummaryResponse
-	(*ListAdvisoryFeedsRequest)(nil),            // 12: lindm.admin.v1.ListAdvisoryFeedsRequest
-	(*AdvisoryFeedStatus)(nil),                  // 13: lindm.admin.v1.AdvisoryFeedStatus
-	(*ListAdvisoryFeedsResponse)(nil),           // 14: lindm.admin.v1.ListAdvisoryFeedsResponse
-	(*AcceptAdvisoryFindingRequest)(nil),        // 15: lindm.admin.v1.AcceptAdvisoryFindingRequest
-	(*AcceptAdvisoryFindingResponse)(nil),       // 16: lindm.admin.v1.AcceptAdvisoryFindingResponse
-	(*timestamppb.Timestamp)(nil),               // 17: google.protobuf.Timestamp
-	(*v1.FeedArtifact)(nil),                     // 18: lindm.advisory.v1.FeedArtifact
-	(*v1.RejectedRecord)(nil),                   // 19: lindm.advisory.v1.RejectedRecord
+	(AdvisoryUncheckedReason)(0),                // 1: lindm.admin.v1.AdvisoryUncheckedReason
+	(*AdvisoryException)(nil),                   // 2: lindm.admin.v1.AdvisoryException
+	(*AdvisoryFinding)(nil),                     // 3: lindm.admin.v1.AdvisoryFinding
+	(*AdvisoryFreshness)(nil),                   // 4: lindm.admin.v1.AdvisoryFreshness
+	(*ListDeviceFindingsRequest)(nil),           // 5: lindm.admin.v1.ListDeviceFindingsRequest
+	(*ListDeviceFindingsResponse)(nil),          // 6: lindm.admin.v1.ListDeviceFindingsResponse
+	(*ListDeviceUncoveredPackagesRequest)(nil),  // 7: lindm.admin.v1.ListDeviceUncoveredPackagesRequest
+	(*UncoveredPackage)(nil),                    // 8: lindm.admin.v1.UncoveredPackage
+	(*ListDeviceUncoveredPackagesResponse)(nil), // 9: lindm.admin.v1.ListDeviceUncoveredPackagesResponse
+	(*ListAdvisorySummaryRequest)(nil),          // 10: lindm.admin.v1.ListAdvisorySummaryRequest
+	(*AdvisorySummary)(nil),                     // 11: lindm.admin.v1.AdvisorySummary
+	(*AdvisoryUncheckedGroup)(nil),              // 12: lindm.admin.v1.AdvisoryUncheckedGroup
+	(*ListAdvisorySummaryResponse)(nil),         // 13: lindm.admin.v1.ListAdvisorySummaryResponse
+	(*ListAdvisoryFeedsRequest)(nil),            // 14: lindm.admin.v1.ListAdvisoryFeedsRequest
+	(*AdvisoryFeedStatus)(nil),                  // 15: lindm.admin.v1.AdvisoryFeedStatus
+	(*ListAdvisoryFeedsResponse)(nil),           // 16: lindm.admin.v1.ListAdvisoryFeedsResponse
+	(*AcceptAdvisoryFindingRequest)(nil),        // 17: lindm.admin.v1.AcceptAdvisoryFindingRequest
+	(*AcceptAdvisoryFindingResponse)(nil),       // 18: lindm.admin.v1.AcceptAdvisoryFindingResponse
+	(*timestamppb.Timestamp)(nil),               // 19: google.protobuf.Timestamp
+	(*v1.FeedArtifact)(nil),                     // 20: lindm.advisory.v1.FeedArtifact
+	(*v1.RejectedRecord)(nil),                   // 21: lindm.advisory.v1.RejectedRecord
 }
 var file_lindm_admin_v1_advisories_proto_depIdxs = []int32{
-	17, // 0: lindm.admin.v1.AdvisoryException.accepted_at:type_name -> google.protobuf.Timestamp
-	17, // 1: lindm.admin.v1.AdvisoryException.expires_at:type_name -> google.protobuf.Timestamp
-	17, // 2: lindm.admin.v1.AdvisoryFinding.published_at:type_name -> google.protobuf.Timestamp
+	19, // 0: lindm.admin.v1.AdvisoryException.accepted_at:type_name -> google.protobuf.Timestamp
+	19, // 1: lindm.admin.v1.AdvisoryException.expires_at:type_name -> google.protobuf.Timestamp
+	19, // 2: lindm.admin.v1.AdvisoryFinding.published_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: lindm.admin.v1.AdvisoryFinding.state:type_name -> lindm.admin.v1.AdvisoryFindingState
-	1,  // 4: lindm.admin.v1.AdvisoryFinding.exception:type_name -> lindm.admin.v1.AdvisoryException
+	2,  // 4: lindm.admin.v1.AdvisoryFinding.exception:type_name -> lindm.admin.v1.AdvisoryException
 	0,  // 5: lindm.admin.v1.AdvisoryFreshness.state:type_name -> lindm.admin.v1.AdvisoryFindingState
-	17, // 6: lindm.admin.v1.AdvisoryFreshness.inventory_at:type_name -> google.protobuf.Timestamp
-	17, // 7: lindm.admin.v1.AdvisoryFreshness.inventory_expires_at:type_name -> google.protobuf.Timestamp
-	17, // 8: lindm.admin.v1.AdvisoryFreshness.feed_checked_at:type_name -> google.protobuf.Timestamp
-	17, // 9: lindm.admin.v1.AdvisoryFreshness.feed_expires_at:type_name -> google.protobuf.Timestamp
-	2,  // 10: lindm.admin.v1.ListDeviceFindingsResponse.findings:type_name -> lindm.admin.v1.AdvisoryFinding
-	3,  // 11: lindm.admin.v1.ListDeviceFindingsResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
-	7,  // 12: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.packages:type_name -> lindm.admin.v1.UncoveredPackage
-	3,  // 13: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
-	10, // 14: lindm.admin.v1.ListAdvisorySummaryResponse.advisories:type_name -> lindm.admin.v1.AdvisorySummary
-	17, // 15: lindm.admin.v1.AdvisoryFeedStatus.checked_at:type_name -> google.protobuf.Timestamp
-	17, // 16: lindm.admin.v1.AdvisoryFeedStatus.expires_at:type_name -> google.protobuf.Timestamp
-	17, // 17: lindm.admin.v1.AdvisoryFeedStatus.attempted_at:type_name -> google.protobuf.Timestamp
-	18, // 18: lindm.admin.v1.AdvisoryFeedStatus.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	17, // 19: lindm.admin.v1.AdvisoryFeedStatus.snapshot_at:type_name -> google.protobuf.Timestamp
-	19, // 20: lindm.admin.v1.AdvisoryFeedStatus.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
-	13, // 21: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
-	17, // 22: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 23: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	19, // 6: lindm.admin.v1.AdvisoryFreshness.inventory_at:type_name -> google.protobuf.Timestamp
+	19, // 7: lindm.admin.v1.AdvisoryFreshness.inventory_expires_at:type_name -> google.protobuf.Timestamp
+	19, // 8: lindm.admin.v1.AdvisoryFreshness.feed_checked_at:type_name -> google.protobuf.Timestamp
+	19, // 9: lindm.admin.v1.AdvisoryFreshness.feed_expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 10: lindm.admin.v1.ListDeviceFindingsResponse.findings:type_name -> lindm.admin.v1.AdvisoryFinding
+	4,  // 11: lindm.admin.v1.ListDeviceFindingsResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
+	8,  // 12: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.packages:type_name -> lindm.admin.v1.UncoveredPackage
+	4,  // 13: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
+	1,  // 14: lindm.admin.v1.AdvisoryUncheckedGroup.reason:type_name -> lindm.admin.v1.AdvisoryUncheckedReason
+	11, // 15: lindm.admin.v1.ListAdvisorySummaryResponse.advisories:type_name -> lindm.admin.v1.AdvisorySummary
+	12, // 16: lindm.admin.v1.ListAdvisorySummaryResponse.unchecked_groups:type_name -> lindm.admin.v1.AdvisoryUncheckedGroup
+	19, // 17: lindm.admin.v1.AdvisoryFeedStatus.checked_at:type_name -> google.protobuf.Timestamp
+	19, // 18: lindm.admin.v1.AdvisoryFeedStatus.expires_at:type_name -> google.protobuf.Timestamp
+	19, // 19: lindm.admin.v1.AdvisoryFeedStatus.attempted_at:type_name -> google.protobuf.Timestamp
+	20, // 20: lindm.admin.v1.AdvisoryFeedStatus.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
+	19, // 21: lindm.admin.v1.AdvisoryFeedStatus.snapshot_at:type_name -> google.protobuf.Timestamp
+	21, // 22: lindm.admin.v1.AdvisoryFeedStatus.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	15, // 23: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
+	19, // 24: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
+	2,  // 25: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
+	26, // [26:26] is the sub-list for method output_type
+	26, // [26:26] is the sub-list for method input_type
+	26, // [26:26] is the sub-list for extension type_name
+	26, // [26:26] is the sub-list for extension extendee
+	0,  // [0:26] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_advisories_proto_init() }
@@ -1516,8 +1775,8 @@ func file_lindm_admin_v1_advisories_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_advisories_proto_rawDesc), len(file_lindm_admin_v1_advisories_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   16,
+			NumEnums:      2,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

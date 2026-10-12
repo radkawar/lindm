@@ -180,7 +180,7 @@ export function AuditView({
                           : "Account name unavailable"}
                   </TableCell>
                   <TableCell className="min-w-48 max-w-md whitespace-normal break-words">
-                    {event.reason.trim() || "Not recorded"}
+                    {event.reason.trim()}
                   </TableCell>
                   <TableCell>
                     {event.targetDeviceId && canOpenDevices ? (
@@ -193,9 +193,7 @@ export function AuditView({
                       </Link>
                     ) : event.targetDeviceId ? (
                       event.deviceHostname.trim() || "Unnamed device"
-                    ) : (
-                      "Not recorded"
-                    )}
+                    ) : null}
                   </TableCell>
                   <TableCell>
                     <TechnicalDetails
