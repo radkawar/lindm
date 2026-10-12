@@ -267,8 +267,25 @@ export class ChromiumDriver {
   async browserTask(fn, args) {
     return this.page.evaluate(fn, args);
   }
+  // A page navigation is a read-only GET. Shared lab hosts flap interface
+  // addresses, which makes Chromium abort it (net::ERR_NETWORK_CHANGED);
+  // repeat only that class of failure, a bounded number of times.
   async goto(url) {
-    await this.page.goto(url, { waitUntil: "domcontentloaded" });
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.page.goto(url, { waitUntil: "domcontentloaded" });
+        return;
+      } catch (error) {
+        if (
+          attempt >= 3 ||
+          !/net::ERR_(NETWORK_CHANGED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE)/.test(
+            String(error?.message ?? ""),
+          )
+        )
+          throw error;
+        await delay(1000);
+      }
+    }
   }
   async screenshot() {
     return this.page.screenshot({ fullPage: true, timeout: 10_000 });
