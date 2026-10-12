@@ -158,3 +158,34 @@ export async function revealAfterApproval({
     refusal: (await panel.innerText()).trim().split("\n").slice(0, 3).join(" "),
   };
 }
+
+// While a value is revealed the card shows only the value block and the
+// recorded reason: no request form, approval sentence or reveal buttons.
+export async function requireRevealedAlone({ main, require, reason, revealName }) {
+  const reasonFact = (await main.locator("[data-reveal-reason]").innerText()).trim();
+  require(reasonFact ===
+    `Reason recorded: ${reason}`, `Revealed value does not state the recorded reason (got ${JSON.stringify(reasonFact)})`);
+  for (const [what, count] of [
+    ["the Reason field", await main.getByRole("textbox", { name: "Reason", exact: true }).count()],
+    [
+      "the approval sentence",
+      await main.getByText(/^Needs approval|only admin who can reveal/).count(),
+    ],
+    [`"${revealName}"`, await main.getByRole("button", { name: revealName, exact: true }).count()],
+    [
+      '"Request approval"',
+      await main.getByRole("button", { name: "Request approval", exact: true }).count(),
+    ],
+  ])
+    require(count === 0, `While revealed, the page still shows ${what}`);
+}
+
+// After Hide now the request form returns.
+export async function requireFormRestored({ main, require, revealName }) {
+  const button = main.getByRole("button", { name: revealName, exact: true });
+  await button.waitFor({ timeout }).catch(() => {});
+  require(await button.isVisible(), `"${revealName}" did not return after Hide now`);
+  require(await main
+    .getByRole("textbox", { name: "Reason", exact: true })
+    .isVisible(), "The Reason field did not return after Hide now");
+}

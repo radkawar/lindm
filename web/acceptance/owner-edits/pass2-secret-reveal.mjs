@@ -6,7 +6,15 @@
 // completing the in-page "Verify it's you" when the server asks for it.
 // State (registered late): one new admin account, one approved and consumed
 // secret reveal approval (audited).
-import { createAdmin, revealAfterApproval } from "./second-admin.mjs";
+import {
+  createAdmin,
+  requireFormRestored,
+  requireRevealedAlone,
+  revealAfterApproval,
+} from "./second-admin.mjs";
+
+const reason = "Owner pass 2 check: copy the value";
+const revealName = "Reveal secret";
 
 export const task = {
   name: "Revealed secret has copy and countdown",
@@ -14,7 +22,7 @@ export const task = {
   route: "/secrets/$secretId",
   priority: "medium",
   acceptance:
-    "A revealed secret shows a visible 'Hides in N s' countdown, a Copy button that copies the raw value, and Hide now.",
+    "A revealed secret shows only the value with a visible 'Hides in N s' countdown, Copy (raw value), Hide now and the recorded reason; the request form returns after hiding.",
 };
 
 export async function check({ page, config, demo, visit, require, capture, step }) {
@@ -27,7 +35,7 @@ export async function check({ page, config, demo, visit, require, capture, step 
 
   step("open secret");
   await visit(`/secrets/${SecretID}`);
-  await main.getByRole("button", { name: "Reveal secret" }).waitFor({ timeout: 30_000 });
+  await main.getByRole("button", { name: revealName }).waitFor({ timeout: 30_000 });
   require(await main
     .getByText("The value disappears after 30 seconds or when you leave this page.")
     .isVisible(), "Reveal does not say when the value hides");
@@ -40,18 +48,21 @@ export async function check({ page, config, demo, visit, require, capture, step 
       .innerText()
   ).trim();
   const name = prompt.replace(/^Type /, "").replace(/ to confirm$/, "");
-  await main.getByLabel("Reason", { exact: true }).fill("Owner pass 2 check: copy the value");
+  await main.getByLabel("Reason", { exact: true }).fill(reason);
   await main.getByLabel(prompt).fill(name);
   const { value, refusal } = await revealAfterApproval({
     page,
     config,
     admin,
     refreshName: "Check approval",
-    revealName: "Reveal secret",
+    revealName,
     valueLabel: "Secret value",
     failureTitle: "Secret not revealed",
   });
   if (!value) throw new Error(`The approved reveal did not show the value: ${refusal}`);
+
+  step("only the value while revealed");
+  await requireRevealedAlone({ main, require, reason, revealName });
 
   step("countdown, copy, hide");
   const countdown = (await main.locator("[data-reveal-countdown]").innerText()).trim();
@@ -67,4 +78,5 @@ export async function check({ page, config, demo, visit, require, capture, step 
   await capture("pass2-secret-reveal");
   await main.getByRole("button", { name: "Hide now", exact: true }).click();
   require(!(await value.isVisible()), "Hide now left the value visible");
+  await requireFormRestored({ main, require, revealName });
 }

@@ -224,23 +224,28 @@ export function RecoveryKeyReveal({
   }
 
   const awaitingApproval = approvalRequired === true && approvalState !== ApprovalState.APPROVED;
-  return (
-    <div className="grid gap-3 rounded-md border p-3">
-      {secret ? (
+  if (secret) {
+    const key = new TextDecoder().decode(secret);
+    return (
+      <div className="grid gap-3 rounded-md border p-3">
         <RevealedSecret
           label="Recovery key"
-          display={groupKey(new TextDecoder().decode(secret))}
-          raw={new TextDecoder().decode(secret)}
+          display={groupKey(key)}
+          raw={key}
           hidesAt={hidesAt}
+          reason={reason.trim()}
           note="Grouped in fours for reading aloud; Copy copies it without dashes."
           copiedMessage="Recovery key copied"
           onHide={hide}
         />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          The key hides after 30 seconds or when you leave the page.
-        </p>
-      )}
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-3 rounded-md border p-3">
+      <p className="text-sm text-muted-foreground">
+        The key hides after 30 seconds or when you leave the page.
+      </p>
       <Label htmlFor={`reveal-reason-${actionId}`}>Reason</Label>
       <Textarea
         id={`reveal-reason-${actionId}`}
@@ -289,7 +294,7 @@ export function RecoveryKeyReveal({
       <div className="flex gap-2">
         <Button
           variant={approvalRequired === null || awaitingApproval ? "outline" : "default"}
-          disabled={busy || secret !== null || ambiguous === "approval" || awaitingApproval}
+          disabled={busy || ambiguous === "approval" || awaitingApproval}
           onClick={() => void reveal()}
         >
           {busy ? "Requesting…" : ambiguous === "reveal" ? "Retry" : "Reveal recovery key"}
@@ -297,7 +302,7 @@ export function RecoveryKeyReveal({
         {approvalRequired === false ? null : (
           <Button
             variant={awaitingApproval ? "default" : "outline"}
-            disabled={busy || secret !== null || ambiguous === "reveal"}
+            disabled={busy || ambiguous === "reveal"}
             onClick={() => void requestApproval()}
           >
             {approvalState === null ? "Request approval" : "Refresh approval status"}

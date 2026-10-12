@@ -8,7 +8,15 @@
 // completing the in-page "Verify it's you" when the server asks for it.
 // State (registered late): one new admin account, one approved and consumed
 // recovery-key reveal approval (audited).
-import { createAdmin, revealAfterApproval } from "./second-admin.mjs";
+import {
+  createAdmin,
+  requireFormRestored,
+  requireRevealedAlone,
+  revealAfterApproval,
+} from "./second-admin.mjs";
+
+const reason = "Owner pass 2 check: read key to user";
+const revealName = "Reveal recovery key";
 
 export const task = {
   name: "Recovery key reveal leads with the key",
@@ -16,7 +24,7 @@ export const task = {
   route: "/devices/$deviceId/recovery/$actionId",
   priority: "high",
   acceptance:
-    "Reveal page opens with the reveal form/result; no 'Rotate escrow recovery key' card or its expiry; a revealed key shows as 20f4-a061-… groups with a visible 'Hides in N s' countdown and Copy copies the raw 64-character key.",
+    "Reveal page opens with the reveal form/result; no Rotate escrow recovery key card or its expiry; a revealed key shows alone (no request form) as 20f4-a061-… groups with a visible Hides in N s countdown, the recorded reason, and Copy copies the raw 64-character key; the form returns after hiding.",
 };
 
 const grouped = /^([0-9a-f]{4}-){15}[0-9a-f]{4}$/;
@@ -48,18 +56,21 @@ export async function check({ page, config, demo, visit, require, capture, step 
     "Recovery access", `First card is not the reveal (got ${JSON.stringify(titles[0])})`);
 
   step("request approval, approve as the second admin, reveal");
-  await main.getByLabel("Reason", { exact: true }).fill("Owner pass 2 check: read key to user");
+  await main.getByLabel("Reason", { exact: true }).fill(reason);
   await main.getByLabel("Type the device name to confirm").fill(hostname);
   const { value: key, refusal } = await revealAfterApproval({
     page,
     config,
     admin,
     refreshName: "Refresh approval status",
-    revealName: "Reveal recovery key",
+    revealName,
     valueLabel: "Recovery key",
     failureTitle: "Couldn't reveal recovery key",
   });
   if (!key) throw new Error(`The approved reveal did not show the key: ${refusal}`);
+
+  step("only the key while revealed");
+  await requireRevealedAlone({ main, require, reason, revealName });
 
   step("grouped key, countdown, raw copy");
   const shown = (await key.innerText()).trim();
@@ -77,7 +88,8 @@ export async function check({ page, config, demo, visit, require, capture, step 
   // The demo fixture's disposable key; the owner asked to see the revealed state.
   await capture("pass2-safety-reveal");
 
-  step("hide now");
+  step("hide now restores the form");
   await main.getByRole("button", { name: "Hide now", exact: true }).click();
   require(!(await key.isVisible()), "Hide now left the key visible");
+  await requireFormRestored({ main, require, revealName });
 }

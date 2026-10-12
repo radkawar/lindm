@@ -237,25 +237,29 @@ export function SecretReveal({
     failure?.reason === "approval_required" || failure?.reason === "human_approval_required";
   const awaitingApproval =
     (approvalRequired === true || approvalRefused) && approvalState !== ApprovalState.APPROVED;
-  return (
-    <div className="grid gap-3 rounded-md border p-3">
-      {shown ? (
+  if (shown) {
+    return (
+      <div className="grid gap-3 rounded-md border p-3">
         <RevealedSecret
           label="Secret value"
           display={shown.text}
           raw={shown.text}
           hidesAt={hidesAt}
+          reason={reason.trim()}
           note={
             shown.hex ? "Shown and copied as hexadecimal because it isn't plain text." : undefined
           }
           copiedMessage="Secret copied"
           onHide={hide}
         />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          The value disappears after 30 seconds or when you leave this page.
-        </p>
-      )}
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-3 rounded-md border p-3">
+      <p className="text-sm text-muted-foreground">
+        The value disappears after 30 seconds or when you leave this page.
+      </p>
       <Label htmlFor={`${idPrefix}-reason`}>Reason</Label>
       <Textarea
         id={`${idPrefix}-reason`}
@@ -309,7 +313,7 @@ export function SecretReveal({
       <div className="flex flex-wrap gap-2">
         <Button
           variant={approvalRequired === null || awaitingApproval ? "outline" : "default"}
-          disabled={busy || secret !== null || ambiguous === "approval" || awaitingApproval}
+          disabled={busy || ambiguous === "approval" || awaitingApproval}
           onClick={() => void reveal()}
         >
           {busy ? "Requesting…" : ambiguous === "reveal" ? "Try again" : "Reveal secret"}
@@ -317,7 +321,7 @@ export function SecretReveal({
         {approvalRequired === false && !approvalRefused ? null : (
           <Button
             variant={awaitingApproval ? "default" : "outline"}
-            disabled={busy || secret !== null || ambiguous === "reveal"}
+            disabled={busy || ambiguous === "reveal"}
             onClick={() => void requestApproval()}
           >
             {approvalState === null ? "Request approval" : "Check approval"}

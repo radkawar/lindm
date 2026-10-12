@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-// A revealed secret value with a visible auto-hide countdown, Copy (raw value)
-// and Hide now. The owner hides the value itself when `hidesAt` passes; this
-// component only shows the remaining time.
+// A revealed secret value with a visible auto-hide countdown, Copy (raw value),
+// Hide now and the audited reason it was revealed for. While it shows, the
+// caller renders nothing else: the request form returns after it hides. The
+// caller hides the value when `hidesAt` passes; this only shows the time left.
 export function RevealedSecret({
   label,
   display,
   raw,
   hidesAt,
+  reason,
   note,
   onHide,
   copiedMessage,
@@ -18,6 +20,7 @@ export function RevealedSecret({
   display: string;
   raw: string;
   hidesAt: number;
+  reason: string;
   note?: string;
   onHide: () => void;
   copiedMessage: string;
@@ -38,6 +41,10 @@ export function RevealedSecret({
       </p>
       <p className="text-sm text-muted-foreground" data-reveal-countdown>
         Hides in {seconds} s or when you leave the page.{note ? ` ${note}` : ""}
+      </p>
+      <p className="text-sm" data-reveal-reason>
+        <span className="text-muted-foreground">Reason recorded: </span>
+        {reason}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button
