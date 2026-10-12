@@ -143,6 +143,31 @@ func TestCreateOnlyExistingAccountRequiresAdoption(t *testing.T) {
 		t.Fatalf("existing account acquired under CREATE_ONLY: %v", err)
 	}
 }
+
+// Creating an account the profile leaves without explicit numeric identity,
+// home or shell is a typed precondition the administrator fixes in the profile,
+// never an internal failure retried forever.
+func TestCreationWithoutExplicitIdentityIsTypedPrecondition(t *testing.T) {
+	p := testProvider()
+	group := fixtureSnapshot(true)
+	group.Observation.GetLocalGroup().Exists = false
+	group.Observation.GetLocalGroup().Gid = nil
+	d := groupDesired(nil)
+	d.GetLocalGroup().Gid = nil
+	user := fixtureSnapshot(false)
+	user.Observation.GetLocalUser().Exists = false
+	u := userDesired()
+	u.GetLocalUser().HomeDirectory = nil
+	for _, c := range []struct {
+		desired *resourcev1.ResourceDesiredState
+		before  *agentv1.ResourceOwnershipSnapshot
+	}{{d, group}, {u, user}} {
+		_, _, err := p.target(context.Background(), c.desired, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE, c.before, fixtureDB(), nil)
+		if !errors.Is(err, ErrConflict) || admissiondetail.Of(err) != "explicit_account_identity_required" {
+			t.Fatalf("%s creation without explicit identity: %v", c.desired.GetRef().GetKind(), err)
+		}
+	}
+}
 func TestChangedDimensionsDoNotAcquireSatisfiedFields(t *testing.T) {
 	before := fixtureSnapshot(false)
 	after := proto.CloneOf(before)

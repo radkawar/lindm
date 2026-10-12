@@ -3690,6 +3690,16 @@ and its checked signing key are prerequisites, not authority supplied by a
 profile. Immutable OSTree and Nix installations are rejected. Existing native
 records with unprovable repository provenance remain explicitly unknown and
 cannot be acquired by inventing a signer or copying the desired repository.
+Provenance is known only for a package lindm installed (its transaction receipt
+names source, signer and metadata revision). A package already installed by the
+image or by hand is therefore refused under every ownership mode as
+`existing_package_unverified`, a typed `PRECONDITION`; it does not verify
+read-only as converged either, because convergence requires the approved source
+and the persistent pin. The staging failure carries the detail in
+`ResourcePreparationOutcome.detail`, which becomes the row's BLOCKED reason
+([architecture](architecture.md#adoption-required-refusals)). The APT snapshot
+lists each signer digest once, although every suite of an archive (for example
+`noble`, `noble-updates`, `noble-security`) is signed by the same key.
 
 Preparation runs asynchronously in the bounded native helper, keyed by the exact
 signed action and its preparation deadline. It downloads authenticated metadata

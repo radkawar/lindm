@@ -1,15 +1,19 @@
 package orgapply
 
 import (
+	"strconv"
 	"testing"
+	"testing/synctest"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	orgv1 "lindm/gen/lindm/org/v1"
+	"lindm/internal/rpcreason"
 )
 
 func TestExceptionProposalNeverAcceptsOrApproves(t *testing.T) {
@@ -79,4 +83,44 @@ func TestExceptionCanonicalExpiryDoesNotReissueApproval(t *testing.T) {
 	if len(client.requests) != 1 {
 		t.Fatal("one-microsecond expiry change was silently tolerated")
 	}
+}
+
+// A managed package install publishes a new host observation while a long
+// finding scan is paging; the server aborts the stale cursor and the scan
+// restarts from the first page instead of failing the whole apply.
+func TestExceptionScanRestartsWhenAdvisoryEvidenceChanges(t *testing.T) {
+	setup := func(changes int) (*fakeAdmin, *orgv1.Organization) {
+		client := newFakeAdmin()
+		deviceID := uuid.NewString()
+		client.fleet = []*adminv1.Device{{Id: deviceID, Hostname: "laptop"}}
+		// The declared finding is on the second page, so a stale cursor matters.
+		for i := range 250 {
+			client.findings = append(client.findings, &adminv1.AdvisoryFinding{Id: uuid.NewString(), AdvisoryId: "advisory-" + strconv.Itoa(i), PackageName: "package", State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED})
+		}
+		client.findingSnapshotChanges = changes
+		return client, &orgv1.Organization{Name: "exceptions", AdvisoryExceptions: []*orgv1.AdvisoryException{{Hostname: "laptop", AdvisoryId: "advisory-249", PackageName: "package", ProposeApproval: true, Request: &adminv1.AcceptAdvisoryFindingRequest{Reason: "temporary compatibility exception", ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}}}}
+	}
+	synctest.Test(t, func(t *testing.T) {
+		client, spec := setup(findingScanAttempts - 1)
+		plan, err := Plan(t.Context(), client, spec)
+		if err != nil {
+			t.Fatalf("a changed evidence snapshot must restart the scan: %v", err)
+		}
+		if client.findingCalls != 2*findingScanAttempts {
+			t.Fatalf("scan made %d list calls, want %d", client.findingCalls, 2*findingScanAttempts)
+		}
+		result, err := Apply(t.Context(), client, plan, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Outcomes) != 1 || result.Outcomes[0].Status != "pending" || result.Outcomes[0].Detail == "finding not found" {
+			t.Fatalf("restarted scan lost the finding: %+v", result.Outcomes)
+		}
+	})
+	synctest.Test(t, func(t *testing.T) {
+		client, spec := setup(findingScanAttempts)
+		if _, err := Plan(t.Context(), client, spec); connect.CodeOf(err) != connect.CodeAborted || rpcreason.Get(err) != "advisory_evidence_changed" {
+			t.Fatalf("persistent evidence churn must surface after %d scans, got %v", findingScanAttempts, err)
+		}
+	})
 }

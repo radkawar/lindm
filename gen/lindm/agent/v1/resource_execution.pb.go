@@ -484,9 +484,13 @@ func (x *ResourceExecutionPreparation) GetMaxCacheBytes() uint64 {
 // Explicit evidence that staging ended without ever producing a native plan.
 // This is not a native observation, mutation result or convergence claim.
 type ResourcePreparationOutcome struct {
-	state         protoimpl.MessageState        `protogen:"open.v1"`
-	Preparation   *ResourceExecutionPreparation `protobuf:"bytes,1,opt,name=preparation,proto3" json:"preparation,omitempty"`
-	Failure       ResourceExecutionFailure      `protobuf:"varint,2,opt,name=failure,proto3,enum=lindm.agent.v1.ResourceExecutionFailure" json:"failure,omitempty"`
+	state       protoimpl.MessageState        `protogen:"open.v1"`
+	Preparation *ResourceExecutionPreparation `protobuf:"bytes,1,opt,name=preparation,proto3" json:"preparation,omitempty"`
+	Failure     ResourceExecutionFailure      `protobuf:"varint,2,opt,name=failure,proto3,enum=lindm.agent.v1.ResourceExecutionFailure" json:"failure,omitempty"`
+	// Optional closed snake_case cause an administrator can act on, for example
+	// existing_package_unverified or native_tool_outdated. Never free text,
+	// paths or native tool output.
+	Detail        string `protobuf:"bytes,3,opt,name=detail,proto3" json:"detail,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -533,6 +537,13 @@ func (x *ResourcePreparationOutcome) GetFailure() ResourceExecutionFailure {
 		return x.Failure
 	}
 	return ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSPECIFIED
+}
+
+func (x *ResourcePreparationOutcome) GetDetail() string {
+	if x != nil {
+		return x.Detail
+	}
+	return ""
 }
 
 // Device-key DSSE payload application/vnd.lindm.execution-challenge.v1+protobuf.
@@ -2164,10 +2175,11 @@ const file_lindm_agent_v1_resource_execution_proto_rawDesc = "" +
 	"\x1cResourceExecutionPreparation\x12>\n" +
 	"\bdeadline\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\bdeadline\x125\n" +
 	"\x0fmax_cache_bytes\x18\x02 \x01(\x04B\r\xbaH\n" +
-	"2\b\x18\x80\x80\x80\x80\x10 \x00R\rmaxCacheBytes\"\xc6\x01\n" +
+	"2\b\x18\x80\x80\x80\x80\x10 \x00R\rmaxCacheBytes\"\xfd\x01\n" +
 	"\x1aResourcePreparationOutcome\x12V\n" +
 	"\vpreparation\x18\x01 \x01(\v2,.lindm.agent.v1.ResourceExecutionPreparationB\x06\xbaH\x03\xc8\x01\x01R\vpreparation\x12P\n" +
-	"\afailure\x18\x02 \x01(\x0e2(.lindm.agent.v1.ResourceExecutionFailureB\f\xbaH\t\x82\x01\x06\x10\x01 \x00 \x01R\afailure\"\xd4\n" +
+	"\afailure\x18\x02 \x01(\x0e2(.lindm.agent.v1.ResourceExecutionFailureB\f\xbaH\t\x82\x01\x06\x10\x01 \x00 \x01R\afailure\x125\n" +
+	"\x06detail\x18\x03 \x01(\tB\x1d\xbaH\x1ar\x18\x18@2\x14^([a-z][a-z0-9_]*)?$R\x06detail\"\xd4\n" +
 	"\n" +
 	"\x1aResourceExecutionChallenge\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +

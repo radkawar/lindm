@@ -636,16 +636,33 @@ A provider whose `CREATE_ONLY` acquisition meets an existing unowned native
 object returns its `ErrAdoptionRequired`, which also satisfies its `ErrConflict`
 so existing classification holds: the file (`existing_file`), SSH banner
 (`existing_banner_file`), account (`existing_account`), systemd definition
-(`existing_definition`), package/pin (`existing_package`) and sysctl
+(`existing_definition`), package/pin (`existing_package`, only for a package
+whose provenance lindm recorded when it installed it) and sysctl
 (`existing_kernel_setting`) providers. `internal/agent/admissiondetail` attaches
 the closed snake_case detail. Objects that approval can never acquire stay plain
 `ErrConflict` with a detail: the Fedora `/etc/issue.net` symlink
 (`existing_banner_symlink`), the reserved banner drop-in
-(`existing_banner_dropin`) and an existing OS-update timer or path
-(`existing_update_timer`). Other actionable details are `native_tool_outdated`
+(`existing_banner_dropin`), an existing OS-update timer or path
+(`existing_update_timer`) and a package installed without lindm
+(`existing_package_unverified`). That last one cannot converge read-only either:
+`NativePackageChecks.converged` requires `approved_source_matches` (lindm's
+recorded origin equals the desired repository) and the package's persistent
+version pin, and dpkg/rpm keep no artifact digest that could prove a preinstalled
+package came from the approved repository. Account creation without explicit
+numeric identity (a group's GID; a user's UID, primary group, home and shell) is
+`ErrConflict` with `explicit_account_identity_required`; the provider never
+allocates IDs. Other actionable details are `native_tool_outdated`
 (DNF below the registry minimum), `native_tool_missing` (OS-update tooling),
 `ssh_service_inactive`, `ssh_config_invalid` and `unit_not_installed` (a
 `SYSTEMD_SERVICE` unit systemd reports `NoSuchUnit` or `not-found`).
+
+Package rows meet most of these during preparation (staging), not admission:
+an executor record may carry an admission refusal on a prepared intent only for
+`CAPABILITY_NOT_ENABLED`. The effect-free staging failure therefore records the
+detail in `ResourcePreparationOutcome.detail`, and the server uses it as the
+row's reason exactly like a refusal detail: `PRECONDITION` with a detail is
+BLOCKED, `UNSUPPORTED` stays native-unsupported but named (for example
+`native_tool_outdated` on a stock Fedora 44 DNF5).
 
 ### Closed resources and targeting: control-plane cutover
 

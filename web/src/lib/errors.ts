@@ -200,7 +200,7 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
     "The device couldn't confirm whether the last change finished. Check the device before assigning again.",
   execution_failed: "The last change failed on the device. Its report is under Latest change.",
   preparation_precondition_failed:
-    "The device stopped before changing anything because a safety check failed, for example a package that was already installed without lindm. Nothing was changed.",
+    "The device stopped before changing anything because a safety check failed. Nothing was changed.",
   ownership_baseline_unavailable:
     "lindm has no record of this setting from before it took over, so it leaves the device as it is.",
   precondition_failed:
@@ -264,6 +264,10 @@ const DEVICE_CAUSES: Record<string, string> = {
     "The device's system tool for this item is too old (on Fedora, dnf5 older than 5.4.6.0). Apply OS updates on the device first.",
   native_tool_missing:
     "Blocked: a system tool this item needs isn't installed on the device. Install it on the device.",
+  existing_package_unverified:
+    "Blocked: this package was already installed without lindm, and lindm can't verify it came from the approved repository, so it won't take it over. Remove the package on the device, or remove it from the profile.",
+  explicit_account_identity_required:
+    "Blocked: creating this local account needs its exact numeric ID in the profile (a GID for a group; a UID, primary group, home folder and login shell for a user). Add them to the profile.",
   ssh_service_inactive:
     "Blocked: the SSH service isn't running on the device. Start SSH on the device, or remove the SSH setting from the profile.",
   ssh_config_invalid:

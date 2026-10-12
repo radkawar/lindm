@@ -46,7 +46,9 @@ getent ahostsv4 localhost | awk '{print $1}' | sort -u`
 
 // configureAssistanceGuest opts the installed executor into remote assistance
 // and waits for its session-helper socket. Everything else in the packaged
-// configuration is preserved.
+// configuration is preserved. An executor already opted in (a resumed demo) is
+// not restarted: a restart would interrupt resource effects the executor began
+// at boot and leave them OUTCOME_UNKNOWN.
 func configureAssistanceGuest(ctx context.Context, vm *guestVM) error {
 	data, err := vm.run(ctx, "sudo -n cat /etc/lindm/executor.json", nil, 1<<20, 10*time.Second)
 	if err != nil {
@@ -55,6 +57,9 @@ func configureAssistanceGuest(ctx context.Context, vm *guestVM) error {
 	config := new(agentv1.AgentConfig)
 	if err := protojson.Unmarshal(data, config); err != nil {
 		return err
+	}
+	if config.GetRemoteAssistance().GetEnabled() {
+		return pollGuest(ctx, vm, time.Minute, "executor session socket", "test -S "+nativeQuote(localrpc.DefaultSessionSocketPath))
 	}
 	config.RemoteAssistance = &agentv1.RemoteAssistanceConfig{Enabled: true}
 	data, err = protojson.Marshal(config)

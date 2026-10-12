@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -492,4 +493,33 @@ func capabilityGuardConfig() *agentv1.ConnectivityGuardConfig {
 		}
 	}
 	return guard
+}
+
+// An effect-free staging refusal keeps the provider's closed actionable detail
+// in the signed preparation outcome, so the server can name the cause.
+func TestResourcePreparationFailureCarriesDetail(t *testing.T) {
+	for _, tc := range []struct {
+		err     error
+		failure agentv1.ResourceExecutionFailure
+		detail  string
+	}{
+		{admissiondetail.Wrap(fmt.Errorf("%w: installed provenance unknown", packageprovider.ErrConflict), "existing_package_unverified"), agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, "existing_package_unverified"},
+		{admissiondetail.Wrap(fmt.Errorf("%w: native dnf5 5.4.6.0 or newer required", packageprovider.ErrUnsupported), "native_tool_outdated"), agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated"},
+		{packageprovider.ErrConflict, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, ""},
+	} {
+		f, n, intent := newPreparationFixture(t)
+		_, envelope := f.prepare(t, intent)
+		n.planErr.Store(&tc.err)
+		response, err := f.svc.PrepareResourceExecution(t.Context(), connect.NewRequest(&agentv1.PrepareResourceExecutionRequest{IntentEnvelope: envelope}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		status := response.Msg.GetStatus()
+		if status.GetFailure() != tc.failure || status.GetPreparationOutcome().GetFailure() != tc.failure || status.GetPreparationOutcome().GetDetail() != tc.detail || n.applies.Load() != 0 {
+			t.Fatalf("%v: staging outcome = %v", tc.err, status)
+		}
+		if _, attested := attestResource(t, f, status); !proto.Equal(attested.GetStatus(), status) {
+			t.Fatalf("%v: signed history lost the preparation detail", tc.err)
+		}
+	}
 }

@@ -594,8 +594,12 @@ func (p *Provider) acquisitionAllowed(before *resourcev1.ResourceObservation, le
 		return errors.New("packageprovider: release has no ownership baseline")
 	}
 	o := before.GetNativePackage()
+	// lindm knows a package's origin only when it installed it; dpkg/rpm keep
+	// no artifact digest that could prove a preinstalled package came from the
+	// approved repository, so neither CREATE_ONLY nor approved adoption may
+	// take it over.
 	if o.GetInstalled() && !o.GetRecord().GetProvenanceKnown() {
-		return errors.New("packageprovider: installed provenance unknown; unsafe acquisition refused")
+		return admissiondetail.Wrap(fmt.Errorf("%w: installed provenance unknown; unsafe acquisition refused", ErrConflict), "existing_package_unverified")
 	}
 	if (o.GetInstalled() || pinClaimsPackage(before.GetRef(), o)) && p.config.Ownership.GetPolicy().GetMode() != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
 		return admissiondetail.Wrap(fmt.Errorf("%w: existing package/pin requires approved adoption", ErrAdoptionRequired), "existing_package")

@@ -268,3 +268,21 @@ func TestNativeKindRegistryIsClosed(t *testing.T) {
 		}
 	}
 }
+
+// Creating a home under the registry's /home root needs that parent writable;
+// ProtectHome=read-only would override ReadWritePaths for the same path. A home
+// root elsewhere keeps ProtectHome=read-only.
+func TestAccountHomeCreationUnderHomeIsWritable(t *testing.T) {
+	directory := "/var/lib/lindm/executor/resource-transactions/" + nativeTestAction
+	for _, tc := range []struct {
+		home, parent, protect string
+	}{{"/home/developer", "/home", "no"}, {"/srv/homes/developer", "/srv/homes", "read-only"}} {
+		user := &resourcev1.LocalUserDesired{Name: "developer", Presence: resourcev1.Presence_PRESENCE_PRESENT, HomeDirectory: &tc.home, Home: &resourcev1.HomePolicy{Creation: resourcev1.HomeCreation_HOME_CREATION_CREATE_IF_ABSENT}}
+		ref := &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_LOCAL_USER, CanonicalKey: "developer"}
+		plan := &resourcev1.ResourcePlan{Ref: ref, Backend: &resourcev1.BackendSelection{Product: &resourcev1.PlatformProduct{OsId: "ubuntu", Version: "24.04"}}, Plan: &resourcev1.ResourcePlan_LocalUser{LocalUser: &resourcev1.LocalUserPlan{Desired: user}}}
+		values := unitValues(t, directory, plan, nil, nil)
+		if values["ProtectHome"] != tc.protect || !slices.Contains(unitValue[[]string](t, values, "ReadWritePaths"), tc.parent) || slices.Contains(unitValue[[]string](t, values, "ReadWritePaths"), tc.home) {
+			t.Fatalf("%s: ProtectHome=%v ReadWritePaths=%v", tc.home, values["ProtectHome"], values["ReadWritePaths"])
+		}
+	}
+}

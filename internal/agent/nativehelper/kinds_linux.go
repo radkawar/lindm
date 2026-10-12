@@ -90,7 +90,16 @@ var account = nativeKind{
 		s.privateNetwork = false
 		s.families = append(s.families, "AF_INET", "AF_INET6")
 		if user := desired.GetLocalUser(); user != nil && user.GetHome().GetCreation() == resourcev1.HomeCreation_HOME_CREATION_CREATE_IF_ABSENT {
-			s.paths = append(s.paths, filepath.Dir(user.GetHomeDirectory()))
+			parent := filepath.Dir(user.GetHomeDirectory())
+			s.paths = append(s.paths, parent)
+			if underProtectedHome(parent) {
+				// ProtectHome=read-only would win over ReadWritePaths for the
+				// same path (systemd keeps the read-only mount of /home), so
+				// home creation under the registry's /home root failed with
+				// EROFS. ProtectSystem=strict still keeps /root, /run/user and
+				// every other path read-only; only the parent is writable.
+				s.protectHome = "no"
+			}
 		}
 		return nil
 	},
@@ -104,6 +113,16 @@ var account = nativeKind{
 		result.After, err = accountprovider.ObserveNative(ctx, env, request.GetDesired())
 		return err
 	},
+}
+
+// underProtectedHome reports whether path is one of ProtectHome's trees.
+func underProtectedHome(path string) bool {
+	for _, root := range []string{"/home", "/root", "/run/user"} {
+		if path == root || strings.HasPrefix(path, root+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // The vendor tool may create its own state directory, but only after the helper

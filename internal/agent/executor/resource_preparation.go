@@ -13,6 +13,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/journal"
 	"lindm/internal/agent/packageprovider"
 	"lindm/internal/resource"
@@ -135,7 +136,7 @@ func (s *Service) pollResourcePreparationLocked(ctx context.Context, loaded *bou
 	}
 	if operationErr != nil {
 		slog.Warn("resource preparation failed", "action_id", current.GetIntent().GetActionId(), "error", operationErr)
-		if err := s.endResourcePreparation(ctx, loaded, current, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, preparationFailure(operationErr)); err != nil {
+		if err := s.endResourcePreparationDetail(ctx, loaded, current, revision, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, preparationFailure(operationErr), admissiondetail.Of(operationErr)); err != nil {
 			return nil, err
 		}
 		return resourcePreparation(current), nil
@@ -212,6 +213,13 @@ func (s *Service) cancelPackagePreparation(ctx context.Context, intent *agentv1.
 }
 
 func (s *Service) endResourcePreparation(ctx context.Context, loaded *bound, record *agentv1.ResourceExecutionRecord, revision int64, state agentv1.ResourceExecutionState, failure agentv1.ResourceExecutionFailure) error {
+	return s.endResourcePreparationDetail(ctx, loaded, record, revision, state, failure, "")
+}
+
+// endResourcePreparationDetail also records the provider's closed actionable
+// detail (for example existing_package_unverified or native_tool_outdated) of
+// an effect-free staging failure, so the administrator sees the cause.
+func (s *Service) endResourcePreparationDetail(ctx context.Context, loaded *bound, record *agentv1.ResourceExecutionRecord, revision int64, state agentv1.ResourceExecutionState, failure agentv1.ResourceExecutionFailure, detail string) error {
 	// Cleanup is retried if the RPC or durable completion fails. The native
 	// cancellation tombstone forbids a concurrent late Stage from recreating it.
 	if err := s.cancelNativePreparation(ctx, record); err != nil {
@@ -220,7 +228,7 @@ func (s *Service) endResourcePreparation(ctx context.Context, loaded *bound, rec
 	next := proto.CloneOf(record)
 	next.State, next.Failure, next.CompletedAt = state, failure, protoTimestamp(s.now())
 	if record.GetNativePlan() == nil {
-		next.PreparationOutcome = &agentv1.ResourcePreparationOutcome{Preparation: proto.CloneOf(record.GetIntent().GetPreparation()), Failure: failure}
+		next.PreparationOutcome = &agentv1.ResourcePreparationOutcome{Preparation: proto.CloneOf(record.GetIntent().GetPreparation()), Failure: failure, Detail: detail}
 	}
 	if err := s.updateResourceAction(ctx, loaded, revision, next); err != nil {
 		return err

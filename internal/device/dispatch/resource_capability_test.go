@@ -22,6 +22,14 @@ func refusalStatus(reason agentv1.ResourceAdmissionRefusalReason, capability age
 	}
 }
 
+// preparationStatus is an effect-free staging failure: no plan, no refusal.
+func preparationStatus(failure agentv1.ResourceExecutionFailure, detail string) *agentv1.ResourceExecutionStatus {
+	return &agentv1.ResourceExecutionStatus{
+		State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: failure,
+		PreparationOutcome: &agentv1.ResourcePreparationOutcome{Preparation: &agentv1.ResourceExecutionPreparation{MaxCacheBytes: 1}, Failure: failure, Detail: detail},
+	}
+}
+
 // The console names the exact capability to enable, and only capability_*
 // reasons are dispatched again when the device's capabilities change.
 func TestResourceResultDispositionNamesRefusals(t *testing.T) {
@@ -42,6 +50,10 @@ func TestResourceResultDispositionNamesRefusals(t *testing.T) {
 		{"unsupported", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE, 0, ""), 6, "native_unsupported"},
 		{"provider unsupported before start", &agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED}, 6, "native_unsupported"},
 		{"unsupported after start stays a failure", &agentv1.ResourceExecutionStatus{State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, StartedAt: timestamppb.Now()}, 4, "execution_failed"},
+		{"preparation precondition detail blocks", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, "existing_package_unverified"), 5, "existing_package_unverified"},
+		{"preparation precondition", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, ""), 4, ResourceReasonPreparationPrecondition},
+		{"preparation unsupported detail", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated"), 6, "native_tool_outdated"},
+		{"preparation unsupported", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, ""), 6, "native_unsupported"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			disposition, reason := resourceResultDisposition(test.status)
@@ -78,6 +90,9 @@ func TestReleaseResultStateNamesCapability(t *testing.T) {
 	}
 	if _, reason := ReleaseResultState(refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, 0, "native_tool_outdated")); reason != "native_tool_outdated" {
 		t.Fatalf("release dropped the refusal detail: %s", reason)
+	}
+	if state, reason := ReleaseResultState(preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated")); state != "release_conflict" || reason != "native_tool_outdated" {
+		t.Fatalf("release dropped the preparation detail: %s %s", state, reason)
 	}
 }
 

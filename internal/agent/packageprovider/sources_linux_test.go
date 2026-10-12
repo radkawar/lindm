@@ -3,6 +3,7 @@
 package packageprovider
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -107,5 +108,28 @@ func TestCheckSourceRefusesUnpinnedUnsignedMetadata(t *testing.T) {
 	base.Repository.GetRpm().Location = &resourcev1.RpmRepository_BaseUrls{BaseUrls: &resourcev1.RepositoryURLs{Urls: []string{"https://mirrors.fedoraproject.org/pub/"}}}
 	if err := checkSource(base); !errors.Is(err, config.ErrUnsignedMetadata) {
 		t.Fatalf("base URL without signed metadata accepted: %v", err)
+	}
+}
+
+// noble, noble-updates and noble-security are each signed by the same archive
+// key; the snapshot lists that signer once, so it validates and the staging
+// helper accepts it.
+func TestAPTSnapshotListsSharedSuiteSignerOnce(t *testing.T) {
+	archive := bytes.Repeat([]byte{0x87}, 32)
+	other := bytes.Repeat([]byte{0x19}, 32)
+	var signers [][]byte
+	for _, suite := range [][][]byte{{archive}, {archive}, {archive, other}} {
+		signers = appendUniqueSigners(signers, suite)
+	}
+	if len(signers) != 2 || !bytes.Equal(signers[0], archive) || !bytes.Equal(signers[1], other) {
+		t.Fatalf("signers = %x", signers)
+	}
+	v, err := validator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := &resourcev1.RepositorySnapshot{Repository: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_PACKAGE_REPOSITORY, CanonicalKey: "apt/8053e72a-44e8-53fc-9472-825c068cf9b5"}, MetadataSha256: archive, SignerSha256: signers}
+	if err := v.Validate(&resourcev1.RepositorySnapshots{Repositories: []*resourcev1.RepositorySnapshot{snapshot}}); err != nil {
+		t.Fatalf("deduplicated snapshot invalid: %v", err)
 	}
 }

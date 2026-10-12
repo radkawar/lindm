@@ -11,6 +11,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	adminv1connect "lindm/gen/lindm/admin/v1/adminv1connect"
+	"lindm/internal/rpcreason"
 )
 
 func devices(ctx context.Context, client adminv1connect.AdminServiceClient) ([]*adminv1.Device, error) {
@@ -56,23 +57,7 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 		deviceID := candidates[0].GetId()
 		items, ok := findings[deviceID]
 		if !ok {
-			hostname, scanned := e.GetHostname(), 0
-			items, err = pages(func(token string) ([]*adminv1.AdvisoryFinding, string, error) {
-				if scanned++; scanned > maxFindingPages {
-					return nil, "", errors.New("orgapply: device findings exceed the scan bound")
-				}
-				r, e := client.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 200, PageToken: token}))
-				if e != nil {
-					return nil, "", e
-				}
-				var matches []*adminv1.AdvisoryFinding
-				for _, f := range r.Msg.GetFindings() {
-					if declared[findingKey(hostname, f.GetAdvisoryId(), f.GetPackageName())] {
-						matches = append(matches, f)
-					}
-				}
-				return matches, r.Msg.GetNextPageToken(), nil
-			})
+			items, err = declaredFindings(ctx, client, deviceID, e.GetHostname(), declared)
 			if err != nil {
 				return fmt.Errorf("list exception findings: %w", err)
 			}
@@ -122,6 +107,48 @@ func (p *ChangePlan) exceptions(ctx context.Context, client adminv1connect.Admin
 		p.add("advisory_exception", name, match.GetId(), status, "", request)
 	}
 	return nil
+}
+
+// findingScanAttempts bounds restarts of one device's finding scan. A cursor
+// is bound to one advisory evidence snapshot; a newer host observation (for
+// example after a managed package installs) aborts the old cursor with
+// advisory_evidence_changed, and only a scan restarted from the first page
+// reads one consistent snapshot. Listing has no effect.
+const findingScanAttempts = 5
+
+// declaredFindings scans every page of one device's findings, retaining only
+// declared identities, restarting from the first page when the evidence
+// snapshot changes underneath the cursor.
+func declaredFindings(ctx context.Context, client adminv1connect.AdminServiceClient, deviceID, hostname string, declared map[string]bool) ([]*adminv1.AdvisoryFinding, error) {
+	for attempt := 1; ; attempt++ {
+		scanned := 0
+		items, err := pages(func(token string) ([]*adminv1.AdvisoryFinding, string, error) {
+			if scanned++; scanned > maxFindingPages {
+				return nil, "", errors.New("orgapply: device findings exceed the scan bound")
+			}
+			r, e := client.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID, PageSize: 200, PageToken: token}))
+			if e != nil {
+				return nil, "", e
+			}
+			var matches []*adminv1.AdvisoryFinding
+			for _, f := range r.Msg.GetFindings() {
+				if declared[findingKey(hostname, f.GetAdvisoryId(), f.GetPackageName())] {
+					matches = append(matches, f)
+				}
+			}
+			return matches, r.Msg.GetNextPageToken(), nil
+		})
+		if err == nil || attempt == findingScanAttempts || connect.CodeOf(err) != connect.CodeAborted || rpcreason.Get(err) != "advisory_evidence_changed" {
+			return items, err
+		}
+		timer := time.NewTimer(time.Duration(attempt) * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 // maxFindingPages bounds one device's scan at 1,000,000 findings of 200 per

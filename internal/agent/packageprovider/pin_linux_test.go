@@ -281,6 +281,20 @@ func TestCreateOnlyInstalledPackageRequiresAdoption(t *testing.T) {
 		t.Fatalf("installed package acquired under CREATE_ONLY: %v", err)
 	}
 }
+
+// A preinstalled package (provenance unknown: lindm did not install it) is a
+// typed precondition under every ownership mode, never adoption.
+func TestUnverifiedInstalledPackageIsTypedPrecondition(t *testing.T) {
+	d := desiredFixture(resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_DEB)
+	before := &resourcev1.ResourceObservation{Observed: &resourcev1.ResourceObservation_NativePackage{NativePackage: &resourcev1.NativePackageObservation{Package: d.GetNativePackage().GetPackage(), Installed: true, Record: &resourcev1.NativePackageRecord{Package: d.GetNativePackage().GetPackage(), Version: d.GetNativePackage().GetExact()}}}}
+	for _, mode := range []resourcev1.OwnershipMode{resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY, resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION} {
+		p := &Provider{config: Config{Ownership: &agentv1.ResourceOwnershipBinding{Policy: &resourcev1.OwnershipPolicy{Mode: mode}}}}
+		err := p.acquisitionAllowed(before, nil, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
+		if !errors.Is(err, ErrConflict) || errors.Is(err, ErrAdoptionRequired) || admissiondetail.Of(err) != "existing_package_unverified" {
+			t.Fatalf("%s: unverified installed package = %v", mode, err)
+		}
+	}
+}
 func TestOutdatedManagerNamesDetail(t *testing.T) {
 	err := requireManager(dnf.Manager{Kind: dnf.DNF5, Version: "5.0.1"}, dnf.DNF5, "5.2.0")
 	if !errors.Is(err, ErrUnsupported) || admissiondetail.Of(err) != "native_tool_outdated" {

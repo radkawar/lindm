@@ -149,7 +149,7 @@
       "id": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
       "spec": {
         "name": "Company baseline",
-        "description": "Shared security baseline; executor file allowed_roots must include /etc/motd.d.",
+        "description": "Shared security baseline; the deployment's default device capabilities (packages, files under /etc/motd.d, local accounts, OS updates) enable it. The firewall row needs the firewall capability, which needs deployment firewall settings.",
         "resources": [
           {
             "resourceId": "5a8a187a-d28c-506e-ae52-0b65fbda3535",
@@ -668,7 +668,8 @@
               },
               "localGroup": {
                 "name": "developers",
-                "presence": "PRESENCE_PRESENT"
+                "presence": "PRESENCE_PRESENT",
+                "gid": 1500
               }
             },
             "ownership": {
@@ -690,7 +691,17 @@
               "localUser": {
                 "name": "developer",
                 "presence": "PRESENCE_PRESENT",
+                "uid": 1500,
                 "primaryGroup": "developers",
+                "homeDirectory": "/home/developer",
+                "shell": {
+                  "installedShell": "/bin/bash"
+                },
+                "home": {
+                  "creation": "HOME_CREATION_CREATE_IF_ABSENT",
+                  "mode": 448,
+                  "approvedRootId": "f0047cfe-68c5-5850-a2b5-b9adc55d4f43"
+                },
                 "password": {
                   "locked": {}
                 }

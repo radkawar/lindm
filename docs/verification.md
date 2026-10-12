@@ -6099,6 +6099,76 @@ output and audit, binary digests). Run `org-verify-01` is the failing run with
 the earlier binary. This is virtual-machine evidence, not physical-device or
 assistance-scenario qualification.
 
+#### Out-of-box capability policy, two-desktop demo (2026-10-12)
+
+`lab demo -spec lab/demo/org-desktops-demo.json` with no lab-only provider
+opt-ins: the agents are installed by the console-copied install command and get
+provider authority only from the signed capability policy (`lab/demo/org.json`:
+deployment default PACKAGES, FILES, LOCAL_ACCOUNTS, OS_UPDATES; Finance group
+KERNEL_MODULE_BLOCKLIST). `make acceptance-build` binaries, `-repo` the shared
+fixture, `-build-repo` the private branch; binary digests are in
+`pe-proof-binaries.sha256`. Ubuntu 24.04 GNOME Engineering laptop on `dgx20`
+(Secure Boot on), Fedora 44 GNOME Finance desktop on `dgx21` (Secure Boot off).
+
+Run `pe-proof2-01` (devices `6ee0af62-ec36-4bd0-a5ca-e93c656513d6` and
+`46addc23-4e64-4885-893b-ba2445d93777`) received the signed policy (issued and
+executor-reported `ACTIVE` version 1 on both; the Engineering grant is the four
+deployment defaults, Finance adds `KERNEL_MODULE_BLOCKLIST` from its static
+group; every other capability `NOT_ENABLED`). The product reported:
+
+| Row                                      | Ubuntu 24.04 laptop                                                      | Fedora 44 desktop                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `MANAGED_FILE /etc/motd.d/50-company`    | SUCCEEDED, verified CONVERGED                                            | SUCCEEDED, verified CONVERGED                            |
+| `SYSTEMD_SERVICE cups.service`           | SUCCEEDED, verified CONVERGED                                            | UNSUPPORTED `unit_not_installed` (cups is not installed) |
+| `OS_UPDATE_POLICY system`                | SUCCEEDED, verified CONVERGED                                            | BLOCKED `native_tool_missing` (`dnf5-plugin-automatic`)  |
+| `FIREWALL_ZONE`                          | BLOCKED `capability_firewall_not_enabled`                                | BLOCKED `capability_firewall_not_enabled`                |
+| `MANAGED_FILE …/99-lindm-blocklist.conf` | not assigned                                                             | SUCCEEDED, verified CONVERGED                            |
+| `NATIVE_PACKAGE deb/podman`              | SUCCEEDED, verified CONVERGED                                            | not applicable                                           |
+| `NATIVE_PACKAGE deb/git`, `deb/htop`     | BLOCKED `existing_package_unverified` (preinstalled in the image)        | not applicable                                           |
+| `LOCAL_GROUP developers`                 | SUCCEEDED, verified CONVERGED (GID 1500)                                 | not assigned                                             |
+| `LOCAL_USER developer`                   | OUTCOME_UNKNOWN: home creation `EROFS` (fixed after this run, see below) | not assigned                                             |
+| `SSH_SERVER system`                      | BLOCKED `existing_banner_file` (base-files `/etc/issue.net`)             | not assigned                                             |
+
+The stock Fedora 44 image has `dnf5 5.4.1.0`, `dnf5-plugins 5.4.1.0` and no
+`dnf5-plugin-automatic` or `cups`; neither the OS update policy nor a package row
+can update DNF5 there (see [Fedora](platforms/fedora.md#capability-policy-facts-signed-provider-grants)).
+The Ubuntu golden (live-server ISO plus desktop) has `needrestart 3.6-7ubuntu4.5`,
+`unattended-upgrades 2.9.1+nmu4ubuntu1` and `update-notifier-common
+3.192.68.2`; the stock desktop ISO lacks `needrestart`.
+
+The runs found and fixed these defects (each with a regression test):
+
+- The organization apply's paginated finding scan failed mid-scan:
+  a managed package install published new inventory and the server aborted the
+  stale cursor with `advisory_evidence_changed`, failing the demo
+  (`pe-proof-01`). The scan now restarts from the first page, bounded.
+- The APT snapshot listed the shared archive signer once per suite, so the
+  staging helper rejected `signer_sha256` as non-unique and every package
+  install failed `package_staging_native_failed`.
+- A preinstalled package failed as an undetailed `preparation_precondition_failed`.
+  It is now `existing_package_unverified`, carried by the new
+  `ResourcePreparationOutcome.detail` (Fedora's preparation-time
+  `native_tool_outdated` reaches the row the same way).
+- `LOCAL_GROUP`/`LOCAL_USER` without explicit IDs failed as an untyped internal
+  error retried every 20 seconds; it is now `explicit_account_identity_required`,
+  and the demo rows name GID/UID 1500, `/home/developer` and `/bin/bash`.
+- Creating `/home/developer` failed with `EROFS` after `useradd` because
+  `ProtectHome=read-only` overrode `ReadWritePaths=/home`; the account unit now
+  uses `ProtectHome=no` with only the home root writable.
+- On resume the lab rewrote `executor.json` for remote assistance and restarted
+  the executor two seconds after boot, interrupting the Fedora blocklist effect
+  (`OUTCOME_UNKNOWN`, then an internal failure every 20 seconds); an executor
+  already opted in is no longer restarted.
+
+Not yet re-run with the last two fixes: both Sparks became unreachable at about
+21:40 during run `pe-proof3-01` (infrastructure, not a product result), so native
+guest checks of the fully fixed build are pending. Evidence:
+`~/.cache/lindm-pe-proof/pe-proof-interim-manifest.sha256`, SHA-256
+`e8136538f03b5ec01d8a8b3b7461ede7f09c7395603acbcf01afd6ea070d3b35` (51 files:
+per-run logs, apply outcomes, `ready.json`, `resources-*.json` with capability
+state, executor journal extracts, TPM boot evidence, destroy logs, binary
+digests). This is virtual-machine evidence, not physical-device qualification.
+
 #### Named split held lifecycle regression
 
 On 2026-10-11, a native aarch64 KVM run on `dgx20` exercised

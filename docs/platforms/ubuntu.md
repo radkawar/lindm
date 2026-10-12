@@ -723,6 +723,14 @@ every remotely granted capability that needs registry facts.
 | LOCAL_ACCOUNTS                        | home root `/home` (`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`), UID/GID 1000–59999 (`login.defs` `UID_MIN`..`UID_MAX`−1)                                                                                                                            |
 | OS_UPDATES, FIREWALL, KERNEL_SETTINGS | as the local providers; FIREWALL selects every non-loopback interface with a permanent MAC and needs the restore unit enabled                                                                                                                   |
 
+Accounts are created only with explicit identity (a group's GID; a user's UID,
+primary group, home and shell), otherwise `explicit_account_identity_required`.
+Creating a home under `/home` runs the account transaction with
+`ProtectHome=no` and only `/home` in `ReadWritePaths` (`ProtectSystem=strict`
+keeps the rest read-only): under `ProtectHome=read-only` systemd kept `/home`
+read-only despite `ReadWritePaths=/home`, `useradd` succeeded and the home
+creation failed with `EROFS`, leaving the row `OUTCOME_UNKNOWN` (2026-10-12).
+
 The APT source is verified with `/usr/share/keyrings/ubuntu-archive-keyring.gpg`
 from `ubuntu-keyring 2023.11.28.1`, noble's only version. Its accepted SHA-256 is
 `80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31` (3607 bytes,
@@ -736,7 +744,14 @@ noble `InRelease`. The extracted file verified `noble`, `noble-updates` and
 (HTTPS, `gpgv`: Good signature, key `F6ECB3762474EDA9D21B7022871920D1991BC93C`),
 and is byte-identical to the file on an Ubuntu 24.04.4 host. Any other key bytes
 report `vendor_key_unrecognized`. The package provider writes one `deb` line per
-suite and requires exactly one verified `InRelease` per approved suite.
+suite and requires exactly one verified `InRelease` per approved suite. All three
+suites are signed by the same archive key; the repository snapshot lists that
+signer once (a duplicate failed the staging helper's validation,
+`signer_sha256: repeated value must contain unique items`, before 2026-10-12).
+A package the image already installed (the lab golden ships `git
+1:2.43.0-1ubuntu7.3` and `htop 3.3.0-4build1`) has no lindm provenance and is
+refused as `existing_package_unverified`; only packages lindm installs (for
+example `podman` from `noble-updates`) converge.
 
 Ubuntu 22.04 uses the same repository identity, URIs, components and key path
 with suites `jammy`, `jammy-updates`, `jammy-security`. Its key file comes from
@@ -765,10 +780,22 @@ records use the signed `jammy-release-20260926` serial
 ([verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)).
 
 The provider configures native automatic updates; it never installs anything
-itself. It needs the root-local opt-in `os_update_provider: {"enabled": true}` in
-`executor.json` and the native `unattended-upgrades`, `needrestart` and
-`update-notifier-common` packages (a missing one is a precondition failure
-naming it). A signed policy owns exactly four objects:
+itself. It needs the `OS_UPDATES` capability (in the deployment's default signed
+grant) or the root-local opt-in `os_update_provider: {"enabled": true}` in
+`executor.json`, and the native `unattended-upgrades`, `needrestart` and
+`update-notifier-common` packages (a missing `unattended-upgrades` or
+`needrestart` is refused before any effect as `native_tool_missing` naming it).
+The stock Ubuntu 24.04 desktop image ships no `needrestart`: the
+`ubuntu-24.04.5.1-desktop-amd64.manifest` lists `unattended-upgrades
+2.9.1+nmu4ubuntu1` and `update-notifier-common 3.192.68.2` but not
+`needrestart`, which only the live-server manifest carries (`3.6-7ubuntu4.5`;
+both fetched from releases.ubuntu.com on 2026-10-12). A stock desktop therefore
+refuses the policy until `needrestart` is installed, by hand or by a profile
+`NATIVE_PACKAGE deb/needrestart` row the policy depends on. The lab's Ubuntu
+golden is installed from the live-server ISO plus the desktop, so it has
+`needrestart` and the policy converges there
+([verification](../verification.md#out-of-box-capability-policy-two-desktop-demo-2026-10-12)).
+A signed policy owns exactly four objects:
 `/etc/lindm/os-update/policy.binpb` (0600, the runner's validated policy),
 `/etc/systemd/system/lindm-os-update.timer` (one `OnCalendar=` per weekday in the
 policy's IANA zone, `Persistent=true`),

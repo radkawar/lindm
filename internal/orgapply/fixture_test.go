@@ -48,6 +48,10 @@ type fakeAdmin struct {
 	// targeting revision would.
 	previewConflicts int
 	previewCalls     int
+	// findingSnapshotChanges makes the next N continuation pages abort as a
+	// newer host observation replacing the cursor's evidence snapshot would.
+	findingSnapshotChanges int
+	findingCalls           int
 }
 
 func newFakeAdmin() *fakeAdmin {
@@ -172,8 +176,13 @@ var _ adminv1connect.AdminServiceClient = (*fakeAdmin)(nil)
 // ListDeviceFindings pages like the product: at most page_size findings and an
 // opaque cursor (here the decimal offset) until the device's list is exhausted.
 func (f *fakeAdmin) ListDeviceFindings(_ context.Context, request *connect.Request[adminv1.ListDeviceFindingsRequest]) (*connect.Response[adminv1.ListDeviceFindingsResponse], error) {
+	f.findingCalls++
 	start := 0
 	if token := request.Msg.GetPageToken(); token != "" {
+		if f.findingSnapshotChanges > 0 {
+			f.findingSnapshotChanges--
+			return nil, rpcreason.Error(connect.CodeAborted, "advisory_evidence_changed")
+		}
 		var err error
 		if start, err = strconv.Atoi(token); err != nil || start < 0 || start > len(f.findings) {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid page token"))

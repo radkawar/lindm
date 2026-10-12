@@ -210,7 +210,12 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 		}
 		return disposition, reason
 	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED && status.GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED && status.GetStartedAt() == nil:
-		// The provider refused before any native effect was authorized.
+		// The provider refused before any native effect was authorized; an
+		// effect-free staging failure may name the actionable cause, such as
+		// native_tool_outdated.
+		if detail := status.GetPreparationOutcome().GetDetail(); detail != "" {
+			return 6, detail
+		}
 		return 6, "native_unsupported"
 	case status.GetReadOnly() && status.GetVerification().GetDisposition() == resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE:
 		// A successful release acknowledgment is not proof of the active
@@ -232,8 +237,12 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 	case status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN:
 		return 4, "outcome_unknown"
 	case status.GetStartedAt() == nil && status.GetPreparationOutcome().GetFailure() == agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION:
-		// A device safety check refused before any effect, such as create-only
-		// acquisition of a package installed without lindm.
+		// A device safety check refused before any effect. A named cause
+		// (such as existing_package_unverified) blocks like an admission
+		// refusal detail; otherwise the row needs attention.
+		if detail := status.GetPreparationOutcome().GetDetail(); detail != "" {
+			return 5, detail
+		}
 		return 4, ResourceReasonPreparationPrecondition
 	default:
 		return 4, "execution_failed"

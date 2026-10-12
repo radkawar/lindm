@@ -89,7 +89,7 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 		if err != nil {
 			return nil, err
 		}
-		signers = append(signers, fingerprints...)
+		signers = appendUniqueSigners(signers, fingerprints)
 		verified[entry.Name()] = true
 	}
 	if err := aptSuitesVerified(apt, verified); err != nil {
@@ -103,6 +103,19 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 		return nil, err
 	}
 	return &resourcev1.RepositorySnapshot{Repository: sourceRef(source), MetadataSha256: metadata, SignerSha256: signers}, nil
+}
+
+// appendUniqueSigners adds each signer digest once, in first-seen order. Every
+// suite of one approved archive (noble, noble-updates, noble-security) is
+// signed by the same archive key, and a repository snapshot lists each signer
+// once.
+func appendUniqueSigners(signers, fingerprints [][]byte) [][]byte {
+	for _, fingerprint := range fingerprints {
+		if !slices.ContainsFunc(signers, func(signer []byte) bool { return bytes.Equal(signer, fingerprint) }) {
+			signers = append(signers, fingerprint)
+		}
+	}
+	return signers
 }
 
 // aptSuites lists the primary suite then the additional suites.

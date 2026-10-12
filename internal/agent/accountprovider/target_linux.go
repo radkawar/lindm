@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/subtle"
-	"errors"
 	"fmt"
 	"slices"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/resource"
 	"lindm/internal/secretseal"
 )
@@ -43,7 +43,7 @@ func (p *Provider) target(ctx context.Context, d *resourcev1.ResourceDesiredStat
 		} else {
 			if !o.GetExists() {
 				if g.Gid == nil {
-					return nil, nil, errors.New("accountprovider: creation requires an explicit noncolliding GID")
+					return nil, nil, admissiondetail.Wrap(fmt.Errorf("%w: creation requires an explicit noncolliding GID", ErrConflict), "explicit_account_identity_required")
 				}
 				o.Exists = true
 			}
@@ -95,7 +95,7 @@ func (p *Provider) target(ctx context.Context, d *resourcev1.ResourceDesiredStat
 		} else {
 			if !o.GetExists() {
 				if u.Uid == nil || u.PrimaryGroup == nil || u.HomeDirectory == nil || u.Shell == nil {
-					return nil, nil, errors.New("accountprovider: creation requires explicit UID, primary group, home and installed shell")
+					return nil, nil, admissiondetail.Wrap(fmt.Errorf("%w: creation requires explicit UID, primary group, home and installed shell", ErrConflict), "explicit_account_identity_required")
 				}
 				o.Exists = true
 				o.PasswordLocked = proto.Bool(true)

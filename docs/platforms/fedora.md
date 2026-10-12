@@ -573,6 +573,9 @@ submitted for F43.
 | LOCAL_ACCOUNTS                        | home root `/home` (`f0047cfe-68c5-5850-a2b5-b9adc55d4f43`), UID/GID 1000–59999                                                                                                                                                                  |
 | OS_UPDATES, FIREWALL, KERNEL_SETTINGS | as the local providers                                                                                                                                                                                                                          |
 
+Account creation and home creation under `/home` behave as on
+[Ubuntu](ubuntu.md#capability-policy-facts-signed-provider-grants).
+
 Key: the regular file `/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-primary` (the
 `-x86_64`/`-aarch64` names are symlinks to it and are not used), accepted
 SHA-256 `93642aec521a1e5e96dd715f7ae0ec0850ebc9de09a94ce03cae5263f26cc18a`
@@ -607,8 +610,16 @@ moved the lock to `/var/lib/dnf`. No option bypasses the read-only check in
 5.4.1.0, so the 44 release image's DNF5 cannot be used. The floor stays at the
 natively qualified 5.4.6.0 (Fedora 44 updates); 5.4.3.0–5.4.5.0 were not
 exercised. A stock Fedora 44 image refuses package rows with
-`native_tool_outdated` until OS updates are applied; an OS update policy that
-installs all updates (OS_UPDATES is in the default grant) satisfies it.
+`native_tool_outdated` until DNF5 is updated. The OS update policy cannot do
+that on a stock image either: its prerequisite `dnf5-plugin-automatic` is not
+installed (Fedora-Server-dvd-aarch64-44-1.7 with the Workstation environment
+has `dnf5 5.4.1.0` and `dnf5-plugins 5.4.1.0` but no
+`dnf5-plugin-automatic`), so the policy is refused as `native_tool_missing`,
+and a package row installing the plugin is itself refused as
+`native_tool_outdated`. Neither capability bootstraps the other; an
+administrator must run `dnf5 upgrade` (or install `dnf5-plugin-automatic`) on
+the device once
+([verification](../verification.md#out-of-box-capability-policy-two-desktop-demo-2026-10-12)).
 
 ### OS update policy (`os.update.v1`)
 

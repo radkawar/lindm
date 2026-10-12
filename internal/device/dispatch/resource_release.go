@@ -104,6 +104,9 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 	if refusal.GetDetail() != "" && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN && refusal.GetReason() != agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED {
 		return "release_conflict", refusal.GetDetail()
 	}
+	if detail := status.GetPreparationOutcome().GetDetail(); detail != "" && status.GetStartedAt() == nil {
+		return "release_conflict", detail
+	}
 	switch status.GetAdmissionRefusal().GetReason() {
 	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_BASELINE_UNKNOWN:
 		return "baseline_unknown", "ownership_baseline_unavailable"
