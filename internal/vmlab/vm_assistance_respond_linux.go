@@ -56,7 +56,14 @@ func AssistanceRespond(ctx context.Context, evidenceDir, action string) (string,
 	switch action {
 	case "screenshot":
 	case "allow", "decline", "stop":
-		_, banner, err := screen.waitBanner(ctx, 15*time.Second)
+		// Target the current request's banner (or the in-progress notice for
+		// stop), never a leftover: org demo finance-desktop's Allow landed on
+		// a cancelled session's stale request.
+		title := "remote assistance request"
+		if action == "stop" {
+			title = "remote assistance in progress"
+		}
+		_, banner, err := screen.waitTitledBanner(ctx, title, 45*time.Second)
 		if err != nil {
 			return "", err
 		}

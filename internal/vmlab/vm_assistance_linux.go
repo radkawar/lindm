@@ -426,6 +426,7 @@ type assistanceScenarioSpec struct {
 
 var assistanceScenarios = []assistanceScenarioSpec{
 	{name: "control", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED},
+	{name: "rerequest", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED},
 	{name: "view", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED},
 	{name: "decline", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED},
 	{name: "portal-cancel", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, portalCancel: true},
@@ -447,6 +448,7 @@ var assistanceAuditExpectations = map[string][]string{
 	"view":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
 	"lock":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
 	"decline":             {"assistance.request", "assistance.prompt"},
+	"rerequest":           {"assistance.request", "assistance.prompt"},
 	"portal-cancel":       {"assistance.request", "assistance.prompt"},
 	"view-unavailable":    {"assistance.request"},
 	"control-unavailable": {"assistance.request"},

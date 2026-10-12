@@ -1209,7 +1209,9 @@ artifacts/bin/lab hosts baseline -host dgx21 -record artifacts/dgx21-baseline.js
 The maintained baseline supports local and SSH Ubuntu 24.04, installs exact direct
 package versions from `lab/baseline/ubuntu-24.04.packages`, records all before/after
 package and group changes, and verifies package-owned firmware, native tool versions
-and a fresh run-user `/dev/kvm` open. It emits a ready host entry as protobuf JSON.
+and a fresh run-user `/dev/kvm` open. `tesseract` (with its English language
+data) reads lab banner text; the baseline reports its version and package and
+never installs it: a host without it fails readiness. It emits a ready host entry as protobuf JSON.
 It is an explicit authorized host mutation, unlike ordinary VM runs; it never
 performs a broad upgrade or cleanup. Native tools are preferred on the Sparks:
 this avoids nested Docker/libguestfs device plumbing and preserves normal firmware

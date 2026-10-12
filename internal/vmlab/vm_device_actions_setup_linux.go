@@ -260,7 +260,11 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 		// mask lives in /run, and dpkg's frontend lock is waited for. A vendor
 		// boot-time apt-get (Pop!_OS 24.04 pop2404-lock-quarantine-01) holds the
 		// same lists lock, so any running apt is waited for, bounded, first.
-		return "export DEBIAN_FRONTEND=noninteractive; if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; " +
+		// Packages the golden already installed skip that wait and refresh: a
+		// first-boot unattended-upgrades run outlasted the 10 min setup bound
+		// with nothing to install (ubuntu24-tier1-07, amd64 and arm64).
+		return fmt.Sprintf("export DEBIAN_FRONTEND=noninteractive; if [ \"$(dpkg-query -W -f='${db:Status-Status}\\n' %[1]s 2>/dev/null | grep -cx installed)\" = %[2]d ]; then exit 0; fi; ", strings.Join(packages, " "), len(packages)) +
+			"if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; " +
 			"for i in $(seq 600); do pgrep -x apt-get >/dev/null || pgrep -x apt >/dev/null || pgrep -x unattended-upgr >/dev/null || break; sleep 1; done; " +
 			"apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
 	case backend.DNF():

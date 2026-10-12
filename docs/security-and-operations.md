@@ -998,6 +998,14 @@ assistance until a shared or external relay contract exists.
 Managed devices also need `AgentConfig.remote_assistance.enabled`. The packaged
 executor configuration leaves it disabled.
 
+GNOME shows one banner at a time. It kept an idle seat's "Remote assistance
+ended" banner on screen, and a new request, even a critical one, queued behind
+it unseen until the request expired. So every new request first withdraws the
+previous "ended" notice, and a request's own banner is withdrawn when it is
+answered, expires or is cancelled. The `rerequest` lab scenario asks again
+right after a session ends and fails unless the new request is on screen
+within 15 s.
+
 ### Native single-host installation
 
 The `lindmd` DEB/RPM contains the embedded-console executable at `/usr/bin/lindmd`,

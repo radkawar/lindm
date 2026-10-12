@@ -8,6 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -71,12 +75,67 @@ func (s *assistanceScreen) captureReference(ctx context.Context) (string, error)
 		display := second.Bounds()
 		centre := display.Min.X + display.Dx()/2
 		if _, count := screenDiffBounds(first, second, image.Rect(centre-420, display.Min.Y+gnomeTopBarHeight, centre+420, display.Min.Y+360), screenDiffThreshold); count < 200 {
-			s.reference = second
-			return s.save("desktop-reference", second)
+			// A resident lindm banner also holds still; a reference that
+			// contains it hides that banner and every later one from the
+			// locator (org demo finance-desktop respond, Fedora 44).
+			text, err := s.ocr(ctx, second, image.Rect(centre-420, display.Min.Y+gnomeTopBarHeight, centre+420, display.Min.Y+360))
+			if err != nil {
+				return "", err
+			}
+			if !strings.Contains(text, "lindm") && !strings.Contains(text, "remote assistance") {
+				s.reference = second
+				return s.save("desktop-reference", second)
+			}
 		}
 		first = second
 	}
 	return "", errors.New("guest desktop never settled for a clean reference capture")
+}
+
+// ocr returns tesseract's normalized lowercase text for region of img, read
+// in grayscale upscaled three times. Without host tesseract it returns ""
+// (callers that require OCR check for tesseract themselves).
+func (s *assistanceScreen) ocr(ctx context.Context, img *image.RGBA, region image.Rectangle) (string, error) {
+	if _, err := exec.LookPath("tesseract"); err != nil {
+		return "", nil
+	}
+	path, err := s.save(fmt.Sprintf("ocr-%d", time.Now().UnixNano()), upscaleGray(img, region, 3))
+	if err != nil {
+		return "", err
+	}
+	out, err := hostCommand(ctx, s.evidence.dir, "env", nil, "OMP_THREAD_LIMIT=1", "tesseract", filepath.Join(s.evidence.dir, path), "stdout", "--psm", "6")
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(strings.Fields(strings.ToLower(string(out))), " "), nil
+}
+
+// waitTitledBanner waits for the banner whose OCR'd title contains title,
+// letting any other notice (a stale "ended" banner, a cancelled request's
+// leftover) expire first. Without host tesseract it falls back to the
+// consent prompt's height test for requests.
+func (s *assistanceScreen) waitTitledBanner(ctx context.Context, title string, timeout time.Duration) (*image.RGBA, image.Rectangle, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		img, banner, err := s.waitBanner(ctx, timeout)
+		if err != nil {
+			return img, banner, err
+		}
+		text, err := s.ocr(ctx, img, banner)
+		if err != nil {
+			return img, banner, err
+		}
+		switch {
+		case text == "" && (title != "remote assistance request" || banner.Dy() >= consentPromptMinHeight):
+			return img, banner, nil
+		case text != "" && strings.Contains(text, title):
+			return img, banner, nil
+		}
+		if err := s.waitNoBanner(ctx, timeout); err != nil {
+			return img, image.Rectangle{}, fmt.Errorf("another notice stayed visible instead of %q: %w", title, err)
+		}
+	}
 }
 
 // waitBanner waits for a notification banner whose bounds are identical in
@@ -102,6 +161,31 @@ func (s *assistanceScreen) waitBanner(ctx context.Context, timeout time.Duration
 			}
 			return img, image.Rectangle{}, fmt.Errorf("guest notification banner did not appear: %w", ctx.Err())
 		case <-time.After(screenPollInterval):
+		}
+	}
+}
+
+// consentPromptMinHeight separates the consent prompt (title, a multi-line
+// request and an action row: 215 px on GNOME 50) from a previous session's
+// action-less "ended" notice (100 px with GNOME 50's header row, about 76 px
+// on GNOME 43/46). GNOME can show that notice only after the next request,
+// once waitNoBanner already passed: Fedora 44 fedora44-tier1-07 clicked the
+// late "ended" notice as the clipboard-policy prompt and the request ended
+// prompt_dismissed.
+const consentPromptMinHeight = 140
+
+// waitPromptBanner waits for the consent prompt banner, letting any shorter
+// notice shown first expire instead of mistaking it for the prompt.
+func (s *assistanceScreen) waitPromptBanner(ctx context.Context, timeout time.Duration) (*image.RGBA, image.Rectangle, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	for {
+		img, banner, err := s.waitBanner(ctx, timeout)
+		if err != nil || banner.Dy() >= consentPromptMinHeight {
+			return img, banner, err
+		}
+		if err := s.waitNoBanner(ctx, timeout); err != nil {
+			return img, image.Rectangle{}, fmt.Errorf("a %d px notice stayed visible instead of the consent prompt: %w", banner.Dy(), err)
 		}
 	}
 }
@@ -357,4 +441,32 @@ func (s *assistanceScreen) waitPointerHover(ctx context.Context, point image.Poi
 		case <-time.After(screenPollInterval):
 		}
 	}
+}
+
+// upscaleGray returns region of img as grayscale, bilinearly scaled by
+// factor, in an RGBA image for the evidence PNG encoder.
+func upscaleGray(img *image.RGBA, region image.Rectangle, factor int) *image.RGBA {
+	region = region.Intersect(img.Bounds())
+	width, height := region.Dx()*factor, region.Dy()*factor
+	out := image.NewRGBA(image.Rect(0, 0, width, height))
+	luma := func(x, y int) float64 {
+		x = min(max(x, region.Min.X), region.Max.X-1)
+		y = min(max(y, region.Min.Y), region.Max.Y-1)
+		i := img.PixOffset(x, y)
+		return 0.299*float64(img.Pix[i]) + 0.587*float64(img.Pix[i+1]) + 0.114*float64(img.Pix[i+2])
+	}
+	for y := range height {
+		sy := float64(region.Min.Y) + (float64(y)+0.5)/float64(factor) - 0.5
+		y0, fy := int(math.Floor(sy)), sy-math.Floor(sy)
+		for x := range width {
+			sx := float64(region.Min.X) + (float64(x)+0.5)/float64(factor) - 0.5
+			x0, fx := int(math.Floor(sx)), sx-math.Floor(sx)
+			top := luma(x0, y0)*(1-fx) + luma(x0+1, y0)*fx
+			bottom := luma(x0, y0+1)*(1-fx) + luma(x0+1, y0+1)*fx
+			v := uint8(math.Round(top*(1-fy) + bottom*fy))
+			i := out.PixOffset(x, y)
+			out.Pix[i], out.Pix[i+1], out.Pix[i+2], out.Pix[i+3] = v, v, v, 255
+		}
+	}
+	return out
 }

@@ -102,7 +102,7 @@ versions = {
     'rsync': ['--version'], 'xorriso': ['-version'], 'guestfish': ['--version'],
     'virt-inspector': ['--version'], 'rpm': ['--version'], 'rpmbuild': ['--version'],
     'createrepo_c': ['--version'], 'gcc': ['--version'], 'go': ['version'],
-    'ukify': ['--version'],
+    'ukify': ['--version'], 'tesseract': ['--version'],
 }
 required = list(versions) + ['swtpm_setup', 'cloud-localds', 'virt-fw-vars', 'mcopy', 'mkfs.vfat', 'mkfs.ext4', 'cryptsetup',
     'unsquashfs', 'zstd', 'jq', 'ssh', 'scp', 'dpkg-deb', 'dpkg-scanpackages', 'debsigs', 'rpm2cpio',
@@ -129,6 +129,8 @@ for name in required:
     package_versions = {owner: command('dpkg-query', '-W', '-f=${Version}', '--', owner) for owner in owners}
     version = command(path, *versions[name]) if name in versions else ''
     tools[name] = {'path': path, 'resolved_path': resolved, 'packages': package_versions, 'version_output': version}
+if 'eng' not in command('tesseract', '--list-langs').split():
+    raise RuntimeError('tesseract lacks English language data')
 print(json.dumps({'firmware': firmware, 'tools': tools}, sort_keys=True))
 LINDM_BASELINE_READY
 `

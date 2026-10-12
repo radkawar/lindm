@@ -40,6 +40,9 @@ func TestLabAPTInstallStopsPackageKitFirst(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(bin, "pgrep"), []byte(pgrep), 0o700); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(bin, "dpkg-query"), []byte("#!/bin/sh\necho not-installed\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command("/bin/sh", "-eu", "-c", command)
 	cmd.Env = append(os.Environ(), "PATH="+bin+":/usr/bin:/bin")
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -60,6 +63,41 @@ func TestLabAPTInstallStopsPackageKitFirst(t *testing.T) {
 	}
 	if !slices.Equal(lines, want) {
 		t.Fatalf("calls = %q, want %q", lines, want)
+	}
+}
+
+// ubuntu24-tier1-07: a first-boot unattended-upgrades run outlasted the setup
+// bound although the golden already had every witness package. Installed
+// packages skip the APT wait and refresh entirely.
+func TestLabAPTInstallSkipsInstalledPackages(t *testing.T) {
+	release, ok := platform.Lookup("debian-13")
+	if !ok {
+		t.Fatal("registry lacks debian-13")
+	}
+	command, err := labInstallCommand(release, []string{"curl", "jq"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	calls := filepath.Join(t.TempDir(), "calls")
+	for _, name := range []string{"systemctl", "apt-get", "sleep", "pgrep"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\necho "+name+" >> "+nativeQuote(calls)+"\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for status, wantCalls := range map[string]bool{"installed\ninstalled": false, "installed\nnot-installed": true, "installed": true} {
+		_ = os.Remove(calls)
+		if err := os.WriteFile(filepath.Join(bin, "dpkg-query"), []byte("#!/bin/sh\nprintf '"+status+"\\n'\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		cmd := exec.Command("/bin/sh", "-eu", "-c", command)
+		cmd.Env = append(os.Environ(), "PATH="+bin+":/usr/bin:/bin")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%q: %v: %s", status, err, output)
+		}
+		if _, err := os.Stat(calls); (err == nil) != wantCalls {
+			t.Errorf("dpkg status %q: APT ran = %t, want %t", status, err == nil, wantCalls)
+		}
 	}
 }
 

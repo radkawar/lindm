@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"time"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
@@ -25,6 +26,8 @@ type Notification struct {
 	Critical bool
 	// Persistent sets expire_timeout 0 (never expire).
 	Persistent bool
+	// Lifetime sets a bounded expire_timeout so a notice cannot stay resident.
+	Lifetime time.Duration
 }
 
 // NotificationAction is one action button.

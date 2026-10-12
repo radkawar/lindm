@@ -133,8 +133,12 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	control := spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
 	scenario := &assistanceScenarioEvidence{Name: spec.name, Mode: map[bool]string{true: "control", false: "view"}[control], ExpectedCause: assistanceCauseText(spec.cause), ExpectedDetail: spec.detail}
 	r.result.Scenarios = append(r.result.Scenarios, scenario)
-	if err := r.screen.waitNoBanner(ctx, 45*time.Second); err != nil {
-		return err
+	// rerequest asks again right after control ended, without waiting for
+	// its "ended" notice to go: the new request must be on screen at once.
+	if spec.name != "rerequest" {
+		if err := r.screen.waitNoBanner(ctx, 45*time.Second); err != nil {
+			return err
+		}
 	}
 	var created struct {
 		SessionID string `json:"sessionId"`
@@ -152,7 +156,19 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if _, err := r.waitSession(ctx, scenario, 90*time.Second, "prompted", atLeast(adminv1.AssistanceState_ASSISTANCE_STATE_PROMPTED)); err != nil {
 		return err
 	}
-	prompt, banner, err := r.screen.waitBanner(ctx, 30*time.Second)
+	var prompt *image.RGBA
+	var banner image.Rectangle
+	var err error
+	if spec.name == "rerequest" {
+		// No waiting out other notices: a resident "ended" banner that hides
+		// the request is the failure (org demo finance-desktop, Fedora 44).
+		prompt, banner, err = r.screen.waitBanner(ctx, 15*time.Second)
+		if err == nil && banner.Dy() < consentPromptMinHeight {
+			err = fmt.Errorf("a %d px notice was on screen instead of the new request", banner.Dy())
+		}
+	} else {
+		prompt, banner, err = r.screen.waitPromptBanner(ctx, 60*time.Second)
+	}
 	if err != nil {
 		return err
 	}

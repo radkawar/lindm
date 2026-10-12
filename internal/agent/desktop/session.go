@@ -47,6 +47,26 @@ type sessionDeps struct {
 	repostInterval     time.Duration
 	callTimeout        time.Duration
 	cleanupTimeout     time.Duration
+
+	// ended is the latest "Remote assistance ended" notice. GNOME shows one
+	// banner at a time and keeps an idle seat's normal banner resident, so
+	// a new request (even critical) queued behind it unseen until expiry
+	// (org demo finance-desktop, Fedora 44). Each new prompt withdraws it.
+	endedMu sync.Mutex
+	ended   Notice
+}
+
+// replaceEndedNotice withdraws the previous "ended" notice and remembers next
+// (nil when a prompt is about to be shown).
+func (d *sessionDeps) replaceEndedNotice(ctx context.Context, next Notice) error {
+	d.endedMu.Lock()
+	previous := d.ended
+	d.ended = next
+	d.endedMu.Unlock()
+	if previous == nil {
+		return nil
+	}
+	return previous.Close(ctx)
 }
 
 // session drives one invitation from prompt to end. Its goroutine owns all
@@ -244,6 +264,7 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 		return s.failure(consentCtx, deps.lockReporting)
 	}
 	r.markup = slices.Contains(capabilities, "body-markup")
+	s.logIfErr("withdraw previous end notice", deps.replaceEndedNotice(consentCtx, nil))
 	prompt, err := deps.notifier.Notify(consentCtx, s.promptNotification(r.markup))
 	if err != nil {
 		return s.failure(consentCtx, unavailable("notification_failed", err))
@@ -520,11 +541,15 @@ func (s *session) cleanup(r *sessionResources) {
 	prompted, cause := s.prompted, s.cause
 	s.mu.Unlock()
 	if prompted && cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED {
-		_, err := s.deps.notifier.Notify(ctx, Notification{
-			Summary: "Remote assistance ended",
-			Body:    "Remote assistance ended: " + causeText(cause),
+		notice, err := s.deps.notifier.Notify(ctx, Notification{
+			Summary:  "Remote assistance ended",
+			Body:     "Remote assistance ended: " + causeText(cause),
+			Lifetime: 10 * time.Second,
 		})
 		s.logIfErr("post end notice", err)
+		if err == nil {
+			s.logIfErr("withdraw previous end notice", s.deps.replaceEndedNotice(ctx, notice))
+		}
 	}
 }
 

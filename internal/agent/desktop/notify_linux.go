@@ -71,6 +71,8 @@ func (n *DesktopNotifier) Notify(ctx context.Context, notification Notification)
 	expire := int32(-1)
 	if notification.Persistent {
 		expire = 0
+	} else if notification.Lifetime > 0 {
+		expire = int32(notification.Lifetime.Milliseconds())
 	}
 	err := n.bus.call(ctx, notificationsName, notificationsPath, notificationsIface+".Notify",
 		notificationApp, uint32(0), "", notification.Summary, notification.Body, actions, hints, expire).Store(&notice.id)
