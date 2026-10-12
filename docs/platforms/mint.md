@@ -193,6 +193,7 @@ lanes use `OVMF_VARS_4M.ms.fd` with Secure Boot enforced.
 | Assistance VIEW/CONTROL                                                              | unavailable                  | `sessions/mint/mint223-assistance-02/assistance.json` | `ab55da8ff567ac164ddd272238fe7564c7af8f7d49f8e2455cafe1cefcc26ad3` |
 | Recovery sanitize, Mint original, measured GRUB, NVMe format                         | pass                         | `device-actions-mint-original-recovery-nvme-07.json`  | `2ba33c1dbc2d0a2fc0c121382fd98865824e2b8839b76063d2964f3134c81e89` |
 | Recovery sanitize, Mint original, measured GRUB, SATA overwrite                      | pass                         | `device-actions-mint-original-recovery-sata-07b.json` | `ed05a68121abdece41bba98713216868a569b59ac9db3454a434c7a32bf7e321` |
+| 30 consecutive unattended TPM2 cold boots (main `8c6af7ff`, Secure Boot on)          | pass                         | `device-actions-tpm-unattended-boots-08.json`         | `bf5869a0037cd3f29693b31562bddd2779d6b9a9e17cefac0907cfd38190fabf` |
 
 The device-action record covers encryption inventory (LUKS2 UUID, TPM 2.0,
 Secure Boot on, host oracle match), escrow (keyslot 1), audited reveal and custody

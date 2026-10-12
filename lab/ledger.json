@@ -10458,9 +10458,25 @@
       "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
       "source": "MATRIX_SOURCE_IMPORT",
       "verified": true,
-      "scope": "signed DEB 0.7.0\u21920.7.1; control-plane trust; local authority",
+      "scope": "signed DEB 0.7.0→0.7.1; control-plane trust; local authority",
       "reference": "#tier-1-parity-records-2026-10-11",
       "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
+    },
+    {
+      "platform": "linuxmint-22.3",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "linuxmint-22.3-cinnamon-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/device-actions-tpm-unattended-boots-08.json",
+      "sha256": "bf5869a0037cd3f29693b31562bddd2779d6b9a9e17cefac0907cfd38190fabf",
+      "recorded": "2026-10-12T23:25:36.870666870Z",
+      "revision": "696a48a66969e4dfef0966db44bb055f12e38569",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff",
+      "reference": "#tier-1-parity-records-2026-10-11",
+      "mainlineRevision": "696a48a66969e4dfef0966db44bb055f12e38569"
     }
   ]
 }
