@@ -190,6 +190,9 @@ const (
 	// AdminServiceCreateDeviceActionProcedure is the fully-qualified name of the AdminService's
 	// CreateDeviceAction RPC.
 	AdminServiceCreateDeviceActionProcedure = "/lindm.admin.v1.AdminService/CreateDeviceAction"
+	// AdminServicePreflightDeviceActionProcedure is the fully-qualified name of the AdminService's
+	// PreflightDeviceAction RPC.
+	AdminServicePreflightDeviceActionProcedure = "/lindm.admin.v1.AdminService/PreflightDeviceAction"
 	// AdminServiceGetDeviceActionsProcedure is the fully-qualified name of the AdminService's
 	// GetDeviceActions RPC.
 	AdminServiceGetDeviceActionsProcedure = "/lindm.admin.v1.AdminService/GetDeviceActions"
@@ -333,6 +336,7 @@ type AdminServiceClient interface {
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
 	ListRollouts(context.Context, *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error)
 	CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error)
+	PreflightDeviceAction(context.Context, *connect.Request[v1.PreflightDeviceActionRequest]) (*connect.Response[v1.PreflightDeviceActionResponse], error)
 	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	CreateAssistanceSession(context.Context, *connect.Request[v1.CreateAssistanceSessionRequest]) (*connect.Response[v1.CreateAssistanceSessionResponse], error)
@@ -695,6 +699,12 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("CreateDeviceAction")),
 			connect.WithClientOptions(opts...),
 		),
+		preflightDeviceAction: connect.NewClient[v1.PreflightDeviceActionRequest, v1.PreflightDeviceActionResponse](
+			httpClient,
+			baseURL+AdminServicePreflightDeviceActionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("PreflightDeviceAction")),
+			connect.WithClientOptions(opts...),
+		),
 		getDeviceActions: connect.NewClient[v1.GetDeviceActionsRequest, v1.GetDeviceActionsResponse](
 			httpClient,
 			baseURL+AdminServiceGetDeviceActionsProcedure,
@@ -927,6 +937,7 @@ type adminServiceClient struct {
 	controlRollout                       *connect.Client[v1.ControlRolloutRequest, v1.ControlRolloutResponse]
 	listRollouts                         *connect.Client[v1.ListRolloutsRequest, v1.ListRolloutsResponse]
 	createDeviceAction                   *connect.Client[v1.CreateDeviceActionRequest, v1.CreateDeviceActionResponse]
+	preflightDeviceAction                *connect.Client[v1.PreflightDeviceActionRequest, v1.PreflightDeviceActionResponse]
 	getDeviceActions                     *connect.Client[v1.GetDeviceActionsRequest, v1.GetDeviceActionsResponse]
 	getDeviceAction                      *connect.Client[v1.GetDeviceActionRequest, v1.GetDeviceActionResponse]
 	createAssistanceSession              *connect.Client[v1.CreateAssistanceSessionRequest, v1.CreateAssistanceSessionResponse]
@@ -1225,6 +1236,11 @@ func (c *adminServiceClient) CreateDeviceAction(ctx context.Context, req *connec
 	return c.createDeviceAction.CallUnary(ctx, req)
 }
 
+// PreflightDeviceAction calls lindm.admin.v1.AdminService.PreflightDeviceAction.
+func (c *adminServiceClient) PreflightDeviceAction(ctx context.Context, req *connect.Request[v1.PreflightDeviceActionRequest]) (*connect.Response[v1.PreflightDeviceActionResponse], error) {
+	return c.preflightDeviceAction.CallUnary(ctx, req)
+}
+
 // GetDeviceActions calls lindm.admin.v1.AdminService.GetDeviceActions.
 func (c *adminServiceClient) GetDeviceActions(ctx context.Context, req *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error) {
 	return c.getDeviceActions.CallUnary(ctx, req)
@@ -1426,6 +1442,7 @@ type AdminServiceHandler interface {
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
 	ListRollouts(context.Context, *connect.Request[v1.ListRolloutsRequest]) (*connect.Response[v1.ListRolloutsResponse], error)
 	CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error)
+	PreflightDeviceAction(context.Context, *connect.Request[v1.PreflightDeviceActionRequest]) (*connect.Response[v1.PreflightDeviceActionResponse], error)
 	GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error)
 	GetDeviceAction(context.Context, *connect.Request[v1.GetDeviceActionRequest]) (*connect.Response[v1.GetDeviceActionResponse], error)
 	CreateAssistanceSession(context.Context, *connect.Request[v1.CreateAssistanceSessionRequest]) (*connect.Response[v1.CreateAssistanceSessionResponse], error)
@@ -1784,6 +1801,12 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("CreateDeviceAction")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServicePreflightDeviceActionHandler := connect.NewUnaryHandler(
+		AdminServicePreflightDeviceActionProcedure,
+		svc.PreflightDeviceAction,
+		connect.WithSchema(adminServiceMethods.ByName("PreflightDeviceAction")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetDeviceActionsHandler := connect.NewUnaryHandler(
 		AdminServiceGetDeviceActionsProcedure,
 		svc.GetDeviceActions,
@@ -2066,6 +2089,8 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceListRolloutsHandler.ServeHTTP(w, r)
 		case AdminServiceCreateDeviceActionProcedure:
 			adminServiceCreateDeviceActionHandler.ServeHTTP(w, r)
+		case AdminServicePreflightDeviceActionProcedure:
+			adminServicePreflightDeviceActionHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceActionsProcedure:
 			adminServiceGetDeviceActionsHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceActionProcedure:
@@ -2343,6 +2368,10 @@ func (UnimplementedAdminServiceHandler) ListRollouts(context.Context, *connect.R
 
 func (UnimplementedAdminServiceHandler) CreateDeviceAction(context.Context, *connect.Request[v1.CreateDeviceActionRequest]) (*connect.Response[v1.CreateDeviceActionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CreateDeviceAction is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) PreflightDeviceAction(context.Context, *connect.Request[v1.PreflightDeviceActionRequest]) (*connect.Response[v1.PreflightDeviceActionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreflightDeviceAction is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) GetDeviceActions(context.Context, *connect.Request[v1.GetDeviceActionsRequest]) (*connect.Response[v1.GetDeviceActionsResponse], error) {

@@ -26,6 +26,7 @@ import { Presence } from "../../../gen/lindm/resource/v1/identity_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { describeViolation } from "@/lib/validation";
 import { initialState, object, replaceReference, withDerivedRef } from "./resource-draft";
 import { fieldLabel } from "./typed-fields";
 
@@ -185,7 +186,7 @@ function draftErrors(violations: Violation[]): DraftErrors {
   for (const violation of violations) {
     const entry = violation.field.find((part) => part.kind === "list_sub");
     if (entry === undefined) {
-      errors.profile.push(violation.toString());
+      errors.profile.push(describeViolation(violation).message);
       continue;
     }
     const message = settingMessage(violation, violations);

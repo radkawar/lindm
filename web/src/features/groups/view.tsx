@@ -24,6 +24,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { adminClient } from "@/lib/rpc";
+import { describeViolations } from "@/lib/validation";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
 
@@ -155,7 +156,7 @@ function GroupEditor({
     if (validation.kind !== "valid") {
       setError(
         validation.kind === "invalid"
-          ? validation.violations.map((item) => item.toString()).join("; ")
+          ? describeViolations(validation.violations)
           : validation.error.message,
       );
       return;

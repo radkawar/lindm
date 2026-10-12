@@ -28,6 +28,7 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
+import { describeViolation } from "@/lib/validation";
 import {
   setAssignmentApproval,
   setAssignmentAttempt,
@@ -177,7 +178,7 @@ export function ResourceAssignmentForm({
     if (validation.kind !== "valid") {
       setErrors(
         validation.kind === "invalid"
-          ? validation.violations.map((violation) => violation.toString())
+          ? validation.violations.map((violation) => describeViolation(violation).message)
           : [`Assignment validation failed: ${validation.error.message}`],
       );
       return;

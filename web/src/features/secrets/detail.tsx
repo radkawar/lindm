@@ -45,7 +45,8 @@ import { Timestamp } from "@/components/ui/timestamp";
 import { MaterialField, purposeLabels, takeMaterial } from "./material";
 import { secretQueryOptions } from "./queries";
 import { SecretReveal } from "./reveal";
-import { validateRequest } from "./validation";
+import { validateRequest } from "@/lib/validation";
+import { secretMaterialHints } from "./validation";
 
 export function SecretDetailView({ secretId }: { secretId: string }) {
   const lifetime = useAuthLifetime();
@@ -276,7 +277,7 @@ function RotateSecretForm({ secret, onRotated }: { secret: SecretSummary; onRota
           reason: reason.trim(),
         });
         try {
-          validateRequest(RotateSecretRequestSchema, request);
+          validateRequest(RotateSecretRequestSchema, request, secretMaterialHints);
         } catch (error) {
           material.material.value?.fill(0);
           throw error;

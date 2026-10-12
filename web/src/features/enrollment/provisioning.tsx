@@ -37,7 +37,8 @@ import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import { provisioningTokensQueryOptions } from "./queries";
-import { enrollmentFailure, validateEnrollment } from "./validation";
+import { enrollmentFailure } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 export function ProvisioningTokens() {
   const lifetime = useAuthLifetime();
@@ -151,7 +152,7 @@ export function IssueProvisioningToken({
           groupIds: groupIds.filter(Boolean),
           profileRevisionIds: profileRevisionIds.filter(Boolean),
         });
-        validateEnrollment(CreateProvisioningTokenRequestSchema, request);
+        validateRequest(CreateProvisioningTokenRequestSchema, request);
         setCaptured(request);
       }
       submitted = true;
@@ -352,7 +353,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           tokenId: token.tokenId,
           reason: String(data.get("reason") ?? "").trim(),
         });
-      validateEnrollment(RevokeProvisioningTokenRequestSchema, request);
+      validateRequest(RevokeProvisioningTokenRequestSchema, request);
       setCaptured(request);
       submitted = true;
       await adminClient.revokeProvisioningToken(request, {

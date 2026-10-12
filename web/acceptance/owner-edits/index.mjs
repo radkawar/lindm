@@ -23,6 +23,8 @@ import * as pass2EmptySetting from "./pass2-bug1-empty-setting.mjs";
 import * as pass2SafetyApprovals from "./pass2-safety-approvals.mjs";
 import * as approvals from "./approvals.mjs";
 import * as audit from "./audit.mjs";
+import * as pass2RestartDelay from "./pass2-bug2-restart-delay.mjs";
+import * as pass2ReviewPreflight from "./pass2-bug3-review-preflight.mjs";
 import * as wipeForm from "./wipe-form.mjs";
 import * as pass2Bug4 from "./pass2-bug4-enrollment-stale.mjs";
 import * as pass2Bug5 from "./pass2-bug5-token-cancel.mjs";
@@ -61,6 +63,9 @@ export const ownerEdits = [
   pass2EmptySetting,
   approvals,
   audit,
+  pass2RestartDelay,
+  // Needs the route device's inventory stale, so it precedes the wipe check's refresh.
+  pass2ReviewPreflight,
   wipeForm,
   pass2SafetyWipe,
   // Creates a one-time code, then approves the seed's pending enrollment.

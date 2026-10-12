@@ -21,7 +21,7 @@ import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors"
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 import { deviceQueryOptions } from "./queries";
 
 export function LocalAdminPasswordReveal({
@@ -100,7 +100,7 @@ export function LocalAdminPasswordReveal({
         reason: reason.trim(),
         approvalId: approvalId.trim(),
       });
-      validateInventory(RevealLocalAdminPasswordRequestSchema, payload);
+      validateRequest(RevealLocalAdminPasswordRequestSchema, payload);
       request.current = payload;
     }
     return request.current;

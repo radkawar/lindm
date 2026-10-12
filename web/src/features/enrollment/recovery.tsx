@@ -20,7 +20,8 @@ import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { enrollmentFailure, validateEnrollment } from "./validation";
+import { enrollmentFailure } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 export function RecoveryEnrollment({ device }: { device: Device }) {
   const lifetime = useAuthLifetime();
@@ -57,7 +58,7 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
           lifetimeSeconds: Number(data.get("lifetime")),
           reason: String(data.get("reason") ?? "").trim(),
         });
-      validateEnrollment(CreateRecoveryEnrollmentGrantRequestSchema, request);
+      validateRequest(CreateRecoveryEnrollmentGrantRequestSchema, request);
       setCaptured(request);
       submitted = true;
       const result = await adminClient.createApproval(

@@ -89,6 +89,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"ControlRollout":                       {identity.PermissionAssignResources, operators, false},
 		"ListRollouts":                         {identity.PermissionAssignResources, operators, false},
 		"CreateDeviceAction":                   {identity.PermissionRunRemoteExecution, admins, false},
+		"PreflightDeviceAction":                {identity.PermissionRunRemoteExecution, admins, false},
 		"GetDeviceActions":                     {identity.PermissionReadFleet, readers, false},
 		"GetDeviceAction":                      {identity.PermissionReadFleet, readers, false},
 		"GetDeviceEncryption":                  {identity.PermissionReadFleet, readers, false},

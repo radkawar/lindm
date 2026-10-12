@@ -1,8 +1,9 @@
-import { createClient, type Interceptor } from "@connectrpc/connect";
+import { Code, ConnectError, createClient, type Interceptor } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { AdminService } from "../../gen/lindm/admin/v1/admin_pb";
 import { IntegrationService } from "../../gen/lindm/integrations/v1/delivery_pb";
 import { ReportService } from "../../gen/lindm/integrations/v1/reports_pb";
+import { checkRequest } from "@/lib/validation";
 
 let csrfToken = "";
 
@@ -22,10 +23,20 @@ const csrfInterceptor: Interceptor = (next) => async (request) => {
   return await next(request);
 };
 
+// Every request passes the protos' rules and encodes before it leaves, so a bad
+// form value surfaces as a definite field error (see toRpcFailure), never as
+// encoder text or an "outcome unknown" transport failure.
+const requestGuard: Interceptor = (next) => async (request) => {
+  const problem = request.stream ? undefined : checkRequest(request.method.input, request.message);
+  if (problem)
+    throw new ConnectError(problem.message, Code.InvalidArgument, undefined, undefined, problem);
+  return await next(request);
+};
+
 const transport = createConnectTransport({
   baseUrl: location.origin,
   defaultTimeoutMs: 30_000,
-  interceptors: [csrfInterceptor],
+  interceptors: [requestGuard, csrfInterceptor],
   fetch: (input, init) => fetch(input, { ...init, credentials: "same-origin", cache: "no-store" }),
 });
 

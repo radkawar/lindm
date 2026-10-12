@@ -29,6 +29,7 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { canonicalUuid, newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
+import { describeViolations } from "@/lib/validation";
 import { useTargetPickers } from "./pickers";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
@@ -366,7 +367,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                 if (validation.kind !== "valid") {
                   setValidationError(
                     validation.kind === "invalid"
-                      ? validation.violations.map((item) => item.toString()).join("; ")
+                      ? describeViolations(validation.violations)
                       : validation.error.message,
                   );
                   return;

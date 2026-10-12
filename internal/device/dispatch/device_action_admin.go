@@ -118,68 +118,107 @@ func (s *Service) CreateDeviceAction(ctx context.Context, req *connect.Request[a
 }
 
 func (s *Service) createAuthorizedDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.CreateDeviceActionRequest], actor identity.Principal, authorization *identity.Authorization, permission identity.Permission, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, device devicedb.GetDeviceForUpdateRow, generationID, requestID uuid.UUID, digest, document []byte) (*connect.Response[adminv1.CreateDeviceActionResponse], error) {
-	deviceID := device.ID
-	if device.State != core.StateActive || device.CurrentGenerationID == nil || *device.CurrentGenerationID != generationID {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_rejected")
-	}
-	generation, err := q.GetGenerationAuthority(ctx, generationID)
+	now, err := requireActionDevice(ctx, q, device, generationID)
 	if err != nil {
-		return nil, core.MapErr(err)
-	}
-	if generation.State != core.StateActive || generation.SessionEpoch <= 0 {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_session_unavailable")
-	}
-	now, err := core.DispatchClock(ctx, q)
-	if err != nil {
-		return nil, core.MapErr(err)
-	}
-	// Intent is an online preflight, not an offline destructive queue.
-	if !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > time.Minute {
-		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_offline")
+		return nil, err
 	}
 	expires := req.Msg.GetExpiresAt().AsTime()
 	if !expires.After(now) || expires.After(now.Add(10*time.Minute)) || expires.After(snapshot.Delegation.GetExpiresAt().AsTime()) {
 		return nil, core.Invalid("device_action_expiry")
 	}
-	if err := s.inventory.RequireRecoveryReadiness(ctx, q, generationID, req.Msg.GetSpec(), now); err != nil {
-		return nil, core.MapErr(err)
+	open, closeReason, err := s.requireActionPreconditions(ctx, q, device.ID, generationID, req.Msg.GetSpec(), now)
+	if err != nil {
+		return nil, err
 	}
-	if err := requireActionInventory(ctx, q, generationID, req.Msg.GetSpec(), now); err != nil {
-		return nil, core.MapErr(err)
+	if open != nil {
+		if err := q.CloseDeviceAction(ctx, devicedb.CloseDeviceActionParams{ID: open.ID, ClosedAt: core.Timestamptz(now), ClosedReason: closeReason}); err != nil {
+			return nil, core.MapErr(err)
+		}
 	}
-	if err := requireLiveRootEscrow(ctx, q, deviceID, req.Msg.GetSpec()); err != nil {
-		return nil, core.MapErr(err)
+	return s.mintDeviceAction(ctx, tx, q, req, actor, authorization, permission, snapshot, verifier, device.ID, generationID, requestID, digest, document, now, expires)
+}
+
+// requireActionDevice admits only the current, connected generation and returns
+// the dispatch clock. Intent is an online preflight, not an offline queue.
+func requireActionDevice(ctx context.Context, q *devicedb.Queries, device devicedb.GetDeviceForUpdateRow, generationID uuid.UUID) (time.Time, error) {
+	now, err := core.DispatchClock(ctx, q)
+	if err != nil {
+		return time.Time{}, core.MapErr(err)
 	}
-	if err := core.RequireActionRestriction(ctx, q, deviceID, req.Msg.GetSpec()); err != nil {
-		return nil, core.MapErr(err)
+	if device.State != core.StateActive || device.CurrentGenerationID == nil || *device.CurrentGenerationID != generationID {
+		return now, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_generation_rejected")
 	}
-	if err := requireLockActionRestriction(ctx, q, deviceID, generationID, req.Msg.GetSpec()); err != nil {
-		return nil, core.MapErr(err)
+	generation, err := q.GetGenerationAuthority(ctx, generationID)
+	if err != nil {
+		return now, core.MapErr(err)
 	}
-	if rotate := req.Msg.GetSpec().GetEscrowRotate(); rotate != nil {
+	if generation.State != core.StateActive || generation.SessionEpoch <= 0 {
+		return now, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_session_unavailable")
+	}
+	if !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > time.Minute {
+		return now, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_offline")
+	}
+	return now, nil
+}
+
+// requireActionPreconditions runs the spec's readiness, inventory, restriction
+// and open-action checks. It never writes: an open action that a new one
+// supersedes is returned with its close reason for the caller to close.
+func (s *Service) requireActionPreconditions(ctx context.Context, q *devicedb.Queries, deviceID, generationID uuid.UUID, spec *agentv1.DeviceActionSpec, now time.Time) (*devicedb.DeviceAction, string, error) {
+	if err := s.inventory.RequireRecoveryReadiness(ctx, q, generationID, spec, now); err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if err := requireActionInventory(ctx, q, generationID, spec, now); err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if err := requireLiveRootEscrow(ctx, q, deviceID, spec); err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if err := core.RequireActionRestriction(ctx, q, deviceID, spec); err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if err := requireLockActionRestriction(ctx, q, deviceID, generationID, spec); err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if rotate := spec.GetEscrowRotate(); rotate != nil {
 		if s.Escrow == nil || rotate.GetEscrowKeyId() != s.Escrow.KeyID() || !bytes.Equal(rotate.GetEscrowPublicKey(), s.Escrow.PublicKey()) {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "escrow_key_rejected")
+			return nil, "", rpcreason.Error(connect.CodeFailedPrecondition, "escrow_key_rejected")
 		}
 	}
 	open, err := q.GetOpenDeviceAction(ctx, deviceID)
-	if err == nil {
-		inverse, err := releaseSupersedesUnknownLock(open, generationID, req.Msg.GetSpec())
-		if err != nil {
-			return nil, core.MapErr(err)
-		}
-		reason := "expired_unstarted"
-		if inverse {
-			reason = "outcome_unknown"
-		} else if open.OutcomeUnknown || len(open.StartGrantEnvelope) > 0 || now.Before(open.ExpiresAt.Time) {
-			return nil, rpcreason.Error(connect.CodeFailedPrecondition, "device_action_pending")
-		}
-		if err := q.CloseDeviceAction(ctx, devicedb.CloseDeviceActionParams{ID: open.ID, ClosedAt: core.Timestamptz(now), ClosedReason: reason}); err != nil {
-			return nil, core.MapErr(err)
-		}
-	} else if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, core.MapErr(err)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", nil
 	}
-	return s.mintDeviceAction(ctx, tx, q, req, actor, authorization, permission, snapshot, verifier, deviceID, generationID, requestID, digest, document, now, expires)
+	if err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	inverse, err := releaseSupersedesUnknownLock(open, generationID, spec)
+	if err != nil {
+		return nil, "", core.MapErr(err)
+	}
+	if inverse {
+		return &open, "outcome_unknown", nil
+	}
+	if open.OutcomeUnknown || len(open.StartGrantEnvelope) > 0 || now.Before(open.ExpiresAt.Time) {
+		return nil, "", rpcreason.Error(connect.CodeFailedPrecondition, "device_action_pending")
+	}
+	return &open, "expired_unstarted", nil
+}
+
+// requireActionDelegated rejects capabilities the current delegation does not
+// grant to both online signing roles, before any intent is signed.
+func (s *Service) requireActionDelegated(snapshot *executionauthority.Snapshot, spec *agentv1.DeviceActionSpec) (string, error) {
+	capability, err := trust.DeviceActionCapability(spec)
+	if err != nil {
+		return "", core.Invalid("invalid_device_action")
+	}
+	if !core.DeviceActionSignerDelegated(snapshot.Delegation, s.Signing.PlanKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, capability) {
+		return "", core.DeviceActionCapabilityError(capability, "plan")
+	}
+	if !core.DeviceActionSignerDelegated(snapshot.Delegation, s.Signing.StartKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, capability) {
+		return "", core.DeviceActionCapabilityError(capability, "start")
+	}
+	return capability, nil
 }
 
 func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Queries, req *connect.Request[adminv1.CreateDeviceActionRequest], actor identity.Principal, authorization *identity.Authorization, permission identity.Permission, snapshot *executionauthority.Snapshot, verifier *trust.ExecutionVerifier, deviceID, generationID, requestID uuid.UUID, digest, document []byte, now, expires time.Time) (*connect.Response[adminv1.CreateDeviceActionResponse], error) {
@@ -206,15 +245,9 @@ func (s *Service) mintDeviceAction(ctx context.Context, tx pgx.Tx, q *devicedb.Q
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
-	capability, err := trust.DeviceActionCapability(req.Msg.GetSpec())
+	capability, err := s.requireActionDelegated(snapshot, req.Msg.GetSpec())
 	if err != nil {
-		return nil, core.Invalid("invalid_device_action")
-	}
-	if !core.DeviceActionSignerDelegated(snapshot.Delegation, s.Signing.PlanKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, capability) {
-		return nil, core.DeviceActionCapabilityError(capability, "plan")
-	}
-	if !core.DeviceActionSignerDelegated(snapshot.Delegation, s.Signing.StartKey, agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, capability) {
-		return nil, core.DeviceActionCapabilityError(capability, "start")
+		return nil, err
 	}
 	id := uuid.New()
 	intent := &agentv1.DeviceActionIntent{DeploymentId: s.DeploymentID.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generationID.String(), ActionId: id.String(), ActorId: actor.ID.String(), ActionSequence: uint64(sequence), RecoveryEpoch: snapshot.Delegation.GetMinimumRecoveryEpoch(), RootVersion: snapshot.Root.GetVersion(), DelegationVersion: snapshot.Delegation.GetVersion(), AuthorizationVersion: authorization.Version(), NotBefore: timestamppb.New(core.DeviceActionNotBefore(now, snapshot.Delegation)), ExpiresAt: req.Msg.GetExpiresAt(), Spec: req.Msg.GetSpec(), SpecSha256: specDigest}

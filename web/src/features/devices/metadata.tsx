@@ -24,7 +24,7 @@ import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { AttributeFields, readAttributeInputs } from "./attributes";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 export function DeviceMetadataCard({
   deviceId,
@@ -184,7 +184,7 @@ function MetadataForm({
               metadata: value,
               reason: String(data.get("reason") ?? "").trim(),
             });
-            validateInventory(SetDeviceMetadataRequestSchema, request);
+            validateRequest(SetDeviceMetadataRequestSchema, request);
             setCaptured(request);
           }
           setInputError("");

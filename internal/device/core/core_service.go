@@ -449,7 +449,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.ListDeviceGroupsRequest{},
 		&adminv1.SetDeviceGroupRequest{},
 		&adminv1.DeleteDeviceGroupRequest{},
-		&adminv1.CreateDeviceActionRequest{},
+		&adminv1.CreateDeviceActionRequest{}, &adminv1.PreflightDeviceActionRequest{},
 		&adminv1.GetDeviceActionsRequest{},
 		&adminv1.GetDeviceActionRequest{},
 		&adminv1.ListDeviceStorageTargetsRequest{},

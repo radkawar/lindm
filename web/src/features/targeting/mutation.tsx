@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { describeViolations } from "@/lib/validation";
 import { TargetFields } from "./fields";
 import { useTargetPickers } from "./pickers";
 
@@ -116,7 +117,7 @@ export function TargetMutation<S extends DescMessage>({
           if (validation.kind !== "valid") {
             setError(
               validation.kind === "invalid"
-                ? validation.violations.map((item) => item.toString()).join("; ")
+                ? describeViolations(validation.violations)
                 : validation.error.message,
             );
             return;

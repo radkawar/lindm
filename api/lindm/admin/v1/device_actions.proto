@@ -50,6 +50,32 @@ message CreateDeviceActionRequest {
 message CreateDeviceActionResponse {
   DeviceAction action = 1 [(buf.validate.field).required = true];
 }
+// Runs CreateDeviceAction's device, inventory, restriction and delegation checks
+// for this spec without creating, signing or auditing anything. Request expiry,
+// idempotency and approval are checked only by CreateDeviceAction.
+message PreflightDeviceActionRequest {
+  string device_id = 1 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  string enrollment_generation = 2 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).string.not_in = "00000000-0000-0000-0000-000000000000"
+  ];
+  lindm.agent.v1.DeviceActionSpec spec = 3 [(buf.validate.field).required = true];
+}
+message PreflightDeviceActionResponse {
+  // Empty when CreateDeviceAction would pass these checks at checked_at;
+  // otherwise the FailedPrecondition Lindm-Reason it would return.
+  string blocked_reason = 1 [(buf.validate.field).string.max_len = 128];
+  google.protobuf.Timestamp checked_at = 2 [(buf.validate.field).required = true];
+  // Last authenticated contact (heartbeat), not an inventory report.
+  google.protobuf.Timestamp last_seen_at = 3;
+  // Latest accepted host inventory report; unset when none was received.
+  google.protobuf.Timestamp inventory_received_at = 4;
+  // Maximum host inventory age this action accepts; 0 when it needs none.
+  uint32 inventory_max_age_seconds = 5;
+}
 message GetDeviceActionsRequest {
   string device_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 page_size = 2 [(buf.validate.field).uint32.lte = 200];

@@ -1,8 +1,17 @@
 import { useSyncExternalStore } from "react";
-import type { CreateDeviceActionRequest } from "../../../gen/lindm/admin/v1/device_actions_pb";
+import type {
+  CreateDeviceActionRequest,
+  PreflightDeviceActionResponse,
+} from "../../../gen/lindm/admin/v1/device_actions_pb";
 import type { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
 import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";
 import type { RpcFailure } from "@/lib/errors";
+
+// The server's create-time checks, run for the reviewed request before Send.
+export type DeviceActionPreflight =
+  | { state: "checking" }
+  | { state: "checked"; result: PreflightDeviceActionResponse }
+  | { state: "failed"; failure: RpcFailure };
 
 export type DeviceActionAttempt = {
   payload: CreateDeviceActionRequest;
@@ -13,6 +22,7 @@ export type DeviceActionAttempt = {
   approvalId: string;
   approvalAmbiguous: boolean;
   approvalState?: ApprovalState;
+  preflight: DeviceActionPreflight;
 };
 
 // Nonsecret, principal-scoped exact retries survive route changes, not a page reload.
@@ -37,6 +47,19 @@ export function setDeviceActionAttempt(
   else attempts.delete(deviceId);
   emit();
   return true;
+}
+
+// Applies an async result only while the same reviewed request is still current,
+// so a late check never lands on an edited or discarded action.
+export function updateDeviceActionAttempt(
+  lifetime: AuthLifetime,
+  deviceId: string,
+  payload: CreateDeviceActionRequest,
+  update: (current: DeviceActionAttempt) => DeviceActionAttempt,
+): boolean {
+  const current = attempts.get(deviceId);
+  if (!current || current.payload !== payload) return false;
+  return setDeviceActionAttempt(lifetime, deviceId, update(current));
 }
 
 export function useDeviceActionAttempt(deviceId: string): DeviceActionAttempt | null {

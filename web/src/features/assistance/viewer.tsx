@@ -38,7 +38,7 @@ import {
 } from "./display";
 import { InputCapture, videoFramePoint } from "./input";
 import { assistanceSessionQueryOptions } from "./queries";
-import { validateAssistanceRequest } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 const INPUT_CHANNEL_LABEL = "lindm-input";
 const ICE_GATHERING_TIMEOUT_MS = 10_000;
@@ -555,7 +555,7 @@ function AssistanceConnection({
         );
       }
       const request = create(AnswerAssistanceSessionRequestSchema, { sessionId, answerSdp });
-      validateAssistanceRequest(AnswerAssistanceSessionRequestSchema, request);
+      validateRequest(AnswerAssistanceSessionRequestSchema, request);
       update({ stage: "answering" });
       answerSent = true;
       const response = await adminClient.answerAssistanceSession(request, {

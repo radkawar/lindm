@@ -32,7 +32,7 @@ import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { attributeDefinitionsQueryOptions } from "./queries";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 export function AttributeDefinitions() {
   const lifetime = useAuthLifetime();
@@ -203,7 +203,7 @@ function DefinitionForm({
               },
               reason: String(data.get("reason") ?? "").trim(),
             });
-            validateInventory(SetAttributeDefinitionRequestSchema, request);
+            validateRequest(SetAttributeDefinitionRequestSchema, request);
             setCaptured(request);
           }
           setInputError("");

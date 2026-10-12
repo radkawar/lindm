@@ -24,6 +24,7 @@ import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
+import { describeViolations } from "@/lib/validation";
 import {
   NumberControl,
   OptionalControls,
@@ -169,9 +170,7 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
     const result = validator.validate(PreviewTargetAssignmentImpactRequestSchema, request);
     if (result.kind !== "valid") {
       setError(
-        result.kind === "invalid"
-          ? result.violations.map((item) => item.toString()).join("; ")
-          : result.error.message,
+        result.kind === "invalid" ? describeViolations(result.violations) : result.error.message,
       );
       return;
     }
@@ -403,7 +402,7 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
               if (result.kind !== "valid") {
                 setError(
                   result.kind === "invalid"
-                    ? result.violations.map((item) => item.toString()).join("; ")
+                    ? describeViolations(result.violations)
                     : result.error.message,
                 );
                 return;

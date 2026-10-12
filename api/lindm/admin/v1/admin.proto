@@ -84,6 +84,7 @@ service AdminService {
   rpc ControlRollout(ControlRolloutRequest) returns (ControlRolloutResponse);
   rpc ListRollouts(ListRolloutsRequest) returns (ListRolloutsResponse);
   rpc CreateDeviceAction(CreateDeviceActionRequest) returns (CreateDeviceActionResponse);
+  rpc PreflightDeviceAction(PreflightDeviceActionRequest) returns (PreflightDeviceActionResponse);
   rpc GetDeviceActions(GetDeviceActionsRequest) returns (GetDeviceActionsResponse);
   rpc GetDeviceAction(GetDeviceActionRequest) returns (GetDeviceActionResponse);
   rpc CreateAssistanceSession(CreateAssistanceSessionRequest) returns (CreateAssistanceSessionResponse);

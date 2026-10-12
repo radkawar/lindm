@@ -94,8 +94,14 @@ func (s *Service) ListDeviceStorageTargets(ctx context.Context, req *connect.Req
 	return core.NoStore(response), nil
 }
 
+// ActionInventoryMaxAge bounds how old the latest host inventory may be when a
+// device action selects inventory facts. Host collection runs every 10 minutes,
+// independently of the 60-second check-in, so a device that just checked in can
+// still hold an inventory older than this.
+const ActionInventoryMaxAge = 5 * time.Minute
+
 func ActionInventoryFresh(host devicedb.GetHostObservationRow, now time.Time) bool {
-	return host.ReceivedAt.Valid && !host.ReceivedAt.Time.After(now) && now.Sub(host.ReceivedAt.Time) <= 5*time.Minute
+	return host.ReceivedAt.Valid && !host.ReceivedAt.Time.After(now) && now.Sub(host.ReceivedAt.Time) <= ActionInventoryMaxAge
 }
 
 func storageString(value *inventoryv1.ObservedString) string {

@@ -20,7 +20,7 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 import { deviceEncryptionQueryOptions } from "./action-queries";
 
 export function RecoveryKeyReveal({
@@ -99,7 +99,7 @@ export function RecoveryKeyReveal({
         reason: reason.trim(),
         approvalId: approvalId.trim(),
       });
-      validateInventory(RevealRecoveryKeyRequestSchema, payload);
+      validateRequest(RevealRecoveryKeyRequestSchema, payload);
       request.current = payload;
     }
     return request.current;

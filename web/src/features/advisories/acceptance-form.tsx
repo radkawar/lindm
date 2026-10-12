@@ -18,6 +18,7 @@ import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
+import { describeViolation } from "@/lib/validation";
 import { setAcceptanceAttempt, useAcceptanceAttempt, type AcceptanceAttempt } from "./attempt";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
@@ -110,7 +111,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         if (validation.kind !== "valid") {
           setErrors(
             validation.kind === "invalid"
-              ? validation.violations.map((item) => item.toString())
+              ? validation.violations.map((item) => describeViolation(item).message)
               : [validation.error.message],
           );
           return;

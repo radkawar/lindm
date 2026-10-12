@@ -25,7 +25,8 @@ import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { RpcError } from "@/components/ui/rpc-error";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { enrollmentFailure, validateEnrollment } from "./validation";
+import { enrollmentFailure } from "./validation";
+import { validateRequest } from "@/lib/validation";
 import { downloadEnrollmentFile } from "./download";
 
 export function OfflineEnrollment() {
@@ -57,7 +58,7 @@ function OfflineAuthorization() {
       if (file.size > 64 * 1024)
         throw new Error("That file is too large. Root files are 64 KiB at most.");
       const root = fromJsonString(ExecutionRootSchema, await file.text());
-      validateEnrollment(ExecutionRootSchema, root);
+      validateRequest(ExecutionRootSchema, root);
       // ExecutionRoot has no maps: schema-order protobuf serialization matches
       // trust.ExecutionRootDigest, not BootstrapBundle's raw JSON file digest.
       const bytes = new Uint8Array(toBinary(ExecutionRootSchema, root));
@@ -94,7 +95,7 @@ function OfflineAuthorization() {
             bootstrapRootSha256: String(data.get("rootDigest") ?? "").trim(),
           }),
         );
-        validateEnrollment(CreateOfflineEnrollmentAuthorizationRequestSchema, request);
+        validateRequest(CreateOfflineEnrollmentAuthorizationRequestSchema, request);
         setCaptured(request);
       }
       submitted = true;
@@ -243,7 +244,7 @@ function OfflineExchange() {
       const text = await file.text();
       lifetime.signal.throwIfAborted();
       const value = fromJsonString(OfflineEnrollmentRequestFileSchema, text);
-      validateEnrollment(OfflineEnrollmentRequestFileSchema, value);
+      validateRequest(OfflineEnrollmentRequestFileSchema, value);
       setRequest(value);
     } catch (error) {
       if (!lifetime.signal.aborted) setFailure(enrollmentFailure(error, false));
@@ -260,7 +261,7 @@ function OfflineExchange() {
       const options = { signal: lifetime.signal, timeoutMs: 30_000 };
       if (exact.action === "import") {
         const payload = create(ImportOfflineEnrollmentRequestRequestSchema, { request });
-        validateEnrollment(ImportOfflineEnrollmentRequestRequestSchema, payload);
+        validateRequest(ImportOfflineEnrollmentRequestRequestSchema, payload);
         setAttempt(exact);
         submitted = true;
         const result = await adminClient.importOfflineEnrollmentRequest(payload, options);
@@ -278,7 +279,7 @@ function OfflineExchange() {
           request,
           reason: exact.reason,
         });
-        validateEnrollment(ExportOfflineEnrollmentResponseRequestSchema, payload);
+        validateRequest(ExportOfflineEnrollmentResponseRequestSchema, payload);
         setAttempt(exact);
         submitted = true;
         const result = await adminClient.exportOfflineEnrollmentResponse(payload, options);

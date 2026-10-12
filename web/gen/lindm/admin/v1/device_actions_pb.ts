@@ -20,7 +20,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/device_actions.proto.
  */
 export const file_lindm_admin_v1_device_actions: GenFile = /*@__PURE__*/
-  fileDesc("CiNsaW5kbS9hZG1pbi92MS9kZXZpY2VfYWN0aW9ucy5wcm90bxIObGluZG0uYWRtaW4udjEi/wIKDERldmljZUFjdGlvbhIRCglhY3Rpb25faWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEh0KFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgDIAEoCRIuCgRzcGVjGAQgASgLMiAubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uU3BlYxIQCghhY3Rvcl9pZBgFIAEoCRIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCgZzdGF0dXMYCCABKAsyIi5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25TdGF0dXMSFQoNY2xvc2VkX3JlYXNvbhgJIAEoCRIXCg9hY3Rpb25fcmV2aXNpb24YCiABKAQSJAoSYWN0b3JfZGlzcGxheV9uYW1lGAsgASgJQgi6SAVyAxiAAiKeAwoZQ3JlYXRlRGV2aWNlQWN0aW9uUmVxdWVzdBJCCgpyZXF1ZXN0X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKCWRldmljZV9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJNChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAyABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESNgoEc3BlYxgEIAEoCzIgLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvblNwZWNCBrpIA8gBARI2CgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhkKBnJlYXNvbhgGIAEoCUIJukgGcgSYtRgBEiAKC2FwcHJvdmFsX2lkGAcgASgJQgu6SAjYAQFyA7ABASJSChpDcmVhdGVEZXZpY2VBY3Rpb25SZXNwb25zZRI0CgZhY3Rpb24YASABKAsyHC5saW5kbS5hZG1pbi52MS5EZXZpY2VBY3Rpb25CBrpIA8gBASJxChdHZXREZXZpY2VBY3Rpb25zUmVxdWVzdBIbCglkZXZpY2VfaWQYASABKAlCCLpIBXIDsAEBEhsKCXBhZ2Vfc2l6ZRgCIAEoDUIIukgFKgMYyAESHAoKcGFnZV90b2tlbhgDIAEoCUIIukgFcgMYgAQi3gEKGEdldERldmljZUFjdGlvbnNSZXNwb25zZRItCgdhY3Rpb25zGAEgAygLMhwubGluZG0uYWRtaW4udjEuRGV2aWNlQWN0aW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCRIXCg9zZXNzaW9uc19sb2NrZWQYAyABKAgSEwoLcXVhcmFudGluZWQYBCABKAgSNAoQcXVhcmFudGluZV91bnRpbBgFIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASFgoObG9ja19hY3Rpb25faWQYBiABKAkiNQoWR2V0RGV2aWNlQWN0aW9uUmVxdWVzdBIbCglhY3Rpb25faWQYASABKAlCCLpIBXIDsAEBIk8KF0dldERldmljZUFjdGlvblJlc3BvbnNlEjQKBmFjdGlvbhgBIAEoCzIcLmxpbmRtLmFkbWluLnYxLkRldmljZUFjdGlvbkIGukgDyAEBIlkKGkdldERldmljZUVuY3J5cHRpb25SZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESHgoJbHVrc191dWlkGAIgASgJQgu6SAjYAQFyA7ABASKaAQoURGV2aWNlUmVjb3ZlcnlFc2Nyb3cSEQoJYWN0aW9uX2lkGAEgASgJEhEKCWx1a3NfdXVpZBgCIAEoCRIPCgdrZXlzbG90GAMgASgNEi0KCXN0b3JlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASHAoUcmV0aXJlbWVudF9jb25maXJtZWQYBSABKAgitgIKG0dldERldmljZUVuY3J5cHRpb25SZXNwb25zZRI8CgtvYnNlcnZhdGlvbhgBIAEoCzInLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvbk9ic2VydmF0aW9uEjQKBmVzY3JvdxgCIAEoCzIkLmxpbmRtLmFkbWluLnYxLkRldmljZVJlY292ZXJ5RXNjcm93EhUKDWVzY3Jvd19rZXlfaWQYAyABKAkSGQoRZXNjcm93X3B1YmxpY19rZXkYBCABKAwSRAoccmVjb3Zlcnlfa2V5X3JldmVhbF9hcHByb3ZhbBgGIAEoCzIeLmxpbmRtLmFkbWluLnYxLlJldmVhbEFwcHJvdmFsSgQIBRAGUiVyZWNvdmVyeV9rZXlfcmV2ZWFsX2FwcHJvdmFsX3JlcXVpcmVkIq8BChhSZXZlYWxSZWNvdmVyeUtleVJlcXVlc3QSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARIbCglhY3Rpb25faWQYAyABKAlCCLpIBXIDsAEBEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEiAKC2FwcHJvdmFsX2lkGAUgASgJQgu6SAjYAQFyA7ABASI9ChlSZXZlYWxSZWNvdmVyeUtleVJlc3BvbnNlEiAKDHJlY292ZXJ5X2tleRgBIAEoDEIKukgHegUQARiAICLsAQoTRGV2aWNlU3RvcmFnZVRhcmdldBI1CgZ0YXJnZXQYASABKAsyHS5saW5kbS5hZ2VudC52MS5TdG9yYWdlVGFyZ2V0Qga6SAPIAQESLwoEbnZtZRgCIAEoCzIhLmxpbmRtLmFnZW50LnYxLk5WTWVTYW5pdGl6ZVNjb3BlEgwKBG5hbWUYAyABKAkSEgoKc2l6ZV9ieXRlcxgEIAEoBBINCgVtb2RlbBgFIAEoCRISCgplbmNyeXB0aW9uGAYgASgJEhIKCm1vdW50cG9pbnQYByABKAkSFAoMcm9vdF9iYWNraW5nGAggASgIItMBCh9MaXN0RGV2aWNlU3RvcmFnZVRhcmdldHNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESTAoLYWN0aW9uX2tpbmQYAiABKAlCN7pINHIyUg1lc2Nyb3dfcm90YXRlUgl0cG0yX2JpbmRSDGNyeXB0b19lcmFzZVIIc2FuaXRpemUSKwoVcmVjb3ZlcnlfaW1hZ2Vfc2hhMjU2GAMgASgMQge6SAR6AmggSACIAQFCGAoWX3JlY292ZXJ5X2ltYWdlX3NoYTI1NiLaAgogTGlzdERldmljZVN0b3JhZ2VUYXJnZXRzUmVzcG9uc2USNAoHdGFyZ2V0cxgBIAMoCzIjLmxpbmRtLmFkbWluLnYxLkRldmljZVN0b3JhZ2VUYXJnZXQSHQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJEhUKDWhvc3Rfc2VxdWVuY2UYAyABKAQSLwoLcmVjZWl2ZWRfYXQYBCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi8KC29ic2VydmVkX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBINCgVmcmVzaBgGIAEoCBIaChJ1bmF2YWlsYWJsZV9yZWFzb24YByABKAkSPQoScmVjb3ZlcnlfcmVhZGluZXNzGAggASgLMiEubGluZG0uYWRtaW4udjEuUmVjb3ZlcnlSZWFkaW5lc3MigwIKEVJlY292ZXJ5UmVhZGluZXNzEkEKC29ic2VydmF0aW9uGAEgASgLMiwubGluZG0uYWdlbnQudjEuUmVjb3ZlcnlSZWFkaW5lc3NPYnNlcnZhdGlvbhINCgVyZWFkeRgCIAEoCBIOCgZyZWFzb24YAyABKAkSFAoMaW1hZ2Vfc2hhMjU2GAQgASgMEhIKCmltYWdlX3NpemUYBSABKAQSFAoMbmVlZGVkX2J5dGVzGAYgASgEEhcKD2F2YWlsYWJsZV9ieXRlcxgHIAEoBBIzCglib290X21vZGUYCCABKA4yIC5saW5kbS5hZ2VudC52MS5SZWNvdmVyeUJvb3RNb2RlQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_admin_v1_secrets, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_recovery_readiness, file_lindm_validation_v1_string_rules]);
+  fileDesc("CiNsaW5kbS9hZG1pbi92MS9kZXZpY2VfYWN0aW9ucy5wcm90bxIObGluZG0uYWRtaW4udjEi/wIKDERldmljZUFjdGlvbhIRCglhY3Rpb25faWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEh0KFWVucm9sbG1lbnRfZ2VuZXJhdGlvbhgDIAEoCRIuCgRzcGVjGAQgASgLMiAubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uU3BlYxIQCghhY3Rvcl9pZBgFIAEoCRIuCgpjcmVhdGVkX2F0GAYgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpleHBpcmVzX2F0GAcgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIyCgZzdGF0dXMYCCABKAsyIi5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25TdGF0dXMSFQoNY2xvc2VkX3JlYXNvbhgJIAEoCRIXCg9hY3Rpb25fcmV2aXNpb24YCiABKAQSJAoSYWN0b3JfZGlzcGxheV9uYW1lGAsgASgJQgi6SAVyAxiAAiKeAwoZQ3JlYXRlRGV2aWNlQWN0aW9uUmVxdWVzdBJCCgpyZXF1ZXN0X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkEKCWRldmljZV9pZBgCIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJNChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAyABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESNgoEc3BlYxgEIAEoCzIgLmxpbmRtLmFnZW50LnYxLkRldmljZUFjdGlvblNwZWNCBrpIA8gBARI2CgpleHBpcmVzX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEhkKBnJlYXNvbhgGIAEoCUIJukgGcgSYtRgBEiAKC2FwcHJvdmFsX2lkGAcgASgJQgu6SAjYAQFyA7ABASJSChpDcmVhdGVEZXZpY2VBY3Rpb25SZXNwb25zZRI0CgZhY3Rpb24YASABKAsyHC5saW5kbS5hZG1pbi52MS5EZXZpY2VBY3Rpb25CBrpIA8gBASLoAQocUHJlZmxpZ2h0RGV2aWNlQWN0aW9uUmVxdWVzdBJBCglkZXZpY2VfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESTQoVZW5yb2xsbWVudF9nZW5lcmF0aW9uGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEjYKBHNwZWMYAyABKAsyIC5saW5kbS5hZ2VudC52MS5EZXZpY2VBY3Rpb25TcGVjQga6SAPIAQEiiQIKHVByZWZsaWdodERldmljZUFjdGlvblJlc3BvbnNlEiAKDmJsb2NrZWRfcmVhc29uGAEgASgJQgi6SAVyAxiAARI2CgpjaGVja2VkX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEIGukgDyAEBEjAKDGxhc3Rfc2Vlbl9hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASOQoVaW52ZW50b3J5X3JlY2VpdmVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIhChlpbnZlbnRvcnlfbWF4X2FnZV9zZWNvbmRzGAUgASgNInEKF0dldERldmljZUFjdGlvbnNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGwoJcGFnZV9zaXplGAIgASgNQgi6SAUqAxjIARIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiABCLeAQoYR2V0RGV2aWNlQWN0aW9uc1Jlc3BvbnNlEi0KB2FjdGlvbnMYASADKAsyHC5saW5kbS5hZG1pbi52MS5EZXZpY2VBY3Rpb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJEhcKD3Nlc3Npb25zX2xvY2tlZBgDIAEoCBITCgtxdWFyYW50aW5lZBgEIAEoCBI0ChBxdWFyYW50aW5lX3VudGlsGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIWCg5sb2NrX2FjdGlvbl9pZBgGIAEoCSI1ChZHZXREZXZpY2VBY3Rpb25SZXF1ZXN0EhsKCWFjdGlvbl9pZBgBIAEoCUIIukgFcgOwAQEiTwoXR2V0RGV2aWNlQWN0aW9uUmVzcG9uc2USNAoGYWN0aW9uGAEgASgLMhwubGluZG0uYWRtaW4udjEuRGV2aWNlQWN0aW9uQga6SAPIAQEiWQoaR2V0RGV2aWNlRW5jcnlwdGlvblJlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIeCglsdWtzX3V1aWQYAiABKAlCC7pICNgBAXIDsAEBIpoBChREZXZpY2VSZWNvdmVyeUVzY3JvdxIRCglhY3Rpb25faWQYASABKAkSEQoJbHVrc191dWlkGAIgASgJEg8KB2tleXNsb3QYAyABKA0SLQoJc3RvcmVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIcChRyZXRpcmVtZW50X2NvbmZpcm1lZBgFIAEoCCK2AgobR2V0RGV2aWNlRW5jcnlwdGlvblJlc3BvbnNlEjwKC29ic2VydmF0aW9uGAEgASgLMicubGluZG0uYWdlbnQudjEuRGV2aWNlQWN0aW9uT2JzZXJ2YXRpb24SNAoGZXNjcm93GAIgASgLMiQubGluZG0uYWRtaW4udjEuRGV2aWNlUmVjb3ZlcnlFc2Nyb3cSFQoNZXNjcm93X2tleV9pZBgDIAEoCRIZChFlc2Nyb3dfcHVibGljX2tleRgEIAEoDBJEChxyZWNvdmVyeV9rZXlfcmV2ZWFsX2FwcHJvdmFsGAYgASgLMh4ubGluZG0uYWRtaW4udjEuUmV2ZWFsQXBwcm92YWxKBAgFEAZSJXJlY292ZXJ5X2tleV9yZXZlYWxfYXBwcm92YWxfcmVxdWlyZWQirwEKGFJldmVhbFJlY292ZXJ5S2V5UmVxdWVzdBIcCgpyZXF1ZXN0X2lkGAEgASgJQgi6SAVyA7ABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEhsKCWFjdGlvbl9pZBgDIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAQgASgJQgm6SAZyBJi1GAESIAoLYXBwcm92YWxfaWQYBSABKAlCC7pICNgBAXIDsAEBIj0KGVJldmVhbFJlY292ZXJ5S2V5UmVzcG9uc2USIAoMcmVjb3Zlcnlfa2V5GAEgASgMQgq6SAd6BRABGIAgIuwBChNEZXZpY2VTdG9yYWdlVGFyZ2V0EjUKBnRhcmdldBgBIAEoCzIdLmxpbmRtLmFnZW50LnYxLlN0b3JhZ2VUYXJnZXRCBrpIA8gBARIvCgRudm1lGAIgASgLMiEubGluZG0uYWdlbnQudjEuTlZNZVNhbml0aXplU2NvcGUSDAoEbmFtZRgDIAEoCRISCgpzaXplX2J5dGVzGAQgASgEEg0KBW1vZGVsGAUgASgJEhIKCmVuY3J5cHRpb24YBiABKAkSEgoKbW91bnRwb2ludBgHIAEoCRIUCgxyb290X2JhY2tpbmcYCCABKAgi0wEKH0xpc3REZXZpY2VTdG9yYWdlVGFyZ2V0c1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARJMCgthY3Rpb25fa2luZBgCIAEoCUI3ukg0cjJSDWVzY3Jvd19yb3RhdGVSCXRwbTJfYmluZFIMY3J5cHRvX2VyYXNlUghzYW5pdGl6ZRIrChVyZWNvdmVyeV9pbWFnZV9zaGEyNTYYAyABKAxCB7pIBHoCaCBIAIgBAUIYChZfcmVjb3ZlcnlfaW1hZ2Vfc2hhMjU2ItoCCiBMaXN0RGV2aWNlU3RvcmFnZVRhcmdldHNSZXNwb25zZRI0Cgd0YXJnZXRzGAEgAygLMiMubGluZG0uYWRtaW4udjEuRGV2aWNlU3RvcmFnZVRhcmdldBIdChVlbnJvbGxtZW50X2dlbmVyYXRpb24YAiABKAkSFQoNaG9zdF9zZXF1ZW5jZRgDIAEoBBIvCgtyZWNlaXZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLwoLb2JzZXJ2ZWRfYXQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg0KBWZyZXNoGAYgASgIEhoKEnVuYXZhaWxhYmxlX3JlYXNvbhgHIAEoCRI9ChJyZWNvdmVyeV9yZWFkaW5lc3MYCCABKAsyIS5saW5kbS5hZG1pbi52MS5SZWNvdmVyeVJlYWRpbmVzcyKDAgoRUmVjb3ZlcnlSZWFkaW5lc3MSQQoLb2JzZXJ2YXRpb24YASABKAsyLC5saW5kbS5hZ2VudC52MS5SZWNvdmVyeVJlYWRpbmVzc09ic2VydmF0aW9uEg0KBXJlYWR5GAIgASgIEg4KBnJlYXNvbhgDIAEoCRIUCgxpbWFnZV9zaGEyNTYYBCABKAwSEgoKaW1hZ2Vfc2l6ZRgFIAEoBBIUCgxuZWVkZWRfYnl0ZXMYBiABKAQSFwoPYXZhaWxhYmxlX2J5dGVzGAcgASgEEjMKCWJvb3RfbW9kZRgIIAEoDjIgLmxpbmRtLmFnZW50LnYxLlJlY292ZXJ5Qm9vdE1vZGVCIlogbGluZG0vZ2VuL2xpbmRtL2FkbWluL3YxO2FkbWludjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_admin_v1_secrets, file_lindm_agent_v1_device_actions, file_lindm_agent_v1_recovery_readiness, file_lindm_validation_v1_string_rules]);
 
 /**
  * Immutable imperative action, never a desired-state assignment or retry policy.
@@ -158,6 +158,83 @@ export const CreateDeviceActionResponseSchema: GenMessage<CreateDeviceActionResp
   messageDesc(file_lindm_admin_v1_device_actions, 2);
 
 /**
+ * Runs CreateDeviceAction's device, inventory, restriction and delegation checks
+ * for this spec without creating, signing or auditing anything. Request expiry,
+ * idempotency and approval are checked only by CreateDeviceAction.
+ *
+ * @generated from message lindm.admin.v1.PreflightDeviceActionRequest
+ */
+export type PreflightDeviceActionRequest = Message<"lindm.admin.v1.PreflightDeviceActionRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string enrollment_generation = 2;
+   */
+  enrollmentGeneration: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.DeviceActionSpec spec = 3;
+   */
+  spec?: DeviceActionSpec | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PreflightDeviceActionRequest.
+ * Use `create(PreflightDeviceActionRequestSchema)` to create a new message.
+ */
+export const PreflightDeviceActionRequestSchema: GenMessage<PreflightDeviceActionRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_device_actions, 3);
+
+/**
+ * @generated from message lindm.admin.v1.PreflightDeviceActionResponse
+ */
+export type PreflightDeviceActionResponse = Message<"lindm.admin.v1.PreflightDeviceActionResponse"> & {
+  /**
+   * Empty when CreateDeviceAction would pass these checks at checked_at;
+   * otherwise the FailedPrecondition Lindm-Reason it would return.
+   *
+   * @generated from field: string blocked_reason = 1;
+   */
+  blockedReason: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp checked_at = 2;
+   */
+  checkedAt?: Timestamp | undefined;
+
+  /**
+   * Last authenticated contact (heartbeat), not an inventory report.
+   *
+   * @generated from field: google.protobuf.Timestamp last_seen_at = 3;
+   */
+  lastSeenAt?: Timestamp | undefined;
+
+  /**
+   * Latest accepted host inventory report; unset when none was received.
+   *
+   * @generated from field: google.protobuf.Timestamp inventory_received_at = 4;
+   */
+  inventoryReceivedAt?: Timestamp | undefined;
+
+  /**
+   * Maximum host inventory age this action accepts; 0 when it needs none.
+   *
+   * @generated from field: uint32 inventory_max_age_seconds = 5;
+   */
+  inventoryMaxAgeSeconds: number;
+};
+
+/**
+ * Describes the message lindm.admin.v1.PreflightDeviceActionResponse.
+ * Use `create(PreflightDeviceActionResponseSchema)` to create a new message.
+ */
+export const PreflightDeviceActionResponseSchema: GenMessage<PreflightDeviceActionResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_device_actions, 4);
+
+/**
  * @generated from message lindm.admin.v1.GetDeviceActionsRequest
  */
 export type GetDeviceActionsRequest = Message<"lindm.admin.v1.GetDeviceActionsRequest"> & {
@@ -182,7 +259,7 @@ export type GetDeviceActionsRequest = Message<"lindm.admin.v1.GetDeviceActionsRe
  * Use `create(GetDeviceActionsRequestSchema)` to create a new message.
  */
 export const GetDeviceActionsRequestSchema: GenMessage<GetDeviceActionsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 3);
+  messageDesc(file_lindm_admin_v1_device_actions, 5);
 
 /**
  * @generated from message lindm.admin.v1.GetDeviceActionsResponse
@@ -230,7 +307,7 @@ export type GetDeviceActionsResponse = Message<"lindm.admin.v1.GetDeviceActionsR
  * Use `create(GetDeviceActionsResponseSchema)` to create a new message.
  */
 export const GetDeviceActionsResponseSchema: GenMessage<GetDeviceActionsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 4);
+  messageDesc(file_lindm_admin_v1_device_actions, 6);
 
 /**
  * @generated from message lindm.admin.v1.GetDeviceActionRequest
@@ -247,7 +324,7 @@ export type GetDeviceActionRequest = Message<"lindm.admin.v1.GetDeviceActionRequ
  * Use `create(GetDeviceActionRequestSchema)` to create a new message.
  */
 export const GetDeviceActionRequestSchema: GenMessage<GetDeviceActionRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 5);
+  messageDesc(file_lindm_admin_v1_device_actions, 7);
 
 /**
  * @generated from message lindm.admin.v1.GetDeviceActionResponse
@@ -264,7 +341,7 @@ export type GetDeviceActionResponse = Message<"lindm.admin.v1.GetDeviceActionRes
  * Use `create(GetDeviceActionResponseSchema)` to create a new message.
  */
 export const GetDeviceActionResponseSchema: GenMessage<GetDeviceActionResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 6);
+  messageDesc(file_lindm_admin_v1_device_actions, 8);
 
 /**
  * @generated from message lindm.admin.v1.GetDeviceEncryptionRequest
@@ -288,7 +365,7 @@ export type GetDeviceEncryptionRequest = Message<"lindm.admin.v1.GetDeviceEncryp
  * Use `create(GetDeviceEncryptionRequestSchema)` to create a new message.
  */
 export const GetDeviceEncryptionRequestSchema: GenMessage<GetDeviceEncryptionRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 7);
+  messageDesc(file_lindm_admin_v1_device_actions, 9);
 
 /**
  * @generated from message lindm.admin.v1.DeviceRecoveryEscrow
@@ -327,7 +404,7 @@ export type DeviceRecoveryEscrow = Message<"lindm.admin.v1.DeviceRecoveryEscrow"
  * Use `create(DeviceRecoveryEscrowSchema)` to create a new message.
  */
 export const DeviceRecoveryEscrowSchema: GenMessage<DeviceRecoveryEscrow> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 8);
+  messageDesc(file_lindm_admin_v1_device_actions, 10);
 
 /**
  * @generated from message lindm.admin.v1.GetDeviceEncryptionResponse
@@ -366,7 +443,7 @@ export type GetDeviceEncryptionResponse = Message<"lindm.admin.v1.GetDeviceEncry
  * Use `create(GetDeviceEncryptionResponseSchema)` to create a new message.
  */
 export const GetDeviceEncryptionResponseSchema: GenMessage<GetDeviceEncryptionResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 9);
+  messageDesc(file_lindm_admin_v1_device_actions, 11);
 
 /**
  * Requires dedicated permission, recent step-up, reason and audited custody access.
@@ -406,7 +483,7 @@ export type RevealRecoveryKeyRequest = Message<"lindm.admin.v1.RevealRecoveryKey
  * Use `create(RevealRecoveryKeyRequestSchema)` to create a new message.
  */
 export const RevealRecoveryKeyRequestSchema: GenMessage<RevealRecoveryKeyRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 10);
+  messageDesc(file_lindm_admin_v1_device_actions, 12);
 
 /**
  * @generated from message lindm.admin.v1.RevealRecoveryKeyResponse
@@ -423,7 +500,7 @@ export type RevealRecoveryKeyResponse = Message<"lindm.admin.v1.RevealRecoveryKe
  * Use `create(RevealRecoveryKeyResponseSchema)` to create a new message.
  */
 export const RevealRecoveryKeyResponseSchema: GenMessage<RevealRecoveryKeyResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 11);
+  messageDesc(file_lindm_admin_v1_device_actions, 13);
 
 /**
  * Observed selection only, not native qualification or execution authority.
@@ -477,7 +554,7 @@ export type DeviceStorageTarget = Message<"lindm.admin.v1.DeviceStorageTarget"> 
  * Use `create(DeviceStorageTargetSchema)` to create a new message.
  */
 export const DeviceStorageTargetSchema: GenMessage<DeviceStorageTarget> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 12);
+  messageDesc(file_lindm_admin_v1_device_actions, 14);
 
 /**
  * @generated from message lindm.admin.v1.ListDeviceStorageTargetsRequest
@@ -506,7 +583,7 @@ export type ListDeviceStorageTargetsRequest = Message<"lindm.admin.v1.ListDevice
  * Use `create(ListDeviceStorageTargetsRequestSchema)` to create a new message.
  */
 export const ListDeviceStorageTargetsRequestSchema: GenMessage<ListDeviceStorageTargetsRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 13);
+  messageDesc(file_lindm_admin_v1_device_actions, 15);
 
 /**
  * @generated from message lindm.admin.v1.ListDeviceStorageTargetsResponse
@@ -562,7 +639,7 @@ export type ListDeviceStorageTargetsResponse = Message<"lindm.admin.v1.ListDevic
  * Use `create(ListDeviceStorageTargetsResponseSchema)` to create a new message.
  */
 export const ListDeviceStorageTargetsResponseSchema: GenMessage<ListDeviceStorageTargetsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 14);
+  messageDesc(file_lindm_admin_v1_device_actions, 16);
 
 /**
  * Admission for the selected signed artifact, never native execution authority.
@@ -618,5 +695,5 @@ export type RecoveryReadiness = Message<"lindm.admin.v1.RecoveryReadiness"> & {
  * Use `create(RecoveryReadinessSchema)` to create a new message.
  */
 export const RecoveryReadinessSchema: GenMessage<RecoveryReadiness> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_device_actions, 15);
+  messageDesc(file_lindm_admin_v1_device_actions, 17);
 

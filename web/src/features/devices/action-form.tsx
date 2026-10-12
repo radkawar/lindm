@@ -1,8 +1,10 @@
-import { create, equals, toBinary } from "@bufbuild/protobuf";
+import { create, equals, getOption, toBinary, type DescField } from "@bufbuild/protobuf";
 import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
+import { Code } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CreateDeviceActionRequestSchema,
@@ -62,9 +64,10 @@ import { recoveryReadinessMessage } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
-import { formatTimestamp } from "@/lib/time";
+import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import {
   setDeviceActionAttempt,
+  updateDeviceActionAttempt,
   useDeviceActionAttempt,
   type DeviceActionAttempt,
 } from "./action-attempt";
@@ -84,7 +87,12 @@ import {
   deviceStorageTargetsQueryOptions,
 } from "./action-queries";
 import { deviceQueryOptions } from "./queries";
-import { validateInventory } from "./validation";
+import {
+  formErrorMessage,
+  requestProblem,
+  validateRequest,
+  type FieldError,
+} from "@/lib/validation";
 import {
   ObservedStorageTargetPicker,
   observedStorageSelections,
@@ -119,6 +127,22 @@ const approvalLabels: Record<ApprovalState, string> = {
   [ApprovalState.CONSUMED]: "Used",
   [ApprovalState.EXPIRED]: "Expired",
   [ApprovalState.WITHDRAWN]: "Withdrawn",
+};
+
+// Power delays are bounded by the protos (logind schedules at most an hour ahead);
+// the form states the same range rather than restating a number of its own.
+function powerDelayMax(field: DescField): number {
+  const rule = getOption(field, validationRules).type;
+  if (rule.case !== "uint32" || rule.value.lessThan.case !== "lte")
+    throw new Error("Missing bounded power delay constraint");
+  return rule.value.lessThan.value;
+}
+const restartDelayMax = powerDelayMax(RestartActionSchema.field.delaySeconds);
+const shutdownDelayMax = powerDelayMax(ShutdownActionSchema.field.delaySeconds);
+// Server refusals that fresh inventory repairs.
+const inventoryBlockers: Record<string, true> = {
+  device_action_inventory_stale: true,
+  device_action_inventory_unavailable: true,
 };
 
 const actionSummaries: Record<DeviceActionKind, string> = {
@@ -282,6 +306,8 @@ export function DeviceActionForm({
   const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState("");
   const [rpcFailure, setRpcFailure] = useState<RpcFailure | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<readonly FieldError[]>([]);
+  const [refreshFailure, setRefreshFailure] = useState<RpcFailure | null>(null);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -301,29 +327,33 @@ export function DeviceActionForm({
     ),
     enabled: storage,
   });
-  // A refresh requested from this form: follow it, then reload storage as soon as
-  // the device reports success so the target list appears without a reload.
+  // A refresh requested from this form: follow it, then reload storage and rerun
+  // the review's server checks as soon as the device reports success.
   const refreshAction = useQuery({
     ...deviceActionQueryOptions(lifetime, deviceId, refreshActionId),
-    enabled: storage && refreshActionId !== "",
+    enabled: refreshActionId !== "",
     refetchInterval: (query) =>
       query.state.status !== "error" &&
       refreshOutcome(query.state.data, query.state.dataUpdatedAt) === "waiting"
         ? 3_000
         : false,
   });
-  const refreshResult =
-    !storage || !refreshActionId
-      ? undefined
-      : refreshAction.error
-        ? "error"
-        : refreshOutcome(refreshAction.data, refreshAction.dataUpdatedAt);
+  const refreshResult = !refreshActionId
+    ? undefined
+    : refreshAction.error
+      ? "error"
+      : refreshOutcome(refreshAction.data, refreshAction.dataUpdatedAt);
   const refreshSucceeded = refreshResult === "succeeded";
+  const recheckAfterRefresh = useEffectEvent(() => {
+    if (attempt?.status === "frozen" || attempt?.status === "rejected")
+      void checkPreflight(attempt);
+  });
   useEffect(() => {
     if (!refreshSucceeded) return;
     void queryClient.invalidateQueries({
       queryKey: ["device-storage-targets", lifetime.generation, deviceId],
     });
+    recheckAfterRefresh();
   }, [refreshSucceeded, queryClient, lifetime.generation, deviceId]);
   const destructive = kind === "cryptoErase" || kind === "sanitize";
   const frozen = attempt !== null;
@@ -411,6 +441,15 @@ export function DeviceActionForm({
     return { key: index, path: name ? `/dev/${name}` : "", sizeBytes: target.sizeBytes };
   });
 
+  const power = kind === "restart" || kind === "shutdown";
+  const delayMax = kind === "shutdown" ? shutdownDelayMax : restartDelayMax;
+  const delayText = powerDelay.trim();
+  const delayError = !power
+    ? ""
+    : delayText !== "" && !(/^\d+$/.test(delayText) && Number(delayText) <= delayMax)
+      ? `Enter a whole number of seconds from 0 to ${delayMax}.`
+      : (fieldErrors.find((entry) => entry.field === "delay_seconds")?.message ?? "");
+
   // What still blocks review, named inline instead of a disabled button. Empty
   // required text fields are reported by native form validation instead.
   const missing = (
@@ -428,6 +467,7 @@ export function DeviceActionForm({
         ]
       : [
           needsRecovery && !recoveryReady ? "a ready recovery image" : "",
+          delayError ? `a delay from 0 to ${delayMax} seconds` : "",
           storage && confirmation !== confirmationName ? "the typed hostname confirmation" : "",
           liveErase && !liveTargets.length ? "volumes added to the list" : "",
           liveErase && liveTargets.some((entry) => !isStillObserved(entry))
@@ -603,7 +643,7 @@ export function DeviceActionForm({
               throw new Error(
                 "This disk's NVMe details are incomplete. Refresh inventory, then try again.",
               );
-            validateInventory(NVMeSanitizeScopeSchema, nvmeScope);
+            validateRequest(NVMeSanitizeScopeSchema, nvmeScope);
           }
           spec.action = {
             case: kind,
@@ -659,7 +699,7 @@ export function DeviceActionForm({
         expiresAt: timestampFromDate(new Date(Date.now() + 10 * 60_000)),
         reason: reason.trim(),
       });
-      validateInventory(CreateDeviceActionRequestSchema, payload);
+      validateRequest(CreateDeviceActionRequestSchema, payload);
       const digest = await crypto.subtle.digest("SHA-256", toBinary(DeviceActionSpecSchema, spec));
       lifetime.signal.throwIfAborted();
       const specSha256 = Array.from(new Uint8Array(digest), (byte) =>
@@ -683,17 +723,92 @@ export function DeviceActionForm({
         if (needsRecovery && !latest?.recoveryReadiness?.ready)
           throw new Error(recoveryReadinessMessage(latest?.recoveryReadiness?.reason || ""));
       }
-      setDeviceActionAttempt(lifetime, attemptKey, {
+      const next: DeviceActionAttempt = {
         payload,
         specSha256,
         status: "frozen",
         failure: null,
         approvalId: "",
         approvalAmbiguous: false,
+        preflight: { state: "checking" },
+      };
+      if (setDeviceActionAttempt(lifetime, attemptKey, next)) void checkPreflight(next);
+    } catch (error) {
+      if (!lifetime.signal.aborted) {
+        setFieldErrors(requestProblem(error)?.fields ?? []);
+        setError(formErrorMessage(error, "Check the action details."));
+      }
+    } finally {
+      inFlight.current = false;
+      if (!lifetime.signal.aborted) setBusy(false);
+    }
+  }
+
+  // Runs the server's create-time checks for the reviewed request, so a refusal
+  // such as stale inventory appears with its remedy before Send, not after.
+  async function checkPreflight(captured: DeviceActionAttempt) {
+    const { payload } = captured;
+    updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) => ({
+      ...current,
+      preflight: { state: "checking" },
+    }));
+    try {
+      const result = await adminClient.preflightDeviceAction(
+        {
+          deviceId: payload.deviceId,
+          enrollmentGeneration: payload.enrollmentGeneration,
+          spec: payload.spec,
+        },
+        { signal: lifetime.signal, timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) =>
+        // A server-precondition refusal the checks now pass can be sent again
+        // with the same request ID; any other refusal still needs Edit action.
+        current.status === "rejected" &&
+        current.failure?.code === Code.FailedPrecondition &&
+        !result.blockedReason
+          ? { ...current, status: "frozen", failure: null, preflight: { state: "checked", result } }
+          : { ...current, preflight: { state: "checked", result } },
+      );
+    } catch (error) {
+      if (lifetime.signal.aborted) return;
+      updateDeviceActionAttempt(lifetime, attemptKey, payload, (current) => ({
+        ...current,
+        preflight: { state: "failed", failure: toRpcFailure(error) },
+      }));
+    }
+  }
+
+  // Asks the device for fresh inventory under the reviewed action's reason; the
+  // review's checks run again when the device reports it.
+  async function requestInventory(captured: DeviceActionAttempt) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    setRefreshFailure(null);
+    try {
+      const response = await adminClient.createDeviceAction(
+        create(CreateDeviceActionRequestSchema, {
+          requestId: newRequestId(),
+          deviceId,
+          enrollmentGeneration: captured.payload.enrollmentGeneration,
+          spec: create(DeviceActionSpecSchema, {
+            action: { case: "refreshInventory", value: create(RefreshInventoryActionSchema) },
+          }),
+          expiresAt: timestampFromDate(new Date(Date.now() + 10 * 60_000)),
+          reason: captured.payload.reason,
+        }),
+        { signal: lifetime.signal, timeoutMs: 30_000 },
+      );
+      lifetime.signal.throwIfAborted();
+      if (!response.action?.actionId) throw new Error("The server didn't confirm the request.");
+      setRefreshActionId(response.action.actionId);
+      void queryClient.invalidateQueries({
+        queryKey: ["device-actions", lifetime.generation, deviceId],
       });
     } catch (error) {
-      if (!lifetime.signal.aborted)
-        setError(error instanceof Error ? error.message : "Check the action details.");
+      if (!lifetime.signal.aborted) setRefreshFailure(toRpcFailure(error));
     } finally {
       inFlight.current = false;
       if (!lifetime.signal.aborted) setBusy(false);
@@ -740,14 +855,17 @@ export function DeviceActionForm({
       createdActionId = response.action.actionId;
     } catch (error) {
       const failure = toRpcFailure(error);
-      setDeviceActionAttempt(lifetime, attemptKey, {
+      const refused: DeviceActionAttempt = {
         ...next,
         status: failure.ambiguous ? "ambiguous" : "rejected",
         failure,
-      });
+      };
+      setDeviceActionAttempt(lifetime, attemptKey, refused);
       if (!lifetime.signal.aborted) {
         const feedback = classifyRpcFailure(failure);
         toast[feedback.tone === "destructive" ? "error" : "warning"](feedback.title);
+        // Refresh the review's evidence (check-in and inventory times) for the refusal.
+        if (failure.code === Code.FailedPrecondition) void checkPreflight(refused);
       }
     } finally {
       inFlight.current = false;
@@ -777,8 +895,15 @@ export function DeviceActionForm({
       lifetime.signal.throwIfAborted();
       if (!response.approval?.id)
         throw new Error("The server didn't confirm the approval request.");
+      // An approval-required refusal is resolved by this request; others stand.
+      const approvalRefusal =
+        attempt.status === "rejected" &&
+        attempt.failure?.code === Code.PermissionDenied &&
+        (attempt.failure.reason === "approval_required" ||
+          attempt.failure.reason === "human_approval_required");
       setDeviceActionAttempt(lifetime, attemptKey, {
         ...attempt,
+        ...(approvalRefusal ? { status: "frozen", failure: null } : {}),
         approvalId: response.approval.id,
         approvalState: response.approval.state,
         approvalAmbiguous: false,
@@ -848,6 +973,143 @@ export function DeviceActionForm({
         {refreshLink}
       </p>
     ) : undefined;
+
+  // The server's current refusal of the reviewed request: from its review-time
+  // check, or from Send when the device changed in between.
+  const preflight = attempt?.preflight;
+  const checked = preflight?.state === "checked" ? preflight.result : undefined;
+  const refusalReason =
+    attempt?.status === "rejected" && attempt.failure?.code === Code.FailedPrecondition
+      ? attempt.failure.reason
+      : attempt?.status === "frozen"
+        ? (checked?.blockedReason ?? "")
+        : "";
+  const blocker = refusalReason
+    ? classifyRpcFailure({
+        code: Code.FailedPrecondition,
+        codeName: "FailedPrecondition",
+        message: refusalReason,
+        reason: refusalReason,
+        unauthenticated: false,
+        denied: false,
+        ambiguous: false,
+      })
+    : undefined;
+  const checkedAt = checked?.checkedAt ? timestampDate(checked.checkedAt) : new Date();
+  const lastContact = checked?.lastSeenAt
+    ? freshnessLabel(timestampDate(checked.lastSeenAt), checkedAt)
+    : undefined;
+  const inventoryAge = checked?.inventoryReceivedAt
+    ? freshnessLabel(timestampDate(checked.inventoryReceivedAt), checkedAt)
+    : undefined;
+  const inventoryWindow = checked?.inventoryMaxAgeSeconds
+    ? `${Math.round(checked.inventoryMaxAgeSeconds / 60)} minutes`
+    : "";
+  // Why the refusal happened, in the device's own times: a check-in is not an
+  // inventory report, so a device can be online with inventory too old to use.
+  const blockerEvidence =
+    refusalReason === "device_action_inventory_stale" && inventoryAge && inventoryWindow
+      ? `${deviceName} ${lastContact ? `last checked in ${lastContact}, but its` : "'s"} latest inventory arrived ${inventoryAge}. This action needs inventory from the last ${inventoryWindow}, and check-ins don't include inventory.`
+      : refusalReason === "device_action_offline" && lastContact
+        ? `${deviceName} last checked in ${lastContact}.`
+        : "";
+  const canRefreshInventory =
+    canPermission(principal, actionPermissions.refreshInventory) &&
+    canPermission(principal, "fleet.read");
+  const sendBlockedReason = !attempt
+    ? ""
+    : attempt.status === "rejected"
+      ? blocker
+        ? `Send is off until this is resolved: ${blocker.title.toLowerCase()}.`
+        : `Send is off after this refusal. ${attempt.failure ? classifyRpcFailure(attempt.failure).action : "Edit the action to start a new request."}`
+      : attempt.status !== "frozen"
+        ? ""
+        : preflight?.state === "checking"
+          ? "Send is available once the server's checks finish."
+          : preflight?.state === "failed"
+            ? "Send is available once the server's checks run. Check again."
+            : blocker
+              ? `Send is off until this is resolved: ${blocker.title.toLowerCase()}.`
+              : "";
+  const reviewCheck = !attempt ? null : preflight?.state === "checking" ? (
+    <p role="status" className="text-sm text-muted-foreground">
+      Checking whether {deviceName} can take this action now…
+    </p>
+  ) : preflight?.state === "failed" && attempt.status === "frozen" ? (
+    <RpcError failure={preflight.failure} title="Couldn't check this action">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={() => void checkPreflight(attempt)}
+      >
+        Check again
+      </Button>
+    </RpcError>
+  ) : blocker ? (
+    <Alert
+      data-slot="action-blocker"
+      className={blocker.tone === "warning" ? "border-warning/25 bg-warning/10" : undefined}
+    >
+      <AlertTitle>{blocker.title}</AlertTitle>
+      <AlertDescription className="grid gap-2">
+        <p>{blockerEvidence || blocker.message}</p>
+        {inventoryBlockers[refusalReason] && canRefreshInventory ? (
+          refreshResult === "waiting" ? (
+            <p role="status">
+              Inventory requested. Waiting for {deviceName} to report it; this action is checked
+              again when it arrives. {refreshLink}
+            </p>
+          ) : (
+            <>
+              {refreshResult === "error" ? (
+                <RpcError
+                  failure={toRpcFailure(refreshAction.error)}
+                  title="Couldn't check the refresh"
+                />
+              ) : (
+                refreshNote
+              )}
+              {refreshFailure ? (
+                <RpcError failure={refreshFailure} title="Couldn't request inventory" />
+              ) : null}
+              {refreshResult === "unknown" || refreshFailure?.ambiguous ? null : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void requestInventory(attempt)}
+                  >
+                    Refresh inventory
+                  </Button>
+                  <span className="text-muted-foreground">
+                    Uses the reason above. This action is checked again when inventory arrives.
+                  </span>
+                </div>
+              )}
+            </>
+          )
+        ) : (
+          <p>{blocker.action}</p>
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit"
+          disabled={busy}
+          onClick={() => void checkPreflight(attempt)}
+        >
+          Check again
+        </Button>
+      </AlertDescription>
+    </Alert>
+  ) : checked && attempt.status === "frozen" ? (
+    <p role="status" className="text-sm text-muted-foreground">
+      Server checks passed {freshnessLabel(checkedAt, new Date())}
+      {inventoryAge && inventoryWindow ? `; inventory received ${inventoryAge}` : ""}. The device
+      confirms when it runs the action.
+    </p>
+  ) : null;
 
   return (
     <div className="grid gap-4">
@@ -925,10 +1187,25 @@ export function DeviceActionForm({
                   <Label htmlFor={`${prefix}-power-delay`}>Delay in seconds (optional)</Label>
                   <Input
                     id={`${prefix}-power-delay`}
+                    data-freeform="power delay in seconds, checked against its proto range"
                     inputMode="numeric"
                     value={powerDelay}
-                    onChange={(event) => setPowerDelay(event.target.value)}
+                    aria-invalid={delayError ? true : undefined}
+                    aria-describedby={`${prefix}-power-delay-range${delayError ? ` ${prefix}-power-delay-error` : ""}`}
+                    onChange={(event) => {
+                      setPowerDelay(event.target.value);
+                      setFieldErrors([]);
+                    }}
                   />
+                  <p id={`${prefix}-power-delay-range`} className="text-sm text-muted-foreground">
+                    0 to {delayMax} seconds. Leave empty to{" "}
+                    {kind === "shutdown" ? "shut down" : "restart"} now.
+                  </p>
+                  {delayError ? (
+                    <p id={`${prefix}-power-delay-error`} className="text-sm text-destructive">
+                      {delayError}
+                    </p>
+                  ) : null}
                   <Label htmlFor={`${prefix}-power-message`}>User notification (optional)</Label>
                   <Input
                     id={`${prefix}-power-message`}
@@ -1369,20 +1646,30 @@ export function DeviceActionForm({
                     ? attempt.failure
                       ? classifyRpcFailure(attempt.failure).tone
                       : "destructive"
-                    : "info"
+                    : attempt.status === "frozen" && sendBlockedReason
+                      ? blocker
+                        ? blocker.tone
+                        : "neutral"
+                      : "info"
               }
             >
-              {
-                {
-                  frozen: "Ready to send",
-                  inflight: "Sending",
-                  ambiguous: "Outcome unknown",
-                  rejected: "Not accepted",
-                  accepted: "Sent",
-                }[attempt.status]
-              }
+              {attempt.status === "frozen"
+                ? preflight?.state === "checking"
+                  ? "Checking"
+                  : blocker
+                    ? "Not ready to send"
+                    : preflight?.state === "failed"
+                      ? "Not checked"
+                      : "Ready to send"
+                : {
+                    inflight: "Sending",
+                    ambiguous: "Outcome unknown",
+                    rejected: "Not accepted",
+                    accepted: "Sent",
+                  }[attempt.status]}
             </StatusBadge>
           </div>
+          {reviewCheck}
           {attempt.actionId ? (
             <Link
               to="/devices/$deviceId/actions/$actionId"
@@ -1418,7 +1705,7 @@ export function DeviceActionForm({
               We couldn&apos;t confirm the approval request. Retry it before changing anything.
             </p>
           ) : null}
-          {attempt.failure ? (
+          {attempt.failure && !(attempt.status === "rejected" && blocker) ? (
             <RpcError failure={attempt.failure}>
               {attempt.status === "ambiguous" ? (
                 <p>Retry sending. Don&apos;t create a new action.</p>
@@ -1472,6 +1759,11 @@ export function DeviceActionForm({
               </AlertDescription>
             </Alert>
           ) : null}
+          {sendBlockedReason ? (
+            <p id={`${prefix}-send-blocked`} className="text-sm text-muted-foreground">
+              {sendBlockedReason}
+            </p>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             {approvalFirst ? null : (
               <Button
@@ -1480,8 +1772,10 @@ export function DeviceActionForm({
                   (needsRecovery && !recoveryReady && attempt.status !== "ambiguous") ||
                   attempt.status === "accepted" ||
                   attempt.status === "inflight" ||
-                  attempt.approvalAmbiguous
+                  attempt.approvalAmbiguous ||
+                  !!sendBlockedReason
                 }
+                aria-describedby={sendBlockedReason ? `${prefix}-send-blocked` : undefined}
                 onClick={() => void send(attempt)}
               >
                 {attempt.status === "ambiguous" ? "Retry sending" : "Send action"}
@@ -1520,6 +1814,7 @@ export function DeviceActionForm({
                 setConfirmation("");
                 setError("");
                 setRpcFailure(null);
+                setRefreshFailure(null);
               }}
             >
               Edit action

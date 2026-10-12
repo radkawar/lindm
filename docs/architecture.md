@@ -874,6 +874,17 @@ The console population's synthetic inventory declares zero users/sessions explic
 storage, TPM and encryption availability remain unavailable rather than implying
 observed hardware or native execution proof.
 
+`PreflightDeviceAction` runs create's device, inventory, restriction, open-action
+and delegation checks for an exact spec under create's authority fence and lock
+order, then rolls back: nothing is signed, closed or audited. It returns the
+`FAILED_PRECONDITION` reason create would return (empty when ready) with the
+device's last check-in, latest host inventory time and the action's inventory window,
+so the console review shows a refusal and its remedy before Send. Request expiry,
+idempotency and approval stay create-only checks. Check-ins (every 60 seconds) and
+host inventory (every 10 minutes) are separate facts: inventory-selecting actions
+need inventory received within 5 minutes, so a device that just checked in can still
+need a refresh.
+
 Power requests use the authenticated local logind D-Bus, with the root-owned
 `allow_power_actions` opt-in. Optional `delay_seconds` is bounded to 0–3600 and an
 optional printable user message to 512 characters. Immediate requests use

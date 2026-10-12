@@ -43,7 +43,7 @@ import {
   modeLabels,
 } from "./display";
 import { assistanceSessionsQueryOptions } from "./queries";
-import { validateAssistanceRequest } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 const MAX_DURATION_MINUTES = 30;
 
@@ -105,7 +105,7 @@ function AssistanceRequestForm({ deviceId }: { deviceId: string }) {
           reason: reason.trim(),
           maxDurationSeconds: parsed * 60,
         });
-        validateAssistanceRequest(CreateAssistanceSessionRequestSchema, request);
+        validateRequest(CreateAssistanceSessionRequestSchema, request);
         return request;
       },
       send: (request, options) => adminClient.createAssistanceSession(request, options),

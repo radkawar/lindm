@@ -39,7 +39,7 @@ import { LocalAdminPasswordReveal } from "./local-admin-reveal";
 import { RevealApprovalNote } from "@/components/ui/reveal-approval-note";
 import { Fact, ObservedTime } from "./observations";
 import { localAdminPasswordQueryOptions } from "./queries";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 const DAY_SECONDS = 86_400;
 const HOUR_SECONDS = 3_600;
@@ -280,7 +280,7 @@ function LocalAdminPolicyForm({
           },
           reason: reason.trim(),
         });
-        validateInventory(SetLocalAdminPasswordPolicyRequestSchema, request);
+        validateRequest(SetLocalAdminPasswordPolicyRequestSchema, request);
         return request;
       },
       send: (request, options) => adminClient.setLocalAdminPasswordPolicy(request, options),
@@ -382,7 +382,7 @@ function LocalAdminRotationRequest({ deviceId }: { deviceId: string }) {
           deviceId,
           reason: reason.trim(),
         });
-        validateInventory(RequestLocalAdminPasswordRotationRequestSchema, request);
+        validateRequest(RequestLocalAdminPasswordRotationRequestSchema, request);
         return request;
       },
       send: (request, options) => adminClient.requestLocalAdminPasswordRotation(request, options),
@@ -440,7 +440,7 @@ function LocalAdminPolicyRemoval({ deviceId }: { deviceId: string }) {
           deviceId,
           reason: reason.trim(),
         });
-        validateInventory(RemoveLocalAdminPasswordPolicyRequestSchema, request);
+        validateRequest(RemoveLocalAdminPasswordPolicyRequestSchema, request);
         return request;
       },
       send: (request, options) => adminClient.removeLocalAdminPasswordPolicy(request, options),

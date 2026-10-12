@@ -1,4 +1,5 @@
 import { Code, ConnectError } from "@connectrpc/connect";
+import { requestProblem, type FieldError } from "@/lib/validation";
 
 export type RpcFailure = {
   code: Code;
@@ -8,6 +9,8 @@ export type RpcFailure = {
   unauthenticated: boolean;
   denied: boolean;
   ambiguous: boolean;
+  // Set only for a request the browser refused to send; nothing reached the server.
+  fields?: readonly FieldError[];
 };
 
 const AMBIGUOUS: Record<number, true> = {
@@ -40,6 +43,20 @@ const CODE_NAME: Record<number, string> = {
 };
 
 export function toRpcFailure(error: unknown): RpcFailure {
+  // A request the browser could not validate or encode never left it: a
+  // definite, field-level refusal, never an ambiguous outcome or encoder text.
+  const problem = requestProblem(error);
+  if (problem)
+    return {
+      code: Code.InvalidArgument,
+      codeName: CODE_NAME[Code.InvalidArgument],
+      message: problem.message,
+      reason: "request_invalid",
+      unauthenticated: false,
+      denied: false,
+      ambiguous: false,
+      fields: problem.fields,
+    };
   const connectError = ConnectError.from(error);
   const ambiguous = AMBIGUOUS[connectError.code] === true;
   const raw = connectError.rawMessage.trim();
@@ -248,8 +265,9 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Inventory needs refreshing",
-          message: "The device's last report is too old for this action.",
-          action: "Wait for the device to check in, then refresh.",
+          message:
+            "The device's latest inventory is older than this action allows. Check-ins don't send inventory.",
+          action: "Request fresh inventory, then check again.",
         };
       case "device_action_offline":
         return {
@@ -257,6 +275,21 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           title: "Device is not connected",
           message: "This action requires recent contact with the device.",
           action: "Reconnect the device before trying again.",
+        };
+      case "device_action_pending":
+        return {
+          tone: "warning",
+          title: "Another action is still open",
+          message: "This device has an action that hasn't finished or expired yet.",
+          action: "Open the device's actions and wait for it to finish, then check again.",
+        };
+      case "device_action_generation_rejected":
+      case "device_action_session_unavailable":
+        return {
+          tone: "warning",
+          title: "Device enrollment changed",
+          message: "This device was re-enrolled, revoked or hasn't connected since enrolling.",
+          action: "Reload the device page before trying again.",
         };
     }
   }
@@ -290,6 +323,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Sign-in required",
       message: "Your session could not authorize this request.",
       action: "Sign in again to continue.",
+    };
+  }
+  if (failure.code === Code.InvalidArgument && failure.reason === "request_invalid") {
+    return {
+      tone: "warning",
+      title: "Check the form",
+      message: failure.message,
+      action: "Nothing was sent. Correct the values, then try again.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.reason === "secret_purpose_mismatch") {

@@ -206,7 +206,8 @@ async function lostLaptop(ctx) {
     "Selected lock without sign-out and all eligible local accounts; requesting independent review, not immediate execution.",
   );
   await dialog.getByRole("button", { name: "Review action", exact: true }).click();
-  await visible(dialog.getByText("Ready to send", { exact: true }));
+  // The review runs the server's checks; stale demo inventory honestly blocks Send.
+  await visible(dialog.getByText(/^(Ready to send|Not ready to send)$/));
   await visible(dialog.getByText(device.Hostname, { exact: true }));
   await visible(dialog.getByText("No: lock only", { exact: true }));
   await visible(dialog.getByText("All eligible local human accounts", { exact: true }));
@@ -361,7 +362,8 @@ async function criticalCVE(ctx) {
     "Security-only updates and no automatic reboot are the displayed defaults. No patch has been requested yet.",
   );
   await dialog.getByRole("button", { name: "Review action", exact: true }).click();
-  await visible(dialog.getByText("Ready to send", { exact: true }));
+  await visible(dialog.getByText(/^(Ready to send|Not ready to send)$/));
+  const sendable = await dialog.getByText("Ready to send", { exact: true }).isVisible();
   await visible(dialog.getByText("Security updates", { exact: true }));
   await visible(dialog.getByText("Never: report reboot-required only", { exact: true }));
   await visible(dialog.getByText(/The action confirms only that the native update run started/));
@@ -376,7 +378,7 @@ async function criticalCVE(ctx) {
       ? "A critical affected device is selected. The request can start native updating; accepting it cannot prove remediation."
       : "Coverage blocker: no inspected device has a current Critical affected finding. The patch workflow is reviewed, not misrepresented as CVE remediation.",
   );
-  if (exposed) {
+  if (exposed && sendable) {
     await dialog.getByRole("button", { name: "Send action", exact: true }).click();
     await visible(main.getByRole("heading", { name: "Patch now", exact: true }));
     await visible(main.getByRole("article"));
@@ -414,15 +416,20 @@ async function criticalCVE(ctx) {
     "partly",
     "Inventory's patch status is disconnected from the incident and may predate this request.",
     "Correlate the request and timestamp with native run result, package inventory and reevaluated findings before reporting fixed.",
-    exposed
+    exposed && sendable
       ? "Inspected reported patch evidence after the request; no native execution or CVE remediation is claimed."
-      : "Inspected available patch evidence; no update was sent because the critical exposure prerequisite was not established.",
+      : exposed
+        ? "Inspected available patch evidence; no update was sent because the server's review checks refused the request."
+        : "Inspected available patch evidence; no update was sent because the critical exposure prerequisite was not established.",
   );
   return {
     outcome: "blocked",
-    reason: exposed
-      ? "A security update request was accepted for a device with visible Critical affected evidence. The synthetic fixture cannot prove a native patch run or remediation; fresh package inventory and reevaluated findings are required."
-      : "No current Critical affected finding was established on the inspected fixture-device pages. Fleet advisories lack exposed-device drilldown/search; source and inventory gaps cannot be treated as safety. Patch review was completed without sending an unjustified remediation request.",
+    reason:
+      exposed && sendable
+        ? "A security update request was accepted for a device with visible Critical affected evidence. The synthetic fixture cannot prove a native patch run or remediation; fresh package inventory and reevaluated findings are required."
+        : exposed
+          ? "A device with visible Critical affected evidence was found, but the review's server checks refused the patch request (shown with its remedy); nothing was sent."
+          : "No current Critical affected finding was established on the inspected fixture-device pages. Fleet advisories lack exposed-device drilldown/search; source and inventory gaps cannot be treated as safety. Patch review was completed without sending an unjustified remediation request.",
   };
 }
 

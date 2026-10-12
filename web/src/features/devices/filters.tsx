@@ -22,7 +22,7 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { adminClient } from "@/lib/rpc";
 import { AttributeFields, readAttributeInputs } from "./attributes";
 import { deviceFilter, deviceSort, type DeviceSearch } from "./search";
-import { validateInventory } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 export function DeviceFilters({
   search,
@@ -89,7 +89,7 @@ function FilterForm({
             lastSeenFrom: from ? timestampFromDate(new Date(`${from}Z`)) : undefined,
             lastSeenUntil: until ? timestampFromDate(new Date(`${until}Z`)) : undefined,
           });
-          validateInventory(DeviceFilterSchema, next);
+          validateRequest(DeviceFilterSchema, next);
           setError("");
           const hostnameSearch = String(data.get("hostname-search") ?? "").trim();
           onSearch({
@@ -346,7 +346,7 @@ export function DeviceExport({ search }: { search: DeviceSearch }) {
                 pageSize: search.pageSize,
                 pageToken,
               });
-              validateInventory(ExportDevicesRequestSchema, request);
+              validateRequest(ExportDevicesRequestSchema, request);
               inFlight.current = true;
               setInputError("");
               download.mutate(request);

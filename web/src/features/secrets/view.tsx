@@ -45,7 +45,8 @@ import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { MaterialField, purposeLabels, purposeOptions, takeMaterial } from "./material";
 import { secretsQueryOptions } from "./queries";
-import { validateRequest } from "./validation";
+import { validateRequest } from "@/lib/validation";
+import { secretMaterialHints } from "./validation";
 
 export function SecretsView({
   pageSize,
@@ -214,7 +215,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
           reason: reason.trim(),
         });
         try {
-          validateRequest(CreateSecretRequestSchema, request);
+          validateRequest(CreateSecretRequestSchema, request, secretMaterialHints);
         } catch (error) {
           material.material.value?.fill(0);
           throw error;

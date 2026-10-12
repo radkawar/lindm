@@ -21,7 +21,7 @@ import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors"
 import { newRequestId } from "@/lib/ids";
 import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
-import { validateRequest } from "./validation";
+import { validateRequest } from "@/lib/validation";
 
 const approvalStateLabels: Partial<Record<ApprovalState, string>> = {
   [ApprovalState.PENDING]: "waiting for another admin",

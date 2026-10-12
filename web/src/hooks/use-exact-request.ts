@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors";
+import { formErrorMessage } from "@/lib/validation";
 
 type Captured<T> = { request: T; discard?: (request: T) => void };
 
@@ -68,7 +69,7 @@ export function useExactRequest<T>() {
       try {
         current = { request: capture(), discard };
       } catch (error) {
-        setInvalid(error instanceof Error ? error.message : "The request is not valid.");
+        setInvalid(formErrorMessage(error, "The request is not valid."));
         return;
       }
       captured.current = current;
