@@ -186,13 +186,19 @@ installation time.
   is never stored. The server's live-root crypto-erase set requires every
   encrypted mapping to be covered, so every installer-encrypted Pop!\_OS machine
   was refused `device_action_storage_target_set_mismatch` (observed natively,
-  `device-actions-wipe-live-erase-01.json`). The agent now reports
-  `StorageIdentity.ephemeral_key` only with native proof (kernel dm UUID
-  `CRYPT-PLAIN-`, one live `crypt` table segment with a real cipher, crypttab key
-  `/dev/urandom` or `/dev/random`, no LUKS1/LUKS2 header magic on the backing
-  device; any failed step leaves it UNAVAILABLE and the refusal stands), and the
-  server exempts exactly those mappings. The console's storage table and the
-  crypto-erase form name them ("ephemeral random-key swap; destroyed at
+  `device-actions-wipe-live-erase-01-snap10-failed.json`). The agent now reports
+  `StorageIdentity.ephemeral_key` only with native proof, read by the
+  capability-free root inventory helper (kernel dm UUID exactly
+  `CRYPT-PLAIN-<mapping>`, the mapping's only kernel slave is its observed
+  parent, crypttab's single entry for it keys it from `/dev/urandom` or
+  `/dev/random` in plain mode with no null cipher, no LUKS1/LUKS2 header magic on
+  the backing device; any failed step leaves it UNAVAILABLE and the refusal
+  stands), and the server exempts exactly those mappings. The helper has no
+  `CAP_SYS_ADMIN`, so the live `dmsetup table` is not part of the agent's proof
+  (the first version used it and was refused the same way on Pop!\_OS,
+  `device-actions-wipe-live-erase-01-snap11-failed.json`); the wipe lane's
+  independent oracle still reads it as root. The console's storage table and the
+  crypto-erase form name the mappings ("ephemeral random-key swap; destroyed at
   power-off"), as does the wipe lane's record. An observation from an older agent
   carries no proof, so a fresh inventory from an updated agent is required first.
   Linux Mint's Ubiquity LUKS layout puts swap inside its LVM on LUKS and has no

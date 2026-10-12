@@ -24,10 +24,18 @@ const popSwapLsblk = `{"blockdevices":[{"name":"vda","kname":"vda","type":"disk"
 const popCrypttab = "cryptdata UUID=3d4d665b-aa58-4bb0-b0c1-717a43cebe20 none luks\ncryptswap UUID=e44be28a-9a75-4a05-819e-5bc72b620ca2 /dev/urandom swap,plain,offset=1024,cipher=aes-xts-plain64,size=512\n"
 
 type ephemeralFixture struct {
-	dmUUID, crypttab, table string
-	tableStatus             inventoryv1.CollectionStatus
-	backing                 []byte
+	dmUUID, crypttab string
+	slaves           []string
+	slavesErr        error
+	backing          []byte
 }
+
+type slaveEntry string
+
+func (e slaveEntry) Name() string             { return string(e) }
+func (slaveEntry) IsDir() bool                { return false }
+func (slaveEntry) Type() fs.FileMode          { return fs.ModeSymlink }
+func (slaveEntry) Info() (fs.FileInfo, error) { return nil, fs.ErrNotExist }
 
 func (f ephemeralFixture) collect(t *testing.T) *inventoryv1.BlockDevice {
 	t.Helper()
@@ -50,18 +58,25 @@ func (f ephemeralFixture) collect(t *testing.T) *inventoryv1.BlockDevice {
 			}
 			return nil, fs.ErrPermission
 		},
+		readDir: func(path string) ([]fs.DirEntry, error) {
+			if path != "/sys/class/block/dm-1/slaves" {
+				return nil, fs.ErrNotExist
+			}
+			var entries []fs.DirEntry
+			for _, name := range f.slaves {
+				entries = append(entries, slaveEntry(name))
+			}
+			return entries, f.slavesErr
+		},
+		// The root inventory helper has no capabilities, so the proof may run
+		// no device-mapper tool (dmsetup and cryptsetup need CAP_SYS_ADMIN and
+		// /dev/mapper/control).
 		run: func(_ context.Context, b backend, parse func(io.Reader) inventoryv1.CollectionStatus) inventoryv1.CollectionStatus {
 			switch b.name {
 			case "lsblk":
 				return parse(strings.NewReader(popSwapLsblk))
-			case "dmsetup":
-				if strings.Join(b.args, " ") != "table cryptswap" {
-					t.Fatalf("dmsetup args %q", b.args)
-				}
-				if f.tableStatus != success {
-					return f.tableStatus
-				}
-				return parse(strings.NewReader(f.table))
+			case "dmsetup", "cryptsetup":
+				t.Fatalf("storage collection ran %s %q", b.name, b.args)
 			}
 			return unavailable
 		},
@@ -90,8 +105,7 @@ func (f ephemeralFixture) collect(t *testing.T) *inventoryv1.BlockDevice {
 
 // Pop!_OS's distinst random-key swap is proven ephemeral, and nothing else is.
 func TestEphemeralKeyRequiresEveryNativeProof(t *testing.T) {
-	table := "0 8387584 crypt aes-xts-plain64 :64:logon:cryptsetup:0000 0 252:4 1024 1 allow_discards\n"
-	plain := ephemeralFixture{dmUUID: "CRYPT-PLAIN-cryptswap", crypttab: popCrypttab, table: table, tableStatus: success, backing: make([]byte, 8<<20)}
+	plain := ephemeralFixture{dmUUID: "CRYPT-PLAIN-cryptswap", crypttab: popCrypttab, slaves: []string{"vda4"}, backing: make([]byte, 8<<20)}
 	luksAt := func(offset int, magic string) []byte {
 		data := make([]byte, 8<<20)
 		copy(data[offset:], magic)
@@ -116,13 +130,17 @@ func TestEphemeralKeyRequiresEveryNativeProof(t *testing.T) {
 		{"unlabelled mapping", func(f *ephemeralFixture) { f.dmUUID = "" }, unavailable, false},
 		{"LUKS primary header on backing", func(f *ephemeralFixture) { f.backing = luksAt(0, "LUKS\xba\xbe") }, invalid, false},
 		{"LUKS2 secondary header on backing", func(f *ephemeralFixture) { f.backing = luksAt(0x4000, "SKUL\xba\xbe") }, invalid, false},
-		{"multi-segment table", func(f *ephemeralFixture) { f.table = table + table }, invalid, false},
-		{"null cipher", func(f *ephemeralFixture) {
-			f.table = strings.Replace(table, "aes-xts-plain64", "cipher_null-ecb", 1)
-		}, invalid, false},
-		{"dmsetup denied", func(f *ephemeralFixture) {
-			f.tableStatus = inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED
-		}, inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED, false},
+		{"label names another mapping", func(f *ephemeralFixture) { f.dmUUID = "CRYPT-PLAIN-cryptother" }, unavailable, false},
+		{"second kernel slave", func(f *ephemeralFixture) { f.slaves = []string{"vda4", "vda3"} }, invalid, false},
+		{"slave is not the observed parent", func(f *ephemeralFixture) { f.slaves = []string{"vda3"} }, invalid, false},
+		{"slaves unreadable", func(f *ephemeralFixture) { f.slaves, f.slavesErr = nil, fs.ErrPermission },
+			inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED, false},
+		{"null cipher configured", func(f *ephemeralFixture) {
+			f.crypttab = strings.Replace(f.crypttab, "aes-xts-plain64", "cipher_null-ecb", 1)
+		}, unavailable, false},
+		{"urandom key with luks mode", func(f *ephemeralFixture) {
+			f.crypttab = strings.Replace(f.crypttab, "swap,plain", "swap,luks", 1)
+		}, unavailable, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := plain
@@ -132,5 +150,16 @@ func TestEphemeralKeyRequiresEveryNativeProof(t *testing.T) {
 				t.Fatalf("ephemeral_key = %v, want status %s value %t", got, tc.status, tc.value)
 			}
 		})
+	}
+}
+
+// Storage reaches the server only through the sandboxed root helper, so the
+// ephemeral-key proof's readers must be wired there; a missing reader would
+// leave every random-key swap unproven on real machines.
+func TestRootObservationSourcesCarryEphemeralKeyReaders(t *testing.T) {
+	s := rootObservationSources()
+	if s.readFile == nil || s.readDir == nil || s.openBlock == nil || s.run == nil {
+		t.Fatalf("root observation sources lack an ephemeral-key reader: readFile %t readDir %t openBlock %t run %t",
+			s.readFile != nil, s.readDir != nil, s.openBlock != nil, s.run != nil)
 	}
 }

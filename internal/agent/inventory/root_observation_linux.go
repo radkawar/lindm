@@ -17,10 +17,15 @@ import (
 // interfaces. The executor supplies and rechecks the current boot identity.
 // No key material or execution authority is included.
 func CollectRootObservation(ctx context.Context, bootID string) *inventoryv1.RootObservation {
-	return collectRootObservation(ctx, bootID, detailSources{
-		readFile: readDetailFile, stat: os.Stat, run: runNative,
+	return collectRootObservation(ctx, bootID, rootObservationSources())
+}
+
+// rootObservationSources are the native readers of the sandboxed root helper.
+func rootObservationSources() detailSources {
+	return detailSources{
+		readFile: readDetailFile, readDir: readDetailDir, stat: os.Stat, run: runNative,
 		openBlock: openStorageBlock, nvmeScope: actionprovider.ReadNVMeSanitizeScope,
-	})
+	}
 }
 
 func collectRootObservation(ctx context.Context, bootID string, sources detailSources) *inventoryv1.RootObservation {
