@@ -390,6 +390,10 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		reasons = appendUnique(reasons, "lab-only: the installed "+arch+" kernel cannot bind the TPM the lab attaches (Lab.TPM.Unobservable)")
 		gated = true
 	}
+	if spec.GetSecureBoot() && r.Lab.SecureBootUnavailable != "" {
+		reasons = appendUnique(reasons, "Secure Boot unavailable: "+r.Lab.SecureBootUnavailable+" (Lab.SecureBootUnavailable)")
+		gated = true
+	}
 	primaryEdition, recoveryEdition := "", ""
 	if slices.Contains(spec.GetCapabilities(), string(platform.RecoverySanitize)) {
 		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition

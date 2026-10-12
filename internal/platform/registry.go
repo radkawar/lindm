@@ -75,6 +75,9 @@ const (
 	// The APT runner renders Ubuntu's Allowed-Origins (origin:suite) list.
 	reasonDebianOSUpdate = "the os-update runner selects Ubuntu origin:suite pairs; Debian's security suites (stable-security/oldstable-security) need codename/label Origins-Pattern selection, which is not implemented"
 	reasonRockyOSV       = "Rocky's OSV export uses source-like package mappings without a complete binary universe"
+	// popUnsignedBoot was measured with `sbverify --list` on the Pop!_OS 24.04
+	// generic build 28 golden's ESP ("No signature table present").
+	popUnsignedBoot = "Pop!_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot"
 	// Omarchy's ALPM pre-transaction hook (00-omarchy-update-guard.hook)
 	// aborts any direct `pacman -Syu`; `omarchy update` owns the transaction.
 	reasonOmarchyOSUpdate = "Omarchy 4.0.4's ALPM guard aborts direct pacman system upgrades (only `omarchy update` may run them), and its moving stable mirrors have no immutable snapshot for a pinned rolling update"
@@ -632,13 +635,14 @@ var registry = []*Release{
 				Trigger: "busctl call com.system76.SystemUpdater /com/system76/SystemUpdater com.system76.SystemUpdater UpdateSystem"},
 			// pop-default-settings' pop-zram-config (pop-default-settings-zram.service)
 			// runs `sysctl -w vm.swappiness=180` at every boot after systemd-sysctl.
-			SysctlKey: "vm.vfs_cache_pressure"},
+			SysctlKey:             "vm.vfs_cache_pressure",
+			SecureBootUnavailable: popUnsignedBoot},
 		// apt.pop-os.org/release ("pop-os-release") and /proprietary
 		// ("system76") use codename noble and the Pop!_OS key; its Ubuntu mirror
 		// serves Ubuntu's own signed InRelease (observed 2026-10-11).
 		Advisory: Advisory{VendorOrigins: []string{"pop-os-release", "system76"}, Partial: "vendor feed unavailable for Pop!_OS packages"},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
-		Gates:    gates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock, Assistance}),
+		Gates:    gates(string(RecoverySanitize), "original-device recovery requires Secure Boot; "+popUnsignedBoot),
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),

@@ -12,27 +12,27 @@ Ubuntu, but **no Ubuntu evidence carries over** to it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Pop!\_OS 24.04 LTS                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------- |
-| inventory         | implemented                                                                                             |
-| lifecycle         | implemented                                                                                             |
-| dispatch          | implemented                                                                                             |
-| packages          | implemented                                                                                             |
-| accounts          | implemented                                                                                             |
-| sysctl            | implemented                                                                                             |
-| definitions       | implemented                                                                                             |
-| password          | implemented                                                                                             |
-| firewall          | implemented                                                                                             |
-| encryption        | implemented                                                                                             |
-| wipe              | implemented                                                                                             |
-| report-loss       | implemented                                                                                             |
-| lock              | implemented                                                                                             |
-| recovery-sanitize | implemented                                                                                             |
-| self-update       | implemented                                                                                             |
-| assistance        | implemented                                                                                             |
-| advisories        | partial: vendor feed unavailable for Pop!\_OS packages                                                  |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release |
-| release-upgrade   | gated: release upgrade is not implemented                                                               |
+| Capability        | Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory         | implemented                                                                                                                                                                                                                                          |
+| lifecycle         | implemented                                                                                                                                                                                                                                          |
+| dispatch          | implemented                                                                                                                                                                                                                                          |
+| packages          | implemented                                                                                                                                                                                                                                          |
+| accounts          | implemented                                                                                                                                                                                                                                          |
+| sysctl            | implemented                                                                                                                                                                                                                                          |
+| definitions       | implemented                                                                                                                                                                                                                                          |
+| password          | implemented                                                                                                                                                                                                                                          |
+| firewall          | implemented                                                                                                                                                                                                                                          |
+| encryption        | implemented                                                                                                                                                                                                                                          |
+| wipe              | implemented                                                                                                                                                                                                                                          |
+| report-loss       | implemented                                                                                                                                                                                                                                          |
+| lock              | implemented                                                                                                                                                                                                                                          |
+| recovery-sanitize | gated: original-device recovery requires Secure Boot; Pop!\_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot |
+| self-update       | implemented                                                                                                                                                                                                                                          |
+| assistance        | implemented                                                                                                                                                                                                                                          |
+| advisories        | partial: vendor feed unavailable for Pop!\_OS packages                                                                                                                                                                                               |
+| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                              |
+| release-upgrade   | gated: release upgrade is not implemented                                                                                                                                                                                                            |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -146,8 +146,13 @@ installation time.
   (kernel and initrd copied to `EFI/Pop_OS-<root UUID>/`, options from its
   configuration); distinst adds `Recovery-<FAT serial>.conf` booting the casper
   copy on `/recovery` from `EFI/Recovery-<FAT serial>/` (observed in the golden).
-  Reboot, TPM2 PCR policy, recovery boot and ESP capacity remain to be observed
-  in the action lanes.
+  Registry `Lab.SecureBootUnavailable` records this, so every lab matrix cell
+  that requires Secure Boot (`tpm-unattended-boots`, `recovery-sanitize`) is
+  gated with that reason, and recovery-sanitize is gated for Pop!\_OS: original-
+  device recovery relies on Secure Boot (measured GRUB PCR 7 or a signed
+  recovery UKI), which an unsigned systemd-boot cannot provide. The TPM2 bind
+  and its unattended boots run without Secure Boot (PCR 7 then measures
+  SecureBoot=0), which is how Pop!\_OS boots by default.
 - **Repositories.** `pop-os-apps.sources` (`apt.pop-os.org/proprietary`),
   `pop-os-release.sources` (`apt.pop-os.org/release`) and `system.sources`
   (`apt.pop-os.org/ubuntu`, noble/-security/-updates/-backports) are the installed

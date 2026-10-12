@@ -159,6 +159,36 @@ func TestPlanGatesTPMCellsWhereTPMIsUnobservable(t *testing.T) {
 	}
 }
 
+// Pop!_OS installs an unsigned systemd-boot, so a cell that requires Secure
+// Boot is gated with the registry's measured reason instead of failing; the
+// same lane without Secure Boot stays schedulable.
+func TestPlanGatesSecureBootCellsWhereSecureBootIsUnavailable(t *testing.T) {
+	pop := release(t, "pop-24.04")
+	if pop.Lab.SecureBootUnavailable == "" {
+		t.Fatal("pop-24.04 lost its measured Secure Boot reason")
+	}
+	encrypted := labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	secure := &labv1.MatrixCell{Name: "tpm-unattended-boots", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions", Tpm: true, SecureBoot: true}
+	plain := &labv1.MatrixCell{Name: "device-actions", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions"}
+	in := &Inputs{
+		Manifests: []*Manifest{
+			{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "cosmic-encrypted-lab"}, Release: pop, Architecture: "x86_64"},
+			{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "cosmic"}, Release: pop, Architecture: "x86_64"},
+		},
+		Ledger: &labv1.MatrixLedger{},
+	}
+	got := map[string]*Cell{}
+	for _, c := range in.Plan([]*platform.Release{pop}, []*labv1.MatrixCell{secure, plain}) {
+		got[c.Spec.GetName()] = c
+	}
+	if c := got["tpm-unattended-boots"]; c.State != Gated || !strings.Contains(c.Reason, "Lab.SecureBootUnavailable") || !strings.Contains(c.Reason, pop.Lab.SecureBootUnavailable) {
+		t.Fatalf("pop Secure Boot cell: %v %q", c.State, c.Reason)
+	}
+	if c := got["device-actions"]; c.State == Gated {
+		t.Fatalf("pop cell without Secure Boot gated: %q", c.Reason)
+	}
+}
+
 // A Debian netinst ISO boots both the plain installed golden and the
 // guided-LUKS encrypted golden, so encrypted cells are not "no image".
 func TestDebianNetinstServesEncryptedCells(t *testing.T) {

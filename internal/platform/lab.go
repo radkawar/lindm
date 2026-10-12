@@ -81,6 +81,10 @@ type Lab struct {
 	// SysctlKey replaces the resources lane's vm.swappiness when a vendor
 	// boot service owns that key's live value (empty keeps vm.swappiness).
 	SysctlKey string
+	// SecureBootUnavailable is the measured reason the installed system cannot
+	// boot under UEFI Secure Boot; lab matrix cells that require Secure Boot
+	// are gated with it. Empty when Secure Boot is available.
+	SecureBootUnavailable string
 	// OSUpdateTargets pins, per guest architecture (x86_64, aarch64), the
 	// later rolling snapshot the os-update lane's whole-system policy installs.
 	// Lane prerequisites are provisioned at the image's own snapshot, so a
