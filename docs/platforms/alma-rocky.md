@@ -307,7 +307,10 @@ x86_64. Five-scenario remote assistance passed on Rocky and AlmaLinux 10.2
 On 9.8 (GNOME 40), assistance ends with `UNAVAILABLE capture_no_frames`. The
 vendor PipeWire 1.4.11 sends damage-frame and keepalive timestamps that stall
 GStreamer's `pipewiresrc`; upstream PipeWire fixed this in `efd1526` and
-`49300d8`, and no capture fallback is added. Records and the diagnosis are in
+`49300d8`, and no capture fallback is added. Rocky 9.8 x86_64 fails the same
+way (no decoded frames), so the defect is not architecture-specific; the
+capture workaround is remote-assistance product work. Records and the diagnosis
+are in
 [verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
 
 ## Advisory feeds
