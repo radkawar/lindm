@@ -48,9 +48,14 @@ export function sourceAnchor(feedId: string) {
   return `advisory-source-${feedId}`;
 }
 
+// How the server's advisory sources are set up (operator documentation).
+export const advisorySourcesDocsUrl =
+  "https://github.com/radkawar/lindm/blob/main/docs/engineering.md#advisory-feed-operations";
+
 // Why a refreshed, unexpired source is still incomplete, as one sentence, and
-// its remedy. An unscoped skipped entry voids completeness; otherwise the source
-// never claimed to list every advisory of its release.
+// its remedy in admin terms. The banner states the device consequence; this is
+// the only place the gap itself is explained. An unscoped skipped entry voids
+// completeness; otherwise the source never claimed to list every advisory.
 export function sourceGap(feed: AdvisoryFeedStatus) {
   const os = feedOSLabel(feed);
   const unscoped = feed.rejectedRecords.filter(
@@ -58,13 +63,13 @@ export function sourceGap(feed: AdvisoryFeedStatus) {
   ).length;
   if (unscoped === 0) {
     return {
-      missing: `Missing the complete ${os} advisory list; this source has only selected advisories, so no ${os} device can be shown as unaffected.`,
-      remedy: `Configure a source that lists every ${os} advisory under advisories.feeds in the server configuration.`,
+      missing: `Missing the complete ${os} advisory list; this source has only selected advisories.`,
+      remedy: `Add a source that lists every ${os} advisory to the lindm server.`,
     };
   }
-  const entries = unscoped === 1 ? "1 skipped entry" : `${unscoped} skipped entries`;
+  const entries = unscoped === 1 ? `1 skipped ${os} entry` : `${unscoped} skipped ${os} entries`;
   return {
-    missing: `Missing the affected packages of ${entries}, so no ${os} device can be shown as unaffected.`,
+    missing: `Missing the affected packages of ${entries}.`,
     remedy: `Review the skipped entries below; ${os} devices stay unchecked until the vendor names their packages.`,
   };
 }

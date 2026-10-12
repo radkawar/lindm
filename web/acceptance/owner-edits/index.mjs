@@ -13,6 +13,7 @@ import * as deviceActions from "./device-actions.mjs";
 import * as assistanceRecord from "./assistance-record.mjs";
 import * as revealApproval from "./pass2-reveal-approval.mjs";
 import * as advisories from "./advisories.mjs";
+import * as advisoriesSources from "./advisories-sources.mjs";
 import * as enrollment from "./enrollment.mjs";
 import * as rollouts from "./rollouts.mjs";
 import * as pass2Bug7DialogScrolled from "./pass2-bug7-dialog-scrolled.mjs";
@@ -44,6 +45,7 @@ export const ownerEdits = [
   assistanceRecord,
   revealApproval,
   advisories,
+  advisoriesSources,
   enrollment,
   pass2Bug5,
   rollouts,

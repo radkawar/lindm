@@ -249,9 +249,11 @@ SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;
 -- name: ListAdvisorySummary :many
 -- Same device states as advisory_finding_status, weighted from shared sets:
 -- a fresh device is affected unless every finding of the advisory is under an
--- active exception, accepted if any is, and stale devices are unknown.
+-- active exception, accepted if any is, and stale devices are unknown. Only
+-- active devices count, the same population as CountAdvisoryDevices.
 WITH dev AS (
  SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ JOIN devices d ON d.id=s.device_id AND d.state='active'
  WHERE s.finding_set_id IS NOT NULL
   AND device_scope_matches(s.device_id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb)
 ), bound AS (

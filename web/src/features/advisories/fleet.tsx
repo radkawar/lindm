@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { RpcError } from "@/components/ui/rpc-error";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import { TechnicalDetails } from "@/components/ui/technical-details";
-import { Button } from "@/components/ui/button";
+import { ListPagination } from "@/components/ui/list-pagination";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Timestamp } from "@/components/ui/timestamp";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { usePrincipal } from "@/hooks/use-permissions";
 import { canPermission } from "@/lib/permissions";
@@ -25,7 +26,7 @@ import { toRpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 import { CoverageBanner } from "./coverage-banner";
 import {
-  AdvisoryPaging,
+  advisorySourcesDocsUrl,
   feedOSLabel,
   publishedSeverity,
   sourceAnchor,
@@ -37,10 +38,10 @@ import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./querie
 
 export function AdvisoryFleet() {
   const lifetime = useAuthLifetime();
-  // Advisory sources are fleet-wide; a device-scoped reader sees findings only.
-  const canReviewSources = canPermission(usePrincipal(), "fleet.read", true);
   const [pageToken, setPageToken] = useState("");
   const now = useFreshnessClock();
+  // Advisory sources are fleet-wide; a device-scoped reader sees findings only.
+  const canReviewSources = canPermission(usePrincipal(), "fleet.read", true);
   const summary = useQuery(advisorySummaryQueryOptions(lifetime, pageToken));
   const feeds = useQuery({ ...advisoryFeedsQueryOptions(lifetime), enabled: canReviewSources });
   const feedUnknown =
@@ -62,6 +63,11 @@ export function AdvisoryFleet() {
             ? "Security advisories affecting your devices, and whether advisory sources are up to date."
             : "Security advisories affecting your devices."
         }
+        onRefresh={() => {
+          void summary.refetch();
+          if (canReviewSources) void feeds.refetch();
+        }}
+        refreshing={summary.isFetching || feeds.isFetching}
         actions={
           <Link to="/devices" className="text-sm underline underline-offset-4">
             View findings by device
@@ -72,9 +78,9 @@ export function AdvisoryFleet() {
         <CoverageBanner
           summary={summary.data}
           feeds={feeds.data?.feeds ?? []}
-          canReviewSources={canReviewSources}
           reloading={summary.isFetching}
           onReload={() => void summary.refetch()}
+          canReviewSources={canReviewSources}
         />
       ) : null}
       <Card>
@@ -87,14 +93,6 @@ export function AdvisoryFleet() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <Button
-            className="w-fit"
-            variant="outline"
-            disabled={summary.isFetching}
-            onClick={() => void summary.refetch()}
-          >
-            Refresh
-          </Button>
           {summary.isPending ? (
             <div role="status" className="grid gap-3">
               <span className="text-sm text-muted-foreground">Loading advisories…</span>
@@ -141,7 +139,6 @@ export function AdvisoryFleet() {
                     <TableHead>Severity</TableHead>
                     <TableHead>Affected devices</TableHead>
                     <TableHead>Accepted</TableHead>
-                    <TableHead>Not checked</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -164,9 +161,13 @@ export function AdvisoryFleet() {
                             <span className="text-xs text-muted-foreground">Not published</span>
                           )}
                         </TableCell>
-                        <TableCell>{advisory.affectedDevices.toString()}</TableCell>
+                        <TableCell>
+                          <AffectedDevices
+                            affected={advisory.affectedDevices}
+                            unconfirmed={advisory.unknownDevices}
+                          />
+                        </TableCell>
                         <TableCell>{advisory.acceptedDevices.toString()}</TableCell>
-                        <TableCell>{advisory.unknownDevices.toString()}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -180,11 +181,15 @@ export function AdvisoryFleet() {
               ) : null}
             </>
           ) : null}
-          <AdvisoryPaging
-            token={pageToken}
-            next={summary.data?.nextPageToken ?? ""}
+          <ListPagination
+            label="Advisory pages"
             busy={summary.isFetching}
-            onPage={setPageToken}
+            onPrevious={pageToken ? () => setPageToken("") : undefined}
+            onNext={
+              summary.data?.nextPageToken
+                ? () => setPageToken(summary.data.nextPageToken)
+                : undefined
+            }
           />
         </CardContent>
       </Card>
@@ -195,18 +200,20 @@ export function AdvisoryFleet() {
               <h2>Advisory sources</h2>
             </CardTitle>
             <CardDescription>
-              Findings are only accurate when sources and device inventory are up to date.
+              Findings are only accurate when sources and device inventory are up to date. Sources
+              are set up on the lindm server:{" "}
+              <a
+                href={advisorySourcesDocsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4"
+              >
+                how to add an advisory source
+              </a>
+              .
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <Button
-              className="w-fit"
-              variant="outline"
-              disabled={feeds.isFetching}
-              onClick={() => void feeds.refetch()}
-            >
-              Refresh sources
-            </Button>
             {feeds.isPending ? (
               <div role="status" className="grid gap-3">
                 <span className="text-sm text-muted-foreground">Loading advisory sources…</span>
@@ -217,7 +224,7 @@ export function AdvisoryFleet() {
             {feeds.isSuccess && feeds.data.feeds.length === 0 ? (
               <EmptyState
                 title="No advisory sources set up"
-                description="Add sources under advisories.feeds in the server configuration, then refresh."
+                description="Add advisory sources to the lindm server, then refresh."
               />
             ) : null}
             {feeds.data?.feeds.map((feed) => {
@@ -244,10 +251,11 @@ export function AdvisoryFleet() {
                       : `${feed.advisoryCount.toString()} advisories`}
                   </p>
                   <p>
-                    Last refreshed:{" "}
-                    {feed.checkedAt ? formatTimestamp(feed.checkedAt).local : "Never"}
+                    Last refreshed: <Timestamp value={feed.checkedAt} missing="Never" />
                   </p>
-                  <p>Expires: {formatTimestamp(feed.expiresAt).local}</p>
+                  <p>
+                    Expires: <Timestamp value={feed.expiresAt} relative={false} />
+                  </p>
                   <p
                     data-advisory-source-status=""
                     className={feed.error ? "text-destructive" : "text-muted-foreground"}
@@ -256,11 +264,9 @@ export function AdvisoryFleet() {
                   </p>
                   {status.remedy ? <p>{status.remedy}</p> : null}
                   {feed.rejectedRecords.length > 0 ? (
-                    <details>
-                      <summary className="cursor-pointer font-medium">
-                        Skipped entries ({feed.rejectedRecords.length})
-                      </summary>
-                      <ul className="mt-3 grid gap-3">
+                    <section aria-label="Skipped entries" className="grid gap-3">
+                      <p className="font-medium">Skipped entries ({feed.rejectedRecords.length})</p>
+                      <ul className="grid gap-3">
                         {feed.rejectedRecords.map((record, index) => (
                           <li
                             key={`${record.id}:${index}`}
@@ -276,11 +282,12 @@ export function AdvisoryFleet() {
                           </li>
                         ))}
                       </ul>
-                    </details>
+                    </section>
                   ) : null}
                   <TechnicalDetails
                     items={[
                       { label: "Source ID", value: feed.id },
+                      { label: "Server setting", value: "advisories.feeds" },
                       { label: "Source URL", value: feed.sourceUrl },
                       { label: "Last attempt", value: formatTimestamp(feed.attemptedAt).local },
                       {
@@ -372,4 +379,26 @@ function sourceStatus(
   }
   const gap = sourceGap(feed);
   return { tone: "warning", label: "Incomplete", sentence: gap.missing, remedy: gap.remedy };
+}
+
+// Devices with the advisory: confirmed by a current, complete check, and found
+// on devices whose check is incomplete or out of date (their findings stand,
+// but the device can't be shown as fully checked).
+function AffectedDevices({ affected, unconfirmed }: { affected: bigint; unconfirmed: bigint }) {
+  const devices = unconfirmed === 1n ? "1 device" : `${unconfirmed.toString()} devices`;
+  return (
+    <div className="grid gap-0.5">
+      {affected > 0n || unconfirmed === 0n ? (
+        <span className="tabular-nums">{affected.toString()}</span>
+      ) : null}
+      {unconfirmed > 0n ? (
+        <span
+          data-advisory-unconfirmed={unconfirmed.toString()}
+          className="text-xs text-muted-foreground"
+        >
+          {affected > 0n ? "Also found on" : "Found on"} {devices} not fully checked
+        </span>
+      ) : null}
+    </div>
+  );
 }

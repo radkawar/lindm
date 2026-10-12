@@ -9,7 +9,7 @@ import {
 } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { feedOSLabel, osLabel, sourceAnchor, sourceGap } from "./display";
+import { feedOSLabel, osLabel, sourceAnchor } from "./display";
 
 // The remedy a cause offers: wait for the background check, act on the devices
 // (request inventory, inspect their evidence), or fix the advisory source setup.
@@ -55,7 +55,7 @@ function describe(
     case AdvisoryUncheckedReason.FEED_UNAVAILABLE:
       return {
         title: `No advisory source for ${os}`,
-        detail: `Add a ${os} source under advisories.feeds in the server configuration.`,
+        detail: `The lindm server has no ${os} advisory source to check these devices against.`,
         fix: "sources",
       };
     case AdvisoryUncheckedReason.RHEL_PLATFORM_STREAM_UNAVAILABLE:
@@ -75,7 +75,7 @@ function describe(
       return {
         title: `Source incomplete for ${os}`,
         detail: feed
-          ? sourceGap(feed).missing
+          ? "None of these devices can be shown as unaffected until the source is complete."
           : `The ${os} source doesn't list every ${os} advisory, so these devices stay unchecked.`,
         fix: "source",
       };

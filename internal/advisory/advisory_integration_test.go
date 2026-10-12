@@ -168,6 +168,14 @@ func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	if summary.UnknownDevices != 1 || summary.EvaluatedDevices != 0 || len(summary.Advisories) != 1 || summary.Advisories[0].UnknownDevices != 1 {
 		t.Fatalf("fleet freshness waited for background reevaluation: %v", summary)
 	}
+	// Inactive devices are outside the fleet population: their old findings
+	// count neither as affected nor as found on a device not fully checked.
+	mustExec(t, t.Context(), pool, "UPDATE devices SET state='recovery_hold' WHERE id=$1", id)
+	summary, err = s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, true, []byte("[]"))
+	if err != nil || summary.UnknownDevices != 0 || len(summary.Advisories) != 0 {
+		t.Fatalf("inactive device counted in advisory summary: %v %v", summary, err)
+	}
+	mustExec(t, t.Context(), pool, "UPDATE devices SET state='active' WHERE id=$1", id)
 	out, err = listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)

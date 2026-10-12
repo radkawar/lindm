@@ -894,6 +894,7 @@ func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error)
 const listAdvisorySummary = `-- name: ListAdvisorySummary :many
 WITH dev AS (
  SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ JOIN devices d ON d.id=s.device_id AND d.state='active'
  WHERE s.finding_set_id IS NOT NULL
   AND device_scope_matches(s.device_id,$2::boolean,$3::jsonb)
 ), bound AS (
@@ -939,7 +940,8 @@ type ListAdvisorySummaryRow struct {
 
 // Same device states as advisory_finding_status, weighted from shared sets:
 // a fresh device is affected unless every finding of the advisory is under an
-// active exception, accepted if any is, and stale devices are unknown.
+// active exception, accepted if any is, and stale devices are unknown. Only
+// active devices count, the same population as CountAdvisoryDevices.
 func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySummaryParams) ([]ListAdvisorySummaryRow, error) {
 	rows, err := q.db.Query(ctx, listAdvisorySummary,
 		arg.RowLimit,
