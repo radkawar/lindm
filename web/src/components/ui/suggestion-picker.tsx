@@ -85,7 +85,7 @@ export function SuggestionPicker({
           list.isSuccess && settled && suggestions.length === 0
             ? prefix
               ? `No recorded values start with “${prefix}”.`
-              : "No values are recorded yet."
+              : "The device has reported no values yet."
             : undefined,
         fetching: list.isFetching,
         onFirst: after ? () => setPage({ prefix, after: "" }) : undefined,

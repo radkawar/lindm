@@ -27,7 +27,7 @@ async function openAssistanceTab(page, main, visit, settle, deviceId) {
     () =>
       !document
         .querySelector('[role="tabpanel"]:not([hidden])')
-        ?.innerText.includes("Checking whether this device can be helped"),
+        ?.innerText.includes("Checking assistance availability"),
     null,
     { timeout: 30_000 },
   );

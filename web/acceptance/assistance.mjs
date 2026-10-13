@@ -228,7 +228,7 @@ const commands = {
     await ui.wait({ role: "heading", text: "Session history" });
     // The request form appears only once readiness answers READY.
     await driver.page
-      .getByText("Checking whether this device can be helped…", { exact: true })
+      .getByText("Checking assistance availability…", { exact: true })
       .waitFor({ state: "hidden" });
     const requestForm =
       (await driver.page

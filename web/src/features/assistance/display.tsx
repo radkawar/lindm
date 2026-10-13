@@ -105,8 +105,7 @@ export function AssistanceStateBadge({ session }: { session: AssistanceSession }
 
 export function endCauseText(session: AssistanceSession): string {
   if (session.state !== AssistanceState.ENDED) return "";
-  const label = endCauseLabels[session.endCause] ?? endCauseLabels[AssistanceEndCause.UNSPECIFIED];
-  return session.endDetail ? `${label} (${session.endDetail})` : label;
+  return endCauseLabels[session.endCause] ?? endCauseLabels[AssistanceEndCause.UNSPECIFIED];
 }
 
 // Empty for a refused request: it never reached a person, so there is nothing to report.
@@ -134,7 +133,9 @@ export function controlText(session: AssistanceSession): string {
   if (session.mode !== AssistanceMode.CONTROL) return "Not requested";
   if (session.state === AssistanceState.ENDED) {
     if (!session.consentedAt) return "";
-    return session.controlGranted ? "Was granted; no longer active" : "Not granted by the user";
+    return session.controlGranted
+      ? "The user allowed control. Access has ended."
+      : "The user did not allow control";
   }
   if (session.controlGranted) return "Granted";
   if (session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED)
@@ -162,7 +163,7 @@ const failureMessages: Record<string, ReactNode> = {
   [`${Code.FailedPrecondition}:assistance_busy`]:
     "Another remote assistance session is already open on this device.",
   [`${Code.FailedPrecondition}:assistance_disabled`]: (
-    <>Remote assistance is turned off on this device. {disabledRemedy}</>
+    <>The device configuration disables remote assistance. {disabledRemedy}</>
   ),
   [`${Code.FailedPrecondition}:assistance_no_desktop`]:
     "The latest inventory shows no desktop session or sign-in screen. This device has no desktop to share.",

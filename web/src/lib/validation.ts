@@ -85,7 +85,7 @@ function describe(path: string, ruleId: string, ruleMessage: string, hints?: Fie
 export function violationText(label: string, ruleId: string, ruleMessage: string): string {
   const [family = "", rule = ""] = ruleId.split(".");
   const [first = "", second = ""] = ruleMessage.match(/-?\d+(?:\.\d+)?/g) ?? [];
-  if (ruleId === "required") return `${label} is required.`;
+  if (ruleId === "required") return `Enter ${label.toLowerCase()}.`;
   if (STANDARD_RULE_FAMILIES[family] !== true) {
     const text = ruleMessage.trim();
     if (text === "" || RAW_VALIDATION_TEXT.test(text)) return `${label} isn't valid.`;
@@ -96,11 +96,11 @@ export function violationText(label: string, ruleId: string, ruleMessage: string
     case "min_len":
     case "min_bytes":
       return first === "1" || first === ""
-        ? `${label} is required.`
-        : `${label} is too short: use at least ${first} characters.`;
+        ? `Enter ${label.toLowerCase()}.`
+        : `${label} is too short. Use at least ${first} characters.`;
     case "max_len":
     case "max_bytes":
-      return `${label} is too long: use at most ${first} characters.`;
+      return `${label} is too long. Use at most ${first} characters.`;
     case "len":
     case "len_bytes":
       return `${label} must be exactly ${first} characters.`;
@@ -109,7 +109,7 @@ export function violationText(label: string, ruleId: string, ruleMessage: string
     case "suffix":
     case "contains":
     case "not_contains":
-      return `${label} contains characters or a format that isn't allowed.`;
+      return `${label} has an unsupported format or character.`;
     case "ip":
     case "ipv4":
     case "ipv6":

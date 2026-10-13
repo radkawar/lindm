@@ -528,7 +528,7 @@ async function remoteHelp(ctx) {
     await visible(main.getByRole("heading", { name: "Why this session ended", exact: true }));
     // No one accepted, so the record says nothing was shared (a started session
     // reads "Session record. Sharing and control have ended.").
-    await visible(main.getByText("Request record. Nothing was shared.", { exact: true }));
+    await visible(main.getByText("Request record. The device shared nothing.", { exact: true }));
     requireState(!(await takeControl.isVisible()), "remote_help_ended_control_visible");
     requested = false;
     await shot(

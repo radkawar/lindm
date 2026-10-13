@@ -44,8 +44,9 @@ const completedLabels: Record<number, string> = {
 };
 
 const incompleteLabels: Record<string, string> = {
-  command_state_lost: "The request outcome was lost. Check the device before sending it again.",
-  command_expired: "The request expired before completion was confirmed.",
+  command_state_lost:
+    "The request has no recorded outcome. Check the device before sending it again.",
+  command_expired: "The request expired without confirmation of completion.",
   session_ended: "The session ended before this request finished.",
   content_expired: "Clipboard text is no longer available. Choose Read clipboard again.",
 };
@@ -235,9 +236,9 @@ export function AssistanceControls({
       : result
         ? incompleteLabels[result.reason] ||
           (result.status === AssistanceCommandStatus.EXPIRED
-            ? "The request expired before completion was confirmed."
+            ? "The request expired without confirmation of completion."
             : result.status === AssistanceCommandStatus.CANCELLED
-              ? "The request was cancelled."
+              ? "The request ended with cancellation."
               : "The request did not report successful completion.")
         : "";
   return (
@@ -374,7 +375,7 @@ export function AssistanceControls({
             (session.displays.length === 0
               ? "No shared displays are available."
               : session.displays.length === 1
-                ? "Only one display was shared."
+                ? "The user shared only one display."
                 : "Choose one of the displays the user shared.")}
         </p>
       </div>

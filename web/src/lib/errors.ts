@@ -130,9 +130,9 @@ const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
   device_action_recovery_attestation_unavailable:
     "The device cannot prove its boot state with its TPM. lindm cannot verify recovery.",
   device_action_recovery_boot_mode_mismatch:
-    "The device now boots differently from when recovery was prepared. Prepare recovery again.",
+    "The device's boot mode changed after recovery preparation. Prepare recovery again.",
   device_action_recovery_kernel_mismatch:
-    "The device's kernel changed since recovery was prepared. Prepare recovery again.",
+    "The device's kernel changed after recovery preparation. Prepare recovery again.",
   device_action_esp_insufficient:
     "Unsupported: ESP capacity. The signed recovery image does not fit the EFI system partition. Use separately qualified external recovery media with an on-site operator. Do not remove ordinary boot files. Do not resize the ESP to bypass this gate.",
 };
@@ -140,7 +140,7 @@ const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
 export function recoveryReadinessMessage(reason: string) {
   return (
     RECOVERY_READINESS_MESSAGES[reason] ??
-    "Recovery readiness is not confirmed. Review the recorded reason before continuing."
+    "lindm cannot confirm recovery readiness. Review the recorded reason before continuing."
   );
 }
 
@@ -164,7 +164,7 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
     "Blocked: the admin who assigned this profile can no longer send secrets to this device.",
   policy_authority_changed:
     "Blocked: the admin who set this policy lost access. Set the policy again to resume.",
-  escrow_unconfigured: "Blocked: secret storage isn't set up on the server.",
+  escrow_unconfigured: "Blocked: the server does not provide secret storage.",
   native_package_manager_busy:
     "Another package manager was running. Nothing changed. lindm retries at the next check.",
   resource_executor_not_available:
@@ -183,7 +183,7 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
     "Taking over this existing setting needs an approved assignment. Assign the profile again with an approval.",
   assignment_authority_changed:
     "The admin who assigned this profile no longer has permission. Assign the profile again to resume.",
-  dependency_pending: "Waiting for the items it depends on to be applied first.",
+  dependency_pending: "Waiting for the device to apply this item's dependencies.",
   dependency_attention: "An item this depends on needs attention. Fix that item first.",
   dependency_not_applicable:
     "A dependency does not apply to this device. lindm cannot apply this item. Change the profile.",
@@ -245,7 +245,7 @@ const ADOPTION_CAUSES: Record<string, string> = {
   existing_file: "Blocked: a file lindm didn't create already exists at this path.",
   existing_account: "Blocked: a local user or group with this name already exists on the device.",
   existing_definition: "Blocked: a systemd unit with this name already exists on the device.",
-  existing_package: "Blocked: this package is already installed and lindm didn't install it.",
+  existing_package: "Blocked: this package exists on the device, but lindm did not install it.",
   existing_kernel_setting:
     "Blocked: a kernel setting file lindm didn't create already sets this parameter.",
 };
@@ -263,7 +263,7 @@ const DEVICE_CAUSES: Record<string, string> = {
   native_tool_outdated:
     "The system tool is too old. Fedora requires dnf5 5.4.6.0 or newer. Apply All updates through an OS update policy or Patch now. Fedora security-only updates do not update dnf5. lindm retries when device packages change.",
   native_tool_missing:
-    "Blocked: a system tool this item needs isn't installed on the device. Install it on the device.",
+    "Blocked: the device lacks a required system tool. Install it on the device.",
   existing_package_unverified:
     "Blocked: lindm cannot verify this installed package's repository. Remove the package from the device, or remove it from the profile.",
   explicit_account_identity_required:
@@ -273,7 +273,7 @@ const DEVICE_CAUSES: Record<string, string> = {
   ssh_config_invalid:
     "Blocked: sshd rejected the device's SSH configuration. lindm left it unchanged. Repair the SSH configuration on the device.",
   unit_not_installed:
-    "The systemd unit this item needs isn't installed on the device. Install the package that provides it.",
+    "The device lacks the required systemd unit. Install the package that provides it.",
   native_unsupported:
     "The device's agent can't manage this kind of item on its OS release. Nothing changed.",
 };
@@ -364,8 +364,8 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "assistance_unconfigured":
         return {
           tone: "neutral",
-          title: "Remote assistance is not configured",
-          message: "This server is not configured to provide remote assistance.",
+          title: "Remote assistance unavailable",
+          message: "This server does not provide remote assistance.",
           action: "Ask an administrator to review the assistance and relay settings.",
         };
       case "assistance_policy_ceiling":
@@ -386,7 +386,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Clipboard text is no longer available",
-          message: "The previously read clipboard text has expired or was cleared.",
+          message: "The previously read clipboard text no longer exists in this session.",
           action: "Choose Read clipboard to request the current text again.",
         };
       case "assistance_command_busy":
@@ -451,14 +451,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "neutral",
           title: "Action not enabled",
-          message: "This action is not enabled by this deployment's trust delegation.",
+          message: "The deployment's trust delegation does not allow this action.",
           action: "Ask an administrator to review the action's signing delegation.",
         };
       case "approval_evidence_unavailable":
         return {
           tone: "warning",
           title: "Evidence no longer available",
-          message: "The device no longer reports what this request was made for.",
+          message: "The device no longer reports the evidence that this request needs.",
           action: "Reject this request. Propose a new one from the device if it still applies.",
         };
       case "advisory_unavailable":
@@ -468,7 +468,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "neutral",
           title: "Capability not configured",
-          message: "This capability is not enabled on the server.",
+          message: "The server configuration does not allow this capability.",
           action: "Ask an administrator to review the server configuration.",
         };
       case "device_action_tpm2_unavailable":
@@ -600,14 +600,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "device_quarantined":
         return {
           tone: "warning",
-          title: "Device is quarantined",
+          title: "Network quarantine active",
           message: "The device accepts only requests to undo the active network quarantine.",
           action: "Undo the quarantine first, or wait for it to end.",
         };
       case "device_lock_release_required":
         return {
           tone: "warning",
-          title: "Accounts are already locked",
+          title: "Account lock active",
           message: "The device cannot accept a new lock while the current lock remains active.",
           action: "Undo the current account lock first.",
         };
@@ -629,7 +629,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       case "device_action_escrow_scope_incomplete":
         return {
           tone: "warning",
-          title: "Not every encrypted volume is included",
+          title: "Select every encrypted volume",
           message:
             "This recovery-key removal must include every encrypted volume whose recovery key lindm stores.",
           action: "Select all the device's encrypted volumes. Review the request again.",
@@ -645,7 +645,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "neutral",
           title: "Capability not configured",
-          message: "This capability is not enabled on the server.",
+          message: "The server configuration does not allow this capability.",
           action: "Ask an administrator to review the server configuration.",
         };
       case "rotation_overlap_active":
@@ -761,7 +761,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       return {
         tone: "warning",
         title: "Username or password is incorrect.",
-        message: "Check both and try again.",
+        message: "Check the username and password. Retry signing in.",
         action: "Repeated failures lock the account for a while.",
       };
     }
@@ -837,13 +837,13 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Type can't change",
-          message: "A destination keeps the type it was created with.",
+          message: "A destination keeps its original type.",
           action: "Add a new destination of the other type instead.",
         };
       case "invalid_request":
         return {
           tone: "warning",
-          title: "Some values weren't accepted",
+          title: "The server rejected some values",
           message: "The server rejected one or more of the values entered.",
           action: "Check each field against its hint. Retry the request.",
         };
@@ -857,7 +857,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     return {
       tone: "warning",
       title: "Already submitted",
-      message: "This form was already submitted with different values.",
+      message: "The server already received this form with different values.",
       action: "Start over to send a new request.",
     };
   }

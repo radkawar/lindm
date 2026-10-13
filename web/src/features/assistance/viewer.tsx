@@ -221,7 +221,7 @@ function AssistanceViewerSession({
           ended
             ? session.startedAt
               ? "Session record. Sharing and control have ended."
-              : "Request record. Nothing was shared."
+              : "Request record. The device shared nothing."
             : creator
               ? "The user chooses what to share. Leaving this page stops your session."
               : "Only the requesting admin can connect. The user can stop sharing at any time."
@@ -268,6 +268,7 @@ function AssistanceViewerSession({
                 { label: "Device ID", value: deviceId },
                 { label: "Session ID", value: sessionId },
                 { label: "Operator ID", value: session.operatorId },
+                { label: "End detail", value: session.endDetail },
               ]}
             />
           ) : null}
@@ -352,13 +353,13 @@ function SessionStatus({
         {failed ? <p className="mt-1 text-sm">{startFailureRemedy(session)}</p> : null}
         {failed ? (
           <p className="mt-1 text-sm text-muted-foreground" data-review-state="clear">
-            Refused <TimeCell value={session.endedAt} />. Once this is fixed, return to the device
-            to request again.
+            Request failed <TimeCell value={session.endedAt} />. Resolve the reported cause. Return
+            to the device to request assistance again.
           </p>
         ) : ended ? (
           <p className="mt-1 text-sm text-muted-foreground" data-review-state="clear">
-            Ended <TimeCell value={session.endedAt} />. To help again, return to the device and
-            request a new session with fresh consent.
+            Ended <TimeCell value={session.endedAt} />. Return to the device to help again. Request
+            a new session with fresh consent.
           </p>
         ) : waiting ? (
           <p className="mt-1 text-sm text-muted-foreground" data-review-state="blocked">
@@ -1031,8 +1032,8 @@ function AssistanceConnection({
             <Alert>
               <AlertTitle>Open in another tab</AlertTitle>
               <AlertDescription>
-                This session is connected elsewhere. Stop that session before requesting a new one
-                here.
+                Another page has this session's connection. Stop that session before requesting a
+                new one here.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -1126,11 +1127,11 @@ function AssistanceConnection({
               {ended
                 ? "Session ended"
                 : !sessionAvailable
-                  ? "Session details unavailable. Controls are paused."
+                  ? "Session details unavailable. You cannot use controls."
                   : !stream
                     ? "No video yet"
                     : !active
-                      ? "Connection interrupted. Controls are paused."
+                      ? "Connection interrupted. You cannot use controls."
                       : presentation.metadataAvailable === false
                         ? "This browser cannot confirm the shared screen. Use a browser with RTP presentation metadata."
                         : "Waiting for the selected screen…"}
@@ -1242,7 +1243,8 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
       </div>
       <p className="text-muted-foreground">
         If they choose Allow, their desktop asks which screen to share
-        {control ? " and whether to allow control" : ""}. Nothing is shared until they confirm it.
+        {control ? " and whether to allow control" : ""}. The device shares nothing until they
+        confirm it.
       </p>
     </section>
   );

@@ -103,13 +103,10 @@ export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
 function AssistanceRequest({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const query = useQuery(assistanceReadinessQueryOptions(lifetime, deviceId));
-  if (query.isPending) return <p role="status">Checking whether this device can be helped…</p>;
+  if (query.isPending) return <p role="status">Checking assistance availability…</p>;
   if (query.error)
     return (
-      <RpcError
-        failure={toRpcFailure(query.error)}
-        title="Couldn't check whether this device can be helped"
-      >
+      <RpcError failure={toRpcFailure(query.error)} title="Could not check assistance availability">
         <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
           Check again
         </Button>
@@ -148,7 +145,7 @@ function AssistanceGateReason({
           assistance.
         </>
       ) : (
-        <>Remote assistance is turned off on this device. {disabledRemedy}</>
+        <>The device configuration disables remote assistance. {disabledRemedy}</>
       );
     case AssistanceReadinessState.NO_DESKTOP:
       return (
@@ -379,7 +376,7 @@ function AssistanceRequestForm({
         The request asks for consent. Sharing starts only after the user accepts. Either person can
         stop the session before its time limit.
         {policyUnknown
-          ? " The agent does not report whether assistance is enabled. The device can refuse the request."
+          ? " The agent does not report whether its configuration allows assistance. The device can refuse the request."
           : ""}
       </p>
       <div className="flex flex-wrap gap-2">
