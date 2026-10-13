@@ -999,12 +999,20 @@ rollout awaiting its one `resources.rollout` approval, which apply requests as t
 fixture owner; nothing is saved or sent before it. The runner then has the
 controller's independently enrolled approver account decide those requests
 through the ordinary `ApproveApproval` RPC
-(`devlab.ApprovalSession.ApproveRollouts`). It never requests on another human's
-behalf or bypasses the approval. It records the approved rollout IDs as
-`organization-approved-rollouts.json` and prints their count. The unchanged apply
-that follows reports a rollout the promoter has not started yet as `pending`.
-Both humans stay visible in the console's approval history. A resume approves any
-rollout a new apply started, for example after an approval expired.
+(`devlab.ApprovalSession.RollOutOrganization`). It never requests on another
+human's behalf or bypasses the approval. Each rollout is reviewed against the
+devices' current heads, so where two pending rollouts cover one device (Company
+baseline and Engineering tools on the Engineering laptop; Company baseline and
+Finance hardened, which starts at once, on the Finance desktop), the later
+activation finds the device changed and holds it for review. The runner waits
+until the approved rollouts have started, then applies again
+(`organization-reviewed-N.json`). That apply reviews each held device again in a
+follow-up rollout, and the runner approves it in the next round. Rounds end when no
+rollout awaits approval, and are bounded by the number of assignments. The
+approved rollout IDs are recorded in `organization-approved-rollouts.json` and
+their count is printed. The unchanged apply then has to change nothing. Both humans
+stay visible in the console's approval history. A resume approves any rollout a
+new apply started, for example after an approval expired.
 
 The controller retains `demos/NAME/demo-state.json` with each original host
 snapshot, image digest and device binding, and `control-plane/` with the same
@@ -1130,11 +1138,13 @@ enrollment and inventory, the full unchanged source document is applied; each
 assignment rolls out to its reviewed devices. Company baseline and Engineering
 tools adopt existing native state, so their rollouts wait for the one approval
 apply requests. The seed's independent approver decides each one through
-`ApproveApproval` (`devlab.ApprovalSession.ApproveRollouts`), as a second admin
-would in the console. The seed then waits until the promoter has started every
-approved rollout and device. The seed then starts one adoption rollout (Kernel
-hardening) that waits for its approval. A separate post-seed apply verifies
-idempotence.
+`ApproveApproval`, as a second admin would in the console, and applies again after
+the approved rollouts start so devices a later activation changed are reviewed and
+approved again (`devlab.ApprovalSession.RollOutOrganization`; the demo report keeps
+the final apply's outcomes). The seed then waits until the promoter has started
+every device; `Routes.RolloutID` names an active rollout that activated devices.
+The seed then starts one adoption rollout (Kernel hardening) that waits for its
+approval. A separate post-seed apply verifies idempotence.
 Normal devices retain their department targeting labels. Outcomes are retained in
 the sanitized demo report, including pending advisory selectors and unsupported
 operations; missing hosts or findings are never fabricated. The declared Engineering

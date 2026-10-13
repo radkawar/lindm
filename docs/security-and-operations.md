@@ -797,8 +797,17 @@ or sent to a device until a second human with `approvals.manage` and unrestricte
 `resources.assign` approves it in the console (Approvals). A group with no enrolled
 device has nothing to approve; its assignment is saved and rolls out after review
 on a later apply. An unapproved request expires after an hour, and the next apply
-requests a new one. The persistent lab demo and the console review seed have their
-independent approver account approve these requests through the same API.
+requests a new one. Each rollout is reviewed against the devices' current heads.
+When two pending rollouts cover one device (Company baseline with Engineering tools
+or with a department profile), the later activation finds the device changed and
+holds it for review instead of applying a stale plan. After the approved rollouts
+start, run `apply` again. It rolls held devices out in a follow-up rollout, which
+needs its own approval when it adopts. Repeat until no assignment is `pending`.
+A review lists an enrolled device that has not reported inventory yet, but neither
+counts nor plans it, so it never makes an unchanged apply start another rollout;
+the first apply after it becomes active rolls it out.
+The persistent lab demo and the console review seed have their independent
+approver account approve these requests through the same API, in the same rounds.
 
 Declared rollouts are stage plans, not stored objects: an assignment that names
 one rolls out through its stages on each `apply`, and an unreferenced one creates

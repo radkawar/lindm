@@ -201,15 +201,18 @@ message PreviewTargetAssignmentImpactResponse {
   bytes review_sha256 = 14;
   uint32 candidate_count = 15;
   repeated string reasons = 16;
-  // Included devices whose proposed change adopts existing native state
-  // (OWNERSHIP_MODE_APPROVED_ADOPTION) and the distinct adopted settings.
+  // Included devices whose proposed resolution adopts existing native state
+  // (OWNERSHIP_MODE_APPROVED_ADOPTION), and the distinct adopted settings. Only
+  // active devices with a current generation are counted, as only they are planned.
   uint32 adopting_count = 17;
   repeated lindm.resource.v1.ResourceRef adopted = 18 [(buf.validate.field).repeated.max_items = 64];
   // Rolling this out needs one independent approval: an adoption, or the
   // reviewer's authorization policy requires approval for resources.assign.
   bool approval_required = 19;
-  // Included devices whose settings change, and devices the proposal no longer
-  // includes whose settings change (removals). Both are planned by a rollout.
+  // Devices this rollout would change: included devices whose settings change,
+  // and devices the proposal no longer includes whose settings change (removals).
+  // Only active devices with a current generation are planned and counted; a
+  // device row marked device_not_active may show a change no rollout applies yet.
   uint32 changed_count = 20;
   uint32 removing_count = 21;
   // Of the changed and removing devices, those whose current settings come

@@ -18,6 +18,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 )
 
@@ -120,6 +121,48 @@ func TestImpactUpdateIncludesRemovedScope(t *testing.T) {
 	report := f.impact(t, r)
 	if report.CandidateCount != 2 || report.ExcludedCount != 1 || report.IncludedCount != 1 {
 		t.Fatalf("removed old target was not reviewed: %v", report)
+	}
+}
+
+// Counts cover only devices a rollout plans. A member enrolled but not yet
+// active (no host report) keeps its changed row, marked device_not_active, but
+// is neither a change nor an adoption: an unchanged declaration must not start
+// a rollout (and request an approval) on every apply for it.
+func TestImpactCountsOnlyPlannableDevices(t *testing.T) {
+	f := newTargetingFixture(t)
+	group := f.impactGroup(t, 1)
+	if _, err := f.pool.Exec(t.Context(), "INSERT INTO device_group_memberships(group_id,device_id) VALUES ($1,$2)", group, f.device); err != nil {
+		t.Fatal(err)
+	}
+	adopting := &policyv1.TargetResolution{Resources: []*policyv1.ResolvedResource{{
+		Ref:         &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: "net.ipv4.conf.all.accept_redirects"},
+		Disposition: policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_READY,
+		Resource: &policyv1.ProfileResource{
+			Desired:   &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: "net.ipv4.conf.all.accept_redirects"}},
+			Ownership: &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED},
+		},
+	}}}
+	resolve := func(context.Context, pgx.Tx, *uuid.UUID, []*policyv1.TargetCandidate) (*policyv1.TargetResolution, *policyv1.TargetResolution, error) {
+		return &policyv1.TargetResolution{}, proto.CloneOf(adopting), nil
+	}
+	var report *adminv1.PreviewTargetAssignmentImpactResponse
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
+		var err error
+		report, err = f.store.Impact(t.Context(), tx, f.actor, f.impactRequest(impactGroup(group)), resolve)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// The fixture's active device runs a direct per-device head, so its change
+	// replaces it; the pending member has no head and is not counted at all.
+	if report.IncludedCount != 2 || report.ChangedCount != 1 || report.AdoptingCount != 1 || report.RemovingCount != 0 || report.ReplacingDirectCount != 1 || !report.ApprovalRequired {
+		t.Fatalf("counts include a device no rollout plans: included=%d changed=%d adopting=%d removing=%d direct=%d approval=%v devices=%d", report.IncludedCount, report.ChangedCount, report.AdoptingCount, report.RemovingCount, report.ReplacingDirectCount, report.ApprovalRequired, len(report.Devices))
+	}
+	for _, row := range report.Devices {
+		pending := row.DeviceId != f.device.String()
+		if !row.Changed || pending != slices.Contains(row.Reasons, "device_not_active") {
+			t.Fatalf("device row lost its change or activity reason: %v", row)
+		}
 	}
 }
 

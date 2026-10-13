@@ -153,6 +153,81 @@ func (a *ApprovalSession) ApproveRollouts(ctx context.Context, requester *OwnerS
 	}
 }
 
+// RollOutOrganization applies the organization (apply round 0), then, while
+// rollouts of its assignments await approval, has the independent human approve
+// them, waits until the promoter has started them and applies again. Each
+// rollout is reviewed against the devices' current heads, and an adopting
+// rollout saves nothing before approval. So when two adopting assignments cover
+// one device, the second activation finds the device changed and holds it for
+// review. The next apply reviews it again, and that follow-up rollout is
+// approved in the next round. It returns every approved rollout ID and fails
+// when approvals are still requested after one round per assignment.
+func (a *ApprovalSession) RollOutOrganization(ctx context.Context, requester *OwnerSession, assignmentIDs []string, reason string, apply func(ctx context.Context, round int) error) ([]string, error) {
+	if err := apply(ctx, 0); err != nil {
+		return nil, err
+	}
+	var all []string
+	for round := 1; ; round++ {
+		approved, err := a.ApproveRollouts(ctx, requester, assignmentIDs, reason)
+		all = append(all, approved...)
+		if err != nil || len(approved) == 0 {
+			return all, err
+		}
+		if round > len(assignmentIDs) {
+			return all, fmt.Errorf("organization rollouts still requested approval after %d rounds", round)
+		}
+		if err := awaitRolloutsStarted(ctx, requester, assignmentIDs, approved); err != nil {
+			return all, err
+		}
+		if err := apply(ctx, round); err != nil {
+			return all, err
+		}
+	}
+}
+
+// awaitRolloutsStarted waits until the promoter has started every approved
+// rollout and activated every admitted device of the assignments' rollouts.
+func awaitRolloutsStarted(ctx context.Context, owner *OwnerSession, assignmentIDs, approved []string) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		starting := false
+		for after := ""; ; {
+			request := &adminv1.ListRolloutsRequest{PageSize: 100}
+			if after != "" {
+				request.AfterId = &after
+			}
+			listed, err := owner.Admin.ListRollouts(ctx, connect.NewRequest(request))
+			if err != nil {
+				return fmt.Errorf("list rollouts: %w", err)
+			}
+			rollouts := listed.Msg.GetRollouts()
+			for _, r := range rollouts {
+				switch {
+				case r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL && slices.Contains(approved, r.GetRollout().GetRolloutId()):
+					starting = true
+				case r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE && !r.GetPaused() && r.GetStartingCount() > 0 && slices.Contains(assignmentIDs, r.GetAssignment().GetAssignmentId()):
+					starting = true
+				}
+			}
+			if len(rollouts) < 100 {
+				break
+			}
+			after = rollouts[len(rollouts)-1].GetRollout().GetRolloutId()
+		}
+		if !starting {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait for approved rollouts to start: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
 func (a *ApprovalSession) distinct(requester *OwnerSession) error {
 	if a == nil || a.closed || a.session == nil || requester == nil || requester.AccountID == a.session.AccountID {
 		return errors.New("laboratory approval requires two distinct authenticated humans")

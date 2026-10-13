@@ -274,10 +274,15 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 				}
 			}
 			countImpactDevice(report, rawMatch, match, e.timeLimit)
-			if match == included {
-				countAdoption(report, proposed)
+			// Change and adoption counts cover only devices a rollout plans (the
+			// StartRollout planner): a device without an active generation keeps
+			// its row, marked device_not_active, but no rollout would change it.
+			if d.CurrentGenerationID != nil && d.State == "active" {
+				if match == included {
+					countAdoption(report, proposed)
+				}
+				countImpactChange(report, match, changed, direct)
 			}
-			countImpactChange(report, match, changed, direct)
 			if plan != nil {
 				if err := plan(plannedDevice{id: d.ID, generation: d.CurrentGenerationID, state: d.State, match: match, proposed: proposed, changed: changed, head: d.ResourceAssignmentID}); err != nil {
 					return nil, nil, err

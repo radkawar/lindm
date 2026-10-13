@@ -398,24 +398,15 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	// Re-plan after enrollment/metadata so targeting activates actual members
 	// and exceptions resolve actual inventory. This is not an idempotency probe;
 	// the integration test reapplies the finished organization independently.
-	applied, err := s.applyOrganization(ctx, s.organization)
-	if err != nil {
-		return err
-	}
-	if len(applied.Secrets) != 0 {
-		clear(applied.Secrets)
-		return errors.New("post-enrollment organization apply unexpectedly reissued credentials")
-	}
-	s.demo.Organization = applied.Outcomes
-	approved, err := s.approveOrganizationRollouts(ctx)
-	if err != nil {
+	if err := s.rollOutOrganization(ctx); err != nil {
 		return err
 	}
 	// Organization assignments roll out asynchronously through the promoter.
-	if err := s.awaitRollouts(ctx, approved); err != nil {
+	if err := s.awaitRollouts(ctx); err != nil {
 		return err
 	}
 	s.demo.Routes.ProfileID = s.organization.GetProfiles()[0].GetId()
+	var err error
 	if s.demo.Routes.FirewallProfileID, err = s.publishFirewallReviewProfile(ctx); err != nil {
 		return err
 	}
@@ -988,26 +979,37 @@ func (s *demoSeed) catalog(ctx context.Context) error {
 	return nil
 }
 
-// approveOrganizationRollouts decides, as the independent approver, the one
-// approval each organization rollout with adoption rows awaits. Apply already
-// requested it as the owner; a second admin approves in the product API, as in
-// the console. It returns the approved rollout IDs.
-func (s *demoSeed) approveOrganizationRollouts(ctx context.Context) ([]string, error) {
+// rollOutOrganization applies the full organization and has the independent
+// approver decide each adoption rollout's one approval, as a second admin does
+// in the console, applying again after the approved rollouts start so devices
+// a later activation changed are reviewed again (devlab.RollOutOrganization).
+// The demo report keeps the final apply's outcomes.
+func (s *demoSeed) rollOutOrganization(ctx context.Context) error {
 	assignments := make([]string, 0, len(s.organization.GetAssignments()))
 	for _, a := range s.organization.GetAssignments() {
 		assignments = append(assignments, a.GetAssignment().GetAssignmentId())
 	}
-	approved, err := s.approver.ApproveRollouts(ctx, s.owner, assignments, "Second admin approves the organization's reviewed adoption rollout")
+	_, err := s.approver.RollOutOrganization(ctx, s.owner, assignments, "Second admin approves the organization's reviewed adoption rollout", func(ctx context.Context, _ int) error {
+		applied, err := s.applyOrganization(ctx, s.organization)
+		if err != nil {
+			return err
+		}
+		if len(applied.Secrets) != 0 {
+			clear(applied.Secrets)
+			return errors.New("post-enrollment organization apply unexpectedly reissued credentials")
+		}
+		s.demo.Organization = applied.Outcomes
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("approve organization rollouts: %w", err)
+		return fmt.Errorf("roll out demo organization: %w", err)
 	}
-	return approved, nil
+	return nil
 }
 
-// awaitRollouts waits for the promoter to start every approved rollout and
-// activate every admitted device of the organization's rollouts, so later
-// convergence observes their heads.
-func (s *demoSeed) awaitRollouts(ctx context.Context, approved []string) error {
+// awaitRollouts waits for the promoter to activate every admitted device of
+// the organization's rollouts, so later convergence observes their heads.
+func (s *demoSeed) awaitRollouts(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
@@ -1019,14 +1021,12 @@ func (s *demoSeed) awaitRollouts(ctx context.Context, approved []string) error {
 		}
 		starting := false
 		for _, r := range listed.Msg.GetRollouts() {
-			if r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL && slices.Contains(approved, r.GetRollout().GetRolloutId()) {
-				starting = true
-				continue
-			}
 			if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE {
 				continue
 			}
-			if s.demo.Routes.RolloutID == "" && r.GetPlannedCount() > 0 {
+			// A rollout whose drifted devices a follow-up rollout reviewed again
+			// may have activated none; the route names one that activated some.
+			if s.demo.Routes.RolloutID == "" && r.GetActivatedCount() > 0 {
 				s.demo.Routes.RolloutID = r.GetRollout().GetRolloutId()
 			}
 			starting = starting || (!r.GetPaused() && r.GetStartingCount() > 0)

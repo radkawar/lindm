@@ -154,7 +154,7 @@ export function CapabilityPolicyEditor({
           : `Edit capabilities for ${policy.scopeName || "this group"}`}
       </h3>
       <fieldset disabled={disabled} className="grid min-w-0 gap-5">
-        <fieldset className="grid gap-3">
+        <fieldset className="grid min-w-0 gap-3">
           <legend className="mb-2 text-sm font-medium">The lindm agent may manage</legend>
           {remoteCapabilities.map((capability) => {
             const copy = capabilityCopy(capability);
@@ -164,16 +164,16 @@ export function CapabilityPolicyEditor({
               !deploymentHasFirewall &&
               !selected.includes(capability);
             return (
-              <label key={capability} className="flex items-start gap-2 text-sm">
+              <label key={capability} className="flex min-w-0 items-start gap-2 text-sm">
                 <input
                   type="checkbox"
-                  className="mt-1"
+                  className="mt-1 shrink-0"
                   checked={selected.includes(capability)}
                   disabled={firewallBlocked}
                   aria-describedby={`${id}-${capability}`}
                   onChange={(event) => toggle(capability, event.target.checked)}
                 />
-                <span className="grid gap-0.5">
+                <span className="grid min-w-0 gap-0.5 break-words">
                   <span className="font-medium">{copy.name}</span>
                   <span id={`${id}-${capability}`} className="text-muted-foreground">
                     {firewallBlocked

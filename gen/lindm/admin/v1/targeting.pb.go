@@ -1590,15 +1590,18 @@ type PreviewTargetAssignmentImpactResponse struct {
 	ReviewSha256         []byte                          `protobuf:"bytes,14,opt,name=review_sha256,json=reviewSha256,proto3" json:"review_sha256,omitempty"`
 	CandidateCount       uint32                          `protobuf:"varint,15,opt,name=candidate_count,json=candidateCount,proto3" json:"candidate_count,omitempty"`
 	Reasons              []string                        `protobuf:"bytes,16,rep,name=reasons,proto3" json:"reasons,omitempty"`
-	// Included devices whose proposed change adopts existing native state
-	// (OWNERSHIP_MODE_APPROVED_ADOPTION) and the distinct adopted settings.
+	// Included devices whose proposed resolution adopts existing native state
+	// (OWNERSHIP_MODE_APPROVED_ADOPTION), and the distinct adopted settings. Only
+	// active devices with a current generation are counted, as only they are planned.
 	AdoptingCount uint32             `protobuf:"varint,17,opt,name=adopting_count,json=adoptingCount,proto3" json:"adopting_count,omitempty"`
 	Adopted       []*v11.ResourceRef `protobuf:"bytes,18,rep,name=adopted,proto3" json:"adopted,omitempty"`
 	// Rolling this out needs one independent approval: an adoption, or the
 	// reviewer's authorization policy requires approval for resources.assign.
 	ApprovalRequired bool `protobuf:"varint,19,opt,name=approval_required,json=approvalRequired,proto3" json:"approval_required,omitempty"`
-	// Included devices whose settings change, and devices the proposal no longer
-	// includes whose settings change (removals). Both are planned by a rollout.
+	// Devices this rollout would change: included devices whose settings change,
+	// and devices the proposal no longer includes whose settings change (removals).
+	// Only active devices with a current generation are planned and counted; a
+	// device row marked device_not_active may show a change no rollout applies yet.
 	ChangedCount  uint32 `protobuf:"varint,20,opt,name=changed_count,json=changedCount,proto3" json:"changed_count,omitempty"`
 	RemovingCount uint32 `protobuf:"varint,21,opt,name=removing_count,json=removingCount,proto3" json:"removing_count,omitempty"`
 	// Of the changed and removing devices, those whose current settings come

@@ -730,8 +730,9 @@ export type PreviewTargetAssignmentImpactResponse = Message<"lindm.admin.v1.Prev
   reasons: string[];
 
   /**
-   * Included devices whose proposed change adopts existing native state
-   * (OWNERSHIP_MODE_APPROVED_ADOPTION) and the distinct adopted settings.
+   * Included devices whose proposed resolution adopts existing native state
+   * (OWNERSHIP_MODE_APPROVED_ADOPTION), and the distinct adopted settings. Only
+   * active devices with a current generation are counted, as only they are planned.
    *
    * @generated from field: uint32 adopting_count = 17;
    */
@@ -751,8 +752,10 @@ export type PreviewTargetAssignmentImpactResponse = Message<"lindm.admin.v1.Prev
   approvalRequired: boolean;
 
   /**
-   * Included devices whose settings change, and devices the proposal no longer
-   * includes whose settings change (removals). Both are planned by a rollout.
+   * Devices this rollout would change: included devices whose settings change,
+   * and devices the proposal no longer includes whose settings change (removals).
+   * Only active devices with a current generation are planned and counted; a
+   * device row marked device_not_active may show a change no rollout applies yet.
    *
    * @generated from field: uint32 changed_count = 20;
    */

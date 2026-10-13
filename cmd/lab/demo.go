@@ -414,10 +414,7 @@ func (r *demoRun) holdDevices(ctx context.Context) (err error) {
 			}
 		}
 	}
-	if err := r.apply(ctx, "organization-ready.json", true, false); err != nil {
-		return err
-	}
-	if err := r.approveRollouts(ctx); err != nil {
+	if err := r.rollOutOrganization(ctx); err != nil {
 		return err
 	}
 	if err := r.apply(ctx, "organization-unchanged.json", true, true); err != nil {
@@ -438,12 +435,15 @@ func (r *demoRun) holdDevices(ctx context.Context) (err error) {
 	return demoContextError(ctx)
 }
 
-// approveRollouts has the controller's independent approver decide the one
-// approval each organization rollout with adoption rows awaits. Apply
-// requested it as the fixture owner; the approver is a second enrolled human
-// deciding through the product API, never a bypass. Approved rollouts start
-// through the promoter. The decision stays in the console's approval history.
-func (r *demoRun) approveRollouts(ctx context.Context) (err error) {
+// rollOutOrganization applies the complete organization and has the
+// controller's independent approver decide the one approval each adoption
+// rollout awaits. Apply requested it as the fixture owner; the approver is a
+// second enrolled human deciding through the product API, never a bypass.
+// After the approved rollouts start it applies again, so devices a later
+// activation changed are reviewed (and approved) again
+// (devlab.RollOutOrganization). Decisions stay in the console's approval
+// history; evidence records every apply and the approved rollout IDs.
+func (r *demoRun) rollOutOrganization(ctx context.Context) (err error) {
 	owner, err := r.controller.Fixture.OpenOwnerSession(ctx)
 	if err != nil {
 		return err
@@ -458,9 +458,15 @@ func (r *demoRun) approveRollouts(ctx context.Context) (err error) {
 	for _, a := range r.spec.Organization.GetAssignments() {
 		assignments = append(assignments, a.GetAssignment().GetAssignmentId())
 	}
-	approved, err := approver.ApproveRollouts(ctx, owner, assignments, "Lab demo second admin approves the organization's reviewed adoption rollout")
+	approved, err := approver.RollOutOrganization(ctx, owner, assignments, "Lab demo second admin approves the organization's reviewed adoption rollout", func(ctx context.Context, round int) error {
+		record := "organization-ready.json"
+		if round > 0 {
+			record = fmt.Sprintf("organization-reviewed-%d.json", round)
+		}
+		return r.apply(ctx, record, true, false)
+	})
 	if err != nil {
-		return fmt.Errorf("approve organization rollouts: %w", err)
+		return fmt.Errorf("roll out organization: %w", err)
 	}
 	if err := publishDemoJSON(filepath.Join(r.options.evidence, "organization-approved-rollouts.json"), approved, 0400); err != nil {
 		return err

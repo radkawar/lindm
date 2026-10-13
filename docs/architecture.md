@@ -799,6 +799,10 @@ enrollment generation and the digest of its reviewed proposed resolution (the sa
 `resolution_sha256` a per-device preview computes). The impact device rows name the
 revisions currently managing each setting, including a direct per-device
 assignment, so replacement and precedence are reviewable before anything changes.
+The report's changed, removing, replacing-direct and adopting counts cover only
+those plannable devices (active, with a current generation). A row for a device
+that is not active yet still shows its change, with reason `device_not_active`, so
+an unchanged declaration does not start a rollout that would plan nothing new.
 When any planned change adopts existing native state
 (`OWNERSHIP_MODE_APPROVED_ADOPTION`) or authorization policy requires approval for
 `resources.assign`, the rollout waits: nothing is saved or admitted, and the

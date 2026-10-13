@@ -177,7 +177,7 @@
       "id": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
       "spec": {
         "name": "Company baseline",
-        "description": "Shared security baseline: a company login message, printing turned off, nightly security updates with a scheduled restart, a firewall that lets only SSH in, ICMP redirects ignored and local password rules. Devices can apply the firewall once firewall settings are set for all devices. The redirect settings and password rules take over settings every device already has, so rolling this profile out needs one approval. Password rules apply only on devices where root turns on password_provider in /etc/lindm/executor.json; other devices show them as blocked.",
+        "description": "Shared security baseline: a company login message, printing turned off, nightly security updates with a scheduled restart, a firewall that lets only SSH in, ICMP redirects ignored and local password rules. Devices can apply the firewall once firewall settings are set for all devices. The redirect settings and password rules take over settings every device already has, so rolling this profile out needs one approval. Password rules apply only on devices whose administrator turned on local password management on the device itself; other devices show them as blocked.",
         "resources": [
           {
             "resourceId": "5a8a187a-d28c-506e-ae52-0b65fbda3535",

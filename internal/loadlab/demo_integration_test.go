@@ -21,6 +21,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/orgapply"
 )
@@ -222,11 +223,15 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		}
 	}
 	// The reviewed rollout flow: a named staged rollout whose pilot the
-	// promoter activated, and an adoption waiting for its single approval.
+	// promoter activated, and an adoption waiting for its single approval. The
+	// review lists every adoption in the planned devices' resolution, which on
+	// Engineering devices also holds the organization's own adoption rows.
 	if staged.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE || staged.GetRollout().GetName() == "" || staged.GetActivatedCount() == 0 {
 		t.Fatalf("staged demo rollout: %v", staged)
 	}
-	if adopting.GetApprovalId() == "" || adopting.GetAdoptingCount() == 0 || len(adopting.GetAdopted()) != 1 {
+	if adopting.GetApprovalId() == "" || adopting.GetAdoptingCount() == 0 || !slices.ContainsFunc(adopting.GetAdopted(), func(ref *resourcev1.ResourceRef) bool {
+		return ref.GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL && ref.GetCanonicalKey() == "kernel.kptr_restrict"
+	}) {
 		t.Fatalf("adoption demo rollout: %v", adopting)
 	}
 	approvals, err := admin.ListApprovals(ctx, connect.NewRequest(&adminv1.ListApprovalsRequest{PageSize: 50}))
@@ -597,12 +602,8 @@ func TestDemoOrganizationResourceConvergence(t *testing.T) {
 	if err := s.describe(ctx, d, nil); err != nil {
 		t.Fatal(err)
 	}
-	applied, err = s.applyOrganization(ctx, organization)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer clear(applied.Secrets)
-	// Adoption rows wait for one approval per rollout; a second admin decides it.
+	// Adoption rows wait for one approval per rollout; a second admin decides
+	// them, and the organization is applied again until no rollout awaits one.
 	if err := fixture.UseAdminApprover(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -616,14 +617,10 @@ func TestDemoOrganizationResourceConvergence(t *testing.T) {
 		}
 	})
 	s.approver = approver
-	approved, err := s.approveOrganizationRollouts(ctx)
-	if err != nil {
+	if err := s.rollOutOrganization(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(approved) == 0 {
-		t.Fatal("no organization rollout awaited its adoption approval")
-	}
-	if err := s.awaitRollouts(ctx, approved); err != nil {
+	if err := s.awaitRollouts(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.converge(ctx, d); err != nil {

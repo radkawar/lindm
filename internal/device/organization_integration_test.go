@@ -72,6 +72,13 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if _, err := f.svc.ReportHostObservation(core.WithDevicePrincipal(t.Context(), principal), connect.NewRequest(hostObservation(enrolled.Msg.GetEnrollmentGeneration(), 1, "org-engineering"))); err != nil {
 		t.Fatal(err)
 	}
+	// A second Engineering device enrolls but never reports inventory, so it
+	// stays pending: no rollout can plan it, and it must not make every apply
+	// start (and request approval for) another rollout.
+	pendingRequest, _ := provisionIntent(t, token)
+	if _, err := f.svc.Provision(t.Context(), connect.NewRequest(pendingRequest)); err != nil {
+		t.Fatal(err)
+	}
 	plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
 	if err != nil {
 		t.Fatal(err)
@@ -82,39 +89,61 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	}
 	// The organization's baseline and Engineering tools adopt existing native
 	// state, so each rollout for the enrolled device waits for one approval
-	// that apply requested; nothing is saved or activated before it.
-	awaiting := 0
-	for _, o := range result.Outcomes {
-		if o.Kind == "assignment" && o.Status == "pending" && strings.HasPrefix(o.Detail, "requires independent approval ") {
-			awaiting++
-		}
-	}
-	if awaiting == 0 {
-		t.Fatalf("matching enrolled device did not start an adoption rollout: %+v", result.Outcomes)
-	}
-	pending, err := f.svc.ListRollouts(f.stepUp, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// that apply requested; nothing is saved or activated before it. Both are
+	// reviewed against the device's head before either is approved, so the
+	// second to activate finds the device changed and holds it for review. The
+	// next apply reviews it again in a follow-up rollout with its own approval.
+	// Activation is the promoter's.
 	reviewer := approvalReviewer(t, f.svc, t.Context())
-	approved := 0
-	for _, r := range pending.Msg.GetRollouts() {
-		if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL {
-			continue
-		}
-		if _, err := f.svc.ApproveApproval(reviewer, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: r.GetApprovalId(), Reason: "Reviewed the organization's adoption rollout"})); err != nil {
-			t.Fatal(err)
-		}
-		approved++
-	}
-	if approved != awaiting {
-		t.Fatalf("approved %d rollouts, apply reported %d awaiting approval", approved, awaiting)
-	}
-	// Activation is the promoter's: each approved rollout starts and applies its
-	// exact reviewed change, the later review covering the earlier assignment.
 	promoter, err := targeting.NewPromoter(f.svc.Pool, f.svc.Identity, f.svc.Targeting, f.svc.RolloutHooks())
 	if err != nil {
 		t.Fatal(err)
+	}
+	for round := 0; ; round++ {
+		awaiting := 0
+		for _, o := range result.Outcomes {
+			if o.Kind == "assignment" && o.Status == "pending" && strings.HasPrefix(o.Detail, "requires independent approval ") {
+				awaiting++
+			}
+		}
+		if round == 0 && awaiting == 0 {
+			t.Fatalf("matching enrolled device did not start an adoption rollout: %+v", result.Outcomes)
+		}
+		if awaiting == 0 {
+			break
+		}
+		if round > len(spec.GetAssignments()) {
+			t.Fatalf("organization rollouts still requested approval after %d rounds: %+v", round, result.Outcomes)
+		}
+		pending, err := f.svc.ListRollouts(f.stepUp, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		approved := 0
+		for _, r := range pending.Msg.GetRollouts() {
+			if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL {
+				continue
+			}
+			if _, err := f.svc.ApproveApproval(reviewer, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: r.GetApprovalId(), Reason: "Reviewed the organization's adoption rollout"})); err != nil {
+				t.Fatal(err)
+			}
+			approved++
+		}
+		if approved != awaiting {
+			t.Fatalf("approved %d rollouts, apply reported %d awaiting approval", approved, awaiting)
+		}
+		for range 3 {
+			if err := promoter.RunOnce(f.stepUp); err != nil {
+				t.Fatal(err)
+			}
+		}
+		plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result, err = orgapply.Apply(f.stepUp, f.svc, plan, orgapply.Options{}); err != nil {
+			t.Fatal(err)
+		}
 	}
 	for range 3 {
 		if err := promoter.RunOnce(f.stepUp); err != nil {
@@ -129,6 +158,10 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if head == "" || state.Msg.GetActiveTargetPreview() == nil {
 		t.Fatal("active target evidence missing")
 	}
+	before, err := f.svc.ListRollouts(f.stepUp, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+	if err != nil {
+		t.Fatal(err)
+	}
 	plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
 	if err != nil {
 		t.Fatal(err)
@@ -138,8 +171,8 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, o := range result.Outcomes {
-		// Assignments whose groups have no device stay pending, never rolled out.
-		if o.Kind == "assignment" && (o.Status == "created" || o.Status == "updated") {
+		// Assignments whose groups have no device are saved, never rolled out.
+		if o.Kind == "assignment" && o.Status != "unchanged" {
 			t.Fatalf("target reapplied: %+v", o)
 		}
 	}
@@ -147,9 +180,14 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(rollouts.Msg.GetRollouts()) != len(before.Msg.GetRollouts()) {
+		t.Fatalf("unchanged apply started %d rollouts", len(rollouts.Msg.GetRollouts())-len(before.Msg.GetRollouts()))
+	}
+	// A rollout whose held device a follow-up rollout reviewed again is no
+	// longer active; every active one has activated its devices.
 	for _, r := range rollouts.Msg.GetRollouts() {
-		if r.GetNeedsReviewCount() != 0 || r.GetStartingCount() != 0 {
-			t.Fatalf("sequential organization rollouts left a device for review: %v", r)
+		if r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE && (r.GetNeedsReviewCount() != 0 || r.GetStartingCount() != 0) {
+			t.Fatalf("organization rollouts left a device for review: %v", r)
 		}
 	}
 	if len(result.Secrets) != 0 {
