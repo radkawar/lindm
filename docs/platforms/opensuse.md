@@ -1281,16 +1281,21 @@ on the DGX Spark hosts, x86_64 on local KVM, each record in the
 | Device actions       | `tw2-arm-da-r2-724cf2ed/…/device-actions-aarch64.json` / `4b30b9f39632082cd3b286b89f3f022330f4c40e78ffaf15b85a3e687344c1c6`        |
 | TPM unattended boots | `tw2-arm-tpm-r2-c43c16df/…/tpm-unattended-boots-aarch64.json` / `4174e9b0fa3f1d15710d82224571f823d6b057448d4626695b26396482bb9075` |
 
-| Cell                | x86_64 record / SHA-256                                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory           | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`              |
-| Dispatch            | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported)    |
-| Enroll from console | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`    |
-| Air gap             | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)      |
-| Self-update         | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported) |
-| Lifecycle           | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)   |
-| Services            | `tw2-x86-r11-7fd59b73/…/services-x86_64.json` / `db5246f3ebe20bfba871e2ad50287644cb0131e664e568e618589c56c816f7c4`              |
-| Assistance          | `tw2-x86-r11-7fd59b73/…/assistance-x86_64/assistance.json` / `8594528e8a44c5b3945fa8dc40b13a33356357c0298f0d877771f99663b3ad26` |
+| Cell                 | x86_64 record / SHA-256                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory            | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`              |
+| Dispatch             | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported)    |
+| Enroll from console  | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`    |
+| Air gap              | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)      |
+| Self-update          | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported) |
+| Lifecycle            | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)   |
+| Services             | `tw2-x86-r11-7fd59b73/…/services-x86_64.json` / `db5246f3ebe20bfba871e2ad50287644cb0131e664e568e618589c56c816f7c4`              |
+| Assistance           | `tw2-x86-r11-7fd59b73/…/assistance-x86_64/assistance.json` / `8594528e8a44c5b3945fa8dc40b13a33356357c0298f0d877771f99663b3ad26` |
+| Advisories           | `tw2-x86-r12-84dccfe4/…/advisories-x86_64.json` / `b42aeceb752970b0b47f44173b4a94afc2910f296191d8edf53670e1dc50e973`            |
+| OS update            | `tw2-x86-r12-84dccfe4/…/os-update-x86_64.json` / `327225c98f8631d48e6fe9407d77d2da531134cf256f5937a87b082a03c7fef0`             |
+| Encrypted            | `tw2-x86-r12-84dccfe4/…/encrypted-x86_64.json` / `32be0ac41c5c38bb71215e2ba4819fcc3a661408613eb6c3707950ec80490f6e`             |
+| TPM unattended boots | `tw2-x86-r12-84dccfe4/…/tpm-unattended-boots-x86_64.json` / `82690a8b71f569776a79300eda591549a5eeb2bcadad19d8d119995f0f5cb7a7`  |
+| Device actions       | `tw2-x86-r12-84dccfe4/…/device-actions-x86_64.json` / `f5d7a03be8cdf18ac2fb428ac9b9b8248fc8f9a5b02227ea53ef9819bb6312a3`        |
 
 "Imported" records come from lanes that finished after their matrix parent was
 stopped (so it would not start superseded cells) and were added with
@@ -1319,8 +1324,19 @@ zypper's system store failed the lane leaf ("certificate signature failure")
 while `curl --cacert` passed. Snapshot authorities now get their own names and
 random serials. The x86_64 assistance failure (`tw2-x86-assist-r2`) timed out
 waiting for fresh device presence and inventory; that wait now reports the last
-observations. The remaining x86_64 cells are queued behind the shared local KVM
-slots.
+observations. Encrypted, TPM and device-action lanes on this host need
+`SUPERMIN_KERNEL`/`SUPERMIN_MODULES` (root-only `/boot`).
+
+Two x86_64 cells remain open. Resources (`tw2-x86-r12`) passed packages, files,
+groups, users and five sysctl scenarios, then `net.ipv4.ip_forward` was refused
+with "later effective sysctl.d assignment": YaST's installer writes
+`/etc/sysctl.d/70-yast.conf` (`CFA::Sysctl`, including `net.ipv4.ip_forward`),
+which sorts after lindm's `60-lindm-*` stanza, so the refusal is correct. The
+lane now uses `net.ipv4.conf.all.log_martians` on Tumbleweed
+(`Lab.SysctlNetKey`), and the refusal names the overriding file. tpm-reference-repair
+(`tw2-x86-r12`) failed when the lane's own agent restart after the 0.1.0→0.1.1
+RPM upgrade was refused as "attempted too often"; the lane now clears the start
+rate counter first and keeps the agent journal on failure. Both cells need a rerun.
 
 ## Known gaps
 

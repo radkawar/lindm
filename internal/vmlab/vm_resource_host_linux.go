@@ -55,6 +55,10 @@ const (
 	// vendor boot service owns that live value (platform Lab.SysctlKey).
 	resourceLabVendorSysctlKey   = "vm.vfs_cache_pressure"
 	resourceLabVendorSysctlPrior = resourceFixtureRoot + "/sysctl-vendor-prior"
+	// resourceLabInstallerNetKey stands in for net.ipv4.ip_forward on releases
+	// whose installer assigns it in a later sysctl.d file (Lab.SysctlNetKey).
+	resourceLabInstallerNetKey   = "net.ipv4.conf.all.log_martians"
+	resourceLabInstallerNetPrior = resourceFixtureRoot + "/sysctl-installer-net-prior"
 )
 
 // provisionHostResourceRoots adds the root-local account and sysctl approvals
@@ -64,7 +68,7 @@ func provisionHostResourceRoots(config *agentv1.AgentConfig) {
 		ApprovedHomeRoots: []*agentv1.NativeApprovedHomeRoot{{RootId: resourceLabHomeRootID, Path: resourceLabHomeRoot}},
 		MinUid:            24000, MaxUid: 24999, MinGid: 24000, MaxGid: 24999,
 	}
-	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabVendorSysctlKey, resourceLabNetKey}}
+	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabVendorSysctlKey, resourceLabNetKey, resourceLabInstallerNetKey}}
 }
 
 // labSysctlKey selects the release's lab sysctl key and its recorded prior.
@@ -76,6 +80,17 @@ func labSysctlKey(lab platform.Lab) (key, prior string, err error) {
 		return resourceLabVendorSysctlKey, resourceLabVendorSysctlPrior, nil
 	}
 	return "", "", fmt.Errorf("no lab sysctl fixture for %s", lab.SysctlKey)
+}
+
+// labSysctlNetKey selects the release's lab net.* key and its recorded prior.
+func labSysctlNetKey(lab platform.Lab) (key, prior string, err error) {
+	switch lab.SysctlNetKey {
+	case "":
+		return resourceLabNetKey, resourceLabNetPrior, nil
+	case resourceLabInstallerNetKey:
+		return resourceLabInstallerNetKey, resourceLabInstallerNetPrior, nil
+	}
+	return "", "", fmt.Errorf("no lab net sysctl fixture for %s", lab.SysctlNetKey)
 }
 
 // The adopted user's password is random and never known to the lane; only the
@@ -104,6 +119,7 @@ systemctl daemon-reload
 sysctl -n ` + resourceLabSysctlKey + ` > ` + resourceLabSysctlPrior + `
 sysctl -n ` + resourceLabVendorSysctlKey + ` > ` + resourceLabVendorSysctlPrior + `
 sysctl -n ` + resourceLabNetKey + ` > ` + resourceLabNetPrior + `
+sysctl -n ` + resourceLabInstallerNetKey + ` > ` + resourceLabInstallerNetPrior + `
 `
 
 func setupHostResourceFixtures(ctx context.Context, vm *guestVM) error {
@@ -617,7 +633,10 @@ func exerciseResourceSysctl(ctx context.Context, r *resourceDispatch, evidence *
 	if err := resourceReleaseStep(ctx, r, evidence, "release-after-reboot-restores-prior", resourceSysctlDesired(key, "23").GetRef(), withVM(r.vm, sysctlOracle(key, prior, ""))); err != nil {
 		return err
 	}
-	net, netPrior := resourceLabNetKey, resourceLabNetPrior
+	net, netPrior, err := labSysctlNetKey(r.lab)
+	if err != nil {
+		return err
+	}
 	r.fresh()
 	if err := resourceStep(ctx, r, evidence, "net-key-set-persistent", resourceSysctlDesired(net, "1"), resourceAdoptionPolicy(), false, withVM(r.vm, sysctlOracle(net, netPrior, "1"))); err != nil {
 		return err

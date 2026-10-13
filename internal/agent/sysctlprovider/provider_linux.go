@@ -240,7 +240,14 @@ func (p *Provider) Plan(ctx context.Context, desired *resourcev1.ResourceDesired
 			return nil, err
 		}
 		if graph.conflict || graph.value == nil || *graph.value != normalizeValue(desired.GetSysctl().GetValue()) {
-			return nil, fmt.Errorf("%w: later effective sysctl.d assignment", ErrConflict)
+			source := "no effective assignment"
+			switch {
+			case graph.conflict:
+				source = "conflicting assignments"
+			case graph.source != nil:
+				source = *graph.source
+			}
+			return nil, fmt.Errorf("%w: later effective sysctl.d assignment (%s)", ErrConflict, source)
 		}
 	}
 	change := resourcev1.NativeObjectChange_NATIVE_OBJECT_CHANGE_UPDATE

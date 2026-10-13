@@ -58,9 +58,10 @@ func TestLabQuiescePackageUnitsStopsPopUpdater(t *testing.T) {
 	}
 }
 
-// Pop!_OS's pop-zram-config rewrites vm.swappiness at every boot, so its
-// resources lane uses another key; every registry override needs a fixture
-// that records the key's prior value and a root approval.
+// Pop!_OS's pop-zram-config rewrites vm.swappiness at every boot, and
+// Tumbleweed's installer assigns net.ipv4.ip_forward in 70-yast.conf, so their
+// resources lanes use other keys; every registry override needs a fixture that
+// records the key's prior value and a root approval.
 func TestRegistryLabSysctlKeysHaveFixtures(t *testing.T) {
 	config := new(agentv1.AgentConfig)
 	provisionHostResourceRoots(config)
@@ -69,8 +70,14 @@ func TestRegistryLabSysctlKeysHaveFixtures(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", release.Key, err)
 		}
-		if !strings.Contains(resourceHostFixtureScript, "sysctl -n "+key+" > "+prior+"\n") || !slices.Contains(config.GetSysctlProvider().GetAllowedKeys(), key) {
-			t.Fatalf("%s lab sysctl key %s lacks its fixture or approval", release.Key, key)
+		net, netPrior, err := labSysctlNetKey(release.Lab)
+		if err != nil {
+			t.Fatalf("%s: %v", release.Key, err)
+		}
+		for _, fixture := range [][2]string{{key, prior}, {net, netPrior}} {
+			if !strings.Contains(resourceHostFixtureScript, "sysctl -n "+fixture[0]+" > "+fixture[1]+"\n") || !slices.Contains(config.GetSysctlProvider().GetAllowedKeys(), fixture[0]) {
+				t.Fatalf("%s lab sysctl key %s lacks its fixture or approval", release.Key, fixture[0])
+			}
 		}
 	}
 }

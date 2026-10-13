@@ -270,8 +270,15 @@ func (m *actionMachine) UpgradeAgent(ctx context.Context) error {
 	if _, err := waitGuestExecutorReady(ctx, m.vm.guest, agentv1.Lifecycle_LIFECYCLE_ENROLLED); err != nil {
 		return err
 	}
-	if err := lifecycleCommand(ctx, m.vm.guest, "resume upgraded action relay", "systemctl restart lindm-agent.service"); err != nil {
-		return err
+	// The package's configure restarts the executor (which restarts the agent
+	// through Requires=) and then the agent; those starts and any on-failure
+	// retry count toward StartLimitBurst=5 per 60 s. On Tumbleweed this lane's
+	// own restart was then refused ("attempted too often") and left the agent
+	// stopped, so clear the rate counter first. The running-binary assertion and
+	// the relayed actions that follow still prove the upgraded agent runs.
+	if err := lifecycleCommand(ctx, m.vm.guest, "resume upgraded action relay", "systemctl reset-failed lindm-agent.service || :; systemctl restart lindm-agent.service"); err != nil {
+		journal, journalErr := m.vm.guest.run(ctx, "sudo -n journalctl --no-pager -o short-iso -n 80 -u lindm-agent.service -u lindm-executor.service", nil, 64<<10, 30*time.Second)
+		return errors.Join(err, fmt.Errorf("agent and executor journal:\n%s", journal), journalErr)
 	}
 	return lifecycleCommand(ctx, m.vm.guest, "assert running upgraded agent binary", runningAgentBinaryCommand(m.upgrade.PayloadSHA256))
 }

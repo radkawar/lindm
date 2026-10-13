@@ -882,6 +882,11 @@ var registry = []*Release{
 			// has published nothing after its 2026-10-07 snapshot (repomd
 			// 990c58b8…, revision 2026-10-08T02:08Z), so aarch64 has no target.
 			OSUpdateTargets: map[string]RollingTarget{"x86_64": {Date: "2026-10-10", ClosureSHA256: "1165cc188e357a44320f9dee48974af28f76f0c6dd454d22e6d875526ac6ad3a", RepomdSHA256: "f48382bb7f18b6762f1fcf342954413c5ed88edd33a6c9215c4d80dc86e1f0d2"}},
+			// YaST's installer writes /etc/sysctl.d/70-yast.conf (CFA::Sysctl,
+			// including net.ipv4.ip_forward), which sorts after lindm's
+			// 60-lindm-* stanza; the provider refused ip_forward with "later
+			// effective sysctl.d assignment" on the x86_64 resources lane.
+			SysctlNetKey: "net.ipv4.conf.all.log_martians",
 			Session: LabSession{
 				Desktops:  map[string][]string{"gnome": {"patterns-gnome-gnome", "gnome-terminal", "xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer-plugin-pipewire", "gstreamer-plugins-good"}},
 				GDMConfig: "/etc/gdm/custom.conf", GDMSysconfig: "/etc/sysconfig/displaymanager", Name: "gnome", Terminal: []string{"gnome-terminal", "--"},

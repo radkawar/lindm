@@ -81,6 +81,10 @@ type Lab struct {
 	// SysctlKey replaces the resources lane's vm.swappiness when a vendor
 	// boot service owns that key's live value (empty keeps vm.swappiness).
 	SysctlKey string
+	// SysctlNetKey replaces the resources lane's net.ipv4.ip_forward when the
+	// installer's own sysctl.d file assigns that key after lindm's stanza, so
+	// the provider correctly refuses it (empty keeps net.ipv4.ip_forward).
+	SysctlNetKey string
 	// SecureBootUnavailable is the measured reason the installed system cannot
 	// boot under UEFI Secure Boot; lab matrix cells that require Secure Boot
 	// are gated with it. Empty when Secure Boot is available.
