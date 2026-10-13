@@ -44,9 +44,11 @@ Current LTS on x86_64: Pop!\_OS 24.04 LTS, `generic` build 28 (System76's
 `api.pop-os.org/builds/24.04/generic` names it the current non-NVIDIA build for
 Intel and AMD graphics; the `intel` channel's build 20 is an older, separately
 maintained image and `nvidia` adds the proprietary driver). System76 arm64 images
-are not part of this row. No capability cell is qualified yet; see the
+are not part of this row. Qualified natively on x86_64: inventory, lifecycle,
+dispatch and power, self-update, encryption, and lock/release/quarantine; see the
 [tier capability matrix](../verification.md#tier-capability-matrix) and
-[Known gaps](#known-gaps).
+[Known gaps](#known-gaps). Records are under
+`~/.cache/lindm-desktopderiv-20261011/pop/` unless stated otherwise.
 
 ## Media and identity
 
@@ -251,33 +253,58 @@ source. No external agent repository is used. Missing artifacts produce an
 explicit setup remedy; successful Ubuntu installation does not qualify Pop!\_OS.
 See the [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
 
-The Ubuntu-base DEB is expected to apply through authenticated APT. Not yet
-recorded on Pop!\_OS.
+The Ubuntu-base DEB applies through authenticated APT on Pop!\_OS: signed install,
+enrollment, upgrade 0.1.0→0.1.1, reboot, purge/reinstall and revocation
+(`lifecycle-01.json`,
+`9a04e2eb3f123714249fd140ecb1dc8bea7e4b2fdd570b615f8c7f557f2a7a48`).
 
 ## Services and sandbox
 
-As in the [shared boundaries](README.md#shared-implementation-boundaries); not yet
-observed on Pop!\_OS.
+As in the [shared boundaries](README.md#shared-implementation-boundaries).
+Connected dispatch passed all ten service scenarios (`dispatch-01.json`,
+`c4b6da37366c9cd09d0a3d290ebc7c1baf7da66d35cef0d64bcfe9ff5afbfdbb`) and the power
+actions (`power-01.json`,
+`860b66a4531e5abae2851a4afa7d6145a3233ea99f1d7d4cebcb3d2a9dc330d4`).
 
 ## Updates
 
-Not recorded. Pop!\_OS ships its own update tooling (COSMIC Store, `pop-upgrade`),
-and its ownership relative to OS patch policy must be specified.
+Signed agent self-update passed (`updates-01.json`,
+`f613a0b67e2c0a6b4b0cd116de74ca8647c82dc0ff736cb03e033e91f787278b`). The vendor
+`pop-system-updater` holding dpkg's lock makes a package assignment end FAILED
+`NATIVE_BUSY` with no change (natively observed in the connected resources lane's
+`vendor-updater-native-busy` scenario). OS patch policy remains gated (see the
+table above).
 
 ## Inventory
 
-Not recorded. The first `lab vm inspect` run failed in the lab's APT-origin oracle
-(see Repositories above), not in the agent; it must be rerun.
+Strict inventory passed on the distinst golden: 1754 packages, APT origins
+verified (`inspect-03.json`,
+`4f1807cc50489b3c7ca03f5063c276f4d29599f96f342a414e9a8e1bccc221c6`).
 
 ## Encryption and recovery
 
-Not recorded. The encrypted golden (`-desktop cosmic -tpm-boot`) is implemented
-but not yet built.
+The encrypted golden (`-desktop cosmic -tpm-boot`) passed inventory, LUKS header
+match and two cold boots (`encrypted-01.json`,
+`b5a81078417af29d26607f5569744e070a34d70db26ce5191c1b5391f512b1e6`). Escrow,
+audited reveal, recovery boot with the revealed key, committed rotation (retired
+slot absent), crash recovery with old and new keys, TPM2 bind with an unattended
+boot, and rejection of a mismatched PCR 7 policy followed by revealed-key recovery
+passed (`device-actions-encryption-01.json`,
+`0e0d560d59bfec47f2d210bb1ad7ece49769d12492e5ec515aa47c419e7951ba`), as did the
+encryption compliance scenario (`device-actions-compliance-01.json`,
+`35ef27effdfc9e45b7932c8ee01a335f61e03bad6a419dda760c8d831be6f87e`). All ran with
+Secure Boot off (see systemd-boot above); the Secure Boot TPM cells and recovery
+sanitize are gated.
 
 ## Actions
 
-Not recorded. Lock/release/quarantine, live-root crypto-erase, report-loss and
-recovery sanitize each need native evidence here.
+Lock ends `OUTCOME_UNKNOWN` `session_lock_state_unreported` with the COSMIC
+locker engaged (journal oracle; logind `LockedHint` stays no); release, account
+locks and quarantine passed (DesktopSessions,
+`~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-lock-quarantine-11.json`,
+`e6e5b4a138d02bb3da893fc01eef7c9d75546b05c45aca4798b2b48cb26913e7`). Live-root
+crypto-erase and report-loss are pending a rerun with the ephemeral random-key
+proof (see Random-key swap above).
 
 ## Advisory feeds
 
@@ -333,9 +360,10 @@ the recipe above; ISO relabels are not used.
 
 ## Known gaps
 
-No capability cell is qualified. Built and probed: the unencrypted golden only.
-Pending native runs: inspect (rerun after the oracle fix), lifecycle, dispatch and
-power actions, resources (executor and connected), the encrypted golden and its
-encryption/wipe/lock/quarantine actions, agent self-update and assistance.
+Pending native runs: live-root crypto-erase and report-loss (two refusals
+recorded, see Random-key swap above), and resources (executor and connected; the
+first connected run's sysctl `reboot-persists` failed on `pop-zram-config`, see
+zram swappiness above). Recovery sanitize and the Secure Boot TPM cells are gated
+on the unsigned systemd-boot.
 Assistance is gated: VIEW ends `UNAVAILABLE` `notification_actions_hidden` and
 CONTROL `portal_remote_desktop_unavailable`, both before consent.
