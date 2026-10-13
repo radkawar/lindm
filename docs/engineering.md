@@ -1205,6 +1205,16 @@ storage can finish. A second current Affected finding on `ubuntu-ws-02` carries 
 risk-acceptance proposal awaiting independent approval, beside one whose finding
 evidence is unavailable; the seed fails when no Affected finding appears instead of
 omitting them.
+After its real Fedora evaluation reports an Affected finding, `fedora-ws-03`
+reports a later package scan that its collector was refused
+(`PERMISSION_DENIED` through the agent's `ReportPackageAttempt`; the native
+lifecycle lane induces the same failure with a systemd `InaccessiblePaths` drop-in).
+The server keeps its last successful snapshot and findings but marks the evaluation
+`package_collection_failed`, so `/advisories` names those advisories as found on a
+device not fully checked and the coverage banner reports a failed package list.
+The server admits one package report per device every five minutes, so the seed
+retries only the `rate_limited` rejection, for at most six minutes. It fails if the
+advisory summary then names no such advisory.
 
 The organization's `capabilityPolicies` (the deployment policy with Kernel settings
 for the three ICMP-redirect keys; Kernel settings for

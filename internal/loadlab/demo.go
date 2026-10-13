@@ -496,6 +496,13 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return err
 	}
 	for _, d := range s.devices {
+		if d.demo.packageScanDenied {
+			if err := s.denyPackageScan(ctx, d); err != nil {
+				return err
+			}
+		}
+	}
+	for _, d := range s.devices {
 		if d.demo.state == "stale" {
 			if err := s.awaitStale(ctx, d); err != nil {
 				return err

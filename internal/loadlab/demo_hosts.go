@@ -68,11 +68,15 @@ type demoDevice struct {
 	// factsWithheld never reports host inventory, so platform-limited items
 	// wait for its facts while unrestricted items still apply.
 	factsWithheld bool
-	labels        []string
-	platform      *inventoryv1.PlatformDetails
-	backend       string
-	packages      packageData
-	serial, luks  string
+	// packageScanDenied reports, after the device's real-feed findings exist,
+	// a later package collection its collector was refused; see
+	// denyPackageScan.
+	packageScanDenied bool
+	labels            []string
+	platform          *inventoryv1.PlatformDetails
+	backend           string
+	packages          packageData
+	serial, luks      string
 	// agent is the host's capability-policy-aware executor; nil for an agent
 	// older than capability policies.
 	agent *demoAgent
@@ -107,7 +111,8 @@ func demoDevices(source string) ([]*demoDevice, error) {
 		{hostname: "ubuntu-ws-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation"}, bulk: demoRoutePackages},
 		// An older agent: it does not report its assistance setting, which is off.
 		{hostname: "ubuntu-ws-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionNone, service: serviceApplies, department: "engineering", labels: []string{"workstation"}, proposal: true},
-		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "finance", labels: []string{"workstation"}},
+		// Its latest package scan was refused after its findings were evaluated.
+		{hostname: "fedora-ws-03", key: "fedora-44", kernel: "6.17.1-300.fc44.x86_64", sessions: 1, assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "finance", labels: []string{"workstation"}, packageScanDenied: true},
 		{hostname: "ubuntu-srv-04", key: "ubuntu-24.04", kernel: "6.8.0-142-generic", headless: true, assistance: assistanceOff, encryption: encryptionUnknown, service: serviceFails, department: "it-helpdesk", labels: []string{"server", "build"}},
 		// The owner's report: a headless RHEL server, assistance off, an admin on SSH.
 		{hostname: "rhel-srv-05", key: "rhel-9", versionID: "9.8", kernel: "5.14.0-687.5.3.el9_8.x86_64", sessions: 1, headless: true, assistance: assistanceOff, encryption: encryptionNone, service: serviceApplies, department: "finance", labels: []string{"server", "database"}, platform: el},

@@ -327,6 +327,20 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		if device.Hostname == "rhel-srv-05" && findings.Msg.GetFreshness().GetReason() != "rhel_platform_stream_unavailable" {
 			t.Fatalf("captured unregistered RHEL platform invented coverage: %v", findings.Msg.GetFreshness())
 		}
+		// Its refused package scan leaves its real-feed findings standing on a
+		// device that is no longer fully checked.
+		if device.Hostname == "fedora-ws-03" && (findings.Msg.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || findings.Msg.GetFreshness().GetReason() != "package_collection_failed" || len(findings.Msg.GetFindings()) == 0) {
+			t.Fatalf("refused package scan did not keep its findings unconfirmed: %v findings=%d", findings.Msg.GetFreshness(), len(findings.Msg.GetFindings()))
+		}
+	}
+	// The console's first /advisories page (50 rows) names an advisory found on
+	// a device that isn't fully checked.
+	summary, err := admin.ListAdvisorySummary(ctx, connect.NewRequest(&adminv1.ListAdvisorySummaryRequest{PageSize: 50}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(summary.Msg.GetAdvisories(), func(advisory *adminv1.AdvisorySummary) bool { return advisory.GetUnknownDevices() > 0 }) {
+		t.Fatalf("first advisory page names no advisory found on a device not fully checked: %v", summary.Msg)
 	}
 	// Proposed risk: an AFFECTED finding pending independent review beside a
 	// proposal whose finding evidence is unavailable.
