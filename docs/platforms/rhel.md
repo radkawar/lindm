@@ -7,31 +7,31 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability           | RHEL 8                                                                                                                          | RHEL 9                                              | RHEL 10                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------------------------------- |
-| inventory            | implemented                                                                                                                     | implemented                                         | implemented                                         |
-| lifecycle            | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| dispatch             | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| packages             | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                                         | implemented                                         |
-| accounts             | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
-| sysctl               | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
-| definitions          | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                                         | implemented                                         |
-| password             | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| firewall             | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                                         | implemented                                         |
-| encryption           | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| wipe                 | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| report-loss          | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| lock                 | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| recovery-sanitize    | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| self-update          | gated: not implemented for RHEL 8                                                                                               | implemented                                         | implemented                                         |
-| assistance           | gated: not implemented for RHEL 8                                                                                               | gated: no maintained RHEL assistance session recipe | gated: no maintained RHEL assistance session recipe |
-| assistance-clipboard | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9                   | gated: not implemented for RHEL 10                  |
-| assistance-keyboard  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9                   | gated: not implemented for RHEL 10                  |
-| assistance-displays  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9                   | gated: not implemented for RHEL 10                  |
-| assistance-messages  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9                   | gated: not implemented for RHEL 10                  |
-| advisories           | implemented                                                                                                                     | implemented                                         | implemented                                         |
-| os-update            | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                                         | implemented                                         |
-| release-upgrade      | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented           | gated: release upgrade is not implemented           |
+| Capability           | RHEL 8                                                                                                                          | RHEL 9                                    | RHEL 10                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------- |
+| inventory            | implemented                                                                                                                     | implemented                               | implemented                               |
+| lifecycle            | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| dispatch             | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| packages             | gated: systemd 239 rejects the package helper's transient-unit sandbox (ProtectKernelLogs=) and busctl has no --json before 240 | implemented                               | implemented                               |
+| accounts             | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                               | implemented                               |
+| sysctl               | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                               | implemented                               |
+| definitions          | gated: systemd 239 is below the definition provider floor 252                                                                   | implemented                               | implemented                               |
+| password             | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| firewall             | gated: EL host providers are qualified only on RHEL, AlmaLinux and Rocky Linux 9/10                                             | implemented                               | implemented                               |
+| encryption           | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| wipe                 | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| report-loss          | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| lock                 | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| recovery-sanitize    | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| self-update          | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| assistance           | gated: not implemented for RHEL 8                                                                                               | implemented                               | implemented                               |
+| assistance-clipboard | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9         | gated: not implemented for RHEL 10        |
+| assistance-keyboard  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9         | gated: not implemented for RHEL 10        |
+| assistance-displays  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9         | gated: not implemented for RHEL 10        |
+| assistance-messages  | gated: not implemented for RHEL 8                                                                                               | gated: not implemented for RHEL 9         | gated: not implemented for RHEL 10        |
+| advisories           | implemented                                                                                                                     | implemented                               | implemented                               |
+| os-update            | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                         | implemented                               | implemented                               |
+| release-upgrade      | gated: release upgrade is not implemented                                                                                       | gated: release upgrade is not implemented | gated: release upgrade is not implemented |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -414,9 +414,10 @@ not the Boot ISO, which needs entitled network repositories. The Anaconda
 kickstart lays out LVM on LUKS2 with RHEL's autopart defaults (measured on the
 goldens: 613,160 KiB vfat ESP; xfs `/boot` 1 GiB on 9.8, 2 GiB on 10.2),
 keeps SELinux Enforcing and installs everything from the DVD: the
-`@^workstation-product-environment` GNOME session (RHEL ships no KDE), the TPM user
-space and the native action prerequisites, because the unregistered installed
-system has no repository. EL 9's dracut 057 has no split `systemd-cryptsetup`
+`@^workstation-product-environment` GNOME session (RHEL ships no KDE) with its
+[assistance capture stack](#remote-assistance-session), the TPM user space and the
+native action prerequisites, because the unregistered installed system has no
+repository. EL 9's dracut 057 has no split `systemd-cryptsetup`
 module (naming an absent module is fatal); EL 10's dracut 107 ships it, so the
 registry selects the TPM module list per major. Both majors ship
 `systemd-cryptenroll` with the `systemd-tpm2` token plugin; Secure Boot uses the
@@ -607,8 +608,8 @@ The held-demo advisory configuration derives RHEL 9's paired CSAF archives from
 registry facts, with standard-stream coverage for x86_64 and aarch64 and a
 seven-day maximum age. Its controller-owned `advisory-cache` revalidates the
 vendor exports and publishes through the production parser before waiting for a
-current device evaluation. This feed configuration does not bypass the RHEL
-assistance session-recipe gate or establish new graphical qualification.
+current device evaluation. This feed configuration does not establish graphical
+qualification.
 
 Each JSON document is capped at **128 MiB**, independently of the
 512 MiB compressed-archive and **32 GiB expanded-archive** limits. The measured
@@ -778,6 +779,37 @@ Qualify each release/architecture with actual portal actions, two-head guest eff
 nonces/hashes and termination evidence. Missing interfaces stay gated; unattended
 and KDE implementation/qualification require parent confirmation.
 
+### Remote assistance session
+
+The lab session is the encrypted golden's GDM autologin into GNOME Wayland,
+installed only from the Binary DVD's BaseOS/AppStream (registry
+`rhelSession9`/`rhelSession10`). Its kickstart `%packages` add the capture stack
+the session helper's `gst-launch-1.0` pipeline needs
+(`internal/agent/desktop/gst.go`): `pipewire-gstreamer` (`pipewiresrc`),
+`gstreamer1-plugins-base` (`videorate`, `videoconvert`, `videoscale`),
+`gstreamer1-plugins-good` (`vp8enc` over `libvpx`, `rtpvp8pay`, `rtpstreampay`),
+`gstreamer1` (`fdsink`, `gst-launch-1.0`/`gst-inspect-1.0`), `xdg-desktop-portal`
+and `xdg-desktop-portal-gnome`. The assistance lane requires them with `rpm -q`,
+because the unregistered guest has no repository to install from. The terminal
+the lane types into is `gnome-terminal` on 9.8 and `ptyxis` on 10.2, the only
+one each DVD ships.
+
+| DVD         | xdg-desktop-portal / -gnome | PipeWire | GStreamer (base, good) | GNOME Shell / Mutter |
+| ----------- | --------------------------- | -------- | ---------------------- | -------------------- |
+| 9.8 (both)  | 1.12.6 / 41.2               | 1.4.9    | 1.22.12                | 40.10 / 40.9         |
+| 10.2 (both) | 1.20.0 / 47.3               | 1.4.9    | 1.26.7                 | 49.4 / 49.4          |
+
+Every package is in AppStream on all four pinned DVDs, and both
+`workstation-product-environment` and `graphical-server-environment` (aarch64)
+already default-install them through comps; the package query is
+`$HOME/.cache/lindm-rhel-assist-20261013/dvd-package-query.txt` (SHA-256
+`f1faeab3577b4ca63eafa72670369cbf003c1a90e25b4c3221d199fcc859f38a`).
+
+RHEL 10.2 x86_64 passes all six assistance scenarios; RHEL 9.8 x86_64 fails
+with no decoded frames, the EL 9 capture symptom shared with Rocky Linux and
+AlmaLinux 9.8 (product capture defect, not a recipe gap); aarch64 is blocked:
+lab hosts offline ([verification](../verification.md#rhel-assistance-session-recipe-2026-10-13)).
+
 ## Lab
 
 Use maintained image acquisition/offline verification and the registered native
@@ -824,9 +856,9 @@ the guest first, as a subscribed customer host is.
 
 ## Gaps
 
-RHEL 8, physical TPM/media, entitled air-gap lifecycle (the gated lane above), the
-RHEL GNOME assistance session and each gated resource/action in the table above
-remain independent work. The aarch64 encryption, lock, wipe and recovery
+RHEL 8, physical TPM/media, entitled air-gap lifecycle (the gated lane above) and
+each gated resource/action in the table above remain independent work. The
+aarch64 encryption, lock, wipe and recovery
 matrix cells passed on the Server with GUI golden
 ([verification](../verification.md#rhel-matrix-completion-2026-10-12)); the
 encrypted Workstation (x86_64) and Server with GUI (aarch64) goldens qualify only

@@ -223,11 +223,16 @@ LINDM_GRUB
 		// No release tree: the vendor-authenticated Binary DVD (BaseOS and
 		// AppStream) is the only package source, and an unregistered installed
 		// system has no other repository. The action prerequisites, desktop
-		// environment and TPM user space are therefore part of the golden.
+		// environment and TPM user space are therefore part of the golden, and
+		// so is an entitled release's assistance capture stack (the rebuilds
+		// keep their free vendor repositories and install it in the lane).
 		extra = "firstboot --disable\n"
 		packages += strings.Join(lab.Guest.Actions, "\n") + "\n"
 		if desktop != "" {
 			packages = strings.Join(lab.Session.DesktopPackages(desktop, architecture), "\n") + "\n" + packages
+			if lab.Entitlement && len(lab.Session.Capture) != 0 {
+				packages += strings.Join(lab.Session.Capture, "\n") + "\n"
+			}
 		}
 		if tpmBoot {
 			packages += strings.Join(lab.TPM.Packages, "\n") + "\n"

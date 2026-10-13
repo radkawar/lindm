@@ -191,13 +191,16 @@ func TestAssistanceCapturePackagesKeepCompositorABIReleaseSpecific(t *testing.T)
 
 func TestAssistanceTerminalMatchesInstalledDesktop(t *testing.T) {
 	for _, test := range []struct {
-		version string
-		argv    []string
+		id, version string
+		argv        []string
 	}{
-		{"24.04", []string{"gnome-terminal", "--"}},
-		{"26.04", []string{"ptyxis", "--new-window", "--"}},
+		{"ubuntu", "24.04", []string{"gnome-terminal", "--"}},
+		{"ubuntu", "26.04", []string{"ptyxis", "--new-window", "--"}},
+		// The RHEL 9.8 DVD ships gnome-terminal only; 10.2 ships ptyxis only.
+		{"rhel", "9.8", []string{"gnome-terminal", "--"}},
+		{"rhel", "10.2", []string{"ptyxis", "--new-window", "--"}},
 	} {
-		release := ForManifest("ubuntu", test.version)
+		release := ForManifest(test.id, test.version)
 		if !release.Supported(Assistance) || !slices.Equal(release.Lab.Session.Terminal, test.argv) {
 			t.Errorf("%s assistance terminal = %v, want %v", release.Name, release.Lab.Session.Terminal, test.argv)
 		}

@@ -264,10 +264,15 @@ func lockAssistanceSession(ctx context.Context, vm *guestVM, sessionID string, l
 
 // installAssistanceCapture installs the release's capture stack (the agent
 // package's recommended screen-capture dependencies) from its signed archive.
+// An unregistered entitled guest has no repository: its golden installed the
+// stack from the vendor-authenticated Binary DVD, so it is only required.
 func installAssistanceCapture(ctx context.Context, vm *guestVM, release *platform.Release) error {
 	command, err := labInstallCommand(release, release.Lab.Session.Capture)
 	if err != nil {
 		return fmt.Errorf("assistance capture stack: %w", err)
+	}
+	if release.Lab.Entitlement {
+		command = "rpm -q " + strings.Join(release.Lab.Session.Capture, " ")
 	}
 	result, err := vm.runResult(ctx, "sudo -n env DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, 1<<20, 15*time.Minute)
 	if err != nil {

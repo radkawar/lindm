@@ -252,14 +252,23 @@ var (
 	// Fedora signs only its x86_64 kernels for shim (see reasonFedoraARMUnsignedKernel).
 	fedoraARMNoSecureBoot = map[string]string{"aarch64": "the vendor aarch64 kernel has no Authenticode signature, so shim refuses it"}
 	// RHEL installs only from the vendor-authenticated Binary DVD (no Lab.Repository):
-	// the Workstation environment, TPM user space and action prerequisites
-	// become kickstart %packages. An unregistered installed system has no other
-	// repository, so the action prerequisites also carry the recovery helpers.
-	rhelSession = LabSession{
-		Desktops: map[string][]string{"gnome": {"@^workstation-product-environment"}},
-		// The aarch64 DVDs' comps have only Server with GUI and Server.
-		ArchitectureDesktops: map[string]map[string][]string{"aarch64": {"gnome": {"@^graphical-server-environment"}}},
-		GDMConfig:            "/etc/gdm/custom.conf", Name: "gnome",
+	// the Workstation environment, its capture stack, TPM user space and action
+	// prerequisites become kickstart %packages. An unregistered installed system
+	// has no other repository, so the action prerequisites also carry the
+	// recovery helpers. Every capture package (pipewiresrc, videorate,
+	// videoconvert, videoscale, vp8enc, rtpvp8pay, rtpstreampay, fdsink, the GNOME
+	// portal backend) is in the 9.8 and 10.2 DVDs' AppStream on both
+	// architectures, and both comps environments default-install them.
+	rhelDesktops = map[string][]string{"gnome": {"@^workstation-product-environment"}}
+	// The aarch64 DVDs' comps have only Server with GUI and Server.
+	rhelARMDesktops = map[string]map[string][]string{"aarch64": {"gnome": {"@^graphical-server-environment"}}}
+	rhelSession9    = LabSession{
+		Desktops: rhelDesktops, ArchitectureDesktops: rhelARMDesktops, GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+		Terminal: []string{"gnome-terminal", "--"}, Capture: elRebuildCapture,
+	}
+	rhelSession10 = LabSession{
+		Desktops: rhelDesktops, ArchitectureDesktops: rhelARMDesktops, GDMConfig: "/etc/gdm/custom.conf", Name: "gnome",
+		Terminal: []string{"ptyxis", "--new-window", "--"}, Capture: elRebuildCapture,
 	}
 	rhelGuest = LabGuest{
 		KernelConfig: "/boot/config-%s",
@@ -633,15 +642,15 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks9, el9Pins),
 		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
-			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
+			Installer: Anaconda, Session: rhelSession9, Guest: rhelGuest,
 			RPMMedia: &LabRPMMedia{Repositories: []string{"BaseOS", "AppStream"}, Key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"},
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.
 			TPM: LabTPM{Modules: dracutTPM, Packages: rhelTPMPackages}},
 		// Native qualification of each action is per pinned minor in
 		// verification.md (RHEL encrypted device actions); implemented
 		// capabilities stay admitted so their qualification lanes can run.
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
-		Gates:    rhelGates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(), OSUpdate),
 	},
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
@@ -650,12 +659,12 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks10, el10Pins),
 		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
-			Installer: Anaconda, Session: rhelSession, Guest: rhelGuest,
+			Installer: Anaconda, Session: rhelSession10, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: rhelTPMPackages}},
 		// Native qualification per pinned minor: see the rhel-9 row.
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize}),
-		Gates:    rhelGates(),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}),
+		Gates:    without(gates(), OSUpdate),
 	},
 	elRebuild("rocky-8", "Rocky Linux 8", "Rocky Linux", "rocky", "8", TierOutside, 239, "Rocky Linux:8", "rocky-linux", reasonRockyOSV),
 	{
@@ -916,13 +925,6 @@ func withPins(q Quirks, pins []PasswordPins) Quirks {
 func withCapture(session LabSession, packages ...string) LabSession {
 	session.Capture = slices.Concat(session.Capture, packages)
 	return session
-}
-
-// rhelGates gates the RHEL action lane without a maintained recipe. Gates mean
-// "not implemented", never "not yet qualified": a gated capability also
-// refuses its own qualification lane.
-func rhelGates() map[Capability]string {
-	return without(gates(string(Assistance), "no maintained RHEL assistance session recipe"), OSUpdate)
 }
 
 func elRebuild(key, name, distribution, id, major string, tier Tier, systemd int, ecosystem, purl, partial string) *Release {

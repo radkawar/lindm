@@ -158,8 +158,9 @@ func TestEncryptedFedoraRecipe(t *testing.T) {
 }
 
 // RHEL installs from the vendor-authenticated Binary DVD only: an unregistered
-// installed system has no repository, so the desktop, TPM user space and action
-// prerequisites are kickstart packages, never a network or third-party tree.
+// installed system has no repository, so the desktop, its assistance capture
+// stack, TPM user space and action prerequisites are kickstart packages, never
+// a network or third-party tree.
 func TestEncryptedRHELRecipe(t *testing.T) {
 	login, private, public := encryptedInstallerTestKeys(t)
 	for _, version := range []string{"9.8", "10.2"} {
@@ -191,6 +192,11 @@ func TestEncryptedRHELRecipe(t *testing.T) {
 					}
 					if slices.Contains(selected, "@^workstation-product-environment") != (desktop == "gnome") {
 						t.Error("RHEL Workstation environment does not follow the desktop selection")
+					}
+					for _, capture := range []string{"pipewire-gstreamer", "gstreamer1-plugins-good", "xdg-desktop-portal", "xdg-desktop-portal-gnome"} {
+						if slices.Contains(selected, capture) != (desktop == "gnome") {
+							t.Errorf("RHEL capture package %q does not follow the desktop selection", capture)
+						}
 					}
 					if slices.Contains(selected, "tpm2-tss") != tpmBoot {
 						t.Error("RHEL TPM user space does not follow the TPM boot selection")
