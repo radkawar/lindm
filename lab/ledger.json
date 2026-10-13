@@ -12384,6 +12384,40 @@
       "recoveryManifest": "debian-12-amd64",
       "recoveryManifestSha256": "09557b4fbd31d0f47b8226791f56e01583e7a99569b96d6d1aa0fcd7cbaff726",
       "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
+    },
+    {
+      "platform": "rocky-10",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "rocky-10.2-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel2-tpmrep2-x86-20261013T162855Z/rocky-10/tpm-reference-repair-x86_64.json",
+      "sha256": "59f3fab4b36b2bc6c8706a0ef95fb10bb53d8ec5084525187c9460fcf32b671a",
+      "recorded": "2026-10-13T21:36:33.218122990Z",
+      "revision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "27070bc6e7ed0ca721ab805058b60d4ab6cb53a7e8189f62ad243ccb406fbe80",
+      "recoveryManifest": "rocky-10.2-20260525.0-x86-64",
+      "recoveryManifestSha256": "8026588bc9d6874d409402a0fe48a5c8a84c61a1812a4f83712bd0fed1936412",
+      "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
+    },
+    {
+      "platform": "rocky-9",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "rocky-9.8-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel2-tpmrep2-x86-20261013T162855Z/rocky-9/tpm-reference-repair-x86_64.json",
+      "sha256": "a1e4c08cbced9fe91e6c38014789fc78a2ec7ce37ade0a1a599c803e5f1c4884",
+      "recorded": "2026-10-13T21:45:23.937089956Z",
+      "revision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "7a6591c243bc0630a31dffb4f392663f9c29f9ff374713258d3821bf45437392",
+      "recoveryManifest": "rocky-9.8-20260525.0-x86-64",
+      "recoveryManifestSha256": "1eaec491a807f8a15baf697fdf6e335976d97a034cbd11014158ce4b821d93c2",
+      "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
     }
   ]
 }
