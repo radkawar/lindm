@@ -187,3 +187,38 @@ func TestCompleteRepositoryAdmissionRejectsUnattestedPackagesAndKeySubstitution(
 		})
 	}
 }
+
+func TestCanonicalBundleNormalizesWritableAncillaryMetadataWithoutChangingBytes(t *testing.T) {
+	bundle := t.TempDir()
+	metadata := filepath.Join(bundle, "repo", "rpm", "repodata")
+	if err := os.MkdirAll(metadata, 0775); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(metadata, 0775); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(metadata, "repomd.xml")
+	if err := writeNew(path, []byte("signed metadata permission boundary"), 0664); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0664); err != nil {
+		t.Fatal(err)
+	}
+	before, _, err := digestFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := normalizeAgentRepository(bundle); err != nil {
+		t.Fatal(err)
+	}
+	after, _, err := digestFile(path)
+	if err != nil || after != before {
+		t.Fatalf("normalization changed signed bytes: %v", err)
+	}
+	for name, mode := range map[string]os.FileMode{bundle: 0755, metadata: 0755, path: 0444} {
+		info, err := os.Lstat(name)
+		if err != nil || info.Mode().Perm() != mode {
+			t.Fatalf("unprotected bundle member %s: %v", name, err)
+		}
+	}
+}

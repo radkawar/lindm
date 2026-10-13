@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -117,4 +119,26 @@ func publishAgentRepositories(ctx context.Context, bundle string, request Reques
 	}
 	_, err := packaging.PublishArch(ctx, packaging.ArchRequest{OutputDir: repositories, Packages: paths[string(packaging.FormatArch)], Signer: request.PackageSigner, SourceDateEpoch: request.SourceDateEpoch})
 	return err
+}
+
+// normalizeAgentRepository applies the installed bundle's protected modes after
+// external repository tools finish. Their ancillary metadata/directories can
+// inherit the caller's writable umask; permission changes preserve signed bytes.
+func normalizeAgentRepository(bundle string) error {
+	return filepath.WalkDir(bundle, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return os.Chmod(path, 0755)
+		}
+		if !info.Mode().IsRegular() || info.Size() <= 0 {
+			return fmt.Errorf("releasebuild: agent repository member %q must be a nonempty regular file", path)
+		}
+		return os.Chmod(path, 0444)
+	})
 }

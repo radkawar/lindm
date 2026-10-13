@@ -167,6 +167,9 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 	if err := publishAgentRepositories(ctx, bundle, request, manifest); err != nil {
 		return nil, err
 	}
+	if err := normalizeAgentRepository(bundle); err != nil {
+		return nil, err
+	}
 	if err := verifyRepositoryPayloads(bundle, manifest); err != nil {
 		return nil, err
 	}
