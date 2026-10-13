@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
 import { SuggestionPicker } from "@/components/ui/suggestion-picker";
-import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Textarea } from "@/components/ui/textarea";
 import { newRequestId } from "@/lib/ids";
 import { object, sameReference } from "./resource-draft";
@@ -641,19 +640,13 @@ function TypedField({
           onChange={(next) => onChange(next === "" && optional ? undefined : next)}
         />
       ) : recordReference && generatedReference ? (
-        <>
-          <p className="text-xs text-muted-foreground">Created automatically for this setting.</p>
-          <TechnicalDetails items={[{ label, value: String(value ?? "") }]} />
-        </>
+        <p className="text-xs text-muted-foreground">Created automatically for this setting.</p>
       ) : recordReference ? (
-        // No list exists for this identity; it is never typed in, only kept.
-        <>
-          <p className="text-xs text-muted-foreground">
-            {value ? "Kept as saved." : "Not set."} This reference can't be chosen in the console
-            yet.
-          </p>
-          {value ? <TechnicalDetails items={[{ label, value: String(value) }]} /> : null}
-        </>
+        // No list exists for this identity; it is never typed in, only kept. The
+        // value itself is in the editor's single View JSON.
+        <p className="text-xs text-muted-foreground">
+          {value ? "Kept as saved." : "Not set."} This reference can't be chosen in the console yet.
+        </p>
       ) : field.scalar === ScalarType.BYTES && field.jsonName === "content" ? (
         <FileContent id={id} value={String(value ?? "")} onChange={onChange} disabled={disabled} />
       ) : (
@@ -801,9 +794,6 @@ function MessageInput({
             Add the setting this depends on to this profile first.
           </p>
         ) : null}
-        <TechnicalDetails
-          items={[{ label: "Current reference", value: String(value.canonicalKey ?? "") }]}
-        />
       </div>
     );
   }

@@ -48,6 +48,9 @@ export async function check({ page, demo, visit, require, capture, step }) {
   require(headerAligned, "'Start over from this version' isn't in the editor header");
   require((await main.getByText(/\b\d+ of \d+ settings\b/).count()) ===
     0, "the 'N of 64 settings' counter is still shown");
+  const disclosures = await editor.locator("details > summary").allInnerTexts();
+  require(disclosures.length <=
+    1, `the editor card has ${disclosures.length} disclosures (${disclosures.join(", ")}); keep only View JSON`);
   await capture("profile editor leads");
 
   step("new setting");

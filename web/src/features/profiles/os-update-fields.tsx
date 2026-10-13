@@ -105,14 +105,11 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
   const changeReboot = (next: JsonObject) => onChange({ ...value, rebootPolicy: next });
   return (
     <div className="grid gap-5">
-      <details className="text-sm">
-        <summary className="cursor-pointer font-medium">Timing and prerequisites</summary>
-        <p className="mt-2 text-muted-foreground">
-          Devices need their native automatic-update tools and signed repositories. Windows use the
-          selected time zone. A start skipped by daylight saving does not open that day; a repeated
-          start opens only once.
-        </p>
-      </details>
+      <p className="text-xs text-muted-foreground">
+        Devices need their native automatic-update tools and signed repositories. Windows use the
+        selected time zone; a start skipped by daylight saving does not open that day, and a
+        repeated start opens only once.
+      </p>
       <section className="grid gap-3">
         <h2 className="text-base font-semibold">Install updates</h2>
         <Label htmlFor={`${id}-selection`}>Updates to install</Label>
