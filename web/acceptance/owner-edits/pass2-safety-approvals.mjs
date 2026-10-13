@@ -13,11 +13,13 @@ export const task = {
   route: "/approvals",
   priority: "high",
   acceptance:
-    "With the seed: an empty decision reason shows 'Enter a decision reason…' describing the disabled Approve and Reject; the risk acceptance whose finding is gone is badged Invalid, explains why, and its Approve stays disabled after a reason is typed; no card repeats a fact label, and the wipe card shows its consequence line without a Mode/Target/Size block.",
+    "With the seed: an empty decision reason shows 'Enter a reason for your decision' describing the disabled Approve and Reject; the risk acceptance whose finding is gone is badged Invalid, explains why, and its Approve stays disabled after a reason is typed; no card repeats a fact label, and the wipe card shows its consequence line without a Mode/Target/Size block.",
 };
 
 const timeout = 30_000;
-const HINT = /^Enter a decision reason to (approve or )?reject\./;
+const HINT =
+  /^Enter a reason (?:for your decision|to reject this request)\. lindm records the reason in the audit log\.$/;
+const EVIDENCE_GONE = "The device no longer reports this finding. You cannot approve this request.";
 
 // Facts per card: every <dt> label (primary and Details), and primary-text
 // labels outside Details that would duplicate the consequence line.
@@ -115,17 +117,20 @@ export async function check({ page, visit, require, capture, step }) {
   });
   require((await invalid.count()) >
     0, "No risk acceptance with missing evidence is badged Invalid");
-  const stale = await advisory.evaluateAll((articles) =>
-    articles
-      .filter((article) => (article.textContent ?? "").includes("no longer available"))
-      .map((article) => article.querySelector('[data-slot="badge"]')?.textContent?.trim() ?? ""),
+  const stale = await advisory.evaluateAll(
+    (articles, explanation) =>
+      articles
+        .filter((article) => (article.textContent ?? "").includes(explanation))
+        .map((article) => article.querySelector('[data-slot="badge"]')?.textContent?.trim() ?? ""),
+    EVIDENCE_GONE,
   );
   const unmarked = stale.filter((badge) => badge !== "Invalid");
   require(unmarked.length === 0, `Evidence-gone requests are badged ${unmarked.join(", ")}`);
   if ((await invalid.count()) > 0) {
     const card = invalid.first();
-    const explanation = card.getByRole("alert").filter({ hasText: "no longer available" });
-    require((await explanation.count()) === 1, "The Invalid request does not explain why");
+    const explanation = card.getByRole("alert").filter({ hasText: EVIDENCE_GONE });
+    require((await explanation.count()) === 1 &&
+      (await explanation.isVisible()), "The Invalid request does not explain why");
     const approve = card.getByRole("button", { name: "Approve", exact: true });
     for (let index = 0; index < (await approve.count()); index++)
       require(await approve.nth(index).isDisabled(), "An Invalid request has an enabled Approve");
@@ -135,7 +140,7 @@ export async function check({ page, visit, require, capture, step }) {
       require(await approve.isDisabled(), "Approve enables on an Invalid request once a reason is typed");
       const described = await describedText(card, approve);
       require(described.some((text) =>
-        text.includes("no longer available"),
+        text.includes(EVIDENCE_GONE),
       ), "Disabled Approve is not described by the evidence explanation");
       const reject = card.getByRole("button", { name: "Reject", exact: true });
       require(await reject.isEnabled(), "An Invalid request cannot be rejected");
@@ -147,7 +152,7 @@ export async function check({ page, visit, require, capture, step }) {
   const runs = main.getByRole("button", { name: "Accept approved risk", exact: true });
   for (let index = 0; index < (await runs.count()); index++) {
     const card = main.locator("article").filter({ has: runs.nth(index) });
-    if ((await card.getByText("no longer available").count()) > 0)
+    if ((await card.getByText(EVIDENCE_GONE, { exact: false }).count()) > 0)
       require(await runs.nth(index).isDisabled(), "Approved risk with missing evidence can be run");
   }
 }

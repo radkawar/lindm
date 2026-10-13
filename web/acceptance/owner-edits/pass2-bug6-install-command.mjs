@@ -1,9 +1,7 @@
-// Owner pass 2, bug 6: the one-time code dialog defaulted to the first registry
-// OS (Ubuntu 22.04), then showed an empty disabled command and server-config
-// jargon. The OS now defaults to the most common OS among seeded devices; with
-// the demo's unpublished agent repository it says in one sentence what blocks
-// the command and links to Settings › Agent repository, with no empty command
-// field, no disabled copy button and no configuration keys.
+// The one-time code chooser defaults to the fleet's most common OS.
+// The stock fixture now provides signed agent packages. Check its eligible
+// command, not an invented missing-publication state. review-enrollment owns
+// the independent missing-artifact fixture and its absent command assertion.
 //
 // State: creates one unused 5-minute one-time code (after the read-only
 // Enrollment checks, which count codes). The secret stays in the masked field
@@ -14,7 +12,7 @@ export const task = {
   route: "/enrollment",
   priority: "high",
   acceptance:
-    "The OS chooser preselects the seeded fleet's most common OS; with no agent repository it shows one sentence linking to Settings › Agent repository, no command field or copy button, and never 'releaseRepository'.",
+    "On the stock Ready fixture, the OS chooser preselects the fleet's most common OS; an eligible signed source provides a nonempty command and enabled copy action. Missing-source absence remains covered by the independent review-enrollment missing-artifact fixture.",
 };
 
 const timeout = 30_000;
@@ -34,6 +32,17 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   const main = page.getByRole("main");
   const expected = mostCommon(demo?.Devices ?? []);
   if (expected.length === 0) throw new Error("The demo seed reports no device OS");
+  const instructions = await page.evaluate(async () => {
+    const session = await (await fetch("/auth/session", { cache: "no-store" })).json();
+    const response = await fetch("/lindm.admin.v1.AdminService/GetEnrollmentInstructions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrfToken },
+      body: "{}",
+    });
+    if (!response.ok) throw new Error(`GetEnrollmentInstructions_${response.status}`);
+    return response.json();
+  });
+  require(instructions.readiness?.ready === true, "Stock repository is not Ready");
 
   step("create one-time code");
   await visit("/enrollment");
@@ -62,28 +71,23 @@ export async function check({ page, demo, visit, settle, require, capture, step 
       chosen,
     ), `OS defaults to "${chosen}", not the fleet's most common (${expected.join(" or ")})`);
 
-    step("unavailable command is actionable");
+    step("ready source provides an eligible command");
     const text = await dialog.innerText();
     require(!text.includes("releaseRepository"), "Dialog shows server configuration keys");
-    require(!text.includes(
-      "Install command unavailable",
-    ), "Dialog still shows a bare 'Install command unavailable'");
-    require((await settings.count()) === 1, "No link to Settings › Agent repository");
-    if ((await settings.count()) === 1) {
-      require((await settings.getAttribute("href")) ===
-        "/settings#agent-repository", "Settings link does not target the Agent repository section");
-      const sentence = (await settings.locator("xpath=..").innerText()).trim();
-      require(sentence.includes(
-        chosen,
-      ), `Blocking sentence does not name ${chosen}: "${sentence}"`);
-      require(sentence.split(/[.;]\s/).length <=
-        2, `Blocking reason is more than one sentence: "${sentence}"`);
+    const platform = (instructions.platforms ?? []).find((entry) => entry.label === chosen);
+    require(platform?.readiness?.ready ===
+      true, `${chosen} has no eligible signed installation source`);
+    require((await settings.count()) === 0, "Ready source incorrectly shows a repository blocker");
+    require((await command.count()) === 1, "Ready source provides no install command");
+    if ((await command.count()) === 1) {
+      require((await command.inputValue()).trim().length >
+        0, "Ready source provides an empty command");
+      require((await command.getAttribute("readonly")) !== null, "Install command is editable");
     }
-    require((await command.count()) === 0, "An empty install command field is still shown");
-    require((await dialog
-      .getByRole("button", { name: "Copy install command", exact: true })
-      .count()) === 0, "A disabled 'Copy install command' is still shown");
-    await capture("install-command-unavailable");
+    const copy = dialog.getByRole("button", { name: "Copy install command", exact: true });
+    require((await copy.count()) === 1 &&
+      (await copy.isEnabled()), "Ready command has no enabled copy action");
+    await capture("install-command-ready");
   } finally {
     await dialog.getByRole("button", { name: "Done, forget secret", exact: true }).click();
     await dialog.waitFor({ state: "hidden", timeout });

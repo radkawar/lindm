@@ -104,6 +104,9 @@ async function withdraw({ page, main, visit, require, title, reason }) {
   require(described.some((text) =>
     HINT.test(text),
   ), "Disabled Withdraw request is not described by its hint");
+  const hint = card.getByText(HINT);
+  require((await hint.count()) === 1 &&
+    (await hint.isVisible()), "The withdrawal hint is not visible with an empty reason");
   await card
     .getByRole("textbox", { name: "Withdrawal reason" })
     .fill("Owner pass 2 acceptance: withdraw own request");
@@ -150,7 +153,13 @@ export async function check({ page, config, demo, visit, require, protectSecret,
 
   step("propose");
   await form.getByRole("button", { name: "Propose risk acceptance", exact: true }).click();
-  await form.getByText(/^Proposed\./).waitFor({ timeout });
+  await form
+    .getByRole("status")
+    .filter({
+      hasText:
+        "Proposal saved. Another administrator must approve it before lindm accepts this risk.",
+    })
+    .waitFor({ timeout });
   require((await form.getByRole("button", { name: "Accept again" }).count()) ===
     0, "'Accept again' is offered after proposing");
   require((await form.getByRole("link", { name: "Open approval inbox" }).count()) ===

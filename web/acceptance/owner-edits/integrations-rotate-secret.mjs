@@ -8,7 +8,7 @@ export const task = {
   route: "/integrations",
   priority: "high",
   acceptance:
-    "SOC webhook has an enabled Rotate secret action; its dialog says 'The old secret keeps working for 1 hour; update the receiver before <time>' (and 'stops working immediately' for no overlap); after Generate, Rotate secret is enabled; 'Not recorded' never appears.",
+    "SOC webhook has an enabled Rotate secret action; its dialog says 'The old secret works for 1 hour. Update the receiver before <time>' (and 'stops working immediately' for no overlap); after Generate, Rotate secret is enabled; 'Not recorded' never appears.",
 };
 
 export async function check({ page, visit, require, capture, step }) {
@@ -24,7 +24,7 @@ export async function check({ page, visit, require, capture, step }) {
   const dialog = page.getByRole("dialog", { name: "Rotate signing secret for SOC webhook" });
   await dialog.waitFor({ timeout: 30_000 });
   const text = await dialog.innerText();
-  require(/The old secret keeps working for 1 hour; update the receiver before \S.+\./.test(
+  require(/The old secret works for 1 hour\. Update the receiver before \S.+\./.test(
     text,
   ), "the overlap consequence is not stated");
   require(!text.includes("Not recorded"), "the dialog says 'Not recorded'");

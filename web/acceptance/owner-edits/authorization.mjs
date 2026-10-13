@@ -85,9 +85,11 @@ export async function check({ page, visit, require, capture, step }) {
       .map((id) => document.getElementById(id)?.textContent ?? "")
       .join(" "),
   );
-  require(/can't be used/.test(nameHelp) &&
-    /lowercase/i.test(
-      nameHelp,
+  require(nameHelp.includes('"Patch operator" is invalid.') &&
+    nameHelp.includes("Start with a lowercase letter.") &&
+    nameHelp.includes("Use lowercase letters, digits, dots, dashes or underscores.") &&
+    nameHelp.includes(
+      "Example: patch-operator.",
     ), `Invalid role name 'Patch operator' is not explained before saving (got '${nameHelp}')`);
   require((await name.getAttribute("aria-invalid")) ===
     "true", "Invalid role name is not marked invalid");

@@ -8,10 +8,10 @@ export const task = {
   route: "/advisories",
   priority: "high",
   acceptance:
-    "On the seed, the page opens with a banner stating why 7 devices are unchecked and a button that resolves or explains it; each Incomplete source states what is missing; no URL is visible without expanding Details.",
+    "On the seed, the page opens with a banner naming the current unchecked-device count and explaining each cause with a remedy; each Incomplete source states what is missing; no URL is visible without expanding Details.",
 };
 
-const bannerTitle = /^(\d+) devices? (?:isn't|aren't) checked for advisories$/;
+const bannerTitle = /^lindm has not checked (\d+) devices? for advisories$/;
 const genericGap = /missing some data/i;
 
 // Text nodes containing an http(s) URL, split into those shown and those inside

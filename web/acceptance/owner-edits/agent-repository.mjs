@@ -1,19 +1,15 @@
-// Owner task: Settings > Agent repository gives one setup explanation in admin
-// terms with a link to the server setup guide, then groups platforms into
-// Ready, Supported (needs setup) and a collapsed Not supported yet. Server
-// configuration keys appear only inside technical details. Read-only.
+// Settings reports verified repository state, not a simulated missing publication.
+// The stock fixture is Ready. Missing-artifact enrollment runs are separate.
 export const task = {
   name: "Agent repository grouped readiness",
   screenId: "",
   route: "/settings",
   priority: "normal",
   acceptance:
-    "Agent repository shows one setup explanation with a 'Server setup guide' link, then 'Ready', 'Supported, needs setup' and 'Not supported yet' in that order with 'Not supported yet' collapsed; no 'releaseRepository' or per-row server-config sentence outside the details.",
+    "Agent repository states the actual server readiness once with a local Installation guide; Ready, Needs attention and collapsed Not supported yet groups match each platform's eligibility; configuration keys stay in Details. The stock fixture is Ready, not a missing-source test.",
 };
 
-const GROUPS = [/^Ready \(\d+\)$/, /^Supported, needs setup \(\d+\)$/];
 const UNSUPPORTED = /^Not supported yet \((\d+)\)$/;
-const SETUP = "To make a platform installable";
 
 export async function check({ page, visit, settle, require, capture, step }) {
   const main = page.getByRole("main");
@@ -23,51 +19,89 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await section.waitFor({ timeout: 30_000 });
   await section.locator("li").first().waitFor({ timeout: 30_000 });
   await settle();
+  const instructions = await page.evaluate(async () => {
+    const session = await (await fetch("/auth/session", { cache: "no-store" })).json();
+    const response = await fetch("/lindm.admin.v1.AdminService/GetEnrollmentInstructions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRF-Token": session.csrfToken },
+      body: "{}",
+    });
+    if (!response.ok) throw new Error(`GetEnrollmentInstructions_${response.status}`);
+    return response.json();
+  });
+  const platforms = instructions.platforms ?? [];
+  const supported = platforms.filter(
+    (platform) => platform.support === "ENROLLMENT_PLATFORM_SUPPORT_SUPPORTED",
+  );
+  const groups = [
+    { name: "Ready", platforms: supported.filter((platform) => platform.readiness?.ready) },
+    {
+      name: "Needs attention",
+      platforms: supported.filter((platform) => !platform.readiness?.ready),
+    },
+    {
+      name: "Not supported yet",
+      platforms: platforms.filter((platform) => !supported.includes(platform)),
+    },
+  ];
+  require(platforms.length > 0, "The server returned no platform eligibility");
 
-  step("single setup explanation with guide link");
+  step("readiness explanation with local guide");
   const primary = await section.innerText();
-  require(primary.split(SETUP).length - 1 ===
-    1, `Expected one setup explanation ("${SETUP}…"), found ${primary.split(SETUP).length - 1}`);
-  const guide = section.getByRole("link", { name: "Server setup guide", exact: true });
-  require((await guide.count()) === 1, "No 'Server setup guide' link");
-  if ((await guide.count()) === 1)
-    require(/docs\/.+\.md#/.test(
-      (await guide.getAttribute("href")) ?? "",
-    ), "Setup guide link does not point at a docs section");
+  const readySentence = "Devices install signed agent packages from this server.";
+  require(instructions.readiness?.ready === true, "The stock fixture repository is not Ready");
+  require(primary.split(readySentence).length - 1 ===
+    1, "Ready repository does not explain its signed package source once");
+  const guide = section.getByRole("link", { name: "Installation guide", exact: true });
+  require((await guide.count()) === 1, "No Installation guide link");
+  if ((await guide.count()) === 1) {
+    const target = new URL((await guide.getAttribute("href")) ?? "", page.url());
+    require(target.origin === new URL(page.url()).origin &&
+      target.pathname === "/help/security-and-operations.md" &&
+      target.hash ===
+        "#prepare-the-servers-installation-repository", "Installation guide does not target the local repository setup section");
+  }
   require(!primary.includes(
     "releaseRepository",
   ), "Primary text names releaseRepository configuration");
 
-  step("groups in order");
-  const ready = section.getByRole("heading", { name: GROUPS[0] });
-  const needsSetup = section.getByRole("heading", { name: GROUPS[1] });
-  const unsupported = section.locator("summary").filter({ hasText: UNSUPPORTED });
-  require((await ready.count()) === 1, "No 'Ready' group");
-  require((await needsSetup.count()) === 1, "No 'Supported, needs setup' group");
-  require((await unsupported.count()) === 1, "No 'Not supported yet' disclosure");
-  if (
-    (await ready.count()) === 1 &&
-    (await needsSetup.count()) === 1 &&
-    (await unsupported.count()) === 1
-  ) {
-    const handles = [
-      await ready.elementHandle(),
-      await needsSetup.elementHandle(),
-      await unsupported.elementHandle(),
-    ];
-    const ordered = await page.evaluate(
-      ([a, b, c]) =>
-        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) &&
-        Boolean(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING),
-      handles,
-    );
-    require(ordered, "Groups are not in the order Ready, Supported needs setup, Not supported yet");
-    const open = await unsupported.evaluate((summary) => summary.parentElement?.open === true);
-    require(!open, "'Not supported yet' is expanded by default");
-    const count = Number(UNSUPPORTED.exec((await unsupported.innerText()).trim())?.[1] ?? 0);
-    require(count >
-      0, "The registry's design-only releases are not listed under 'Not supported yet'");
+  step("group eligibility and order");
+  const headings = await section.locator("h3, summary").allInnerTexts();
+  const expected = groups.map((group) => `${group.name} (${group.platforms.length})`);
+  require(expected.every(
+    (text, index) => headings[index]?.trim() === text,
+  ), `Groups disagree with platform eligibility or order: ${headings.join(" | ")}`);
+  for (const group of groups.slice(0, 2)) {
+    const heading = section.getByRole("heading", {
+      name: `${group.name} (${group.platforms.length})`,
+      exact: true,
+    });
+    require((await heading.count()) === 1, `Missing ${group.name} group`);
+    if ((await heading.count()) !== 1) continue;
+    const container = heading.locator("xpath=..");
+    const rows = await container.locator("li").allInnerTexts();
+    require(rows.length ===
+      group.platforms.length, `${group.name} lists the wrong number of platforms`);
+    for (const platform of group.platforms)
+      require(rows.some((text) =>
+        text.includes(platform.label),
+      ), `${group.name} omits ${platform.label}`);
+    if (!group.platforms.length)
+      require((await container
+        .getByText(
+          group.name === "Ready"
+            ? "No platform is installable from this server yet."
+            : "Every supported platform is installable.",
+          { exact: true },
+        )
+        .count()) === 1, `${group.name} has no meaningful empty state`);
   }
+  const unsupported = section.locator("summary").filter({ hasText: UNSUPPORTED });
+  require((await unsupported.count()) === 1, "No Not supported yet disclosure");
+  if ((await unsupported.count()) === 1)
+    require(!(await unsupported.evaluate(
+      (summary) => summary.parentElement?.open === true,
+    )), "Not supported yet is expanded by default");
 
   step("rows say only what differs");
   const rows = await section.locator("li").allInnerTexts();
@@ -76,10 +110,20 @@ export async function check({ page, visit, settle, require, capture, step }) {
     0, `Rows repeat server configuration text: ${jargon.slice(0, 2).join(" | ")}`);
   await capture("agent-repository");
 
-  step("expand not supported yet");
+  step("unsupported platforms explain their state");
   if ((await unsupported.count()) === 1) {
     await unsupported.click();
-    await section.getByText("NixOS", { exact: false }).first().waitFor({ timeout: 10_000 });
+    const container = unsupported.locator("xpath=..");
+    require((await container
+      .getByText("lindm does not support agent installation on these releases.", { exact: true })
+      .count()) === 1, "Unsupported platforms lack an installation consequence");
+    const listed = await container.locator("li").allInnerTexts();
+    require(listed.length ===
+      groups[2].platforms.length, "Unsupported group lists the wrong number of platforms");
+    for (const platform of groups[2].platforms)
+      require(listed.some((text) =>
+        text.includes(platform.label),
+      ), `Unsupported group omits ${platform.label}`);
     await capture("agent-repository-not-supported");
     await unsupported.click();
   }

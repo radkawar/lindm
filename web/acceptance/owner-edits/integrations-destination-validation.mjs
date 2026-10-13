@@ -47,7 +47,9 @@ export async function check({ page, visit, require, capture, step }) {
   await dialog.getByRole("button", { name: "Create destination", exact: true }).click();
   const text = await dialog.innerText();
   require(/Use an https:\/\/ address/.test(text), "no error for the http:// address");
-  require(/Use 32 to 64 characters; this has 5/.test(text), "no error for the short secret");
+  require(/Use 32 to 64 characters\. This secret has 5\./.test(
+    text,
+  ), "no error for the short secret");
   require(/Enter a reason that contains visible text/.test(
     text,
   ), "no error for the missing reason");

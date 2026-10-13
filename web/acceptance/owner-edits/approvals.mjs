@@ -8,8 +8,8 @@
 // secret, the least-impact approval-gated request: it changes nothing on any
 // device, reveals nothing until another admin approves, and the console asks
 // for it with a 10-minute lifetime. The server refuses any decision by the
-// requester and has no withdraw, so the request is left to expire; no later
-// review step approves it. The check never clicks "Reveal secret".
+// requester; no later review step approves it. The check never clicks
+// "Reveal secret".
 export const task = {
   name: "Approvals pending first",
   screenId: "d9d718034e2fb5ebeb0c9891",
@@ -108,7 +108,7 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     require(line.includes(device.Hostname), `Consequence omits ${device.Hostname}: "${line}"`);
     require(/\b\d+(\.\d)? GiB\b/.test(line), `Consequence has no GiB size: "${line}"`);
     require(!/\d{7,}/.test(line), "Consequence shows a raw byte count");
-    require(line.includes("cannot be undone"), "Consequence omits irreversibility");
+    require(line.includes("irreversible"), "Consequence omits irreversibility");
     require(wipe.consequenceRed, "Consequence is not red");
     require(wipe.consequenceLines === 1, `Consequence spans ${wipe.consequenceLines} lines`);
     require(wipe.detailsToggles === 1, `Wipe card has ${wipe.detailsToggles} Details toggles`);
