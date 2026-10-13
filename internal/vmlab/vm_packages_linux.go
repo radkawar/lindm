@@ -46,6 +46,11 @@ type nativeGuestPackages struct {
 	rollingSnapshot *resourcev1.RollingUpdateSnapshot
 	// osUpdateTarget is the registry's later os-update policy snapshot.
 	osUpdateTarget *resourcev1.RollingUpdateSnapshot
+	// executorConfigMode is the octal mode /etc/lindm/executor.json must keep
+	// across install and upgrade: empty is the packaged 640; a lane that
+	// installs a local action qualification hardens it to 600, and an upgrade
+	// must preserve that.
+	executorConfigMode string
 }
 
 func nativeQuote(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'" }
@@ -476,8 +481,12 @@ printf '%s:%s\n' "$uid" "$gid"
 func (p *nativeGuestPackages) assertOwnership(ctx context.Context, installed bool) error {
 	command := nativeOwnership
 	if installed {
+		mode := p.executorConfigMode
+		if mode == "" {
+			mode = "640"
+		}
 		command += `
-test -f /etc/lindm/executor.json; check /etc/lindm/executor.json 0:0:640
+test -f /etc/lindm/executor.json; check /etc/lindm/executor.json 0:0:` + mode + `
 test -f /etc/lindm/agent.json; check /etc/lindm/agent.json 0:0:644
 test -x ` + packaging.BinaryPath + `; check ` + packaging.BinaryPath + ` 0:0:755
 `

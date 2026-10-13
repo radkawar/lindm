@@ -10698,6 +10698,40 @@
       "recoveryManifest": "ubuntu-resolute-20260927-amd64",
       "recoveryManifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
       "mainlineRevision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340"
+    },
+    {
+      "platform": "debian-13",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "debian-13-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-repair-20261012T220753Z/debian-13/tpm-reference-repair-x86_64.json",
+      "sha256": "8108e8817ef6a9b81afc5407cd12632ae51e15c12a583f6daf8d59c2a0028886",
+      "recorded": "2026-10-13T02:51:47.256889300Z",
+      "revision": "dafaa8a2d9a86e60a67cd7b5189dd386604f4e26",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
+      "recoveryManifest": "debian-13-amd64",
+      "recoveryManifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
+      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-repair-20261012T220753Z/ubuntu-24.04/tpm-reference-repair-x86_64.json",
+      "sha256": "1440a419eb1ff825df68d65a287f7c352389c05489f67253dce0bfcc1dc84b6c",
+      "recorded": "2026-10-13T02:54:25.641326820Z",
+      "revision": "dafaa8a2d9a86e60a67cd7b5189dd386604f4e26",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bb853abdc412b1c8e415de31fcf4f13eb6489ae4e1558b1e34d779d3587f5927",
+      "recoveryManifest": "ubuntu-noble-20260926-amd64",
+      "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
     }
   ]
 }

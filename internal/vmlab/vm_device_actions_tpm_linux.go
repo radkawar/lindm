@@ -259,6 +259,8 @@ func (m *actionMachine) UpgradeAgent(ctx context.Context) error {
 	if m.packages == nil {
 		return errors.New("agent upgrade requires a package set with a later version")
 	}
+	// configureActionGuest hardened executor.json to 0600; the upgrade must keep it.
+	m.packages.executorConfigMode = "600"
 	err := m.packages.Upgrade(ctx)
 	err = errors.Join(err, m.packages.Close())
 	m.packages = nil
