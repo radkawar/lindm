@@ -47,6 +47,11 @@ type DemoOptions struct {
 	SourceDirectory string
 	// AdvisoryCache retains vendor exports across runs; defaults beneath SourceDirectory/.cache.
 	AdvisoryCache string
+	// FixtureFeeds serves the small checked-in vendor documents instead of
+	// real vendor exports, so the seed finishes in minutes. AdvisoryCache is
+	// then unused. Only the Fedora controlled repository is complete, so
+	// accepted and proposed findings come from Fedora devices.
+	FixtureFeeds bool
 }
 
 // Demo holds no credentials; safe to print/store as evidence.
@@ -92,6 +97,7 @@ type demoSeed struct {
 	origin       *devlab.ConsoleDemo
 	demo         Demo
 	organization *orgv1.Organization
+	fixtureFeeds bool
 }
 
 // DemoPresence keeps the route device checking in after seeding, so the console
@@ -159,22 +165,25 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	if err != nil {
 		return Demo{}, nil, err
 	}
-	feeds := &configv1.AdvisoryConfig{RefreshEnabled: true}
-	seen := make(map[string]bool)
-	for _, device := range devices {
-		if seen[device.release.Key] {
-			continue
+	var feeds *configv1.AdvisoryConfig
+	if !options.FixtureFeeds {
+		feeds = &configv1.AdvisoryConfig{RefreshEnabled: true}
+		seen := make(map[string]bool)
+		for _, device := range devices {
+			if seen[device.release.Key] {
+				continue
+			}
+			cfg, err := devlab.HeldAdvisories(*device.release, "amd64")
+			if err != nil {
+				return Demo{}, nil, err
+			}
+			feeds.Feeds = append(feeds.Feeds, cfg.GetFeeds()...)
+			seen[device.release.Key] = true
 		}
-		cfg, err := devlab.HeldAdvisories(*device.release, "amd64")
-		if err != nil {
-			return Demo{}, nil, err
-		}
-		feeds.Feeds = append(feeds.Feeds, cfg.GetFeeds()...)
-		seen[device.release.Key] = true
 	}
 	// Initial vendor downloads/revalidation have their own bounded deadline,
 	// before the twenty-minute synthetic device seed (enrollment, scale writes
-	// and real-feed evaluation waits).
+	// and evaluation waits). Nil feeds select the checked-in fixtures.
 	origin, err := fixture.ConfigureConsoleDemo(ctx, feeds, options.AdvisoryCache)
 	if err != nil {
 		return Demo{}, nil, fmt.Errorf("configure console demo: %w", err)
@@ -194,7 +203,7 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		resultErr = errors.Join(resultErr, r.owner.Close(cleanup))
 	}()
 	defer r.enrollmentTransport.CloseIdleConnections()
-	s := &demoSeed{runner: r, origin: origin, organization: organization}
+	s := &demoSeed{runner: r, origin: origin, organization: organization, fixtureFeeds: options.FixtureFeeds}
 	// Provision enrollment prerequisites through the same organization engine.
 	// Rollouts freeze a real cohort at creation and cannot precede enrollment;
 	// their assignments are applied with the full spec after inventory arrives.
@@ -456,14 +465,31 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	if err := s.scale(ctx); err != nil {
 		return err
 	}
-	if err := s.acceptFinding(ctx, rich); err != nil {
+	// Real exports report AFFECTED on the Ubuntu route device. Fixture feeds are
+	// complete only for the Fedora controlled repository, whose sudo node
+	// affects the Fedora baseline, so Fedora devices carry both exceptions.
+	accepted := rich
+	proposed := slices.DeleteFunc(slices.Clone(s.devices), func(d *simulatedDevice) bool { return !d.demo.proposal })
+	if s.fixtureFeeds {
+		accepted, proposed = nil, nil
+		for _, d := range s.devices {
+			switch d.demo.hostname {
+			case "fedora-ws-03":
+				accepted = d
+			case demoScaleHostname:
+				proposed = append(proposed, d)
+			}
+		}
+		if accepted == nil || len(proposed) == 0 {
+			return errors.New("fixture feeds require the Fedora demo devices")
+		}
+	}
+	if err := s.acceptFinding(ctx, accepted); err != nil {
 		return err
 	}
-	for _, d := range s.devices {
-		if d.demo.proposal {
-			if err := s.proposeAdvisoryAcceptance(ctx, d); err != nil {
-				return err
-			}
+	for _, d := range proposed {
+		if err := s.proposeAdvisoryAcceptance(ctx, d); err != nil {
+			return err
 		}
 	}
 	if err := s.awaitScaleFindings(ctx); err != nil {

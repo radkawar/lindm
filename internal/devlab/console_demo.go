@@ -1,6 +1,7 @@
 package devlab
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -17,12 +18,16 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
+	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/config"
+	"lindm/internal/platform"
 )
 
 // ConsoleDemo describes the fixture-owned loopback HTTPS origin. It holds no
@@ -49,9 +54,67 @@ func (o *consoleDemoOrigin) close() error {
 	return err
 }
 
-// ConfigureConsoleDemo enables real registry-derived vendor feeds through the
-// revalidating cache, plus an owned webhook sink and assistance relay. Only the
-// webhook uses the ephemeral CA. Call once, before enrolling demo devices.
+// consoleDemoFeed is one checked-in vendor fixture served as
+// /feeds/<release>/<name> for the registry row release. Signed documents also
+// serve their vendor .sha256 and .asc proofs. The repository feed is the
+// complete updateinfo of the fixture-owned controlled Fedora repository: the
+// recorded vendor node inside an <updates> root.
+type consoleDemoFeed struct {
+	release, name, fixture string
+	format                 advisoryv1.FeedFormat
+	stream                 string
+	signed, repository     bool
+}
+
+// Single notices are partial vendor snapshots, so their devices' findings stay
+// UNKNOWN (feed_partial_coverage). The Fedora controlled repository is the one
+// complete source: only Fedora devices can report AFFECTED. Provenance is
+// recorded in internal/advisory/feed/testdata/provenance.txt.
+func consoleDemoFeeds() []consoleDemoFeed {
+	return []consoleDemoFeed{
+		{release: "ubuntu-24.04", name: "USN-6859-1.json", fixture: "ubuntu-USN-6859-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
+		{release: "debian-12", name: "DSA-5724-1.json", fixture: "debian-DSA-5724-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
+		{release: "fedora-44", name: "updateinfo.xml", fixture: "fedora44-sudo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true},
+		{release: "rhel-9", name: "rhsa-2024_6783.json", fixture: "redhat-rhsa-2024_6783.json", format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, stream: "standard", signed: true},
+	}
+}
+
+// consoleDemoFixtureFeeds reads the served documents, keyed by origin-relative
+// path, and their feed sources with URLs beneath origin.
+func consoleDemoFixtureFeeds(repository, origin string) (map[string][]byte, *configv1.AdvisoryConfig, error) {
+	files := make(map[string][]byte)
+	advisories := &configv1.AdvisoryConfig{RefreshEnabled: true, InventoryMaxAgeSeconds: proto.Uint32(604800)}
+	for _, feed := range consoleDemoFeeds() {
+		release, ok := platform.Lookup(feed.release)
+		if !ok {
+			return nil, nil, fmt.Errorf("console demo release %s is not registered", feed.release)
+		}
+		path := "/feeds/" + feed.release + "/" + feed.name
+		suffixes := []string{""}
+		if feed.signed {
+			suffixes = append(suffixes, ".sha256", ".asc")
+		}
+		for _, suffix := range suffixes {
+			data, err := os.ReadFile(filepath.Join(repository, "internal", "advisory", "feed", "testdata", feed.fixture+suffix))
+			if err != nil {
+				return nil, nil, fmt.Errorf("read demo advisory fixture: %w", err)
+			}
+			files[path+suffix] = data
+		}
+		if feed.repository {
+			files[path] = slices.Concat([]byte("<updates>"), files[path], []byte("</updates>"))
+		}
+		advisories.Feeds = append(advisories.Feeds, &advisoryv1.FeedSource{Id: "demo-" + feed.release, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: origin + path, MaxAgeSeconds: 604800})
+	}
+	return files, advisories, nil
+}
+
+// ConfigureConsoleDemo enables the demo's vendor feeds plus an owned webhook
+// sink and assistance relay. Non-nil advisories are real registry-derived
+// feeds refreshed through the revalidating cache in cacheDir. Nil advisories
+// serve the small checked-in vendor fixtures (consoleDemoFeeds) from the
+// owned origin instead, so the first refresh takes seconds. Only that origin
+// uses the ephemeral CA. Call once, before enrolling demo devices.
 func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories *configv1.AdvisoryConfig, cacheDir string) (*ConsoleDemo, error) {
 	if f.closed || f.local == nil || f.ConsoleOrigin == consoleOrigin || f.demo != nil {
 		return nil, errors.New("console demo requires one live dynamic local console fixture")
@@ -90,6 +153,21 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories 
 	}
 	origin := fmt.Sprintf("https://localhost:%d", address.Port)
 	mux := http.NewServeMux()
+	if advisories == nil {
+		files, fixtures, err := consoleDemoFixtureFeeds(f.repository, origin)
+		if err != nil {
+			return nil, errors.Join(err, listener.Close())
+		}
+		mux.HandleFunc("GET /feeds/", func(w http.ResponseWriter, r *http.Request) {
+			data, ok := files[r.URL.Path]
+			if !ok {
+				http.NotFound(w, r)
+				return
+			}
+			http.ServeContent(w, r, r.URL.Path, time.Time{}, bytes.NewReader(data))
+		})
+		document.Proto.Advisories = fixtures
+	}
 	mux.HandleFunc("POST /webhook", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := io.Copy(io.Discard, io.LimitReader(r.Body, 1<<20)); err != nil {
 			http.Error(w, "unreadable delivery", http.StatusBadRequest)
@@ -111,8 +189,10 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories 
 	if err := f.Restart(ctx); err != nil {
 		return nil, err
 	}
-	if err := f.EnableAdvisories(ctx, advisories, cacheDir); err != nil {
-		return nil, err
+	if advisories != nil {
+		if err := f.EnableAdvisories(ctx, advisories, cacheDir); err != nil {
+			return nil, err
+		}
 	}
 	return &ConsoleDemo{WebhookURL: origin + "/webhook", CAPEM: string(authority)}, nil
 }

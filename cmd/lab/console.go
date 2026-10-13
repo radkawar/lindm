@@ -30,18 +30,22 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	hostObservation := flags.String("host-observation", "", "captured HostObservation protobuf JSON to replay on one simulated device (historical, at most 1 MiB)")
 	revealApproval := flags.Bool("reveal-approval", false, "require a second human to approve secret and local-admin password reveals")
 	demo := flags.Bool("demo", false, "seed the deterministic console demo dataset instead of the capacity population (ignores -devices/-packages/-assignment-percent/-enrollment-workers)")
-	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache for -demo (default <repo>/.cache/lab/advisories)")
+	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache for -demo -feeds real (default <repo>/.cache/lab/advisories)")
+	feeds := flags.String("feeds", "fixtures", "-demo advisory feeds: fixtures (small checked-in vendor documents, ready in minutes) or real (current full vendor exports; first refresh can take an hour)")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
 	if *binary == "" || flags.NArg() != 0 {
 		return errors.New("lab console requires -lindmd FILE; no positional arguments")
 	}
+	if *feeds != "fixtures" && *feeds != "real" {
+		return errors.New("lab console -feeds must be fixtures or real")
+	}
 	if *advisoryCache == "" {
 		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
 	}
 	setupTimeout := 30 * time.Minute
-	if *demo {
+	if *demo && *feeds == "real" {
 		setupTimeout = 3 * time.Hour
 	}
 	setup, cancel := context.WithTimeout(ctx, setupTimeout)
@@ -60,7 +64,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	reporting := "devices stop reporting after population."
 	if *demo {
 		// The outer context: the route device keeps checking in until the console stops.
-		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache})
+		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache, FixtureFeeds: *feeds == "fixtures"})
 		if err != nil {
 			return err
 		}

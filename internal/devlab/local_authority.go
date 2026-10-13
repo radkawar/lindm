@@ -157,10 +157,12 @@ func (f *AuthorityFixture) newLocalSession(account *localAccount) (*OwnerSession
 	if f.connected != nil {
 		dial = f.connectedDialContext()
 	}
-	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: dial, MaxIdleConns: 4, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
-	client := &http.Client{Transport: transport, Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	// The header timeout exceeds the server's own 15 s RPC bound, so a loaded
+	// host answers with its definitive result instead of a client-side cut.
+	transport := &http.Transport{TLSClientConfig: tlsConfig, DialContext: dial, MaxIdleConns: 4, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second, ResponseHeaderTimeout: 20 * time.Second}
+	client := &http.Client{Transport: transport, Jar: jar, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	session := &OwnerSession{client: client, transport: transport, local: account, AccountID: account.id, origin: f.ConsoleOrigin}
-	session.Admin = adminv1connect.NewAdminServiceClient(client, f.ConsoleOrigin, connect.WithInterceptors(connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
+	session.Admin = adminv1connect.NewAdminServiceClient(client, f.ConsoleOrigin, connect.WithInterceptors(connect.UnaryInterceptorFunc(retryLoadedHost), connect.UnaryInterceptorFunc(func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			req.Header().Set("Origin", f.ConsoleOrigin)
 			req.Header().Set("X-CSRF-Token", session.csrf)

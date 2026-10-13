@@ -1097,7 +1097,18 @@ isolated console fixture with `-demo` data, issues a one-time enrollment for
 through the real password and WebAuthn flow (CDP virtual authenticator). Credentials
 stay in a private 0600 file that is removed afterwards; the report is redacted and
 screenshots mask sensitive and password fields. `lab console -demo` serves the same
-seeded fleet interactively.
+seeded fleet interactively. Its `-feeds` defaults to `fixtures`: the small
+checked-in vendor documents (USN-6859-1, DSA-5724-1, the Fedora 44 sudo
+updateinfo node as a complete controlled repository, and RHSA-2024:6783 with its
+`.sha256`/`.asc` proofs) served from the fixture-owned loopback origin, so the
+console is ready in minutes. Only Fedora devices report AFFECTED there, so the
+accepted and proposed finding exceptions sit on `fedora-ws-03` and the scale
+device. `-feeds real` seeds the full exports described below, as `ui-review`
+always does. The demo owner's admin client waits 20 s for response headers
+(above the server's 15 s RPC bound) and retries reads and `request_id`
+mutations, which the server replays exactly, up to four attempts on
+`deadline_exceeded` or `unavailable`, so one slow call on a loaded host does not
+fail a long seed.
 For a private worktree, use `make ui-review UI_REVIEW_REPO=/path/to/shared-checkout`
 to read the shared fixture's protected trust without copying credentials. The
 embedded UI and browser runner still come from the current worktree; the default
@@ -1220,8 +1231,9 @@ dependent `developer` account at `dependency_attention`) and
 a create-only SSH notice meets `existing_banner_file`. The simulator has no SSH or
 kernel-setting executor, so admitted adoption rows end unsupported, never compliant.
 
-Advisories come from registry-derived real Ubuntu OSV, Fedora updateinfo and RHEL
-CSAF exports, not single-record fixtures or a loopback feed server. First refresh
+With `-feeds real` (always for review), advisories come from registry-derived
+real Ubuntu OSV, Fedora updateinfo and RHEL CSAF exports, not single-record
+fixtures or a loopback feed server. First refresh
 uses the revalidating HTTP cache at `<repo>/.cache/lab/advisories`, shared across
 worktrees using the same `-repo` development-trust checkout; `-advisory-cache DIRECTORY`
 selects another persistent cache. Cache revalidation/index publication holds a
