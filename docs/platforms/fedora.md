@@ -696,7 +696,12 @@ runs under the same lindm window timer, runner and release model as
 and may also lack `dnf5-plugins` (for `dnf5 needs-restarting`). The runner then
 reaches the same transaction through `dnf5` itself and the same reboot verdict
 through rpm (see below). The observed native version names
-`dnf5-plugin-automatic` when it is installed, and `dnf5` otherwise.
+`dnf5-plugin-automatic` when it is installed, and `dnf5` otherwise. On the lab's
+Fedora 44 x86_64 GNOME desktop (Fedora-Server-dvd-x86_64-44-1.7 with the
+Workstation environment: `dnf5 5.4.1.0`, no `dnf5-plugin-automatic`) the policy
+granted by the default OS_UPDATES capability converged, verified, with the owned
+`/etc/dnf/automatic.conf` and timer; no window run was observed
+([verification](../verification.md#out-of-box-capability-policy-two-desktop-demo-2026-10-12)).
 `dnf5 automatic` accepts no configuration path. It reads
 `/usr/share/dnf5/dnf5-plugins/automatic.conf`, then
 `/etc/dnf/dnf5-plugins/automatic.conf`, then `/etc/dnf/automatic.conf`, and later

@@ -1,0 +1,41 @@
+{
+  "organization": "org.json",
+  "devices": [
+    {
+      "key": "engineering-laptop",
+      "hostname": "demo-engineering-01",
+      "manifest": "../images/ubuntu-noble-encrypted-amd64.json",
+      "role": "DEMO_ROLE_DESKTOP",
+      "group": "26d5407e-0035-5ae1-b4c9-83d105e13915",
+      "provisioningToken": "engineering",
+      "assistance": true,
+      "tpmBind": true,
+      "host": "local",
+      "firmware": {
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd",
+        "vars": "/usr/share/OVMF/OVMF_VARS_4M.ms.fd",
+        "package": "ovmf",
+        "version": "2024.02-2ubuntu0.10",
+        "secureBoot": true
+      }
+    },
+    {
+      "key": "finance-desktop",
+      "hostname": "demo-finance-01",
+      "manifest": "../images/fedora-44-encrypted-x86_64.json",
+      "role": "DEMO_ROLE_DESKTOP",
+      "group": "9b1eb9f4-dee7-54b3-839d-4e0938f5a579",
+      "provisioningToken": "finance",
+      "assistance": true,
+      "tpmBind": true,
+      "host": "local",
+      "firmware": {
+        "code": "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd",
+        "vars": "/usr/share/OVMF/OVMF_VARS_4M.ms.fd",
+        "package": "ovmf",
+        "version": "2024.02-2ubuntu0.10",
+        "secureBoot": true
+      }
+    }
+  ]
+}

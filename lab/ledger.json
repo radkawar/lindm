@@ -12081,6 +12081,23 @@
       "verified": true,
       "manifestSha256": "bd5cd11035502c75403ec6a6884865d7d2dd318eb974a15a118f41932939dbf0",
       "mainlineRevision": "ef926eb0a9564cf4a8be65c711c452634ec0921d"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "encrypted",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-pe-proof/x86-ubuntu-encrypted-2/ubuntu-24.04/encrypted-x86_64.json",
+      "sha256": "964342efd6539b67bf77dc80b3c156eb6432d128f511a93f29cf5127bbae3047",
+      "recorded": "2026-10-13T14:23:49.765391073Z",
+      "revision": "7558da8ec830b410df2800ac5688ca8cb02a14e2-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bb853abdc412b1c8e415de31fcf4f13eb6489ae4e1558b1e34d779d3587f5927",
+      "recoveryManifest": "ubuntu-noble-20260926-amd64",
+      "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "7558da8ec830b410df2800ac5688ca8cb02a14e2"
     }
   ]
 }

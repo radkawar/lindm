@@ -26,7 +26,7 @@ func TestAdmitMaintainedOrganizationDemo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"../../lab/demo/org-demo.json", "../../lab/demo/org-desktops-demo.json"} {
+	for _, path := range []string{"../../lab/demo/org-demo.json", "../../lab/demo/org-desktops-demo.json", "../../lab/demo/org-desktops-x86-demo.json"} {
 		spec, err := Load(path)
 		if err != nil {
 			t.Fatal(err)
