@@ -48,7 +48,15 @@ fedora|rhel|almalinux|rocky)
 *)
  command -v firewall-cmd >/dev/null
  systemctl enable --now firewalld.service >/dev/null 2>&1
- firewall-cmd --state >/dev/null
+ # firewalld owns its bus name before its zones load, so on a loaded host
+ # firewall-cmd reports "not running" for a while after the unit started.
+ # A start that never completes keeps the unit's own reason on stderr.
+ i=0
+ until firewall-cmd --state >/dev/null 2>&1; do
+  i=$((i+1))
+  if [ "$i" -ge 120 ]; then systemctl status --no-pager --lines=0 firewalld.service >&2; journalctl --no-pager -b -u firewalld.service -n 30 -o cat >&2; exit 1; fi
+  sleep 1
+ done
  ;;
 esac`
 

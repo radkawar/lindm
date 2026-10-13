@@ -12098,6 +12098,41 @@
       "recoveryManifest": "ubuntu-noble-20260926-amd64",
       "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
       "mainlineRevision": "7558da8ec830b410df2800ac5688ca8cb02a14e2"
+    },
+    {
+      "platform": "arch",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r25/arch/resources-x86_64.json",
+      "sha256": "76219b31d419bd535227ccd2f041c142ce0f281eab5684311a2c6ab64b1212e2",
+      "recorded": "2026-10-13T18:09:26.271625143Z",
+      "revision": "3f5e6142b5734f597471712714698d8682f0f4cd",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "ef926eb0a9564cf4a8be65c711c452634ec0921d"
+    },
+    {
+      "platform": "arch",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-systemd-boot-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r26/arch/tpm-reference-repair-x86_64.json",
+      "sha256": "5def94e4fe2ea9e424cb5d9b99ae107056418253d914606d9eca6ca8e4084279",
+      "recorded": "2026-10-13T18:03:17.348070503Z",
+      "revision": "61a3f3dab3f2268fa150f09a5455bcc6470e44df",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "886d69487ebcb99f03847d708c847de56af46b90147bb13b69c335c135c0950e",
+      "repositorySnapshotDate": "2026-10-02",
+      "recoveryManifest": "arch-cloud-20261001.604814-x86-64",
+      "recoveryManifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "recoveryRepositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "5618b5f77d4d2eb6aa6363c9d8c510d8e5a2ebe9"
     }
   ]
 }

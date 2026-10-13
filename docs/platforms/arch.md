@@ -788,6 +788,8 @@ each record in the [ledger](../verification.md#1-launch-platform-qualification):
 | OS update            | pass                            | `~/.cache/lindm-arch-qualify/r20/arch/os-update-x86_64.json` / `9512995c2d40687e68d910785c27c1d18ea1fb3729bca9aa3022d598d8a60c61`            |
 | Encryption           | pass                            | `~/.cache/lindm-arch-qualify/r21/arch/encrypted-x86_64.json` / `0e23d06dc86839522785d381f26a0680bde5703e124065fa53805286cf47c673`            |
 | TPM unattended boots | pass (owner Secure Boot)        | `~/.cache/lindm-arch-qualify/r22/arch/tpm-unattended-boots-x86_64.json` / `eaad12e25e10acf6db07c4eebe36855cc2fad2f1befdbfb487dbde5463415532` |
+| TPM reference repair | pass (owner Secure Boot)        | `~/.cache/lindm-arch-qualify/r26/arch/tpm-reference-repair-x86_64.json` / `5def94e4fe2ea9e424cb5d9b99ae107056418253d914606d9eca6ca8e4084279` |
+| Resources            | pass                            | `~/.cache/lindm-arch-qualify/r25/arch/resources-x86_64.json` / `76219b31d419bd535227ccd2f041c142ce0f281eab5684311a2c6ab64b1212e2`            |
 
 The os-update lane provisions its prerequisites at the image's Archive pin
 (2026-10-02) and gives the whole-system policy the registry's later
@@ -802,6 +804,10 @@ required); the native boot record alone is not signed evidence. The pacman
 lock-boundary probe requires the resource fixture root and its ancestry to be
 root-protected, not private: the root stays 0755 because it also holds the lab
 accounts' homes.
+The firewall fixture names the host with `uname -n` (Arch's base install has no
+`hostname` command) and waits for firewalld's running state, which on a loaded
+host trails its D-Bus name; a start that never completes reports the unit's own
+journal.
 
 Encryption escrow rotation confirms its server receipt within the device clock
 skew the control plane tolerates: these offline guests keep only the host RTC,

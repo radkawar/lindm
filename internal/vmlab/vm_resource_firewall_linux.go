@@ -545,7 +545,8 @@ fi
 # Quarantine admits loopback only from its 127.0.0.1 management endpoint, so
 # the systemd-resolved stub (127.0.0.53) is unreachable while quarantined; the
 # lab's sudo needs the local hostname in /etc/hosts (the Debian convention).
-getent -s files hosts "$(hostname)" >/dev/null || printf '127.0.1.1 %s\n' "$(hostname)" >> /etc/hosts
+# uname -n, not hostname(1): Arch's base install has no inetutils.
+getent -s files hosts "$(uname -n)" >/dev/null || printf '127.0.1.1 %s\n' "$(uname -n)" >> /etc/hosts
 ` + firewallNativeManagerScript + `
 if systemctl is-active --quiet firewalld.service; then
  firewall-cmd --permanent --add-port=8080/tcp --add-port=8081/tcp --add-port=8083/tcp >/dev/null
