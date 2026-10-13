@@ -38,6 +38,14 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await page.getByLabel("Search devices", { exact: true }).fill(query);
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await settle();
+  // The list keeps the previous page on screen (aria-busy) until the searched page
+  // arrives; read rows only once the search is applied and no read is in flight.
+  await page.getByRole("button", { name: `Remove hostname filter: ${query}` }).waitFor();
+  await page
+    .waitForFunction(() => !document.querySelector('main [aria-busy="true"]'), null, {
+      timeout: 30_000,
+    })
+    .catch(() => {});
   const found = await hostnames(table);
   const expected = devices
     .filter((device) => device.Hostname.toLowerCase().includes(part.toLowerCase()))
