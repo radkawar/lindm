@@ -203,7 +203,7 @@ var (
 	almaExports   = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/AlmaLinux/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 1 << 30}}
 	rockyExports  = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Rocky%20Linux/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 1 << 30}}
 	// Rocky Linux and AlmaLinux 9/10 lab lanes, on both architectures.
-	elRebuildLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}
+	elRebuildLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart}
 	// Linux Mint and Pop!_OS installed-golden lab lanes (x86_64). Advisory
 	// lanes there qualify the verified-origin partial evaluation through the
 	// Ubuntu base's feed (Advisory.VendorOrigins).
@@ -442,7 +442,7 @@ var registry = []*Release{
 		VendorRepositories: []VendorRepository{jammyArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// Jammy's dracut 051 has no tpm2-tss module: the initramfs carries the
 		// TSS2 libraries systemd 249's cryptsetup dlopens and the TPM drivers.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneServices, LaneUpdates, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall}, Installer: Subiquity, Session: ubuntuSession, Guest: ubuntuGuest, FirstBootAccount: true,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM: LabTPM{Modules: []string{"systemd", "crypt", "lvm"}, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"},
 				Items:   []string{"/usr/lib/%s/libtss2-esys.so.0", "/usr/lib/%s/libtss2-mu.so.0", "/usr/lib/%s/libtss2-rc.so.0", "/usr/lib/%s/libtss2-tctildr.so.0", "/usr/lib/%s/libtss2-tcti-device.so.0"},
@@ -533,7 +533,7 @@ var registry = []*Release{
 		// No vendor archive: AptRepository has one URI, but the security pocket
 		// lives only under /debian-security (debian.md, "Capability policy facts").
 		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		// Recovery sanitize is measured GRUB only (systemd 252 has no ukify),
@@ -551,7 +551,7 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
 		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit}, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories}, actionLanes),
 		Gates:    gates(string(ReleaseUpgrade), "no successor release: Debian 14 is not released", string(OSUpdate), reasonDebianOSUpdate),

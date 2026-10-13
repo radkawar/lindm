@@ -60,9 +60,11 @@ This common delivery method does not transfer RHEL/Fedora or cross-derivative
 qualification.
 
 A provisioning token offers **cloud-init** and **Kickstart** for every AlmaLinux,
-Rocky Linux and CentOS Stream row, using the same DNF snippet as RHEL. No
-provisioning lane has a record for these releases; the RHEL 9 Kickstart result
-does not transfer to them.
+Rocky Linux and CentOS Stream row, using the same DNF snippet as RHEL. AlmaLinux
+and Rocky Linux 9/10 have maintained cloud-init and signed vendor-DVD Kickstart
+lane recipes on both architectures. aarch64 qualification is blocked: lab hosts
+offline (Sparks). CentOS Stream has no provisioning record; neither the recipes
+nor the RHEL 9 Kickstart result qualify these releases.
 
 Use native RPMs, independently verified against the configured package signer.
 The builder signs then verifies before recording the release artifact

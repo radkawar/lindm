@@ -72,7 +72,9 @@ Ubuntu installation evidence does not qualify Debian.
 
 A provisioning token offers only **cloud-init** for Debian (genericcloud images).
 Debian's installer uses preseed, which the console does not generate, and Ubuntu
-autoinstall is subiquity-only. No provisioning lane has a Debian record.
+autoinstall is subiquity-only. Debian 12/13 have maintained cloud-init lane recipes
+on both architectures. aarch64 qualification is blocked: lab hosts offline
+(Sparks); a lane recipe is not a passing provisioning record.
 
 Agent packaging uses DEB/APT, not an RPM-derived path. Authentication is repository
 `InRelease` signature → `Packages` hashes → exact archive digest; a built `.deb` is

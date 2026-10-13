@@ -241,8 +241,10 @@ both formats passed end to end from the console clipboard through independent
 approval to **Enrolled** ([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
 cloud-init also passed on 24.04 amd64 and on 26.04 amd64 and arm64 (9021e6a2), and
 autoinstall on 24.04 and 26.04 amd64 (live-server media; see the same section).
-22.04 and 26.04 arm64 autoinstall are offered but have no passing provisioning
-record.
+22.04 has maintained cloud-init and autoinstall lanes on both architectures;
+autoinstall uses the pinned signed 22.04.5 live-server ISO, not desktop media.
+22.04 and 26.04 arm64 autoinstall have no passing provisioning record.
+22.04 aarch64 qualification is blocked: lab hosts offline (Sparks).
 
 Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
 signature check. Authentication is signed `InRelease` → hashed `Packages` → archive
