@@ -12000,6 +12000,40 @@
       "recoveryManifest": "rhel-9.8-kvm-x86-64",
       "recoveryManifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "94befa8f62ab7ee470a18eda680ae6ebd5ec7c32"
+    },
+    {
+      "platform": "debian-13",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "debian-13-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-repair-20261013T131246Z/debian-13/tpm-reference-repair-x86_64.json",
+      "sha256": "0ea23fb201defdb247d28c9a1cba2f9a52eebb145f871d0a9fa1fae5c4a80eef",
+      "recorded": "2026-10-13T14:04:25.954218811Z",
+      "revision": "ecfac2b4b5ebb15fb18667e44f895b746223ba15",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
+      "recoveryManifest": "debian-13-amd64",
+      "recoveryManifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-tpmrace/matrix-repair-20261013T131246Z/ubuntu-24.04/tpm-reference-repair-x86_64.json",
+      "sha256": "fd7c6a3d4d103b7351ca04b04a4ca847e958e378833d05adef4d74a837a35897",
+      "recorded": "2026-10-13T14:45:49.913375007Z",
+      "revision": "ecfac2b4b5ebb15fb18667e44f895b746223ba15",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bb853abdc412b1c8e415de31fcf4f13eb6489ae4e1558b1e34d779d3587f5927",
+      "recoveryManifest": "ubuntu-noble-20260926-amd64",
+      "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
     }
   ]
 }
