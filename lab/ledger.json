@@ -12418,6 +12418,36 @@
       "recoveryManifest": "rocky-9.8-20260525.0-x86-64",
       "recoveryManifestSha256": "1eaec491a807f8a15baf697fdf6e335976d97a034cbd11014158ce4b821d93c2",
       "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/pop/resources-executor-01.json",
+      "sha256": "a05870165bf024d21a615d823ce98d1dc0ae08f452dbb80708d997bb11e4a7a5",
+      "recorded": "2026-10-13T16:37:10.914658210Z",
+      "revision": "eb0f1ca4d163ae0fb789a3989a4d3a03809ac35e",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "executor: packages, files; main 85caf6ed",
+      "mainlineRevision": "eb0f1ca4d163ae0fb789a3989a4d3a03809ac35e"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/pop/resources-connected-rest-01.json",
+      "sha256": "c008015771c2bec124d9d8707621a7fc34b3be1004333d0a26d0e7ed554a8582",
+      "recorded": "2026-10-13T21:35:57.657023541Z",
+      "revision": "eb0f1ca4d163ae0fb789a3989a4d3a03809ac35e-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "connected: files, accounts, sysctl, definitions, password, firewall, secret-password, local-admin",
+      "mainlineRevision": "eb0f1ca4d163ae0fb789a3989a4d3a03809ac35e"
     }
   ]
 }

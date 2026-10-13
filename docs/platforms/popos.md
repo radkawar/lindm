@@ -46,7 +46,8 @@ Intel and AMD graphics; the `intel` channel's build 20 is an older, separately
 maintained image and `nvidia` adds the proprietary driver). System76 arm64 images
 are not part of this row. Qualified natively on x86_64: inventory, lifecycle,
 dispatch and power, self-update, encryption, live-root crypto-erase, report-loss,
-and lock/release/quarantine; see the
+lock/release/quarantine, and the resource kinds files, groups, users, sysctl,
+definitions, password, firewall, secret-password and local-admin; see the
 [tier capability matrix](../verification.md#tier-capability-matrix) and
 [Known gaps](#known-gaps). Records are under
 `~/.cache/lindm-desktopderiv-20261011/pop/` unless stated otherwise.
@@ -398,12 +399,20 @@ the recipe above; ISO relabels are not used.
 
 ## Known gaps
 
-Pending native runs: resources. The connected run passed packages (including
-`vendor-updater-native-busy`), files, groups, users, sysctl (with
-`vm.vfs_cache_pressure`) and definitions and failed at password
-(os-release symlinks, see Identity above); the executor run failed on a busy
-dpkg lock (see pop-upgrade above). Firewall, secret-password and local-admin are
-not yet exercised. Recovery sanitize and the Secure Boot TPM cells are gated on
-the unsigned systemd-boot.
+Resources: the executor phase passed packages and files
+(`resources-executor-01.json`,
+`a05870165bf024d21a615d823ce98d1dc0ae08f452dbb80708d997bb11e4a7a5`, main
+`85caf6ed`), and the connected phase passed files, groups, users, sysctl (with
+`vm.vfs_cache_pressure`), definitions, password, firewall, secret-password and
+local-admin (`resources-connected-rest-01.json`,
+`c008015771c2bec124d9d8707621a7fc34b3be1004333d0a26d0e7ed554a8582`, main
+`60be6a7a`). The connected packages kind passed its earlier scenarios,
+including `vendor-updater-native-busy`, but stops at
+`modified-installation-unverified`
+(`resources-connected-01-snap13-failed.json`,
+`ac59b7082169fd0d1b1019843932c70561e925f44ca14a674f974a5356a9a3af`): main's
+server does not yet qualify approved package adoption on any APT release, so
+that rerun waits for the package-adoption qualification to land. Recovery
+sanitize and the Secure Boot TPM cells are gated on the unsigned systemd-boot.
 Assistance is gated: VIEW ends `UNAVAILABLE` `notification_actions_hidden` and
 CONTROL `portal_remote_desktop_unavailable`, both before consent.
