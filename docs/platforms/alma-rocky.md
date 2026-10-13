@@ -305,8 +305,12 @@ On the encrypted "Server with GUI" GNOME goldens, Rocky Linux and AlmaLinux
 - GNOME lock with nftables quarantine and release.
 
 AlmaLinux 10.2 repeated encryption, erase, report-loss and lock/quarantine on
-x86_64. Five-scenario remote assistance passed on Rocky and AlmaLinux 10.2
-(GNOME 49) on aarch64 and on AlmaLinux 10.2 x86_64.
+x86_64, and the matrix encryption, wipe/loss/lock, recovery-sanitize and
+30-boot unattended TPM2 cells passed on x86_64 for Rocky 9.8/10.2 and
+AlmaLinux 9.8/10.2 as well
+([verification](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)).
+Five-scenario remote assistance passed on Rocky and AlmaLinux 10.2 (GNOME 49) on
+aarch64 and x86_64.
 
 On 9.8 (GNOME 40), assistance ends with `UNAVAILABLE capture_no_frames`. The
 vendor PipeWire 1.4.11 sends damage-frame and keepalive timestamps that stall
