@@ -716,10 +716,10 @@ and is bound to the installed identity. The plan baseline and the journal's
 ownership claim carry the proven provenance. DNF4, zypper and pacman have no
 proof. The approved adoption pins the package; `RESTORE_OWNED` release restores
 only the recorded pin and never removes or downgrades a package lindm did not
-install. The server does not yet dispatch `APPROVED_ADOPTION` for
-`NATIVE_PACKAGE` (pending native qualification), so out of the box a provable
-preinstalled package is BLOCKED `existing_package` and an unprovable one
-`existing_package_unverified`.
+install. The server dispatches `APPROVED_ADOPTION` for `NATIVE_PACKAGE`, so a
+preinstalled package the approved source proves is adopted with an approved
+adoption (create-only: BLOCKED `existing_package`) and an unprovable one is
+BLOCKED `existing_package_unverified`.
 
 Account creation without explicit
 numeric identity (a group's GID; a user's UID, primary group, home and shell) is

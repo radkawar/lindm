@@ -215,7 +215,7 @@ func (p *Provider) proveDEB(ctx context.Context, directory, scratch string, reco
 	if err := checkDownloadBudget(directory, declared, p.stagingMax); err != nil {
 		return nil, err
 	}
-	if err := boundedDownload(ctx, scratch, declarations, func(downloadContext context.Context) error {
+	if err := boundedDownload(ctx, directory, scratch, declarations, func(downloadContext context.Context) error {
 		_, err := p.run(downloadContext, "/usr/bin/apt-get", append(aptOptions(directory), "download", spec), scratch, env)
 		return err
 	}); err != nil {
@@ -487,7 +487,7 @@ func (p *Provider) proveRPM(ctx context.Context, directory, scratch string, reco
 	if err := checkDownloadBudget(directory, size, p.stagingMax); err != nil {
 		return nil, err
 	}
-	if err := boundedDownload(ctx, scratch, declarations, func(downloadContext context.Context) error {
+	if err := boundedDownload(ctx, directory, scratch, declarations, func(downloadContext context.Context) error {
 		_, err := p.dnf(downloadContext, directory, []string{"download", "--destdir=" + scratch, nevra})
 		return err
 	}); err != nil {

@@ -4112,9 +4112,11 @@ ownership baseline. Like an already satisfied managed file, it verifies read-onl
 from the plan's proof, and each reconcile proves again. Release never removes or
 downgrades a package that was installed when its row was acquired:
 `RESTORE_OWNED` restores the recorded pin bytes and retains the installed
-version, including a version lindm later upgraded it to. Dispatch of
-`APPROVED_ADOPTION` for packages is pending native qualification
-([verification](verification.md#native-package-approved-adoption-pending)).
+version, including a version lindm later upgraded it to. `APPROVED_ADOPTION` for
+packages is qualified on Ubuntu 24.04 (APT) and Fedora 44 (DNF5) x86_64
+([verification](verification.md#native-package-approved-adoption)). A DNF5
+request the installed package already satisfies stages no transaction, because
+libdnf5 resolves a "Reason Change" for a package installed outside DNF.
 
 Preparation runs asynchronously in the bounded native helper, keyed by the exact
 signed action and its preparation deadline. It downloads authenticated metadata

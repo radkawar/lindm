@@ -183,36 +183,11 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		return nil, nil, err
 	}
 	spec := dnfSpec(d, target)
-	resolved, declared, err := p.resolveDNFSizes(ctx, directory, command, d, spec)
-	if err != nil {
-		return nil, nil, err
-	}
-	// --store may retain both native cache and transaction copies.
-	if err := checkDownloadBudget(directory, 2*declared, p.stagingMax); err != nil {
-		return nil, nil, err
-	}
-	declarations := make(map[string]downloadDeclaration)
-	for _, entry := range resolved.Entries {
-		if entry.DownloadSize == 0 {
-			continue
+	resolved := &dnfResolved{Version: 1}
+	if !p.dnfSatisfied(d, db.records[packageKey(target)]) {
+		if resolved, err = p.stageDNF(ctx, directory, command, d, spec); err != nil {
+			return nil, nil, err
 		}
-		if entry.FileName == "" || filepath.Base(entry.FileName) != entry.FileName || !strings.HasSuffix(entry.FileName, ".rpm") {
-			return nil, nil, errors.New("packageprovider: invalid native RPM download filename")
-		}
-		if _, exists := declarations[entry.FileName]; exists {
-			return nil, nil, ErrConflict
-		}
-		declarations[entry.FileName] = downloadDeclaration{size: entry.DownloadSize}
-	}
-	if err := boundedDownload(ctx, directory, declarations, func(downloadContext context.Context) error {
-		if p.manager == dnf.DNF4 {
-			_, err := p.dnf4(downloadContext, "stage", directory, p.versionlock, command, spec)
-			return err
-		}
-		_, err := p.dnf(downloadContext, directory, []string{command, "--store=" + filepath.Join(directory, "transaction"), spec})
-		return err
-	}); err != nil {
-		return nil, nil, err
 	}
 	data, err := custody.ReadRoot(filepath.Join(directory, "transaction", "transaction.json"), 4<<20, false)
 	if errors.Is(err, os.ErrNotExist) {
@@ -279,6 +254,52 @@ func (p *Provider) planDNF(ctx context.Context, directory string, d *resourcev1.
 		}
 	}
 	return entries, snapshot, nil
+}
+
+// dnfSatisfied reports a DNF5 request that the installed record already
+// satisfies, which has no package transaction. libdnf5 still resolves one for
+// a package installed outside DNF (an image build or rpm -i): a "Reason
+// Change" to user-installed, which is DNF history, not a package effect, and
+// never part of a lindm transaction.
+func (p *Provider) dnfSatisfied(d *resourcev1.NativePackageDesired, installed *resourcev1.NativePackageRecord) bool {
+	return p.manager == dnf.DNF5 && nativeMatches(d, installed)
+}
+
+// stageDNF resolves the exact download sizes, then has the native manager
+// download and store the transaction within those declarations.
+func (p *Provider) stageDNF(ctx context.Context, directory, command string, d *resourcev1.NativePackageDesired, spec string) (*dnfResolved, error) {
+	resolved, declared, err := p.resolveDNFSizes(ctx, directory, command, d, spec)
+	if err != nil {
+		return nil, err
+	}
+	// --store may retain both native cache and transaction copies.
+	if err := checkDownloadBudget(directory, 2*declared, p.stagingMax); err != nil {
+		return nil, err
+	}
+	declarations := make(map[string]downloadDeclaration)
+	for _, entry := range resolved.Entries {
+		if entry.DownloadSize == 0 {
+			continue
+		}
+		if entry.FileName == "" || filepath.Base(entry.FileName) != entry.FileName || !strings.HasSuffix(entry.FileName, ".rpm") {
+			return nil, errors.New("packageprovider: invalid native RPM download filename")
+		}
+		if _, exists := declarations[entry.FileName]; exists {
+			return nil, ErrConflict
+		}
+		declarations[entry.FileName] = downloadDeclaration{size: entry.DownloadSize}
+	}
+	if err := boundedDownload(ctx, directory, directory, declarations, func(downloadContext context.Context) error {
+		if p.manager == dnf.DNF4 {
+			_, err := p.dnf4(downloadContext, "stage", directory, p.versionlock, command, spec)
+			return err
+		}
+		_, err := p.dnf(downloadContext, directory, []string{command, "--store=" + filepath.Join(directory, "transaction"), spec})
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return resolved, nil
 }
 
 func parseNEVRA(nevra string) (*resourcev1.PackageIdentity, *resourcev1.NativeVersion, error) {

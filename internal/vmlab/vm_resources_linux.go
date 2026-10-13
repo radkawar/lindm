@@ -403,13 +403,16 @@ func exerciseConnectedResources(ctx context.Context, packages *nativeGuestPackag
 			return err
 		}
 		kinds[0].Unproven = nil
-		required := []string{"exact-v1-dependency-readiness", "wrong-signing-key-refused", "unavailable-exact-version-refused", "exact-v2-upgrade", "repeat-exact-v2", "owned-absence", "presence-after-absence", "release-retains-dependency", "external-pin-drift-release-refused", "interrupted-running-no-replay"}
+		// In run order: qualification compares each scenario by position.
+		required := []string{"exact-v1-dependency-readiness", "wrong-signing-key-refused", "unavailable-exact-version-refused"}
 		if lab.Updater.Unit != "" {
 			required = append(required, packageVendorBusyScenario)
 		}
+		required = append(required, "exact-v2-upgrade", "repeat-exact-v2", "owned-absence", "presence-after-absence", "release-retains-dependency")
 		if packageAdoptionSupported(rpm) {
 			required = append(required, packageAdoptionScenarios...)
 		}
+		required = append(required, "external-pin-drift-release-refused", "interrupted-running-no-replay")
 		if err := qualifyResourceEvidence(&kinds[0], required); err != nil {
 			return err
 		}

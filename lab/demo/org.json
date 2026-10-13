@@ -435,7 +435,7 @@
       "id": "cab4ef19-709a-5471-87d3-520361903656",
       "spec": {
         "name": "Engineering tools",
-        "description": "Git, htop and Podman from each device's own OS vendor repository on Ubuntu 24.04, Fedora 44 and RHEL 9 and 10 (htop on Fedora only, because RHEL ships it in EPEL), a company notice before SSH sign-in, and a developer account that starts with a locked password. Ubuntu ships its own SSH notice file, so the notice takes it over and rolling this profile out needs one approval.",
+        "description": "Git, htop and Podman from each device's own OS vendor repository on Ubuntu 24.04, Fedora 44 and RHEL 9 and 10 (htop on Fedora only, because RHEL ships it in EPEL), a company notice before SSH sign-in, and a developer account that starts with a locked password. Ubuntu already installs git and htop and ships its own SSH notice file, so the profile takes them over and rolling it out needs one approval.",
         "resources": [
           {
             "resourceId": "16eb0787-548e-57f4-977a-a1be276ecbef",
@@ -459,7 +459,7 @@
               }
             },
             "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
               "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
             },
             "verification": {
@@ -505,7 +505,7 @@
               }
             },
             "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
               "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
             },
             "verification": {

@@ -419,7 +419,7 @@ func (p *Provider) planAPT(ctx context.Context, directory string, d *resourcev1.
 		if err := checkDownloadBudget(directory, declared, p.stagingMax); err != nil {
 			return nil, nil, err
 		}
-		if err := boundedDownload(ctx, directory, declarations, func(downloadContext context.Context) error {
+		if err := boundedDownload(ctx, directory, directory, declarations, func(downloadContext context.Context) error {
 			_, err := p.apt(downloadContext, directory, "/usr/bin/apt-get", append([]string{"--assume-yes", "--download-only"}, aptTransactionArgs(d, target)...))
 			return err
 		}); err != nil {

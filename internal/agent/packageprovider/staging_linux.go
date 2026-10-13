@@ -273,10 +273,12 @@ func matchDNFDeclaration(resolved *dnfResolved, transaction *dnfTransaction) err
 }
 
 // Native managers may download concurrently. RLIMIT_FSIZE bounds every child
-// file by the largest declared artifact (or preexisting native cache file), and
-// the watcher enforces each package's smaller individual declaration. This is
+// file by the largest declared artifact or preexisting file in the staging
+// directory (the manager rewrites its own caches there, and SIGXFSZ kills it
+// past the limit), and the watcher enforces each package's smaller individual
+// declaration in downloads, which is staging or a directory inside it. This is
 // active bounded staging, not an atomic filesystem quota.
-func boundedDownload(ctx context.Context, directory string, declarations map[string]downloadDeclaration, run func(context.Context) error) (resultErr error) {
+func boundedDownload(ctx context.Context, staging, downloads string, declarations map[string]downloadDeclaration, run func(context.Context) error) (resultErr error) {
 	if len(declarations) == 0 {
 		return run(ctx)
 	}
@@ -284,7 +286,7 @@ func boundedDownload(ctx context.Context, directory string, declarations map[str
 	for _, declaration := range declarations {
 		maximum = max(maximum, declaration.size)
 	}
-	if err := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkErr error) error {
+	if err := filepath.WalkDir(staging, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -308,7 +310,7 @@ func boundedDownload(ctx context.Context, directory string, declarations map[str
 	}
 	defer func() { resultErr = errors.Join(resultErr, restore()) }()
 	check := func() error {
-		return filepath.WalkDir(directory, func(path string, entry fs.DirEntry, walkErr error) error {
+		return filepath.WalkDir(downloads, func(path string, entry fs.DirEntry, walkErr error) error {
 			if errors.Is(walkErr, os.ErrNotExist) {
 				return nil
 			}

@@ -236,7 +236,7 @@ func (p *Provider) planALPM(ctx context.Context, directory string, d *resourcev1
 	if err := checkDownloadBudget(directory, total, p.stagingMax); err != nil {
 		return nil, err
 	}
-	if err := boundedDownload(ctx, directory, declarations, func(ctx context.Context) error {
+	if err := boundedDownload(ctx, directory, directory, declarations, func(ctx context.Context) error {
 		_, err := p.run(ctx, p.managerPath, p.alpmArgs(directory, "-Sw", "--", target), "/", nil)
 		return err
 	}); err != nil {

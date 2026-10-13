@@ -515,11 +515,17 @@ non-config file and no size, digest or link-target change. `updates` keeps only
 current builds, so a package the image installed and `updates` has since
 superseded is `existing_package_unverified` until the device is updated. A
 proven package is BLOCKED `existing_package` under create-only ownership.
-Approved adoption pins it in `versionlock.toml`; `RESTORE_OWNED` release removes
-only that entry. Server dispatch of approved package adoption is pending native
-qualification, DNF4 (EL) has no proof, and a stock 44 image still refuses
-package rows as `native_tool_outdated` first. Unit coverage only: no Fedora
-record exercises the proof yet.
+Approved adoption pins it in `versionlock.toml` without a package transaction;
+`RESTORE_OWNED` release removes only that entry. DNF5 stages nothing for a
+request the installed package already satisfies: for a package installed
+outside DNF (`rpm -i`, an image build) libdnf5 would resolve a "Reason Change"
+to user-installed, which is DNF history rather than a package effect and which
+lindm's resolver refuses as an unsafe action. The x86_64 connected package
+lane qualifies the four adoption cases against an `rpm -i`-installed signed
+fixture after the guest's DNF5 5.4.6.0 update
+([records](../verification.md#native-package-approved-adoption)); DNF4 (EL)
+has no proof, a stock 44 image still refuses package rows as
+`native_tool_outdated` first, and aarch64 is not exercised.
 
 The typed kernel-module blocklist needs the kernel-module blocklist device
 capability (a signed capability policy) or the root executor's local

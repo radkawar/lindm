@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -21,7 +22,41 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/dnf"
 )
+
+// An installed package lindm adopts (installed by rpm -i or an image build)
+// already satisfies its exact row. DNF5 must not stage it: libdnf5 resolved a
+// "Reason Change", which the resolver refused as an unsafe action.
+func TestDNF5SatisfiedRequestStagesNoTransaction(t *testing.T) {
+	identity := &resourcev1.PackageIdentity{Ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM, NativeName: "proof", Architecture: "x86_64"}
+	v1 := &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Rpm{Rpm: &resourcev1.RPMVersion{Version: "1.0", Release: "1"}}}
+	v2 := &resourcev1.NativeVersion{Version: &resourcev1.NativeVersion_Rpm{Rpm: &resourcev1.RPMVersion{Version: "2.0", Release: "1"}}}
+	exact := func(version *resourcev1.NativeVersion) *resourcev1.NativePackageDesired {
+		return &resourcev1.NativePackageDesired{Package: identity, Presence: resourcev1.Presence_PRESENCE_PRESENT, Version: &resourcev1.NativePackageDesired_Exact{Exact: version}}
+	}
+	installed := &resourcev1.NativePackageRecord{Package: identity, Version: v1}
+	absent := &resourcev1.NativePackageDesired{Package: identity, Presence: resourcev1.Presence_PRESENCE_ABSENT}
+	for _, tc := range []struct {
+		name      string
+		manager   dnf.Kind
+		desired   *resourcev1.NativePackageDesired
+		installed *resourcev1.NativePackageRecord
+		satisfied bool
+	}{
+		{"installed exact version", dnf.DNF5, exact(v1), installed, true},
+		{"absent and not installed", dnf.DNF5, absent, nil, true},
+		{"other installed version", dnf.DNF5, exact(v2), installed, false},
+		{"not installed", dnf.DNF5, exact(v1), nil, false},
+		{"installed but desired absent", dnf.DNF5, absent, installed, false},
+		{"DNF4 stages its own satisfied request", dnf.DNF4, exact(v1), installed, false},
+	} {
+		p := &Provider{ecosystem: resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM, manager: tc.manager}
+		if got := p.dnfSatisfied(tc.desired, tc.installed); got != tc.satisfied {
+			t.Errorf("%s: satisfied = %t, want %t", tc.name, got, tc.satisfied)
+		}
+	}
+}
 
 func TestDownloadDeclarationRequiresExactAuthenticatedSizes(t *testing.T) {
 	digest := sha256.Sum256([]byte("native archive"))
@@ -44,6 +79,38 @@ func TestDownloadDeclarationRequiresExactAuthenticatedSizes(t *testing.T) {
 		}
 	}
 }
+
+// A provenance proof downloads into a scratch directory inside staging while the
+// native manager rewrites its caches in staging. The file-size limit must
+// follow those caches: below them, apt-get and dnf5 died of SIGXFSZ.
+func TestBoundedDownloadLetsTheManagerRewriteItsStagingCaches(t *testing.T) {
+	staging := t.TempDir()
+	cache := filepath.Join(staging, "cache", "pkgcache.bin")
+	downloads := filepath.Join(staging, "provenance")
+	for _, directory := range []string{filepath.Dir(cache), downloads} {
+		if err := os.Mkdir(directory, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(cache, make([]byte, 64<<10), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	declarations := map[string]downloadDeclaration{"proof_1.0-1_amd64.deb": {size: 1 << 10}}
+	if err := boundedDownload(t.Context(), staging, downloads, declarations, func(ctx context.Context) error {
+		if output, err := exec.CommandContext(ctx, "/usr/bin/dd", "if=/dev/zero", "of="+cache, "bs=1024", "count=64").CombinedOutput(); err != nil {
+			return fmt.Errorf("rewrite native cache: %w: %s", err, output)
+		}
+		return os.WriteFile(filepath.Join(downloads, "proof_1.0-1_amd64.deb"), make([]byte, 1<<10), 0o600)
+	}); err != nil {
+		t.Fatalf("declared download with a native cache rewrite: %v", err)
+	}
+	if err := boundedDownload(t.Context(), staging, downloads, declarations, func(context.Context) error {
+		return os.WriteFile(filepath.Join(downloads, "other_1.0-1_amd64.deb"), []byte("undeclared"), 0o600)
+	}); err == nil {
+		t.Fatal("undeclared download accepted")
+	}
+}
+
 func TestDNFSolverCannotChangeAfterDownloadPrecheck(t *testing.T) {
 	resolved := &dnfResolved{Version: 1, Entries: []dnfResolvedEntry{{NEVRA: "proof-0:1.0-1.fc44.x86_64", Action: "Install", RepoID: "approved", DownloadSize: 100, FileName: "proof-1.0-1.fc44.x86_64.rpm"}}}
 	transaction := &dnfTransaction{Version: "1.0", RPMs: []dnfRPM{{NEVRA: "proof-1.0-1.fc44.x86_64", Action: "Install", RepoID: "@stored_transaction(approved)"}}}

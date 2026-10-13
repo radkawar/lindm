@@ -2206,15 +2206,15 @@ assignment, signed intent/challenge/start grant, the protected executor and an
 independent native oracle. All records are under
 `$HOME/.cache/lindm-resourceproviders3-20261010/`:
 
-| Kind (ownership exercised)                                                                                                                                      | Ubuntu 24.04 record       | Fedora 44 record          | Not exercised                                                                        |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------ |
-| Native package (create, restore; exact version, absence, dependency retention, pin drift, wrong signer, unavailable version, interrupted effect without replay) | `pkgfile-q2`              | `pkgfile-q2`              | Any-version; repositories other than one signed fixture (EL DNF4: own section below) |
-| Managed file (create, approved adoption, restore; POSIX ACL refusal)                                                                                            | `pkgfile-q2`, `files-hk3` | `pkgfile-q2`, `files-hk3` | Desired ACLs (no such field); filesystems other than ext4/btrfs                      |
-| Local group (create, approved adoption, restore)                                                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | —                                                                                    |
-| Local user (create, approved adoption, restore; UID collision and reused identity refused)                                                                      | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Released-UID reuse by another name (hash delivery: `secrets-q5`/`secrets-q6`)        |
-| Sysctl (approved adoption, restore; reboot persistence, `net.ipv4.ip_forward`)                                                                                  | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Runtime-only values across a reboot; non-host network namespaces                     |
-| Systemd timer and drop-in (create, restore; interval and calendar timers firing)                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Missed calendar catch-up (`Persistent=no`), timers across reboot                     |
-| Password policy (approved adoption, restore)                                                                                                                    | `password-q2`             | `password-q2`             | History, aging, faillock lockout, interactive PAM password change                    |
+| Kind (ownership exercised)                                                                                                                                      | Ubuntu 24.04 record       | Fedora 44 record          | Not exercised                                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Native package (create, restore; exact version, absence, dependency retention, pin drift, wrong signer, unavailable version, interrupted effect without replay) | `pkgfile-q2`              | `pkgfile-q2`              | Any-version; repositories other than one signed fixture (approved adoption, x86_64 only, and EL DNF4: own sections below) |
+| Managed file (create, approved adoption, restore; POSIX ACL refusal)                                                                                            | `pkgfile-q2`, `files-hk3` | `pkgfile-q2`, `files-hk3` | Desired ACLs (no such field); filesystems other than ext4/btrfs                                                           |
+| Local group (create, approved adoption, restore)                                                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | —                                                                                                                         |
+| Local user (create, approved adoption, restore; UID collision and reused identity refused)                                                                      | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Released-UID reuse by another name (hash delivery: `secrets-q5`/`secrets-q6`)                                             |
+| Sysctl (approved adoption, restore; reboot persistence, `net.ipv4.ip_forward`)                                                                                  | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Runtime-only values across a reboot; non-host network namespaces                                                          |
+| Systemd timer and drop-in (create, restore; interval and calendar timers firing)                                                                                | `host-q2`, `host-hk3`     | `host-q2`, `host-hk3`     | Missed calendar catch-up (`Persistent=no`), timers across reboot                                                          |
+| Password policy (approved adoption, restore)                                                                                                                    | `password-q2`             | `password-q2`             | History, aging, faillock lockout, interactive PAM password change                                                         |
 
 Record files are `<distro>-arm64-<host>-resources-<run>.json` (`ubuntu24-arm64-dgx20-…`,
 `fedora44-arm64-dgx21-…`) with these SHA-256 digests:
@@ -2304,39 +2304,80 @@ be in system RPM trust; DNF5 before 5.4.6.0 refuses to store a transaction from
 a read-only `/usr`; `NoNewPrivileges=` breaks RPM's SELinux scriptlet transition
 (exit 127); and DNF's single shared versionlock file is not another package's pin.
 
-##### Native package approved adoption (pending)
+##### Native package approved adoption
 
-The agent implements approved adoption of an installed package that lindm did
-not install, once PREPARE has proven its provenance against the approved
-source ([engineering](engineering.md#native-package-resource-provider)). This is
-**not qualified**: `QualifiedResourceKinds` still lists only `CREATE_ONLY` for
-`NATIVE_PACKAGE`, so the server reports an approved-adoption package row as
-`resource_ownership_operation_unavailable`. The evidence so far is unit-level:
-parser and decision tests (`internal/agent/packageprovider/provenance_linux_test.go`),
-a dpkg comparison against a real dpkg database that dpkg itself installed into a
-private root, and, on an Ubuntu 24.04 amd64 host, the same comparison of the
-installed `git 1:2.43.0-1ubuntu7.3` and `htop 3.3.0-4build1` with their archive
-`.deb`s. The APT and DNF5 proof inside the staging unit, the plan and apply
-bindings, the journal claim and release have not run natively. No RPM proof has
-run at all.
+Approved adoption of an installed package that lindm did not install, once
+PREPARE has proven its provenance against the approved source
+([engineering](engineering.md#native-package-resource-provider)), **passed**
+the connected package lane on Ubuntu 24.04 (APT) and Fedora 44 (DNF5) x86_64,
+so `QualifiedResourceKinds` lists `OWNERSHIP_MODE_APPROVED_ADOPTION` for
+`NATIVE_PACKAGE`. Both records come from one immutable snapshot (`git archive`
+of worktree `pe-pkg-qual` commit `015466de`, tar SHA-256
+`4ff692b8…f4f9`), whose table already listed the mode; the landed tree differs
+from it only in documentation and `lab/demo/org.json`. Commands, with
+`E=$HOME/.cache/lindm-pe-pkg-qual` and the lab-built signed agent package:
 
-The qualifying run is `lab vm resources -phase connected -kinds packages` on
-Ubuntu 24.04 and Fedora 44, from a source tree whose qualification table also
-lists `OWNERSHIP_MODE_APPROVED_ADOPTION` for `NATIVE_PACKAGE`. Its package kind
-then also requires these scenarios on APT and DNF5. The fixture's v1 is
-installed outside lindm (`dpkg -i` / `rpm -i` of the signed artifact), and the
-fixture `.deb`s now ship `md5sums`:
+```sh
+$E/bin4/lab vm resources -phase=connected -kinds=packages -allow-network -local-authority \
+  -manifest lab/images/ubuntu-noble-amd64.json -repo <shared checkout> -build-repo $E/src-015466de \
+  -lindmd $E/bin4/lindmd -diagnostics $E/u24-amd64-5.diag -record $E/ubuntu24-amd64-resources-pkgadopt-5.json
+$E/bin4/lab vm resources -phase=connected -kinds=packages -allow-network -local-authority \
+  -manifest lab/images/fedora-44-x86_64.json -repo <shared checkout> -build-repo $E/src-015466de \
+  -lindmd $E/bin4/lindmd -diagnostics $E/f44-amd64-5.diag -record $E/fedora44-amd64-resources-pkgadopt-5.json
+```
 
-- `modified-installation-unverified`: with a packaged file modified, approved
-  adoption is refused unstarted with `existing_package_unverified`;
+| Record (`$E/`)                             | SHA-256                                                            | Guest                                                                                         | Agent package SHA-256 |
+| ------------------------------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- | --------------------- |
+| `ubuntu24-amd64-resources-pkgadopt-5.json` | `80516a8c836effb3fd16d48c9649f8fbf84b2b92f1033d68b4ff17f70b862305` | `ubuntu-noble-20260926-amd64`                                                                 | `76d658bf…05e1`       |
+| `fedora44-amd64-resources-pkgadopt-5.json` | `1df9596b72e83f97097c03f760655c26f4211dc0dff1d376a89d471b1ae9690e` | `fedora-cloud-44-1.7-x86-64`, SELinux enforcing, DNF5/libdnf5 5.4.6.0 after the lane's update | `29ad4d3c…89c9`       |
+
+Both ran on local x86_64 KVM (QEMU 8.2.2, SeaBIOS, virtio-blk, no TPM) with
+`lab` `4a322007dbca0be7e891af028bfce3a861ab515f7d4a9c510ad1936a30466812` and a
+version-0.1.0-stamped `lindmd`
+`ce5a358cd914fa70ebe6b2ac5e6b92b8173522193f13cc3462dca959e12559ab`. The evidence
+manifest `$E/pkgadopt-5.SHA256SUMS` (both records, both lane logs, the three
+binaries and the source tar) has SHA-256
+`80e15ed1b3e4d8173f66394e1b5559ce94db367d7d6babe1c4adb36dadd81260`.
+
+Each record passed all fourteen package scenarios, in order:
+`exact-v1-dependency-readiness`, `wrong-signing-key-refused`,
+`unavailable-exact-version-refused`, `exact-v2-upgrade`, `repeat-exact-v2`,
+`owned-absence`, `presence-after-absence`, `release-retains-dependency`, the
+four adoption scenarios, `external-pin-drift-release-refused` and
+`interrupted-running-no-replay`. For the adoption scenarios the fixture's signed
+v1 (whose `.deb` ships `md5sums`) is installed outside lindm (`dpkg -i` /
+`rpm -i`):
+
+- `modified-installation-unverified`: with `/usr/bin/lindm-resource-proof`
+  modified, approved adoption is refused unstarted with
+  `existing_package_unverified`; the file digest, package query, absent pin and
+  maintainer log are identical before and after;
 - `installed-package-adoption-required`: create-only is refused unstarted with
-  `existing_package`;
-- `approved-package-adoption`: converges with `approved_source_matches`; the
-  owned pin is the only effect and the maintainer log is unchanged;
+  `existing_package`, the installation unchanged;
+- `approved-package-adoption`: a started action converges with
+  `approved_source_matches`; the owned pin is the only effect and the
+  maintainer-script log is byte-identical before and after;
 - `adopted-release-retains-package`: release restores the unmanaged
   installation byte for byte (version, verify, no pin, maintainer log).
 
-Only records from that run may add the mode to the table.
+Product fixes these runs found: the proof's `apt-get download` and `dnf5
+download` died of `SIGXFSZ`, because the download's `RLIMIT_FSIZE` was sized
+from the empty scratch directory while the manager rewrote its caches in
+staging (the limit now follows the staging directory); and DNF5 staged a
+request the installed package already satisfied, for which libdnf5 resolves a
+"Reason Change" of a package installed outside DNF that the resolver refuses
+(DNF5 now stages no transaction for it). The lane's required-scenario list
+also did not follow its run order, so a passing run failed qualification.
+Earlier attempts in the same directory (`-1` to `-4`) failed for those reasons,
+ran an unstamped `lindmd` (an invocation prerequisite; no scenario ran) or were
+cancelled before admission.
+
+Not exercised: aarch64 (the Sparks were offline), physical hardware, `any`
+version rows such as the demo's `deb/git` and `deb/htop` (only the 2026-10-12
+host comparison of their installed files with the archive `.deb`s in
+[Ubuntu](platforms/ubuntu.md#capability-policy-facts-signed-provider-grants) covers them), real archive
+packages rather than the signed fixture, and DNF4, zypper and pacman, which have
+no proof and stay `existing_package_unverified`.
 
 ##### Secret-delivered password hash and managed local-admin password
 
