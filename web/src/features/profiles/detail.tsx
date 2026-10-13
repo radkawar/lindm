@@ -238,7 +238,7 @@ export function ProfileDetailView({
         <RpcError failure={headFailure}>
           <p>
             Cannot load the latest version. Refresh before editing.
-            {attempt ? " Retry saving your existing draft if necessary." : ""}
+            {attempt ? " Retry the existing save." : ""}
           </p>
         </RpcError>
       ) : null}
@@ -254,7 +254,7 @@ export function ProfileDetailView({
           profileId={profileId}
           initialDraft={editorSource.draft}
           initialExpectedRevisionId={editorSource.expectedRevisionId}
-          sourceNote={`${editorSource.sourceNote} It is kept until you publish it or reload the page.`}
+          sourceNote={`${editorSource.sourceNote} The editor keeps it until publication or page reload.`}
           headerAction={
             <Button
               type="button"

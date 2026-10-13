@@ -24,7 +24,7 @@ function EnrollmentRoute() {
           {options.isPending ? <p role="status">Loading enrollment options…</p> : null}
           {options.isError ? <p role="alert">Unable to load enrollment options.</p> : null}
           {options.data && !options.data.localLogin ? (
-            <p role="status">Local administrator enrollment is not configured.</p>
+            <p role="status">The server does not offer local administrator enrollment.</p>
           ) : null}
           {complete ? (
             <p role="status">

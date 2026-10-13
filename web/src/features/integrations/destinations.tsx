@@ -68,7 +68,7 @@ function secretError(secret: string): string {
   const size = new TextEncoder().encode(secret).length;
   if (size === 0) return "Enter a signing secret, or generate one.";
   if (size < 32 || size > 64) {
-    return `Use 32 to 64 characters; this has ${size}. Generate one to be safe.`;
+    return `Use 32 to 64 characters. This secret has ${size}. Select Generate to create a secret.`;
   }
   return "";
 }
@@ -146,7 +146,7 @@ export function Destinations() {
           description={
             page
               ? "Return to the first page."
-              : "Audit events are not sent anywhere. Add a webhook or syslog server to start sending them."
+              : "The server sends no audit events. Add a webhook or syslog server to start sending."
           }
           action={
             page ? (

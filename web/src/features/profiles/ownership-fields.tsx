@@ -56,7 +56,7 @@ export function OwnershipFields({
     },
     {
       field: "release",
-      label: "When removed from the profile",
+      label: "When you remove this setting",
       schema: ReleaseBehaviorSchema,
       labels: RELEASE_LABELS,
       allowed: qualified?.releaseBehaviors,

@@ -19,8 +19,8 @@ function AuthorizationPage() {
       <div className="grid gap-6">
         <PageHeader title="Authorization" description="Manage organization access." />
         <EmptyState
-          title="Access policy management is restricted"
-          description="Unrestricted account-management permission is required. Ask an organization owner for access."
+          title="Access policy requires permission"
+          description="This policy requires unrestricted account-management permission. Ask an organization owner for access."
           action={<Button render={<Link to="/" />}>Back to dashboard</Button>}
         />
       </div>

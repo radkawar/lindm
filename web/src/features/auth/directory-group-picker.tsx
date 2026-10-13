@@ -29,7 +29,7 @@ export function DirectoryGroupPicker(props: PickerProps) {
       <SuggestionPicker
         {...props}
         field={SuggestionField.DIRECTORY_GROUP}
-        note="Type the beginning of a group. Only groups seen when members signed in appear."
+        note="Type the start of a group name. Results include only groups from previous member sign-ins."
       />
       {props.value ? (
         <TechnicalDetails items={[{ label: "Directory group reference", value: props.value }]} />

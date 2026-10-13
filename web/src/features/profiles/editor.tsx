@@ -105,7 +105,7 @@ export function ProfileEditor({
       });
       lifetime.signal.throwIfAborted();
       if (!response.revision?.spec || response.revision.revisionId === "") {
-        throw new Error("The server didn't confirm the profile was published.");
+        throw new Error("The server did not confirm profile publication.");
       }
       return response.revision;
     },
@@ -492,7 +492,7 @@ export function ProfileEditor({
                     attempt.payload.expectedRevisionId,
                     attempt.payload.reason,
                   );
-                  setNote("Edit the draft again. The draft is not published.");
+                  setNote("Edit the draft again. The draft remains unpublished.");
                 }}
               >
                 Edit draft
@@ -540,8 +540,8 @@ function PublishedOutcome({ published }: { published: ProfileRevision }) {
       <AlertTitle>Profile published</AlertTitle>
       <AlertDescription>
         <p>
-          Version {formatRevisionNumber(published.revisionNumber)} is saved. Devices are unchanged
-          until you roll it out from{" "}
+          The server saved version {formatRevisionNumber(published.revisionNumber)}. Devices remain
+          unchanged until you activate it from{" "}
           <Link to="/rollouts" className="underline underline-offset-4">
             Rollouts
           </Link>
@@ -613,7 +613,7 @@ function RefreshedHead({
         </p>
         <p>
           {same
-            ? "Your draft is already based on this version."
+            ? "Your draft already uses this version."
             : expected
               ? "This is newer than the version your draft started from."
               : "A profile with this ID already exists. Keep your changes only if you meant to update it."}

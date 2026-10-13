@@ -31,7 +31,7 @@ function HomeRootPicker(props: PickerProps) {
 const labels: Record<string, string> = {
   nativeName: "Package name",
   ecosystem: "Package format",
-  presence: "Should be",
+  presence: "Required presence",
   runtime: "Running state",
   enablement: "Start at boot",
   unit: "Unit name",
@@ -194,7 +194,7 @@ const unavailableChoices: Record<string, true> = {
   "lindm.resource.v1.SessionScope.personDesktop": true,
 };
 const UNAVAILABLE_NOTE =
-  "No lindm agent can apply this yet. It is kept as saved; choose another option to change it.";
+  "No lindm agent can apply this yet. The editor keeps the saved value. Choose another option to change it.";
 
 function enumOptions(schema: DescEnum, current?: JsonValue) {
   const first = schema.values[0]?.name ?? "";
@@ -644,7 +644,8 @@ function TypedField({
         // No list exists for this identity; it is never typed in, only kept. The
         // value itself is in the editor's single View JSON.
         <p className="text-xs text-muted-foreground">
-          {value ? "Kept as saved." : "Not set."} This reference can't be chosen in the console yet.
+          {value ? "The editor keeps the saved reference." : "No reference."} The console cannot
+          choose this reference yet.
         </p>
       ) : field.scalar === ScalarType.BYTES && field.jsonName === "content" ? (
         <FileContent id={id} value={String(value ?? "")} onChange={onChange} disabled={disabled} />

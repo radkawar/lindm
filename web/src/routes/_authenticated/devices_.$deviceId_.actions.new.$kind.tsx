@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/devices_/$deviceId_/action
       if (!id || id === "00000000-0000-0000-0000-000000000000")
         throw new Error("The device URL must contain a valid device ID.");
       if (!complexActionKinds.includes(kind as ComplexActionKind))
-        throw new Error("This device action is not supported.");
+        throw new Error("The console does not support this device action.");
       return { deviceId: id, kind: kind as ComplexActionKind };
     },
   },

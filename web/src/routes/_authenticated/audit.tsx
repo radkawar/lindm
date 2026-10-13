@@ -28,7 +28,7 @@ function AuditRoute() {
     return (
       <RestrictedPage
         title="Audit log"
-        restriction="The audit log is restricted"
+        restriction="The audit log requires permission"
         reason="The audit log records actions across the whole fleet, so it needs audit permission without a device scope."
       />
     );
@@ -47,12 +47,8 @@ function AuditRouteError({ error }: ErrorComponentProps) {
   return (
     <section className="mx-auto flex max-w-xl flex-col gap-4 p-6">
       <h1 className="text-2xl font-semibold">Unable to open the audit log</h1>
-      <p role="alert">
-        {cause instanceof Error ? cause.message : "The audit log could not be loaded."}
-      </p>
-      <p>
-        Resetting clears this link's filters and shows the human actions you are authorized to read.
-      </p>
+      <p role="alert">{cause instanceof Error ? cause.message : "The audit log did not load."}</p>
+      <p>Reset filters to show permitted human actions. This clears the filters in this link.</p>
       <Button className="w-fit" render={<Link to="/audit" search={{}} replace />}>
         Reset audit filters
       </Button>

@@ -27,7 +27,7 @@ function ProfilesRoute() {
     return (
       <RestrictedPage
         title="Profiles"
-        restriction="The profile catalog is restricted"
+        restriction="The profile catalog requires permission"
         reason="Profiles apply across the whole fleet, so the catalog needs fleet access without a device scope. A device's Services tab shows the profiles assigned to it."
       />
     );

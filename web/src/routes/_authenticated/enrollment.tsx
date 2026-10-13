@@ -24,7 +24,7 @@ function EnrollmentPage() {
     return (
       <RestrictedPage
         title="Enroll a device"
-        restriction="Enrollment is restricted"
+        restriction="Enrollment requires permission"
         reason="Enrollment codes and tokens apply to the whole fleet, so they need enrollment permission without a device scope."
       />
     );

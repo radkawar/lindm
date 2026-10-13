@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated/accounts")({
     search.create === true ? { create: true } : {},
   beforeLoad: ({ context }) => {
     if (!canPermission(context.principal, "accounts.manage", true))
-      throw new Error("Account management is not authorized.");
+      throw new Error("You do not have account-management permission.");
   },
   component: AccountsPage,
 });

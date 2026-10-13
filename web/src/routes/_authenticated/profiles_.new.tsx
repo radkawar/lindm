@@ -15,7 +15,7 @@ import { SecretPicker, SecretReferencePicker } from "@/features/secrets/picker";
 export const Route = createFileRoute("/_authenticated/profiles_/new")({
   beforeLoad: ({ context }) => {
     if (!canPermission(context.principal, "profiles.manage"))
-      throw new Error("Profile publishing is not authorized.");
+      throw new Error("You do not have profile-publishing permission.");
   },
   component: ProfileCreateRoute,
 });
@@ -46,7 +46,7 @@ function ProfileCreateRoute() {
           key={profileId}
           mode="create"
           profileId={profileId}
-          sourceNote="Add the settings this profile should apply, then publish."
+          sourceNote="Add device settings. Publish the profile."
           onPrepareAnother={() => setProfileId(replaceReservedCreateProfileId(lifetime))}
         />
       </ProfilePickerProvider>

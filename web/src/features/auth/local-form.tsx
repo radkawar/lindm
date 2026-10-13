@@ -86,7 +86,7 @@ export function LocalForm({
     } catch (failure) {
       if (!controller.signal.aborted) {
         if (failure instanceof DOMException && failure.name === "NotAllowedError") {
-          setNotice("Authenticator verification was not completed. Try again when you are ready.");
+          setNotice("Authenticator verification did not finish. Retry when ready.");
         } else {
           setError(toRpcFailure(failure));
         }

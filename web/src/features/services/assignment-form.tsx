@@ -469,8 +469,8 @@ export function ResourceAssignmentDialog({
         <DialogHeader>
           <DialogTitle>Assign profile</DialogTitle>
           <DialogDescription>
-            Choose the profile this device should follow. Later edits to the profile are not applied
-            until you assign the new version.
+            Choose a profile for this device. The device uses that version until you assign a new
+            version.
           </DialogDescription>
         </DialogHeader>
         {state.error ? (

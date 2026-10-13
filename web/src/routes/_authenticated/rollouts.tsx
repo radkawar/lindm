@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/rollouts")({
   },
   beforeLoad: ({ context }) => {
     if (!canPermission(context.principal, "resources.assign"))
-      throw new Error("Resource rollout management is not authorized.");
+      throw new Error("You do not have rollout-management permission.");
   },
   component: RolloutsPage,
 });

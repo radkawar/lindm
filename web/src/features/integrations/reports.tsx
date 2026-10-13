@@ -101,7 +101,7 @@ export function Reports() {
         <div className="grid gap-1">
           <h2 className="text-base font-semibold">Scheduled reports</h2>
           <p className="text-sm text-muted-foreground">
-            Reports are built on a schedule and kept for their retention period.
+            The server builds reports on schedule. It keeps each report for its retention period.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -115,7 +115,7 @@ export function Reports() {
           <DialogHeader>
             <DialogTitle>Add report schedule</DialogTitle>
             <DialogDescription>
-              When enabled, the first report is built shortly after you create the schedule.
+              The server queues the first report when you create an enabled schedule.
             </DialogDescription>
           </DialogHeader>
           <ScheduleForm action={addAction} onDone={() => setAdding(false)} />
@@ -134,7 +134,7 @@ export function Reports() {
           description={
             page
               ? "Return to the first page."
-              : "No reports are built automatically. Add a schedule for inventory, compliance or advisory findings."
+              : "No schedules create reports. Add a schedule for inventory, compliance or advisory findings."
           }
           action={
             page ? (
@@ -214,8 +214,8 @@ function ScheduleRow({ schedule }: { schedule: ReportSchedule }) {
             <DialogHeader>
               <DialogTitle className="break-words">Edit {name}</DialogTitle>
               <DialogDescription>
-                Saving an enabled schedule builds a report shortly, then runs at the chosen
-                interval. Reports already built keep their expiry.
+                Saving an enabled schedule queues a report. The server then follows the chosen
+                interval. Existing reports keep their expiry.
               </DialogDescription>
             </DialogHeader>
             <ScheduleForm existing={schedule} action={action} onDone={() => setOpen(false)} />
@@ -453,11 +453,11 @@ function Artifacts() {
       <p className="-mt-2 text-sm text-muted-foreground">
         {canPermission(principal, "audit.read", true) ? (
           <>
-            Scheduled runs and audit evidence exports. To export evidence, filter the{" "}
+            To export evidence, filter the{" "}
             <Link to="/audit" className="text-foreground underline underline-offset-4">
               audit log
-            </Link>{" "}
-            and choose Export filtered evidence.
+            </Link>
+            . Select Export filtered evidence.
           </>
         ) : (
           "Scheduled runs and audit evidence exports. Exporting evidence also requires unrestricted audit access."

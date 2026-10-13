@@ -74,11 +74,10 @@ const releaseStateLabels: Record<string, string> = {
 };
 
 const releaseReasonLabels: Record<string, string> = {
-  native_unsupported: "The device can't remove this kind of item, so it was left in place.",
-  precondition_failed:
-    "The item changed on the device since lindm set it, so it was left in place.",
+  native_unsupported: "The device cannot remove this item type. It kept the item.",
+  precondition_failed: "The item changed since lindm set it. The device kept the item.",
   native_tool_path_unprotected:
-    "The device's system tool for this item isn't protected, so lindm didn't run it. Nothing changed.",
+    "The system tool lacks protection on this device. lindm did not run it. Nothing changed.",
   native_package_manager_busy:
     "Another package manager was running on the device. Nothing changed; assign the profile again to retry.",
   outcome_unknown: "The removal outcome is unknown. Check the item on the device.",
@@ -88,13 +87,12 @@ const releaseReasonLabels: Record<string, string> = {
   adoption_approval_required:
     "lindm took over this existing item without recorded approval. The device kept the item.",
   ownership_baseline_unavailable:
-    "lindm has no record of the item before it took over, so it was left in place.",
+    "lindm has no record of this item before takeover. The device kept the item.",
   resource_executor_not_available:
-    "The device's agent can't manage this kind of item, so it was left in place.",
+    "The agent cannot manage this item type. The device kept the item.",
   resource_capability_evidence_unavailable:
-    "The device hasn't reported whether it supports this item, so it was left in place.",
-  resource_verification_not_available:
-    "The device can't verify this kind of item, so it was left in place.",
+    "The device has not reported support for this item. It kept the item.",
+  resource_verification_not_available: "The device cannot verify this item type. It kept the item.",
 };
 
 // Rows lindm never sends get one state instead of check, result and change
@@ -112,7 +110,7 @@ function singleStateSentence(resource: ResourceState): string {
   }
   const features = applicabilityFeatures(resource.applicability);
   if (resource.reason === "resource_feature_evidence_unavailable" && features) {
-    return `It requires ${features}, and no device reports evidence of that yet, so it isn't sent. Remove that requirement from the profile.`;
+    return `This item requires ${features}. No device reports this capability yet. lindm does not send the item. Remove the requirement from the profile.`;
   }
   return blockedReasonLabel(resource.reason);
 }
@@ -139,7 +137,7 @@ export function DeviceResources({
     ? "the system"
     : assignment.actorId === principal.id
       ? "you"
-      : assignment.actorDisplayName || "an administrator whose account was removed";
+      : assignment.actorDisplayName || "a former administrator";
   // Work is minted only when the device asks for it, so a pending item with no
   // action means the device has not picked it up yet.
   const unpicked =
@@ -194,7 +192,7 @@ export function DeviceResources({
         ) : null}
         {failure ? (
           <RpcError failure={failure} title="Couldn't load services">
-            {state.data ? <p>The results below may be out of date.</p> : null}
+            {state.data ? <p>These results precede the failed refresh.</p> : null}
           </RpcError>
         ) : null}
         {state.data ? (

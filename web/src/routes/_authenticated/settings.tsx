@@ -24,8 +24,8 @@ function SettingsRoute() {
     return (
       <RestrictedPage
         title="Settings"
-        restriction="Settings are restricted"
-        reason="Server enrollment readiness, device attributes and device capabilities apply to the whole fleet, so they need enrollment, inventory or signing-key management without a device scope."
+        restriction="Settings require permission"
+        reason="These settings affect the whole fleet. They require enrollment, inventory or signing-key management permission without device limits."
       />
     );
   return (

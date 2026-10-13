@@ -65,7 +65,7 @@ function roleNameProblem(
   if (!/^[a-z][a-z0-9_.-]*$/.test(name))
     return `"${name}" is invalid. Start with a lowercase letter. Use lowercase letters, digits, dots, dashes or underscores. Example: patch-operator.`;
   if (roles.some((role, i) => i !== index && role.name === name))
-    return `Another custom role is already named "${name}".`;
+    return `Another custom role already uses "${name}".`;
   return null;
 }
 
@@ -487,7 +487,7 @@ function AuthorizationEditor({
       send: (value, options) => adminClient.updateAuthorization(value, options),
       failureTitle: "Couldn't confirm the access policy",
       onSuccess: async (response) => {
-        if (!response.authorization) throw new Error("The saved access policy was not returned.");
+        if (!response.authorization) throw new Error("The server returned no saved access policy.");
         onSaved(response.authorization);
         await client.invalidateQueries({ queryKey: authorizationQueryOptions(lifetime).queryKey });
         await client.invalidateQueries({ queryKey: ["local-accounts", lifetime.generation] });
@@ -705,10 +705,10 @@ function AuthorizationEditor({
         <div className="grid gap-3 border border-warning p-4 text-sm">
           <h2 className="font-semibold">Review the access change</h2>
           <p>
-            This replaces the complete policy: {policy.roles.length} custom roles,{" "}
-            {policy.groupBindings.length} directory group bindings and{" "}
-            {policy.approvalRequiredPermissions.length} added approval requirements. Removed grants
-            stop authorizing work; unscoped bindings allow every device.
+            This change replaces the complete policy. Custom roles: {policy.roles.length}. Directory
+            bindings: {policy.groupBindings.length}. Added approval requirements:{" "}
+            {policy.approvalRequiredPermissions.length}. Removed grants stop authorizing work.
+            Bindings without device limits allow every device.
           </p>
           <p>
             This change signs out non-owner sessions and invalidates pending authority. Local

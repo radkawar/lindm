@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/groups")({
       !canPermission(context.principal, "accounts.manage", true) &&
       !canPermission(context.principal, "inventory.manage", true)
     )
-      throw new Error("Group management is not authorized.");
+      throw new Error("You do not have group-management permission.");
   },
   component: GroupsPage,
 });

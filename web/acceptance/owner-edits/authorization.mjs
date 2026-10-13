@@ -100,7 +100,7 @@ export async function check({ page, visit, require, capture, step }) {
   await reviewed.check();
   await name.fill("patch-operator");
   require(!(await reviewed.isChecked()) &&
-    (await main.getByText(/review was cleared/).count()) ===
+    (await main.getByText(/Changing the policy clears its review/).count()) ===
       1, "Editing after the review unticked it silently");
   await capture("authorization-review-cleared");
   await main.getByRole("button", { name: "Cancel editing", exact: true }).click();

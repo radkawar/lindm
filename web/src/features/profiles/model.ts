@@ -225,7 +225,7 @@ function settingMessage(violation: Violation, all: Violation[]): string | null {
   if (violation.ruleId === EMPTY_SETTING_RULE) {
     return last?.kind === "field" && last.localName === "firewallZone"
       ? EMPTY_FIREWALL_ZONE
-      : "This setting doesn't manage anything yet. Fill in what it should change.";
+      : "This setting manages nothing yet. Enter the changes to apply.";
   }
   if (/\.(managed_)?dimensions?$/.test(violation.ruleId)) {
     return "This setting doesn't manage anything yet. Choose at least one option to manage.";

@@ -5,7 +5,7 @@ import type { Destination, DeliverySummary } from "../../../gen/lindm/integratio
 // and worker). The raw reason stays in Details.
 const FAILURE_TEXT: Record<string, string> = {
   webhook_transport_failed: "Couldn't connect to the receiver",
-  webhook_response_failed: "The receiver's answer was cut off",
+  webhook_response_failed: "The receiver did not send a complete response",
   syslog_transport_failed: "Couldn't send to the syslog server",
   invalid_destination_trust: "The server cannot load the pinned CA certificate",
   invalid_destination_endpoint: "The destination address isn't valid",

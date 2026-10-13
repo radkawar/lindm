@@ -29,7 +29,7 @@ export async function applyOrganization(
     });
   } catch {
     throw new ConnectError(
-      "The organization response was not received. Check current state before reviewing again.",
+      "The server response did not arrive. Check current accounts and resources before another review.",
       Code.Unavailable,
     );
   }

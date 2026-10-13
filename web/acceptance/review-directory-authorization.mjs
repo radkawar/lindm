@@ -247,7 +247,7 @@ export async function reviewDirectoryAuthorization({
         await capture(page, entry, "in-scope-device");
         step = "deny authorization editor";
         await page.goto(`${fixture.origin}/authorization`);
-        await page.getByText("Access policy management is restricted", { exact: true }).waitFor();
+        await page.getByText("Access policy requires permission", { exact: true }).waitFor();
         require(entry, (await page
           .getByRole("button", { name: "Edit access policy", exact: true })
           .count()) === 0, "Scoped directory user reached policy editing");

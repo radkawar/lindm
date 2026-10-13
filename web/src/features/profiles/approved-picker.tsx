@@ -83,7 +83,7 @@ export function ApprovedReferencePicker({
               <p className="text-xs text-muted-foreground">
                 {prefix
                   ? `No reported ${noun} start with “${prefix}”.`
-                  : `No device reports approved ${noun} yet. They are set in each device's local agent configuration.`}
+                  : `No device reports approved ${noun} yet. Each device's local agent configuration defines these approvals.`}
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">

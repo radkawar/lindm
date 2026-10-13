@@ -20,7 +20,7 @@ function DeviceCapabilitiesRoute() {
     return (
       <RestrictedPage
         title="Device capabilities"
-        restriction="Device capabilities are restricted"
+        restriction="Device capabilities require permission"
         reason="Capability policies apply across the fleet, so viewing them needs device access without a device scope."
       />
     );

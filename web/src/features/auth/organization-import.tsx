@@ -129,7 +129,7 @@ export function OrganizationImport({
     } catch {
       if (!signal?.aborted && !lifetime.signal.aborted && version === uploadVersion.current)
         setMessage(
-          "Choose a valid organization JSON file, at most 16 MiB. Unknown fields are not accepted.",
+          "Choose a valid organization JSON file, at most 16 MiB. The importer rejects unknown fields.",
         );
     }
   }
@@ -265,7 +265,7 @@ export function OrganizationImport({
             {result.failureReason === "organization_review_changed"
               ? "The organization changed after review. Review a fresh plan before applying."
               : applied
-                ? "The import stopped before all work completed. Retain the outcomes and save any secrets below before reviewing again."
+                ? "The import stopped before completion. Retain the outcomes. Save the secrets below before another review."
                 : "The organization review failed. Check the reported cause before continuing."}
           </p>
           <TechnicalDetails
@@ -420,8 +420,8 @@ export function OrganizationImport({
         >
           <h3 className="min-w-0 font-semibold break-words">Save these secrets now</h3>
           <p className="min-w-0 text-sm break-words">
-            Secrets exist only on this page until dismissed or you leave. Copy or download only to
-            an approved private location; downloads are not encrypted.
+            Secrets remain on this page until you dismiss them or leave. Save them only in an
+            approved private location. Downloads contain unencrypted secrets.
           </p>
           {secrets.map((secret, index) => (
             <div className="grid min-w-0 max-w-full gap-2" key={`${secret.kind}:${index}`}>

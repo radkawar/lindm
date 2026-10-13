@@ -127,8 +127,8 @@ export async function check({ page, visit, require, capture, step }) {
   require(nativeDialog === "", `Reset credentials opened a native browser ${nativeDialog}`);
   if ((await confirm.count()) === 1) {
     require((await confirm.innerText()).includes(
-      "signed out",
-    ), "Reset confirmation does not say the account is signed out");
+      "signs out",
+    ), "Reset confirmation does not describe account sign-out");
     await capture("accounts-reset-confirmation");
     await confirm.getByRole("button", { name: "Keep credentials", exact: true }).click();
     await confirm.waitFor({ state: "hidden", timeout });
