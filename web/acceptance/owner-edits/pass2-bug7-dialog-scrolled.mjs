@@ -7,7 +7,9 @@
 // asserts what the user sees and what a full-page capture shows: the backdrop
 // covers every edge of the viewport, the document is exactly one viewport tall
 // (a full-page capture equals the viewport), the dialog is fully in view, the
-// sidebar and header don't move, and closing restores the scroll position.
+// sidebar, header and main content don't move or change width (a lock that drops
+// a classic scrollbar's gutter widens and re-wraps the page under the backdrop),
+// and closing restores the scroll position.
 // Runs in the review browser and again in a second Chromium with the other
 // scrollbar mode, so both overlay (the owner's headless browser) and classic
 // scrollbars are exercised. Read-only: every modal is closed with Escape.
@@ -19,7 +21,7 @@ export const task = {
   route: "/enrollment",
   priority: "high",
   acceptance:
-    "Scrolled Enrollment and wipe form, with overlay and classic scrollbars: an open dialog's backdrop covers the whole viewport and a full-page capture equals the viewport; the dialog is fully in view; sidebar and header don't move; closing restores the scroll position. The mobile navigation sheet behaves the same.",
+    "Scrolled Enrollment, wipe form and mobile Accounts, with overlay and classic scrollbars: an open dialog's backdrop covers the whole viewport and a full-page capture equals the viewport; the dialog is fully in view; sidebar, header and main content keep their position and width; closing restores the scroll position. The mobile navigation sheet behaves the same.",
 };
 
 const timeout = 30_000;
@@ -67,6 +69,20 @@ function cases(demo) {
       popup: (page) => page.getByRole("dialog", { name: "Navigation", exact: true }),
       overlay: "sheet-overlay",
     },
+    {
+      // At 390 px a classic scrollbar is 4% of the width; its gutter must stay reserved.
+      name: "mobile accounts edit dialog",
+      url: "/accounts",
+      viewport: { width: 390, height: 844 },
+      ready: (main) => main.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
+      trigger: (page) =>
+        page
+          .getByRole("main")
+          .getByRole("button", { name: /^Edit / })
+          .last(),
+      popup: (page) => page.getByRole("dialog", { name: /^Edit / }),
+      overlay: "dialog-overlay",
+    },
   ];
 }
 
@@ -105,6 +121,9 @@ function layout(overlaySlot) {
     ),
     sidebar: box(document.querySelector('[data-slot="sidebar-container"]')),
     header: box(document.querySelector("header")),
+    // Main content: a widened layout re-wraps text, which moves and resizes these.
+    main: box(document.querySelector("main")),
+    heading: box(document.querySelector("main h1")),
     popup: box(popup),
     uncovered: points
       .filter(([x, y]) => {
@@ -141,7 +160,13 @@ async function scrolledModal({ page, origin, item, require, capture }) {
   // anything in the sticky header as hidden behind the page's scroll padding.
   await trigger.evaluate((node) => {
     const rect = node.getBoundingClientRect();
-    if (rect.top < 0 || rect.bottom > window.innerHeight) node.scrollIntoView({ block: "center" });
+    if (
+      rect.top < 0 ||
+      rect.bottom > window.innerHeight ||
+      rect.left < 0 ||
+      rect.right > window.innerWidth
+    )
+      node.scrollIntoView({ block: "center", inline: "nearest" });
   });
   const before = await page.evaluate(layout, item.overlay);
   const mode = before.gutter > 0 ? "classic" : "overlay";
@@ -184,6 +209,11 @@ async function scrolledModal({ page, origin, item, require, capture }) {
     open.sidebar,
   ), `${where}: the sidebar moved when the dialog opened`);
   require(!moved(before.header, open.header), `${where}: the header moved when the dialog opened`);
+  for (const part of ["main", "heading"])
+    require(!moved(
+      before[part],
+      open[part],
+    ), `${where}: the page's ${part} moved or changed width under the dialog (${before[part]?.width}px to ${open[part]?.width}px wide)`);
   if (capture) await capture(`${item.name} open`);
   await page.keyboard.press("Escape");
   await popup.waitFor({ state: "hidden", timeout });
