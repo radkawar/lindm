@@ -16,6 +16,14 @@ queue; do not introduce Redis, Kafka, Kubernetes, or a workflow engine as baseli
 installation prerequisites. Object/file storage holds immutable artifacts, not job
 truth. The frontend is a TypeScript web application embedded in the server release.
 
+`lindmd` also embeds `docs/` and serves the help index at `/help` on the
+administrative listener. `/help/<filename>.md#heading` renders bundled Markdown
+with stable heading anchors. Relative documentation links stay on the same origin;
+external references and source-file references appear as text without navigation.
+Help uses no external scripts, styles or images, requires no network access beyond
+the server, and exposes no deployment files. The documents describe the server
+build, not live device observations. Rebuild `lindmd` to publish documentation changes.
+
 | Component              | Responsibility                                                                                                 | Boundary                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `lindmd`               | Admin and device RPC, SSO/session handling, reconciliation, durable workers, embedded console                  | Unprivileged process; one organization/database/trust domain per deployment                           |

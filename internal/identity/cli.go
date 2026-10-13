@@ -123,7 +123,7 @@ func (s *Service) handleCLIApprovalPage(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 	cookie, ok := readOpaqueCookie(r, sessionCookie)
 	if !ok {
-		_, _ = io.WriteString(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>Sign in to lindmctl</title><h1>Sign in to lindmctl</h1><p><a href="/" target="_blank" rel="noopener">Sign in to Lindm in another tab</a> using your normal local authenticator or SSO. Then return here.</p><a href="/auth/cli/approve">Continue after signing in</a></html>`)
+		_, _ = io.WriteString(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>Sign in to lindmctl</title><h1>Sign in to lindmctl</h1><p><a href="/" target="_blank" rel="noopener">Sign in to lindm in another tab</a>.</p><p>Use your local authenticator or single sign-on.</p><p>Return to this tab after you sign in.</p><a href="/auth/cli/approve">Continue</a></html>`)
 		return
 	}
 	principal, decision, err := s.resolve(r.Context(), cookie)
@@ -144,7 +144,7 @@ func (s *Service) handleCLIApprovalPage(w http.ResponseWriter, r *http.Request) 
 		writeStatus(w, http.StatusForbidden)
 		return
 	}
-	_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>Approve lindmctl</title><h1>Approve lindmctl sign-in</h1><p>Signed in as %s. Only approve if you started lindmctl on this computer. A session will be delivered to %s.</p><p>%s</p><form method="post" action="/auth/cli/approve"><input type="hidden" name="csrf_token" value="%s"><button type="submit">Approve CLI session</button></form></html>`, html.EscapeString(principal.DisplayName), html.EscapeString(request.RedirectUri), html.EscapeString(principal.IncidentReason), csrfToken(cookie+binding))
+	_, _ = fmt.Fprintf(w, `<!doctype html><html lang="en"><meta charset="utf-8"><title>Approve lindmctl</title><h1>Approve lindmctl sign-in</h1><p>You signed in as %s.</p><p>Approve only if you started lindmctl on this device.</p><p>lindm sends the session to %s.</p><p>%s</p><form method="post" action="/auth/cli/approve"><input type="hidden" name="csrf_token" value="%s"><button type="submit">Approve CLI session</button></form></html>`, html.EscapeString(principal.DisplayName), html.EscapeString(request.RedirectUri), html.EscapeString(principal.IncidentReason), csrfToken(cookie+binding))
 }
 
 func (s *Service) handleCLIApprove(w http.ResponseWriter, r *http.Request) {

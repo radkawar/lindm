@@ -269,6 +269,33 @@ func TestCLIApprovalOriginCSRFBrowserBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, signedIn := range []bool{false, true} {
+		request := httptest.NewRequest(http.MethodGet, localTestOrigin+"/auth/cli/approve", nil)
+		request.AddCookie(&http.Cookie{Name: cliFlowCookie, Value: binding})
+		if signedIn {
+			request.AddCookie(&http.Cookie{Name: sessionCookie, Value: cookie})
+		}
+		response := httptest.NewRecorder()
+		s.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("CLI approval page status = %d", response.Code)
+		}
+		body := response.Body.String()
+		if signedIn {
+			for _, text := range []string{
+				"Approve only if you started lindmctl on this device.",
+				"lindm sends the session to http://127.0.0.1:34567/callback.",
+				`action="/auth/cli/approve"`,
+				`value="` + csrfToken(cookie+binding) + `"`,
+			} {
+				if !strings.Contains(body, text) {
+					t.Fatalf("CLI approval page omitted %q", text)
+				}
+			}
+		} else if !strings.Contains(body, `href="/" target="_blank" rel="noopener"`) || !strings.Contains(body, "Return to this tab after you sign in.") {
+			t.Fatal("CLI sign-in page lost its return instruction or safe console link")
+		}
+	}
 	for _, scenario := range []string{"missing_origin", "wrong_csrf", "wrong_binding", "valid"} {
 		form := url.Values{"csrf_token": {csrfToken(cookie + binding)}}
 		if scenario == "wrong_csrf" {

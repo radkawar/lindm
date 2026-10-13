@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"lindm/db"
+	"lindm/docs"
 	"lindm/internal/advisory"
 	"lindm/internal/agent/buildinfo"
 	"lindm/internal/assistrelay"
@@ -381,6 +382,12 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
+	help, err := docs.Handler()
+	if err != nil {
+		return nil, fmt.Errorf("initialize documentation: %w", err)
+	}
+	mux.Handle("/help", help)
+	mux.Handle("/help/", help)
 	mux.Handle("/", p.console)
 	return mux, nil
 }
