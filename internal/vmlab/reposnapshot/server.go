@@ -370,6 +370,11 @@ func (r snapshotContextReader) Read(p []byte) (int, error) {
 
 // Match the lab's disposable P-256 CA/leaf pattern, without touching any host
 // certificate store or borrowing the long-lived dev/control-plane authority.
+// Each authority has its own CA name and random serials: a Tumbleweed golden
+// keeps its installer's snapshot CA (the same name and serial 1 before, valid
+// for 24 hours) as a trust anchor, and with both anchors installed zypper's
+// system store failed the lane leaf ("certificate signature failure", exit 4
+// on the x86_64 resources and os-update lanes) while curl --cacert passed.
 func snapshotCertificate(host string) (tls.Certificate, []byte, error) {
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -379,13 +384,18 @@ func snapshotCertificate(host string) (tls.Certificate, []byte, error) {
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
+	serials := make([]byte, 32)
+	if _, err := rand.Read(serials); err != nil {
+		return tls.Certificate{}, nil, err
+	}
+	caSerial, leafSerial := new(big.Int).SetBytes(serials[:16]), new(big.Int).SetBytes(serials[16:])
 	now := time.Now()
-	ca := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "lindm disposable snapshot CA"}, NotBefore: now.Add(-5 * time.Minute), NotAfter: now.Add(24 * time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
+	ca := &x509.Certificate{SerialNumber: caSerial, Subject: pkix.Name{CommonName: "lindm disposable snapshot CA " + hex.EncodeToString(serials[:8])}, NotBefore: now.Add(-5 * time.Minute), NotAfter: now.Add(24 * time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign}
 	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, &caKey.PublicKey, caKey)
 	if err != nil {
 		return tls.Certificate{}, nil, err
 	}
-	leaf := &x509.Certificate{SerialNumber: big.NewInt(2), Subject: pkix.Name{CommonName: host}, NotBefore: ca.NotBefore, NotAfter: ca.NotAfter, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	leaf := &x509.Certificate{SerialNumber: leafSerial, Subject: pkix.Name{CommonName: host}, NotBefore: ca.NotBefore, NotAfter: ca.NotAfter, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	if ip := net.ParseIP(host); ip != nil {
 		leaf.IPAddresses = []net.IP{ip}
 	} else {

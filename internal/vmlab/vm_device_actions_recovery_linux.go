@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -195,23 +196,37 @@ func waitNativeActionPresence(ctx context.Context, owner *devlab.OwnerSession, d
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	var seen, host *timestamppb.Timestamp
+	stale := func() error {
+		return fmt.Errorf("real server has no fresh device presence and inventory within %s (last seen %s, last host inventory %s)", nativeActionPresenceTimeout, presenceTime(seen), presenceTime(host))
+	}
 	for {
 		response, err := owner.Admin.GetDevice(ctx, connect.NewRequest(&adminv1.GetDeviceRequest{DeviceId: deviceID}))
 		if err != nil {
+			if ctx.Err() != nil {
+				return errors.Join(stale(), err)
+			}
 			return err
 		}
 		now := time.Now()
-		seen := response.Msg.GetDevice().GetLastSeenAt()
-		host := response.Msg.GetHost().GetReceivedAt()
+		seen = response.Msg.GetDevice().GetLastSeenAt()
+		host = response.Msg.GetHost().GetReceivedAt()
 		if seen != nil && host != nil && now.Sub(seen.AsTime()) < 30*time.Second && now.Sub(host.AsTime()) < 4*time.Minute {
 			return nil
 		}
 		select {
 		case <-ctx.Done():
-			return errors.New("real server has no fresh device presence and inventory")
+			return stale()
 		case <-ticker.C:
 		}
 	}
+}
+
+func presenceTime(t *timestamppb.Timestamp) string {
+	if t == nil {
+		return "never"
+	}
+	return t.AsTime().UTC().Format(time.RFC3339)
 }
 
 func actionSanitizeSample(ctx context.Context, vm *guestVM, path string, offset uint64, zero bool) error {

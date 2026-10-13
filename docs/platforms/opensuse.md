@@ -312,11 +312,14 @@ a rewritten `/etc/passwd` takes the directory default `etc_t` instead of
 `passwd_file_t`. `chage` and `chpasswd` run confined as `passwd_t` (Tumbleweed's
 policy transitions `unconfined_service_t` there), which may not write `etc_t`
 files: the aarch64 resources lane's first `chage` after `useradd` failed with
-"cannot open …/account-root//etc/passwd". On an SELinux host the helper now records the
-labels of `passwd`, `shadow`, `group` and `gshadow` before each native command
-and restores them afterwards on the rewritten files and their `-` backups
-(`keepDatabaseLabels`). Databases mislabeled by an earlier agent keep their
-label; `restorecon /etc/passwd /etc/shadow /etc/group` repairs them.
+"cannot open …/account-root//etc/passwd". `passwd_t`'s own unnamed type
+transition in `/etc` is `shadow_t`, so a `chage` rewrite would also leave
+`/etc/passwd` as `shadow_t`, unreadable to ordinary NSS clients. On an SELinux
+host the helper now records the labels of `passwd`, `shadow`, `group` and
+`gshadow` before each native command and restores them afterwards on the
+rewritten files and their `-` backups (`keepDatabaseLabels`). Databases
+mislabeled by an earlier agent keep their label; `restorecon /etc/passwd
+/etc/shadow /etc/group` repairs them.
 
 Tumbleweed also keeps no `/etc/gshadow`; shadow's tools maintain it only when it
 exists, and `groupadd` never creates it. The accounts provider admits an absent
@@ -1266,11 +1269,18 @@ on the DGX Spark hosts, x86_64 on local KVM, each record in the
 | Device actions       | `tw2-arm-da-r2-724cf2ed/…/device-actions-aarch64.json` / `4b30b9f39632082cd3b286b89f3f022330f4c40e78ffaf15b85a3e687344c1c6`        |
 | TPM unattended boots | `tw2-arm-tpm-r2-c43c16df/…/tpm-unattended-boots-aarch64.json` / `4174e9b0fa3f1d15710d82224571f823d6b057448d4626695b26396482bb9075` |
 
-| Cell                | x86_64 record / SHA-256                                                                                                                                                             |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory           | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`                                                                  |
-| Dispatch            | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported: the lane finished after its matrix parent was stopped) |
-| Enroll from console | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`                                                        |
+| Cell                | x86_64 record / SHA-256                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory           | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`              |
+| Dispatch            | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported)    |
+| Enroll from console | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`    |
+| Air gap             | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)      |
+| Self-update         | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported) |
+| Lifecycle           | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)   |
+
+"Imported" records come from lanes that finished after their matrix parent was
+stopped (so it would not start superseded cells) and were added with
+`lab matrix import`.
 
 (`…` is `opensuse-tumbleweed`.) Recovery sanitize is recorded in the
 [Tier 2 recovery section](../verification.md#tier-2-recovery-sanitize-records-2026-10-12).
@@ -1281,11 +1291,22 @@ root mapping, udev cascade), TPM policy binding (automatic pcrlock) and the
 assistance readiness gate. aarch64 resources still failed at local-user creation
 (records `tw2-arm-r8`, `tw2-arm-res-r9`, `tw2-arm-res-r10`): `/usr/etc/login.defs`
 outside the prefix, shadow 4.20's removed `--mindays`, then the `etc_t` label on
-`/etc/passwd`; each is fixed above and the cell is not yet rerun. aarch64
-`os-update` has no later target: the ports repository has published nothing
-after its 2026-10-07 snapshot (repomd revision 2026-10-08T02:08Z, unchanged on
-2026-10-12), so no `Lab.OSUpdateTargets` entry exists for aarch64. The other
-x86_64 cells are queued behind the shared local KVM slots.
+`/etc/passwd`; each is fixed above and the cell is not yet rerun: the DGX Spark
+hosts went offline on 2026-10-12 at about 21:40, so every remaining aarch64
+cell is blocked on lab hosts, not failed. aarch64 `os-update` also has no later
+target: the ports repository has published nothing after its 2026-10-07
+snapshot (repomd revision 2026-10-08T02:08Z, unchanged on 2026-10-12), so no
+`Lab.OSUpdateTargets` entry exists for aarch64.
+
+The x86_64 resources (`tw2-x86-res-r8`) and os-update (`tw2-x86-osu-r1`) records
+failed in the lab, not the product: their lane snapshot CA had the same name and
+serial as the installer CA a fresh Tumbleweed golden keeps as a trust anchor, so
+zypper's system store failed the lane leaf ("certificate signature failure")
+while `curl --cacert` passed. Snapshot authorities now get their own names and
+random serials. The x86_64 assistance failure (`tw2-x86-assist-r2`) timed out
+waiting for fresh device presence and inventory; that wait now reports the last
+observations. The remaining x86_64 cells are queued behind the shared local KVM
+slots.
 
 ## Known gaps
 

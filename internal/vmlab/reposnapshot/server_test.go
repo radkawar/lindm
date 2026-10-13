@@ -248,3 +248,39 @@ func TestSnapshotHTTPSIsolatedTrustAndCancellation(t *testing.T) {
 		t.Fatalf("spool survived close: %v", err)
 	}
 }
+
+// Two authorities never share an issuer name or serial, so a stale anchor
+// left in a golden cannot stand in for the lane CA, and a lane leaf verifies
+// only against its own CA.
+func TestSnapshotAuthoritiesAreDistinct(t *testing.T) {
+	var cas []*x509.Certificate
+	var leaves []*x509.Certificate
+	for range 2 {
+		certificate, _, err := snapshotCertificate("127.0.0.1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		leaf, err := x509.ParseCertificate(certificate.Certificate[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		ca, err := x509.ParseCertificate(certificate.Certificate[1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		leaves, cas = append(leaves, leaf), append(cas, ca)
+	}
+	if cas[0].Subject.String() == cas[1].Subject.String() || cas[0].SerialNumber.Cmp(cas[1].SerialNumber) == 0 || leaves[0].SerialNumber.Cmp(leaves[1].SerialNumber) == 0 {
+		t.Fatalf("authorities share an issuer name or serial: %s / %s", cas[0].Subject, cas[1].Subject)
+	}
+	for i, leaf := range leaves {
+		for j, ca := range cas {
+			roots := x509.NewCertPool()
+			roots.AddCert(ca)
+			_, err := leaf.Verify(x509.VerifyOptions{Roots: roots})
+			if (err == nil) != (i == j) {
+				t.Fatalf("leaf %d against CA %d: %v", i, j, err)
+			}
+		}
+	}
+}
