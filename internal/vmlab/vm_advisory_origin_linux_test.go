@@ -113,9 +113,12 @@ func TestVMAdvisoryDerivativeRequiresVerifiedOriginPartial(t *testing.T) {
 	}
 }
 
-// apt-cache policy text as noble/zena print it: the global index list with
-// release fields, then each package's version table. Index priorities differ
-// under package pins, so indexes join on the text after the priority.
+// apt-cache policy text as noble/zena/Pop!_OS print it: the global index list
+// with release fields, then each package's version table. Index priorities
+// differ under package pins, so indexes join on the text after the priority.
+// Pop!_OS pins its release repository to 1001, leaving index rows only seven
+// columns indented; the first parser took them for version rows and the Pop
+// advisories lane found no vendor origin for any of 76 vendor packages.
 func TestParseAPTInstalledOriginsJoinsVersionTableToReleaseFields(t *testing.T) {
 	output := `Package files:
  100 /var/lib/dpkg/status
@@ -129,6 +132,9 @@ func TestParseAPTInstalledOriginsJoinsVersionTableToReleaseFields(t *testing.T) 
  500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages
      release v=24.04,o=Ubuntu,a=noble,n=noble,l=Ubuntu,c=main,b=amd64
      origin archive.ubuntu.com
+1001 http://apt.pop-os.org/release noble/main amd64 Packages
+     release o=pop-os-release,a=noble,n=noble,l=Pop_OS Release,c=main,b=amd64
+     origin apt.pop-os.org
 Pinned packages:
 @@package openssl
 openssl:
@@ -157,12 +163,22 @@ bash:
  *** 5.2.21-2ubuntu4 990
         990 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages
         100 /var/lib/dpkg/status
+@@package adw-gtk3
+adw-gtk3:
+  Installed: 5.3.0-0pop1~1710896694~24.04~213b5ed
+  Candidate: 5.3.0-0pop1~1710896694~24.04~213b5ed
+  Version table:
+ *** 5.3.0-0pop1~1710896694~24.04~213b5ed 1001
+       1001 http://apt.pop-os.org/release noble/main amd64 Packages
+        100 /var/lib/dpkg/status
+     5.2.0-1 500
+        500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages
 `
 	origins, err := parseAPTInstalledOrigins(output)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, want := range map[string][]string{"openssl": {}, "mint-common": {"linuxmint/zena"}, "bash": {"Ubuntu/noble"}} {
+	for name, want := range map[string][]string{"openssl": {}, "mint-common": {"linuxmint/zena"}, "bash": {"Ubuntu/noble"}, "adw-gtk3": {"pop-os-release/noble"}} {
 		if got, ok := origins[name]; !ok || !slices.Equal(got, want) {
 			t.Fatalf("%s origins = %v, want %v", name, got, want)
 		}

@@ -209,15 +209,20 @@ func parseAPTInstalledOrigins(output string) (map[string][]string, error) {
 		origins := []string{}
 		for _, line := range strings.Split(body, "\n") {
 			trimmed := strings.TrimSpace(line)
+			// Version rows are indented five columns (" *** " marks the
+			// installed one); index rows seven, then a right-aligned
+			// four-column priority, so Pop!_OS's 1001 pin leaves only seven
+			// spaces where 500 has eight.
+			indent := len(line) - len(strings.TrimLeft(line, " "))
 			switch {
 			case strings.HasPrefix(trimmed, "Version table:"):
 				inTable = true
 			case !inTable:
 			case strings.HasPrefix(line, " *** "):
 				installed = true
-			case strings.HasPrefix(line, "     ") && !strings.HasPrefix(line, "        "):
+			case indent == 5:
 				installed = false // the next version of the table
-			case installed && strings.HasSuffix(trimmed, " Packages"):
+			case installed && indent > 5 && strings.HasSuffix(trimmed, " Packages"):
 				index, ok := indexes[aptIndexKey(trimmed)]
 				if !ok {
 					return nil, fmt.Errorf("advisories: %s lists an index absent from APT policy: %s", name, trimmed)
