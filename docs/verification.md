@@ -7282,17 +7282,28 @@ already-streamed monitor still sends `SELECT_DISPLAY`) both came after the `-25`
 x86_64 runs. Source `32a6d641` is the Tier 1 tip with `d6b9b500`, equivalent to the
 landed `c793dfef`; the `-27` runs used it.
 
-The Fedora 44 `monitors` failure is attributed to an upstream compositor defect
-under investigation; it is not a product pass. The unplug is a genuine
-virtio-gpu connector disconnect (RFB `SetDesktopSize` 0x0, so
-`virtio_gpu_ui_info` disables the scanout); GNOME 46 on Ubuntu survives the same
-unplug. The crash is in `fedora44-tier1-27/journal-gnome-shell.txt`, SHA-256
-`3e149d637b671725c975b8f2b9d92ad0061a88c0745bc5476b06961b94f11f38`; coredump
-capture is pending. Fedora 44 x86_64 displays therefore stays implemented, and its
-clipboard, keyboard and message rows stay partial: they passed with their
-independent witnesses in the same run, but Tier 1 qualification is per run, so they
-are recorded as passed, not qualified. The presented display-generation fence is not
-exercised by the maintained scenarios and stays not run on both platforms.
+The Fedora 44 `monitors` failure is an upstream GNOME 50 compositor defect, not a
+product pass. With `cursor_mode EMBEDDED`, unplugging the cast monitor crashes
+`gnome-shell` 50.0 (mutter `50.0-1.fc44`) with SIGSEGV:
+`meta_logical_monitor_get_layout(NULL)` ← `is_cursor_in_stream` ←
+`meta_backend_is_hw_cursors_inhibited` ← `meta_cursor_renderer_native_update_cursor`
+← `meta_monitor_manager_notify_monitors_changed` ← `on_kms_resources_changed`.
+The unchecked logical-monitor lookup remains in Mutter through tag 50.3, in
+[`src/backends/meta-screen-cast-monitor-stream-src.c`, `is_cursor_in_stream`](https://gitlab.gnome.org/GNOME/mutter/-/blob/50.3/src/backends/meta-screen-cast-monitor-stream-src.c).
+The unplug is a genuine virtio-gpu connector disconnect (RFB `SetDesktopSize` 0x0,
+so `virtio_gpu_ui_info` disables the scanout); GNOME 46 is unaffected in the
+equivalent Ubuntu run. Evidence is `fedora44-tier1-27` and
+`/home/r/.cache/lindm-assistance-roadmap-20261011/fedora44-monitors-fix-10/journal-coredump.txt`
+and `journal-kernel.txt` in that same directory. lindm fails closed: the session
+ends with no fallback. Monitor-selection qualification on Fedora 44 is blocked
+by this upstream defect. **Mitigation pending, landing separately:** lindm avoids
+the embedded-cursor path on GNOME 50 by selecting METADATA, with HIDDEN plus a
+viewer note as fallback; this is not yet qualified by these records.
+Fedora 44 x86_64 displays therefore stays implemented, and its clipboard, keyboard
+and message rows stay partial: they passed with independent witnesses in the same
+run, but Tier 1 qualification is per run, so they are passed, not qualified.
+The presented display-generation fence is not exercised by the maintained
+scenarios and stays not run on both platforms.
 
 | Capability / maintained scenario requirement | Ubuntu 24.04 x86_64, GNOME 46 Wayland               | Fedora 44 x86_64, GNOME 50 Wayland                                                                     | Required independent evidence                                                                                                                                                                                                     |
 | -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

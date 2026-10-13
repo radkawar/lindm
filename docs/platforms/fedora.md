@@ -941,6 +941,25 @@ mechanisms; elevation leaves credential entry to the employee. Unattended
 implementation and KDE qualification await parent confirmation; X11 is not a
 silent fallback.
 
+### Assistance known issues
+
+Fedora 44 `gnome-shell` 50.0 (mutter `50.0-1.fc44`) SIGSEGVs when the cast
+monitor is unplugged during a RemoteDesktop + ScreenCast portal session using
+`cursor_mode EMBEDDED`. The stack is `meta_logical_monitor_get_layout(NULL)` ←
+`is_cursor_in_stream` ← `meta_backend_is_hw_cursors_inhibited` ←
+`meta_cursor_renderer_native_update_cursor` ←
+`meta_monitor_manager_notify_monitors_changed` ← `on_kms_resources_changed`.
+The same unchecked code is present through Mutter 50.3; GNOME 46 is unaffected.
+See [`fedora44-tier1-27`](../verification.md#commercial-assistance-capability-qualification)
+and `/home/r/.cache/lindm-assistance-roadmap-20261011/fedora44-monitors-fix-10/journal-coredump.txt`
+and `journal-kernel.txt` in that directory. lindm fails closed (the session ends;
+no fallback), so Fedora 44 monitor-selection qualification is blocked by this
+upstream defect.
+
+**Mitigation pending, landing separately:** lindm avoids the embedded-cursor path
+on GNOME 50 using METADATA, with HIDDEN plus a viewer note as fallback. The crash
+records above do not qualify that mitigation.
+
 ## Advisory feeds
 
 Fedora uses repository **updateinfo**, not Red Hat CSAF/VEX. The adapter requires

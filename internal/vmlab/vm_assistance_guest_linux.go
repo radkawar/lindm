@@ -346,7 +346,10 @@ done`)
 }
 
 // assistanceJournalUnits are bounded diagnostic excerpts from the disposable
-// guest, including the public portal path used by the session helper.
+// guest, including the public portal path used by the session helper. The
+// coredump and kernel excerpts name a compositor crash's stack and the DRM
+// connector events around it (fedora44-tier1-27: gnome-shell SIGSEGV on a
+// head removal left only an audit ANOM_ABEND line).
 var assistanceJournalUnits = []struct{ name, selector string }{
 	{"executor", "-u lindm-executor.service"},
 	{"agent", "-u lindm-agent.service"},
@@ -355,6 +358,8 @@ var assistanceJournalUnits = []struct{ name, selector string }{
 	{"portal", "_SYSTEMD_USER_UNIT=xdg-desktop-portal.service"},
 	{"portal-gnome", "_SYSTEMD_USER_UNIT=xdg-desktop-portal-gnome.service"},
 	{"gnome-shell", "_COMM=gnome-shell"},
+	{"coredump", "SYSLOG_IDENTIFIER=systemd-coredump"},
+	{"kernel", "-k"},
 }
 
 func collectAssistanceJournals(ctx context.Context, vm *guestVM, since int64, evidence *assistanceEvidence) ([]assistanceEvidenceFile, error) {
