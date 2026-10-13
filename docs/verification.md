@@ -6599,31 +6599,39 @@ settings on either (keys `actionProvider`, `networkUser`, `remoteAssistance`,
 | `LOCAL_GROUP developers`, `LOCAL_USER developer` | CONVERGED; GID/UID 1500, `/home/developer` 0700 `developer:developers`, password locked                             | not assigned                                                                         |
 | `SSH_SERVER system`                              | CONVERGED by approved adoption; `/etc/issue.net` is the declared banner, `sshd -T` `banner /etc/issue.net`          | not assigned                                                                         |
 
-The `deb/git` and `deb/htop` rows are what `07a70b2e` reports; main `99f4bcbc`
-(after these runs started) makes them approved adoption and has staging-signal
-(SIGXFSZ) fixes; whether the `htop` `apt-get` signal had that cause is
-unverified, so both rows still need a run on that build. Fedora's `dnf5` stays
+The `deb/git` and `deb/htop` rows are what `07a70b2e` reports. A fresh
+Ubuntu-only demo `pe-x86-eng2-05` (device
+`fb6285c9-912e-4c06-acf6-6cf2ceb729ea`) built from main `2eedace2`, which
+includes `99f4bcbc`, ran them as approved adoption. Both were SUCCEEDED and
+verified CONVERGED, with the preinstalled `git 1:2.43.0-1ubuntu7.3` and
+`htop 3.3.0-4build1` unchanged. The `apt-get` status -1 staging failure did not
+recur, and no preparation or execution failure was logged. Every other row
+matched the table, and only the firewall and password-policy capability gates
+remained (`pe-x86-eng2-05/native-engineering-laptop.txt`). Fedora's `dnf5` stays
 `5.4.1.0` until a window run installs an all-updates selection (the demo policy
 is security-only, and Bodhi lists no security advisory for newer `dnf5`), so
 `rpm` package rows there would still be refused `native_tool_outdated`; the
 Finance profile has none. No `execution_signing_rejected` in either agent
 journal. Neither x86 demo was stopped and resumed: a resume re-enters FIFO
-admission. Both were stopped with Ctrl-C (exit 0) and destroyed; no demo
+admission. Every demo was stopped with Ctrl-C (exit 0) and destroyed; no demo
 process, guest or listener remains, only empty lock files and the Spark-blocked
-`pe-proof3` directory (`pe-x86-destroy-audit.txt`).
+`pe-proof3` directory (`pe-x86-destroy-audit.txt`,
+`pe-x86-eng2-destroy-audit.txt`).
 
 Evidence: `~/.cache/lindm-pe-proof/pe-proof-manifest.sha256`, SHA-256
-`98f36e02149723325f1693ca80673b52f500613a85fa66d122e4d3e168b401cd` (128 files:
+`d9a641b8266f2083d752738b5a35fb653d0c2b02c73b56f8a48d3b0aa9df9f22` (155 files:
 aarch64 runs `pe-proof-01`…`03` and `pe-proof2-01`, interrupted `pe-proof3-01`,
-x86 runs `pe-x86-fin*` and `pe-x86-eng-01` with apply, review and approval
-outcomes, `ready.json`, `resources-*.json` with capability state, native guest
-checks `pe-x86-eng-01/native-engineering-laptop.txt` and
+x86 runs `pe-x86-fin*`, `pe-x86-eng-01` and `pe-x86-eng2-05` with apply, review
+and approval outcomes, `ready.json`, `resources-*.json` with capability state,
+native guest checks `native-engineering-laptop.txt` and
 `pe-x86-fin3-01/native-finance-desktop.txt`, executor journal extracts, TPM boot
-evidence, the encrypted requalification records, destroy logs and audit, binary
+evidence, the encrypted requalification records, destroy logs and audits, binary
 digests `pe-proof-binaries.sha256`). Runs `pe-x86-fin-01`/`pe-x86-fin2-01`
 preceded the reviewed-rollout fix: both of the device's rollouts ended
-`preview_changed` and nothing was assigned. This is virtual-machine evidence,
-not physical-device qualification.
+`preview_changed` and nothing was assigned. Runs `pe-x86-eng2-01`…`04` stopped
+before admission because the build toolchain differed from the pins (Node
+26.1.0, Go 1.26.5). This is virtual-machine evidence, not physical-device
+qualification.
 
 #### Named split held lifecycle regression
 
