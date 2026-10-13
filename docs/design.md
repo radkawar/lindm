@@ -240,6 +240,7 @@ Use `data-ste-procedure` for procedural text. Explain each exception; never exem
 a whole page to avoid editing it. Vendor advisory links shown as source data use
 `data-console-link="vendor-advisory"` and the explicit host allowlist in the
 vocabulary file. Other console links must use the console's origin.
+Audit captions name only the kinds declared in `internal/auditkind`.
 
 ## Required design review in every console landing note
 

@@ -118,7 +118,6 @@
   "secret.delivered": "Delivered secret to device",
   "secret.reveal": "Revealed secret",
   "secret.rotated": "Rotated secret",
-  "server.recovery_checkpoint_accepted": "Server recovery checkpoint accepted",
   "targeting.assignment.put": "Saved profile assignment",
   "targeting.group.put": "Saved targeting group",
   "targeting.preview.activate": "Activated preview",
