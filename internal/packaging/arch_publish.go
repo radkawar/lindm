@@ -118,7 +118,7 @@ func PublishArch(ctx context.Context, req ArchRequest) (result *ArchRepository, 
 			return nil, fmt.Errorf("%w: expected .pkg.tar.zst", ErrArtifact)
 		}
 		dest := filepath.Join(repo, name)
-		if err := archCopyInput(input, dest, maxBinaryBytes+(8<<20), epoch); err != nil {
+		if err := archCopyInput(input, dest, maxPackageBytes, epoch); err != nil {
 			return nil, err
 		}
 		if err := archCopyInput(input+".sig", dest+".sig", 64<<10, epoch); err != nil {
@@ -233,7 +233,7 @@ func writeArchDatabase(path string, members []archMember, epoch int64) (err erro
 // readArchInfo accepts only the bounded archive profile emitted by this package.
 // All archive bytes are streamed; only .PKGINFO is retained in memory.
 func readArchInfo(filename string) (map[string][]string, error) {
-	file, err := openRegular(filename)
+	file, err := openBoundedRegular(filename, maxPackageBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func readArchInfo(filename string) (map[string][]string, error) {
 		return nil, err
 	}
 	defer zr.Close()
-	limited := &io.LimitedReader{R: zr, N: maxBinaryBytes + (16 << 20)}
+	limited := &io.LimitedReader{R: zr, N: maxPackageBytes}
 	tr := tar.NewReader(limited)
 	seen := make(map[string]bool)
 	var info map[string][]string
@@ -256,7 +256,7 @@ func readArchInfo(filename string) (map[string][]string, error) {
 			return nil, fmt.Errorf("%w: Arch archive: %w", ErrArtifact, err)
 		}
 		name := strings.TrimSuffix(h.Name, "/")
-		if name == "" || path.Clean(name) != name || strings.HasPrefix(name, "/") || name == ".." || strings.HasPrefix(name, "../") || strings.ContainsAny(name, "\x00\r\n") || seen[name] || len(seen) >= 4096 || h.Uid != 0 || h.Gid != 0 || (h.Typeflag != tar.TypeDir && h.Typeflag != tar.TypeReg) {
+		if name == "" || path.Clean(name) != name || strings.HasPrefix(name, "/") || name == ".." || strings.HasPrefix(name, "../") || strings.ContainsAny(name, "\x00\r\n") || seen[name] || len(seen) >= 16384 || h.Uid != 0 || h.Gid != 0 || (h.Typeflag != tar.TypeDir && h.Typeflag != tar.TypeReg) {
 			return nil, fmt.Errorf("%w: unsafe Arch archive member", ErrArtifact)
 		}
 		seen[name] = true
@@ -278,7 +278,14 @@ func readArchInfo(filename string) (map[string][]string, error) {
 	if _, err := io.Copy(io.Discard, limited); err != nil || limited.N <= 0 {
 		return nil, fmt.Errorf("%w: Arch decompression bound/checksum: %v", ErrArtifact, err)
 	}
-	for _, required := range []string{".PKGINFO", ".MTREE", ".BUILDINFO", ".INSTALL", BinaryPath[1:]} {
+	if info == nil {
+		return nil, fmt.Errorf("%w: missing .PKGINFO", ErrArtifact)
+	}
+	binary := BinaryPath
+	if info["pkgname"][0] == ServerPackageName {
+		binary = ServerBinaryPath
+	}
+	for _, required := range []string{".PKGINFO", ".MTREE", ".BUILDINFO", ".INSTALL", binary[1:]} {
 		if !seen[required] {
 			return nil, fmt.Errorf("%w: missing Arch member %s", ErrArtifact, required)
 		}
@@ -320,7 +327,7 @@ func parseArchInfo(data []byte) (map[string][]string, error) {
 		return nil, fmt.Errorf("%w: missing/duplicate Arch package type", ErrArtifact)
 	}
 	version, ok := strings.CutSuffix(fields["pkgver"][0], "-"+archRelease)
-	if _, err := parseVersion(version); err != nil || !ok || fields["pkgname"][0] != PackageName || fields["pkgbase"][0] != PackageName {
+	if _, err := parseVersion(version); err != nil || !ok || (fields["pkgname"][0] != PackageName && fields["pkgname"][0] != ServerPackageName) || fields["pkgbase"][0] != fields["pkgname"][0] {
 		return nil, fmt.Errorf("%w: unsupported Arch product/version", ErrArtifact)
 	}
 	if arch := fields[pkgInfoArch][0]; arch != "x86_64" && arch != "aarch64" {

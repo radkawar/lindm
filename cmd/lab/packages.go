@@ -62,6 +62,7 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 	flags.Func("reject-fingerprint", "forbid native signing fingerprint (repeatable)", func(value string) error { rejectedFingerprints = append(rejectedFingerprints, value); return nil })
 	flags.Func("reject-home-prefix", "forbid a signing-home subtree (repeatable)", func(value string) error { rejectedHomes = append(rejectedHomes, value); return nil })
 	var agent, repository, version, revision, formats, architecture *string
+	var agentRepository *string
 	if args[0] == "build" || args[0] == "build-server" || args[0] == "build-cli" {
 		binaryFlag := "agent"
 		if args[0] == "build-server" {
@@ -74,8 +75,11 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		repository = flags.String("repo", "", "checkout to compile using cached Go builds")
 		version = flags.String("version", "", "three-component numeric upstream version")
 		revision = flags.String("revision", "development", "source build revision label; not a clean-source attestation")
-		formats = flags.String("formats", "deb,rpm", "comma-separated native formats: deb,rpm,arch (Arch is agent-only)")
+		formats = flags.String("formats", "deb,rpm", "comma-separated native formats: deb,rpm,arch")
 		architecture = flags.String("arch", "", "target architecture: amd64 or arm64; default is the build host")
+		if args[0] == "build-server" {
+			agentRepository = flags.String("agent-repository", "", "authenticated ready agent repository bundle to package unchanged")
+		}
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -83,7 +87,7 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 	if *output == "" {
 		return errors.New("-output DIR is required")
 	}
-	if err := resolvePackagePaths(output, home, passphrase, agent, repository); err != nil {
+	if err := resolvePackagePaths(output, home, passphrase, agent, repository, agentRepository); err != nil {
 		return err
 	}
 	artifacts := flags.Args()
@@ -114,6 +118,9 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 			requested = append(requested, packaging.Format(format))
 		}
 		request := packaging.BuildRequest{AgentBinary: *agent, Version: *version, TargetArchitecture: *architecture, OutputDir: *output, Formats: requested, Signer: signer, SourceDateEpoch: *epoch}
+		if agentRepository != nil {
+			request.AgentRepository = *agentRepository
+		}
 		if args[0] == "build-server" {
 			if *repository != "" {
 				result, err = packaging.BuildServerSource(ctx, packaging.SourceRequest{Repository: *repository, Revision: *revision, BuildRequest: request})

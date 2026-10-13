@@ -254,6 +254,17 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 	if manifest.GetAttestationKeyId() != id {
 		return nil, errors.New("releasebuild: manifest key mismatch")
 	}
+	bundle, err := verifyEmbeddedRepository(ctx, directory, manifest, expectedKeyID)
+	if err != nil {
+		return nil, err
+	}
+	var bundleDigest string
+	if bundle != "" {
+		bundleDigest, err = treeDigest(bundle)
+		if err != nil {
+			return nil, err
+		}
+	}
 	for _, build := range manifest.GetBuilds() {
 		if build.GetSourceSha256() != manifest.GetSourceSha256() || len(build.GetUnsignedSha256()) != len(manifest.GetArtifacts()) {
 			return nil, errors.New("releasebuild: inconsistent signed build observation")
@@ -299,8 +310,13 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 		if err != nil {
 			return nil, err
 		}
+		if artifact.GetProduct() == "lindmd" {
+			if err := verifyBundleProvenance(provenancePredicate, bundleDigest); err != nil {
+				return nil, err
+			}
+		}
 		if artifact.GetFormat() == "oci" {
-			if err := verifyOCICA(filepath.Join(directory, artifact.GetPath()), artifact, sbomPredicate, provenancePredicate); err != nil {
+			if err := verifyOCICA(filepath.Join(directory, artifact.GetPath()), artifact, sbomPredicate, provenancePredicate, bundleForProduct(artifact.GetProduct(), bundle)); err != nil {
 				return nil, err
 			}
 		}

@@ -56,7 +56,7 @@ type archMember struct {
 	digest string
 }
 
-func buildArch(ctx context.Context, work, payload, version string, arch Architecture, epoch int64, key SigningKey, payloadSHA string, staged []stagedFile) (Artifact, error) {
+func buildArch(ctx context.Context, work, payload, version string, arch Architecture, epoch int64, key SigningKey, payloadSHA string, staged []stagedFile, p product) (Artifact, error) {
 	arch.Arch = arch.RPM
 	if arch.Arch != "x86_64" && arch.Arch != "aarch64" {
 		return Artifact{}, ErrArchitecture
@@ -71,11 +71,13 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	}
 	pkgver := version + "-" + archRelease
 	var info strings.Builder
-	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = UNLICENSED\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", PackageName, PackageName, pkgver, agentProduct().summary, epoch, size, arch.Arch)
-	for _, dependency := range platform.BackendPacman.ResourceDependencies() {
-		fmt.Fprintf(&info, "depend = %s\n", dependency)
+	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = UNLICENSED\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", p.name, p.name, pkgver, p.summary, epoch, size, arch.Arch)
+	if p.name == PackageName {
+		for _, dependency := range platform.BackendPacman.ResourceDependencies() {
+			fmt.Fprintf(&info, "depend = %s\n", dependency)
+		}
 	}
-	for _, optional := range agentProduct().archOptdepends {
+	for _, optional := range p.archOptdepends {
 		fmt.Fprintf(&info, "optdepend = %s\n", optional)
 	}
 	for _, file := range staged {
@@ -86,9 +88,28 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	// This is a Go assembler, not a makepkg invocation. Keep its deterministic
 	// recipe in the archive and hash that exact input, without inventing an
 	// installed-package inventory or claiming a clean Arch build environment.
-	recipe := fmt.Sprintf("# lindm native archive recipe: payload is staged before assembly\npkgname=%s\npkgver=%s\npkgrel=%s\narch=('%s')\n# prebuilt static Go payload sha256: %s\npackage() {\n  cp -a \"$srcdir/payload/.\" \"$pkgdir/\"\n}\n", PackageName, version, archRelease, arch.Arch, payloadSHA)
-	buildinfo := fmt.Sprintf("format = 2\npkgname = %s\npkgbase = %s\npkgver = %s\npkgarch = %s\npkgbuild_sha256sum = %x\npackager = Lindm Packaging <packaging@lindm.invalid>\nbuilddate = %d\nbuilddir = /build/lindm\nstartdir = /build/lindm\nbuildtool = go\nbuildtoolver = %s-1-any\n", PackageName, PackageName, pkgver, arch.Arch, sha256.Sum256([]byte(recipe)), epoch, strings.TrimPrefix(runtime.Version(), "go"))
-	for _, item := range []struct{ name, data string }{{".PKGINFO", info.String()}, {".BUILDINFO", buildinfo}, {".INSTALL", archInstall}, {".PKGBUILD", recipe}} {
+	recipe := fmt.Sprintf("# lindm native archive recipe: payload is staged before assembly\npkgname=%s\npkgver=%s\npkgrel=%s\narch=('%s')\n# prebuilt static Go payload sha256: %s\npackage() {\n  cp -a \"$srcdir/payload/.\" \"$pkgdir/\"\n}\n", p.name, version, archRelease, arch.Arch, payloadSHA)
+	buildinfo := fmt.Sprintf("format = 2\npkgname = %s\npkgbase = %s\npkgver = %s\npkgarch = %s\npkgbuild_sha256sum = %x\npackager = Lindm Packaging <packaging@lindm.invalid>\nbuilddate = %d\nbuilddir = /build/lindm\nstartdir = /build/lindm\nbuildtool = go\nbuildtoolver = %s-1-any\n", p.name, p.name, pkgver, arch.Arch, sha256.Sum256([]byte(recipe)), epoch, strings.TrimPrefix(runtime.Version(), "go"))
+	install := strings.ReplaceAll(archInstall, lifecyclePath, p.lifecycle)
+	if p.name == ServerPackageName {
+		// Server upgrades never stop/start services or run migrations.
+		install = `post_install() {
+  /bin/sh /usr/libexec/lindmd/lifecycle configure
+}
+post_upgrade() {
+  post_install
+}
+pre_remove() {
+  /bin/sh /usr/libexec/lindmd/lifecycle remove
+}
+post_remove() {
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload
+  fi
+}
+`
+	}
+	for _, item := range []struct{ name, data string }{{".PKGINFO", info.String()}, {".BUILDINFO", buildinfo}, {".INSTALL", install}, {".PKGBUILD", recipe}} {
 		members = append(members, archMemoryMember(item.name, []byte(item.data)))
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].name < members[j].name })
@@ -97,7 +118,7 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 		return Artifact{}, err
 	}
 	members = append([]archMember{archMemoryMember(".MTREE", mtree)}, members...)
-	path := filepath.Join(work, fmt.Sprintf("%s-%s-%s.pkg.tar.zst", PackageName, pkgver, arch.Arch))
+	path := filepath.Join(work, fmt.Sprintf("%s-%s-%s.pkg.tar.zst", p.name, pkgver, arch.Arch))
 	if err := writeArchArchive(ctx, path, members, epoch); err != nil {
 		return Artifact{}, err
 	}
@@ -119,7 +140,7 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	if err != nil {
 		return Artifact{}, err
 	}
-	return Artifact{Product: PackageName, Format: FormatArch, Path: path, SignaturePath: path + ".sig", SHA256: sum, UnsignedSHA256: sum, Size: archiveSize, Architecture: arch, Version: version, PayloadSHA256: payloadSHA, Signed: true, SignerFingerprint: key.Fingerprint}, nil
+	return Artifact{Product: p.name, Format: FormatArch, Path: path, SignaturePath: path + ".sig", SHA256: sum, UnsignedSHA256: sum, Size: archiveSize, Architecture: arch, Version: version, PayloadSHA256: payloadSHA, Signed: true, SignerFingerprint: key.Fingerprint}, nil
 }
 
 func archMemoryMember(name string, data []byte) archMember {

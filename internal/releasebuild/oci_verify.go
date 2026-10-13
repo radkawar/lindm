@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 
 	releasev1 "lindm/gen/lindm/release/v1"
@@ -24,7 +25,7 @@ type imageDescriptor struct {
 	Size      int64  `json:"size"`
 }
 
-func verifyOCICA(path string, artifact *releasev1.ReleaseArtifact, bom, provenance json.RawMessage) error {
+func verifyOCICA(path string, artifact *releasev1.ReleaseArtifact, bom, provenance json.RawMessage, bundle ...string) error {
 	var build struct {
 		Definition struct {
 			Dependencies []struct {
@@ -73,10 +74,10 @@ func verifyOCICA(path string, artifact *releasev1.ReleaseArtifact, bom, provenan
 	if !found {
 		return errors.New("releasebuild: OCI CA SBOM component missing")
 	}
-	return verifyOCIImage(path, artifact.GetProduct(), artifact.GetArchitecture(), normalized)
+	return verifyOCIImage(path, artifact.GetProduct(), artifact.GetArchitecture(), normalized, bundle...)
 }
 
-func verifyOCIImage(path, product, architecture, caPin string) (err error) {
+func verifyOCIImage(path, product, architecture, caPin string, bundle ...string) (err error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -160,7 +161,7 @@ func verifyOCIImage(path, product, architecture, caPin string) (err error) {
 	if err := verifyOCIConfig(configJSON, product, architecture, manifest.Layers[0].Digest); err != nil {
 		return err
 	}
-	if err := verifyOCILayer(archive, manifest.Layers[0], product, caPin); err != nil {
+	if err := verifyOCILayer(archive, manifest.Layers[0], product, caPin, bundle...); err != nil {
 		return err
 	}
 	if _, err := archive.Next(); err != io.EOF {
@@ -197,7 +198,7 @@ func verifyOCIConfig(configJSON []byte, product, architecture, layerDigest strin
 
 // verifyOCILayer streams the next archive member as the described layer: exactly
 // the product binary and the pinned CA bundle, with the descriptor's digest.
-func verifyOCILayer(archive *tar.Reader, descriptor imageDescriptor, product, caPin string) error {
+func verifyOCILayer(archive *tar.Reader, descriptor imageDescriptor, product, caPin string, bundle ...string) error {
 	layerName, err := descriptorPath(descriptor, "application/vnd.oci.image.layer.v1.tar")
 	if err != nil {
 		return err
@@ -234,6 +235,28 @@ func verifyOCILayer(archive *tar.Reader, descriptor imageDescriptor, product, ca
 			sum := sha256.Sum256(data)
 			if hex.EncodeToString(sum[:]) != caPin {
 				return errors.New("releasebuild: actual OCI CA differs from SBOM/provenance")
+			}
+		}
+	}
+	if len(bundle) != 0 && bundle[0] != "" {
+		entries, err := bundleDigests(bundle[0])
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			header, err := layer.Next()
+			if err != nil {
+				return err
+			}
+			if header.Name != "usr/share/lindmd/agent-repository/"+filepath.ToSlash(entry.name) || header.Typeflag != tar.TypeReg || header.Mode != 0444 || header.Uid != 0 || header.Gid != 0 || header.Size != entry.size {
+				return errors.New("releasebuild: OCI agent repository member mismatch")
+			}
+			hash := sha256.New()
+			if _, err := io.Copy(hash, layer); err != nil {
+				return err
+			}
+			if hex.EncodeToString(hash.Sum(nil)) != entry.sum {
+				return errors.New("releasebuild: OCI agent repository digest mismatch")
 			}
 		}
 	}

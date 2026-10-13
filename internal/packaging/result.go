@@ -60,6 +60,9 @@ type BuildRequest struct {
 	Signer  SigningKey
 	// SourceDateEpoch zero selects DefaultSourceDateEpoch, never the wall clock.
 	SourceDateEpoch int64
+	// AgentRepository is an explicit authenticated bundle copied unchanged into
+	// server packages. Empty omits it for standalone development builds.
+	AgentRepository string
 }
 
 // Architecture is derived from the ELF header, not from the caller's claim.

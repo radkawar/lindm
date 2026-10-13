@@ -55,6 +55,13 @@ func openPrivate(path string) (*os.File, error) {
 }
 
 func openRegular(path string) (*os.File, error) {
+	return openBoundedRegular(path, maxBinaryBytes)
+}
+
+// Native server archives include the complete signed agent repository payload.
+const maxPackageBytes = 5 << 30
+
+func openBoundedRegular(path string, limit int64) (*os.File, error) {
 	cleaned, err := cleanAbsolute(path)
 	if err != nil {
 		return nil, err
@@ -79,7 +86,7 @@ func openRegular(path string) (*os.File, error) {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("%w: setuid or world-writable input rejected", ErrUnsafePath)
 	}
-	if stat.Size <= 0 || stat.Size > maxBinaryBytes {
+	if stat.Size <= 0 || stat.Size > limit {
 		_ = unix.Close(fd)
 		return nil, fmt.Errorf("%w: binary size rejected", ErrUnsafePath)
 	}

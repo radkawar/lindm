@@ -21,7 +21,7 @@ import (
 )
 
 const maxDocument = 32 << 20
-const maxArtifact = 1 << 30
+const maxArtifact = 5 << 30
 
 // command never inherits Go, npm, shell startup or signing credentials.
 func command(ctx context.Context, dir string, environment []string, name string, args ...string) ([]byte, error) {
@@ -238,4 +238,26 @@ func readBounded(path string, limit int64) (data []byte, err error) {
 		return nil, errors.New("releasebuild: document grew beyond bound")
 	}
 	return data, err
+}
+
+// captureBuildSource snapshots source and explicitly pinned release inputs once
+// before either isolated builder starts.
+func captureBuildSource(ctx context.Context, work, repository string, caBundle []byte) (string, string, error) {
+	source := filepath.Join(work, "source")
+	if err := os.Mkdir(source, 0700); err != nil {
+		return "", "", err
+	}
+	if err := snapshot(ctx, repository, source); err != nil {
+		return "", "", err
+	}
+	if len(caBundle) != 0 {
+		if err := os.Mkdir(filepath.Join(source, filepath.Dir(capturedCAPath)), 0700); err != nil {
+			return "", "", err
+		}
+		if err := writeNew(filepath.Join(source, capturedCAPath), caBundle, 0644); err != nil {
+			return "", "", err
+		}
+	}
+	digest, err := treeDigest(source)
+	return source, digest, err
 }

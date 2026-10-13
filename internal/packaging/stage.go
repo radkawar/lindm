@@ -13,9 +13,10 @@ import (
 )
 
 type stagedFile struct {
-	Rel  string
-	Mode os.FileMode
-	Conf bool
+	Rel    string
+	Mode   os.FileMode
+	Conf   bool
+	SHA256 string
 }
 
 func hashReader(r io.Reader) (string, int64, error) {
@@ -138,4 +139,22 @@ func installedSize(root string) (int64, error) {
 		kib = 1
 	}
 	return kib, nil
+}
+
+func stageProductPayload(work string, binary *os.File, epoch int64, p product, bundle, binarySHA string) (string, []stagedFile, string, error) {
+	payload, staged, digest, err := stagePayload(work, binary, epoch, p)
+	if err != nil {
+		return "", nil, "", err
+	}
+	if digest != binarySHA {
+		return "", nil, "", fmt.Errorf("%w: staged binary does not match the opened input", ErrArtifact)
+	}
+	if bundle != "" {
+		files, err := stageAgentRepository(payload, bundle, epoch)
+		if err != nil {
+			return "", nil, "", err
+		}
+		staged = append(staged, files...)
+	}
+	return payload, staged, digest, nil
 }

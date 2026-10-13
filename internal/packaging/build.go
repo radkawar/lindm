@@ -19,9 +19,9 @@ func Build(ctx context.Context, req BuildRequest) (result *BuildResult, err erro
 	return build(ctx, req, agentProduct())
 }
 
-// BuildServer packages a prebuilt lindmd, including its embedded console.
-// AgentBinary carries the server executable. RPM is signed here; DEBs are
-// authenticated by PublishAPT. No host service or database is modified.
+// BuildServer packages a prebuilt lindmd, including its embedded console and an
+// explicitly supplied immutable agent repository. AgentBinary carries the server
+// executable. RPM/Arch are signed here; DEBs are authenticated by PublishAPT.
 func BuildServer(ctx context.Context, req BuildRequest) (*BuildResult, error) {
 	return build(ctx, req, serverProduct())
 }
@@ -40,8 +40,11 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 	if err != nil {
 		return nil, err
 	}
-	if wants(formats, FormatArch) && p.name != PackageName {
-		return nil, fmt.Errorf("%w: Arch packaging supports the agent only", ErrArtifact)
+	if wants(formats, FormatArch) && p.name == CLIPackageName {
+		return nil, fmt.Errorf("%w: Arch packaging supports agent and server only", ErrArtifact)
+	}
+	if req.AgentRepository != "" && p.name != ServerPackageName {
+		return nil, fmt.Errorf("%w: agent repository belongs to the server package", ErrArtifact)
 	}
 	target, err := targetArchitecture(req.TargetArchitecture)
 	if err != nil {
@@ -108,12 +111,9 @@ func build(ctx context.Context, req BuildRequest, p product) (result *BuildResul
 	if err != nil {
 		return nil, err
 	}
-	payload, staged, payloadSHA, err := stagePayload(work, binary, epoch, p)
+	payload, staged, payloadSHA, err := stageProductPayload(work, binary, epoch, p, req.AgentRepository, binarySHA)
 	if err != nil {
 		return nil, err
-	}
-	if payloadSHA != binarySHA {
-		return nil, fmt.Errorf("%w: staged binary does not match the opened input", ErrArtifact)
 	}
 	artifacts, err := buildArtifacts(ctx, work, formats, payload, version, arch, epoch, signer, payloadSHA, staged, p)
 	if err != nil {
@@ -207,7 +207,7 @@ func buildArtifacts(ctx context.Context, work string, formats []Format, payload,
 		case FormatRPM:
 			artifact, err = buildRPM(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged, p)
 		case FormatArch:
-			artifact, err = buildArch(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged)
+			artifact, err = buildArch(ctx, work, payload, version, arch, epoch, signer, payloadSHA, staged, p)
 		default:
 			err = fmt.Errorf("%w: unknown format", ErrArtifact)
 		}

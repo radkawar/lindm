@@ -78,6 +78,20 @@ type buildOutput struct {
 // Build captures bounded source once, makes two isolated clean builds of the
 // complete matrix and publishes only after every unsigned archive agrees.
 func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseManifest, err error) {
+	return buildRelease(ctx, request, false)
+}
+
+// BuildDevelopmentAgentRepository builds and authenticates the complete native
+// agent matrix twice before publishing a fixture-only ready repository bundle.
+// Explicit development custody is required; it is never a production fallback.
+func BuildDevelopmentAgentRepository(ctx context.Context, request Request) (*releasev1.ReleaseManifest, error) {
+	if request.PackageSigner.Custody != packaging.CustodyDevelopment || request.AttestationSigner.Custody != "development" {
+		return nil, errors.New("releasebuild: development repository requires development signers")
+	}
+	return buildRelease(ctx, request, true)
+}
+
+func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifest *releasev1.ReleaseManifest, err error) {
 	if !regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`).MatchString(request.Version) || !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$`).MatchString(request.Revision) || request.SourceDateEpoch <= 0 {
 		return nil, errors.New("releasebuild: version, revision and positive source epoch are required")
 	}
@@ -88,11 +102,15 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 	if err != nil {
 		return nil, err
 	}
-	caBundle, caDigest, err := loadCABundle(request.OCICABundle, request.OCICASHA256)
-	if err != nil {
-		return nil, err
+	var caBundle []byte
+	if !agentOnly {
+		var caDigest string
+		caBundle, caDigest, err = loadCABundle(request.OCICABundle, request.OCICASHA256)
+		if err != nil {
+			return nil, err
+		}
+		request.OCICASHA256 = caDigest
 	}
-	request.OCICASHA256 = caDigest
 	request.PackageSigner.RejectPublicKeySHA256 = append(append(append([]string{}, request.PackageSigner.RejectPublicKeySHA256...), signer.exclusions.spki...), signer.id)
 	request.PackageSigner.RejectFingerprints = append(append([]string{}, request.PackageSigner.RejectFingerprints...), signer.exclusions.fingerprints...)
 	request.PackageSigner.RejectPathPrefixes = append(append([]string{}, request.PackageSigner.RejectPathPrefixes...), signer.exclusions.homes...)
@@ -120,22 +138,7 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 			err = errors.Join(err, cleanupBuildWork(work, ownedWork))
 		}
 	}()
-	source := filepath.Join(work, "source")
-	if err := os.Mkdir(source, 0700); err != nil {
-		return nil, err
-	}
-	if err := snapshot(ctx, request.Repository, source); err != nil {
-		return nil, err
-	}
-	if err := os.Mkdir(filepath.Join(source, filepath.Dir(capturedCAPath)), 0700); err != nil {
-		return nil, err
-	}
-	if err := writeNew(filepath.Join(source, capturedCAPath), caBundle, 0644); err != nil {
-		return nil, err
-	}
-	// Hash the complete captured build inputs once, including the explicitly
-	// pinned CA material added above, before making either builder's copy.
-	sourceDigest, err := treeDigest(source)
+	source, sourceDigest, err := captureBuildSource(ctx, work, request.Repository, caBundle)
 	if err != nil {
 		return nil, err
 	}
@@ -151,41 +154,47 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 		retainWork = true
 		return nil, retainFailure(work, first, second, err)
 	}
-	exported := filepath.Join(work, "export")
-	if err := os.Mkdir(exported, 0700); err != nil {
+	// Native signing may vary between builds. Only after independently built
+	// unsigned agent archives agree can either server consume canonical bytes.
+	bundle := filepath.Join(work, "agent-repository")
+	if err := os.Mkdir(bundle, 0700); err != nil {
 		return nil, err
 	}
-	manifest = &releasev1.ReleaseManifest{Version: request.Version, Revision: request.Revision, SourceSha256: sourceDigest, SourceDateEpoch: request.SourceDateEpoch, AttestationKeyId: signer.id, Custody: request.AttestationSigner.Custody, Builds: []*releasev1.BuildObservation{first.observation, second.observation}}
-	for _, built := range first.artifacts {
-		artifact := built.artifact
-		artifact.SecondUnsignedSha256 = second.observation.GetUnsignedSha256()[artifact.GetPath()]
-		if err := exportArtifact(exported, built); err != nil {
+	manifest, err = exportRelease(ctx, bundle, request, signer, sourceDigest, first, second, "")
+	if err != nil {
+		return nil, err
+	}
+	if err := publishAgentRepositories(ctx, bundle, request, manifest); err != nil {
+		return nil, err
+	}
+	if err := verifyRepositoryPayloads(bundle, manifest); err != nil {
+		return nil, err
+	}
+	if _, err := Verify(ctx, bundle, filepath.Join(bundle, "attestation.pub"), signer.id); err != nil {
+		return nil, err
+	}
+	exported := bundle
+	if !agentOnly {
+		for _, item := range []struct {
+			label string
+			build *buildOutput
+		}{{"first", first}, {"second", second}} {
+			if err := buildProducts(ctx, filepath.Join(work, item.label), request, item.build, []string{"lindmd", "lindmctl"}, bundle); err != nil {
+				return nil, err
+			}
+		}
+		if err := compareBuilds(first, second); err != nil {
+			retainWork = true
+			return nil, retainFailure(work, first, second, err)
+		}
+		exported = filepath.Join(work, "export")
+		if err := os.Mkdir(exported, 0700); err != nil {
 			return nil, err
 		}
-		artifact.SbomPath = artifact.GetPath() + ".sbom.dsse.json"
-		artifact.ProvenancePath = artifact.GetPath() + ".provenance.dsse.json"
-		artifact.SignaturePath = artifact.GetPath() + ".signature.dsse.json"
-		var bom any
-		if err := json.Unmarshal(built.sbom, &bom); err != nil {
+		manifest, err = exportRelease(ctx, exported, request, signer, sourceDigest, first, second, bundle)
+		if err != nil {
 			return nil, err
 		}
-		provenance := provenancePredicate(request, artifact, sourceDigest, caDigest, first.observation, second.observation)
-		if err := writeAttestations(exported, signer, artifact, bom, provenance, manifest.GetCustody()); err != nil {
-			return nil, err
-		}
-		manifest.Artifacts = append(manifest.Artifacts, artifact)
-	}
-	if err := writeSignedManifest(exported, signer, manifest); err != nil {
-		return nil, err
-	}
-	if err := writeNew(filepath.Join(exported, "attestation.pub"), signer.public, 0644); err != nil {
-		return nil, err
-	}
-	if err := copyNew(first.packagePublicKey, filepath.Join(exported, "package-signing.asc"), 0644); err != nil {
-		return nil, err
-	}
-	if _, err := Verify(ctx, exported, filepath.Join(exported, "attestation.pub"), signer.id); err != nil {
-		return nil, err
 	}
 	if err := syncDirectory(exported); err != nil {
 		return nil, err
@@ -201,10 +210,13 @@ func Build(ctx context.Context, request Request) (manifest *releasev1.ReleaseMan
 
 // provenancePredicate is the SLSA v1 provenance for one artifact of the two
 // clean builds. It claims local isolation only, never a trusted builder.
-func provenancePredicate(request Request, artifact *releasev1.ReleaseArtifact, sourceDigest, caDigest string, first, second *releasev1.BuildObservation) map[string]any {
+func provenancePredicate(request Request, artifact *releasev1.ReleaseArtifact, sourceDigest, caDigest, bundleDigest string, first, second *releasev1.BuildObservation) map[string]any {
 	dependencies := []any{map[string]any{"uri": "urn:lindm:captured-source", "digest": map[string]string{"sha256": sourceDigest}}}
 	if artifact.GetFormat() == "oci" {
 		dependencies = append(dependencies, map[string]any{"uri": "urn:lindm:explicit-oci-ca-bundle", "digest": map[string]string{"sha256": caDigest}})
+	}
+	if artifact.GetProduct() == "lindmd" && bundleDigest != "" {
+		dependencies = append(dependencies, map[string]any{"uri": "urn:lindm:canonical-agent-repository-after-unsigned-agreement", "digest": map[string]string{"sha256": bundleDigest}})
 	}
 	return map[string]any{
 		"buildDefinition": map[string]any{
@@ -297,61 +309,80 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 	if err := observeToolchain(ctx, checkout, environment, observation); err != nil {
 		return nil, err
 	}
-	if _, err := command(ctx, checkout, environment, "npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
-		return nil, err
-	}
-	if _, err := command(ctx, checkout, environment, "npm", "run", "build:web"); err != nil {
-		return nil, err
-	}
-	observation.ConsoleTreeSha256, err = treeDigest(filepath.Join(checkout, "web", "dist"))
-	if err != nil {
-		return nil, err
-	}
-	observation.ConsoleSha256, err = consoleDigests(filepath.Join(checkout, "web", "dist"))
-	if err != nil {
-		return nil, err
-	}
-	npmBOM, err := command(ctx, checkout, environment, "npm", "sbom", "--sbom-format=cyclonedx")
-	if err != nil {
-		return nil, err
-	}
 	result := &buildOutput{observation: observation}
+	if err := buildProducts(ctx, root, request, result, []string{"lindm-agent"}, ""); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func buildProducts(ctx context.Context, root string, request Request, result *buildOutput, products []string, bundle string) error {
+	checkout := filepath.Join(root, "source")
+	environment := builderEnvironment(root, request.SourceDateEpoch)
+	observation := result.observation
+	var npmBOM []byte
+	if bundle != "" {
+		if _, err := command(ctx, checkout, environment, "npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
+			return err
+		}
+		if _, err := command(ctx, checkout, environment, "npm", "run", "build:web"); err != nil {
+			return err
+		}
+		var err error
+		observation.ConsoleTreeSha256, err = treeDigest(filepath.Join(checkout, "web", "dist"))
+		if err != nil {
+			return err
+		}
+		observation.ConsoleSha256, err = consoleDigests(filepath.Join(checkout, "web", "dist"))
+		if err != nil {
+			return err
+		}
+		npmBOM, err = command(ctx, checkout, environment, "npm", "sbom", "--sbom-format=cyclonedx")
+		if err != nil {
+			return err
+		}
+	}
 	// Rebuild the packaging helper too: embedded lifecycle assets and package
 	// generation code must come from each captured source, not the invoking lab.
 	helper := filepath.Join(root, "bin", "lab")
 	hostEnvironment := append(append([]string{}, environment...), "GOARCH="+runtime.GOARCH)
-	if _, err := command(ctx, checkout, hostEnvironment, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-o", helper, "./cmd/lab"); err != nil {
-		return nil, err
+	if bundle == "" {
+		if _, err := command(ctx, checkout, hostEnvironment, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-o", helper, "./cmd/lab"); err != nil {
+			return err
+		}
 	}
 	for _, arch := range []string{"amd64", "arm64"} {
 		env := append(append([]string{}, environment...), "GOARCH="+arch)
-		for _, product := range []string{"lindmd", "lindm-agent", "lindmctl"} {
+		for _, product := range products {
 			binary := filepath.Join(root, "bin", product+"-"+arch)
 			flags := "-buildid= -X lindm/internal/agent/buildinfo.Version=" + request.Version + " -X lindm/internal/agent/buildinfo.Revision=" + request.Revision
 			if _, err := command(ctx, checkout, env, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", binary, "./cmd/"+product); err != nil {
-				return nil, err
+				return err
 			}
 			binaryDigest, _, err := digestFile(binary)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			observation.BinarySha256[product+"/"+arch] = binaryDigest
 			bom, err := sbom(ctx, checkout, env, product, request.Version, arch, npmBOM)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			packageDir := filepath.Join(root, "packages", product+"-"+arch)
 			if err := os.Mkdir(packageDir, 0700); err != nil {
-				return nil, err
+				return err
 			}
 			args := packageArgs(request, product, arch, binary, packageDir)
+			if product == "lindmd" {
+				args = append(args, "-agent-repository", bundle)
+			}
 			nativeJSON, err := command(ctx, checkout, hostEnvironment, helper, args...)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			var native packaging.BuildResult
 			if err := json.Unmarshal(nativeJSON, &native); err != nil {
-				return nil, err
+				return err
 			}
 			result.packagePublicKey = native.PublicKey
 			for _, item := range native.Artifacts {
@@ -366,16 +397,16 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 			if product != "lindm-agent" {
 				name := product + "_" + request.Version + "_" + arch + ".oci.tar"
 				path := filepath.Join(packageDir, name)
-				if err := buildOCI(binary, filepath.Join(checkout, capturedCAPath), path, product, arch, request.SourceDateEpoch); err != nil {
-					return nil, err
+				if err := buildOCI(binary, filepath.Join(checkout, capturedCAPath), path, product, arch, request.SourceDateEpoch, bundleForProduct(product, bundle)); err != nil {
+					return err
 				}
 				sum, size, err := digestFile(path)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				ociBOM, err := withCABundleSBOM(bom, request.OCICASHA256)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				artifact := &releasev1.ReleaseArtifact{Path: name, Product: product, Architecture: arch, Format: "oci", Sha256: sum, Size: size, UnsignedSha256: sum}
 				result.artifacts = append(result.artifacts, builtArtifact{artifact: artifact, path: path, sbom: ociBOM})
@@ -384,7 +415,7 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 		}
 	}
 	observation.FinishedAt = time.Now().UTC().Format(time.RFC3339Nano)
-	return result, nil
+	return nil
 }
 
 // builderEnvironment isolates one builder's HOME, Go and npm caches and pins
@@ -447,11 +478,7 @@ func packageArgs(request Request, product, arch, binary, packageDir string) []st
 		packageCommand, binaryFlag = "build-cli", "-lindmctl"
 	}
 	args := []string{"packages", packageCommand, binaryFlag, binary, "-version", request.Version, "-arch", arch, "-output", packageDir, "-source-date-epoch", fmt.Sprint(request.SourceDateEpoch), "-signer-home", request.PackageSigner.Home, "-fingerprint", request.PackageSigner.Fingerprint}
-	// Arch Linux is an x86_64-only platform; Arch Linux ARM is a separate
-	// derivative the release does not target. Arch packaging is agent-only.
-	if product == "lindm-agent" && arch == "amd64" {
-		args = append(args, "-formats", "deb,rpm,arch")
-	}
+	args = append(args, "-formats", strings.Join(nativeFormats(arch, product), ","))
 	if request.PackageSigner.Custody == packaging.CustodyDevelopment {
 		args = append(args, "-development-key")
 	} else {

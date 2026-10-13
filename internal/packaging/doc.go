@@ -49,6 +49,11 @@
 // directory is root:lindmd-migrate 0750 and inaccessible to the runtime unit.
 // No operator config/key is a package-owned conffile; remove and purge retain it
 // and all database contents. The embedded console is supplied by the binary.
+// Release server archives carry the ready, release-attested native agent
+// repository at /usr/share/lindmd/agent-repository. Standalone development builds
+// opt in with BuildRequest.AgentRepository. Packaging copies authenticated bytes,
+// normalizes installation modes/mtime and never signs or mutates that bundle.
+// Server Arch packages use the same no-start/no-migrate lifecycle as DEB/RPM.
 //
 // Artifact stdout is streamed without the diagnostic capture limit; captured
 // stdout and stderr remain bounded. APT Release generation occurs outside the

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,7 +17,7 @@ import (
 
 // OCI images contain the static executable and an explicitly supplied, pinned
 // CA bundle recorded in provenance/SBOM. Ambient host roots are never copied.
-func buildOCI(binary, caBundle, destination, product, arch string, epoch int64) (err error) {
+func buildOCI(binary, caBundle, destination, product, arch string, epoch int64, bundle ...string) (err error) {
 	work, err := os.MkdirTemp(filepath.Dir(destination), "oci-")
 	if err != nil {
 		return err
@@ -27,7 +28,27 @@ func buildOCI(binary, caBundle, destination, product, arch string, epoch int64) 
 		return err
 	}
 	layer := filepath.Join(work, "layer.tar")
-	if err := tarFiles(layer, []tarInput{{source: binary, name: "usr/bin/" + product, mode: 0555}, {source: caBundle, name: "etc/ssl/certs/ca-certificates.crt", mode: 0444}}, epoch); err != nil {
+	entries := []tarInput{{source: binary, name: "usr/bin/" + product, mode: 0555}, {source: caBundle, name: "etc/ssl/certs/ca-certificates.crt", mode: 0444}}
+	if len(bundle) != 0 && bundle[0] != "" {
+		err := filepath.WalkDir(bundle[0], func(path string, entry fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return nil
+			}
+			rel, err := filepath.Rel(bundle[0], path)
+			if err != nil {
+				return err
+			}
+			entries = append(entries, tarInput{source: path, name: "usr/share/lindmd/agent-repository/" + filepath.ToSlash(rel), mode: 0444})
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	if err := tarFiles(layer, entries, epoch); err != nil {
 		return err
 	}
 	layerHash, layerSize, err := digestFile(layer)
@@ -64,7 +85,7 @@ func buildOCI(binary, caBundle, destination, product, arch string, epoch int64) 
 	if err := writeNew(filepath.Join(work, "oci-layout"), []byte(`{"imageLayoutVersion":"1.0.0"}`), 0600); err != nil {
 		return err
 	}
-	entries := []tarInput{{source: filepath.Join(work, "oci-layout"), name: "oci-layout", mode: 0644}, {source: filepath.Join(work, "index.json"), name: "index.json", mode: 0644}}
+	entries = []tarInput{{source: filepath.Join(work, "oci-layout"), name: "oci-layout", mode: 0644}, {source: filepath.Join(work, "index.json"), name: "index.json", mode: 0644}}
 	for _, hash := range []string{configHash, manifestHash, layerHash} {
 		entries = append(entries, tarInput{source: filepath.Join(blobs, hash), name: "blobs/sha256/" + hash, mode: 0644})
 	}

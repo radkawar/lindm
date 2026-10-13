@@ -160,6 +160,15 @@ func verifyDEB(ctx context.Context, work, deb, version string, arch Architecture
 			if header.Typeflag != tar.TypeReg || header.Mode != int64(item.Mode.Perm()) {
 				return fmt.Errorf("%w: deb member mode differs from layout", ErrArtifact)
 			}
+			if item.SHA256 != "" {
+				hash := sha256.New()
+				if _, err := io.Copy(hash, reader); err != nil {
+					return err
+				}
+				if hex.EncodeToString(hash.Sum(nil)) != item.SHA256 {
+					return fmt.Errorf("%w: deb repository member digest differs", ErrArtifact)
+				}
+			}
 		}
 		found[name] = true
 		if name == p.binary[1:] {

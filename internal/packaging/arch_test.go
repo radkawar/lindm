@@ -54,7 +54,7 @@ func TestArchReproducibilityRepositoryAndRejection(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		artifact, buildErr := buildArch(ctx, buildDir, payload, "0.1.0", Architecture{GOARCH: "amd64", Debian: "amd64", RPM: "x86_64", Arch: "x86_64"}, DefaultSourceDateEpoch, validated, digest, staged)
+		artifact, buildErr := buildArch(ctx, buildDir, payload, "0.1.0", Architecture{GOARCH: "amd64", Debian: "amd64", RPM: "x86_64", Arch: "x86_64"}, DefaultSourceDateEpoch, validated, digest, staged, agentProduct())
 		closeErr := guard.close(ctx, buildDir)
 		if buildErr != nil || closeErr != nil {
 			t.Fatalf("build: %v; signer cleanup: %v", buildErr, closeErr)

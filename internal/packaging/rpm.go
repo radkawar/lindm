@@ -245,6 +245,18 @@ func verifyRPM(ctx context.Context, work, rpmPath, version string, arch Architec
 	if got != payloadSHA {
 		return fmt.Errorf("%w: rpm payload digest does not match the input", ErrArtifact)
 	}
+	for _, file := range staged {
+		if file.SHA256 == "" {
+			continue
+		}
+		sum, _, err := hashFile(filepath.Join(extract, file.Rel))
+		if err != nil {
+			return err
+		}
+		if sum != file.SHA256 {
+			return fmt.Errorf("%w: rpm repository member digest differs", ErrArtifact)
+		}
+	}
 	return verifyRPMSignature(ctx, work, rpmPath, key)
 }
 

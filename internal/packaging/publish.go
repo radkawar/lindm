@@ -174,7 +174,7 @@ func stageDEBs(ctx context.Context, work, repo string, debs []string, epoch int6
 // stageDEB checks the product and architecture, then copies the archive into
 // pool/main/l/<package>. It returns the deb's architecture.
 func stageDEB(ctx context.Context, work, repo, deb string, epoch int64) (string, error) {
-	file, err := openRegular(deb)
+	file, err := openBoundedRegular(deb, maxPackageBytes)
 	if err != nil {
 		return "", err
 	}
@@ -461,7 +461,7 @@ func PublishRPM(ctx context.Context, req RPMRequest) (result *RPMRepository, err
 		return nil, err
 	}
 	for _, rpm := range req.RPMs {
-		file, err := openRegular(rpm)
+		file, err := openBoundedRegular(rpm, maxPackageBytes)
 		if err != nil {
 			return nil, err
 		}
