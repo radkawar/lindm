@@ -23,7 +23,12 @@ export function IdentitySettings() {
   const query = useQuery(identitySettingsQueryOptions(lifetime));
   const settings = query.data;
   return (
-    <section className="grid gap-3 border p-4 sm:p-6" aria-labelledby="identity-settings-heading">
+    // One minmax(0, 1fr) column: a long issuer or group value wraps inside the
+    // card instead of widening the column past it (390px phones).
+    <section
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 border p-4 sm:p-6"
+      aria-labelledby="identity-settings-heading"
+    >
       <h2 id="identity-settings-heading" className="text-base font-semibold">
         Sign-in source
       </h2>

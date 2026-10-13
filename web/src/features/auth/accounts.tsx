@@ -127,7 +127,12 @@ export function Accounts({
   ) : null;
 
   return (
-    <section className="grid min-w-0 gap-6" aria-busy={accounts.isFetching || busy}>
+    // One minmax(0, 1fr) column: a child's min-content (a long name in a row or an
+    // opened dialog's trigger state) never widens the page past the viewport.
+    <section
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6"
+      aria-busy={accounts.isFetching || busy}
+    >
       <PageHeader
         title="Accounts"
         description="Who can sign in to this console, with which role and device access."

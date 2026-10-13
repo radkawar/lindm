@@ -6,7 +6,7 @@ import {
   type ResourceObservation,
 } from "../../../gen/lindm/resource/v1/resource_pb";
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import {
   ResourceCompliance,
@@ -19,7 +19,7 @@ import {
   ResourceExecutionState,
 } from "../../../gen/lindm/agent/v1/resource_execution_pb";
 import type { SystemdServiceObservation } from "../../../gen/lindm/resource/v1/observations_pb";
-import type { ResourceRef } from "../../../gen/lindm/resource/v1/identity_pb";
+import { ResourceKind, type ResourceRef } from "../../../gen/lindm/resource/v1/identity_pb";
 import type { DeviceCapabilityState } from "../../../gen/lindm/admin/v1/capabilities_pb";
 import { BlockedReason } from "@/components/ui/blocked-reason";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -159,6 +159,14 @@ export function DeviceResources({
           resource.desired?.ref?.canonicalKey === ref?.canonicalKey,
       )?.desired,
     ) ?? "Unnamed item";
+  // The same name for display: a unit, path, package or kernel key is a technical
+  // value and reads as code (design.md); a firewall zone is described in words.
+  const itemName = (ref: ResourceRef | undefined, title = itemTitle(ref)) =>
+    ref?.kind === ResourceKind.FIREWALL_ZONE || !settingTitle(ref) ? (
+      title
+    ) : (
+      <code className="font-mono text-[0.92em]">{title}</code>
+    );
   return (
     <Card className="min-w-0" aria-busy={state.isFetching}>
       <CardHeader>
@@ -269,9 +277,12 @@ export function DeviceResources({
                     <TableRow key={resource.resourceId}>
                       <TableCell className="align-top">
                         <p className="font-medium break-all">
-                          {(resource.desired?.state.case === "nativePackage"
-                            ? resource.desired.state.value.package?.nativeName
-                            : undefined) ?? itemTitle(resource.desired?.ref)}
+                          {itemName(
+                            resource.desired?.ref,
+                            (resource.desired?.state.case === "nativePackage"
+                              ? resource.desired.state.value.package?.nativeName
+                              : undefined) ?? itemTitle(resource.desired?.ref),
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {resourceKindLabel(resource.desired?.ref?.kind)}
@@ -279,9 +290,12 @@ export function DeviceResources({
                         {resource.dependsOn.length ? (
                           <p className="mt-1 whitespace-normal text-xs text-muted-foreground">
                             Depends on{" "}
-                            {resource.dependsOn
-                              .map((dependency) => itemTitle(dependency.ref))
-                              .join(", ")}
+                            {resource.dependsOn.map((dependency, index) => (
+                              <Fragment key={index}>
+                                {index ? ", " : ""}
+                                {itemName(dependency.ref)}
+                              </Fragment>
+                            ))}
                           </p>
                         ) : null}
                         {resource.desired ||
@@ -411,7 +425,7 @@ export function DeviceResources({
                     {state.data.releases.map((release) => (
                       <TableRow key={release.releaseId}>
                         <TableCell className="align-top">
-                          <p className="font-medium break-all">{itemTitle(release.ref)}</p>
+                          <p className="font-medium break-all">{itemName(release.ref)}</p>
                           <TechnicalDetails
                             items={[
                               { label: "Release ID", value: release.releaseId },
@@ -477,7 +491,7 @@ export function DeviceResources({
                         }
                       >
                         <TableCell className="align-top">
-                          <p className="font-medium break-all">{itemTitle(recent.ref)}</p>
+                          <p className="font-medium break-all">{itemName(recent.ref)}</p>
                           <TechnicalDetails
                             items={[
                               { label: "Action ID", value: recent.action?.actionId },

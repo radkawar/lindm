@@ -160,10 +160,18 @@ async function reviewEnrollment({
     await settle(page);
     for (const name of contract.headings)
       await page.getByRole("heading", { name, exact: true }).waitFor();
-    for (const name of contract.buttons)
-      require(await page
-        .getByRole("button", { name, exact: true })
-        .isEnabled(), "Settings refresh is unavailable");
+    // The page Refresh is disabled while any read on the page is in flight
+    // (readiness, attributes, capabilities); it must become available, not
+    // be enabled at one arbitrary instant.
+    for (const name of contract.buttons) {
+      const button = page.getByRole("button", { name, exact: true });
+      let enabled = false;
+      for (const deadline = Date.now() + 15_000; !enabled && Date.now() < deadline;) {
+        enabled = await button.isEnabled();
+        if (!enabled) await page.waitForTimeout(250);
+      }
+      require(enabled, "Settings refresh is unavailable");
+    }
     const status = ready ? "Ready for listed platforms" : "Installation needs setup";
     await page.getByText(status, { exact: true }).waitFor();
     const section = page.getByRole("region", { name: "Agent repository" });

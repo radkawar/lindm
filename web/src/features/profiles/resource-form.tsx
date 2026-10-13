@@ -27,24 +27,32 @@ import { SSHBannerFields } from "./ssh-banner-fields";
 
 const BLOCK_KERNEL_MODULES = "Block kernel modules";
 
-// What a setting manages, in words, for its heading and its Remove label:
-// "Systemd service cups.service", "Firewall zone: Unnamed zone on wlan0".
-function settingSummary(document: JsonObject, kindLabel: string | undefined): string {
-  if (!kindLabel) return "";
+// What a setting manages, for its heading and its Remove label: the kind in
+// words and, when it names one, the technical key shown as code ("Systemd
+// service" + cups.service, "Kernel setting" + net.ipv4.conf.all.accept_redirects).
+// A firewall zone is named in words: "Firewall zone: Unnamed zone on wlan0".
+function settingSummary(
+  document: JsonObject,
+  kindLabel: string | undefined,
+): { label: string; key: string } {
+  if (!kindLabel) return { label: "", key: "" };
   const desired = object(document.desired);
   if (desired.firewallZone !== undefined) {
     try {
       const zone = fromJson(FirewallZoneDesiredSchema, desired.firewallZone, {
         ignoreUnknownFields: true,
       });
-      return `${kindLabel}: ${firewallZoneLabel(zone)}`;
+      return { label: `${kindLabel}: ${firewallZoneLabel(zone)}`, key: "" };
     } catch {
-      return kindLabel;
+      return { label: kindLabel, key: "" };
     }
   }
   // Singleton settings have a fixed "system…" identity that says nothing more.
   const key = String(object(object(withDerivedRef(document).desired).ref).canonicalKey ?? "");
-  return key && !key.startsWith("system") && !key.endsWith("/") ? `${kindLabel} ${key}` : kindLabel;
+  return {
+    label: kindLabel,
+    key: key && !key.startsWith("system") && !key.endsWith("/") ? key : "",
+  };
 }
 
 export function ResourceFields({
@@ -152,14 +160,36 @@ export function ResourceFields({
       <div className="flex min-w-0 items-start justify-between gap-2">
         <div className="min-w-0 break-words text-sm font-medium" aria-hidden="true">
           Setting {index + 1}
-          {summary ? <span className="font-normal text-muted-foreground"> · {summary}</span> : null}
+          {summary.label ? (
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              · {summary.label}
+              {summary.key ? (
+                <>
+                  {" "}
+                  <code className="font-mono text-[0.92em] break-all">{summary.key}</code>
+                </>
+              ) : null}
+            </span>
+          ) : null}
         </div>
+        {/* "Remove setting 3: Kernel setting net.ipv4.conf.all.accept_redirects". */}
+        <span id={`${id}-remove`} className="sr-only">
+          Remove setting {index + 1}
+          {summary.label ? `: ${summary.label}` : ""}
+          {summary.key ? (
+            <>
+              {" "}
+              <code>{summary.key}</code>
+            </>
+          ) : null}
+        </span>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           disabled={locked}
-          aria-label={`Remove setting ${index + 1}${summary ? `: ${summary}` : ""}`}
+          aria-labelledby={`${id}-remove`}
           title="Remove this setting"
           onClick={onRemove}
         >
