@@ -125,9 +125,11 @@ Use the plain inline lockup beside text. Use the plain stacked lockup on sign-in
 local administrator enrollment and the README. Use **Option 3, neutral tile** in
 the shell rail, favicon, app icons, GitHub avatar and social preview: foreground
 tile, surface-coloured C5 line, scaled to 0.72 and centred, with only the eye
-coloured. The 16/32/48px raster icons use respective line weights 14/10/8 and eye
-radii 11/10/9 before the 0.72 scale. The shell/app icon uses weight 8 and radius 9.
-Keep its open end; never close the shape to make a conventional rounded square.
+coloured. The 16px icon has a simplified frame with 1px strokes on half-pixel
+centres and a 2.5px eye. The 32px icon uses 2px strokes on integer centres and a
+4px eye. These native-coordinate variants keep straight strokes crisp.
+The 48px and shell/app icons retain the 0.72-scaled geometry, weight 8 and eye
+radius 9. Keep the open end; never close the shape to make a conventional square.
 
 Assets are in [docs/brand](brand/) and the identical public assets are served from
 `/brand/`. `mark-*`, `logo-*` and `stacked-*` SVGs provide colour and monochrome,
