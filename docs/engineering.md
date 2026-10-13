@@ -3167,11 +3167,14 @@ state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
 Stock console and native-enrollment fixtures cache their complete signed
-development agent bundle under `<repo>/.cache/lab/agent-repositories`. The key
+development agent bundle under the caller's OS cache directory:
+`lindm/lab/agent-repositories` (normally `$XDG_CACHE_HOME` or `$HOME/.cache`).
+The cache is shared across checkouts, not placed under writable worktree ancestry. Its key
 uses the exact bounded release source digest, development version, revision and
 source epoch. One cancellable file lock prevents concurrent identical cold builds.
-Only an owned mode-0700 cache is accepted; every hit verifies the protected files,
-release attestations and source identity again. A changed source requires a new
+Only an owned mode-0700 cache with protected, non-symlink ancestors is accepted;
+every hit verifies the protected files, release attestations and source identity
+again. A changed source requires a new
 entry. A corrupt entry fails closed with its path; remove only that derived entry
 before rebuilding. Private signing keys remain outside the bundle and are removed
 before publication. Running fixtures own separate immutable inodes: use a

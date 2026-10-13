@@ -47,7 +47,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
 	}
 	preparation, stopPreparation := context.WithTimeout(ctx, *artifactTimeout)
-	err := devlab.PrepareNativeEnrollmentRepository(preparation, *repo, *source)
+	err := devlab.PrepareNativeEnrollmentRepository(preparation, *source)
 	stopPreparation()
 	if err != nil {
 		return fmt.Errorf("prepare stock console artifact: %w", err)

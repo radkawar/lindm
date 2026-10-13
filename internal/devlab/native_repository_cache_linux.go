@@ -22,6 +22,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	releasev1 "lindm/gen/lindm/release/v1"
+	"lindm/internal/agent/statefs"
 	"lindm/internal/packaging"
 	"lindm/internal/releasebuild"
 )
@@ -40,13 +41,22 @@ type cachedNativeRepository struct {
 // PrepareNativeEnrollmentRepository completes the cold signed artifact build
 // before a browser review starts its own deadline. The cache contains only
 // authenticated, complete development releases, never private signing custody.
-func PrepareNativeEnrollmentRepository(ctx context.Context, repository, sourceRepository string) error {
-	_, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, nativeRepositoryCacheDirectory(repository), buildDevelopmentNativeRepository)
+func PrepareNativeEnrollmentRepository(ctx context.Context, sourceRepository string) error {
+	cache, err := nativeRepositoryCacheDirectory()
+	if err != nil {
+		return err
+	}
+	_, err = cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, buildDevelopmentNativeRepository)
 	return err
 }
 
-func nativeRepositoryCacheDirectory(repository string) string {
-	return filepath.Join(repository, ".cache", "lab", "agent-repositories")
+func nativeRepositoryCacheDirectory() (string, error) {
+	base, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	// Worktree ancestors may be group-writable; signing custody must not be.
+	return filepath.Join(base, "lindm", "lab", "agent-repositories"), nil
 }
 
 func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string, build nativeRepositoryBuild) (_ *cachedNativeRepository, resultErr error) {
@@ -104,15 +114,11 @@ func ensureNativeRepositoryCache(directory string) error {
 	if err := os.MkdirAll(directory, 0700); err != nil {
 		return err
 	}
-	info, err := os.Lstat(directory)
+	fd, err := statefs.OpenDirectory(directory)
 	if err != nil {
-		return err
+		return fmt.Errorf("stock agent cache %q requires an owned private 0700 directory and protected ancestors: %w", directory, err)
 	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || !info.IsDir() || info.Mode().Perm()&0077 != 0 || stat.Uid != uint32(os.Geteuid()) {
-		return errors.New("stock agent cache must be an owned private directory, not a link or shared directory")
-	}
-	return nil
+	return unix.Close(fd)
 }
 
 func buildDevelopmentNativeRepository(ctx context.Context, source, bundle, custody string) (manifest *releasev1.ReleaseManifest, resultErr error) {

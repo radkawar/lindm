@@ -92,7 +92,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return err
 	}
 	preparation, stopPreparation := context.WithTimeout(ctx, *artifactTimeout)
-	err = devlab.PrepareNativeEnrollmentRepository(preparation, *repo, checkout)
+	err = devlab.PrepareNativeEnrollmentRepository(preparation, checkout)
 	stopPreparation()
 	if err != nil {
 		return fmt.Errorf("prepare stock console artifact: %w", err)

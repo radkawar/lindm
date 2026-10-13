@@ -72,7 +72,11 @@ func (f *AuthorityFixture) buildNativeEnrollmentArtifact(ctx context.Context, cf
 		return err
 	}
 	started := time.Now()
-	cached, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, nativeRepositoryCacheDirectory(f.repository), buildDevelopmentNativeRepository)
+	cache, err := nativeRepositoryCacheDirectory()
+	if err != nil {
+		return err
+	}
+	cached, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, buildDevelopmentNativeRepository)
 	if err != nil {
 		return err
 	}

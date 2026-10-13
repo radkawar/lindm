@@ -47,7 +47,7 @@ func openPrivate(path string) (*os.File, error) {
 	fd, err := statefs.OpenDirectory(cleaned)
 	if err != nil {
 		if errors.Is(err, statefs.ErrUnsafe) {
-			return nil, fmt.Errorf("%w: %s", ErrUnsafePath, "directory is not a private 0700 directory")
+			return nil, fmt.Errorf("%w: directory %q requires owned mode 0700 and protected ancestors", ErrUnsafePath, cleaned)
 		}
 		return nil, err
 	}

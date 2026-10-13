@@ -127,7 +127,7 @@ func stockCacheNativePublic(t *testing.T) []byte {
 }
 
 func TestStockRepositoryCacheReusesSourceAndRefusesTamper(t *testing.T) {
-	source, cache := stockCacheSource(t), filepath.Join(t.TempDir(), "cache")
+	source, cache := stockCacheSource(t), stockCacheDirectory(t)
 	builds := 0
 	build := func(ctx context.Context, source, bundle, _ string) (*releasev1.ReleaseManifest, error) {
 		builds++
@@ -165,7 +165,7 @@ func TestStockRepositoryCacheReusesSourceAndRefusesTamper(t *testing.T) {
 }
 
 func TestStockRepositoryCacheSingleFlightAndCancellation(t *testing.T) {
-	source, cache := stockCacheSource(t), filepath.Join(t.TempDir(), "cache")
+	source, cache := stockCacheSource(t), stockCacheDirectory(t)
 	digest, err := releasebuild.SourceDigest(t.Context(), source)
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestStockRepositoryCopiesHaveIndependentImmutableInodes(t *testing.T) {
 }
 
 func TestStockRepositoryCacheRefusesSharedDirectoryAndSourceRace(t *testing.T) {
-	source, cache := stockCacheSource(t), filepath.Join(t.TempDir(), "cache")
+	source, cache := stockCacheSource(t), stockCacheDirectory(t)
 	if err := os.Mkdir(cache, 0770); err != nil {
 		t.Fatal(err)
 	}
@@ -267,5 +267,37 @@ func TestStockRepositoryCacheRefusesSharedDirectoryAndSourceRace(t *testing.T) {
 		if entry.IsDir() {
 			t.Fatal("retained failed build output or published a changed-source entry")
 		}
+	}
+}
+
+func stockCacheDirectory(t *testing.T) string {
+	t.Helper()
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	return filepath.Join(parent, "cache")
+}
+
+func TestStockCacheRefusesReplaceableAncestorAndUsesOSCache(t *testing.T) {
+	parent := t.TempDir()
+	if err := os.Chmod(parent, 0775); err != nil {
+		t.Fatal(err)
+	}
+	cache := filepath.Join(parent, "cache")
+	if err := ensureNativeRepositoryCache(cache); err == nil {
+		t.Fatal("accepted private signing cache beneath a replaceable ancestor")
+	}
+	if err := os.Chmod(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureNativeRepositoryCache(cache); err != nil {
+		t.Fatalf("protected cache remained unusable: %v", err)
+	}
+	t.Setenv("XDG_CACHE_HOME", parent)
+	actual, err := nativeRepositoryCacheDirectory()
+	expected := filepath.Join(parent, "lindm", "lab", "agent-repositories")
+	if err != nil || actual != expected {
+		t.Fatalf("cache is not independent of worktree ancestry: got %q, want %q: %v", actual, expected, err)
 	}
 }
