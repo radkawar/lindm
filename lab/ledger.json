@@ -11402,21 +11402,6 @@
     },
     {
       "platform": "pop-24.04",
-      "cell": "lifecycle",
-      "architecture": "x86_64",
-      "manifest": "pop-os-24.04-amd64",
-      "verdict": "MATRIX_VERDICT_PASS",
-      "evidence": "~/.cache/lindm-desktopderiv-20261011/pop/lifecycle-01.json",
-      "sha256": "9a04e2eb3f123714249fd140ecb1dc8bea7e4b2fdd570b615f8c7f557f2a7a48",
-      "recorded": "2026-10-11T21:41:17.007271086Z",
-      "revision": "dc001d0697e2f68558ae6aa8493edf0d0b3fe716-dirty",
-      "source": "MATRIX_SOURCE_IMPORT",
-      "verified": true,
-      "scope": "signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation",
-      "mainlineRevision": "dc001d0697e2f68558ae6aa8493edf0d0b3fe716"
-    },
-    {
-      "platform": "pop-24.04",
       "cell": "dispatch",
       "architecture": "x86_64",
       "manifest": "pop-os-24.04-amd64",
@@ -11549,22 +11534,6 @@
       "verified": true,
       "manifestSha256": "b0fe5c3bcadd3df46dc0c9bb7104c34f0023eee0a17d629ed1fb114cc6667e7e",
       "mainlineRevision": "f772ae8bc899ab6371ae97c0bc9d1a81b7a0d1a6"
-    },
-    {
-      "platform": "linuxmint-22.3",
-      "cell": "lifecycle",
-      "architecture": "x86_64",
-      "manifest": "linuxmint-22.3-cinnamon-amd64",
-      "verdict": "MATRIX_VERDICT_PASS",
-      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
-      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
-      "recorded": "2026-10-11T21:34:01.765236456Z",
-      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
-      "source": "MATRIX_SOURCE_IMPORT",
-      "verified": true,
-      "scope": "signed DEB 0.7.0→0.7.1; control-plane trust; local authority",
-      "reference": "#tier-1-parity-records-2026-10-11",
-      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
     },
     {
       "platform": "pop-24.04",
@@ -11901,6 +11870,54 @@
       "recoveryManifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
       "recoveryRepositorySnapshotDate": "2026-10-02",
       "mainlineRevision": "5618b5f77d4d2eb6aa6363c9d8c510d8e5a2ebe9"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "lifecycle",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/pop/lifecycle-01.json",
+      "sha256": "9a04e2eb3f123714249fd140ecb1dc8bea7e4b2fdd570b615f8c7f557f2a7a48",
+      "recorded": "2026-10-11T21:41:17.007271086Z",
+      "revision": "dc001d0697e2f68558ae6aa8493edf0d0b3fe716-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed DEB 0.1.0\u21920.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation",
+      "mainlineRevision": "dc001d0697e2f68558ae6aa8493edf0d0b3fe716"
+    },
+    {
+      "platform": "linuxmint-22.3",
+      "cell": "lifecycle",
+      "architecture": "x86_64",
+      "manifest": "linuxmint-22.3-cinnamon-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
+      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
+      "recorded": "2026-10-11T21:34:01.765236456Z",
+      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed DEB 0.7.0\u21920.7.1; control-plane trust; local authority",
+      "reference": "#tier-1-parity-records-2026-10-11",
+      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/ults-trr-x86-20261013T133905Z/ubuntu-26.04/tpm-reference-repair-x86_64.json",
+      "sha256": "0f0902170880d0166b4e4950b057734a87251fa9fb845f094ebdcacfd54bea68",
+      "recorded": "2026-10-13T16:19:53.057296446Z",
+      "revision": "5f42b0f1470411307387ee2330cd536479513bd8",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5d12fac9dbb966d60678dbe11a4d58865497ae0bdacd6c594e5ae50e06e489d7",
+      "recoveryManifest": "ubuntu-resolute-20260927-amd64",
+      "recoveryManifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
+      "mainlineRevision": "5f42b0f1470411307387ee2330cd536479513bd8"
     }
   ]
 }
