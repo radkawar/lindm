@@ -17,6 +17,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/packageprovider"
 	"lindm/internal/agent/privatecustody"
 )
 
@@ -166,5 +167,27 @@ func TestPackageEffectPermitExpiresOnBootTime(t *testing.T) {
 	permit.BootId = "a2bca405-36e9-4a43-b5b5-d0b82a05e551"
 	if err := validatePermit(permit); err == nil {
 		t.Fatal("foreign boot helper permit accepted")
+	}
+}
+
+// An apply helper that met a held package database before its effect permit
+// crosses the unit boundary as ErrBusy; the same reason after a permit, or any
+// other reason, is never reported as busy.
+func TestApplyHelperBusyBeforePermitIsNativeBusy(t *testing.T) {
+	failed := agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED
+	busy := &agentv1.NativeHelperResult{Outcome: failed, Reason: reasonNativeBusy}
+	if err := incompleteHelperError(busy, false); !errors.Is(err, packageprovider.ErrBusy) {
+		t.Fatalf("busy before permit = %v", err)
+	}
+	if err := incompleteHelperError(busy, true); errors.Is(err, packageprovider.ErrBusy) {
+		t.Fatalf("busy after permit = %v", err)
+	}
+	unknown := &agentv1.NativeHelperResult{Outcome: agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_UNKNOWN, Reason: reasonNativeBusy}
+	if err := incompleteHelperError(unknown, false); errors.Is(err, packageprovider.ErrBusy) {
+		t.Fatalf("unknown outcome = %v", err)
+	}
+	other := &agentv1.NativeHelperResult{Outcome: failed, Reason: "native_precondition_or_configuration_failure"}
+	if err := incompleteHelperError(other, false); errors.Is(err, packageprovider.ErrBusy) {
+		t.Fatalf("other failure = %v", err)
 	}
 }

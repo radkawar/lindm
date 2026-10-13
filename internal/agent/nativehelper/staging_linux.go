@@ -21,9 +21,10 @@ import (
 	"lindm/internal/agent/statefs"
 )
 
-// stagingReasonBusy is the retained staging result reason for a refusal while
-// another native frontend held dpkg's lock; the executor reports it as busy.
-const stagingReasonBusy = "native_package_manager_busy"
+// reasonNativeBusy is the retained staging or apply result reason for a
+// refusal, before any effect permit, while another native frontend held the
+// package database's lock; the executor reports it as busy.
+const reasonNativeBusy = "native_package_manager_busy"
 
 // Stage starts or inspects a durable effect-free staging unit without waiting for
 // native resolution or downloads. The immutable action request and retained
@@ -80,7 +81,7 @@ func Stage(ctx context.Context, stateDirectory string, input *agentv1.NativePack
 			return false, errors.New("package_staging_result_binding")
 		}
 		if result.GetOutcome() != agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_PREPARED {
-			if result.GetReason() == stagingReasonBusy {
+			if result.GetReason() == reasonNativeBusy {
 				return false, fmt.Errorf("%w: package_staging_native_busy", packageprovider.ErrBusy)
 			}
 			return false, errors.New("package_staging_native_failed")

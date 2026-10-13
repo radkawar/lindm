@@ -87,7 +87,24 @@ func ReadRoot(path string, limit int64, hardlinks bool) (data []byte, err error)
 	if before.Mode&unix.S_IFMT != unix.S_IFREG || (!hardlinks && before.Nlink != 1) || before.Size > limit {
 		return nil, fmt.Errorf("%w: unprotected native file %s", ErrUnsafe, path)
 	}
-	data, err = io.ReadAll(io.LimitReader(file, limit+1))
+	return readStable(file, before, limit, path)
+}
+
+// ReadResolvedRoot reads a bounded root-owned vendor file through
+// OpenResolvedRoot's pinned symlink traversal, for files a distribution ships
+// as a symlink chain (Pop!_OS: /usr/lib/os-release -> /etc/pop-os/os-release).
+// The file must keep its identity and timestamps while it is read.
+func ReadResolvedRoot(path string, limit int64) (data []byte, err error) {
+	file, _, before, err := OpenResolvedRoot(path, limit, unix.PathMax, 40)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	return readStable(file, before, limit, path)
+}
+
+func readStable(file *os.File, before unix.Stat_t, limit int64, path string) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
 		return nil, err
 	}

@@ -92,7 +92,7 @@ func Run(ctx context.Context, document *config.Document, transactionID, phase st
 			result.Outcome = agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED
 			result.Reason = "native_staging_failed"
 			if errors.Is(resultErr, packageprovider.ErrBusy) {
-				result.Reason = stagingReasonBusy
+				result.Reason = reasonNativeBusy
 			}
 		}
 		resultBytes, err := encodeRecord(result)
@@ -169,6 +169,9 @@ func serveEffect(ctx context.Context, directory string, encoded, nonce []byte, e
 	if resultErr != nil {
 		result.Outcome = agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED
 		result.Reason = "native_precondition_or_configuration_failure"
+		if errors.Is(resultErr, packageprovider.ErrBusy) {
+			result.Reason = reasonNativeBusy
+		}
 		if started {
 			result.Outcome = agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_UNKNOWN
 			result.Reason = "native_effect_outcome_unknown"

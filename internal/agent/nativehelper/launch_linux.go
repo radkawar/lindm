@@ -17,6 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/packageprovider"
 )
 
 // Launch starts one fixed helper unit. authorize is invoked only after the helper
@@ -156,6 +157,16 @@ func launchEffect(ctx context.Context, directory, unit string, encoded, nonce []
 			proto.Merge(output, result)
 		}
 		return nil
+	}
+	return incompleteHelperError(result, authorized)
+}
+
+// incompleteHelperError reports a helper result that did not succeed. A busy
+// refusal counts only when no effect permit was issued, so nothing changed and
+// the server may retry; every other result keeps its retained reason.
+func incompleteHelperError(result *agentv1.NativeHelperResult, authorized bool) error {
+	if !authorized && result.GetOutcome() == agentv1.NativeHelperOutcome_NATIVE_HELPER_OUTCOME_FAILED && result.GetReason() == reasonNativeBusy {
+		return fmt.Errorf("%w: package_apply_native_busy", packageprovider.ErrBusy)
 	}
 	return fmt.Errorf("native package helper did not complete: %s", result.GetReason())
 }

@@ -74,3 +74,14 @@ func TestRegistryLabSysctlKeysHaveFixtures(t *testing.T) {
 		}
 	}
 }
+
+// Pop!_OS's background package frontends took dpkg's frontend lock between a
+// lab package's staging and apply; both vendor units are quiesced.
+func TestLabQuiesceCoversPopPackageFrontends(t *testing.T) {
+	units := strings.Fields(strings.TrimPrefix(strings.SplitN(labQuiescePackageUnits, ";", 2)[0], "for unit in "))
+	for _, unit := range []string{"com.system76.SystemUpdater.service", "pop-upgrade.service"} {
+		if !slices.Contains(units, unit) {
+			t.Fatalf("quiesce units %q lack %s", units, unit)
+		}
+	}
+}

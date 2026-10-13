@@ -56,6 +56,14 @@ func readNative(path string, limit int64) ([]byte, error) {
 	data, err := custody.ReadRoot(path, limit, true)
 	return data, unsupported(err)
 }
+
+// readOSRelease reads the vendor os-release through root-owned symlinks only:
+// Pop!_OS 24.04 ships /usr/lib/os-release -> ../../etc/pop-os/os-release, which
+// readNative's no-follow open refused (ELOOP) on every password action.
+func readOSRelease(path string) ([]byte, error) {
+	data, err := custody.ReadResolvedRoot(path, 32768)
+	return data, unsupported(err)
+}
 func digestMessage(m proto.Message) ([]byte, error) {
 	b, err := (proto.MarshalOptions{Deterministic: true}).Marshal(m)
 	if err != nil {
@@ -79,7 +87,7 @@ func checkPlatform(p *resourcev1.PlatformProduct) error {
 			return err
 		}
 	}
-	content, err := readNative("/usr/lib/os-release", 32768)
+	content, err := readOSRelease("/usr/lib/os-release")
 	if err != nil {
 		return err
 	}

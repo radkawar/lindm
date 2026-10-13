@@ -628,5 +628,9 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 // image is skipped. pop-system-updater's unit uses KillMode=process, so its
 // stop leaves an already running apt-get holding the APT/dpkg locks (observed
 // natively on Pop!_OS 24.04 with guest egress); the script then waits, at most
-// 15 minutes, until no apt-get or dpkg process remains.
-const labQuiescePackageUnits = `for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service com.system76.SystemUpdater.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit" && systemctl mask "$unit" || exit; fi; done; i=0; while pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do i=$((i+1)); if test "$i" -gt 900; then echo "package manager still running after quiesce" >&2; exit 1; fi; sleep 1; done`
+// 15 minutes, until no apt-get or dpkg process remains. Pop!_OS's
+// pop-upgrade.service (D-Bus com.system76.PopUpgrade, also asked by the
+// session's pop-upgrade-notify timer) held dpkg's frontend lock between a lab
+// package's staging and apply (observed natively with guest egress, with
+// pop-upgrade and packagekitd the only package frontends running).
+const labQuiescePackageUnits = `for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service unattended-upgrades.service com.system76.SystemUpdater.service pop-upgrade.service dnf-makecache.timer dnf-makecache.service dnf-automatic.timer; do if systemctl cat "$unit" >/dev/null 2>&1; then systemctl stop "$unit" && systemctl mask "$unit" || exit; fi; done; i=0; while pgrep -x apt-get >/dev/null || pgrep -x dpkg >/dev/null; do i=$((i+1)); if test "$i" -gt 900; then echo "package manager still running after quiesce" >&2; exit 1; fi; sleep 1; done`

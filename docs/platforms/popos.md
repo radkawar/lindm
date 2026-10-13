@@ -45,7 +45,8 @@ Current LTS on x86_64: Pop!\_OS 24.04 LTS, `generic` build 28 (System76's
 Intel and AMD graphics; the `intel` channel's build 20 is an older, separately
 maintained image and `nvidia` adds the proprietary driver). System76 arm64 images
 are not part of this row. Qualified natively on x86_64: inventory, lifecycle,
-dispatch and power, self-update, encryption, and lock/release/quarantine; see the
+dispatch and power, self-update, encryption, live-root crypto-erase, report-loss,
+and lock/release/quarantine; see the
 [tier capability matrix](../verification.md#tier-capability-matrix) and
 [Known gaps](#known-gaps). Records are under
 `~/.cache/lindm-desktopderiv-20261011/pop/` unless stated otherwise.
@@ -242,7 +243,23 @@ installation time.
   it (observed: `reboot-persists` failed natively). The resources lane therefore
   uses `vm.vfs_cache_pressure` on Pop!\_OS (registry `Lab.SysctlKey`).
 - **Identity.** `os-release` reports `ID=pop` with `ID_LIKE="ubuntu debian"`;
-  behavior is selected by the registry row, never resemblance.
+  behavior is selected by the registry row, never resemblance. Both
+  `/etc/os-release` and `/usr/lib/os-release` are symlinks (to
+  `/etc/pop-os/os-release`), unlike Ubuntu's regular `/usr/lib/os-release`. The
+  password provider's no-follow read failed every password action with `ELOOP`
+  (executor `internal`, observed natively in
+  `resources-connected-01-snap11-failed.json`); it
+  now follows root-owned symlinks only (`custody.ReadResolvedRoot`). The OS
+  update provider and runner still read os-release without following symlinks;
+  OS update policy is gated on Pop!\_OS.
+- **pop-upgrade.** `pop-upgrade.service` (D-Bus `com.system76.PopUpgrade`,
+  asked by the session's `pop-upgrade-notify` timer) and PackageKit were the only
+  package frontends running when dpkg's frontend lock was taken between a
+  package's staging and apply (`resources-executor-01-snap12-failed.json`). The
+  agent reported
+  that refusal as a generic NATIVE failure; a busy database before the effect
+  permit is now `NATIVE_BUSY` (nothing changed; the server retries). The lab also
+  quiesces `pop-upgrade.service`.
 
 ## Packaging
 
@@ -292,9 +309,16 @@ boot, and rejection of a mismatched PCR 7 policy followed by revealed-key recove
 passed (`device-actions-encryption-01.json`,
 `0e0d560d59bfec47f2d210bb1ad7ece49769d12492e5ec515aa47c419e7951ba`), as did the
 encryption compliance scenario (`device-actions-compliance-01.json`,
-`35ef27effdfc9e45b7932c8ee01a335f61e03bad6a419dda760c8d831be6f87e`). All ran with
-Secure Boot off (see systemd-boot above); the Secure Boot TPM cells and recovery
-sanitize are gated.
+`35ef27effdfc9e45b7932c8ee01a335f61e03bad6a419dda760c8d831be6f87e`). Both reran
+from main `7158bb48` (`device-actions-encryption-01-s12.json`,
+`80635316100284403b721728a4e9772d154cd534c7b2cc38b2b8665912d546c5`, four TPM2
+token references; `device-actions-compliance-01-s12.json`,
+`d3230920151a74b78d59287a1132cf2450279f6c3f0427b626a897d46bbd3b75`). Thirty
+consecutive unattended TPM2 cold boots unlocked with no prompt and no failed
+unseal (`device-actions-tpm-boots-01.json`,
+`313e9fe82523c686addb2fbcad45cd1fcc03bda2a5b26cb678b57db46dc19599`; supplementary
+evidence, not the `tpm-unattended-boots` cell). All ran with Secure Boot off (see
+systemd-boot above); the Secure Boot TPM cells and recovery sanitize are gated.
 
 ## Actions
 
@@ -303,8 +327,13 @@ locker engaged (journal oracle; logind `LockedHint` stays no); release, account
 locks and quarantine passed (DesktopSessions,
 `~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-lock-quarantine-11.json`,
 `e6e5b4a138d02bb3da893fc01eef7c9d75546b05c45aca4798b2b48cb26913e7`). Live-root
-crypto-erase and report-loss are pending a rerun with the ephemeral random-key
-proof (see Random-key swap above).
+crypto-erase passed with `cryptswap` named as an ephemeral random-key mapping
+destroyed at power-off (`device-actions-wipe-live-erase-01.json`,
+`7cc4f53b3c1fb8a8e67ee01bebdaea1c040589eeb3818fb181de645d65de928f`), and
+report-loss blocked the original device
+(`device-actions-wipe-report-loss-01.json`,
+`157b416926f40a22a5effda238f33fb93c25e832672312c27be6326fcbc47f0e`), both from
+main `7158bb48`.
 
 ## Advisory feeds
 
@@ -360,10 +389,12 @@ the recipe above; ISO relabels are not used.
 
 ## Known gaps
 
-Pending native runs: live-root crypto-erase and report-loss (two refusals
-recorded, see Random-key swap above), and resources (executor and connected; the
-first connected run's sysctl `reboot-persists` failed on `pop-zram-config`, see
-zram swappiness above). Recovery sanitize and the Secure Boot TPM cells are gated
-on the unsigned systemd-boot.
+Pending native runs: resources. The connected run passed packages (including
+`vendor-updater-native-busy`), files, groups, users, sysctl (with
+`vm.vfs_cache_pressure`) and definitions and failed at password
+(os-release symlinks, see Identity above); the executor run failed on a busy
+dpkg lock (see pop-upgrade above). Firewall, secret-password and local-admin are
+not yet exercised. Recovery sanitize and the Secure Boot TPM cells are gated on
+the unsigned systemd-boot.
 Assistance is gated: VIEW ends `UNAVAILABLE` `notification_actions_hidden` and
 CONTROL `portal_remote_desktop_unavailable`, both before consent.

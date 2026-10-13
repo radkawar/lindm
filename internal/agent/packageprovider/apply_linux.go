@@ -145,7 +145,7 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 		return beforeEffect(effectContext)
 	}
 	if err := p.config.NativeTransaction(ctx, request, gate); err != nil {
-		return nil, errors.Join(ErrOutcomeUnknown, err)
+		return nil, nativeTransactionError(err, consumed)
 	}
 	if !consumed {
 		return nil, fmt.Errorf("%w: native helper omitted final authority gate", ErrOutcomeUnknown)
@@ -177,4 +177,15 @@ func (p *Provider) Apply(ctx context.Context, plan *resourcev1.ResourcePlan, bef
 		return verification, errors.Join(ErrOutcomeUnknown, err)
 	}
 	return verification, nil
+}
+
+// nativeTransactionError classifies a failed native transaction. A busy native
+// database before the final authority gate changed nothing, so it stays
+// ErrBusy for the server to retry; any failure after the gate, or any other
+// failure, leaves the outcome unknown.
+func nativeTransactionError(err error, gateConsumed bool) error {
+	if !gateConsumed && errors.Is(err, ErrBusy) {
+		return err
+	}
+	return errors.Join(ErrOutcomeUnknown, err)
 }

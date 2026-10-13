@@ -83,3 +83,20 @@ func TestDPKGFrontendHeldReportsAnotherFrontendAndClassifiesBusy(t *testing.T) {
 		t.Fatal("busy classification changed nil or an existing busy error")
 	}
 }
+
+// Pop!_OS's pop-upgrade and PackageKit can take dpkg's frontend lock between
+// staging and apply (observed natively: resources-executor exact-v2-upgrade).
+// A busy database before the final authority gate changed nothing and stays
+// ErrBusy for the server to retry; after the gate the outcome is unknown.
+func TestApplyBusyBeforeAuthorityGateStaysBusy(t *testing.T) {
+	busy := fmt.Errorf("%w: package_apply_native_busy", ErrBusy)
+	if err := nativeTransactionError(busy, false); !errors.Is(err, ErrBusy) || errors.Is(err, ErrOutcomeUnknown) {
+		t.Fatalf("busy before the gate = %v", err)
+	}
+	if err := nativeTransactionError(busy, true); !errors.Is(err, ErrOutcomeUnknown) {
+		t.Fatalf("busy after the gate = %v", err)
+	}
+	if err := nativeTransactionError(errors.New("native package helper did not complete: x"), false); !errors.Is(err, ErrOutcomeUnknown) || errors.Is(err, ErrBusy) {
+		t.Fatalf("other failure = %v", err)
+	}
+}
