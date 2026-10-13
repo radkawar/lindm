@@ -309,6 +309,9 @@ func nativeTPMReferenceRepair(ctx context.Context, manifest *labv1.ImageManifest
 		return err
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
+	if machine.ownerBoot != nil {
+		result.OwnerSecureBoot = append(result.OwnerSecureBoot, machine.ownerBoot)
+	}
 	if err := machine.record(ctx, result); err != nil {
 		return err
 	}

@@ -38,6 +38,7 @@ func TestTPM2BindRefusedFromObservedRelease(t *testing.T) {
 func TestTPM2TokenReferenceStatus(t *testing.T) {
 	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
 	denied := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_PERMISSION_DENIED)
+	absent := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE)
 	for name, test := range map[string]struct {
 		host devicedb.GetHostObservationRow
 		want uint32
@@ -46,6 +47,9 @@ func TestTPM2TokenReferenceStatus(t *testing.T) {
 		"rhel 9":     {devicedb.GetHostObservationRow{OsIDStatus: success, OsIDValue: "rhel", OsVersionStatus: success, OsVersionValue: "9.8"}, 4},
 		"bookworm":   {devicedb.GetHostObservationRow{OsIDStatus: success, OsIDValue: "debian", OsVersionStatus: success, OsVersionValue: "12"}, 1},
 		"unobserved": {devicedb.GetHostObservationRow{OsIDStatus: denied, OsIDValue: "ubuntu", OsVersionStatus: success, OsVersionValue: "24.04"}, 0},
+		// Official Arch has no VERSION_ID; its native absence identifies it.
+		"arch":                 {devicedb.GetHostObservationRow{OsIDStatus: success, OsIDValue: "arch", OsVersionStatus: absent}, 1},
+		"versioned no version": {devicedb.GetHostObservationRow{OsIDStatus: success, OsIDValue: "ubuntu", OsVersionStatus: absent}, 0},
 	} {
 		if got := core.TPM2TokenReferencesRequired(test.host); got != test.want {
 			t.Errorf("%s: required references = %d, want %d", name, got, test.want)

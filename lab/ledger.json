@@ -11882,6 +11882,25 @@
       "repositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
       "repositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
       "mainlineRevision": "b675303311b28de2c6134cee5010f8f4da2cdd43"
+    },
+    {
+      "platform": "arch",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-systemd-boot-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-arch-qualify/r24/arch/tpm-reference-repair-x86_64.json",
+      "sha256": "b508ad09a740e6d3ce93084a63cd7d31ac65f952ea3bec0d74fe47d928627906",
+      "recorded": "2026-10-13T16:15:37.666399092Z",
+      "revision": "f55add234bcc96c6e97918a846342cbfe4393062",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "886d69487ebcb99f03847d708c847de56af46b90147bb13b69c335c135c0950e",
+      "repositorySnapshotDate": "2026-10-02",
+      "recoveryManifest": "arch-cloud-20261001.604814-x86-64",
+      "recoveryManifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "recoveryRepositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "5618b5f77d4d2eb6aa6363c9d8c510d8e5a2ebe9"
     }
   ]
 }

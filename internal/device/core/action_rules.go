@@ -115,26 +115,42 @@ func DeviceActionSignerDelegated(delegation *agentv1.ExecutionDelegation, key ed
 	return false
 }
 
+// observedRelease is the registry release of the host's observed os-release
+// identity. Official Arch has no VERSION_ID: the agent's UNAVAILABLE version
+// identifies a release whose registry version is absent (as advisory matching
+// accepts), while failed or missing collection stays unobserved.
+func observedRelease(host devicedb.GetHostObservationRow) (*platform.Release, bool) {
+	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
+	if host.OsIDStatus != success {
+		return nil, false
+	}
+	switch host.OsVersionStatus {
+	case success:
+		return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}), true
+	case int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE):
+		release := platform.Identify(platform.OSRelease{ID: host.OsIDValue})
+		return release, release.Known() && release.Version.Rule == platform.VersionAbsent
+	}
+	return nil, false
+}
+
 // tpm2BindSupported refuses releases whose shipped systemd cannot take the
 // owner secret from a descriptor (registry fact). An unobserved OS identity
 // defers to the root provider's native probe; it is not a refusal reason.
 func TPM2BindSupported(host devicedb.GetHostObservationRow) bool {
-	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
-	if host.OsIDStatus != success || host.OsVersionStatus != success {
-		return true
-	}
-	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2BindSupported()
+	release, observed := observedRelease(host)
+	return !observed || release.TPM2BindSupported()
 }
 
 // TPM2TokenReferencesRequired is the registry's identical systemd-tpm2 token
 // reference count for the observed release (platform TPM2TokenReferences);
 // 0 when the OS identity is unobserved.
 func TPM2TokenReferencesRequired(host devicedb.GetHostObservationRow) uint32 {
-	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
-	if host.OsIDStatus != success || host.OsVersionStatus != success {
+	release, observed := observedRelease(host)
+	if !observed {
 		return 0
 	}
-	return uint32(platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).TPM2TokenReferences())
+	return uint32(release.TPM2TokenReferences())
 }
 
 // TPM2TokenReferences is the most systemd-tpm2 tokens naming one keyslot in
@@ -162,11 +178,8 @@ func SessionLockOnlyUnsupported(host devicedb.GetHostObservationRow, action *age
 	if action == nil || len(action.GetUsernames()) != 0 || action.GetAllHumanAccounts() || action.GetTerminateSessions() {
 		return false
 	}
-	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
-	if host.OsIDStatus != success || host.OsVersionStatus != success {
-		return false
-	}
-	return platform.Identify(platform.OSRelease{ID: host.OsIDValue, VersionID: host.OsVersionValue}).Desktop.SessionLockUnsupported != ""
+	release, observed := observedRelease(host)
+	return observed && release.Desktop.SessionLockUnsupported != ""
 }
 
 // deviceActionNotBefore backdates an intent by the device clock tolerance but

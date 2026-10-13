@@ -332,8 +332,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.WipePhase == "recovery-attestation-refusal" && options.RecoveryBootMode != recoveryBootMeasured {
 		return nil, errors.New("attestation refusal phase requires recovery boot mode measured-grub")
 	}
-	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) && options.EncryptionPhase != "tpm" {
-		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase or the TPM encryption phase")
+	tpmPhase := options.EncryptionPhase == "tpm" || options.EncryptionPhase == "tpm-repair"
+	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) && !tpmPhase {
+		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase or a TPM encryption phase")
 	}
 	if err := validateEncryptionPhase(options); err != nil {
 		return nil, err
@@ -420,7 +421,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err != nil {
 		return result, err
 	}
-	if options.EncryptionPhase == "tpm" && options.BootstrapFirmwareVars != "" {
+	if tpmPhase && options.BootstrapFirmwareVars != "" {
 		options.ownerSecureBoot, err = prepareActionOwnerSecureBoot(manifest, &options)
 		if err != nil {
 			return result, err

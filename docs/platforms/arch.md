@@ -810,6 +810,11 @@ credential expired. The TPM cell ran on the owner-key path above: both clones
 cold-booted the owner-signed UKI with Secure Boot enforced, the bind left one
 `systemd-tpm2` token, the deliberately extended PCR 7 policy was refused and
 recovered with the revealed key, and all 30 cold boots unlocked without a prompt.
+The server's device-action rules (TPM2 bind support, required `systemd-tpm2`
+token references, session-lock refusal) identify Arch from its os-release `ID`
+and the agent's unavailable `VERSION_ID`, as advisory matching does; before that,
+an Arch device counted as unobserved and the reference-repair lane saw 0
+required references.
 
 The first encrypted GRUB golden boots only since installer umask 077 was scoped to
 credential writers: pacstrap's `mkdir -p -m` had created `/etc` and `/var` as 0700,
