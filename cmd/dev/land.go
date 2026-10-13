@@ -52,7 +52,9 @@ protect again however they end (commit, refusal, rollback, interrupt).
                exactly those files with MESSAGE and push to main's upstream
                (hooks skipped: the gate just ran). Any failure rolls back.
   gate-commit  Run the full make check in the shared tree and, only if green,
-               commit every change with MESSAGE (post-hoc gate).
+               commit exactly the change it checked with MESSAGE (post-hoc
+               gate). Both commit by explicit path only, and refuse, naming
+               the files, if anything else in the tree changed meanwhile.
 `
 
 func lockedRepository(ctx context.Context) (*worktree.Repository, func() error, error) {
@@ -208,16 +210,13 @@ func runGateCommit(args []string) (resultErr error) {
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
-	// The commit's lint-staged hook may rewrite tracked files; Writable
-	// re-protects them however the gate ends.
+	// Writable re-protects the tree however the gate ends; GateCommit commits
+	// exactly the change make check verified, refusing anything written into
+	// the tree meanwhile.
 	return repo.Writable(ctx, func() error {
-		if err := stream(ctx, repo.Main, nil, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners"); err != nil {
-			return fmt.Errorf("make check failed, nothing committed: %w", err)
-		}
-		if err := stream(ctx, repo.Main, nil, "git", "add", "--all"); err != nil {
-			return err
-		}
-		return stream(ctx, repo.Main, nil, "git", "commit", "--quiet", "-m", *message)
+		return repo.GateCommit(ctx, *message, func() error {
+			return stream(ctx, repo.Main, nil, "make", "check", "GOLANGCI_RUN_FLAGS=--allow-parallel-runners")
+		})
 	})
 }
 

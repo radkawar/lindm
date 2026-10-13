@@ -2773,8 +2773,15 @@ and integration locks the actual holder and blocked waiters read from
 `/proc/locks`. The record a holder writes into a lock file is diagnostic only
 and can be stale, since raw `flock` users never rewrite it. `worktree audit` also
 prints the landing marker first. `gate-commit` is the post-hoc full
-gate: it runs `make check` under the lock and commits any remaining change only
-when green.
+gate: it runs `make check` under the lock and commits the remaining change only
+when green. While a landing holds the tree writable, another process can write
+into it; neither command can commit such a write. `land` commits by explicit
+path exactly the applied change plus derived output, and before committing
+compares every file it applied (generated document regions excepted) with what
+it applied and every other uncommitted path with `HEAD`; `gate-commit` saves the
+uncommitted change before `make check` and commits exactly that set, without
+hooks. Any other write refuses the commit, names the files and rolls back (the
+stray write is discarded; `gate-commit` writes the checked state back).
 
 Outside landings the shared checkout's tracked regular files, and every
 directory that directly holds one (the root included), are read-only (`a-w`),

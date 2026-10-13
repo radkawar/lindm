@@ -367,15 +367,24 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		}
 		gated = append(gated, merged.Path)
 	}
+	// What the landing applied, to tell another process's writes during the
+	// window apart from it.
+	applied, err := r.fingerprints(gated, change.Derivation.Blank)
+	if err != nil {
+		return restore(err)
+	}
 	if err := gate(gated); err != nil {
 		return restore(fmt.Errorf("gate failed: %w", err))
+	}
+	if changed, err := r.changedSince(applied, change.Derivation.Blank); err != nil || len(changed) != 0 {
+		return restore(errors.Join(err, strayError(changed)))
 	}
 	files, err := r.landed(ctx, change)
 	if err != nil {
 		return restore(err)
 	}
 	if len(files) != 0 {
-		if _, err := git(ctx, r.Main, append([]string{"add", "--all", "--"}, files...)...); err != nil {
+		if _, err := gitWith(ctx, r.Main, nil, []byte(strings.Join(files, "\x00")), "--literal-pathspecs", "add", "--all", "--pathspec-from-file=-", "--pathspec-file-nul"); err != nil {
 			return restore(err)
 		}
 	}

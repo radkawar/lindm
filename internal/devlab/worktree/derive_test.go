@@ -142,7 +142,7 @@ func TestLandsMergeLedgersAndRegenerateDocuments(t *testing.T) {
 		writeFixture(t, filepath.Join(repo.Main, "README"), "edited by the gate\n")
 		return nil
 	})
-	if err == nil || !strings.Contains(err.Error(), "outside the landing: README") {
+	if err == nil || !strings.Contains(err.Error(), "by something other than the landing") {
 		t.Fatalf("gate edit accepted: %v", err)
 	}
 	clean("gate edit")

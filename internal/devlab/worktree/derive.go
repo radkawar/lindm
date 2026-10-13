@@ -211,7 +211,7 @@ func (r *Repository) landed(ctx context.Context, change Change) ([]string, error
 		}
 	}
 	if len(stray) != 0 {
-		return nil, errors.Join(append([]error{fmt.Errorf("the gate changed files outside the landing: %s", strings.Join(stray, " "))}, failures...)...)
+		return nil, errors.Join(append([]error{strayError(stray)}, failures...)...)
 	}
 	return files, nil
 }
