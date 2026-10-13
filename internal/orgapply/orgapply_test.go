@@ -213,8 +213,8 @@ func TestAssistancePermissionAuthorityDecode(t *testing.T) {
 			}
 			got, err := Decode(body)
 			if !test.valid {
-				if err == nil {
-					t.Fatal("accepted removed permission through declarative apply")
+				if err == nil || !strings.Contains(err.Error(), "roles/assistance names retired permission remote_assistance.run; replace it with remote_assistance.view and remote_assistance.control") {
+					t.Fatalf("declarative apply did not name the retired permission's replacement: %v", err)
 				}
 				return
 			}

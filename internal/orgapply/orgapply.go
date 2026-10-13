@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	orgv1 "lindm/gen/lindm/org/v1"
+	"lindm/internal/permissionupgrade"
 )
 
 // Outcome reports control-plane state, not native execution or compliance.
@@ -101,6 +103,9 @@ func Validate(spec *orgv1.Organization) error {
 	if spec == nil {
 		return errors.New("orgapply: organization is required")
 	}
+	if err := rejectRetiredPermissions(spec.GetAuthorization()); err != nil {
+		return err
+	}
 	if err := protovalidate.Validate(spec); err != nil {
 		return fmt.Errorf("validate organization: %w", err)
 	}
@@ -154,6 +159,23 @@ func Validate(spec *orgv1.Organization) error {
 		scopes[key] = true
 	}
 	return nil
+}
+
+// rejectRetiredPermissions names the replacement for a permission an earlier
+// release accepted. The server upgrades persisted and configured policies, but a
+// declarative document is new input to the policy API, which rejects retired
+// names; apply never rewrites the operator's source document.
+func rejectRetiredPermissions(policy *authv1.AuthorizationPolicy) error {
+	if policy == nil {
+		return nil
+	}
+	changes := permissionupgrade.Policy(proto.CloneOf(policy))
+	if len(changes) == 0 {
+		return nil
+	}
+	legacy := changes[0].Legacy[0]
+	current, _ := permissionupgrade.Replacement(legacy)
+	return fmt.Errorf("validate organization: authorization %s names retired permission %s; replace it with %s, which together grant what it granted", changes[0].List, legacy, strings.Join(current, " and "))
 }
 
 func reason(spec *orgv1.Organization) string                      { return "Apply organization " + spec.GetName() }

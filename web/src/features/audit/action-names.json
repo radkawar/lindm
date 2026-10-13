@@ -56,6 +56,7 @@
   "execution_authority.update": "Updated execution trust",
   "identity.authorization_changed": "Changed account access",
   "identity.authorization_updated": "Changed organization access policy",
+  "identity.authorization_upgraded": "Upgraded organization access policy permission names",
   "identity.break_glass_activated": "Activated emergency access",
   "identity.break_glass_denied": "Refused emergency access request",
   "identity.break_glass_terminated": "Ended emergency access",

@@ -1373,60 +1373,39 @@ Recording is off by default and discloses the organization's later archive acces
 its helper-side encryption is distinct from media relay encryption. A future
 unattended policy must not become an unlock, login-screen or consent bypass.
 
-#### Persisted assistance permission cutover
+#### Retired permission names on upgrade
 
-An existing persisted runtime policy is authoritative over bootstrap configuration.
-An active policy containing the removed `remote_assistance.run` permission makes
-the new server fail closed; changing only the configuration file does not repair
-it. Do not rewrite SQL, historical request receipts or audit events, and do not
-reset a deployment's database to bypass this transition.
+Upgrading needs no administrative transition. Releases before `c793dfef` granted
+viewing and controlling a device together as `remote_assistance.run`; the current
+server replaces it with **both** `remote_assistance.view` and
+`remote_assistance.control` in the same position of the same list, which grants
+exactly what it granted. No capability permission (clipboard, keyboard, display,
+message, files) is added and no scope changes; reducing a role to view-only
+remains a deliberate policy edit. The role and emergency-allowlist bounds are 25
+entries so that a full 24-entry list of the previous release still fits.
 
-Use a reviewed, explicit deny-window transition through the existing
-`GetAuthorization` / `UpdateAuthorization` API. It requires a retained
-unrestricted built-in local owner or the pinned deployment owner that does not
-depend on the custom assistance roles being changed.
+- **Persisted runtime policy.** When the server starts on a persisted policy
+  naming a retired permission, it rewrites the custom roles and approval gates
+  under the policy row lock before validating the policy, stores the result as
+  the next revision, and records one `identity.authorization_upgraded` audit
+  event without an actor. Its details name the previous and new revisions and
+  policy digests, the rename applied and each rewritten list. Group bindings and
+  account role assignments name roles, not permissions, and are unchanged. Every
+  principal re-resolves its authority under the new digest; sessions are not
+  revoked because no grant changed. A later start finds nothing to rewrite.
+  Historical request receipts and audit events keep the names they recorded.
+- **Configuration file.** Bootstrap `authorization` roles and approval gates and
+  the `break_glass` allowlist get the same replacement at load, with a warning
+  naming the lists. Update the file to the current names to silence it.
+- **New input.** `UpdateAuthorization`, the console and declarative organization
+  apply reject retired names. `orgapply` names the replacement in its error
+  rather than rewriting the operator's source document.
 
-1. While the old server still runs, export the complete current policy and its
-   revision. Preserve every role, permission, binding, scope and approval gate.
-   Prepare the final policy by replacing each old assistance permission with
-   **both** `remote_assistance.view` and `remote_assistance.control` in that same
-   role. Do not add capability permissions or change any scopes. Retain previously
-   explicit clipboard, keyboard, display, message or files grants unchanged.
-   Selecting view-only is a separate, deliberate reduction, not an automatic
-   scope-preserving conversion.
-   The role and emergency-allowlist bounds increase from 24 to 25 entries solely
-   to accommodate this explicit two-name replacement of a full old list.
-2. Prepare an interim policy by removing only the old permission. If that leaves
-   a custom role empty, temporarily remove the role and its directory bindings,
-   retaining their exact definitions for the final policy. Accounts assigned to
-   that missing custom role remain recorded but fail closed; never reassign them
-   to a built-in role. Publish the interim policy on the old server with the
-   exported `expected_revision`, a new request ID and an explicit cutover reason.
-   Save the exact returned interim revision and request receipt. A conflict
-   requires fresh review, not an automatic retry with a newer revision.
-3. Assistance grants remain withdrawn during the interruption. Stop all old
-   replicas, update the validated bootstrap configuration and emergency allowlists
-   to the new names, and deploy the new server. No mixed old/new replicas may
-   restore competing permission vocabularies. The persisted interim policy must
-   remain active; bootstrap configuration must not fill in its removed grants.
-4. Authenticate the preserved owner afresh. Publish the reviewed final policy with
-   a new request ID, an explicit reason and `expected_revision` equal to the saved
-   **interim** revision. Never let an apply plan silently substitute the current
-   revision for this restore. If another policy write occurred during the window,
-   the restore must abort: review and merge that intervening change rather than
-   overwriting it from the old snapshot.
-5. Retain both audited revision receipts and verify the resulting grants and
-   scopes. Existing consent and session authority do not survive the deny window;
-   operators need fresh sign-in and new consented sessions. An interruption before
-   restoration leaves grants denied and the owner able to resume. If deployment
-   rolls back before restoration, keep the interim policy or deliberately restore
-   the old policy through the old server with the same revision protections.
-   After the new policy is published, an old binary cannot safely read it.
-
-This procedure is an explicit administrative transition, not a compatibility alias.
-Its exact old/new binary and interruption/CAS qualification must be recorded in
-the [verification ledger](verification.md#commercial-assistance-capability-qualification)
-before claiming a persisted deployment's cutover qualified.
+After the upgrade has rewritten the persisted policy, an older server binary
+cannot read it; roll back only together with the database. Every retired name
+has a fixture of the persisted state of the release that used it under
+`internal/identity/testdata/upgrade/`, which `TestUpgradeFromEarlierReleaseState`
+starts the identity service on.
 
 ### Native single-host installation
 

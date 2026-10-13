@@ -91,6 +91,8 @@ func TestPolicyValidationAndSourceExclusivity(t *testing.T) {
 	}{
 		{name: "custom", valid: true},
 		{name: "unknown permission", change: func(p *authv1.AuthorizationPolicy) { p.Roles[0].Permissions = []string{"future.permission"} }},
+		// Only persisted and configured state is upgraded; new policy input is not.
+		{name: "retired permission", change: func(p *authv1.AuthorizationPolicy) { p.Roles[0].Permissions = []string{"remote_assistance.run"} }},
 		{name: "builtin override", change: func(p *authv1.AuthorizationPolicy) { p.Roles[0].Name = RoleOwner }},
 		{name: "unknown role", change: func(p *authv1.AuthorizationPolicy) { p.GroupBindings[0].Role = "absent" }},
 		{name: "duplicate role", change: func(p *authv1.AuthorizationPolicy) { p.Roles = append(p.Roles, proto.CloneOf(p.Roles[0])) }},

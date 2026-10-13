@@ -137,8 +137,10 @@ var (
 
 // Accounts, sign-in and organization access.
 var (
-	IdentityAuthorizationChanged  = kind("identity.authorization_changed")
-	IdentityAuthorizationUpdated  = kind("identity.authorization_updated")
+	IdentityAuthorizationChanged = kind("identity.authorization_changed")
+	IdentityAuthorizationUpdated = kind("identity.authorization_updated")
+	// Written by server startup when the persisted policy names a retired permission.
+	IdentityAuthorizationUpgraded = kind("identity.authorization_upgraded")
 	IdentityBreakGlassActivated   = kind("identity.break_glass_activated")
 	IdentityBreakGlassDenied      = kind("identity.break_glass_denied")
 	IdentityBreakGlassTerminated  = kind("identity.break_glass_terminated")

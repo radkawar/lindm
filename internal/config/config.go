@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/permissionupgrade"
 )
 
 const maxFileBytes = 1 << 20
@@ -41,6 +43,9 @@ func Load(path string) (*Document, error) {
 	if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("decode configuration: %w", err)
 	}
+	if lists := upgradeRetiredPermissions(cfg); len(lists) != 0 {
+		slog.Warn("configuration names retired permissions; using their current equivalents, update the file", "lists", lists)
+	}
 	validator, err := protovalidate.New(protovalidate.WithMessages(cfg))
 	if err != nil {
 		return nil, fmt.Errorf("compile configuration validation rules: %w", err)
@@ -49,6 +54,23 @@ func Load(path string) (*Document, error) {
 		return nil, fmt.Errorf("validate configuration: %w", err)
 	}
 	return &Document{Proto: cfg, base: filepath.Dir(absolute)}, nil
+}
+
+// upgradeRetiredPermissions replaces permission names an earlier release
+// accepted, so an unchanged configuration file keeps starting the server.
+func upgradeRetiredPermissions(cfg *configv1.ServerConfig) []string {
+	var lists []string
+	for _, change := range permissionupgrade.Policy(cfg.GetAuthorization()) {
+		lists = append(lists, "authorization."+change.List)
+	}
+	if breakGlass := cfg.GetBreakGlass(); breakGlass != nil {
+		upgraded, legacy := permissionupgrade.Permissions(breakGlass.GetAllowedPermissions())
+		if len(legacy) != 0 {
+			breakGlass.AllowedPermissions = upgraded
+			lists = append(lists, "break_glass.allowed_permissions")
+		}
+	}
+	return lists
 }
 
 func reference(base, path string) string {

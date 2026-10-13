@@ -1,0 +1,153 @@
+{
+  "retired": [
+    "remote_assistance.run"
+  ],
+  "persisted": {
+    "roles": [
+      {
+        "name": "legacy-assistance",
+        "permissions": [
+          "remote_assistance.run"
+        ]
+      },
+      {
+        "name": "legacy-mixed",
+        "permissions": [
+          "fleet.read",
+          "remote_assistance.run",
+          "audit.read"
+        ]
+      },
+      {
+        "name": "legacy-everything",
+        "permissions": [
+          "fleet.read",
+          "enrollment.manage",
+          "device.revoke",
+          "audit.read",
+          "execution_trust.manage",
+          "profiles.manage",
+          "resources.assign",
+          "accounts.manage",
+          "inventory.manage",
+          "recovery_keys.read",
+          "remote_execution.run",
+          "remote_assistance.run",
+          "scripts.run",
+          "destructive.execute",
+          "approvals.manage",
+          "integrations.manage",
+          "release_updates.manage",
+          "advisory_exceptions.manage",
+          "encryption.manage",
+          "actions.lock",
+          "actions.release-lock",
+          "actions.quarantine",
+          "secrets.manage",
+          "secrets.reveal"
+        ]
+      },
+      {
+        "name": "unrelated-reader",
+        "permissions": [
+          "fleet.read"
+        ]
+      }
+    ],
+    "approvalRequiredPermissions": [
+      "actions.lock",
+      "secrets.reveal"
+    ]
+  },
+  "upgraded": {
+    "roles": [
+      {
+        "name": "legacy-assistance",
+        "permissions": [
+          "remote_assistance.view",
+          "remote_assistance.control"
+        ]
+      },
+      {
+        "name": "legacy-mixed",
+        "permissions": [
+          "fleet.read",
+          "remote_assistance.view",
+          "remote_assistance.control",
+          "audit.read"
+        ]
+      },
+      {
+        "name": "legacy-everything",
+        "permissions": [
+          "fleet.read",
+          "enrollment.manage",
+          "device.revoke",
+          "audit.read",
+          "execution_trust.manage",
+          "profiles.manage",
+          "resources.assign",
+          "accounts.manage",
+          "inventory.manage",
+          "recovery_keys.read",
+          "remote_execution.run",
+          "remote_assistance.view",
+          "remote_assistance.control",
+          "scripts.run",
+          "destructive.execute",
+          "approvals.manage",
+          "integrations.manage",
+          "release_updates.manage",
+          "advisory_exceptions.manage",
+          "encryption.manage",
+          "actions.lock",
+          "actions.release-lock",
+          "actions.quarantine",
+          "secrets.manage",
+          "secrets.reveal"
+        ]
+      },
+      {
+        "name": "unrelated-reader",
+        "permissions": [
+          "fleet.read"
+        ]
+      }
+    ],
+    "approvalRequiredPermissions": [
+      "actions.lock",
+      "secrets.reveal"
+    ]
+  },
+  "audit": {
+    "renamed": "remote_assistance.run=remote_assistance.view+remote_assistance.control",
+    "lists": "roles/legacy-assistance,roles/legacy-mixed,roles/legacy-everything"
+  },
+  "accounts": [
+    {
+      "id": "3d0c1f4e-7a2b-4c51-9e8d-1b6f2a7c9e01",
+      "granted": [
+        "remote_assistance.view",
+        "remote_assistance.control"
+      ],
+      "denied": [
+        "fleet.read",
+        "remote_assistance.clipboard",
+        "remote_assistance.keyboard"
+      ]
+    },
+    {
+      "id": "3d0c1f4e-7a2b-4c51-9e8d-1b6f2a7c9e02",
+      "granted": [
+        "fleet.read",
+        "audit.read",
+        "remote_assistance.view",
+        "remote_assistance.control"
+      ],
+      "denied": [
+        "remote_assistance.clipboard",
+        "remote_assistance.message"
+      ]
+    }
+  ]
+}

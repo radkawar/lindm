@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/x509"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -209,5 +210,39 @@ func TestAuthorizationSourceSchema(t *testing.T) {
 				t.Fatalf("source validation=%v, want valid=%v", err, test.valid)
 			}
 		})
+	}
+}
+
+// A configuration file written for an earlier release keeps loading: retired
+// permission names become their current equivalents before validation.
+func TestLoadUpgradesRetiredPermissions(t *testing.T) {
+	cfg := executionSigningSchemaConfig()
+	cfg.Authorization = &authv1.AuthorizationPolicy{Roles: []*authv1.RoleDefinition{{Name: "assist", Permissions: []string{"fleet.read", "remote_assistance.run"}}}}
+	cfg.BreakGlass = &configv1.BreakGlassPolicy{AllowedPermissions: []string{"remote_assistance.run", "accounts.manage"}, MaxSessionLifetime: durationpb.New(time.Hour), RequireIncidentReason: true}
+	encoded, err := protojson.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	writeFixtureFile(t, dir, "server.json", encoded)
+	document, err := Load(filepath.Join(dir, "server.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"fleet.read", "remote_assistance.view", "remote_assistance.control"}
+	if got := document.Proto.GetAuthorization().GetRoles()[0].GetPermissions(); !slices.Equal(got, want) {
+		t.Fatalf("role permissions = %q, want %q", got, want)
+	}
+	want = []string{"remote_assistance.view", "remote_assistance.control", "accounts.manage"}
+	if got := document.Proto.GetBreakGlass().GetAllowedPermissions(); !slices.Equal(got, want) {
+		t.Fatalf("break-glass allowlist = %q, want %q", got, want)
+	}
+	cfg.BreakGlass.AllowedPermissions = []string{"remote_assistance.unknown"}
+	if encoded, err = protojson.Marshal(cfg); err != nil {
+		t.Fatal(err)
+	}
+	writeFixtureFile(t, dir, "unknown.json", encoded)
+	if _, err := Load(filepath.Join(dir, "unknown.json")); err == nil {
+		t.Fatal("loaded an unknown permission")
 	}
 }

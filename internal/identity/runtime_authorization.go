@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -17,6 +19,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/auditkind"
 	"lindm/internal/identity/identitydb"
+	"lindm/internal/permissionupgrade"
 )
 
 var (
@@ -155,4 +158,51 @@ func (s *Service) UpdateAuthorization(ctx context.Context, request *adminv1.Upda
 		return nil, s.dbErr(err)
 	}
 	return result, nil
+}
+
+// reasonPermissionUpgrade is the audit reason for a startup permission rename.
+const reasonPermissionUpgrade = "server upgrade replaced retired permission names with their equivalents"
+
+// persistPermissionUpgrade stores a runtime policy whose retired permission names
+// were replaced while the caller holds the policy row lock. The replacement
+// grants exactly what the retired name granted, so sessions are not revoked;
+// the changed digest still makes every principal re-resolve its authority.
+// Historical request receipts and audit events keep the names they recorded.
+func (s *Service) persistPermissionUpgrade(ctx context.Context, q *identitydb.Queries, previous identitydb.LockRuntimeAuthorizationUpdateRow, policy *authorizationPolicy, changes []permissionupgrade.Change) error {
+	definition, err := proto.MarshalOptions{Deterministic: true}.Marshal(policy.definition)
+	if err != nil {
+		return err
+	}
+	if definition == nil {
+		definition = []byte{}
+	}
+	updated, err := q.SetRuntimeAuthorization(ctx, identitydb.SetRuntimeAuthorizationParams{Digest: policy.digest, Definition: definition, ExpectedRevision: previous.Revision})
+	if err != nil {
+		return s.dbErr(err)
+	}
+	lists := make([]string, len(changes))
+	var renamed []string
+	for i, change := range changes {
+		lists[i] = change.List
+		for _, legacy := range change.Legacy {
+			current, _ := permissionupgrade.Replacement(legacy)
+			if rename := legacy + "=" + strings.Join(current, "+"); !slices.Contains(renamed, rename) {
+				renamed = append(renamed, rename)
+			}
+		}
+	}
+	// At most 100 roles of 64 characters plus the approval list stay within the
+	// 8 KiB audit details bound.
+	details, err := json.Marshal(map[string]string{
+		"previous_revision":      strconv.FormatInt(previous.Revision, 10),
+		"revision":               strconv.FormatInt(updated.Revision, 10),
+		"previous_policy_sha256": hex.EncodeToString(previous.Digest),
+		"policy_sha256":          hex.EncodeToString(policy.digest),
+		"renamed":                strings.Join(renamed, ","),
+		"lists":                  strings.Join(lists, ","),
+	})
+	if err != nil {
+		return err
+	}
+	return s.dbErr(q.InsertAuditEvent(ctx, identitydb.InsertAuditEventParams{ID: uuid.New(), Action: auditkind.IdentityAuthorizationUpgraded.String(), ResourceID: "authorization", Reason: reasonPermissionUpgrade, Details: details}))
 }

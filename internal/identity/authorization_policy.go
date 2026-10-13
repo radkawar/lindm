@@ -17,6 +17,7 @@ import (
 	authv1 "lindm/gen/lindm/auth/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/identity/identitydb"
+	"lindm/internal/permissionupgrade"
 )
 
 type authorizationPolicy struct {
@@ -169,9 +170,15 @@ func (s *Service) activatePolicy(ctx context.Context) error {
 		if err := proto.Unmarshal(previous.Definition, definition); err != nil {
 			return s.dbErr(err)
 		}
+		changes := permissionupgrade.Policy(definition)
 		policy, err := compilePolicy(s.policyConfiguration(definition), s.rules)
 		if err != nil {
 			return err
+		}
+		if len(changes) != 0 {
+			if err := s.persistPermissionUpgrade(ctx, q, previous, policy, changes); err != nil {
+				return err
+			}
 		}
 		s.policy = policy
 	}
