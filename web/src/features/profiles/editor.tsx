@@ -47,6 +47,7 @@ import {
 import { qualifiedKindsQueryOptions, profileRevisionQueryOptions } from "./queries";
 import { type Qualification } from "./qualification";
 import { ResourceFields } from "./resource-form";
+import { selectedKind } from "./resource-draft";
 import { RolloutHint } from "./rollout-hint";
 
 // Mention the bound only when an administrator is about to meet it.
@@ -507,6 +508,22 @@ export function ProfileEditor({
               { label: "Request ID", value: shownRequestId },
             ]}
           >
+            {shown.resources.some(
+              (resource) => selectedKind(JSON.parse(resource.document)) === "osUpdate",
+            ) ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Windows use the selected time zone. Daylight saving skips a missing start. A
+                repeated start opens only once.
+              </p>
+            ) : null}
+            {shown.resources.some(
+              (resource) => selectedKind(JSON.parse(resource.document)) === "sshServer",
+            ) ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Removing this setting restores the earlier notice unless someone changed it on the
+                device.
+              </p>
+            ) : null}
             <pre
               className="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all border bg-muted/30 p-3"
               aria-label="Profile draft JSON"

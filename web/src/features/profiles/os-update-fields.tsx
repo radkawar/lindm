@@ -108,13 +108,6 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
       <p className="text-xs text-muted-foreground">
         Devices require native update tools and signed repositories.
       </p>
-      <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">Details</summary>
-        <p className="mt-2">
-          Windows use the selected time zone. Daylight saving skips a missing start. A repeated
-          start opens only once.
-        </p>
-      </details>
       <section className="grid gap-3">
         <h2 className="text-base font-semibold">Install updates</h2>
         <Label htmlFor={`${id}-selection`}>Updates to install</Label>

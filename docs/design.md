@@ -98,6 +98,12 @@ control panel; never imply an old permission still grants access.
   devices matched this filter. Clear filters” is useful. “No data” is not.
   Failed reads retain their error and retry action, never a happy empty state.
 
+Profile editors have one **Advanced options** switch and one **View JSON**
+disclosure, regardless of the number or types of settings. Put secondary setting
+reference text in that editor-level disclosure. Keep safety consequences visible
+beside the affected controls. The OS update review checks the active-voice restart
+deadline explanation; a wording change must not change the scheduling contract.
+
 ## Current-console editing examples
 
 These observations come from the synthetic **ui-review fixture**, not live fleet

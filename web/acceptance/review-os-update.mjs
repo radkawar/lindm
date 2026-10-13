@@ -42,7 +42,7 @@ export async function reviewOSUpdate({ pages, combos, config, screenshot, axe, p
       for (const text of [
         "Install updates",
         "Restart devices",
-        "If no restart time fits before the deadline, no restart is scheduled.",
+        "The device schedules no restart if no allowed time fits before the deadline.",
         "Deferrals move to the next allowed time, never beyond the deadline.",
       ]) {
         if (!body.includes(text))

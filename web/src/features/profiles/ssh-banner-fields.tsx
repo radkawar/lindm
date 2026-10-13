@@ -31,15 +31,6 @@ export function SSHBannerFields({
           ? "This setting includes SSH controls that this editor cannot change. It keeps those controls unchanged."
           : "Anyone who connects sees this text. Keep it public. Replacing an existing notice requires an approved assignment."}
       </p>
-      {!unsupported ? (
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer">Details</summary>
-          <p className="mt-2">
-            Removing this setting restores the earlier notice unless someone changed it on the
-            device.
-          </p>
-        </details>
-      ) : null}
     </div>
   );
 }

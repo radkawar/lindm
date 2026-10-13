@@ -149,4 +149,22 @@ export async function check({ page, demo, visit, require, capture, step }) {
   for (const phrase of [/selection catalog/i, /\bSha256\b/, /Size bytes/, /full apt\//])
     require(!phrase.test(wording), `a package setting still says ${phrase}`);
   await capture("setting form wording");
+
+  step("secondary explanations share the editor disclosure");
+  await type.click();
+  await page.getByRole("option", { name: "OS update policy", exact: true }).click();
+  await second.getByRole("combobox", { name: "Setting type", exact: true }).click();
+  await page.getByRole("option", { name: "SSH sign-in banner", exact: true }).click();
+  const combinedDisclosures = await editor.locator("details > summary").allInnerTexts();
+  require(combinedDisclosures.length === 1 &&
+    combinedDisclosures[0] ===
+      "View JSON", `OS update and SSH settings add disclosures: ${combinedDisclosures.join(", ")}`);
+  await editor.locator("summary", { hasText: /^View JSON$/ }).click();
+  require(await editor
+    .getByText(/Windows use the selected time zone/)
+    .isVisible(), "the editor disclosure omits update time-zone reference");
+  require(await editor
+    .getByText(/Removing this setting restores the earlier notice/)
+    .isVisible(), "the editor disclosure omits SSH restoration reference");
+  await capture("one editor disclosure");
 }
