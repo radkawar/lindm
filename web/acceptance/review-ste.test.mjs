@@ -39,6 +39,19 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
     assert.ok((await inspect("<p>Device group profile policy</p>")).includes("STE noun cluster"));
     const sentence = `Select ${Array.from({ length: 20 }, () => "the").join(" ")} <strong>device</strong>.`;
     assert.ok((await inspect(`<p>${sentence}</p>`)).includes("STE sentence length"));
+    const extraWords = Array.from({ length: 20 }, () => "the").join(" ");
+    assert.ok((await inspect(`<p>Disable ${extraWords}.</p>`)).includes("STE sentence length"));
+    assert.ok(
+      (await inspect(`<p data-ste-procedure>If ${extraWords}.</p>`)).includes(
+        "STE sentence length",
+      ),
+    );
+    assert.ok(!(await inspect(`<p>The ${extraWords}.</p>`)).includes("STE sentence length"));
+    assert.ok(
+      (await inspect(`<p>The ${extraWords} other four words here remain.</p>`)).includes(
+        "STE sentence length",
+      ),
+    );
     assert.ok(
       !(
         await inspect(

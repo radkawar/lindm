@@ -505,7 +505,7 @@ export function installProbes(rules) {
             const words = sentence.match(/\b[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*\b/gu) ?? [];
             const procedure =
               node.closest("[data-ste-procedure]") ||
-              /^(?:select|enter|choose|review|confirm|remove|add|open|close|use|request|wait|check|save|create|start|stop|retry|refresh|copy|install|connect|disconnect|keep|do not)\b/i.test(
+              /^(?:select|enter|choose|review|confirm|remove|add|open|close|use|request|wait|check|save|create|start|stop|retry|refresh|copy|install|connect|disconnect|keep|enable|disable|set|publish|assign|end|read|send|allow|block|reject|approve|revoke|rotate|unlock|lock|wipe|restart|restore|configure|replace|reset|clear|cancel|discard|edit|type|run|follow|compare|inspect|provide|return|contact|ask|do not)\b/i.test(
                 sentence.trim(),
               );
             const limit = procedure
