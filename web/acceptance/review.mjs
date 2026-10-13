@@ -956,22 +956,32 @@ async function main() {
     }
     for (const [index, { theme, viewport }] of viewerUrl ? combos.entries() : []) {
       const page = pages[index];
+      const where = `${theme} ${viewport.name}`;
       if (page !== requester) await visit(page, viewerUrl);
       await settle(page);
       if (await page.getByText("The user allowed viewing only.", { exact: true }).count())
         report.failures.push(
-          `assistance: ${theme} ${viewport} claims a user viewing-only decision before consent`,
+          `assistance: ${where} claims a user viewing-only decision before consent`,
         );
-      if ((await page.getByRole("region", { name: "Remote screen", exact: true }).count()) !== 1)
+      // While the request waits for consent nothing is shared and the screen
+      // surface is hidden; the named region is required only once it shows.
+      const waiting =
+        (await page.getByText("No screen or input is shared yet", { exact: false }).count()) > 0;
+      const regions = await page
+        .getByRole("region", { name: "Remote screen", exact: true })
+        .count();
+      if (regions !== (waiting ? 0 : 1))
         report.failures.push(
-          `assistance: ${theme} ${viewport} remote screen lacks its named accessible region`,
+          waiting
+            ? `assistance: ${where} exposes a remote screen region before anything is shared`
+            : `assistance: ${where} remote screen lacks its named accessible region`,
         );
       if (
         (await page.getByRole("heading", { name: "Clipboard", level: 2, exact: true }).count()) !==
         1
       )
         report.failures.push(
-          `assistance: ${theme} ${viewport} clipboard section skips the page heading hierarchy`,
+          `assistance: ${where} clipboard section skips the page heading hierarchy`,
         );
       await review(
         page,
