@@ -3256,8 +3256,11 @@ distribution: lifecycle package formats and repositories from the row's native
 package backend, `-redhat-token-file` (plus explicit guest egress for the
 registration, except in device-actions, which grants its own) from the row's lab
 entitlement, resource
-`-kinds` from the row's implemented resource capabilities, and the device-action
-recovery image from the same release's cloud manifest. `architectureArgs` holds
+`-kinds` from the row's implemented resource capabilities, the device-action
+recovery image from the same release's cloud manifest, and, for the
+device-action and assistance lanes, `-desktop` from the row's sole lab desktop
+when GNOME (their default) is not one (Mint's `cinnamon`, Pop!\_OS's `cosmic`,
+Omarchy's `hyprland`). `architectureArgs` holds
 execution-host arguments every hardware-selecting lane receives for a guest
 architecture (the Sparks' pinned AAVMF firmware for aarch64). A cell marked
 `secureBoot` (recovery sanitize: original-device signed recovery refuses
@@ -3308,8 +3311,17 @@ maintained release builder, then exports B1/B2/B3 and an expired signed bundle
 with independent bundle/package/attestation/TUF custody and registry-derived
 advisories: the release's primary vendor export, including a registry-declared
 partial source (Rocky's OSV), whose evaluation the lane records rather than
-treating as complete. The development OCI exports pin the fixture transport CA, not the
-host's ambient trust store. Each selected runnable cell then runs as a child
+treating as complete. A derivative row (`Advisory.VendorOrigins`: Linux Mint,
+Pop!\_OS) publishes no feed, so its bundle and `advisories` lane use its base's
+export (Ubuntu's OSV); both lanes then require the server's verified-origin
+`partial` evaluation with reason `vendor_feed_unavailable_<ID>` and uncovered
+packages, and the `advisories` lane also lists every uncovered package and
+checks, through the guest's own `apt-cache policy`, that a vendor-reason package
+comes from a vendor Release Origin and that every finding's package is listed
+only by the base archive's assessed suites
+(`qualified_verified_origin_partial_matching`). The development OCI exports pin
+the fixture transport CA, not the host's ambient trust store. Each selected
+runnable cell then runs as a child
 `lab vm <lane>` through the normal host admission (`-parallel`, default 4, bounds
 concurrent cells; host slots still bound guests). The child's output is kept in
 `<platform>/<cell>-<arch>.log` beside its record. Every finished cell appends one

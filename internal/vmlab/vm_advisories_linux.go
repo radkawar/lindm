@@ -30,9 +30,13 @@ import (
 // package multiset and persisted server evaluation. Partial-feed matching never
 // asserts complete coverage or a clean device.
 type VMAdvisoryEvidence struct {
-	Scope           string                       `json:"scope"`
-	Source          *advisoryv1.FeedSource       `json:"source"`
-	PartialCoverage string                       `json:"partial_coverage,omitempty"`
+	Scope           string                 `json:"scope"`
+	Source          *advisoryv1.FeedSource `json:"source"`
+	PartialCoverage string                 `json:"partial_coverage,omitempty"`
+	// VerifiedOrigin is the partial reason a derivative's evaluation through
+	// its base's feed must carry; Origin is that evaluation's oracle.
+	VerifiedOrigin  string                       `json:"verified_origin,omitempty"`
+	Origin          *VMAdvisoryOriginEvidence    `json:"origin,omitempty"`
 	Refresh         *devlab.AcceptanceFeedResult `json:"refresh,omitempty"`
 	Inventory       *vmInventoryEvidence         `json:"inventory,omitempty"`
 	Packages        []*inventoryv1.Package       `json:"packages,omitempty"`
@@ -52,23 +56,44 @@ type VMAdvisoryEvidence struct {
 // snapshot row has no fixed registry version, so its feed release derives from
 // the image's dated VERSION_ID (an empty Tumbleweed release failed validation).
 func vmAdvisorySource(release *platform.Release, imageVersion, architecture string) (*advisoryv1.FeedSource, error) {
-	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
+	if release == nil || !release.Known() || len(advisoryFeedRow(release).Advisory.Feeds) == 0 {
 		return nil, errors.New("advisories: no maintained vendor source")
 	}
-	return vmAdvisoryFeedSource(release, imageVersion, architecture, release.Advisory.Feeds[0], "matrix-"+release.Key)
+	return vmAdvisoryFeedSource(release, imageVersion, architecture, advisoryFeedRow(release).Advisory.Feeds[0], "matrix-"+release.Key)
+}
+
+// advisoryFeedRow is the registry row whose vendor feeds apply to the release:
+// a derivative's base (BaseCoverage), whose feed covers only the derivative's
+// verified base-archive packages, or the release itself.
+func advisoryFeedRow(release *platform.Release) *platform.Release {
+	if base := release.BaseCoverage(); base != nil {
+		return base
+	}
+	return release
+}
+
+// advisoryOriginReason is the partial evaluation reason the server must report
+// for a derivative evaluated through its base's feed, "" for any other release.
+func advisoryOriginReason(release *platform.Release) string {
+	if release.BaseCoverage() == nil {
+		return ""
+	}
+	return "vendor_feed_unavailable_" + release.ID
 }
 
 // AirgapAdvisories derives the connected station's bundle feeds from every
 // registry feed with a maintained export, with the same partial-coverage
 // policy as the advisories lane. Feeds the registry lists without an export
-// (for example Tumbleweed's CSAF) cannot be acquired and are not invented.
+// (for example Tumbleweed's CSAF) cannot be acquired and are not invented. A
+// derivative bundles its base's feeds: the derivative vendor publishes none.
 func AirgapAdvisories(release *platform.Release, imageVersion, architecture string) (*configv1.AdvisoryConfig, error) {
-	if release == nil || !release.Known() || len(release.Advisory.Feeds) == 0 {
+	if release == nil || !release.Known() || len(advisoryFeedRow(release).Advisory.Feeds) == 0 {
 		return nil, errors.New("advisories: no maintained vendor source")
 	}
+	feedRow := advisoryFeedRow(release)
 	cfg := new(configv1.AdvisoryConfig)
-	for _, feed := range release.Advisory.Feeds {
-		if _, exported := release.Advisory.Exports[feed]; !exported {
+	for _, feed := range feedRow.Advisory.Feeds {
+		if _, exported := feedRow.Advisory.Exports[feed]; !exported {
 			continue
 		}
 		source, err := vmAdvisoryFeedSource(release, imageVersion, architecture, feed, "airgap-"+release.Key+"-"+string(feed))
@@ -85,15 +110,18 @@ func AirgapAdvisories(release *platform.Release, imageVersion, architecture stri
 
 // Stream-scoped (Red Hat) sources name the image's exact minor: from RHEL 10,
 // standard-stream errata carry minor CPEs (enterprise_linux:10.1), so a major
-// source admits only the major-wide VEX claims and never a fix.
+// source admits only the major-wide VEX claims and never a fix. A derivative's
+// source is its base's feed identity and export (advisoryFeedRow), bounded by
+// the derivative's own architectures.
 func vmAdvisoryFeedSource(release *platform.Release, imageVersion, architecture string, feed platform.Feed, prefix string) (*advisoryv1.FeedSource, error) {
-	versionID := release.Version.Value
+	feedRow := advisoryFeedRow(release)
+	versionID := feedRow.Version.Value
 	switch {
-	case release.Version.Rule == platform.VersionSnapshot:
+	case feedRow.Version.Rule == platform.VersionSnapshot:
 		versionID = imageVersion
-	case release.Advisory.PlatformStreams:
-		if platform.Identify(platform.OSRelease{ID: release.ID, VersionID: imageVersion}).Key != release.Key {
-			return nil, fmt.Errorf("advisories: image version %q is not %s", imageVersion, release.Name)
+	case feedRow.Advisory.PlatformStreams:
+		if platform.Identify(platform.OSRelease{ID: feedRow.ID, VersionID: imageVersion}).Key != feedRow.Key {
+			return nil, fmt.Errorf("advisories: image version %q is not %s", imageVersion, feedRow.Name)
 		}
 		versionID = imageVersion
 	}
@@ -106,7 +134,7 @@ func vmAdvisoryFeedSource(release *platform.Release, imageVersion, architecture 
 	if !slices.Contains(release.Architectures, architecture) {
 		return nil, fmt.Errorf("advisories: unsupported architecture %q", architecture)
 	}
-	export, ok := release.Advisory.Exports[feed]
+	export, ok := feedRow.Advisory.Exports[feed]
 	url := export.URL
 	if len(export.ArchitectureURLs) != 0 {
 		url = export.ArchitectureURLs[architecture]
@@ -125,7 +153,7 @@ func vmAdvisoryFeedSource(release *platform.Release, imageVersion, architecture 
 	}
 	source := &advisoryv1.FeedSource{
 		Id:     prefix + "-" + architecture,
-		Distro: release.ID, Release: release.FeedRelease(versionID), Architecture: architecture,
+		Distro: feedRow.ID, Release: feedRow.FeedRelease(versionID), Architecture: architecture,
 		Url: url, Format: advisoryv1.FeedFormat(format), MaxAgeSeconds: export.MaxAgeSeconds,
 		PlatformStream: export.PlatformStream,
 	}
@@ -155,7 +183,7 @@ func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPl
 	if err != nil {
 		return nil, err
 	}
-	evidence = &VMAdvisoryEvidence{Source: source, PartialCoverage: release.Advisory.Partial, Outcome: "incomplete"}
+	evidence = &VMAdvisoryEvidence{Source: source, PartialCoverage: release.Advisory.Partial, VerifiedOrigin: advisoryOriginReason(release), Outcome: "incomplete"}
 	before, err := collectVMTruth(ctx, vm, release)
 	if err != nil {
 		return evidence, err
@@ -200,6 +228,12 @@ func exerciseVMAdvisories(ctx context.Context, vm *guestVM, control *vmControlPl
 	}
 	if err := waitVMAdvisoryEvaluation(ctx, control, deviceID, evidence); err != nil {
 		return evidence, err
+	}
+	if evidence.VerifiedOrigin != "" {
+		if evidence.Origin, err = exerciseVMAdvisoryOrigin(ctx, vm, control, release, deviceID, evidence); err != nil {
+			evidence.Outcome = "verified_origin_partial_unqualified"
+			return evidence, err
+		}
 	}
 	evidence.Boundary, err = exerciseVMAdvisoryBoundary(ctx, vm, fixture, evidence, before.manager)
 	if err != nil {
@@ -331,6 +365,10 @@ func qualifyVMAdvisoryMatches(e *VMAdvisoryEvidence) error {
 		}
 	}
 	partial := e.Freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN && e.Freshness.GetReason() == "feed_partial_coverage"
+	if e.VerifiedOrigin != "" {
+		// A derivative is partial only through its verified-origin oracle.
+		partial = e.Origin != nil && e.Origin.Reason == e.VerifiedOrigin && validateVMAdvisoryOrigin(e.Origin, e) == nil
+	}
 	if !vmValidTime(e.Feed.GetExpiresAt()) || !time.Now().Before(e.Feed.GetExpiresAt().AsTime()) || (e.Freshness.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN && !partial) || (!e.Feed.GetFresh() && !partial) || (e.PartialCoverage != "" && !partial) {
 		e.Outcome = "unsupported_coverage"
 		return fmt.Errorf("advisories: native evaluation remains unqualified: %s", e.Freshness.GetReason())
@@ -340,7 +378,9 @@ func qualifyVMAdvisoryMatches(e *VMAdvisoryEvidence) error {
 		return errors.New("advisories: no affected native package or real vendor boundary oracle; an empty match alone is not a pass")
 	}
 	e.Scope, e.Outcome = "native feed matching; not complete device coverage", "qualified_native_match"
-	if partial || e.PartialCoverage != "" {
+	if e.VerifiedOrigin != "" {
+		e.Scope, e.Outcome = "partial-feed matching", "qualified_verified_origin_partial_matching"
+	} else if partial || e.PartialCoverage != "" {
 		e.Scope, e.Outcome = "partial-feed matching", "qualified_partial_feed_matching"
 	}
 	return nil

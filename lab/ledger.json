@@ -11719,6 +11719,22 @@
       "verified": true,
       "reference": "#el-9-assistance-capture-re-timestamping-2026-10-13",
       "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "linuxmint-22.3",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "linuxmint-22.3-cinnamon-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/device-actions-tpm-reference-repair-01.json",
+      "sha256": "90822f9b6245ac019b3f180afed2fddd90f9828ca9bb1b01196cb4c9d9ed1c3e",
+      "recorded": "2026-10-13T15:56:09.426035228Z",
+      "revision": "b675303311b28de2c6134cee5010f8f4da2cdd43",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "legacy 1 of 4 TPM references repaired to 4 of 4; 30 cold boots; Secure Boot on",
+      "reference": "#tier-1-parity-records-2026-10-11",
+      "mainlineRevision": "b675303311b28de2c6134cee5010f8f4da2cdd43"
     }
   ]
 }

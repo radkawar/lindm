@@ -791,6 +791,14 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	if lane == "device-actions" && strings.HasPrefix(labhost.FlagValue(args, "wipe-phase"), "recovery-") && c.Release.Lab.OwnedBootUnavailableFor(c.Architecture) != "" {
 		args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
 	}
+	// Desktop lanes default to GNOME; media that install only their own
+	// desktop (Mint's Cinnamon, Pop!_OS's COSMIC, Omarchy's Hyprland) refuse
+	// it, so those releases boot their sole maintained lab desktop.
+	if lane == "device-actions" || lane == "assistance" {
+		if desktop := matrixLabDesktop(c.Release); desktop != "" && labhost.FlagValue(args, "desktop") == "" {
+			args = labhost.SetFlag(args, "desktop", desktop)
+		}
+	}
 	args = append(args, "-manifest", filepath.Join(r.root, c.Manifest.Path), "-cache", r.cache)
 	if vmHasHardwareFlags(lane) {
 		args = append(args, r.archArgs[c.Architecture].GetArgs()...)
@@ -898,4 +906,17 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		}
 	}
 	return args, nil
+}
+
+// matrixLabDesktop is the release's only maintained lab desktop when GNOME,
+// the desktop lanes' default, is not among them; "" keeps that default.
+func matrixLabDesktop(r *platform.Release) string {
+	desktops := r.Lab.Session.Desktops
+	if _, gnome := desktops["gnome"]; gnome || len(desktops) != 1 {
+		return ""
+	}
+	for desktop := range desktops {
+		return desktop
+	}
+	return ""
 }

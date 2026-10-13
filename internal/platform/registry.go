@@ -204,6 +204,10 @@ var (
 	rockyExports  = map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Rocky%20Linux/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 1 << 30}}
 	// Rocky Linux and AlmaLinux 9/10 lab lanes, on both architectures.
 	elRebuildLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}
+	// Linux Mint and Pop!_OS installed-golden lab lanes (x86_64). Advisory
+	// lanes there qualify the verified-origin partial evaluation through the
+	// Ubuntu base's feed (Advisory.VendorOrigins).
+	derivativeLanes = []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole}
 	// Encrypted-installer and device-action lab recipes.
 	dracutTPM      = []string{"systemd", "crypt", "tpm2-tss", "lvm"}
 	dracutSplitTPM = []string{"systemd", "crypt", "tpm2-tss", "lvm", "systemd-cryptsetup"}
@@ -736,7 +740,7 @@ var registry = []*Release{
 		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver (logind Lock; never sets LockedHint)"}, Firewall: ufw,
 		// The ISO's Ubiquity runs noninteractively from a debconf preseed; the
 		// installed root uses Ubuntu's initramfs-tools and archive package names.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Ubiquity, Guest: ubuntuGuest,
+		Lab: Lab{Lanes: derivativeLanes, Installer: Ubiquity, Guest: ubuntuGuest,
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}},
 			// The live media install Cinnamon itself; LightDM autologs into it.
 			Session: LabSession{Desktops: map[string][]string{"cinnamon": nil}, Name: "cinnamon", Terminal: []string{"gnome-terminal", "--"},
@@ -760,7 +764,7 @@ var registry = []*Release{
 		// COSMIC comes from the ISO itself (no packages). The shipped
 		// cosmic.portal declares ScreenCast but no RemoteDesktop; the ISO lacks
 		// gstreamer1.0-pipewire, which the agent package Recommends.
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates}, Installer: Distinst, Guest: ubuntuGuest,
+		Lab: Lab{Lanes: derivativeLanes, Installer: Distinst, Guest: ubuntuGuest,
 			Session: LabSession{Desktops: map[string][]string{"cosmic": nil}, Name: "cosmic", Terminal: []string{"cosmic-term", "-e"},
 				Capture: []string{"cosmic-comp", "cosmic-greeter", "cosmic-notifications", "xdg-desktop-portal", "xdg-desktop-portal-cosmic", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good"}},
 			TPM: LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}},

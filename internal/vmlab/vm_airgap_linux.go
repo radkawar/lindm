@@ -75,6 +75,9 @@ type VMAirgapFindings struct {
 	Reason        string    `json:"reason,omitempty"`
 	Findings      int       `json:"findings"`
 	Affected      int       `json:"affected"`
+	// Uncovered counts packages a derivative's partial evaluation leaves
+	// UNKNOWN (no feed covers their verified origin).
+	Uncovered uint64 `json:"uncovered_packages,omitempty"`
 	// Truncated means the 20,000-finding read bound was reached; counts are
 	// then lower bounds.
 	Truncated bool `json:"truncated"`
@@ -332,16 +335,18 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 	if err != nil {
 		return result, err
 	}
-	feedID := ""
+	// A derivative is evaluated through its base's bundled feed and must stay
+	// partial with its verified-origin reason (vendor packages uncovered).
+	feedID, feedDistro, originReason := "", advisoryFeedRow(release).ID, advisoryOriginReason(release)
 	for _, snapshot := range first.GetAdvisories() {
-		if snapshot.GetSource().GetDistro() == distribution {
+		if snapshot.GetSource().GetDistro() == feedDistro {
 			feedID = snapshot.GetSource().GetId()
 		}
 	}
 	if feedID == "" {
-		return result, errors.New("first bundle has no advisory snapshot for the guest distribution")
+		return result, errors.New("first bundle has no advisory snapshot for the guest's feed distribution")
 	}
-	if result.InitialFindings, err = waitDeviceFindings(ctx, control, result.DeviceID, feedID, first.acquiredAt(feedID)); err != nil {
+	if result.InitialFindings, err = waitDeviceFindings(ctx, control, result.DeviceID, feedID, first.acquiredAt(feedID), originReason); err != nil {
 		return result, err
 	}
 	// Negative imports run against the live server before the genuine update.
@@ -389,7 +394,7 @@ func AirgapVM(ctx context.Context, manifest *labv1.ImageManifest, options VMAirg
 		return result, err
 	}
 	result.Steps = append(result.Steps, VMUpdateStep{Name: "second bundle staged " + result.SecondVersion + " paused; agent still holds " + result.FirstVersion, Status: status})
-	if result.RefreshedFindings, err = waitDeviceFindings(ctx, control, result.DeviceID, feedID, second.acquiredAt(feedID)); err != nil {
+	if result.RefreshedFindings, err = waitDeviceFindings(ctx, control, result.DeviceID, feedID, second.acquiredAt(feedID), originReason); err != nil {
 		return result, err
 	}
 	channel := imported.Updates.Channels[0]
@@ -690,8 +695,9 @@ func waitInstalledVersion(ctx context.Context, vm *guestVM, version string) (*ag
 }
 
 // waitDeviceFindings waits for the device evaluation bound to the feed
-// publication acquired at the bundle's signed time.
-func waitDeviceFindings(ctx context.Context, control *vmControlPlane, deviceID, feedID string, acquired time.Time) (*VMAirgapFindings, error) {
+// publication acquired at the bundle's signed time; with originReason, that
+// evaluation must be a derivative's verified-origin PARTIAL with the reason.
+func waitDeviceFindings(ctx context.Context, control *vmControlPlane, deviceID, feedID string, acquired time.Time, originReason string) (*VMAirgapFindings, error) {
 	if acquired.IsZero() {
 		return nil, errors.New("bundle has no acquisition time for the device feed")
 	}
@@ -725,11 +731,13 @@ func waitDeviceFindings(ctx context.Context, control *vmControlPlane, deviceID, 
 		}
 		if err == nil && freshness != nil {
 			findings.FeedID, findings.State, findings.Reason, findings.SourceSHA256 = freshness.GetFeedId(), freshness.GetState().String(), freshness.GetReason(), freshness.GetSourceSha256()
-			findings.FeedCheckedAt, findings.FeedExpiresAt = freshness.GetFeedCheckedAt().AsTime(), freshness.GetFeedExpiresAt().AsTime()
+			findings.FeedCheckedAt, findings.FeedExpiresAt, findings.Uncovered = freshness.GetFeedCheckedAt().AsTime(), freshness.GetFeedExpiresAt().AsTime(), freshness.GetUncoveredPackages()
 			last = findings
 			// The state is recorded as evaluated; coverage policy (complete or
-			// partial) is the parser's, not this lane's, decision.
-			if difference := findings.FeedCheckedAt.Sub(acquired).Abs(); findings.FeedID == feedID && difference < time.Microsecond {
+			// partial) is the parser's, not this lane's, decision, except that
+			// a derivative's base feed is never complete for it.
+			bound := findings.FeedID == feedID && findings.FeedCheckedAt.Sub(acquired).Abs() < time.Microsecond
+			if bound && (originReason == "" || (findings.State == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL.String() && findings.Reason == originReason && findings.Uncovered > 0)) {
 				return findings, nil
 			}
 		}

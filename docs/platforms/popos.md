@@ -365,6 +365,12 @@ Pop!\_OS and Ubuntu keys are in the scanned keyring locations, that the installe
 system's sources match the repositories above, and that lists are stored
 uncompressed or gzip.
 
+The `advisories` and `airgap` lab lanes acquire (or bundle) Ubuntu 24.04's OSV
+export for Pop!\_OS and require that `partial`/`vendor_feed_unavailable_pop`
+evaluation with uncovered packages; the `advisories` lane checks uncovered vendor
+packages and findings against the guest's own `apt-cache policy` origins, as for
+[Linux Mint](mint.md#advisory-feeds).
+
 ## Remote assistance capability roadmap
 
 Pop!_OS/COSMIC inherits no Ubuntu GNOME portal qualification. The

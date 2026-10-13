@@ -170,6 +170,25 @@ desktop-session lane).
   through cinnamon-session's XDG autostart instead
   (`session_unit_activation=xdg-autostart`).
 
+## Advisory feeds
+
+Linux Mint publishes no machine-readable advisory feed, so exposure of Mint's own
+packages is never known. Mint 22.3 (the exact `linuxmint-22.3` row, base
+`ubuntu-24.04`, vendor origin `linuxmint`) is evaluated against the Ubuntu 24.04
+feed only for packages whose every APT listing is a verified Ubuntu-archive index
+of `noble`, `noble-security` or `noble-updates`; the evaluation is always
+`partial` with reason `vendor_feed_unavailable_linuxmint` and an uncovered count
+([architecture](../architecture.md#distro-advisory-findings)). Packages listed only
+by `packages.linuxmint.com` are UNKNOWN `vendor_feed_unavailable`.
+
+The `advisories` and `airgap` lab lanes have no Mint feed of their own: they
+acquire (or bundle) Ubuntu 24.04's OSV export and require that verified-origin
+`partial` evaluation with uncovered packages. The `advisories` lane also lists
+every uncovered package and checks against the guest's own `apt-cache policy`
+that a vendor-reason package's installed version comes from Release Origin
+`linuxmint` and that each finding's package is listed only by Ubuntu's assessed
+suites (`qualified_verified_origin_partial_matching`, never complete coverage).
+
 ## Lab records
 
 All records are under `~/.cache/lindm-desktopderiv-20261011/linuxmint/` on the
@@ -198,6 +217,17 @@ lanes use `OVMF_VARS_4M.ms.fd` with Secure Boot enforced.
 | Recovery sanitize, Mint original, measured GRUB, NVMe format                         | pass                         | `device-actions-mint-original-recovery-nvme-07.json`  | `2ba33c1dbc2d0a2fc0c121382fd98865824e2b8839b76063d2964f3134c81e89` |
 | Recovery sanitize, Mint original, measured GRUB, SATA overwrite                      | pass                         | `device-actions-mint-original-recovery-sata-07b.json` | `ed05a68121abdece41bba98713216868a569b59ac9db3454a434c7a32bf7e321` |
 | 30 consecutive unattended TPM2 cold boots (main `8c6af7ff`, Secure Boot on)          | pass                         | `device-actions-tpm-unattended-boots-08.json`         | `bf5869a0037cd3f29693b31562bddd2779d6b9a9e17cefac0907cfd38190fabf` |
+| TPM reference repair (legacy agent 1 of 4 references → 4 of 4; 30 cold boots)        | pass                         | `device-actions-tpm-reference-repair-01.json`         | `90822f9b6245ac019b3f180afed2fddd90f9828ca9bb1b01196cb4c9d9ed1c3e` |
+
+The TPM reference repair record ran from main `b6753033` (lab `-desktop cinnamon`,
+Secure Boot enforced, `-legacy-agent-revision ced6d209…`): the legacy agent's
+bind wrote one systemd-tpm2 token reference to keyslot 1 where the server
+requires four; after the package upgrade the repair action wrote the missing
+three (server 4 of 4) and all 30 unattended cold boots unsealed with no prompt
+and no unseal failure. `lab matrix run` passed GNOME to the device-action lanes
+of every release until the matrix learned to pass a release's sole lab desktop
+(`TestMatrixDesktopCellsBootTheReleaseDesktop`); Mint's Ubiquity recipe refuses
+any desktop but Cinnamon.
 
 The device-action record covers encryption inventory (LUKS2 UUID, TPM 2.0,
 Secure Boot on, host oracle match), escrow (keyslot 1), audited reveal and custody
