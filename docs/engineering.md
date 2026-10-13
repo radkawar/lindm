@@ -3166,6 +3166,27 @@ browser signs in again and confirms the exact device's server-side **Enrolled**
 state, retaining a redacted screenshot. Package installation or a local identity
 alone is not a pass; there is no command-file-only mode that bypasses this proof.
 
+Stock console and native-enrollment fixtures cache their complete signed
+development agent bundle under `<repo>/.cache/lab/agent-repositories`. The key
+uses the exact bounded release source digest, development version, revision and
+source epoch. One cancellable file lock prevents concurrent identical cold builds.
+Only an owned mode-0700 cache is accepted; every hit verifies the protected files,
+release attestations and source identity again. A changed source requires a new
+entry. A corrupt entry fails closed with its path; remove only that derived entry
+before rebuilding. Private signing keys remain outside the bundle and are removed
+before publication. Running fixtures own separate immutable inodes: use a
+copy-on-write filesystem clone when available, otherwise a bounded streamed copy.
+Never hardlink repository files, because a later fixture changes inode ctime and
+must not invalidate an earlier daemon's tamper fence.
+
+`lab console` and `lab console review` prepare this artifact before their setup or
+review timer begins. `-artifact-build-timeout` bounds that preparation separately
+(default one hour); interruption still cancels it. Cold Go-build subprocesses
+have a 45-minute bound, while other release tools retain their 15-minute bound.
+Publication records include cache-hit state and artifact preparation seconds;
+tool failures include elapsed time. Cache reuse never substitutes for the two
+independent unsigned package builds or native enrollment proof.
+
 The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
 Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
 x86_64/aarch64, including native aarch64 on a

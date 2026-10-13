@@ -63,6 +63,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	directoryAuthorization := flags.Bool("directory-authorization", false, "include real Keycloak group-role editing and scoped browser authorization")
 	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache (default <repo>/.cache/lab/advisories)")
 	timeout := flags.Duration("timeout", 3*time.Hour, "overall review deadline including first vendor refresh")
+	artifactTimeout := flags.Duration("artifact-build-timeout", time.Hour, "signed stock artifact preparation deadline, separate from the review deadline")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -89,6 +90,12 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	serverDigest, err := acceptanceFileDigest(*binary)
 	if err != nil {
 		return err
+	}
+	preparation, stopPreparation := context.WithTimeout(ctx, *artifactTimeout)
+	err = devlab.PrepareNativeEnrollmentRepository(preparation, *repo, checkout)
+	stopPreparation()
+	if err != nil {
+		return fmt.Errorf("prepare stock console artifact: %w", err)
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()

@@ -12,8 +12,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 	"time"
 
 	"lindm/internal/agent/nativeexec"
@@ -27,12 +25,18 @@ const maxArtifact = 5 << 30
 func command(ctx context.Context, dir string, environment []string, name string, args ...string) ([]byte, error) {
 	stdout, stderr := nativeexec.NewBuffer(maxDocument), nativeexec.NewBuffer(maxDocument)
 	env := append([]string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C", "TZ=UTC"}, environment...)
-	err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: stdout, Stderr: stderr, Timeout: 15 * time.Minute})
+	bound := 15 * time.Minute
+	if name == "go" && len(args) > 0 && args[0] == "build" {
+		// Isolated cold compiler caches compete with the native lab on one host.
+		bound = 45 * time.Minute
+	}
+	started := time.Now()
+	err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: stdout, Stderr: stderr, Timeout: bound})
 	if err == nil && (stdout.Truncated() || stderr.Truncated()) {
 		err = errors.New("releasebuild: tool output exceeds bound")
 	}
 	if err != nil {
-		return nil, fmt.Errorf("releasebuild: %s: %w\nstdout:\n%s\nstderr:\n%s", name, err, stdout.String(), stderr.String())
+		return nil, fmt.Errorf("releasebuild: %s after %s: %w\nstdout:\n%s\nstderr:\n%s", name, time.Since(started).Round(time.Millisecond), err, stdout.String(), stderr.String())
 	}
 	return stdout.Bytes(), nil
 }
@@ -97,14 +101,9 @@ func copyNew(src, dst string, mode fs.FileMode) (err error) {
 // snapshot selects tracked and nonignored source, excludes generated build trees,
 // rejects links/special files and copies once before either builder can observe it.
 func snapshot(ctx context.Context, repository, destination string) error {
-	listed, err := command(ctx, repository, nil, "git", "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	paths, err := sourcePaths(ctx, repository)
 	if err != nil {
 		return err
-	}
-	paths := strings.Split(strings.TrimSuffix(string(listed), "\x00"), "\x00")
-	sort.Strings(paths)
-	if len(paths) > 100000 {
-		return errors.New("releasebuild: source file count exceeds bound")
 	}
 	root, err := os.OpenRoot(repository)
 	if err != nil {
@@ -112,24 +111,7 @@ func snapshot(ctx context.Context, repository, destination string) error {
 	}
 	defer func() { _ = root.Close() }()
 	var total int64
-	previous := ""
 	for _, name := range paths {
-		if name == previous {
-			continue
-		}
-		previous = name
-		if !filepath.IsLocal(name) {
-			return errors.New("releasebuild: invalid source path")
-		}
-		skip := false
-		for _, prefix := range []string{".git/", ".cache/", ".tools/", "artifacts/", "node_modules/", "web/dist/"} {
-			if strings.HasPrefix(name, prefix) {
-				skip = true
-			}
-		}
-		if skip {
-			continue
-		}
 		info, err := root.Lstat(name)
 		if err != nil {
 			return err
@@ -153,6 +135,9 @@ func snapshot(ctx context.Context, repository, destination string) error {
 		if err != nil {
 			_ = input.Close()
 			return err
+		}
+		if err := output.Chmod(info.Mode().Perm() & 0755); err != nil {
+			return errors.Join(err, input.Close(), output.Close())
 		}
 		n, copyErr := io.Copy(output, io.LimitReader(input, info.Size()+1))
 		err = errors.Join(copyErr, input.Close(), output.Close())

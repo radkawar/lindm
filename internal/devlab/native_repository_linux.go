@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
@@ -22,7 +23,6 @@ import (
 	"lindm/internal/config"
 	"lindm/internal/packaging"
 	"lindm/internal/platform"
-	"lindm/internal/releasebuild"
 )
 
 // NativeEnrollmentRepository records the signed development artifact and the
@@ -40,6 +40,8 @@ type NativeEnrollmentRepository struct {
 	NativeRepositoriesConfigured bool                       `json:"native_repositories_configured"`
 	Ready                        bool                       `json:"ready"`
 	Manifest                     *releasev1.ReleaseManifest `json:"manifest"`
+	CacheHit                     bool                       `json:"cache_hit"`
+	PreparationSeconds           float64                    `json:"preparation_seconds"`
 }
 
 // buildNativeEnrollmentArtifact creates a private executable-adjacent bundle.
@@ -48,7 +50,7 @@ type NativeEnrollmentRepository struct {
 // Requested architectures must be present; the payload carries the complete
 // stock native matrix. Dedicated development signing keys are removed before
 // lindmd starts, and are never part of the artifact.
-func (f *AuthorityFixture) buildNativeEnrollmentArtifact(ctx context.Context, cfg *configv1.ServerConfig, sourceRepository string, architectures []string) (resultErr error) {
+func (f *AuthorityFixture) buildNativeEnrollmentArtifact(ctx context.Context, cfg *configv1.ServerConfig, sourceRepository string, architectures []string) error {
 	if sourceRepository == "" || len(architectures) == 0 {
 		return errors.New("native enrollment artifact requires a source checkout and explicit architectures")
 	}
@@ -69,33 +71,22 @@ func (f *AuthorityFixture) buildNativeEnrollmentArtifact(ctx context.Context, cf
 	if err != nil {
 		return err
 	}
-	if err := os.Mkdir(custody, 0700); err != nil {
-		return err
-	}
-	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(custody)) }()
-	signer, err := packaging.GenerateDevelopmentSigner(ctx, custody)
+	started := time.Now()
+	cached, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, nativeRepositoryCacheDirectory(f.repository), buildDevelopmentNativeRepository)
 	if err != nil {
 		return err
 	}
-	attestationDirectory := filepath.Join(custody, "attestation")
-	keyID, err := releasebuild.GenerateDevelopmentKey(attestationDirectory)
-	if err != nil {
-		return err
+	if err := materializeNativeRepository(ctx, cached.directory, bundle); err != nil {
+		return fmt.Errorf("materialize signed enrollment artifact: %w", err)
 	}
-	manifest, err := releasebuild.BuildDevelopmentAgentRepository(ctx, releasebuild.Request{
-		Repository: sourceRepository, Output: bundle, Version: "0.1.0", Revision: "console-enrollment-lab",
-		SourceDateEpoch: packaging.DefaultSourceDateEpoch, PackageSigner: *signer,
-		AttestationSigner: releasebuild.AttestationKey{Path: filepath.Join(attestationDirectory, "attestation.pem"), KeyID: keyID, Custody: "development"},
-	})
-	if err != nil {
-		return fmt.Errorf("build signed enrollment artifact: %w", err)
-	}
+	manifest := cached.manifest
 	if err := nativeEnrollmentArtifactArchitectures(manifest, architectures); err != nil {
 		return err
 	}
 	f.NativeRepository = &NativeEnrollmentRepository{
 		APTURL: cfg.GetPublicUrl() + "/repo/apt", RPMURL: cfg.GetPublicUrl() + "/repo/rpm", ArchURL: cfg.GetPublicUrl() + "/repo/arch",
-		SignerFingerprint: signer.Fingerprint, BundleDirectory: bundle, ServerBinary: binary, ServerSHA256: digest, Manifest: manifest,
+		SignerFingerprint: cached.fingerprint, BundleDirectory: bundle, ServerBinary: binary, ServerSHA256: digest, Manifest: manifest,
+		CacheHit: cached.hit, PreparationSeconds: time.Since(started).Seconds(),
 	}
 	f.binary = binary
 	return nil

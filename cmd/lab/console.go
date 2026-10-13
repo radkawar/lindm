@@ -33,6 +33,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	demo := flags.Bool("demo", false, "seed the deterministic console demo dataset instead of the capacity population (ignores -devices/-packages/-assignment-percent/-enrollment-workers)")
 	advisoryCache := flags.String("advisory-cache", "", "persistent vendor HTTP cache for -demo -feeds real (default <repo>/.cache/lab/advisories)")
 	feeds := flags.String("feeds", "fixtures", "-demo advisory feeds: fixtures (small checked-in vendor documents, ready in minutes) or real (current full vendor exports; first refresh can take an hour)")
+	artifactTimeout := flags.Duration("artifact-build-timeout", time.Hour, "signed stock artifact preparation deadline, separate from console setup")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -44,6 +45,12 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	}
 	if *advisoryCache == "" {
 		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
+	}
+	preparation, stopPreparation := context.WithTimeout(ctx, *artifactTimeout)
+	err := devlab.PrepareNativeEnrollmentRepository(preparation, *repo, *source)
+	stopPreparation()
+	if err != nil {
+		return fmt.Errorf("prepare stock console artifact: %w", err)
 	}
 	setupTimeout := 30 * time.Minute
 	if *demo && *feeds == "real" {
