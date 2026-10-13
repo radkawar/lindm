@@ -3849,13 +3849,27 @@ artifacts/bin/lab vm airgap -manifest lab/images/ubuntu-noble-amd64.json \
 
 ### Clean release exports and custody (P20/L17)
 
-`lab release build` creates two isolated source, HOME, Go module/compiler and npm
-cache trees, installs the pinned frontend dependencies and builds all three
-products for `amd64` and `arm64`. Native exports are DEB/RPM for `lindmd`,
-`lindm-agent` and `lindmctl`; OCI exports are the server and CLI. An agent container
-is not a substitute for host systemd/package ownership. Complete unsigned native
-archives and deterministic OCI archives must match between both builders before
-atomic export. RPM signatures are compared separately from the pre-sign archive.
+`lab release build` captures source once and creates two isolated source, HOME,
+Go module/compiler and npm cache trees. Both independently build the complete
+registry-native agent package matrix. Unsigned agent archives must agree before
+publication. The first build's signed packages and both build observations form
+the authenticated agent-only DSSE release bundle; APT/RPM/pacman metadata is signed
+once around those canonical packages. Both builders then independently build
+`lindmd` and `lindmctl`, with the identical verified agent bundle in each server
+artifact. Their complete unsigned native archives and deterministic OCI archives
+must agree before atomic export. Sharing only this already-compared signed input
+avoids pretending wall-clock-dependent native signatures are reproducible.
+
+Native exports cover DEB/RPM and the registry's supported pacman architectures;
+OCI exports are the server and CLI, not the privileged split agent. Every server
+native/OCI artifact includes `/usr/share/lindmd/agent-repository`. It contains
+`release.json`, `release.json.dsse`, the agent artifacts and their attestations,
+the native public signer, and complete signed repositories. The daemon verifies
+this installed artifact before serving it without repository configuration.
+The authenticated server package/image is the local bundle's trust channel;
+neither a network-fetched key nor a self-signed repository establishes trust.
+Source-built console fixtures carry the identical layout beside a private
+server executable. Private signing custody is never part of either payload.
 
 Every artifact has a CycloneDX dependency SBOM and DSSE in-toto artifact/provenance
 statements signed by a distinct pinned release-attestation key. These statements

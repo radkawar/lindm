@@ -84,10 +84,38 @@ or a root fetched and trusted solely because it signs its own bundle.
 
 #### Prepare the server's installation repository
 
-Use the same signed release artifacts produced by the release pipeline. Publish
-native metadata with `internal/packaging`'s APT/RPM publishers, retaining the signed
-`InRelease`, `Packages` indexes, DEB archives, signed `repomd.xml`, RPM archives and
-exported signing key. Do not rebuild or re-sign packages in `lindmd`.
+Install the authenticated `lindmd` release package or its air-gap/OCI artifact.
+It carries `/usr/share/lindmd/agent-repository`: signed native repositories,
+their agent packages and the agent release attestations. On first start, `lindmd`
+verifies that payload and serves it at `/repo/apt`, `/repo/rpm` and `/repo/arch`.
+No `releaseRepository` setting or separate publication step is needed.
+
+**Settings › Agent repository** shows **Ready**, the package versions per OS and
+architecture, or each platform's verification failure. The release covers the
+registry's supported native installation families; design-only platforms remain
+explicitly unavailable. A new `lindmd` release carries the matching agent version.
+Upgrade all replicas to the same authenticated artifact and restart them together.
+The server reads the installed payload; it never rebuilds or re-signs packages,
+copies private keys, or repairs a failed signature check.
+
+The air-gap installer uses exactly the same `lindmd` artifact and repository
+payload. Internet access is not required to publish or download these agent
+packages. Native OS dependencies still need the site's own trusted distribution
+repositories or installation media.
+
+##### Custom publication override
+
+Keep `releaseRepository.directory` and `nativeRepositories` only when the site
+needs a separately curated or replicated native snapshot, for example a staged
+agent version independent of the server upgrade. This override replaces the
+bundled native repositories; absent formats do not silently fall back to the
+installed bundle. The operator owns complete signed snapshots, full signer pins
+and coordinated replica restarts. A release directory used only for TUF updates
+does not override the bundle when `nativeRepositories` is absent.
+
+For that advanced use, publish the same signed release artifacts with
+`internal/packaging`'s publishers. Retain signed metadata, packages and public
+keys. Do not rebuild or re-sign packages in `lindmd`.
 
 On the release signing workstation, set `SIGNER_HOME`, `SIGNER_FINGERPRINT` and
 `SIGNER_PASSPHRASE_FILE` to the protected production package-signing inputs;
@@ -155,6 +183,42 @@ content-digest ETags rather than caching changing names as immutable. For native
 enrollment, the server needs read access only, not signing custody or repository
 write access.
 
+##### Signing-key rotation and compromise
+
+The release pipeline's dedicated native signer signs packages and repository
+metadata. Its private key never reaches `lindmd`. This choice preserves the
+existing RPM/pacman package-signature trust and immutable repository snapshots;
+it does not give a deployment daemon release authority. Agent package hashes
+also match the authenticated release's DSSE attestations. Native signing,
+release attestation, TUF update authority, execution signing and TLS keys remain
+separate trust domains.
+
+Rotate the native signer on the protected release workstation and publish a new
+authenticated `lindmd` release. Verify that release through the independently
+pinned release-attestation channel before installation. Restart every replica
+with its identical payload. The console's **Repository and trust details** shows
+the complete current native signer fingerprint; each copied installation command
+pins it before installing trust. There is no daemon signing-key rotation endpoint.
+
+Already installed devices retain their old native key pins. A server upgrade
+does not silently replace those pins, and native installs or package refreshes
+fail rather than accept the new key. Distribute the new console-generated trust
+and installation instructions over the site's authenticated administrative
+channel, replace only the lindm-specific keyrings/trust entries, and verify the
+full fingerprint before restoring native repository access. Do not rerun a
+used enrollment credential or replace an enrolled device's identity. TUF updates
+retain their independent authenticated root and rollback checks.
+
+For compromise, stop distribution of the affected release, preserve the release
+and audit evidence, and inventory devices that trusted the exposed fingerprint.
+Publish a clean release with a new native signer and authenticated attestations.
+Remove the old native key from each device's lindm-specific trust and authorize
+the new full fingerprint through the trusted administrative channel. A compromised
+package signer alone cannot create a valid release attestation, but devices that
+already trust it must not continue using native repository trust until repaired.
+Never bypass signature checks, globally trust a fetched key, or treat a server
+restart as revocation of keys stored on devices.
+
 The server exposes the matching `/repo/apt/` and `/repo/rpm/` paths on its configured
 HTTPS origin. Preserve unauthenticated `GET`/`HEAD` access through any reverse proxy.
 Unauthenticated means a bare device can download packages; it does not require
@@ -164,9 +228,9 @@ used.
 
 #### Copy and run the enrollment command
 
-1. Open **Settings** and resolve any repository-readiness remedy. Configure the
-   execution bootstrap and the server's externally reachable HTTPS origin as well
-   as the signed artifacts above.
+1. Open **Settings › Agent repository** and confirm **Ready** for the target OS
+   and architecture. A stock authenticated release needs no repository setup.
+   Resolve any reported HTTPS, execution-bootstrap or artifact verification failure.
 2. Choose **Enroll**, issue a single-use code and select the target OS. The platform
    registry selects APT, DNF, zypper or a separately available pacman path. A gated
    platform explains its missing packaging prerequisite instead of guessing.
@@ -1409,8 +1473,10 @@ starts the identity service on.
 
 ### Native single-host installation
 
-The `lindmd` DEB/RPM contains the embedded-console executable at `/usr/bin/lindmd`,
-`lindmd.service`, and a separate, operator-invoked `lindmd-migrate.service`.
+The `lindmd` release DEB/RPM contains the embedded-console executable at
+`/usr/bin/lindmd`, the signed agent-repository payload at
+`/usr/share/lindmd/agent-repository`, `lindmd.service`, and a separate,
+operator-invoked `lindmd-migrate.service`.
 Installation creates dedicated `lindmd` and `lindmd-migrate` accounts. It does **not**
 create credentials, claim an owner, migrate, enable or start the server. Both units
 have an empty capability set and `ProtectSystem=strict`; binding ports below 1024
@@ -1423,9 +1489,12 @@ dumps (`LimitCORE=0`, or a zero core ulimit). Before loading configuration/secre
 collectors that ignore resource limits. This protects short-lived plaintext
 recovery-secret buffers; it is not protection from a compromised host.
 
-Build with `lab packages build-server` using the same explicit signing
-custody as agent builds. Authenticate DEBs through the signed APT repository with
-a separately obtained pinned `Signed-By` key; `dpkg -i` is not signature verification.
+Use the authenticated `lab release build` server artifact, which carries the
+matching signed agent repository. Lower-level `lab packages build-server` callers
+must supply that verified bundle explicitly; an executable-only developer build
+is not a complete stock installation. Authenticate DEBs through the signed APT
+repository with a separately obtained pinned `Signed-By` key;
+`dpkg -i` is not signature verification.
 RPM installations require the pinned release key and `gpgcheck=1`. Development
 signers generated by the lab are never production release keys.
 
@@ -1468,6 +1537,11 @@ signers generated by the lab are never production release keys.
    and unauthenticated admin RPC denial (401). Visit `/enroll`, enter the secret,
    choose a password and register a user-verifying WebAuthn authenticator. The
    password plus authenticator are required for subsequent login.
+8. Open **Settings › Agent repository**. Confirm **Ready**, the expected agent
+   version and the target OS/architecture. There is no repository configuration
+   step. Copy and run the console enrollment command on the bare device, then
+   confirm **Enrolled**. If verification fails, preserve the exact per-OS cause
+   and repair or reinstall the authenticated release instead of disabling checks.
 
 Keep `journalctl -u lindmd -u lindmd-migrate` private. A successful health response
 does not certify a login ceremony, device enrollment, dispatch or capacity.

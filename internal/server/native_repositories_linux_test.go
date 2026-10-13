@@ -111,7 +111,7 @@ func (f *nativeFixture) apt(t *testing.T, arch string) string {
 	name := "pool/main/l/lindm-agent/lindm-agent_1.0.0_" + arch + ".deb"
 	payload := []byte("native delivery fixture for " + arch)
 	f.write(t, "apt", name, payload)
-	packages := []byte(fmt.Sprintf("Package: lindm-agent\nArchitecture: %s\nFilename: %s\nSize: %d\nSHA256: %s\n\n", arch, name, len(payload), nativeTestDigest(payload)))
+	packages := []byte(fmt.Sprintf("Package: lindm-agent\nVersion: 1.0.0\nArchitecture: %s\nFilename: %s\nSize: %d\nSHA256: %s\n\n", arch, name, len(payload), nativeTestDigest(payload)))
 	index := "main/binary-" + arch + "/Packages"
 	f.write(t, "apt", "dists/stable/"+index, packages)
 	compressed := nativeTestGzip(t, packages)
@@ -140,7 +140,7 @@ func (f *nativeFixture) rpm(t *testing.T, arch string) string {
 	name := "lindm-agent-1.0.0-1." + arch + ".rpm"
 	payload := []byte("native RPM delivery fixture for " + arch)
 	f.write(t, "rpm", name, payload)
-	primary := []byte(fmt.Sprintf(`<metadata xmlns="http://linux.duke.edu/metadata/common"><package type="rpm"><name>lindm-agent</name><arch>%s</arch><checksum type="sha256">%s</checksum><size package="%d"/><location href="%s"/></package></metadata>`, arch, nativeTestDigest(payload), len(payload), name))
+	primary := []byte(fmt.Sprintf(`<metadata xmlns="http://linux.duke.edu/metadata/common"><package type="rpm"><name>lindm-agent</name><arch>%s</arch><version epoch="0" ver="1.0.0" rel="1"/><checksum type="sha256">%s</checksum><size package="%d"/><location href="%s"/></package></metadata>`, arch, nativeTestDigest(payload), len(payload), name))
 	compressed := nativeTestGzip(t, primary)
 	index := "repodata/" + nativeTestDigest(compressed) + "-primary.xml.gz"
 	f.write(t, "rpm", index, compressed)
@@ -158,7 +158,7 @@ func (f *nativeFixture) arch(t *testing.T) string {
 	signature := f.sign(t, payload, false)
 	f.write(t, "arch", name, payload)
 	f.write(t, "arch", name+".sig", signature)
-	desc := []byte(fmt.Sprintf("%%FILENAME%%\n%s\n\n%%NAME%%\nlindm-agent\n\n%%ARCH%%\nx86_64\n\n%%CSIZE%%\n%d\n\n%%SHA256SUM%%\n%s\n\n%%PGPSIG%%\n%s\n\n", name, len(payload), nativeTestDigest(payload), base64.StdEncoding.EncodeToString(signature)))
+	desc := []byte(fmt.Sprintf("%%FILENAME%%\n%s\n\n%%NAME%%\nlindm-agent\n\n%%VERSION%%\n1.0.0-1\n\n%%ARCH%%\nx86_64\n\n%%CSIZE%%\n%d\n\n%%SHA256SUM%%\n%s\n\n%%PGPSIG%%\n%s\n\n", name, len(payload), nativeTestDigest(payload), base64.StdEncoding.EncodeToString(signature)))
 	var tarball bytes.Buffer
 	tw := tar.NewWriter(&tarball)
 	if err := tw.WriteHeader(&tar.Header{Name: "lindm-agent-1.0.0-1/desc", Mode: 0644, Size: int64(len(desc)), Typeflag: tar.TypeReg}); err != nil {
@@ -199,6 +199,13 @@ func TestNativeRepositoryAuthenticatedReadOnlyDelivery(t *testing.T) {
 			}
 			if !slices.Equal(repo.architectures, []string{arch}) {
 				t.Fatalf("architectures = %v", repo.architectures)
+			}
+			version := "1.0.0-1"
+			if family == "apt" {
+				version = "1.0.0"
+			}
+			if !slices.Equal(repo.versions[arch], []string{version}) {
+				t.Fatalf("versions = %v", repo.versions)
 			}
 			handler := http.StripPrefix("/repo/"+family+"/", repo)
 			url := "https://untrusted-host.example/repo/" + family + "/" + name

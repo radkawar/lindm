@@ -55,24 +55,23 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 		response.Readiness = enrollmentNotReady("https_trust_unavailable", "Provide the administrative HTTPS CA in the TLS certificate chain or trustedCaFile, with a certificate covering both public origins, then restart lindmd.")
 	}
 	origin := strings.TrimSuffix(cfg.GetPublicUrl(), "/")
-	pins := cfg.GetReleaseRepository().GetNativeRepositories()
 	if native.apt.err == nil {
 		response.AptRepository = &adminv1.EnrollmentAPTRepository{
 			BaseUrl: origin + "/repo/apt", SigningKeyUrl: origin + "/repo/apt/" + nativePublicKey,
-			SigningKeyFingerprint: pins.GetAptSigningKeyFingerprint(),
+			SigningKeyFingerprint: native.apt.fingerprint,
 			Suite:                 packaging.APTDistribution, Components: []string{packaging.APTComponent},
 		}
 	}
 	if native.rpm.err == nil {
 		response.DnfRepository = &adminv1.EnrollmentDNFRepository{
 			BaseUrl: origin + "/repo/rpm", SigningKeyUrl: origin + "/repo/rpm/" + nativePublicKey,
-			SigningKeyFingerprint: pins.GetRpmSigningKeyFingerprint(),
+			SigningKeyFingerprint: native.rpm.fingerprint,
 		}
 	}
 	if native.arch.err == nil {
 		response.ArchRepository = &adminv1.EnrollmentArchRepository{
 			BaseUrl: origin + "/repo/arch", SigningKeyUrl: origin + "/repo/arch/" + nativePublicKey,
-			SigningKeyFingerprint: pins.GetArchSigningKeyFingerprint(), RepositoryName: "lindm",
+			SigningKeyFingerprint: native.arch.fingerprint, RepositoryName: "lindm",
 		}
 	}
 	for _, release := range platform.Releases() {
@@ -121,7 +120,7 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 			case repository == nil:
 				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish a signed native agent repository for this package family on lindmd.")
 			case repository.err != nil:
-				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish the signed native agent repository beneath releaseRepository.directory/repo, configure its full signing fingerprint, and restart every lindmd replica with identical artifacts.")
+				choice.Readiness = enrollmentNotReady("native_repository_unavailable", "The agent repository failed verification: "+repository.err.Error()+". Reinstall the signed lindmd release bundle or correct the custom publication, then restart lindmd.")
 			}
 		}
 		if repository != nil && repository.err == nil {
@@ -130,24 +129,31 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 				switch {
 				case containsArchitecture(repository.architectures, normalized):
 					choice.Architectures = append(choice.Architectures, normalized)
+					appendEnrollmentPackages(choice, repository, normalized)
 				case supported && normalized != "":
 					choice.UnpublishedArchitectures = append(choice.UnpublishedArchitectures, normalized)
 				}
 			}
 			if choice.Readiness.Ready && len(choice.Architectures) == 0 {
-				choice.Readiness = enrollmentNotReady("native_architecture_unavailable", "Publish signed agent metadata and packages for an architecture supported by this platform, then restart every lindmd replica.")
+				choice.Readiness = enrollmentNotReady("native_architecture_unavailable", "The installed release has no signed agent package for this platform's architectures. Install a lindmd release that carries them, then restart lindmd.")
 			}
 		}
 		response.Platforms = append(response.Platforms, choice)
 	}
 	if response.Readiness.Ready && response.AptRepository == nil && response.DnfRepository == nil && response.ArchRepository == nil {
-		response.Readiness = enrollmentNotReady("native_repository_unavailable", "Publish signed native agent repositories beneath releaseRepository.directory/repo, configure their full signing fingerprints, and restart every lindmd replica with identical artifacts.")
+		response.Readiness = enrollmentNotReady("native_repository_unavailable", "The installed signed agent repository is unavailable. Check each platform's verification result and reinstall the signed lindmd release bundle.")
 	}
 	return response
 }
 
 func enrollmentNotReady(reason, remedy string) *adminv1.EnrollmentReadiness {
 	return &adminv1.EnrollmentReadiness{Reason: reason, Remedy: remedy}
+}
+
+func appendEnrollmentPackages(choice *adminv1.EnrollmentPlatform, repository *nativeRepository, arch string) {
+	for _, version := range repository.versions[arch] {
+		choice.AgentPackages = append(choice.AgentPackages, &adminv1.EnrollmentAgentPackage{Architecture: arch, Version: version})
+	}
 }
 
 // bootstrapMaterialHandler serves only the two exact public documents already

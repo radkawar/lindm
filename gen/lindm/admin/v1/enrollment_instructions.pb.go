@@ -360,8 +360,10 @@ type EnrollmentPlatform struct {
 	// signed agent package. Empty when the release is not supported or its
 	// package family has no published repository at all.
 	UnpublishedArchitectures []string `protobuf:"bytes,12,rep,name=unpublished_architectures,json=unpublishedArchitectures,proto3" json:"unpublished_architectures,omitempty"`
-	unknownFields            protoimpl.UnknownFields
-	sizeCache                protoimpl.SizeCache
+	// Versions read from authenticated native repository metadata.
+	AgentPackages []*EnrollmentAgentPackage `protobuf:"bytes,13,rep,name=agent_packages,json=agentPackages,proto3" json:"agent_packages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *EnrollmentPlatform) Reset() {
@@ -478,6 +480,65 @@ func (x *EnrollmentPlatform) GetUnpublishedArchitectures() []string {
 	return nil
 }
 
+func (x *EnrollmentPlatform) GetAgentPackages() []*EnrollmentAgentPackage {
+	if x != nil {
+		return x.AgentPackages
+	}
+	return nil
+}
+
+type EnrollmentAgentPackage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Architecture  string                 `protobuf:"bytes,1,opt,name=architecture,proto3" json:"architecture,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnrollmentAgentPackage) Reset() {
+	*x = EnrollmentAgentPackage{}
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnrollmentAgentPackage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnrollmentAgentPackage) ProtoMessage() {}
+
+func (x *EnrollmentAgentPackage) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnrollmentAgentPackage.ProtoReflect.Descriptor instead.
+func (*EnrollmentAgentPackage) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EnrollmentAgentPackage) GetArchitecture() string {
+	if x != nil {
+		return x.Architecture
+	}
+	return ""
+}
+
+func (x *EnrollmentAgentPackage) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
 type EnrollmentAPTRepository struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
 	BaseUrl               string                 `protobuf:"bytes,1,opt,name=base_url,json=baseUrl,proto3" json:"base_url,omitempty"`
@@ -491,7 +552,7 @@ type EnrollmentAPTRepository struct {
 
 func (x *EnrollmentAPTRepository) Reset() {
 	*x = EnrollmentAPTRepository{}
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -503,7 +564,7 @@ func (x *EnrollmentAPTRepository) String() string {
 func (*EnrollmentAPTRepository) ProtoMessage() {}
 
 func (x *EnrollmentAPTRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[4]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -516,7 +577,7 @@ func (x *EnrollmentAPTRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentAPTRepository.ProtoReflect.Descriptor instead.
 func (*EnrollmentAPTRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{4}
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *EnrollmentAPTRepository) GetBaseUrl() string {
@@ -566,7 +627,7 @@ type EnrollmentDNFRepository struct {
 
 func (x *EnrollmentDNFRepository) Reset() {
 	*x = EnrollmentDNFRepository{}
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -578,7 +639,7 @@ func (x *EnrollmentDNFRepository) String() string {
 func (*EnrollmentDNFRepository) ProtoMessage() {}
 
 func (x *EnrollmentDNFRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[5]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -591,7 +652,7 @@ func (x *EnrollmentDNFRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentDNFRepository.ProtoReflect.Descriptor instead.
 func (*EnrollmentDNFRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{5}
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *EnrollmentDNFRepository) GetBaseUrl() string {
@@ -628,7 +689,7 @@ type EnrollmentArchRepository struct {
 
 func (x *EnrollmentArchRepository) Reset() {
 	*x = EnrollmentArchRepository{}
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -640,7 +701,7 @@ func (x *EnrollmentArchRepository) String() string {
 func (*EnrollmentArchRepository) ProtoMessage() {}
 
 func (x *EnrollmentArchRepository) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[6]
+	mi := &file_lindm_admin_v1_enrollment_instructions_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -653,7 +714,7 @@ func (x *EnrollmentArchRepository) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollmentArchRepository.ProtoReflect.Descriptor instead.
 func (*EnrollmentArchRepository) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{6}
+	return file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EnrollmentArchRepository) GetBaseUrl() string {
@@ -719,7 +780,7 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"\x13EnrollmentReadiness\x12\x14\n" +
 	"\x05ready\x18\x01 \x01(\bR\x05ready\x12 \n" +
 	"\x06reason\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x06reason\x12 \n" +
-	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xe9\x05\n" +
+	"\x06remedy\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\bR\x06remedy\"\xc2\x06\n" +
 	"\x12EnrollmentPlatform\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x01R\x02id\x12\x1e\n" +
 	"\x05label\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x05label\x12\x1d\n" +
@@ -737,7 +798,12 @@ const file_lindm_admin_v1_enrollment_instructions_proto_rawDesc = "" +
 	"cloud-initR\tkickstartR\vautoinstallR\bautoyastR\x05nixosR\x13provisioningFormats\x12O\n" +
 	"\asupport\x18\v \x01(\x0e2).lindm.admin.v1.EnrollmentPlatformSupportB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\asupport\x12W\n" +
-	"\x19unpublished_architectures\x18\f \x03(\tB\x1a\xbaH\x17\x92\x01\x14\x10\x02\"\x10r\x0eR\x05amd64R\x05arm64R\x18unpublishedArchitectures\"\xe7\x02\n" +
+	"\x19unpublished_architectures\x18\f \x03(\tB\x1a\xbaH\x17\x92\x01\x14\x10\x02\"\x10r\x0eR\x05amd64R\x05arm64R\x18unpublishedArchitectures\x12W\n" +
+	"\x0eagent_packages\x18\r \x03(\v2&.lindm.admin.v1.EnrollmentAgentPackageB\b\xbaH\x05\x92\x01\x02\x10\x10R\ragentPackages\"w\n" +
+	"\x16EnrollmentAgentPackage\x127\n" +
+	"\farchitecture\x18\x01 \x01(\tB\x13\xbaH\x10r\x0eR\x05amd64R\x05arm64R\farchitecture\x12$\n" +
+	"\aversion\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x01R\aversion\"\xe7\x02\n" +
 	"\x17EnrollmentAPTRepository\x12'\n" +
 	"\bbase_url\x18\x01 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\abaseUrl\x124\n" +
 	"\x0fsigning_key_url\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\rsigningKeyUrl\x12\\\n" +
@@ -774,30 +840,32 @@ func file_lindm_admin_v1_enrollment_instructions_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_admin_v1_enrollment_instructions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_admin_v1_enrollment_instructions_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_lindm_admin_v1_enrollment_instructions_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_admin_v1_enrollment_instructions_proto_goTypes = []any{
 	(EnrollmentPlatformSupport)(0),            // 0: lindm.admin.v1.EnrollmentPlatformSupport
 	(*GetEnrollmentInstructionsRequest)(nil),  // 1: lindm.admin.v1.GetEnrollmentInstructionsRequest
 	(*GetEnrollmentInstructionsResponse)(nil), // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse
 	(*EnrollmentReadiness)(nil),               // 3: lindm.admin.v1.EnrollmentReadiness
 	(*EnrollmentPlatform)(nil),                // 4: lindm.admin.v1.EnrollmentPlatform
-	(*EnrollmentAPTRepository)(nil),           // 5: lindm.admin.v1.EnrollmentAPTRepository
-	(*EnrollmentDNFRepository)(nil),           // 6: lindm.admin.v1.EnrollmentDNFRepository
-	(*EnrollmentArchRepository)(nil),          // 7: lindm.admin.v1.EnrollmentArchRepository
+	(*EnrollmentAgentPackage)(nil),            // 5: lindm.admin.v1.EnrollmentAgentPackage
+	(*EnrollmentAPTRepository)(nil),           // 6: lindm.admin.v1.EnrollmentAPTRepository
+	(*EnrollmentDNFRepository)(nil),           // 7: lindm.admin.v1.EnrollmentDNFRepository
+	(*EnrollmentArchRepository)(nil),          // 8: lindm.admin.v1.EnrollmentArchRepository
 }
 var file_lindm_admin_v1_enrollment_instructions_proto_depIdxs = []int32{
-	5, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
-	6, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
+	6, // 0: lindm.admin.v1.GetEnrollmentInstructionsResponse.apt_repository:type_name -> lindm.admin.v1.EnrollmentAPTRepository
+	7, // 1: lindm.admin.v1.GetEnrollmentInstructionsResponse.dnf_repository:type_name -> lindm.admin.v1.EnrollmentDNFRepository
 	4, // 2: lindm.admin.v1.GetEnrollmentInstructionsResponse.platforms:type_name -> lindm.admin.v1.EnrollmentPlatform
 	3, // 3: lindm.admin.v1.GetEnrollmentInstructionsResponse.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
-	7, // 4: lindm.admin.v1.GetEnrollmentInstructionsResponse.arch_repository:type_name -> lindm.admin.v1.EnrollmentArchRepository
+	8, // 4: lindm.admin.v1.GetEnrollmentInstructionsResponse.arch_repository:type_name -> lindm.admin.v1.EnrollmentArchRepository
 	3, // 5: lindm.admin.v1.EnrollmentPlatform.readiness:type_name -> lindm.admin.v1.EnrollmentReadiness
 	0, // 6: lindm.admin.v1.EnrollmentPlatform.support:type_name -> lindm.admin.v1.EnrollmentPlatformSupport
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	5, // 7: lindm.admin.v1.EnrollmentPlatform.agent_packages:type_name -> lindm.admin.v1.EnrollmentAgentPackage
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_enrollment_instructions_proto_init() }
@@ -812,7 +880,7 @@ func file_lindm_admin_v1_enrollment_instructions_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc), len(file_lindm_admin_v1_enrollment_instructions_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

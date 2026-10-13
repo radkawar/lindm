@@ -13,16 +13,14 @@ import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { toRpcFailure } from "@/lib/errors";
 import { enrollmentInstructionsQueryOptions } from "./queries";
 
-// Server setup for agent installation (publishing signed packages, signer
-// fingerprints, restart) is documented once; the console links it instead of
-// repeating server configuration keys.
+// The server release carries the repository; settings only shows verified state.
 const SERVER_SETUP_GUIDE =
-  "https://github.com/radkawar/lindm/blob/main/docs/security-and-operations.md#prepare-the-servers-installation-repository";
+  "/help/security-and-operations.md#prepare-the-servers-installation-repository";
 
 // Server-wide readiness reasons in admin terms. The server's exact remedy,
 // which names configuration keys, stays in technical details.
 const SERVER_CAUSE: Record<string, string> = {
-  native_repository_unavailable: "No signed agent packages are published on this server yet.",
+  native_repository_unavailable: "This server cannot verify its signed agent repository.",
   execution_bootstrap_missing:
     "This server has no signed bootstrap trust yet, so new devices cannot verify their enrollment.",
   device_origin_missing: "This server has no public address for devices yet.",
@@ -37,14 +35,11 @@ const PACKAGE_KIND: Record<string, string> = {
 };
 
 function setupSentence(readiness: EnrollmentReadiness | undefined) {
-  const action =
-    "To make a platform installable, publish signed agent packages for its package format and architectures on this server, then restart it.";
-  if (readiness?.ready)
-    return `Devices install the agent only from packages this server publishes. ${action}`;
-  const cause =
+  if (readiness?.ready) return "Devices install signed agent packages from this server.";
+  return (
     SERVER_CAUSE[readiness?.reason ?? ""] ??
-    "This server is not ready to install the agent; its exact message is in the details below.";
-  return `${cause} ${action}`;
+    "This server cannot provide agent packages. Open the trust details for its reported cause."
+  );
 }
 
 // Only what differs from the server-wide state above; nothing when the row
@@ -54,20 +49,23 @@ function rowNote(platform: EnrollmentPlatform, server: EnrollmentReadiness | und
   if (platform.support !== EnrollmentPlatformSupport.SUPPORTED) return "";
   const missing = platform.unpublishedArchitectures;
   if (platform.readiness?.ready)
-    return missing.length ? `No packages published for ${missing.join(", ")}` : "";
+    return missing.length ? `No agent package for ${missing.join(", ")}` : "";
   const reason = platform.readiness?.reason ?? "";
-  if (!server?.ready && reason === server?.reason) return "";
+  if (!server?.ready && reason === server?.reason && platform.readiness?.remedy === server?.remedy)
+    return "";
   switch (reason) {
     case "native_repository_unavailable": {
       const kind = PACKAGE_KIND[platform.packageFamily];
-      return kind ? `No signed ${kind} packages published` : "No signed packages published";
+      return kind
+        ? `${kind} repository check failed. Open trust details.`
+        : "Repository check failed. Open trust details.";
     }
     case "native_architecture_unavailable":
       return missing.length
-        ? `No packages published for ${missing.join(", ")}`
-        : "No packages published for its architectures";
+        ? `No agent package for ${missing.join(", ")}`
+        : "This release has no agent package for these architectures.";
     default:
-      return "Not installable; the server's reason is in the details below";
+      return "Installation unavailable. Open trust details for the reported cause.";
   }
 }
 
@@ -82,9 +80,15 @@ function PlatformRows({
 }) {
   if (!platforms.length) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
-    <ul className="grid grid-cols-2 gap-x-6 border-t pt-2 lg:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-x-6 border-t pt-2 sm:grid-cols-2 lg:grid-cols-3">
       {platforms.map((platform) => {
-        const detail = [platform.architectures.join(", "), rowNote(platform, server)]
+        const versions = platform.agentPackages.map(
+          (agentPackage) => `${agentPackage.architecture}: ${agentPackage.version}`,
+        );
+        const detail = [
+          versions.length ? versions.join(", ") : platform.architectures.join(", "),
+          rowNote(platform, server),
+        ]
           .filter(Boolean)
           .join(" · ");
         return (
@@ -123,7 +127,7 @@ export function RepositoryReadinessSection() {
       </h2>
       {query.isError ? <RpcError failure={toRpcFailure(query.error)} /> : null}
       {query.isPending ? (
-        <p className="text-sm text-muted-foreground">Checking server configuration…</p>
+        <p className="text-sm text-muted-foreground">Checking agent packages…</p>
       ) : null}
       {instructions ? (
         <>
@@ -133,20 +137,15 @@ export function RepositoryReadinessSection() {
               className="w-fit"
             >
               {query.isError
-                ? "Last check could not be refreshed"
+                ? "Could not refresh the last check"
                 : server?.ready
-                  ? "Ready for listed platforms"
-                  : "Installation needs setup"}
+                  ? "Ready"
+                  : "Repository needs attention"}
             </StatusBadge>
             <p className="max-w-prose text-sm">
               {setupSentence(server)}{" "}
-              <a
-                className="font-medium underline underline-offset-4"
-                href={SERVER_SETUP_GUIDE}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Server setup guide
+              <a className="font-medium underline underline-offset-4" href={SERVER_SETUP_GUIDE}>
+                Installation guide
               </a>
             </p>
             <p className="text-xs text-muted-foreground">
@@ -164,9 +163,7 @@ export function RepositoryReadinessSection() {
                 />
               </div>
               <div className="grid gap-2">
-                <h3 className="text-sm font-semibold">
-                  Supported, needs setup ({needsSetup.length})
-                </h3>
+                <h3 className="text-sm font-semibold">Needs attention ({needsSetup.length})</h3>
                 <PlatformRows
                   platforms={needsSetup}
                   server={server}
@@ -179,13 +176,12 @@ export function RepositoryReadinessSection() {
                 </summary>
                 <div className="mt-2 grid gap-2">
                   <p className="text-sm text-muted-foreground">
-                    lindm cannot install its agent on these releases yet, whatever this server
-                    publishes.
+                    lindm does not support agent installation on these releases.
                   </p>
                   <PlatformRows
                     platforms={unsupported}
                     server={server}
-                    empty="Every listed platform is supported."
+                    empty="lindm supports every listed platform."
                   />
                 </div>
               </details>
@@ -206,7 +202,7 @@ export function RepositoryReadinessSection() {
               },
               {
                 label: "APT signing key fingerprint",
-                value: instructions.aptRepository?.signingKeyFingerprint || "Not configured",
+                value: instructions.aptRepository?.signingKeyFingerprint || "Not available",
               },
               {
                 label: "RPM repository",
@@ -214,7 +210,7 @@ export function RepositoryReadinessSection() {
               },
               {
                 label: "RPM signing key fingerprint",
-                value: instructions.dnfRepository?.signingKeyFingerprint || "Not configured",
+                value: instructions.dnfRepository?.signingKeyFingerprint || "Not available",
               },
               {
                 label: "Arch repository",
@@ -222,7 +218,7 @@ export function RepositoryReadinessSection() {
               },
               {
                 label: "Arch signing key fingerprint",
-                value: instructions.archRepository?.signingKeyFingerprint || "Not configured",
+                value: instructions.archRepository?.signingKeyFingerprint || "Not available",
               },
               {
                 label: "Execution root SHA-256",
@@ -253,7 +249,12 @@ function PlatformReasons({
   const byRemedy = new Map<string, string[]>();
   for (const platform of platforms) {
     const readiness = platform.readiness;
-    if (!readiness || readiness.ready || readiness.reason === (server?.reason ?? "")) continue;
+    if (
+      !readiness ||
+      readiness.ready ||
+      (readiness.reason === server?.reason && readiness.remedy === server?.remedy)
+    )
+      continue;
     byRemedy.set(readiness.remedy, [...(byRemedy.get(readiness.remedy) ?? []), platform.label]);
   }
   if (!byRemedy.size) return null;

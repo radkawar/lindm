@@ -18,17 +18,20 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"golang.org/x/sys/unix"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/internal/config"
 	"lindm/internal/packaging"
 )
@@ -40,14 +43,16 @@ const nativePublicKey = "lindm-package-signing.asc"
 var nativeComponent = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+~-]*$`)
 
 // A snapshot admits only public files reached through authenticated native
-// metadata. Every replica must receive identical, immutable publications before
-// startup. Updating a publication requires a coordinated restart, not re-signing
-// on the server or replacing files beneath a running snapshot.
+// metadata. Installed bundles are immutable release artifacts; custom
+// publications must be identical on every replica. A restart captures the
+// matching publication after an upgrade.
 type nativeRepository struct {
 	ctx           context.Context
 	directory     string
 	files         map[string]nativeFile
 	architectures []string
+	fingerprint   string
+	versions      map[string][]string
 	err           error
 }
 
@@ -62,6 +67,9 @@ type nativeRepositories struct {
 
 func loadNativeRepositories(ctx context.Context, resources *config.Resources) *nativeRepositories {
 	pins := resources.Proto.GetReleaseRepository().GetNativeRepositories()
+	if pins == nil {
+		return loadBundledNativeRepositories(ctx)
+	}
 	return &nativeRepositories{
 		apt:  loadNativeRepository(ctx, resources.ReleaseRepositoryDirectory, "apt", pins.GetAptSigningKeyFingerprint()),
 		rpm:  loadNativeRepository(ctx, resources.ReleaseRepositoryDirectory, "rpm", pins.GetRpmSigningKeyFingerprint()),
@@ -70,7 +78,7 @@ func loadNativeRepositories(ctx context.Context, resources *config.Resources) *n
 }
 
 func loadNativeRepository(ctx context.Context, directory, family, fingerprint string) *nativeRepository {
-	r := &nativeRepository{ctx: ctx, directory: filepath.Join(directory, "repo", family), files: make(map[string]nativeFile)}
+	r := &nativeRepository{ctx: ctx, directory: filepath.Join(directory, "repo", family), files: make(map[string]nativeFile), fingerprint: fingerprint, versions: make(map[string][]string)}
 	if directory == "" || fingerprint == "" {
 		r.err = errors.New("native repository directory and signer pin are required")
 		return r
@@ -96,6 +104,20 @@ func loadNativeRepository(ctx context.Context, directory, family, fingerprint st
 	}
 	r.err = err
 	return r
+}
+
+func (r *nativeRepository) addVersion(arch, version string) error {
+	if err := protovalidate.Validate(&adminv1.EnrollmentAgentPackage{Architecture: arch, Version: version}); err != nil {
+		return err
+	}
+	if version == "" || version == "-" {
+		return errors.New("native agent version is missing from signed metadata")
+	}
+	if !slices.Contains(r.versions[arch], version) {
+		r.versions[arch] = append(r.versions[arch], version)
+		slices.Sort(r.versions[arch])
+	}
+	return nil
 }
 
 func nativeSigningKeys(encoded []byte, fingerprint string) (openpgp.EntityList, error) {
@@ -394,6 +416,9 @@ func (r *nativeRepository) readAPT(keys openpgp.EntityList) error {
 			if err := r.admitPackage(fields["Filename"], fields["SHA256"], size); err != nil {
 				return err
 			}
+			if err := r.addVersion(arch, fields["Version"]); err != nil {
+				return err
+			}
 			found = true
 		}
 		if found {
@@ -426,8 +451,13 @@ type nativeRepoMD struct {
 
 type nativeRPMPrimary struct {
 	Packages []struct {
-		Name     string `xml:"name"`
-		Arch     string `xml:"arch"`
+		Name    string `xml:"name"`
+		Arch    string `xml:"arch"`
+		Version struct {
+			Epoch   string `xml:"epoch,attr"`
+			Version string `xml:"ver,attr"`
+			Release string `xml:"rel,attr"`
+		} `xml:"version"`
 		Location struct {
 			Href string `xml:"href,attr"`
 		} `xml:"location"`
@@ -500,6 +530,13 @@ func (r *nativeRepository) readRPM(keys openpgp.EntityList) error {
 				return errors.New("invalid native RPM agent identity")
 			}
 			if err := r.admitPackage(pkg.Location.Href, pkg.Checksum.Value, pkg.Size.Package); err != nil {
+				return err
+			}
+			version := pkg.Version.Version + "-" + pkg.Version.Release
+			if pkg.Version.Epoch != "" && pkg.Version.Epoch != "0" {
+				version = pkg.Version.Epoch + ":" + version
+			}
+			if err := r.addVersion(arch, version); err != nil {
 				return err
 			}
 			if !containsArchitecture(r.architectures, arch) {
@@ -586,6 +623,9 @@ func (r *nativeRepository) readArch(keys openpgp.EntityList) error {
 			return err
 		}
 		if err := r.admitPackage(name, fields["%SHA256SUM%"], size); err != nil {
+			return err
+		}
+		if err := r.addVersion(arch, fields["%VERSION%"]); err != nil {
 			return err
 		}
 		signature, err := r.read(name + ".sig")

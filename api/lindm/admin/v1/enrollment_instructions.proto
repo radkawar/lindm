@@ -117,6 +117,21 @@ message EnrollmentPlatform {
     (buf.validate.field).repeated.items.string.in = "amd64",
     (buf.validate.field).repeated.items.string.in = "arm64"
   ];
+  // Versions read from authenticated native repository metadata.
+  repeated EnrollmentAgentPackage agent_packages = 13 [(buf.validate.field).repeated.max_items = 16];
+}
+
+message EnrollmentAgentPackage {
+  string architecture = 1 [(buf.validate.field).string = {
+    in: [
+      "amd64",
+      "arm64"
+    ]
+  }];
+  string version = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
 }
 
 enum EnrollmentPlatformSupport {

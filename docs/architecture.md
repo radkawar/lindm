@@ -223,11 +223,25 @@ Repository reads require no admin session or device identity: package bytes are
 not confidential, and signatures establish content trust. Unauthenticated access
 does not mean Internet exposure; deployments can keep the HTTPS origin on their
 own network. Serving is read-only, path- and resource-bounded, without directory
-listings or private signing custody. Every replica must receive the identical
-signed release snapshot before traffic is enabled; request routing must not
-alternate between different package catalogs. Runtime HTTP serving never builds,
-signs or repairs packages. Missing artifacts are an actionable setup failure, not
-an invitation to download an agent from another host.
+listings or private signing custody. The authenticated `lindmd` release artifact
+carries immutable signed agent repositories and agent release attestations.
+Startup verifies the release DSSE chain and native metadata, then admits only
+native agent packages whose digests occur in that authenticated release. The
+installed signed server artifact authenticates its local bundle trust anchors;
+network-fetched keys never establish this authority. No repository configuration
+is needed for the stock payload. An explicit custom native publication replaces
+that default and retains its independently configured full signer pins.
+
+Every replica must run the identical signed server/repository snapshot before
+traffic is enabled; routing must not alternate between different package catalogs.
+Runtime serving never builds, signs or repairs packages. Upgrading the server
+captures the matching agent publication on restart. The release pipeline's native
+key remains package-and-metadata authority, never a daemon key; release attestation,
+execution and TUF authority remain independent. New console commands pin the new
+fingerprint after release-key rotation; enrolled devices retain their old native
+pins until an authenticated administrator changes their lindm-specific trust.
+Missing artifacts are an actionable release verification failure, not permission
+to download an agent from another host.
 
 ## 4. Admin identity and authorization
 
