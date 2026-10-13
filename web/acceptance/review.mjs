@@ -30,6 +30,7 @@ import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
 import { reviewOwnerEdits } from "./review-owner-edits.mjs";
 import { reviewRoleWalkthroughs } from "./review-roles.mjs";
 import { popupStability } from "./review-popups.mjs";
+import { captureHelpDocument } from "./review-help.mjs";
 
 process.umask(0o077);
 
@@ -46,6 +47,7 @@ const viewerControls = ["Take control"];
 
 let config;
 let secrets = [];
+let operation = "review";
 const report = {
   startedAt: new Date().toISOString(),
   passed: false,
@@ -211,6 +213,8 @@ async function axe(page, selector) {
 
 async function screenshot(page, file, fullPage) {
   const path = join(config.evidenceDirectory, "screenshots", file);
+  const previousOperation = operation;
+  operation = `capture ${file}`;
   const mask = [
     page.locator('[data-sensitive="true"]'),
     page.locator('input[type="password"]'),
@@ -220,6 +224,7 @@ async function screenshot(page, file, fullPage) {
     path,
     await page.screenshot({ fullPage, animations: "disabled", mask, timeout: 30_000 }),
   );
+  operation = previousOperation;
   return `screenshots/${file}`;
 }
 
@@ -727,14 +732,17 @@ async function main() {
   ])
     if (typeof config[key] !== "string" || !config[key])
       throw new Error("required_configuration_missing");
-  for (const key of ["origin", "username", "password", "enrollmentSecret"])
-    if (typeof config.enrollmentFixture?.[key] !== "string" || !config.enrollmentFixture[key])
-      throw new Error("published_enrollment_fixture_required");
+  for (const fixture of [config.enrollmentFixture, config.missingArtifactFixture])
+    for (const key of ["origin", "username", "password", "enrollmentSecret"])
+      if (typeof fixture?.[key] !== "string" || !fixture[key])
+        throw new Error("enrollment_fixture_required");
   secrets = [
     config.password,
     config.enrollmentSecret,
     config.enrollmentFixture.password,
     config.enrollmentFixture.enrollmentSecret,
+    config.missingArtifactFixture.password,
+    config.missingArtifactFixture.enrollmentSecret,
   ];
   config.evidenceDirectory = resolve(config.evidenceDirectory);
   await privateDirectory(config.evidenceDirectory);
@@ -945,7 +953,9 @@ async function main() {
       await form.getByRole("combobox").first().click();
       await requester.getByRole("option", { name: "View and request control" }).click();
       step = "enter reason";
-      await form.getByLabel("Reason (shown to the local user and audited)").fill("UI review");
+      await form
+        .getByLabel("Reason (the user sees this; the audit log records it)")
+        .fill("UI review");
       step = "submit request";
       await form.getByRole("button", { name: "Request remote assistance" }).click();
       step = "open viewer";
@@ -1052,14 +1062,12 @@ async function main() {
           waitUntil: "domcontentloaded",
         });
         if (!response?.ok()) throw new Error(`local_help_unavailable: ${path}`);
-        await page.evaluate(() => document.fonts.ready);
         const prefix = `${slug(path)}-${theme}-${viewport.name}`;
         report.helpScreenshots.push({
           path,
           theme,
           viewport: viewport.name,
-          viewportScreenshot: await screenshot(page, `${prefix}.png`, false),
-          fullScreenshot: await screenshot(page, `${prefix}-full.png`, true),
+          ...(await captureHelpDocument({ page, prefix, screenshot })),
         });
       }
     }
@@ -1096,7 +1104,7 @@ try {
 } catch (error) {
   // Never print browser exceptions: their call logs can contain filled secrets.
   report.failures.push(
-    `runner: ${/^[a-z][a-z0-9_]+$/.test(error?.message ?? "") ? error.message : `${error?.name ?? "Error"} during review`}`,
+    `runner: ${/^[a-z][a-z0-9_]+$/.test(error?.message ?? "") ? error.message : `${error?.name ?? "Error"} during ${operation}`}`,
   );
   report.passed = false;
 } finally {

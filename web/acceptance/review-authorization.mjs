@@ -50,6 +50,7 @@ export async function reviewAuthorization({
       };
       entry.checks[`copy-${name}`] = { findings: await probe(page, "copy") };
     }
+    let step = "review access policy";
     try {
       await page.goto(`${config.origin}/authorization`);
       await settle(page);
@@ -133,6 +134,7 @@ export async function reviewAuthorization({
       await capture("policy-saved");
 
       await page.goto(`${config.origin}/accounts`);
+      step = "reject invalid organization upload";
       await settle(page);
       const importer = page.getByRole("region", { name: "Import organization", exact: true });
       const upload = importer.getByLabel("Organization JSON", { exact: true });
@@ -143,7 +145,7 @@ export async function reviewAuthorization({
       });
       await importer
         .getByText(
-          "Choose a valid organization JSON file, at most 16 MiB. Unknown fields are not accepted.",
+          "Choose a valid organization JSON file, at most 16 MiB. The importer rejects unknown fields.",
           { exact: true },
         )
         .waitFor();
@@ -152,6 +154,7 @@ export async function reviewAuthorization({
         .isEnabled()), "Invalid organization upload remained reviewable");
       await capture("invalid-upload");
       const username = `review-import-${index}-${crypto.randomUUID().slice(0, 8)}`;
+      step = "review and apply organization account";
       const organization = {
         name: "UI review account import",
         accounts: [{ username, role: name }],
@@ -195,6 +198,7 @@ export async function reviewAuthorization({
       await shown.getByRole("button", { name: "Dismiss secrets", exact: true }).click();
       await shown.waitFor({ state: "detached" });
       await importer.getByRole("button", { name: "Review current plan", exact: true }).click();
+      step = "review unchanged organization account";
       await importer.getByText("No change", { exact: true }).waitFor();
       require((await importer.locator("[data-sensitive='true']").count()) ===
         0, "Review replay revealed an existing account secret");
@@ -209,6 +213,7 @@ export async function reviewAuthorization({
           { username: `${username}-refused`, role: `absent-${crypto.randomUUID().slice(0, 8)}` },
         ],
       };
+      step = "retain partial organization outcomes";
       await upload.setInputFiles({
         name: "partial.json",
         mimeType: "application/json",
@@ -224,7 +229,7 @@ export async function reviewAuthorization({
       await apply.click();
       await importer
         .getByText(
-          "The import stopped before all work completed. Retain the outcomes and save any secrets below before reviewing again.",
+          "The import stopped before completion. Retain the outcomes. Save the secrets below before another review.",
           { exact: true },
         )
         .waitFor();
@@ -240,12 +245,13 @@ export async function reviewAuthorization({
       await capture("partial-outcomes");
       await shown.getByRole("button", { name: "Dismiss secrets", exact: true }).click();
       await page.goto(`${config.origin}/audit`);
+      step = "read authorization audit";
       await page.getByText("Changed organization access policy", { exact: true }).first().waitFor();
       await capture("authorization-audit");
-    } catch {
+    } catch (error) {
       // Playwright call logs may include the uploaded document or displayed secret.
       findings.push({
-        message: "Runtime authorization or organization account scenario did not complete",
+        message: `Runtime authorization or organization account scenario did not complete: ${step} (${error?.name ?? "Error"})`,
         elements: [],
       });
       entry.screenshots.failure = await screenshot(page, `${prefix}-failure.png`, true);

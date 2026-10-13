@@ -20,16 +20,17 @@ import (
 )
 
 type consoleReviewConfig struct {
-	Origin            string                                     `json:"origin"`
-	Username          string                                     `json:"username"`
-	Password          string                                     `json:"password"`
-	EnrollmentSecret  string                                     `json:"enrollmentSecret"`
-	EvidenceDirectory string                                     `json:"evidenceDirectory"`
-	Checkout          string                                     `json:"checkout"`
-	Demo              loadlab.Demo                               `json:"demo"`
-	Build             map[string]string                          `json:"build"`
-	EnrollmentFixture consoleReviewEnrollmentFixture             `json:"enrollmentFixture"`
-	DirectoryFixture  *devlab.DirectoryAuthorizationReviewConfig `json:"directoryFixture,omitempty"`
+	Origin                 string                                     `json:"origin"`
+	Username               string                                     `json:"username"`
+	Password               string                                     `json:"password"`
+	EnrollmentSecret       string                                     `json:"enrollmentSecret"`
+	EvidenceDirectory      string                                     `json:"evidenceDirectory"`
+	Checkout               string                                     `json:"checkout"`
+	Demo                   loadlab.Demo                               `json:"demo"`
+	Build                  map[string]string                          `json:"build"`
+	EnrollmentFixture      consoleReviewEnrollmentFixture             `json:"enrollmentFixture"`
+	MissingArtifactFixture consoleReviewEnrollmentFixture             `json:"missingArtifactFixture"`
+	DirectoryFixture       *devlab.DirectoryAuthorizationReviewConfig `json:"directoryFixture,omitempty"`
 }
 
 type consoleReviewEnrollmentFixture struct {
@@ -139,6 +140,16 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return fmt.Errorf("open published enrollment review fixture: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, enrollmentFixture.Close()) }()
+	missingFixture, err := devlab.OpenMissingArtifactConsoleAuthorityFixture(ctx, *repo, *binary)
+	if err != nil {
+		return fmt.Errorf("open missing artifact review fixture: %w", err)
+	}
+	defer func() { resultErr = errors.Join(resultErr, missingFixture.Close()) }()
+	missingEnrollment, err := missingFixture.CreateConsoleEnrollment(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { missingEnrollment.Secret = "" }()
 	publishedEnrollment, err := enrollmentFixture.CreateConsoleEnrollment(ctx)
 	if err != nil {
 		return err
@@ -161,13 +172,19 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 			Origin: enrollmentFixture.ConsoleOrigin, Username: "console-owner",
 			Password: hex.EncodeToString(password[:]), EnrollmentSecret: publishedEnrollment.GetSecret(),
 		},
+		MissingArtifactFixture: consoleReviewEnrollmentFixture{
+			Origin: missingFixture.ConsoleOrigin, Username: "console-owner",
+			Password: hex.EncodeToString(password[:]), EnrollmentSecret: missingEnrollment.GetSecret(),
+		},
 	}
 	enrollment.Secret = ""
 	publishedEnrollment.Secret = ""
+	missingEnrollment.Secret = ""
 	clear(password[:])
 	encoded, err := json.Marshal(cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	cfg.EnrollmentFixture.Password, cfg.EnrollmentFixture.EnrollmentSecret = "", ""
+	cfg.MissingArtifactFixture.Password, cfg.MissingArtifactFixture.EnrollmentSecret = "", ""
 	if cfg.DirectoryFixture != nil {
 		cfg.DirectoryFixture.ReaderPassword = ""
 		for i := range cfg.DirectoryFixture.OwnerCookies {

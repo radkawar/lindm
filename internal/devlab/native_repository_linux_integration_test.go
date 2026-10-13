@@ -75,6 +75,53 @@ func TestStockConsoleAgentRepositoryWithoutConfiguration(t *testing.T) {
 	if !instructions.Msg.GetReadiness().GetReady() || instructions.Msg.GetAptRepository().GetBaseUrl() != publication.APTURL {
 		t.Fatal("authenticated enrollment instructions did not publish the stock APT repository")
 	}
+	// Give the negative fixture the stock executable, which has a valid adjacent
+	// bundle. It must isolate that binary rather than inherit another lab's Ready.
+	missing, err := OpenMissingArtifactConsoleAuthorityFixture(ctx, repository, fixture.binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := missing.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+	if missing.binary == fixture.binary || filepath.Dir(missing.binary) != missing.directory {
+		t.Fatal("missing artifact console borrowed the stock executable or bundle")
+	}
+	missingDocument, err := config.Load(missing.configPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missingDocument.Proto.GetReleaseRepository() != nil {
+		t.Fatal("missing artifact console added repository configuration")
+	}
+	missingOwner, err := missing.OpenOwnerSession(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := closeReleaseSession(missingOwner); err != nil {
+			t.Error(err)
+		}
+	}()
+	unavailable, err := missingOwner.Admin.GetEnrollmentInstructions(ctx, connect.NewRequest(&adminv1.GetEnrollmentInstructionsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unavailable.Msg.GetReadiness().GetReady() || unavailable.Msg.GetReadiness().GetReason() != "native_repository_unavailable" {
+		t.Fatal("console without an artifact offered installation readiness")
+	}
+	if unavailable.Msg.GetAptRepository() != nil || unavailable.Msg.GetDnfRepository() != nil || unavailable.Msg.GetArchRepository() != nil {
+		t.Fatal("console without an artifact offered native repository instructions")
+	}
+	for _, target := range unavailable.Msg.GetPlatforms() {
+		if target.GetId() == "ubuntu-24.04" || target.GetId() == "fedora-44" {
+			if target.GetReadiness().GetReady() || target.GetReadiness().GetReason() != "native_repository_unavailable" {
+				t.Fatalf("missing artifact target %s offered an install command", target.GetId())
+			}
+		}
+	}
 	var path, digest string
 	var size int64
 	for _, artifact := range publication.Manifest.GetArtifacts() {

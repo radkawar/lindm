@@ -245,3 +245,10 @@ func OpenEnrollmentConsoleAuthorityFixture(ctx context.Context, repository, sour
 func OpenStockConsoleAuthorityFixture(ctx context.Context, repository, sourceRepository, binary string) (*AuthorityFixture, error) {
 	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityLocalConsole, LoadAuthorityOptions{NativeEnrollmentArchitectures: []string{"amd64", "arm64"}, NativeEnrollmentSourceRepository: sourceRepository, stockEnrollment: true})
 }
+
+// OpenMissingArtifactConsoleAuthorityFixture deliberately omits the release
+// artifact, not repository configuration. A private executable prevents another
+// fixture's adjacent bundle from satisfying this negative installation scenario.
+func OpenMissingArtifactConsoleAuthorityFixture(ctx context.Context, repository, binary string) (*AuthorityFixture, error) {
+	return openAuthorityFixtureWithOptions(ctx, repository, binary, authorityLocalConsole, LoadAuthorityOptions{missingEnrollmentArtifact: true})
+}

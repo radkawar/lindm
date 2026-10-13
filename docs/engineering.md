@@ -1118,10 +1118,21 @@ From a private worktree, use
 `make ui-review UI_REVIEW_REPO=/path/to/development-trust-checkout`.
 Only fixture trust and the running development PostgreSQL connection come from
 that directory; the embedded console, browser runner and published agent packages
-come from the checkout under review. The review also opens a separate real signed
-APT/RPM fixture for the OS chooser, clipboard command and trust disclosure. The
-unpublished fixture covers missing-artifact remedies and Settings readiness, so a
-mocked repository response cannot make this review pass.
+come from the checkout under review. The populated stock fixture and a separate,
+empty stock fixture both verify signed APT/RPM installation, the OS chooser,
+clipboard command and trust disclosure without repository configuration. A third
+fixture deliberately omits the signed artifact: it runs a private copy of lindmd
+without an adjacent bundle, so the stock fixture cannot satisfy its negative
+readiness and installation-remedy checks. Missing configuration is not a missing
+artifact. All three use real enrollment instructions, not mocked readiness.
+Scenario failures identify the last operation and exception class without retaining
+browser call logs that may include credentials or commands.
+
+Bundled help uses consecutive physical viewports of at most 8192 CSS pixels in
+height, then restores the requested viewport. The report records each part's
+offset and height; the contact sheet links every part in order. This retains the
+complete reference document on desktop and mobile without a single oversized
+Chromium surface, even when a full-page capture has a smaller clip.
 
 Runtime authorization landings additionally run
 `make ui-review UI_REVIEW_FLAGS=-directory-authorization` with the real development

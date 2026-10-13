@@ -49,6 +49,9 @@ type LoadAuthorityOptions struct {
 	// stockEnrollment suppresses the separate mutable TUF fixture; native
 	// repositories come exclusively from the authenticated server artifact.
 	stockEnrollment bool
+	// missingEnrollmentArtifact isolates the executable without its adjacent
+	// bundle for the real console's missing-artifact review.
+	missingEnrollmentArtifact bool
 	// ListenAddress binds admin/device listeners to one local IPv4 address
 	// (default loopback) so a generator on another host can reach them. TLS
 	// names and signed origins are unchanged; clients dial this address.

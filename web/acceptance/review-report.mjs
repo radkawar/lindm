@@ -72,6 +72,12 @@ export function contactSheet(report) {
         `<li>${edit.passed ? "Pass" : "Fail"} · <b>${escape(edit.route)}</b> ${escape(edit.name)}: ${escape(edit.acceptance)} ${edit.screenshots.map((path, index) => `<a href="${escape(path)}">screenshot ${index + 1}</a>`).join(" ")}${edit.findings.length ? `<ul>${edit.findings.map((finding) => `<li>${escape(finding)}</li>`).join("")}</ul>` : ""}</li>`,
     )
     .join("");
+  const help = (report.helpScreenshots ?? [])
+    .map(
+      (capture) =>
+        `<li>${escape(capture.path)} ${escape(capture.theme)} ${escape(capture.viewport)} · <a href="${escape(capture.viewportScreenshot)}">viewport</a> · Complete document (${escape(capture.dimensions.height)} px): ${capture.fullScreenshots.map((part, index) => `<a href="${escape(part.screenshot)}">part ${index + 1}</a>`).join(" ")}</li>`,
+    )
+    .join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>lindm console UI review</title>
 <style>
@@ -97,6 +103,7 @@ ${failures ? `<h2>Failures (${report.failures.length})</h2><details><summary>Sho
 <tbody>
 ${body}
 </tbody></table>
+${help ? `<h2>Bundled help</h2><p>Consecutive parts cover each complete document without a single oversized image.</p><ul>${help}</ul>` : ""}
 </body></html>
 `;
 }

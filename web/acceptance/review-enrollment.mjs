@@ -1,5 +1,5 @@
-// Real console scenarios, backed by the review's missing-publication and signed
-// publication fixtures. No RPC interception or fabricated readiness responses.
+// Real stock console scenarios and a deliberately absent signed artifact.
+// Missing repository configuration alone is not an installation failure.
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import { enroll, signIn } from "./journey.mjs";
 
@@ -22,7 +22,8 @@ export async function reviewEnrollmentFixtures({
         origin: config.origin,
         theme,
         viewport,
-        ready: false,
+        publication: "stock-fleet",
+        ready: true,
         protectSecret,
         ...helpers,
       })),
@@ -30,42 +31,48 @@ export async function reviewEnrollmentFixtures({
   }
 
   // A distinct browser context is required: cookie scope does not include ports.
-  const published = new ChromiumDriver();
-  await published.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000 });
-  try {
-    const fixture = config.enrollmentFixture;
-    await published.context.grantPermissions(["clipboard-read", "clipboard-write"], {
-      origin: fixture.origin,
-    });
-    await published.context.addInitScript(() => {
-      try {
-        localStorage.removeItem("lindm-theme");
-      } catch {
-        /* Theme still follows the emulated system preference. */
+  for (const [fixture, publication, ready] of [
+    [config.enrollmentFixture, "stock-empty-fleet", true],
+    [config.missingArtifactFixture, "missing-artifact", false],
+  ]) {
+    const published = new ChromiumDriver();
+    await published.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000 });
+    try {
+      await published.context.grantPermissions(["clipboard-read", "clipboard-write"], {
+        origin: fixture.origin,
+      });
+      await published.context.addInitScript(() => {
+        try {
+          localStorage.removeItem("lindm-theme");
+        } catch {
+          /* Theme still follows the emulated system preference. */
+        }
+      });
+      await published.authenticator([]);
+      await published.goto(fixture.origin);
+      const ui = new UI(published, 30_000);
+      await enroll(ui, fixture);
+      await signIn(ui, fixture);
+      for (const { theme, viewport } of combos) {
+        await published.page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await published.page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+        results.push(
+          ...(await reviewEnrollment({
+            page: published.page,
+            origin: fixture.origin,
+            theme,
+            viewport,
+            publication,
+            ready,
+            emptyFleet: true,
+            protectSecret,
+            ...helpers,
+          })),
+        );
       }
-    });
-    await published.authenticator([]);
-    await published.goto(fixture.origin);
-    const ui = new UI(published, 30_000);
-    await enroll(ui, fixture);
-    await signIn(ui, fixture);
-    for (const { theme, viewport } of combos) {
-      await published.page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await published.page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
-      results.push(
-        ...(await reviewEnrollment({
-          page: published.page,
-          origin: fixture.origin,
-          theme,
-          viewport,
-          ready: true,
-          protectSecret,
-          ...helpers,
-        })),
-      );
+    } finally {
+      await published.close();
     }
-  } finally {
-    await published.close();
   }
   return results;
 }
@@ -82,7 +89,6 @@ const contracts = {
     chooser: "Operating system",
     command: "Install and enroll command",
     copy: "Copy install command",
-    disclosure: "What this does",
   },
 };
 async function reviewEnrollment({
@@ -91,6 +97,8 @@ async function reviewEnrollment({
   theme,
   viewport,
   ready,
+  publication,
+  emptyFleet = false,
   protectSecret,
   screenshot,
   axe,
@@ -98,7 +106,7 @@ async function reviewEnrollment({
   settle,
 }) {
   const results = [];
-  const publication = ready ? "published" : "missing-publication";
+  let step = "open scenario";
   async function record(route, variant, operation) {
     const prefix = `${route.slice(1)}-${publication}-${variant}-${theme}-${viewport.name}`;
     const entry = {
@@ -140,10 +148,10 @@ async function reviewEnrollment({
       };
       entry.checks.layout = { findings: await probe(page, "layout", viewport.name === "desktop") };
       entry.checks.copy = { findings: await probe(page, "copy") };
-    } catch {
+    } catch (error) {
       // Browser diagnostics can include the shown-once credential or command.
       findings.push({
-        message: "Enrollment review could not complete the named scenario",
+        message: `Enrollment review could not complete: ${step} (${error?.name ?? "Error"})`,
         elements: [],
       });
       // The edit sheet requires a full-page capture of every scenario, failed ones included.
@@ -156,6 +164,7 @@ async function reviewEnrollment({
 
   await record("/settings", "repository-readiness", async (require, prefix, entry) => {
     const contract = contracts["/settings"];
+    step = "read repository readiness";
     await page.goto(`${origin}/settings`);
     await settle(page);
     for (const name of contract.headings)
@@ -172,7 +181,7 @@ async function reviewEnrollment({
       }
       require(enabled, "Settings refresh is unavailable");
     }
-    const status = ready ? "Ready for listed platforms" : "Installation needs setup";
+    const status = ready ? "Ready" : "Repository needs attention";
     await page.getByText(status, { exact: true }).waitFor();
     const section = page.getByRole("region", { name: "Agent repository" });
     for (const label of choices) await section.getByText(label, { exact: true }).waitFor();
@@ -180,7 +189,7 @@ async function reviewEnrollment({
       "releaseRepository",
     ), "Primary repository text names server configuration keys");
     require((await section
-      .getByRole("link", { name: "Server setup guide", exact: true })
+      .getByRole("link", { name: "Installation guide", exact: true })
       .count()) === 1, "Repository readiness does not link the server setup guide");
     entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
     const details = page.locator("summary").filter({ hasText: contract.disclosure });
@@ -192,11 +201,11 @@ async function reviewEnrollment({
       .waitFor();
     require((await section.innerText()).includes(
       ready ? `${origin}/repo/apt` : "Not published",
-    ), "Repository details do not match this fixture's publication state");
+    ), "Repository details do not match this fixture's artifact state");
     if (!ready)
       require((await section.innerText()).includes(
-        "releaseRepository.directory/repo",
-      ), "Missing repository details do not name the publication configuration remedy");
+        "reinstall the signed lindmd release bundle",
+      ), "Missing artifact details do not name the release installation remedy");
     entry.screenshots.details = await screenshot(page, `${prefix}-details.png`, false);
     await details.click();
   });
@@ -223,8 +232,9 @@ async function reviewEnrollment({
         "/enrollment",
         index === 0 ? "ubuntu-install" : "fedora-install",
         async (require, prefix, entry) => {
+          step = "choose operating system";
           const chooser = dialog.getByLabel(contract.chooser, { exact: true });
-          if (ready && index === 0) {
+          if (emptyFleet && ready && index === 0) {
             // The published fixture has no devices, so no OS can be preselected.
             await settle(page);
             require((await chooser.innerText()).trim() ===
@@ -257,13 +267,14 @@ async function reviewEnrollment({
           const copy = dialog.getByRole("button", { name: contract.copy, exact: true });
           const command = dialog.getByLabel(contract.command, { exact: true });
           if (ready) {
+            step = "copy install command";
             await copy.waitFor();
             require(await copy.isEnabled(), "Published repository does not enable the install command");
             await page.evaluate(() => navigator.clipboard.writeText(""));
             await copy.click();
             await dialog
               .getByRole("status")
-              .filter({ hasText: "Install command copied." })
+              .filter({ hasText: /^Install command copied\./ })
               .waitFor();
             const matches = await page.evaluate(async () => {
               const shown = document.querySelector(
@@ -275,6 +286,7 @@ async function reviewEnrollment({
             });
             require(matches, "Copy install command did not reproduce the displayed command");
           } else {
+            step = "read missing artifact remedy";
             const settings = dialog.getByRole("link", { name: /^Settings › Agent repository/ });
             await settings.waitFor();
             require((await settings.getAttribute("href")) ===
@@ -292,14 +304,15 @@ async function reviewEnrollment({
           });
           entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
           if (ready) {
-            const details = dialog.locator("summary").filter({ hasText: contract.disclosure });
+            step = "review install trust disclosure";
+            const details = dialog.locator("summary").filter({ hasText: /^Details$/ });
             require(!(await details.evaluate(
               (node) => node.parentElement.open,
-            )), "What this does is not collapsed initially");
+            )), "Install details are not collapsed initially");
             await details.click();
             require((await dialog.innerText()).includes(
-              "Authenticates the package signing key",
-            ), "What this does omits signer authentication");
+              "authenticates the package signing key",
+            ), "Install details omit signer authentication");
             await details.scrollIntoViewIfNeeded();
             entry.screenshots.details = await screenshot(page, `${prefix}-details.png`, false);
             await details.click();

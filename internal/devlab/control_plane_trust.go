@@ -317,6 +317,16 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
+	if options.missingEnrollmentArtifact {
+		if mode != authorityLocalConsole || len(options.NativeEnrollmentArchitectures) != 0 || cfg.GetReleaseRepository() != nil {
+			return nil, errors.New("missing enrollment artifact requires an unconfigured local console")
+		}
+		binary := filepath.Join(f.directory, "lindmd")
+		if _, err := copyNativeEnrollmentServer(f.binary, binary); err != nil {
+			return nil, err
+		}
+		f.binary = binary
+	}
 	if len(options.NativeEnrollmentArchitectures) != 0 {
 		if mode != authorityDeviceActions && mode != authorityLocalConsole {
 			return nil, errors.New("native enrollment artifact requires a console authority fixture")
