@@ -541,8 +541,8 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
         <RpcError failure={exact.failure} title="Secret removal failed">
           {exact.ambiguous ? (
             <p>
-              Refresh to check whether the secret remains. Retry the same request. Discard it only
-              to start a new request.
+              Refresh to check whether the secret remains. Retry the same request. Discarding this
+              review does not cancel the removal.
             </p>
           ) : null}
         </RpcError>
