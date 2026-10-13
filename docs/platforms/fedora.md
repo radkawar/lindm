@@ -80,10 +80,16 @@ Kickstart from the Server DVD 43-1.6
 (`$HOME/.cache/lindm-matrix/fedora-prov6-arm-20261012T183959Z/fedora-43/provision-kickstart-aarch64.json`,
 SHA-256 `b76ffe7657afa4e59590472614bec07f3a46c41512733546d671af2a7b7be848`);
 each ended Enrolled after independent approval with `lindm-provision.service`
-successful and the token removed. Fedora 43 x86_64 Kickstart passed the same way
-on local KVM
-(`$HOME/.cache/lindm-matrix/fedora-prov6-x86-20261012T184712Z/fedora-43/provision-kickstart-x86_64.json`,
-SHA-256 `43d53060ae2142b92584fcfd564a46b47b8db11d69b3991f41e62c21c98258c4`).
+successful and the token removed. On x86_64 local KVM all four cells passed the
+same way, in `$HOME/.cache/lindm-matrix/fedora-prov6-x86-20261012T184712Z/`:
+Fedora 43 cloud-init (`fedora-43/provision-cloud-init-x86_64.json`, SHA-256
+`aab2f6ce694a268b4e02d0d47b08cb31fb4af58ab4622c6512ce279596c38970`) and Kickstart
+(`fedora-43/provision-kickstart-x86_64.json`, SHA-256
+`43d53060ae2142b92584fcfd564a46b47b8db11d69b3991f41e62c21c98258c4`), Fedora 44
+cloud-init (`fedora-44/provision-cloud-init-x86_64.json`, SHA-256
+`0383f96d97578dca8aa588cafc68f0663733733cde7ff3feb183718a23f652a6`) and Kickstart
+(`fedora-44/provision-kickstart-x86_64.json`, SHA-256
+`ef1a956abce79ea465e9b07f16fa96a4ae49bbe8842bcd40563373852e41e6d0`).
 
 Use native signed RPM delivery. The builder signs and independently verifies the
 RPM before publishing its digest
@@ -347,6 +353,17 @@ SHA-256 `1bfa7d95d4ecb54bdb7560fbcf2e46ca8c85f09a6d606d58989f2ee88f4684a3`)
 and so did the live device-action cell (lock, quarantine, wipe and loss without
 recovery; `device-actions-aarch64.json` in that directory, SHA-256
 `ae7c067cb9fc8f27124cb4818d78ee4ea05218c62a6d2a755fa7243f21bc29c6`).
+On x86_64 local KVM (OVMF, swtpm2) Fedora 43 passed the `encrypted` cell
+(`$HOME/.cache/lindm-matrix/fedora-act43c-x86-20261012T214357Z/fedora-43/encrypted-x86_64.json`,
+SHA-256 `f069272d649e3cd5f7ac760b3e95479480926b94404bba8cdad6cad229124164`), the
+live device-action cell (`device-actions-x86_64.json` in that directory, SHA-256
+`14362f944903fbabd8be70e55866dfd17b845810af7eeb3ff296cec060e8eca5`) and, with
+Secure Boot enforced, 30 unattended TPM2 boots
+(`$HOME/.cache/lindm-matrix/fedora-tpm2-x86-20261012T214357Z/fedora-43/tpm-unattended-boots-x86_64.json`,
+SHA-256 `ececce4093e36982393a426ef190ee8ef3704faaa3290334ea3fd56281366dae`);
+Fedora 44 passed the same TPM cell
+(`fedora-44/tpm-unattended-boots-x86_64.json` in that directory, SHA-256
+`0a67cc3d35441ae433fde5132ed2a42f364aa7d2a8d0c2ce19d63d26f4e2c647`).
 Original-device recovery on Fedora 43 aarch64 is gated like Fedora 44: the
 release kernel `kernel-core-6.17.1-300.fc43.aarch64` (RPM SHA-256
 `9328e61443dcd71e5671806fbef4345eb15a988229b011340fac8b856315c3ee`) ships a
