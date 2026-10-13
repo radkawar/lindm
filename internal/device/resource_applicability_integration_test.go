@@ -165,3 +165,33 @@ func TestResourceFeaturesWithoutEvidenceAreRefused(t *testing.T) {
 		t.Fatalf("feature without device evidence was not refused: %v", state)
 	}
 }
+
+// Arch has no VERSION_ID; the agent reports it unavailable. That is a fact for
+// the registry's rolling row, not missing evidence, but an unavailable version
+// on a versioned release still waits.
+func TestResourceApplicabilityRollingReleaseWithoutVersion(t *testing.T) {
+	noVersion := func(id string) func(*inventoryv1.HostObservation) {
+		return func(o *inventoryv1.HostObservation) {
+			o.OsId.Value = id
+			o.OsVersion = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE}
+		}
+	}
+	f := newDispatchFixture(t)
+	reportApplicabilityHost(t, f, 1, noVersion("arch"))
+	item := applicabilityResource(f, applicabilityProduct("arch", "", "x86_64"))
+	publishDispatchResources(t, f, item)
+	f.assign(t, nil)
+	if state := onlyResourceState(t, f); state.GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_PENDING {
+		t.Fatalf("Arch device without VERSION_ID did not match its rolling product: %v", state)
+	}
+	assertDispatched(t, f, item)
+
+	f = newDispatchFixture(t)
+	reportApplicabilityHost(t, f, 1, noVersion("debian"))
+	publishDispatchResources(t, f, applicabilityResource(f, applicabilityProduct("debian", "12", "x86_64")))
+	f.assign(t, nil)
+	assertNoResourceWork(t, f)
+	if state := onlyResourceState(t, f); state.GetDisposition() != adminv1.ResourceDisposition_RESOURCE_DISPOSITION_WAITING_FOR_DEVICE_FACTS {
+		t.Fatalf("unavailable version on a versioned release decided applicability: %v", state)
+	}
+}

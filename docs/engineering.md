@@ -3059,7 +3059,8 @@ dispatched and excluded from compliance, fleet, report, rollout-health and
 needs-attention counts; a dependent of it is blocked. Until the device reports its
 OS ID, version and architecture the row is **waiting for device facts**
 (`device_platform_facts_unavailable`), unknown rather than attention; failed
-collection is not a mismatch. The decision is made when the head is assigned and
+collection is not a mismatch. An unavailable `VERSION_ID` is a fact only for a
+registry release without one (Arch Linux). The decision is made when the head is assigned and
 again at every work poll, so arriving facts or a release upgrade move rows in or out
 of scope. Required **features** have no device evidence yet, so any row requiring
 one is refused as unsupported (`resource_feature_evidence_unavailable`) instead of

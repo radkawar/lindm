@@ -45,7 +45,9 @@ type platformFacts struct {
 
 // loadPlatformFacts reads the generation's latest host observation. Missing
 // or failed collection of the OS ID, version or architecture is unknown, not
-// a mismatch; an absent VERSION_ID (rolling releases) is a fact.
+// a mismatch. An absent VERSION_ID is a fact only where the registry release
+// has none (Arch's rolling model; the agent reports it unavailable), as in
+// core's observed release.
 func loadPlatformFacts(ctx context.Context, q *devicedb.Queries, generation uuid.UUID) (platformFacts, error) {
 	row, err := q.GetResourcePlatformFacts(ctx, generation)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -54,8 +56,18 @@ func loadPlatformFacts(ctx context.Context, q *devicedb.Queries, generation uuid
 	if err != nil {
 		return platformFacts{}, err
 	}
-	success, absent := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE)
-	if row.OsIDStatus != success || row.ArchitectureStatus != success || row.OsVersionStatus != success && row.OsVersionStatus != absent {
+	success := int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS)
+	if row.OsIDStatus != success || row.ArchitectureStatus != success {
+		return platformFacts{}, nil
+	}
+	switch row.OsVersionStatus {
+	case success:
+	case int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE), int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE):
+		release := platform.Identify(platform.OSRelease{ID: row.OsIDValue})
+		if !release.Known() || release.Version.Rule != platform.VersionAbsent {
+			return platformFacts{}, nil
+		}
+	default:
 		return platformFacts{}, nil
 	}
 	return platformFacts{known: true, osID: row.OsIDValue, version: row.OsVersionValue, architecture: row.ArchitectureValue}, nil
