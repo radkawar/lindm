@@ -163,7 +163,7 @@ Each small swatch below shows light on the left and dark on the right.
 | Accent / primary / info | ![Accent / primary / info swatch](brand/swatch-accent-primary-info.png) | `#2458b8` | `#91b8ff` | Action, selection and information; plain logo eye |
 | Success                 | ![Success swatch](brand/swatch-success.png)                             | `#176344` | `#79d6aa` | Named, confirmed condition                        |
 | Warning                 | ![Warning swatch](brand/swatch-warning.png)                             | `#805007` | `#f1c578` | Attention or uncertainty                          |
-| Danger (`destructive`)  | ![Danger (destructive) swatch](brand/swatch-danger.png)                 | `#af2838` | `#ff98a2` | Failure or destructive effect                     |
+| Danger (`destructive`)  | ![Danger (destructive) swatch](brand/swatch-danger.png)                 | `#af2838` | `#ffb3bb` | Failure or destructive effect                     |
 | Border / input          | ![Border / input swatch](brand/swatch-border-input.png)                 | `#617188` | `#8292a6` | Control boundary                                  |
 | Focus ring              | ![Focus ring swatch](brand/swatch-focus-ring.png)                       | `#2458b8` | `#91b8ff` | Solid keyboard focus indicator                    |
 | Selection surface       | ![Selection surface swatch](brand/swatch-selection.png)                 | `#e9f0fc` | `#21385c` | Quiet menu/selected-row background                |

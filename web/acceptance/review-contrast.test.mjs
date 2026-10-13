@@ -87,6 +87,7 @@ test("checks all normal, button, selection, ring, chart and tinted status pairs 
 test("fails actual weak text, button, ring and chart pairs instead of skipping", () => {
   for (const token of [
     "foreground",
+    "neutral",
     "primary-foreground",
     "destructive-foreground",
     "ring",
@@ -112,6 +113,21 @@ test("checks status text on the composited 10% tinted background", () => {
   const result = checkPaletteContrast(values);
   assert.ok(result.findings.some((finding) => finding.elements[0].includes("--success/10")));
   assert.ok(!result.findings.some((finding) => finding.elements[0] === "--success / --card"));
+});
+
+test("checks destructive text on the dark 30% hover surface", () => {
+  const values = palette(true);
+  values.background = "#101826";
+  values.card = "#172235";
+  values.destructive = "#ff98a2";
+  const weak = checkPaletteContrast(values, "dark");
+  const hover = "--destructive / --card tinted with --destructive/30";
+  assert.ok(weak.findings.some((finding) => finding.elements[0] === hover));
+  assert.ok(!checkPaletteContrast(values, "light").pairs.some((pair) => pair.tint === 0.3));
+  values.destructive = "#ffb3bb";
+  assert.ok(
+    !checkPaletteContrast(values, "dark").findings.some((finding) => finding.elements[0] === hover),
+  );
 });
 
 test("missing tokens and nonopaque palettes are blocking findings", () => {

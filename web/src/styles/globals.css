@@ -130,11 +130,12 @@
   --secondary: var(--neutral-800);
   --muted: var(--neutral-800);
   --muted-foreground: var(--neutral-300);
+  --neutral: var(--neutral-300);
   --selection: #21385c;
   --selection-foreground: #bed4ff;
   --success: #79d6aa;
   --warning: #f1c578;
-  --destructive: #ff98a2;
+  --destructive: #ffb3bb;
   --destructive-foreground: var(--neutral-950);
   --border: var(--neutral-400);
   --sidebar: var(--neutral-900);
