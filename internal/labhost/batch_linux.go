@@ -237,7 +237,12 @@ func (s *Slots) validateBatchLease(file *os.File) error {
 	if err != nil {
 		return err
 	}
-	for index := uint32(0); index < s.capacity; index++ {
+	// Any slot identity of the namespace, including one beyond a lowered limit.
+	indices, err := s.indices()
+	if err != nil {
+		return err
+	}
+	for _, index := range indices {
 		candidate, err := s.open(index)
 		if err != nil {
 			return err

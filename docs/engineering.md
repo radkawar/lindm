@@ -1841,12 +1841,16 @@ A lane takes one slot per concurrent guest (the firewall resource lane boots a
 probe peer, so it needs two) and admits them all at once or not at all; the
 memory guard covers the sum of its guests. Taking leases one at a time was a
 hold-and-wait deadlock: two pair lanes on a three-slot host could each hold one
-slot forever. Waiting lanes are served first come, first served: each holds a
-flocked `waiter-<arrival>-<pid>-<guests>.lock` ticket (locked before it is
-published), and a lane is admitted only if the slots left after older waiters'
-demand cover its own guests, so a stream of single-guest lanes cannot starve a
-pair. A ticket whose holder died has no flock and is swept. Lanes report their
-current wait reason (slots held, memory, older waiters) when it changes.
+slot forever. Waiting lanes are served strictly first come, first served: each
+holds a flocked `waiter-<arrival>-<pid>-<guests>.lock` ticket (locked before it
+is published), and only the oldest live waiter is admitted, so no younger lane
+of any size takes the slots or memory a waiting multi-guest head needs. The
+guest limit in force is the one the most recently started lane of that host
+recorded in the lease directory's `capacity` file, re-read on every admission
+check: a waiter started before `max_guests` changed admits by the new limit
+instead of starving behind lanes that use it. A ticket whose holder died has no
+flock and is swept. Lanes report their current wait reason (slots held,
+memory, older waiters) when it changes.
 
 For example, from a pinned source checkout with built embedded web assets:
 

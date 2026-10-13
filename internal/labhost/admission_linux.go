@@ -148,15 +148,13 @@ const admissionBusy = "another admission is in progress"
 // outside the new range. Never unlink those identities while holders may exist.
 // A lane's guests are admitted together or not at all: holding one slot while
 // waiting for another is a hold-and-wait deadlock once two multi-guest lanes
-// share a host. Admission is first come, first served: capacity demanded by
-// older live waiters is reserved, so a stream of single-guest lanes cannot
-// starve a multi-guest lane. Memory admission covers the sum of the requested
-// guests. A nil result with a nil error carries the reason admission must wait.
-// An empty ticket queues behind every live waiter.
+// share a host. Admission is strictly first come, first served: only the
+// oldest live waiter is admitted, so no younger lane (of any size) can take the
+// slots or memory the head is waiting for and a multi-guest head never
+// starves. The limit is re-read on every check. Memory admission covers the
+// sum of the requested guests. A nil result with a nil error carries the reason
+// admission must wait. An empty ticket queues behind every live waiter.
 func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (_ []*Lease, wait string, resultErr error) {
-	if guests == 0 || guests > s.capacity {
-		return nil, "", fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, s.capacity)
-	}
 	guard, err := s.openName(".admission.lock")
 	if err != nil {
 		return nil, "", err
@@ -166,6 +164,13 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 	if err != nil || !locked {
 		return nil, admissionBusy, err
 	}
+	capacity, err := s.currentCapacity()
+	if err != nil {
+		return nil, "", err
+	}
+	if guests == 0 || guests > capacity {
+		return nil, "", fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, capacity)
+	}
 	active, err := s.Count()
 	if err != nil {
 		return nil, "", err
@@ -174,11 +179,11 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 	if err != nil {
 		return nil, "", err
 	}
-	if active > s.capacity-guests || demand > s.capacity-guests-active {
-		if older != 0 {
-			return nil, fmt.Sprintf("behind %d older waiters (%d guests); %d of %d slots held", older, demand, active, s.capacity), nil
-		}
-		return nil, fmt.Sprintf("%d of %d slots held; %d needed", active, s.capacity, guests), nil
+	if older != 0 {
+		return nil, fmt.Sprintf("behind %d older waiters (%d guests); %d of %d slots held", older, demand, active, capacity), nil
+	}
+	if active > capacity-guests {
+		return nil, fmt.Sprintf("%d of %d slots held; %d needed", active, capacity, guests), nil
 	}
 	observation, err := s.memoryProbe(ctx)
 	if err != nil {
@@ -200,7 +205,7 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 		}
 		return nil, "retired slots beyond the configured limit are held", err
 	}
-	for index := range s.capacity {
+	for index := range capacity {
 		if uint32(len(leases)) == guests {
 			break
 		}

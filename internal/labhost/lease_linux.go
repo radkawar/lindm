@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +20,8 @@ import (
 )
 
 // Slots is a local process-shared capacity pool. All users of a work directory
-// must use the same host name and capacity; change these only while it is idle.
+// must use the same host name; the capacity in force is the one most recently
+// configured by a user of the namespace (see capacityFile).
 // Lock files are permanent identities: never remove them to release a slot.
 // For SSH hosts, OpenSlots, Count and Acquire must run on the remote host using
 // the same staged binary. This type never interprets SSH transport as local work.
@@ -57,7 +60,52 @@ func OpenSlots(host *labv1.LabHost) (*Slots, error) {
 			return nil, fmt.Errorf("lab hosts: slot directory is not owned by this user: %s", private)
 		}
 	}
-	return &Slots{directory: directory, capacity: host.MaxGuests, memoryMib: host.MaxMemoryMib, memoryProbe: observeMemory, host: host.Name, work: work, diskFree: diskgc.Free, diskCollect: diskgc.Host}, nil
+	slots := &Slots{directory: directory, capacity: host.MaxGuests, memoryMib: host.MaxMemoryMib, memoryProbe: observeMemory, host: host.Name, work: work, diskFree: diskgc.Free, diskCollect: diskgc.Host}
+	if err := slots.publishCapacity(); err != nil {
+		return nil, err
+	}
+	return slots, nil
+}
+
+// capacityFile records the host's guest limit as configured by the most
+// recently started user of the namespace. Admission reads it on every check,
+// so a waiter that started before the limit changed (lab.json is read once,
+// at start) admits by the current limit, like every later waiter: one queue
+// never mixes two limits, which broke first-come order and starved the head.
+const capacityFile = "capacity"
+
+// publishCapacity atomically records this process's configured limit as the
+// namespace's current one.
+func (s *Slots) publishCapacity() error {
+	temporary, err := os.CreateTemp(s.directory, ".capacity-*")
+	if err != nil {
+		return fmt.Errorf("lab hosts: record slot limit: %w", err)
+	}
+	_, err = temporary.WriteString(strconv.FormatUint(uint64(s.capacity), 10) + "\n")
+	if err := errors.Join(err, temporary.Close()); err != nil {
+		return errors.Join(fmt.Errorf("lab hosts: record slot limit: %w", err), os.Remove(temporary.Name()))
+	}
+	if err := os.Rename(temporary.Name(), filepath.Join(s.directory, capacityFile)); err != nil {
+		return errors.Join(fmt.Errorf("lab hosts: record slot limit: %w", err), os.Remove(temporary.Name()))
+	}
+	return nil
+}
+
+// currentCapacity is the namespace's current guest limit: the recorded one,
+// or this process's configured limit when none is recorded.
+func (s *Slots) currentCapacity() (uint32, error) {
+	data, err := os.ReadFile(filepath.Join(s.directory, capacityFile))
+	if errors.Is(err, os.ErrNotExist) {
+		return s.capacity, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("lab hosts: read slot limit: %w", err)
+	}
+	limit, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 32)
+	if err != nil || limit == 0 {
+		return 0, fmt.Errorf("lab hosts: invalid recorded slot limit %q", strings.TrimSpace(string(data)))
+	}
+	return uint32(limit), nil
 }
 
 func (s *Slots) open(index uint32) (*os.File, error) {

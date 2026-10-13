@@ -507,3 +507,131 @@ func TestAwaitMemoryTakesNoSlotAndReportsChanges(t *testing.T) {
 		t.Fatalf("host job took a slot: %d %v", active, err)
 	}
 }
+
+// A waiter that started before the host's limit was raised (it read lab.json
+// once) must admit by the new limit, not keep its stale one while later
+// waiters overtake it under the new limit.
+func TestWaiterAdoptsLaterConfiguredLimit(t *testing.T) {
+	host := fixtureHost("raised", t.TempDir())
+	host.MaxGuests = 3
+	stale, err := openFixtureSlots(host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := stale.AcquireN(t.Context(), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		for _, lease := range held {
+			_ = lease.Close()
+		}
+	}()
+	admitted := make(chan []*Lease, 1)
+	go func() {
+		leases, err := stale.AcquireN(t.Context(), 2) // 2 of 3 held: waits
+		if err != nil {
+			t.Error(err)
+		}
+		admitted <- leases
+	}()
+	waitFor(t, func() bool { waiters, _, err := stale.olderWaiters(""); return err == nil && waiters == 1 })
+	host.MaxGuests = 4
+	if _, err := openFixtureSlots(host); err != nil { // a later lane, configured with 4
+		t.Fatal(err)
+	}
+	select {
+	case leases := <-admitted:
+		if len(leases) != 2 {
+			t.Fatalf("admitted %d guests", len(leases))
+		}
+		for _, lease := range leases {
+			_ = lease.Close()
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the waiter kept its stale limit of 3 after the host was raised to 4")
+	}
+}
+
+// Strict first come, first served on a mixed queue: a two-guest head that the
+// host cannot admit yet (here for memory, which a single guest would fit) is
+// overtaken by none of the single-guest lanes queued after it, and is admitted
+// before them once it fits.
+func TestMixedQueueNeverStarvesItsMultiGuestHead(t *testing.T) {
+	host := fixtureHost("mixed", t.TempDir())
+	host.MaxGuests = 4
+	host.MaxMemoryMib = 4 << 10
+	var roomy atomic.Bool
+	open := func() *Slots {
+		t.Helper()
+		slots, err := OpenSlots(host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		slots.memoryProbe = func(context.Context) (memoryAdmission, error) {
+			if roomy.Load() {
+				return memoryAdmission{AvailableBytes: 64 << 30}, nil
+			}
+			return memoryAdmission{AvailableBytes: 13 << 30}, nil // one 4 GiB guest + headroom
+		}
+		return slots
+	}
+	type admission struct {
+		name   string
+		leases []*Lease
+	}
+	order := make(chan admission, 8)
+	acquire := func(name string, guests uint32) {
+		slots := open()
+		go func() {
+			leases, err := slots.AcquireN(t.Context(), guests)
+			if err != nil {
+				t.Error(err)
+			}
+			order <- admission{name, leases}
+		}()
+		waitFor(t, func() bool {
+			waiters, _, err := slots.olderWaiters("")
+			return err == nil && waiters >= 1
+		})
+	}
+	observer := open()
+	acquire("pair", 2)
+	time.Sleep(20 * time.Millisecond) // later tickets sort after the head's
+	for i := range 3 {
+		acquire(fmt.Sprintf("single-%d", i), 1)
+		time.Sleep(20 * time.Millisecond)
+	}
+	// Each single fits by slots and memory, but the head does not fit yet.
+	time.Sleep(500 * time.Millisecond)
+	select {
+	case got := <-order:
+		t.Fatalf("%s admitted ahead of the waiting two-guest head", got.name)
+	default:
+	}
+	if active, err := observer.Count(); err != nil || active != 0 {
+		t.Fatalf("waiters hold slots: %d %v", active, err)
+	}
+	roomy.Store(true)
+	first := <-order
+	if first.name != "pair" || len(first.leases) != 2 {
+		t.Fatalf("first admitted %s (%d guests), want the two-guest head", first.name, len(first.leases))
+	}
+	for range 2 { // two singles fill the host; the third waits for a release
+		got := <-order
+		if !strings.HasPrefix(got.name, "single-") || len(got.leases) != 1 {
+			t.Fatalf("admitted %s with %d guests", got.name, len(got.leases))
+		}
+		defer func() { _ = got.leases[0].Close() }()
+	}
+	for _, lease := range first.leases {
+		if err := lease.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	last := <-order
+	if len(last.leases) != 1 {
+		t.Fatalf("last single admitted %d guests", len(last.leases))
+	}
+	_ = last.leases[0].Close()
+}

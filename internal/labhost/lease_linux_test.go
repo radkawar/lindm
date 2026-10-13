@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -76,6 +77,7 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 		t.Fatalf("released slots: %d, %v", count, err)
 	}
 	entries, err := os.ReadDir(slots.directory)
+	entries = slices.DeleteFunc(entries, func(entry os.DirEntry) bool { return entry.Name() == capacityFile })
 	if err != nil || len(entries) != 4 {
 		t.Fatalf("persistent lock identities: %d, %v", len(entries), err)
 	}
