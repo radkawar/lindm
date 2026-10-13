@@ -90,9 +90,12 @@ export function ConsoleShell({
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
-        <SidebarHeader className="border-b px-3 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex size-8 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+        <SidebarHeader className="border-b px-3 py-5 group-data-[collapsible=icon]:px-0">
+          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <div
+              data-sidebar-logo
+              className="flex size-8 shrink-0 items-center justify-center bg-primary text-primary-foreground"
+            >
               <ShieldCheckIcon className="size-5" />
             </div>
             <div className="grid group-data-[collapsible=icon]:hidden">

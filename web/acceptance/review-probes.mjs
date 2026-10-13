@@ -452,6 +452,30 @@ export function installProbes(rules) {
         }
       }
       if (desktop) {
+        const collapsed = document.querySelector(
+          '[data-slot="sidebar"][data-state="collapsed"] [data-slot="sidebar-inner"]',
+        );
+        if (collapsed && rendered(collapsed)) {
+          const logo = collapsed.querySelector("[data-sidebar-logo]");
+          if (!logo || !rendered(logo)) {
+            findings.push({
+              check: "sidebar-logo-centered",
+              message: "Collapsed navigation has no visible logo",
+              elements: [describe(collapsed)],
+            });
+          } else {
+            const rail = collapsed.getBoundingClientRect();
+            const mark = logo.getBoundingClientRect();
+            const offset = Math.abs(mark.left + mark.width / 2 - (rail.left + rail.width / 2));
+            if (offset > 1 || mark.left < rail.left || mark.right > rail.right) {
+              findings.push({
+                check: "sidebar-logo-centered",
+                message: `Collapsed navigation logo is ${offset.toFixed(1)}px off center`,
+                elements: [describe(logo)],
+              });
+            }
+          }
+        }
         const gap = document.querySelector('[data-slot="sidebar-gap"]');
         if (gap && rendered(gap.parentElement)) {
           const rect = gap.getBoundingClientRect();

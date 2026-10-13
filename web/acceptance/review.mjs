@@ -628,6 +628,20 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
   entry.screenshots.full = await screenshot(page, `${prefix}-full.png`, true);
   entry.checks.layout = { findings: await probe(page, "layout", viewport.name === "desktop") };
+  if (route.path === "/dashboard" && viewport.name === "desktop") {
+    const toggle = page.locator("header").getByRole("button", { name: "Toggle navigation" });
+    await toggle.click();
+    await page.locator('[data-slot="sidebar"][data-state="collapsed"]').waitFor();
+    try {
+      await settleAnimations(page);
+      entry.screenshots.collapsed = await screenshot(page, `${prefix}-collapsed.png`, false);
+      entry.checks.collapsedLayout = { findings: await probe(page, "layout", true) };
+    } finally {
+      await toggle.click();
+      await page.locator('[data-slot="sidebar"][data-state="expanded"]').waitFor();
+      await settleAnimations(page);
+    }
+  }
   const violations = await axe(page, null);
   entry.checks.axe = {
     violations,

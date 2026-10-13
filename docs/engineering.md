@@ -155,6 +155,9 @@ blocks the runtime-injected `<style>` it would otherwise add, which left toasts 
 The sidebar's in-flow gap carries the sidebar surface, so the column reaches the
 bottom of long pages. Full-page captures must start at scroll position zero: like any
 fixed or sticky element, the sidebar and header otherwise render at the scroll offset.
+In icon mode, the shell removes the header's horizontal padding and centers the
+logo in the navigation column. The dashboard UI review captures collapsed mode
+in both themes and checks the logo's center within one CSS pixel.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Explanations of how a feature works are not inline page text: keep at most one short
