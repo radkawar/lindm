@@ -331,6 +331,14 @@ group shadow (bound into the local database revision, so creating it later
 changes every plan's precondition) and still requires a present one to agree
 with `/etc/group` without group administrators.
 
+Tumbleweed's systemd ships `/usr/lib/sysctl.d/99-sysctl.conf ->
+../../../etc/sysctl.conf` but no `/etc/sysctl.conf`. The sysctl provider resolved
+every configuration link and failed each sysctl resource on this dangling one
+(`lstat … /etc/sysctl.conf: no such file or directory`, x86_64 resources lane).
+systemd-sysctl skips a dangling entry ("Failed to chase") while it still
+overrides the same name in later directories (observed with systemd 261.3); the
+provider now reads it the same way, as an overriding entry without content.
+
 The signed snapshot closure must include the registry's RPM build/signing tools,
 GnuPG, Python, nftables and firewalld before starting resource qualification.
 Native resource, service, interruption and ownership-release records are required
@@ -1281,6 +1289,8 @@ on the DGX Spark hosts, x86_64 on local KVM, each record in the
 | Air gap             | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)      |
 | Self-update         | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported) |
 | Lifecycle           | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)   |
+| Services            | `tw2-x86-r11-7fd59b73/…/services-x86_64.json` / `db5246f3ebe20bfba871e2ad50287644cb0131e664e568e618589c56c816f7c4`              |
+| Assistance          | `tw2-x86-r11-7fd59b73/…/assistance-x86_64/assistance.json` / `8594528e8a44c5b3945fa8dc40b13a33356357c0298f0d877771f99663b3ad26` |
 
 "Imported" records come from lanes that finished after their matrix parent was
 stopped (so it would not start superseded cells) and were added with

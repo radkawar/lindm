@@ -210,11 +210,20 @@ func readPersistence(key string, replacement []byte, replace bool) (persistence,
 	}
 	return effectivePersistence(files, key)
 }
+
+// sysctlDirectories are systemd-sysctl's configuration directories, highest
+// precedence first.
+var sysctlDirectories = []string{"/etc/sysctl.d", "/run/sysctl.d", "/usr/local/lib/sysctl.d", "/usr/lib/sysctl.d"}
+
 func readConfiguration() ([]configFile, error) {
+	return readConfigurationFrom(sysctlDirectories)
+}
+
+func readConfigurationFrom(directories []string) ([]configFile, error) {
 	seen := make(map[string]bool)
 	var files []configFile
 	total := 0
-	for _, directory := range []string{"/etc/sysctl.d", "/run/sysctl.d", "/usr/local/lib/sysctl.d", "/usr/lib/sysctl.d"} {
+	for _, directory := range directories {
 		dir, _, err := custody.OpenRoot(directory, unix.O_RDONLY|unix.O_DIRECTORY)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -241,11 +250,19 @@ func readConfiguration() ([]configFile, error) {
 			seen[name] = true
 			path := filepath.Join(directory, name)
 			resolved, err := filepath.EvalSymlinks(path)
-			if err != nil {
+			file := configFile{path: path}
+			switch {
+			case errors.Is(err, os.ErrNotExist):
+				// A dangling link still overrides the same name in later
+				// directories but contributes nothing: systemd-sysctl skips it
+				// ("Failed to chase"). Tumbleweed's systemd ships
+				// 99-sysctl.conf -> ../../../etc/sysctl.conf without
+				// /etc/sysctl.conf.
+			case err != nil:
 				return nil, err
-			}
-			file := configFile{path: path, masked: resolved == "/dev/null"}
-			if !file.masked {
+			case resolved == "/dev/null":
+				file.masked = true
+			default:
 				file.data, err = rootRead(resolved, 1<<20)
 				if err != nil {
 					return nil, err

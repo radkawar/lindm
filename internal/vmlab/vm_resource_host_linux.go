@@ -268,7 +268,7 @@ func (r *resourceDispatch) settledRelease(ctx context.Context, ref *resourcev1.R
 // denials (journal or auditd log; the executor grep drops audit lines). It is
 // diagnostic context, never qualification evidence.
 func executorDiagnostics(ctx context.Context, vm *guestVM) VMResourceNativeRecord {
-	data, err := vm.run(ctx, "sudo -n journalctl --no-pager -o short-iso -n 50000 2>&1 | grep -E 'lindm-(executor|agent|package|resource|observe)|useradd|groupadd|usermod|userdel|chage|authselect|pam-auth|scriptlet|lindm-resource-crash' | grep -v -e ' audit' -e ' sudo\\[' | tail -n 200; ls -Z /etc/passwd /etc/shadow /etc/group 2>&1; sudo -n sh -c \"journalctl --no-pager -o short-iso -n 50000 | grep -F 'avc:'; grep -hF 'avc:' /var/log/audit/audit.log 2>/dev/null\" | tail -n 60", nil, 256<<10, 30*time.Second)
+	data, err := vm.run(ctx, "sudo -n journalctl --no-pager -o short-iso -n 50000 2>&1 | grep -E 'lindm-(executor|agent|package|resource|observe|os-update)|useradd|groupadd|usermod|userdel|chage|authselect|pam-auth|scriptlet|lindm-resource-crash' | grep -v -e ' audit' -e ' sudo\\[' | tail -n 200; ls -Z /etc/passwd /etc/shadow /etc/group 2>&1; sudo -n sh -c \"journalctl --no-pager -o short-iso -n 50000 | grep -F 'avc:'; grep -hF 'avc:' /var/log/audit/audit.log 2>/dev/null\" | tail -n 60", nil, 256<<10, 30*time.Second)
 	if err != nil {
 		data = []byte(err.Error())
 	}
