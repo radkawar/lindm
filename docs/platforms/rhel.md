@@ -786,8 +786,9 @@ installed only from the Binary DVD's BaseOS/AppStream (registry
 `rhelSession9`/`rhelSession10`). Its kickstart `%packages` add the capture stack
 the session helper's `gst-launch-1.0` pipeline needs
 (`internal/agent/desktop/gst.go`): `pipewire-gstreamer` (`pipewiresrc`),
-`gstreamer1-plugins-base` (`videorate`, `videoconvert`, `videoscale`),
-`gstreamer1-plugins-good` (`vp8enc` over `libvpx`, `rtpvp8pay`, `rtpstreampay`),
+`gstreamer1-plugins-base` (`videoconvert`, `videoscale`),
+`gstreamer1-plugins-good` (`imagefreeze`, `vp8enc` over `libvpx`, `rtpvp8pay`,
+`rtpstreampay`),
 `gstreamer1` (`fdsink`, `gst-launch-1.0`/`gst-inspect-1.0`), `xdg-desktop-portal`
 and `xdg-desktop-portal-gnome`. The assistance lane requires them with `rpm -q`,
 because the unregistered guest has no repository to install from. The terminal
@@ -805,10 +806,9 @@ already default-install them through comps; the package query is
 `$HOME/.cache/lindm-rhel-assist-20261013/dvd-package-query.txt` (SHA-256
 `f1faeab3577b4ca63eafa72670369cbf003c1a90e25b4c3221d199fcc859f38a`).
 
-RHEL 10.2 x86_64 passes all six assistance scenarios; RHEL 9.8 x86_64 fails
-with no decoded frames, the EL 9 capture symptom shared with Rocky Linux and
-AlmaLinux 9.8 (product capture defect, not a recipe gap); aarch64 is blocked:
-lab hosts offline ([verification](../verification.md#rhel-assistance-session-recipe-2026-10-13)).
+RHEL 9.8 and 10.2 x86_64 pass every assistance scenario (9.8 after the EL 9
+capture fix `5a10048e`); aarch64 is blocked: lab hosts offline
+([verification](../verification.md#rhel-assistance-session-recipe-2026-10-13)).
 
 ## Lab
 

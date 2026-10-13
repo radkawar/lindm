@@ -12034,6 +12034,21 @@
       "recoveryManifest": "ubuntu-noble-20260926-amd64",
       "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
       "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-dvd-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelassist2-x86-20261013T150640Z/rhel-9/assistance-x86_64/assistance.json",
+      "sha256": "0af531f069128cd12781156e5cdcb9c1f1002810b830a1def88832e54bc78a86",
+      "recorded": "2026-10-13T17:00:43.973539968Z",
+      "revision": "5a10048e15601b7efa2aceef9b5f7b01b16e7c83",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b0fe5c3bcadd3df46dc0c9bb7104c34f0023eee0a17d629ed1fb114cc6667e7e",
+      "mainlineRevision": "5a10048e15601b7efa2aceef9b5f7b01b16e7c83"
     }
   ]
 }
