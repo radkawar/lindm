@@ -178,7 +178,7 @@ func (s *demoSeed) relabel(ctx context.Context, d *simulatedDevice) error {
 	}
 	for i := range demoScaleRelabels {
 		labels := append(slices.Clone(base), fmt.Sprintf("rack-%c%d", 'a'+rune(i%6), 1+i%12))
-		metadata := &adminv1.DeviceMetadata{Labels: labels, Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a live host"}}
+		metadata := &adminv1.DeviceMetadata{Labels: labels, Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a real device"}}
 		if _, err := s.owner.Admin.SetDeviceMetadata(ctx, connect.NewRequest(&adminv1.SetDeviceMetadataRequest{RequestId: uuid.NewString(), DeviceId: d.id, Metadata: metadata, Reason: fmt.Sprintf("Rack move %d during the build farm rebalance", i+1)})); err != nil {
 			return fmt.Errorf("relabel scale device: %w", err)
 		}

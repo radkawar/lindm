@@ -1173,6 +1173,12 @@ devices; encrypted, unencrypted and unknown roots with escrow custody; device ac
 and assistance history; a secret, webhook, report schedule and audit export; and
 an unassigned "Guest Wi-Fi firewall" profile (`Routes.FirewallProfileID`), whose
 unnamed zone the console must identify by its `wlan0`/`192.168.50.0/24` binding.
+The editor captions the firewall packet verdict `FIREWALL_VERDICT_DROP` as
+**Discard** for incoming defaults, outgoing defaults and individual rules. This
+means silently discarding packets, not removing a resource; protocol values and
+native behavior remain unchanged. Demo owner text identifies a synthetic device,
+not a real device. The stolen-laptop wipe remains a pending approval for another
+administrator; the fixture creates no wipe action.
 Headless servers report assistance off (`Routes.AssistanceOffDeviceID`). The older
 `ubuntu-ws-02` agent reports no assistance setting and refuses a request before
 start (`Routes.RefusedAssistance*`). The Engineering laptop `ubuntu-ws-09` never

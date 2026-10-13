@@ -167,4 +167,32 @@ export async function check({ page, demo, visit, require, capture, step }) {
     .getByText(/Removing this setting restores the earlier notice/)
     .isVisible(), "the editor disclosure omits SSH restoration reference");
   await capture("one editor disclosure");
+
+  step("firewall verdict captions preserve packet behavior");
+  await visit(`/profiles/${encodeURIComponent(demo.Routes.FirewallProfileID)}`);
+  await editor.waitFor({ timeout });
+  const incoming = editor.getByRole("combobox", { name: "Default incoming traffic", exact: true });
+  const outgoing = editor.getByRole("combobox", { name: "Default outgoing traffic", exact: true });
+  require((await incoming.innerText()).trim() === "Discard", "incoming DROP caption changed");
+  require((await outgoing.innerText()).trim() === "Accept", "outgoing ACCEPT changed");
+  await incoming.click();
+  const dropOption = page.getByRole("option", { name: "Drop", exact: true });
+  require((await dropOption.count()) === 0, "the firewall verdict still offers Drop");
+  await page.getByRole("option", { name: "Accept", exact: true }).click();
+  await incoming.click();
+  await page.getByRole("option", { name: "Discard", exact: true }).click();
+  await outgoing.click();
+  await page.getByRole("option", { name: "Discard", exact: true }).click();
+  await editor.locator("summary", { hasText: /^View JSON$/ }).click();
+  const packetDraft = JSON.parse(await editor.getByLabel("Profile draft JSON").innerText());
+  const zone = packetDraft.resources[0].desired.firewallZone;
+  const drop = "FIREWALL_VERDICT_DROP";
+  const bothDiscard = zone.defaultIngress === drop && zone.defaultEgress === drop;
+  require(bothDiscard, "Discard changed the protocol verdict instead of its caption");
+  await outgoing.click();
+  await page.getByRole("option", { name: "Accept", exact: true }).click();
+  const restoredDraft = JSON.parse(await editor.getByLabel("Profile draft JSON").innerText());
+  const restored = restoredDraft.resources[0].desired.firewallZone.defaultEgress;
+  require(restored === "FIREWALL_VERDICT_ACCEPT", "Accept changed the protocol verdict");
+  await capture("firewall packet verdict captions");
 }

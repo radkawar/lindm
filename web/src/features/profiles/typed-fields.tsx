@@ -207,9 +207,13 @@ function enumOptions(schema: DescEnum, current?: JsonValue) {
     )
     .map((value) => ({
       value: value.name,
-      label: unavailableChoices[value.name]
-        ? `${fieldLabel(value.name.slice(prefix.length))} (not available)`
-        : fieldLabel(value.name.slice(prefix.length)),
+      label:
+        schema.typeName === "lindm.resource.v1.FirewallVerdict" &&
+        value.name === "FIREWALL_VERDICT_DROP"
+          ? "Discard"
+          : unavailableChoices[value.name]
+            ? `${fieldLabel(value.name.slice(prefix.length))} (not available)`
+            : fieldLabel(value.name.slice(prefix.length)),
     }));
 }
 

@@ -518,7 +518,7 @@ func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical 
 	if d.demo.factsWithheld {
 		row.Hostname, row.OS = "", ""
 	}
-	metadata := &adminv1.DeviceMetadata{Labels: append([]string{"synthetic-demo"}, d.demo.labels...), Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a live host"}}
+	metadata := &adminv1.DeviceMetadata{Labels: append([]string{"synthetic-demo"}, d.demo.labels...), Owner: &adminv1.DeviceMetadata_OwnerText{OwnerText: "Synthetic demo device, not a real device"}}
 	if d.demo.state == "stale" {
 		// Preserve token-created static RBAC membership, but keep this explicit
 		// history-only device outside department policy targeting.
@@ -601,7 +601,7 @@ func (s *demoSeed) seedStaleProfile(ctx context.Context, d *simulatedDevice) err
 // binding rather than its UUID. It is not part of the organization policy.
 func (s *demoSeed) publishFirewallReviewProfile(ctx context.Context) (string, error) {
 	zone := uuid.NewString()
-	spec := &policyv1.ResourceProfile{Name: "Guest Wi-Fi firewall", Description: "Drop unsolicited inbound traffic from the guest network.", Resources: []*policyv1.ProfileResource{{
+	spec := &policyv1.ResourceProfile{Name: "Guest Wi-Fi firewall", Description: "Discards incoming traffic from the guest network.", Resources: []*policyv1.ProfileResource{{
 		ResourceId: uuid.NewString(),
 		Desired: &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_FIREWALL_ZONE, CanonicalKey: zone}, State: &resourcev1.ResourceDesiredState_FirewallZone{FirewallZone: &resourcev1.FirewallZoneDesired{
 			ZoneId: zone, Presence: resourcev1.Presence_PRESENCE_PRESENT, Interfaces: []*resourcev1.InterfaceSelector{{Identity: &resourcev1.InterfaceSelector_PermanentMac{PermanentMac: "02:00:00:00:50:01"}, Ifname: proto.String("wlan0")}},
@@ -693,8 +693,8 @@ func (s *demoSeed) richDevice(ctx context.Context, d *simulatedDevice) error {
 	if _, err := s.owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(&adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, Spec: &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_ReleaseLock{ReleaseLock: &agentv1.ReleaseLockAction{LockActionId: lockID}}}, ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Second)), Reason: "Console demo undo that expires unstarted"})); err != nil {
 		return fmt.Errorf("send demo undo: %w", err)
 	}
-	// The erase stays a pending approval for a second human; no action exists.
-	wipe := &adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, ExpiresAt: timestamppb.New(time.Now().Add(10 * time.Minute)), Reason: "Laptop reported stolen; erase its disk encryption keys",
+	// The wipe stays a pending approval for a second human; no action exists.
+	wipe := &adminv1.CreateDeviceActionRequest{RequestId: uuid.NewString(), DeviceId: d.id, EnrollmentGeneration: d.generation, ExpiresAt: timestamppb.New(time.Now().Add(10 * time.Minute)), Reason: "Someone reported this laptop stolen. Wipe its disk encryption keys.",
 		Spec: &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_CryptoErase{CryptoErase: &agentv1.CryptoEraseAction{Mode: agentv1.CryptoEraseMode_CRYPTO_ERASE_MODE_OFFLINE, Target: target}}}}
 	if _, err := s.owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_CreateDeviceAction{CreateDeviceAction: wipe}})); err != nil {
 		return fmt.Errorf("request demo wipe approval: %w", err)
