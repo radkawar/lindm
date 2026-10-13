@@ -490,7 +490,82 @@ export function installProbes(rules) {
         seen.add(id);
         findings.push({ check: "copy", rule, source, excerpt, elements: [describe(node)] });
       };
-      const inspect = (value, node, source, identifiers) => {
+      const inspect = (value, node, source, identifiers, ste = true) => {
+        const vocabulary = ste && rules.vocabulary;
+        const exempt = (rule) => {
+          const declaration = node.closest("[data-ste-exempt]")?.getAttribute("data-ste-exempt");
+          return declaration?.split(";").some((entry) => {
+            const [name, ...reason] = entry.split(":");
+            return name.trim() === rule && reason.join(":").trim().length > 0;
+          });
+        };
+        if (vocabulary) {
+          const sentences = value.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [];
+          for (const sentence of sentences) {
+            const words = sentence.match(/\b[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*\b/gu) ?? [];
+            const procedure =
+              node.closest("[data-ste-procedure]") ||
+              /^(?:select|enter|choose|review|confirm|remove|add|open|close|use|request|wait|check|save|create|start|stop|retry|refresh|copy|install|connect|disconnect|keep|do not)\b/i.test(
+                sentence.trim(),
+              );
+            const limit = procedure
+              ? vocabulary.sentenceLimits.procedure
+              : vocabulary.sentenceLimits.description;
+            if (words.length > limit && !exempt("sentence-length"))
+              report("STE sentence length", sentence, 0, sentence.length, node, source);
+          }
+          if (!exempt("passive-voice")) {
+            const passive =
+              /\b(?:am|is|are|was|were|be|been|being)\s+(?:\w+ly\s+)?(?:\w+ed|given|shown|sent|written|taken|known|done|made|built|found|held)\b/i.exec(
+                value,
+              );
+            if (passive)
+              report("STE passive voice", value, passive.index, passive[0].length, node, source);
+          }
+          if (!exempt("vocabulary")) {
+            for (const term of vocabulary.approvedTerms) {
+              for (const synonym of term.forbiddenSynonyms) {
+                const escaped = synonym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const match = new RegExp(`\\b${escaped}\\b`, "i").exec(value);
+                if (match)
+                  report(
+                    `STE use "${term.term}"`,
+                    value,
+                    match.index,
+                    match[0].length,
+                    node,
+                    source,
+                  );
+              }
+            }
+          }
+          if (!exempt("noun-cluster")) {
+            const nouns = new Set(vocabulary.nounWords);
+            const tokens = [...value.matchAll(/\b[\p{L}]+\b/gu)];
+            let run = [];
+            for (const token of tokens) {
+              const previous = run.at(-1);
+              const contiguous =
+                !previous ||
+                /^\s+$/.test(value.slice(previous.index + previous[0].length, token.index));
+              run =
+                nouns.has(token[0].toLowerCase()) && contiguous
+                  ? [...run, token]
+                  : nouns.has(token[0].toLowerCase())
+                    ? [token]
+                    : [];
+              if (run.length === 4)
+                report(
+                  "STE noun cluster",
+                  value,
+                  run[0].index,
+                  token.index + token[0].length - run[0].index,
+                  node,
+                  source,
+                );
+            }
+          }
+        }
         for (const { rule, regex } of compiled) {
           const match = regex.exec(value);
           if (match) report(rule, value, match.index, match[0].length, node, source);
@@ -502,14 +577,31 @@ export function installProbes(rules) {
         }
       };
       const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const steBlocks = new Set();
       for (let text = walker.nextNode(); text; text = walker.nextNode()) {
         const parent = text.parentElement;
         // Field values (a textarea's text) are operator input, not console copy.
         if (!parent || !text.nodeValue.trim() || parent.closest("script,style,template,textarea"))
           continue;
         if (!rendered(parent) || srOnly(parent) || excluded(parent)) continue;
+        const block =
+          parent.closest(
+            "p,label,button,a,summary,h1,h2,h3,h4,h5,h6,li,dt,dd,[role=alert],[role=status]",
+          ) ?? parent;
+        if (!steBlocks.has(block)) {
+          steBlocks.add(block);
+          const primaryText = [...block.childNodes]
+            .map((child) => {
+              if (child.nodeType === Node.TEXT_NODE) return child.nodeValue;
+              if (child.nodeType !== Node.ELEMENT_NODE || excluded(child) || !rendered(child))
+                return "";
+              return child.innerText ?? "";
+            })
+            .join(" ");
+          inspect(normalize(primaryText), block, "primary text", false);
+        }
         const phrase = normalize(text.nodeValue).includes(" ");
-        inspect(text.nodeValue, parent, "text", phrase || !!parent.closest(identifierScope));
+        inspect(text.nodeValue, parent, "text", phrase || !!parent.closest(identifierScope), false);
         if (byteValue.test(text.nodeValue) && bytesLabelled(parent)) {
           const excerpt = normalize(parent.parentElement?.textContent ?? text.nodeValue).slice(
             0,
@@ -534,6 +626,25 @@ export function installProbes(rules) {
           const value = node.getAttribute(attribute);
           if (value) inspect(value, node, attribute, true);
         }
+      }
+      for (const node of document.querySelectorAll("a[href]")) {
+        if (!rendered(node)) continue;
+        let url;
+        try {
+          url = new URL(node.getAttribute("href"), location.href);
+        } catch {
+          report("invalid console link", node.getAttribute("href"), 0, 120, node, "href");
+          continue;
+        }
+        if (url.origin === location.origin) continue;
+        const advisory =
+          node.getAttribute("data-console-link") === "vendor-advisory" &&
+          url.protocol === "https:" &&
+          !url.username &&
+          !url.password &&
+          (!url.port || url.port === "443") &&
+          rules.vocabulary?.vendorAdvisoryHosts.includes(url.hostname);
+        if (!advisory) report("external console link", url.href, 0, url.href.length, node, "href");
       }
       return findings;
     },

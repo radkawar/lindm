@@ -110,6 +110,36 @@ below are in its `screenshots/` directory. Retain them with the before/after rev
 | Device, `devices-deviceid-overview-light-desktop-full.png`               | Hostname first; observed inventory time; explicit lock warning and undo advice. | A long uniform field grid repeats hostname/compliance and gives missing CPU the same weight as contact and encryption. Lead with the device's present situation and next investigation; keep full inventory in Inventory. |
 | Assistance, `devices-deviceid-assistance-sessionid-dark-mobile-full.png` | Named device, support reason, end cause, visible state independent of colour.   | Ended session still says “Leaving this page ends the session” and “Control: Granted”. Lead with who stopped it and when; label historical consent as historical; offer return to device.                                  |
 
+## Simplified Technical English
+
+The owner accepted ASD-STE100 Simplified Technical English for all console copy
+on 2026-10-13. These rules apply to primary rendered text, including accessible
+names, controls, notices and dialogs:
+
+- Limit procedural sentences to 20 words and descriptive sentences to 25 words.
+- Give one instruction per sentence. Use the imperative for procedures.
+- Use active voice. Name the actor when its identity matters.
+- Avoid ambiguous phrasal verbs. Use a direct verb with one clear meaning.
+- Use the controlled vocabulary in `web/src/lib/vocabulary.json`. Use one word
+  for each meaning: **device**, not interchangeable machine, host or endpoint;
+  **remove**, not delete, erase or drop. Keep **wipe** for the destructive action.
+  Technical terms with different meanings, such as a database host, remain distinct.
+- Limit noun clusters to three words. Use a preposition to explain longer groups.
+- Limit paragraphs to six sentences. Remove duplicate explanations.
+- Do not hedge. State confirmed facts, unknown facts and prerequisites directly.
+
+Keep required safety consequences visible. Move reference text into Details or
+the documentation served by the customer's lindmd. Console help links use `/help`;
+public repository links are not console help.
+
+`make ui-review` checks rendered copy for sentence length, passive voice,
+forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.
+Declare narrow exceptions with `data-ste-exempt="rule: reason"` in code.
+Use `data-ste-procedure` for procedural text. Explain each exception; never exempt
+a whole page to avoid editing it. Vendor advisory links shown as source data use
+`data-console-link="vendor-advisory"` and the explicit host allowlist in the
+vocabulary file. Other console links must use the console's origin.
+
 ## Required design review in every console landing note
 
 Report **pass / needs owner decision / not applicable (why)** for each item:

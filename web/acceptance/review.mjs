@@ -741,6 +741,9 @@ async function main() {
   config.copyRules = JSON.parse(
     await readFile(join(config.checkout, "web/acceptance/copy-rules.json"), "utf8"),
   );
+  config.copyRules.vocabulary = JSON.parse(
+    await readFile(join(config.checkout, "web/src/lib/vocabulary.json"), "utf8"),
+  );
   const require = createRequire(import.meta.url);
   config.axeSource = await readFile(require.resolve("axe-core/axe.min.js"), "utf8");
   report.axeVersion = JSON.parse(
