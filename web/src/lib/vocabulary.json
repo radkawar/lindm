@@ -30,6 +30,11 @@
     },
     { "term": "wipe", "meaning": "Destructively remove device data", "forbiddenSynonyms": [] },
     {
+      "term": "discard",
+      "meaning": "Abandon temporary material. Discarding a review does not cancel the request. Discarding a packet sends no reply.",
+      "forbiddenSynonyms": []
+    },
+    {
       "term": "drop-in",
       "meaning": "A systemd configuration fragment, not the remove action",
       "forbiddenSynonyms": []
@@ -156,6 +161,7 @@
     "www.opensuse.org",
     "lists.opensuse.org",
     "security.archlinux.org",
+    "osv-vulnerabilities.storage.googleapis.com",
     "www.cve.org",
     "nvd.nist.gov"
   ]

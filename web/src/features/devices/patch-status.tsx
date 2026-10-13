@@ -159,14 +159,14 @@ export function DevicePatchStatus({ status }: { status: PatchStatusObservation |
       <CardHeader>
         <CardTitle>Patch status</CardTitle>
         <CardDescription>
-          Computed offline on the device from its native package cache and published with the host
-          collection above. Device-reported telemetry, not installation proof.
+          The device computes patch status offline from its package cache. This report does not
+          prove installation.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-6">
         {!status ? (
           <p className="text-muted-foreground">
-            Patch status unknown: this host observation did not report one.
+            Patch status unknown. The latest report contains none.
           </p>
         ) : (
           <>

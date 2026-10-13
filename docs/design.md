@@ -137,6 +137,8 @@ names, controls, notices and dialogs:
 Keep required safety consequences visible. Move reference text into Details or
 the documentation served by the customer's lindmd. Console help links use `/help`;
 public repository links are not console help.
+Show at most three CVE identifiers per finding. Keep longer identifier lists and
+platform lists in the existing Details disclosure.
 
 `make ui-review` checks rendered copy for sentence length, passive voice,
 forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.

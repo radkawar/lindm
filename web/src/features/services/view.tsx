@@ -104,9 +104,11 @@ const SINGLE_STATE_LABELS: Partial<Record<ResourceDisposition, string>> = {
 };
 
 function singleStateSentence(resource: ResourceState): string {
-  const platforms = applicabilityPlatforms(resource.applicability);
-  if (resource.disposition === ResourceDisposition.NOT_APPLICABLE && platforms) {
-    return `It targets ${platforms}. lindm doesn't send it to this device or count it for compliance.`;
+  if (
+    resource.disposition === ResourceDisposition.NOT_APPLICABLE &&
+    resource.applicability?.products.length
+  ) {
+    return "This item targets other platforms. lindm does not send it to this device or count it for compliance.";
   }
   const features = applicabilityFeatures(resource.applicability);
   if (resource.reason === "resource_feature_evidence_unavailable" && features) {
@@ -295,7 +297,8 @@ export function DeviceResources({
                             ))}
                           </p>
                         ) : null}
-                        {resource.desired ||
+                        {resource.applicability?.products.length ||
+                        resource.desired ||
                         resource.reason ||
                         (resource.latestAction && !SINGLE_STATE_LABELS[resource.disposition]) ? (
                           // One Details per row: the item's identifiers and desired
@@ -304,6 +307,10 @@ export function DeviceResources({
                             items={[
                               ...settingTechnicalIds(resource.desired?.ref),
                               { label: "Reason code", value: resource.reason },
+                              {
+                                label: "Target platforms",
+                                value: applicabilityPlatforms(resource.applicability),
+                              },
                             ]}
                           >
                             {resource.desired ? (

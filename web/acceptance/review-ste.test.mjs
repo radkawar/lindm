@@ -81,6 +81,26 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
       ),
       [],
     );
+    assert.deepEqual(
+      await inspect(
+        '<a data-console-link="vendor-advisory" href="https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip">Vendor advisory data</a>',
+      ),
+      [],
+    );
+    assert.ok(
+      (
+        await inspect(
+          '<a href="https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip">Help</a>',
+        )
+      ).includes("external console link"),
+    );
+    assert.ok(
+      (
+        await inspect(
+          '<a data-console-link="vendor-advisory" href="https://storage.googleapis.com/Ubuntu/all.zip">Vendor advisory data</a>',
+        )
+      ).includes("external console link"),
+    );
     assert.ok(
       (
         await inspect(

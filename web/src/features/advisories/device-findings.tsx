@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Fragment, useDeferredValue, useState } from "react";
+import { Fragment, useDeferredValue, useMemo, useState } from "react";
 import {
   AdvisoryFindingState,
   DeviceFindingSort,
@@ -74,6 +74,18 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
   const totals = findings.error ? undefined : findings.data?.totals;
   const filtered = packagePrefix !== "" || advisoryPrefix !== "";
   const freshness = findings.data?.freshness;
+  const cveDetails = useMemo(() => {
+    const items: { label: string; value: string }[] = [];
+    for (const finding of findings.data?.findings ?? []) {
+      if (finding.cves.length > 3) {
+        items.push({
+          label: `${finding.advisoryId} CVEs`,
+          value: finding.cves.join(", "),
+        });
+      }
+    }
+    return items;
+  }, [findings.data?.findings]);
   const current =
     !findings.error &&
     freshness !== undefined &&
@@ -222,10 +234,12 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                 { label: "Feed ID", value: freshness.feedId },
                 { label: "Snapshot ID", value: freshness.snapshotId },
                 { label: "Source SHA-256", value: freshness.sourceSha256 },
+                ...cveDetails,
               ]}
             />
           </>
         ) : null}
+        {!freshness && cveDetails.length ? <TechnicalDetails items={cveDetails} /> : null}
         {findings.data?.findings.length === 0 ? (
           <EmptyState
             title="No findings on this page"
@@ -281,8 +295,15 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                           <span className="font-medium">{finding.advisoryId}</span>
                         )}
                         {finding.cves.length ? (
-                          <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                            {finding.cves.join(", ")}
+                          <code className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                            {finding.cves[0]}
+                            {finding.cves.length > 1 ? `, ${finding.cves[1]}` : null}
+                            {finding.cves.length > 2 ? `, ${finding.cves[2]}` : null}
+                          </code>
+                        ) : null}
+                        {finding.cves.length > 3 ? (
+                          <span className="block text-xs text-muted-foreground">
+                            {finding.cves.length - 3} more in Details.
                           </span>
                         ) : null}
                         <span className="block text-xs text-muted-foreground">

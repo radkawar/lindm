@@ -565,7 +565,7 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
       </div>
       {confirmed && reason.trim() !== "" ? null : (
         <p id={`${id}-prerequisite`} className="text-sm text-muted-foreground">
-          Enter a reason and type the name to delete.
+          Enter a reason. Type the name to confirm removal.
         </p>
       )}
     </form>
