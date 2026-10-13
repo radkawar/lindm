@@ -72,8 +72,24 @@ export function couldNotStart(session: AssistanceSession): boolean {
   );
 }
 
+// UNAVAILABLE details that no package fix resolves: the desktop itself cannot honour
+// consent, lock or control. Every other detail keeps the packages remedy.
+const unsupportedDesktop: Record<string, string> = {
+  notification_actions_hidden:
+    "This desktop's notification server shows no Allow or Decline buttons, so the person can't consent. Remote assistance isn't supported on this desktop.",
+  session_lock_state_unreported:
+    "This desktop doesn't report when its screen locks, so sharing couldn't stop at a lock. Remote assistance isn't supported on this desktop.",
+  portal_remote_desktop_unavailable:
+    "This desktop's screen-sharing portal offers no remote control. Request view only instead.",
+};
+
 export function startFailureRemedy(session: AssistanceSession): ReactNode {
-  return couldNotStart(session) ? startFailures[session.endCause] : null;
+  if (!couldNotStart(session)) return null;
+  if (session.endCause === AssistanceEndCause.UNAVAILABLE) {
+    const unsupported = unsupportedDesktop[session.endDetail];
+    if (unsupported) return unsupported;
+  }
+  return startFailures[session.endCause];
 }
 
 export function AssistanceStateBadge({ session }: { session: AssistanceSession }) {

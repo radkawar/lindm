@@ -12,6 +12,7 @@ import {
   visibleOutcome,
 } from "./assistance-startup.mjs";
 import { decodeNativeMarker, sampleNativeMarker } from "./assistance-marker.mjs";
+import { END_HEADINGS } from "./assistance-end.mjs";
 
 // Line-oriented private control protocol for `lab vm assistance`
 // (internal/vmlab/vm_assistance_browser_linux.go). Each stdin line is one JSON
@@ -617,16 +618,16 @@ const commands = {
     return {};
   },
   async ended(args) {
-    // The viewer states the end cause in the paragraph after its
-    // "Why this session ended" heading.
+    // The viewer states the end cause in the paragraph after its end heading;
+    // a refused request reads "Why it couldn't start" (pop2404-assistance-dbg-01).
     const cause = await until(
       () =>
-        driver.page.evaluate(() => {
-          const heading = [...document.querySelectorAll("h2")].find(
-            (node) => node.textContent.trim() === "Why this session ended",
+        driver.page.evaluate((headings) => {
+          const heading = [...document.querySelectorAll("h2")].find((node) =>
+            headings.includes(node.textContent.trim()),
           );
           return heading?.nextElementSibling?.innerText.trim() ?? "";
-        }),
+        }, END_HEADINGS),
       timeout(args),
       "console_end_cause_timeout",
     );
