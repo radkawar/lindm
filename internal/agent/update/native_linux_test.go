@@ -305,3 +305,46 @@ func TestReleaseZypperNamesRestoresSingleLinkCustody(t *testing.T) {
 		t.Fatalf("unrelated cache file removed: %v", err)
 	}
 }
+
+// A power loss during the self-update's pacman transaction leaves db.lck; the
+// boot recovery's pacman then refused "could not lock database" (Omarchy
+// updates-fin3). Only an empty owned regular lock older than this boot goes.
+func TestReleasePreviousBootPacmanLock(t *testing.T) {
+	owner := uint32(os.Getuid())
+	for _, test := range []struct {
+		name    string
+		content string
+		dir     bool
+		owner   uint32
+		boot    time.Duration // relative to the lock's creation
+		removed bool
+	}{
+		{name: "previous boot", owner: owner, boot: time.Hour, removed: true},
+		{name: "this boot", owner: owner, boot: -time.Hour},
+		{name: "foreign owner", owner: owner + 1, boot: time.Hour},
+		{name: "not empty", content: "1234\n", owner: owner, boot: time.Hour},
+		{name: "directory", dir: true, owner: owner, boot: time.Hour},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "db.lck")
+			var err error
+			if test.dir {
+				err = os.Mkdir(path, 0700)
+			} else {
+				err = os.WriteFile(path, []byte(test.content), 0)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := releasePreviousBootPacmanLock(path, test.owner, time.Now().Add(test.boot)); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) != test.removed {
+				t.Fatalf("removed = %v, want %v", errors.Is(err, os.ErrNotExist), test.removed)
+			}
+		})
+	}
+	if err := releasePreviousBootPacmanLock(filepath.Join(t.TempDir(), "db.lck"), owner, time.Now()); err != nil {
+		t.Fatalf("absent lock: %v", err)
+	}
+}

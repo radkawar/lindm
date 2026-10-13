@@ -370,7 +370,12 @@ mirror while retaining its evidence label.
 Agent self-update is narrower: pacman previews the local admitted package and
 rejects any selection other than `lindm-agent`, then authorizes and runs the local
 `-U` transaction
-([`native_linux.go`](../../internal/agent/update/native_linux.go):466-480).
+([`native_linux.go`](../../internal/agent/update/native_linux.go):466-487).
+A power loss mid-transaction leaves libalpm's `db.lck` (an `O_EXCL` file nothing
+holds open). The boot recovery removes it only when it is an empty root-owned
+regular file last changed before the current boot; a lock from the current boot
+stays and pacman refuses. Omarchy's Btrfs root kept the lock across the lane's
+reset, and recovery failed `could not lock database` until this was handled.
 That code is not a successful native self-update qualification, an OS upgrade or
 a filesystem rollback system. Signed release freshness/replay fences and native
 recovery receipts are independent of repository signing

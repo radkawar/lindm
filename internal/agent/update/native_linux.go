@@ -474,12 +474,57 @@ func applyPackage(ctx context.Context, directory string, tx *agentv1.AgentUpdate
 		if err := authorize(); err != nil {
 			return err
 		}
+		if interrupted {
+			boot, err := bootTime()
+			if err != nil {
+				return err
+			}
+			if err := releasePreviousBootPacmanLock(pacmanLockPath, 0, boot); err != nil {
+				return err
+			}
+		}
 		_, err = mutatingCommand(ctx, phase, "/usr/bin/pacman", "-U", "--noconfirm", "--noprogressbar", path)
 		return err
 	default:
 		return errors.New("native package manager unsupported")
 	}
 	return err
+}
+
+// pacmanLockPath is libalpm's database lock: an O_EXCL file, never held open,
+// that pacman unlinks when its transaction ends.
+const pacmanLockPath = "/var/lib/pacman/db.lck"
+
+// releasePreviousBootPacmanLock removes the lock a transaction interrupted by
+// power loss leaves behind. Nothing can hold a lock last changed before this
+// boot, yet every boot recovery's own `pacman -U` refused "could not lock
+// database" (Omarchy self-update: the reset landed after Btrfs had committed
+// db.lck). Only an empty root-owned regular file older than this boot is
+// removed; any lock from this boot stays and pacman refuses with its own error.
+func releasePreviousBootPacmanLock(path string, owner uint32, boot time.Time) error {
+	var st unix.Stat_t
+	if err := unix.Lstat(path, &st); errors.Is(err, unix.ENOENT) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if st.Mode&unix.S_IFMT != unix.S_IFREG || st.Uid != owner || st.Size != 0 || !time.Unix(st.Ctim.Unix()).Before(boot) {
+		return nil
+	}
+	return unix.Unlink(path)
+}
+
+// bootTime is the wall-clock instant the kernel booted under the current
+// clock, the /proc/stat btime derivation, so it moves with any clock step.
+func bootTime() (time.Time, error) {
+	var realtime, boottime unix.Timespec
+	if err := unix.ClockGettime(unix.CLOCK_REALTIME, &realtime); err != nil {
+		return time.Time{}, err
+	}
+	if err := unix.ClockGettime(unix.CLOCK_BOOTTIME, &boottime); err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(0, realtime.Nano()-boottime.Nano()), nil
 }
 
 // zypperUpdateCommand installs only the verified input RPM. --disable-repositories

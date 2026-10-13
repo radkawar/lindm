@@ -30,8 +30,8 @@ const localAdminFixtureScript = `set -eu
 ` + nativeOSRelease + `
 case "$ID" in
  ubuntu) admin=sudo ;;
- fedora) admin=wheel ;;
- *) echo 'local-admin lane requires Ubuntu or Fedora' >&2; exit 1 ;;
+ fedora|arch) admin=wheel ;;
+ *) echo 'local-admin lane requires Ubuntu, Fedora or Arch' >&2; exit 1 ;;
 esac
 useradd --create-home --shell /bin/bash --groups "$admin" ` + localAdminLabAccount + `
 if command -v restorecon >/dev/null 2>&1; then restorecon -RF /home/` + localAdminLabAccount + `; fi
