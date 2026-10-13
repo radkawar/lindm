@@ -2020,6 +2020,33 @@ rejuvenating retained native proof; trust and empty-work polls remain read-only.
 Concurrent enrollment coverage uses generic profile revisions without bypassing
 pending approval or fixed authorization-version fences.
 
+The 2026-10-13 integration regression investigation at `9b251718` reproduced
+`TestOrganizationTargetsEnrolledDeviceIdempotently` 20/20 times. It was not lost
+membership: both Engineering enrollment IDs were identical before and after the
+rejected create-only call. Commit `a9893a4d` added an enrolled-but-uninventoried
+device to prevent unchanged organization apply from repeatedly starting empty
+rollouts, but left the older one-member assertion stale. The regression now checks
+both expected members before the call and the exact membership snapshot afterward.
+It and a deterministic create-only write blocked behind an uncommitted group and
+enrollment membership each passed 20 runs under the race detector.
+
+The 10,000-device impact comparison used real PostgreSQL with `-race` and the same
+protected fixture. Before the rollout redesign (`b530e0cd^`, `f26c7865`), build /
+500-page traversal / save took 8.357 / 48.323 / 5.141 seconds. At `9b251718`,
+`StartRollout` exceeded the unchanged 15-second product RPC budget. Profiling
+identified repeated JSON encoding of maximum report metadata; first-stage freezing
+also added per-device lock/read/clock queries and individual membership inserts.
+These are linear overheads, not evidence of quadratic provenance computation.
+After encoding the metadata reserve once and paging locked stage inputs and
+membership copies, two runs took 8.555 / 55.808 / 5.217 and
+6.036 / 48.680 / 5.095 seconds. Both retained all 10,000 report rows and frozen
+members, one eligible enrolled device and 9,999 excluded pending devices, with
+every response below the existing 1 MiB protobuf/JSON bounds. No deadline changed.
+Measurements are retained at
+`~/.cache/lindm-integ-red-20261013/measurements.json`. This synthetic pending-device
+cohort is a server regression gate, not native-provider or full active-fleet
+latency qualification.
+
 On 2026-10-10 the landed tree passed `make generate`, `go build ./...`,
 `go vet ./...`, `npm run build:web`, `npm run typecheck:web`, and unit race
 tests for resource, policy, targeting, device, identity, ctl, loadlab and devlab.

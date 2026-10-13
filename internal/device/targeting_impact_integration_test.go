@@ -206,13 +206,27 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	if persistedRows != 10000 || persistedBytes > 64<<20 {
 		t.Fatalf("unbounded persisted report: rows=%d bytes=%d", persistedRows, persistedBytes)
 	}
+	t.Logf("10k impact before start: build=%s pages=%s", buildDuration, pageDuration)
 	saveStart := time.Now()
 	saveCtx, cancelSave := context.WithTimeout(f.adminCtx, 30*time.Second)
 	defer cancelSave()
-	if _, err := f.service.StartRollout(saveCtx, connect.NewRequest(reviewedRollout(review, "Roll out fully reviewed 10000-device baseline"))); err != nil {
+	started, err := f.service.StartRollout(saveCtx, connect.NewRequest(reviewedRollout(review, "Roll out fully reviewed 10000-device baseline")))
+	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("10k impact build=%s pages=%s save=%s max_protobuf=%d max_json=%d persisted_rows=%d persisted_bytes=%d", buildDuration, pageDuration, time.Since(saveStart), maxProto, maxJSON, persistedRows, persistedBytes)
+	saveDuration := time.Since(saveStart)
+	state := started.Msg.GetRollout()
+	if state.GetSelectedCount() != 1 || state.GetPendingCount() != 0 || state.GetExcludedCount() != 9999 {
+		t.Fatalf("10k first stage changed cohort eligibility: %v", state)
+	}
+	var members, included, pendingGenerations int
+	if err := f.pool.QueryRow(t.Context(), "SELECT count(*),count(*) FILTER(WHERE membership=1),count(*) FILTER(WHERE generation_id IS NULL AND membership=2) FROM resource_rollout_members WHERE rollout_id=$1 AND ring_index=0", uuid.MustParse(state.GetRollout().GetRolloutId())).Scan(&members, &included, &pendingGenerations); err != nil {
+		t.Fatal(err)
+	}
+	if members != 10000 || included != 1 || pendingGenerations != 9999 {
+		t.Fatalf("10k first stage lost durable members: members=%d included=%d pending_generations=%d", members, included, pendingGenerations)
+	}
+	t.Logf("10k impact build=%s pages=%s save=%s max_protobuf=%d max_json=%d persisted_rows=%d persisted_bytes=%d", buildDuration, pageDuration, saveDuration, maxProto, maxJSON, persistedRows, persistedBytes)
 }
 
 // reviewedRollout rolls out exactly the reviewed proposal to everyone at once.

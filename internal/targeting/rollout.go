@@ -135,18 +135,26 @@ type member struct {
 }
 
 func (s *Store) freezeStage(ctx context.Context, q *targetingdb.Queries, p identity.Principal, perm identity.Permission, spec *policyv1.RolloutSpec, index int32) error {
+	if err := unrestricted(p, perm); err != nil {
+		return err
+	}
 	ring := spec.Rings[index]
 	id := uuid.MustParse(spec.RolloutId)
 	after := uuid.Nil
 	members := make([]member, 0)
 	var excludedCount int32
 	for {
-		ids, err := q.ListTargetingDevices(ctx, after)
+		devices, err := q.ListRolloutDevicePage(ctx, after)
 		if err != nil {
 			return err
 		}
-		for _, deviceID := range ids {
-			e, err := loadEvaluation(ctx, q, p, perm, deviceID)
+		// Query the clock after the page's device locks have been acquired.
+		now, err := q.TargetingClock(ctx)
+		if err != nil {
+			return err
+		}
+		for _, device := range devices {
+			e, err := evaluationFromDevice(q, targetingdb.TargetingDeviceRow(device), now.Time)
 			if err != nil {
 				return err
 			}
@@ -163,13 +171,13 @@ func (s *Store) freezeStage(ctx context.Context, q *targetingdb.Queries, p ident
 			} else {
 				match = unknown
 			}
-			members = append(members, member{id: deviceID, generation: e.input.Device.CurrentGenerationID, bucket: Bucket(id, spec.Salt, deviceID), match: match})
+			members = append(members, member{id: device.ID, generation: e.input.Device.CurrentGenerationID, bucket: Bucket(id, spec.Salt, device.ID), match: match})
 			if len(members) > 10000 {
 				return ErrCapacity
 			}
-			after = deviceID
+			after = device.ID
 		}
-		if len(ids) < 200 {
+		if len(devices) < 200 {
 			break
 		}
 	}
@@ -199,8 +207,18 @@ func (s *Store) freezeStage(ctx context.Context, q *targetingdb.Queries, p ident
 	if err := q.InsertRolloutStage(ctx, targetingdb.InsertRolloutStageParams{RolloutID: id, RingIndex: index, SelectedCount: selected, PendingCount: int32(len(members)) - selected - excludedCount, ExcludedCount: excludedCount}); err != nil {
 		return err
 	}
+	batch := make([]targetingdb.InsertRolloutMemberParams, 0, 200)
 	for _, m := range members {
-		if err := q.InsertRolloutMember(ctx, targetingdb.InsertRolloutMemberParams{RolloutID: id, RingIndex: index, DeviceID: m.id, GenerationID: m.generation, Bucket: int32(m.bucket), Membership: int16(m.match)}); err != nil {
+		batch = append(batch, targetingdb.InsertRolloutMemberParams{RolloutID: id, RingIndex: index, DeviceID: m.id, GenerationID: m.generation, Bucket: int32(m.bucket), Membership: int16(m.match)})
+		if len(batch) == cap(batch) {
+			if _, err := q.InsertRolloutMember(ctx, batch); err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+	if len(batch) > 0 {
+		if _, err := q.InsertRolloutMember(ctx, batch); err != nil {
 			return err
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -76,7 +77,8 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	// stays pending: no rollout can plan it, and it must not make every apply
 	// start (and request approval for) another rollout.
 	pendingRequest, _ := provisionIntent(t, token)
-	if _, err := f.svc.Provision(t.Context(), connect.NewRequest(pendingRequest)); err != nil {
+	pendingEnrollment, err := f.svc.Provision(t.Context(), connect.NewRequest(pendingRequest))
+	if err != nil {
 		t.Fatal(err)
 	}
 	plan, err = orgapply.Plan(f.stepUp, f.svc, spec)
@@ -203,17 +205,24 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	// An absent-group plan may race enrollment. The create-only API guard must not
 	// rewrite the now-populated group's authorization membership.
 	group := spec.GetGroups()[0]
+	membershipBefore, err := f.svc.ListDeviceGroups(f.stepUp, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{GroupIds: []string{group.GetId()}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedMembers := []string{enrolled.Msg.GetDeviceId(), pendingEnrollment.Msg.GetDeviceId()}
+	slices.Sort(expectedMembers)
+	if len(membershipBefore.Msg.GetGroups()) != 1 || !slices.Equal(membershipBefore.Msg.GetGroups()[0].GetDeviceIds(), expectedMembers) {
+		t.Fatalf("enrollment did not retain both Engineering memberships: %v", membershipBefore.Msg)
+	}
 	_, err = f.svc.SetDeviceGroup(f.stepUp, connect.NewRequest(&adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: group.GetId(), Name: group.GetName(), CreateOnly: true, Reason: "stale absent group plan regression"}))
 	if connect.CodeOf(err) != connect.CodeAborted {
 		t.Fatalf("create-only existing group: %v", err)
 	}
-	groups, err := f.svc.ListDeviceGroups(f.stepUp, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{}))
+	groups, err := f.svc.ListDeviceGroups(f.stepUp, connect.NewRequest(&adminv1.ListDeviceGroupsRequest{GroupIds: []string{group.GetId()}}))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, g := range groups.Msg.GetGroups() {
-		if g.GetId() == group.GetId() && (len(g.GetDeviceIds()) != 1 || g.GetDeviceIds()[0] != enrolled.Msg.GetDeviceId()) {
-			t.Fatal("create-only race erased enrolled RBAC membership")
-		}
+	if len(groups.Msg.GetGroups()) != 1 || !slices.Equal(groups.Msg.GetGroups()[0].GetDeviceIds(), membershipBefore.Msg.GetGroups()[0].GetDeviceIds()) {
+		t.Fatalf("create-only race erased enrolled RBAC membership: before %v, after %v", membershipBefore.Msg, groups.Msg)
 	}
 }

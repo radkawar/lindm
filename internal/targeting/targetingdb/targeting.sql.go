@@ -263,10 +263,6 @@ func (q *Queries) InsertRolloutEvent(ctx context.Context, arg InsertRolloutEvent
 	return err
 }
 
-const insertRolloutMember = `-- name: InsertRolloutMember :exec
-INSERT INTO resource_rollout_members(rollout_id,ring_index,device_id,generation_id,bucket,membership) VALUES ($1,$2,$3,$4,$5,$6)
-`
-
 type InsertRolloutMemberParams struct {
 	RolloutID    uuid.UUID
 	RingIndex    int32
@@ -274,18 +270,6 @@ type InsertRolloutMemberParams struct {
 	GenerationID *uuid.UUID
 	Bucket       int32
 	Membership   int16
-}
-
-func (q *Queries) InsertRolloutMember(ctx context.Context, arg InsertRolloutMemberParams) error {
-	_, err := q.db.Exec(ctx, insertRolloutMember,
-		arg.RolloutID,
-		arg.RingIndex,
-		arg.DeviceID,
-		arg.GenerationID,
-		arg.Bucket,
-		arg.Membership,
-	)
-	return err
 }
 
 const insertRolloutStage = `-- name: InsertRolloutStage :exec
@@ -473,6 +457,93 @@ func (q *Queries) ListDynamicGroups(ctx context.Context, arg ListDynamicGroupsPa
 	return items, nil
 }
 
+const listRolloutDevicePage = `-- name: ListRolloutDevicePage :many
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ ''::text AS previous_preview_id,
+ ''::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id > $1::uuid
+ORDER BY d.id LIMIT 200
+FOR UPDATE OF d
+`
+
+type ListRolloutDevicePageRow struct {
+	ID                   uuid.UUID
+	CurrentGenerationID  *uuid.UUID
+	State                string
+	Hostname             string
+	OsID                 string
+	OsVersion            string
+	HostnameStatus       int16
+	OsIDStatus           int16
+	OsVersionStatus      int16
+	HostSequence         int64
+	HostDigest           []byte
+	Architecture         string
+	LastSeenAt           pgtype.Timestamptz
+	HostReceivedAt       pgtype.Timestamptz
+	Metadata             []byte
+	Labels               []string
+	Groups               []string
+	PreviousPreviewID    string
+	ResourceAssignmentID string
+}
+
+// The rollout caller requires unrestricted authority. Lock one bounded page
+// in device-ID order and read membership inputs together, not per device.
+func (q *Queries) ListRolloutDevicePage(ctx context.Context, afterID uuid.UUID) ([]ListRolloutDevicePageRow, error) {
+	rows, err := q.db.Query(ctx, listRolloutDevicePage, afterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRolloutDevicePageRow{}
+	for rows.Next() {
+		var i ListRolloutDevicePageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CurrentGenerationID,
+			&i.State,
+			&i.Hostname,
+			&i.OsID,
+			&i.OsVersion,
+			&i.HostnameStatus,
+			&i.OsIDStatus,
+			&i.OsVersionStatus,
+			&i.HostSequence,
+			&i.HostDigest,
+			&i.Architecture,
+			&i.LastSeenAt,
+			&i.HostReceivedAt,
+			&i.Metadata,
+			&i.Labels,
+			&i.Groups,
+			&i.PreviousPreviewID,
+			&i.ResourceAssignmentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRollouts = `-- name: ListRollouts :many
 SELECT id FROM resource_rollouts
 WHERE id > $1::uuid
@@ -619,30 +690,6 @@ func (q *Queries) ListTargetingDevicePage(ctx context.Context, afterID uuid.UUID
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTargetingDevices = `-- name: ListTargetingDevices :many
-SELECT id FROM devices WHERE id > $1::uuid ORDER BY id LIMIT 200
-`
-
-func (q *Queries) ListTargetingDevices(ctx context.Context, afterID uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listTargetingDevices, afterID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package targeting
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/types/known/wrapperspb"
@@ -40,5 +41,42 @@ func TestAttributeValueMatchesDefinitionSemantics(t *testing.T) {
 	}
 	if AttributeValueMatches(nil, &adminv1.AttributeValue{Value: &adminv1.AttributeValue_IntValue{IntValue: 0}}) {
 		t.Fatal("undeclared attribute admitted")
+	}
+}
+
+// A retained device must still fit when the response carries maximum final
+// counts, adoption references and a continuation cursor, including JSON escapes.
+func TestImpactRowBudgetReservesFullResponseMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		hostname string
+		capacity bool
+	}{
+		{name: "large reviewable row", hostname: strings.Repeat("x", maxDocumentBytes/2)},
+		{name: "metadata pushes row over ceiling", hostname: strings.Repeat("x", maxDocumentBytes-1024), capacity: true},
+		{name: "JSON escaping exceeds ceiling", hostname: strings.Repeat("\x00", maxDocumentBytes/6), capacity: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			envelope := impactEnvelope(nil, 0, &adminv1.PreviewTargetAssignmentImpactResponse{})
+			budget, err := newImpactRowBudget(envelope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			item := &adminv1.TargetAssignmentDeviceImpact{Hostname: test.hostname}
+			err = budget.validate(item)
+			if test.capacity {
+				if !errors.Is(err, ErrCapacity) {
+					t.Fatalf("unreviewable impact row accepted: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			envelope.Devices = []*adminv1.TargetAssignmentDeviceImpact{item}
+			if err := ValidateResponse(envelope); err != nil {
+				t.Fatalf("accepted impact row cannot be reviewed with full metadata: %v", err)
+			}
+		})
 	}
 }

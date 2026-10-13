@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -186,13 +187,15 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 	if err != nil {
 		return nil, nil, err
 	}
-	u, scopes := params.Unrestricted, params.Scopes
 	now, err := q.TargetingClock(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	report := &adminv1.PreviewTargetAssignmentImpactResponse{Assignment: proto.CloneOf(proposal), ExpectedRevision: expected, EvaluatedAt: timestamppb.New(now.Time), ValidUntil: timestamppb.New(now.Time.Add(15 * time.Minute)), Complete: true}
-	envelope := impactEnvelope(proposal, expected, report)
+	envelope, err := newImpactRowBudget(impactEnvelope(proposal, expected, report))
+	if err != nil {
+		return nil, nil, err
+	}
 	h := sha256.New()
 	_, _ = h.Write(catalog.digest)
 	totalBytes, scanned := 0, 0
@@ -221,7 +224,7 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 			report.CandidateCount++
 			// TargetingDevice already locks the scoped row; the report uses one
 			// pinned evaluation clock rather than querying the clock per member.
-			device, err := q.TargetingDevice(ctx, targetingdb.TargetingDeviceParams{DeviceID: candidate.ID, Unrestricted: u, Scopes: scopes})
+			device, err := q.TargetingDevice(ctx, targetingdb.TargetingDeviceParams{DeviceID: candidate.ID, Unrestricted: params.Unrestricted, Scopes: params.Scopes})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -246,8 +249,7 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 			if current == nil || proposed == nil {
 				return nil, nil, ErrRejected
 			}
-			d := e.input.Device
-			changed, direct, err := deviceImpactChange(ctx, q, d, current, proposed, match, proposal.AssignmentId)
+			changed, direct, err := deviceImpactChange(ctx, q, device, current, proposed, match, proposal.AssignmentId)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -269,7 +271,7 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 			_, _ = h.Write(input)
 			_, _ = h.Write(digest("impact.device", b))
 			if retain != nil {
-				if err := q.InsertImpactDevice(ctx, targetingdb.InsertImpactDeviceParams{ReportID: *retain, DeviceID: d.ID, Document: b}); err != nil {
+				if err := q.InsertImpactDevice(ctx, targetingdb.InsertImpactDeviceParams{ReportID: *retain, DeviceID: device.ID, Document: b}); err != nil {
 					return nil, nil, err
 				}
 			}
@@ -277,14 +279,14 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 			// Change and adoption counts cover only devices a rollout plans (the
 			// StartRollout planner): a device without an active generation keeps
 			// its row, marked device_not_active, but no rollout would change it.
-			if d.CurrentGenerationID != nil && d.State == "active" {
+			if device.CurrentGenerationID != nil && device.State == "active" {
 				if match == included {
 					countAdoption(report, proposed)
 				}
 				countImpactChange(report, match, changed, direct)
 			}
 			if plan != nil {
-				if err := plan(plannedDevice{id: d.ID, generation: d.CurrentGenerationID, state: d.State, match: match, proposed: proposed, changed: changed, head: d.ResourceAssignmentID}); err != nil {
+				if err := plan(plannedDevice{id: device.ID, generation: device.CurrentGenerationID, state: device.State, match: match, proposed: proposed, changed: changed, head: device.ResourceAssignmentID}); err != nil {
 					return nil, nil, err
 				}
 			}
@@ -365,9 +367,9 @@ func impactEnvelope(proposal *policyv1.TargetAssignment, expected uint64, report
 		ReviewSha256: make([]byte, sha256.Size), CandidateCount: maxImpactDevices,
 		EvaluatedDeviceCount: maxImpactDevices, TargetCount: maxImpactDevices,
 		IncludedCount: maxImpactDevices, ExcludedCount: maxImpactDevices, UnknownCount: maxImpactDevices,
-		Reasons:       []string{"candidate_limit", "report_byte_limit", "device_visibility_incomplete", "response_envelope_reserve"},
-		Devices:       make([]*adminv1.TargetAssignmentDeviceImpact, 1),
-		AdoptingCount: maxImpactDevices, ApprovalRequired: true, ChangedCount: maxImpactDevices, RemovingCount: maxImpactDevices, ReplacingDirectCount: maxImpactDevices, Adopted: make([]*resourcev1.ResourceRef, maxAdoptedRefs),
+		Reasons:           []string{"candidate_limit", "report_byte_limit", "device_visibility_incomplete", "response_envelope_reserve"},
+		NextAfterDeviceId: proto.String(uuid.Nil.String()),
+		AdoptingCount:     maxImpactDevices, ApprovalRequired: true, ChangedCount: maxImpactDevices, RemovingCount: maxImpactDevices, ReplacingDirectCount: maxImpactDevices, Adopted: make([]*resourcev1.ResourceRef, maxAdoptedRefs),
 	}
 	for i := range envelope.Adopted {
 		envelope.Adopted[i] = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: strings.Repeat("k", 1024)}
@@ -375,7 +377,43 @@ func impactEnvelope(proposal *policyv1.TargetAssignment, expected uint64, report
 	return envelope
 }
 
-func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, changed, direct bool, envelope *adminv1.PreviewTargetAssignmentImpactResponse) ([]byte, error) {
+// The metadata reserve is identical for every row. Serialize it once rather
+// than serializing the 64 maximum-length adoption references for every device.
+type impactRowBudget struct {
+	protobuf int
+	json     int
+	row      *adminv1.PreviewTargetAssignmentImpactResponse
+}
+
+func newImpactRowBudget(envelope *adminv1.PreviewTargetAssignmentImpactResponse) (*impactRowBudget, error) {
+	b, err := protojson.Marshal(envelope)
+	if err != nil {
+		return nil, err
+	}
+	return &impactRowBudget{
+		protobuf: proto.Size(envelope), json: len(b),
+		row: &adminv1.PreviewTargetAssignmentImpactResponse{Devices: make([]*adminv1.TargetAssignmentDeviceImpact, 1)},
+	}, nil
+}
+
+func (budget *impactRowBudget) validate(item *adminv1.TargetAssignmentDeviceImpact) error {
+	budget.row.Devices[0] = item
+	if budget.protobuf+proto.Size(budget.row) > maxDocumentBytes {
+		return ErrCapacity
+	}
+	b, err := protojson.Marshal(budget.row)
+	if err != nil {
+		return err
+	}
+	// Adding the two JSON object sizes conservatively reserves their joining
+	// comma and its optional space as well as the devices field and brackets.
+	if budget.json+len(b) > maxDocumentBytes {
+		return ErrCapacity
+	}
+	return nil
+}
+
+func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, changed, direct bool, envelope *impactRowBudget) ([]byte, error) {
 	d := e.input.Device
 	item := &adminv1.TargetAssignmentDeviceImpact{DeviceId: d.ID.String(), Hostname: d.Hostname, OsId: d.OsID, OsVersion: d.OsVersion, Architecture: d.Architecture, State: d.State, Match: match, CurrentResolution: current, ProposedResolution: proposed, Changed: changed, ReplacesDirectAssignment: direct, Reasons: []string{"native_capabilities_unknown"}}
 	if d.HostReceivedAt.Valid {
@@ -408,9 +446,7 @@ func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolut
 		}
 	}
 	// Every retained row must be individually reviewable with full metadata.
-	envelope.Devices[0] = item
-	envelope.NextAfterDeviceId = &item.DeviceId
-	if err := ValidateResponse(envelope); err != nil {
+	if err := envelope.validate(item); err != nil {
 		return nil, err
 	}
 	return encoded(item)

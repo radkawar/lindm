@@ -776,6 +776,11 @@ still constrain row visibility. Neither a target nor a pagination cursor grants
 access to hidden devices. Pages recheck visibility and retain the same actor,
 proposal, digest and evaluation timestamp.
 
+The maximum report-metadata reserve (including adoption references) is encoded
+once per evaluation; each device checks only its own protobuf and JSON contribution
+against the remaining budget. It still must fit a page with every final count,
+reason and continuation cursor; JSON escaping cannot bypass the ceiling.
+
 `StartRollout` is the one reviewed mutation (design note:
 [rollout flow](design-concepts/rollout-flow.md)). It binds the exact proposal (which
 must not name a rollout), expected assignment revision, report digest and a stage
@@ -811,6 +816,11 @@ humans need unrestricted `resources.assign`) whose payload is the exact request.
 Without a request within an hour, or on rejection or expiry, the rollout ends
 visibly. Otherwise, the start saves the assignment bound to the new rollout and
 freezes the first stage in the same transaction; a start never activates a device.
+Stage freezing reads and locks device inputs in ID-ordered pages of 200, queries
+the evaluation clock after each page's locks, and persists frozen membership with
+bounded 200-row copies. It retains inactive devices as excluded members, including
+their nullable enrollment generation, and keeps the original 10,000-device cap,
+minimum cohort gates and salted selection.
 
 Impact reports are immutable while retained, expire within 15 minutes (earlier at
 relevant freshness/window boundaries), and are capped at five reports per actor.
