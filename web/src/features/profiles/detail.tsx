@@ -237,8 +237,8 @@ export function ProfileDetailView({
       {headFailure ? (
         <RpcError failure={headFailure}>
           <p>
-            Couldn't load the latest version. Refresh before editing.
-            {attempt ? " You can still retry saving your draft." : ""}
+            Cannot load the latest version. Refresh before editing.
+            {attempt ? " Retry saving your existing draft if necessary." : ""}
           </p>
         </RpcError>
       ) : null}

@@ -121,7 +121,7 @@ export function Accounts({
   const failure = error ? (
     <RpcError failure={error}>
       {error.ambiguous ? (
-        <p>The change may have gone through. Refresh the list before trying again.</p>
+        <p>The change outcome is unknown. Refresh the list before trying again.</p>
       ) : null}
     </RpcError>
   ) : null;
@@ -162,8 +162,8 @@ export function Accounts({
         >
           <h2 className="font-semibold">Save this enrollment secret now</h2>
           <p className="max-w-3xl text-sm">
-            Send it to the account holder privately and have them open /enroll. It won't be shown
-            again.
+            Send the secret privately to the account holder. Ask them to open /enroll. The console
+            never shows this secret again.
           </p>
           <code className="border bg-background p-3 break-all select-all">{enrollment.secret}</code>
           <p className="text-sm">
@@ -335,7 +335,11 @@ export function Accounts({
 // Enrollment sets the password and the passkey in one step, and a reset clears both.
 function AccountState({ account }: { account: LocalAccount }) {
   const [status, label, description] = !account.enabled
-    ? (["neutral", "Disabled", "Can't sign in until the account is enabled."] as const)
+    ? ([
+        "neutral",
+        "Disabled",
+        "An administrator must enable this account before sign-in.",
+      ] as const)
     : !account.enrolled
       ? (["warning", "Waiting for enrollment", "No password or passkey set yet."] as const)
       : (["success", "Password and passkey set", "Can sign in."] as const);
@@ -532,9 +536,9 @@ function AccountEditor({
             Reset {account.username}'s credentials?
           </h3>
           <p>
-            {account.username} is signed out now and their password and passkey are removed. They
-            can't sign in until they enroll again with the new one-time secret shown on this page.
-            This can't be undone.
+            This reset signs out {account.username} and removes their password and passkey. They
+            cannot sign in until they enroll with the new one-time secret shown here. You cannot
+            undo this reset.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="destructive" disabled={busy} onClick={onReset}>

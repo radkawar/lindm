@@ -80,8 +80,8 @@ export function useIntegrationAction(): IntegrationAction {
           {failure.ambiguous ? (
             <>
               <p>
-                This may have gone through. Try again before making another change; leaving this
-                page cancels the retry.
+                The change outcome is unknown. Retry before making another change. Leaving this page
+                cancels the retry.
               </p>
               <Button
                 className="w-fit"

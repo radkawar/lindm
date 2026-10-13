@@ -543,16 +543,16 @@ function Artifacts() {
                   </StatusBadge>
                   {artifact.state === "queued" || artifact.state === "building" ? (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Being prepared. Use Refresh at the top of the page to check for the download.
+                      Preparing report. Select Refresh to check for the download.
                     </p>
                   ) : null}
                   {artifact.failureReason ? (
                     <p role="alert" className="mt-1 break-words text-xs text-destructive">
                       {artifact.kind === ReportKind.AUDIT_SELECTION
                         ? artifact.failureReason === "report_limit_exceeded"
-                          ? "Too many matching events or too much evidence to export. Narrow the audit filters or time range and start another export. No partial evidence is available."
-                          : "The filtered evidence could not be exported. Review the details before trying again."
-                        : "This report failed and has no partial data. The failure reason is in Details."}
+                          ? "The export exceeds the event or evidence limit. Narrow the audit filters or time range. Start another export. No partial evidence is available."
+                          : "The export failed. Review Details before trying again."
+                        : "This report failed. No partial data is available. Review the failure reason in Details."}
                     </p>
                   ) : null}
                 </TableCell>

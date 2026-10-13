@@ -32,10 +32,10 @@ const PAGE_SIZES = [50, 100] as const;
 
 const ATTEMPT_LABEL: Record<PublishStatus, string> = {
   inflight: "A profile is still saving.",
-  ambiguous: "A save may not have gone through.",
-  conflict: "A save was blocked by a newer change.",
-  rejected: "A save was rejected.",
-  published: "A profile was published.",
+  ambiguous: "The save outcome is unknown.",
+  conflict: "A newer change blocked the save.",
+  rejected: "The server rejected a save.",
+  published: "The server published a profile.",
 };
 
 export function ProfilesView({

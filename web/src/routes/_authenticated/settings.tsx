@@ -32,7 +32,7 @@ function SettingsRoute() {
     <div className="grid min-w-0 gap-6">
       <PageHeader
         title="Settings"
-        description="Check whether this server can enroll devices, define the attributes devices carry, and choose what the agent may change on them."
+        description="Check enrollment readiness. Set device attributes and agent permissions. Review assistant access."
         onRefresh={() => void queryClient.refetchQueries({ type: "active" })}
         refreshing={fetching > 0}
       />

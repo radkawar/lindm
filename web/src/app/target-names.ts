@@ -21,7 +21,7 @@ function useGroupLabel(id: string) {
   if (query.data) return { text: query.data.name || "Unnamed group", ready: true };
   if (query.isPending) return { text: "Loading name…", ready: false };
   if (query.error) return { text: "Group name unavailable", ready: false };
-  return { text: "Deleted device group", ready: false };
+  return { text: "Removed device group", ready: false };
 }
 
 // The target's display name, or why it is unavailable. Every lookup runs

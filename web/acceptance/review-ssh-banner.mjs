@@ -17,7 +17,7 @@ export async function reviewSSHBanner({
     "\n";
   for (const [index, { theme, viewport }] of combos.entries()) {
     const page = pages[index];
-    let step = "choose SSH login banner";
+    let step = "choose SSH sign-in banner";
     try {
       await visit(page, "/profiles/new");
       await page
@@ -27,7 +27,7 @@ export async function reviewSSHBanner({
         .getByLabel("Reason", { exact: true })
         .fill("Review public SSH notice; no devices assigned");
       await page.getByLabel("Setting type", { exact: true }).click();
-      await page.getByRole("option", { name: "SSH login banner", exact: true }).click();
+      await page.getByRole("option", { name: "SSH sign-in banner", exact: true }).click();
       const field = page.getByLabel("Notice before SSH sign-in", { exact: true });
       await field.waitFor();
       await review(
@@ -88,7 +88,7 @@ export async function reviewSSHBanner({
       if (await published.count()) await published.locator(":scope > summary").click();
       const saved = page
         .locator("[data-profile-setting]")
-        .filter({ has: page.getByRole("heading", { name: /^SSH login banner/ }) });
+        .filter({ has: page.getByRole("heading", { name: /^SSH sign-in banner/ }) });
       await saved.getByText("Full setting", { exact: true }).click();
       const record = JSON.parse((await saved.locator("pre").textContent()) ?? "");
       if (record.desired?.sshServer?.bannerText !== notice)

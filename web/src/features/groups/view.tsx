@@ -328,7 +328,7 @@ function GroupEditor({
       lifetime.signal.throwIfAborted();
       toast.success(
         exact.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
-          ? "Group deleted"
+          ? "Group removed"
           : "Group saved",
       );
       await client.invalidateQueries({ queryKey: ["device-groups", lifetime.generation] });
@@ -397,7 +397,7 @@ function GroupEditor({
       {failure ? (
         <RpcError failure={failure}>
           {failure.ambiguous ? (
-            <p>We couldn&apos;t confirm the change. Try again: it won&apos;t apply twice.</p>
+            <p>The change outcome is unknown. Retry the same request. It cannot apply twice.</p>
           ) : null}
         </RpcError>
       ) : null}
@@ -431,15 +431,15 @@ function GroupEditor({
               if (
                 attempt ||
                 window.confirm(
-                  `Delete the group “${group.name}” (${deviceCount(group.deviceIds.length)})? Accounts limited to this group lose access to these devices. The devices stay enrolled. This can't be undone.`,
+                  `Remove the group “${group.name}” (${deviceCount(group.deviceIds.length)})? Accounts limited to this group lose access to these devices. The devices stay enrolled. You cannot undo this removal.`,
                 )
               )
                 void save(true);
             }}
           >
             {attempt?.$typeName === "lindm.admin.v1.DeleteDeviceGroupRequest"
-              ? "Try deleting again"
-              : "Delete group"}
+              ? "Retry removal"
+              : "Remove group"}
           </Button>
         ) : null}
         {group && reason.trim() === "" ? (

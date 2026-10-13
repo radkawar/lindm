@@ -218,9 +218,9 @@ function settingMessage(violation: Violation, all: Violation[]): string | null {
       );
       return required
         ? null
-        : "Use plain text in the SSH login notice, without terminal control characters.";
+        : "Use plain text in the SSH sign-in notice. Do not include terminal control characters.";
     }
-    return violationText("SSH login notice", violation.ruleId, violation.message);
+    return violationText("SSH sign-in notice", violation.ruleId, violation.message);
   }
   if (violation.ruleId === EMPTY_SETTING_RULE) {
     return last?.kind === "field" && last.localName === "firewallZone"

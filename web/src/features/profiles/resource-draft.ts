@@ -21,12 +21,12 @@ export const resourceKinds = [
   {
     arm: "managedFile",
     label: "Managed file",
-    help: "Write a file at an approved path. Don't put secrets here.",
+    help: "Write a file at an approved path. Do not include secrets.",
   },
   {
     arm: "localUser",
     label: "Local user",
-    help: "Create or remove a local account. Home folders are never deleted.",
+    help: "Create or remove a local account. The device keeps home folders.",
   },
   {
     arm: "localGroup",
@@ -51,7 +51,7 @@ export const resourceKinds = [
   {
     arm: "encryptionCompliance",
     label: "Encryption compliance",
-    help: "Check that disks are encrypted. This doesn't encrypt disks or rotate keys.",
+    help: "Check disk encryption. This check does not encrypt disks or rotate keys.",
   },
   {
     arm: "passwordPolicy",
@@ -60,18 +60,18 @@ export const resourceKinds = [
   },
   {
     arm: "sshServer",
-    label: "SSH login banner",
+    label: "SSH sign-in banner",
     help: "Show a notice before SSH sign-in on devices with an active SSH service.",
   },
   {
     arm: "osUpdate",
     label: "OS update policy",
-    help: "Schedule update installation and decide when employees may defer a restart.",
+    help: "Schedule updates. Choose when employees can defer a restart.",
   },
   {
     arm: "sessionPolicy",
-    label: "Login and session policy",
-    help: "Set screen lock and login limits.",
+    label: "Sign-in and session policy",
+    help: "Set screen lock and sign-in limits.",
   },
   {
     arm: "repository",
@@ -147,7 +147,7 @@ export function initialState(arm: string): JsonObject {
         rebootPolicy: {
           mode: "OS_UPDATE_REBOOT_MODE_SCHEDULED",
           maxDelayMinutes: 60,
-          notice: "Updates were installed. This device restarts at the scheduled time.",
+          notice: "This device installed updates. It restarts at the scheduled time.",
         },
         deferralDays: 0,
       };

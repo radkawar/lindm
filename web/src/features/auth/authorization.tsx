@@ -63,7 +63,7 @@ function roleNameProblem(
   if (builtInRoles.includes(name))
     return `"${name}" is a built-in role name. Choose a different name.`;
   if (!/^[a-z][a-z0-9_.-]*$/.test(name))
-    return `"${name}" can't be used. Use lowercase letters, digits, dots, dashes or underscores, starting with a letter (for example patch-operator).`;
+    return `"${name}" is invalid. Start with a lowercase letter. Use lowercase letters, digits, dots, dashes or underscores. Example: patch-operator.`;
   if (roles.some((role, i) => i !== index && role.name === name))
     return `Another custom role is already named "${name}".`;
   return null;
@@ -101,15 +101,15 @@ export function Authorization(pickers: Pickers) {
       {identity.isError ? <RpcError failure={toRpcFailure(identity.error)} /> : null}
       {policy.data && !policy.data.authorization?.policy ? (
         <p role="alert">
-          The access policy was not returned. Refresh before editing; no replacement policy has been
-          assumed.
+          The server returned no access policy. Refresh before editing. The console did not assume a
+          replacement policy.
         </p>
       ) : null}
       {saved ? (
         <div role="status" className="grid gap-2 border p-4">
           <p>
-            Access policy saved. The recorded result below may be historical; refresh to see the
-            current policy.
+            Access policy saved. The result below records that change. Refresh to see the current
+            policy.
           </p>
           <TechnicalDetails
             items={[
@@ -136,7 +136,7 @@ export function Authorization(pickers: Pickers) {
             <p className="text-sm text-muted-foreground">
               {policy.data.authorization.runtime ? "Runtime policy" : "Server bootstrap policy"}.
               Last changed: <Timestamp value={policy.data.authorization.updatedAt} />.
-              {policy.isError ? " Current access could not be refreshed." : ""}
+              {policy.isError ? " The access refresh failed." : ""}
             </p>
             <Button
               className="w-fit"
@@ -228,7 +228,9 @@ function ScopeSummary({
   if (!scopes.length) return <p className="text-sm">Device access: All devices.</p>;
   return (
     <div className="grid min-w-0 gap-2 text-sm">
-      <p>Device access: Match any rule below; within a rule, all listed conditions must match.</p>
+      <p>
+        Device access includes matches for any rule. Each rule requires all its listed conditions.
+      </p>
       <ol className="grid min-w-0 gap-3">
         {scopes.map((scope, index) => (
           <li key={index} className="grid min-w-0 gap-1 border-l-2 pl-3">
@@ -709,9 +711,9 @@ function AuthorizationEditor({
             stop authorizing work; unscoped bindings allow every device.
           </p>
           <p>
-            Non-owner sessions are signed out and pending authority is invalidated. Local
-            unrestricted owners and the deployment owner retain recovery access. Account roles are
-            not reassigned when you remove or rename a role.
+            This change signs out non-owner sessions and invalidates pending authority. Local
+            unrestricted owners and the deployment owner retain recovery access. Removing or
+            renaming a role does not reassign account roles.
           </p>
           <label className="flex items-start gap-2">
             <input
@@ -726,8 +728,7 @@ function AuthorizationEditor({
           </label>
           {reviewCleared && !confirmed ? (
             <p role="status" className="text-warning">
-              You changed the policy after reviewing it, so the review was cleared. Review the
-              change again before saving.
+              Changing the policy clears its review. Review the change again before saving.
             </p>
           ) : null}
         </div>

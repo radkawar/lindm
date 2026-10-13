@@ -356,7 +356,7 @@ export function ResourceAssignmentForm({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.status === "ambiguous"
-              ? "Select Retry to resend the same request. It won't be applied twice."
+              ? "Select Retry to resend the same request. The device cannot apply it twice."
               : "Start a new assignment to try again."}
           </p>
         </RpcError>

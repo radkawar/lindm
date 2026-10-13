@@ -81,13 +81,12 @@ const releaseReasonLabels: Record<string, string> = {
     "The device's system tool for this item isn't protected, so lindm didn't run it. Nothing changed.",
   native_package_manager_busy:
     "Another package manager was running on the device. Nothing changed; assign the profile again to retry.",
-  outcome_unknown:
-    "The device couldn't confirm whether the item was removed. Check it on the device.",
+  outcome_unknown: "The removal outcome is unknown. Check the item on the device.",
   release_failed: "The device couldn't remove this item. Check it on the device.",
   resource_reassigned: "The new profile manages this item too, so it stays.",
-  cancelled_no_effect: "Removal was cancelled before the device changed anything.",
+  cancelled_no_effect: "The device cancelled removal before making changes.",
   adoption_approval_required:
-    "lindm took this item over from an existing setting without a recorded approval, so it was left in place.",
+    "lindm took over this existing item without recorded approval. The device kept the item.",
   ownership_baseline_unavailable:
     "lindm has no record of the item before it took over, so it was left in place.",
   resource_executor_not_available:
@@ -101,7 +100,7 @@ const releaseReasonLabels: Record<string, string> = {
 // Rows lindm never sends get one state instead of check, result and change
 // columns that would all restate "nothing happened".
 const SINGLE_STATE_LABELS: Partial<Record<ResourceDisposition, string>> = {
-  [ResourceDisposition.UNSUPPORTED]: "Can't be applied",
+  [ResourceDisposition.UNSUPPORTED]: "Device cannot apply",
   [ResourceDisposition.NOT_APPLICABLE]: "Not applicable to this device",
   [ResourceDisposition.WAITING_FOR_DEVICE_FACTS]: "Waiting for device facts",
 };
@@ -238,7 +237,7 @@ export function DeviceResources({
                 </>
               ) : assignment ? (
                 <>
-                  <p>None. The profile was removed.</p>
+                  <p>No profile. An administrator removed the assignment.</p>
                   <p className="whitespace-pre-wrap break-words text-muted-foreground">
                     Removed by {actor} on {formatTimestamp(assignment.assignedAt).local}. Reason:{" "}
                     {assignment.reason}

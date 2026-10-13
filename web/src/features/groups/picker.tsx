@@ -105,5 +105,5 @@ export function GroupName({ value }: { value: string }) {
   if (group) return <>{group.name || "(unnamed group)"}</>;
   if (page.error || lookup.error) return <>(name unavailable)</>;
   if (page.isPending || lookup.isPending) return <>(loading name…)</>;
-  return <>(deleted group)</>;
+  return <>(removed group)</>;
 }

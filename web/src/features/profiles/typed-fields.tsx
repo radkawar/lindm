@@ -41,7 +41,7 @@ const labels: Record<string, string> = {
   deviceId: "Device",
   personId: "Person",
   principalId: "Account",
-  approvedRootId: "Approved home folder root",
+  approvedRootId: "Approved root for home folders",
   subjectBindingId: "Secret subject",
   artifactId: "Artifact",
   catalogId: "Nix catalog entry",
@@ -72,7 +72,7 @@ const labels: Record<string, string> = {
   dropIn: "Service drop-in",
   daily: "Daily, UTC",
   intervalSeconds: "Interval (seconds)",
-  installedShell: "Installed login shell",
+  installedShell: "Sign-in shell",
   localUserNames: "Local names",
   maxAgeSeconds: "Re-check within (seconds)",
   completeMembershipDimension: "Remove members not listed here",
@@ -84,7 +84,7 @@ const labels: Record<string, string> = {
   minClasses: "Minimum character classes",
   historyCount: "Remembered passwords",
   maxAgeDays: "Maximum password age (days)",
-  failureLimit: "Failed login limit",
+  failureLimit: "Failed sign-in limit",
   unlockAfterSeconds: "Unlock after (seconds)",
   memoryMaxBytes: "Memory limit (bytes)",
   cpuWeight: "CPU weight",
@@ -106,7 +106,7 @@ const labels: Record<string, string> = {
   deferralDays: "Defer each update (days)",
   user: "Local user name",
   group: "Local group name",
-  primaryGroup: "Primary local group name",
+  primaryGroup: "Primary group for the local user",
   modules: "Kernel module names",
 };
 
@@ -412,8 +412,7 @@ function PackageArchitectureField({
         onValueChange={onChange}
       />
       <p id={`${id}-description`} className="text-xs text-muted-foreground">
-        Each device installs its own build. Choose one architecture only when devices need that
-        specific build.
+        Each device installs its own build. Choose one architecture only if devices need that build.
       </p>
     </div>
   );
@@ -831,7 +830,7 @@ function FileContent({
   } catch {
     return (
       <p className="text-sm text-muted-foreground">
-        This file isn't text and will be kept as is. Clear it to replace it with text.
+        The device keeps this non-text file unchanged. Clear it to replace it with text.
       </p>
     );
   }

@@ -7,12 +7,12 @@ const FAILURE_TEXT: Record<string, string> = {
   webhook_transport_failed: "Couldn't connect to the receiver",
   webhook_response_failed: "The receiver's answer was cut off",
   syslog_transport_failed: "Couldn't send to the syslog server",
-  invalid_destination_trust: "The pinned CA certificate couldn't be loaded",
+  invalid_destination_trust: "The server cannot load the pinned CA certificate",
   invalid_destination_endpoint: "The destination address isn't valid",
   invalid_destination_kind: "The destination type isn't supported",
-  destination_secret_unreadable: "The signing secret can't be read. Rotate it",
-  destination_disabled: "The destination was paused",
-  destination_deleted: "The destination was deleted",
+  destination_secret_unreadable: "The server cannot read the signing secret. Rotate it",
+  destination_disabled: "An administrator paused the destination",
+  destination_deleted: "An administrator removed the destination",
   lease_expired: "Sending timed out on every attempt",
 };
 

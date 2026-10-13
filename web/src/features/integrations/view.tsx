@@ -14,7 +14,7 @@ export function IntegrationsView() {
     <div className="grid min-w-0 gap-8">
       <PageHeader
         title="Integrations and reports"
-        description="Send events to other systems, retry failed deliveries and download reports."
+        description="Send audit events to other systems. Retry failed deliveries. Download reports."
         onRefresh={() => void client.invalidateQueries({ queryKey })}
         refreshing={fetching}
       />

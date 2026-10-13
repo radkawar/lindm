@@ -235,14 +235,14 @@ export function ResourceFields({
         />
         {unavailable ? (
           <p id={`${id}-kind-help`} className="text-xs text-muted-foreground">
-            Types marked not available yet can't be applied to devices by this server.
+            This server cannot apply types marked unavailable to devices.
           </p>
         ) : null}
       </div>
       {arm && selectedQualification === undefined ? (
         <p role="note" className="border border-warning/30 bg-warning/10 p-3 text-sm">
-          Devices can't apply this setting type yet. It stays in the profile but is never sent to
-          devices.
+          Devices cannot apply this setting type yet. The profile keeps it. The server never sends
+          it to devices.
         </p>
       ) : null}
       {ownershipRefused ? (
@@ -302,8 +302,8 @@ export function ResourceFields({
             ) : null}
           </div>
           <p className="text-sm">
-            Assigned devices block future loads and rebuild their boot files. Active drivers stay
-            loaded until restart; built-in drivers cannot be blocked.
+            Devices block future module loads and rebuild boot files. Active drivers stay loaded
+            until restart. Devices cannot block built-in drivers.
           </p>
         </div>
       ) : arm === "encryptionCompliance" ? (
@@ -334,7 +334,7 @@ export function ResourceFields({
         />
       ) : arm ? (
         <p className="text-sm text-muted-foreground">
-          This setting type can't be edited here. It will be kept as is.
+          This editor cannot change this setting type. It keeps the setting unchanged.
         </p>
       ) : null}
       {errors.length > 0 ? (

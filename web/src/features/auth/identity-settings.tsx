@@ -33,7 +33,7 @@ export function IdentitySettings() {
         Sign-in source
       </h2>
       <p className="text-sm text-muted-foreground">
-        Set in the server configuration. You can't change it here.
+        The server configuration sets these values. You cannot change them here.
       </p>
       {query.isPending ? <p role="status">Loading identity settings…</p> : null}
       {query.isError ? <RpcError failure={toRpcFailure(query.error)} /> : null}
@@ -92,8 +92,8 @@ export function IdentitySettings() {
           </dl>
           {settings.refreshIntervalSeconds ? (
             <p className="text-sm text-muted-foreground">
-              This is about your own account. If the check fails or is too old, you lose access
-              until it succeeds.
+              This check covers your account. A failed or expired check blocks access until a check
+              succeeds.
             </p>
           ) : null}
           <TechnicalDetails

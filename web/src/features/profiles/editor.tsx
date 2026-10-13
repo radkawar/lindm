@@ -282,9 +282,7 @@ export function ProfileEditor({
             {sourceNote}
           </p>
           {locked ? (
-            <p className="text-sm">
-              Editing is paused while this save is pending. Retry it, or start over.
-            </p>
+            <p className="text-sm">This save pauses editing. Retry the save or start over.</p>
           ) : null}
           <div className="grid gap-1.5">
             <Label htmlFor="profile-name">Name</Label>
@@ -494,7 +492,7 @@ export function ProfileEditor({
                     attempt.payload.expectedRevisionId,
                     attempt.payload.reason,
                   );
-                  setNote("You can edit the draft again. Not published yet.");
+                  setNote("Edit the draft again. The draft is not published.");
                 }}
               >
                 Edit draft
@@ -581,9 +579,9 @@ function AttemptStatus({ attempt }: { attempt: PublishAttempt }) {
       <RpcError failure={attempt.failure}>
         <p>
           {attempt.conflict
-            ? "Someone published a newer version first. Load it, then choose whether to keep your changes."
+            ? "Another administrator published a newer version. Load that version. Choose whether to keep your changes."
             : attempt.failure.ambiguous
-              ? "We couldn't confirm the save. Retry: it won't publish twice."
+              ? "The save outcome is unknown. Retry the same save. It cannot publish twice."
               : ""}
         </p>
       </RpcError>

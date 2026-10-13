@@ -70,7 +70,7 @@ export function Deliveries() {
           Delivery log
         </h2>
         <p className="text-sm text-muted-foreground">
-          Failed deliveries are listed; successful ones are counted per destination.
+          This list shows failed deliveries. Each destination shows its successful delivery count.
         </p>
       </div>
       {failures.error ? <RpcError failure={toRpcFailure(failures.error)} /> : null}
@@ -299,8 +299,8 @@ function FailureRow({
                 <DialogHeader>
                   <DialogTitle>Retry delivery to {destinationName}</DialogTitle>
                   <DialogDescription>
-                    The event is queued again for this destination only. The receiver may already
-                    have it and should ignore a repeat.
+                    The server queues this event for this destination only. The receiver can already
+                    have this event. It must ignore duplicates.
                   </DialogDescription>
                 </DialogHeader>
                 {action.feedback}

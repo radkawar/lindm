@@ -20,7 +20,7 @@ function AuthorizationPage() {
         <PageHeader title="Authorization" description="Manage organization access." />
         <EmptyState
           title="Access policy management is restricted"
-          description="You need unrestricted account-management permission to view or change this policy. Ask an organization owner if you need this access."
+          description="Unrestricted account-management permission is required. Ask an organization owner for access."
           action={<Button render={<Link to="/" />}>Back to dashboard</Button>}
         />
       </div>

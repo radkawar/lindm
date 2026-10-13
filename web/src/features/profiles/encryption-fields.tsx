@@ -31,8 +31,8 @@ export function EncryptionComplianceFields({
   return (
     <div className="grid min-w-0 gap-4">
       <p className="text-sm">
-        Always checked: the root disk is encrypted with LUKS. Devices that fail a check are reported
-        as not compliant.
+        The device checks root disk encryption with LUKS. A failed check means the device does not
+        comply.
       </p>
       {CHECKS.map((check) => {
         const required = value[check.field] === true;

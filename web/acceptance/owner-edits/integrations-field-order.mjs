@@ -56,7 +56,7 @@ export async function check({ page, visit, require, capture, step }) {
   for (const [button, title, submit] of [
     ["Edit", "Edit SOC webhook", "Save changes"],
     ["Rotate secret", "Rotate signing secret for SOC webhook", "Rotate secret"],
-    ["Delete SOC webhook", "Delete SOC webhook", "Delete destination"],
+    ["Remove SOC webhook", "Remove SOC webhook", "Remove destination"],
   ]) {
     step(`${title} order`);
     await row.getByRole("button", { name: button, exact: true }).click();

@@ -35,8 +35,8 @@ export function ScopeEditor({
     <fieldset className="grid min-w-0 gap-4 border p-4" disabled={disabled}>
       <legend className="px-1 text-sm font-semibold">Device access</legend>
       <p className="max-w-3xl text-sm text-muted-foreground">
-        Leave empty to allow all devices. Otherwise access includes devices matching any rule.
-        Within a rule, labels, selected devices and device groups must all match.
+        Leave empty to allow all devices. Access includes matches for any rule. Each rule requires
+        matching labels, selected devices and device groups.
       </p>
       {scopes.map((scope, index) => (
         <div className="grid min-w-0 gap-3 border bg-muted/20 p-4" key={index}>

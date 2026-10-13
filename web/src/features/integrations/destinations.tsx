@@ -124,7 +124,7 @@ export function Destinations() {
           <DialogHeader>
             <DialogTitle>Add destination</DialogTitle>
             <DialogDescription>
-              Only audit events recorded after it is created are sent.
+              The server sends only audit events recorded after creation.
             </DialogDescription>
           </DialogHeader>
           <DestinationForm action={addAction} onDone={() => setAdding(false)} />
@@ -267,8 +267,8 @@ function DestinationRow({
           <Button
             variant="ghost"
             size="sm"
-            aria-label={`Delete ${name}`}
-            title={`Delete ${name}`}
+            aria-label={`Remove ${name}`}
+            title={`Remove ${name}`}
             onClick={() => setOpen("delete")}
           >
             <Trash2 aria-hidden="true" />
@@ -278,7 +278,7 @@ function DestinationRow({
           open={open === "edit"}
           onClose={() => setOpen("")}
           title={`Edit ${name}`}
-          description="Changes apply to events sent after you save. The type can't be changed."
+          description="Changes affect events sent after you save. You cannot change the destination type."
         >
           <DestinationForm
             destination={destination}
@@ -297,8 +297,8 @@ function DestinationRow({
         <RowDialog
           open={open === "delete"}
           onClose={() => setOpen("")}
-          title={`Delete ${name}`}
-          description="This can't be undone."
+          title={`Remove ${name}`}
+          description="You cannot undo this removal."
         >
           <DeleteForm
             destination={destination}
@@ -744,7 +744,7 @@ function RotateForm({
             </Button>
           </div>
           <p id={`${id}-secret-hint`} className="text-xs text-muted-foreground">
-            32 to 64 characters. Copy it to the receiver; it's never shown again.
+            32 to 64 characters. Copy it to the receiver. The console never shows it again.
           </p>
           <FieldError id={`${id}-secret-error`} message={attempted ? errors.secret : ""} />
         </div>
@@ -761,12 +761,12 @@ function RotateForm({
         <p className="border-l-2 border-warning pl-3 text-sm" aria-live="polite">
           {overlap > 0 ? (
             <>
-              The old secret keeps working for {label}; update the receiver before{" "}
+              The old secret works for {label}. Update the receiver before{" "}
               <Timestamp value={deadline} relative={false} />.
             </>
           ) : (
             <>
-              The old secret stops working immediately; the receiver rejects events until it has the
+              The old secret stops working immediately. The receiver rejects events until it has the
               new secret.
             </>
           )}
@@ -827,10 +827,10 @@ function DeleteForm({
       <p className="border-l-2 border-destructive pl-3 text-sm">
         {name} stops receiving events.{" "}
         {pending === undefined
-          ? "Events not yet delivered to it are dropped."
+          ? "The server removes events that have not reached this destination."
           : pending > 0n
-            ? `${plural(pending, "event")} not yet delivered to it are dropped.`
-            : "No events are waiting to be delivered to it."}
+            ? `The server removes ${plural(pending, "event")} that have not reached this destination.`
+            : "No events are waiting for this destination."}
       </p>
       <fieldset className="grid min-w-0 gap-3" disabled={action.blocked}>
         <ReasonField
@@ -840,7 +840,7 @@ function DeleteForm({
           error={attempted ? error : ""}
         />
         <Button type="submit" variant="destructive" className="w-fit">
-          Delete destination
+          Remove destination
         </Button>
       </fieldset>
     </form>

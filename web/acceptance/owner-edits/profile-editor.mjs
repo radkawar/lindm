@@ -10,7 +10,7 @@ export const task = {
   route: "/profiles/$profileId",
   priority: "normal",
   acceptance:
-    "The editor comes before any version picker and Start over is in its header; no settings counter; new settings start untyped; one Advanced options and one View JSON control however many settings; Remove is an icon button labelled with the setting; encryption checks offer Don't check / Required; Login and session policy and Package repository are disabled as not available yet; setting forms don't mention catalogs, digests or byte sizes.",
+    "The editor comes before any version picker and Start over is in its header; no settings counter; new settings start untyped; one Advanced options and one View JSON control however many settings; Remove is an icon button labelled with the setting; encryption checks offer Don't check / Required; Sign-in and session policy and Package repository are disabled as not available yet; setting forms don't mention catalogs, digests or byte sizes.",
 };
 
 const timeout = 30_000;
@@ -82,7 +82,7 @@ export async function check({ page, demo, visit, require, capture, step }) {
 
   step("setting type availability");
   await type.click();
-  for (const name of ["Login and session policy", "Package repository"]) {
+  for (const name of ["Sign-in and session policy", "Package repository"]) {
     const option = page.getByRole("option", { name: new RegExp(`^${name}`) });
     await option.first().waitFor({ timeout });
     require((await option.first().getAttribute("aria-disabled")) === "true" &&

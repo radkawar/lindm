@@ -153,14 +153,14 @@ export function LocalForm({
             onChange={(event) => setReason(event.target.value)}
           />
           <p className="text-sm text-muted-foreground">
-            Don't include passwords. Emergency sign-ins are recorded.
+            Do not include passwords. The audit log records emergency sign-ins.
           </p>
         </>
       ) : null}
       <p className="text-sm text-muted-foreground">
         {enrollment
-          ? "Set a password, then register a security key or passkey. You'll sign in afterwards."
-          : "After your password, confirm with your security key or passkey."}
+          ? "Set a password. Register a security key or passkey. Then sign in."
+          : "Enter your password. Confirm with your security key or passkey."}
       </p>
       {notice ? (
         <Alert>

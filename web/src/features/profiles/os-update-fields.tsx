@@ -106,10 +106,15 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
   return (
     <div className="grid gap-5">
       <p className="text-xs text-muted-foreground">
-        Devices need their native automatic-update tools and signed repositories. Windows use the
-        selected time zone; a start skipped by daylight saving does not open that day, and a
-        repeated start opens only once.
+        Devices require native update tools and signed repositories.
       </p>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Details</summary>
+        <p className="mt-2">
+          Windows use the selected time zone. Daylight saving skips a missing start. A repeated
+          start opens only once.
+        </p>
+      </details>
       <section className="grid gap-3">
         <h2 className="text-base font-semibold">Install updates</h2>
         <Label htmlFor={`${id}-selection`}>Updates to install</Label>
@@ -136,7 +141,8 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
           disabled={disabled}
         />
         <p className="text-sm text-muted-foreground">
-          Updates may start in this window and continue until their transaction finishes.
+          Devices can start updates in this window. An update transaction continues until it
+          finishes.
         </p>
         <Label htmlFor={`${id}-update-delay`}>Wait before installing new updates (days)</Label>
         <Input
@@ -207,7 +213,7 @@ export function OSUpdateFields({ value, onChange, id, disabled }: Props) {
               />
             )}
             <p className="text-sm text-muted-foreground">
-              If no restart time fits before the deadline, no restart is scheduled.
+              The device schedules no restart if no allowed time fits before the deadline.
             </p>
             <label className="flex items-center gap-2 text-sm">
               <input

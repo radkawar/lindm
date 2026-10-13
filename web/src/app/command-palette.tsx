@@ -142,7 +142,7 @@ export function CommandPalette({
         onOpenChange={changeOpen}
         finalFocus={returnFocus}
         title="Search console"
-        description="Open a page, start an action or open a device. Use arrow keys to choose and Enter to open."
+        description="Choose a page, action or device. Use arrow keys to choose. Press Enter to open."
         className="sm:max-w-xl"
       >
         {/* The server already matched the hostname prefix while a device is being chosen. */}

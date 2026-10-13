@@ -86,7 +86,7 @@ function AuthenticatedLayout() {
         >
           <strong>Break-glass emergency session: restricted and audited</strong>
           <p>Incident: {principal.incidentReason}</p>
-          <p>Sign out to end this emergency session when the incident is resolved.</p>
+          <p>Sign out when you resolve the incident. This ends the emergency session.</p>
         </div>
       ) : null}
       {logoutError ? <RpcError failure={logoutError} title="Sign-out failed" /> : null}

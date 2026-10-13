@@ -194,7 +194,7 @@ export function OrganizationImport({
       await navigator.clipboard.writeText(secret);
       setMessage("Secret copied. Share it only through an approved private channel.");
     } catch {
-      setMessage("Clipboard access was denied. Select and copy the displayed secret manually.");
+      setMessage("Clipboard access failed. Select the displayed secret. Copy it manually.");
     }
   }
   function downloadSecrets() {
@@ -230,8 +230,7 @@ export function OrganizationImport({
     >
       <h2 className="text-base font-semibold">Import organization</h2>
       <p className="text-sm text-muted-foreground">
-        Upload an organization file, review current changes, then apply that reviewed plan using
-        this console session.
+        Upload an organization file. Review the changes. Apply the reviewed plan in this session.
       </p>
       <label className="grid gap-2 text-sm font-medium">
         Organization JSON
@@ -255,8 +254,8 @@ export function OrganizationImport({
         <RpcError failure={failure}>
           <p>
             {applied
-              ? "Some changes may have completed. Check current accounts and resources before reviewing again. Issued secrets cannot be retrieved by retrying."
-              : "The current plan could not be reviewed. No apply was requested."}
+              ? "The import outcome is unknown. Check current accounts and resources before another review. Retrying cannot retrieve issued secrets."
+              : "The plan review failed. The console did not request changes."}
           </p>
         </RpcError>
       ) : null}
@@ -267,7 +266,7 @@ export function OrganizationImport({
               ? "The organization changed after review. Review a fresh plan before applying."
               : applied
                 ? "The import stopped before all work completed. Retain the outcomes and save any secrets below before reviewing again."
-                : "The organization could not be reviewed. Check the reported cause before continuing."}
+                : "The organization review failed. Check the reported cause before continuing."}
           </p>
           <TechnicalDetails
             items={[
@@ -282,7 +281,7 @@ export function OrganizationImport({
           <h3 className="font-semibold">{applied ? "Recorded outcomes" : "Review current plan"}</h3>
           {!applied ? (
             <p className="text-sm text-muted-foreground">
-              Reviewed <Timestamp value={reviewedAt} />. No changes have been applied.
+              Reviewed <Timestamp value={reviewedAt} />. The console has applied no changes.
             </p>
           ) : (
             <p className="text-sm">
@@ -290,7 +289,7 @@ export function OrganizationImport({
             </p>
           )}
           {!result.outcomes.length ? (
-            <p className="text-sm">No item outcomes were returned.</p>
+            <p className="text-sm">The server returned no item outcomes.</p>
           ) : null}
           <ul className="grid gap-3">
             {result.outcomes.map((outcome, index) => (
@@ -471,10 +470,10 @@ export function OrganizationImport({
       {!applied && result && !result.failureCode ? (
         <div className="grid gap-3 border border-warning p-3 text-sm">
           <p>
-            Apply only the plan shown above. Omitted items are not deleted. Changes are not atomic:
-            a failure can leave earlier items applied. Accounts are enabled with the specified roles
-            and device access; authorization changes replace the whole access policy. Device work
-            may still need approval or a check-in.
+            Apply only the plan above. The import keeps omitted items. A failure can leave earlier
+            changes in place. The import enables accounts with the specified roles and device
+            access. Authorization changes replace the whole access policy. Device changes can
+            require approval or a check-in.
           </p>
           <label className="flex items-start gap-2">
             <input
