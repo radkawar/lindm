@@ -1336,7 +1336,20 @@ lane now uses `net.ipv4.conf.all.log_martians` on Tumbleweed
 (`Lab.SysctlNetKey`), and the refusal names the overriding file. tpm-reference-repair
 (`tw2-x86-r12`) failed when the lane's own agent restart after the 0.1.0→0.1.1
 RPM upgrade was refused as "attempted too often"; the lane now clears the start
-rate counter first and keeps the agent journal on failure. Both cells need a rerun.
+rate counter first and keeps the agent journal on failure.
+
+The rerun at 284200c0 (`tw2-x86-r14`) moved resources further: packages, files,
+groups, users, all eight sysctl scenarios (including
+`net.ipv4.conf.all.log_martians`) and the timer and drop-in kind passed. The
+next kind then failed to open its root recovery session ("ssh: handshake
+failed … connection reset by peer"). This run did not establish whether that is
+a Tumbleweed or a host transport cause. tpm-reference-repair did not reach the
+upgrade. Its legacy 0.1.0 agent's TPM2 bind ended `OUTCOME_UNKNOWN`. That agent
+predates the bind's `--tpm2-pcrlock=` fix, and the same Tumbleweed pcrlock policy
+broke the current agent's bind before that fix. This is likely the cause, but
+the run did not confirm it. x86_64 `provision-autoyast` has no record: its lane
+needs the per-lane console browser configurations
+(`PLATFORM-ARCH.<lane>.json`), and the console fixture used here predates them.
 
 ## Known gaps
 

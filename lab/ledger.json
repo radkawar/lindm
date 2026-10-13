@@ -12133,6 +12133,47 @@
       "recoveryManifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
       "recoveryRepositorySnapshotDate": "2026-10-02",
       "mainlineRevision": "5618b5f77d4d2eb6aa6363c9d8c510d8e5a2ebe9"
+    },
+    {
+      "platform": "opensuse-tumbleweed",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "opensuse-tumbleweed-20261009-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-tier2-matrix/tw2-x86-r14-284200c0/opensuse-tumbleweed/tpm-reference-repair-x86_64.json",
+      "sha256": "6310c6e1377c8fda17560f9d6edd2d86e6ba49f5b13b3e2a988aec0a38f20626",
+      "recorded": "2026-10-13T17:54:15.769259529Z",
+      "revision": "284200c0db06c6f8fec60486358556373cde6655",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "48a40971933df11b662777b35fa79002721aa5de3d51a2524cbfde0024aa975c",
+      "repositorySnapshotDate": "2026-10-09",
+      "repositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
+      "repositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
+      "recoveryManifest": "opensuse-tumbleweed-20261009-x86-64",
+      "recoveryManifestSha256": "3b6fa8b66223739518f0cb9c438ee96c42895ef40e1452c6b45a3ac583341a83",
+      "recoveryRepositorySnapshotDate": "2026-10-09",
+      "recoveryRepositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
+      "recoveryRepositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
+      "mainlineRevision": "284200c0db06c6f8fec60486358556373cde6655"
+    },
+    {
+      "platform": "opensuse-tumbleweed",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "opensuse-tumbleweed-20261009-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-tier2-matrix/tw2-x86-r14-284200c0/opensuse-tumbleweed/resources-x86_64.json",
+      "sha256": "8faedd3839112749d0c438867b7133a5f0ebb7652af3348cf8c492a9172e047c",
+      "recorded": "2026-10-13T18:34:16.613089504Z",
+      "revision": "284200c0db06c6f8fec60486358556373cde6655",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "3b6fa8b66223739518f0cb9c438ee96c42895ef40e1452c6b45a3ac583341a83",
+      "repositorySnapshotDate": "2026-10-09",
+      "repositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
+      "repositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
+      "mainlineRevision": "284200c0db06c6f8fec60486358556373cde6655"
     }
   ]
 }
