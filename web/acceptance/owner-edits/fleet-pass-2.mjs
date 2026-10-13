@@ -174,9 +174,16 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   require((await rows.count()) > 0, "Findings are not table rows");
   require(!/(^|\s)0:\d/.test(await panel.innerText()), "Findings show a zero epoch (0:)");
   const totals = panel.locator("[data-finding-totals]");
+  const totalsText = (await totals.innerText().catch(() => "")).trim();
   require(/^\d[\d,]* open findings? .*critical .*high/.test(
-    (await totals.innerText().catch(() => "")).trim(),
+    totalsText,
   ), "Findings show no total count with severity breakdown");
+  const accepted = totalsText.match(/\b([\d,]+) accepted (risks?)\b/);
+  if (accepted) {
+    const expectedNoun = Number(accepted[1].replaceAll(",", "")) === 1 ? "risk" : "risks";
+    require(accepted[2] ===
+      expectedNoun, "accepted risk count uses the wrong singular or plural noun");
+  }
   require((await panel.getByLabel("Sort by", { exact: true }).count()) ===
     1, "Findings have no sort control");
   const packageSearch = panel.getByLabel("Search packages", { exact: true });

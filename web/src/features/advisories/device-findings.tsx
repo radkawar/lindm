@@ -139,7 +139,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
               `${totals.low.toLocaleString()} low`,
               `${totals.unrated.toLocaleString()} not rated by the vendor`,
             ].join(" · ")}
-            {totals.accepted > 0n ? ` · ${totals.accepted.toLocaleString()} accepted risks` : ""}
+            {totals.accepted > 0n
+              ? ` · ${totals.accepted.toLocaleString()} accepted ${totals.accepted === 1n ? "risk" : "risks"}`
+              : ""}
           </p>
         ) : null}
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_12rem] sm:items-end">
