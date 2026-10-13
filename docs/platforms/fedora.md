@@ -364,6 +364,19 @@ SHA-256 `ececce4093e36982393a426ef190ee8ef3704faaa3290334ea3fd56281366dae`);
 Fedora 44 passed the same TPM cell
 (`fedora-44/tpm-unattended-boots-x86_64.json` in that directory, SHA-256
 `0a67cc3d35441ae433fde5132ed2a42f364aa7d2a8d0c2ce19d63d26f4e2c647`).
+The matrix gates `tpm-reference-repair` as not applicable on Fedora (903113f5:
+each release needs one systemd-tpm2 token reference). Runs made before that gate
+(legacy agent `ced6d209` binds, the native manager upgrades to 0.1.1, then 30
+unattended boots) confirm it on both releases: the legacy bind already wrote the
+one reference, so no repair bind was dispatched, and every boot unlocked:
+`$HOME/.cache/lindm-matrix/fedora-tpmrep3-x86-20261013T175026Z/fedora-43/tpm-reference-repair-x86_64.json`,
+SHA-256 `cea373cdc16b3e56950df631cdc55079802579fc0c13215c90445780c5a4668c`;
+`fedora-44/tpm-reference-repair-x86_64.json`, SHA-256
+`bbda5cad5022a2cb7178246551b1b337c3e5fb0c0b935fd2099cee2dd1e61d0c`. The first
+attempts stopped at the lab's own post-upgrade agent restart: the guest journal
+shows five `lindm-agent.service` starts in 47 s (lane setup plus the package
+restart), so the sixth hit `StartLimitBurst=5` and was refused; the lab now
+clears that counter first (284200c0).
 Original-device recovery on Fedora 43 aarch64 is gated like Fedora 44: the
 release kernel `kernel-core-6.17.1-300.fc43.aarch64` (RPM SHA-256
 `9328e61443dcd71e5671806fbef4345eb15a988229b011340fac8b856315c3ee`) ships a

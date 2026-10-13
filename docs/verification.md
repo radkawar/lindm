@@ -7073,7 +7073,10 @@ With that kernel copy, Fedora 43 x86_64 `encrypted`, `device-actions` and
 `tpm-unattended-boots` and Fedora 44 x86_64 `tpm-unattended-boots` passed, as did
 all four x86_64 provisioning cells (Fedora 43/44 cloud-init and Kickstart); the
 records and digests are listed in [platform notes](platforms/fedora.md#encryption-and-recovery)
-and `lab/ledger.json`.
+and `lab/ledger.json`. `tpm-reference-repair` is gated as not applicable on Fedora
+(one token reference, 903113f5); runs made before that gate passed on both
+releases after the lab cleared the agent's start-rate counter before its
+post-upgrade restart (284200c0; root cause in [platform notes](platforms/fedora.md#encryption-and-recovery)).
 
 Fedora 44 x86_64 `resources` failed twice before passing. In
 `fedora-f44-x86res-20261012T025825Z/fedora-44/resources-x86_64.json` (SHA-256
