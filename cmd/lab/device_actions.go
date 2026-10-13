@@ -44,7 +44,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
 	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland; empty is a headless server golden, refused for lock scenarios")
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack; false is accepted only with -wipe-phase lock-quarantine")
-	flags.StringVar(&options.BootstrapFirmwareVars, "bootstrap-firmware-vars", "", "Arch owner-UKI only: package-owned non-Secure-Boot template for unsigned archiso; final owner db is enrolled into -firmware-vars after shutdown")
+	flags.StringVar(&options.BootstrapFirmwareVars, "bootstrap-firmware-vars", "", "Arch owner-UKI only (original recovery, or -encryption-phase tpm on the systemd-boot installer edition): package-owned non-Secure-Boot template for unsigned archiso; final owner db is enrolled into -firmware-vars after shutdown")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, exclusively created then made read-only")
 	if err := flags.Parse(args); err != nil {
 		return err

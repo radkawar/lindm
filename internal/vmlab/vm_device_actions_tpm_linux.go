@@ -416,6 +416,9 @@ func nativeTPMMismatch(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return err
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
+	if machine.ownerBoot != nil {
+		result.OwnerSecureBoot = append(result.OwnerSecureBoot, machine.ownerBoot)
+	}
 	approver, err := fixture.OpenApproverSession(ctx)
 	if err != nil {
 		return err

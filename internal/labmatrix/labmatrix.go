@@ -397,6 +397,10 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 	primaryEdition, recoveryEdition, excludedEdition := "", "", ""
 	if slices.Contains(spec.GetCapabilities(), string(platform.RecoverySanitize)) {
 		primaryEdition, recoveryEdition = r.Lab.RecoveryInstallerEdition, r.Lab.RecoveryEdition
+	} else if spec.GetSecureBoot() && r.Quirks.RecoveryOwnerKey {
+		// Media without vendor Secure Boot trust reach it only through the
+		// owner-signed systemd-boot/UKI chain of that installer edition.
+		primaryEdition = r.Lab.RecoveryInstallerEdition
 	}
 	if format, ok := platform.LaneProvisioning(platform.LabLane(spec.GetLane())); ok && format != platform.ProvisionCloudInit {
 		excludedEdition = platform.DesktopInstallerEdition

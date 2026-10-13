@@ -73,7 +73,14 @@ The matrix pins the local x86_64 lab's `ovmf` package version and 4 MiB
 Secure-Boot-capable code with its non-enrolled variables template. Selecting
 capable firmware does not assert enforced Secure Boot; ordinary unsigned Arch
 installer lanes use noSB variables. Recovery requires an explicit enrolled
-template and the separately qualified owner-key transition.
+template and the separately qualified owner-key transition. The Secure Boot
+`tpm-unattended-boots` cell takes the same owner-key path: the matrix selects the
+systemd-boot installer edition, installs it under the noSB template
+(`-bootstrap-firmware-vars /usr/share/OVMF/OVMF_VARS_4M.fd`), and each clone then
+gets a UKI built from its own kernel, `sd-encrypt` initramfs and command line,
+signed with systemd-boot by a run-only owner key whose certificate alone joins the
+clone's private db. The TPM2 bind, PCR 7 mismatch and the 30 unattended boots all
+run with Secure Boot enforced under that owner trust, not vendor shim trust.
 
 Offline disposable Arch guests use an explicit registry-scoped **host UTC RTC**
 policy, not claimed NTP synchronization. The vendor cloud image orders its real
@@ -330,6 +337,8 @@ A minimum password age is refused (`unsupported_native_policy`): shadow 4.20
 removed it ([release notes](https://github.com/shadow-maint/shadow/releases/tag/4.20.0):
 `sp_min`, `chage`/`passwd --mindays`, `PASS_MIN_DAYS`), and its tools fail while
 `/etc/login.defs` sets `PASS_MIN_DAYS` (registry `Quirks.NoPasswordMinAge`).
+Arch's shadow 4.20 `login.defs` ships a bare `MOTD_FILE` line; like shadow's own
+parser, the provider treats a name without a value as defining nothing.
 The native modules live under `/usr/lib/security`. The implementation follows
 the maintained [pambase stack](https://gitlab.archlinux.org/archlinux/packaging/packages/pambase/-/blob/main/system-auth),
 but support is selected only by the registry's exact measured package pins,
@@ -765,18 +774,20 @@ Keep raw account/network/journal diagnostics private.
 `lab matrix run -platform arch -architecture x86_64` from main, local KVM, with
 each record in the [ledger](../verification.md#1-launch-platform-qualification):
 
-| Cell           | Result                          | Record / SHA-256                                                                                                                             |
-| -------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory      | pass                            | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
-| Lifecycle      | pass                            | `~/.cache/lindm-arch-qualify/r14/arch/lifecycle-x86_64.json` / `5e71f6963ee5894bea093784a68d3b390bb7265f3d158db00a1fd23acfe623be`            |
-| Air-gap bundle | pass                            | `~/.cache/lindm-arch-qualify/r14-airgap/arch/airgap-x86_64.json` / `1f5915592c596e87d66f3af7727b21d0f242f37c2058e6826adbc5525afe5cb3`        |
-| Dispatch       | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
-| Assistance     | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
-| Services       | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
-| Self-update    | pass                            | `~/.cache/lindm-arch-qualify/r10/arch/self-update-x86_64.json` / `2da464d722b05863dac4d481a65d9b3a29db35094c1b7d3c5c1789b73e2d6173`          |
-| Advisories     | pass (partial tracker coverage) | `~/.cache/lindm-arch-qualify/r11/arch/advisories-x86_64.json` / `7c47a9264f23f333dfce5d1dda4f631da102424f799a124c8050e86b8224b140`           |
-| Wipe/loss/lock | pass                            | `~/.cache/lindm-arch-qualify/r17/arch/device-actions-x86_64.json` / `c91fc71e19657f0f2e2b25e57dc9dd4d2de193b01abb9fc8082d81f92b74f987`       |
-| OS update      | pass                            | `~/.cache/lindm-arch-qualify/r20/arch/os-update-x86_64.json` / `9512995c2d40687e68d910785c27c1d18ea1fb3729bca9aa3022d598d8a60c61`            |
+| Cell                 | Result                          | Record / SHA-256                                                                                                                             |
+| -------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory            | pass                            | `~/.cache/lindm-arch-qualify/r1-inv/arch/inventory-x86_64.json` / `e4919a3926385d4a943ad08ff72e3a5dd16a26aba1a09def3b2e161cab99b5cb`         |
+| Lifecycle            | pass                            | `~/.cache/lindm-arch-qualify/r14/arch/lifecycle-x86_64.json` / `5e71f6963ee5894bea093784a68d3b390bb7265f3d158db00a1fd23acfe623be`            |
+| Air-gap bundle       | pass                            | `~/.cache/lindm-arch-qualify/r14-airgap/arch/airgap-x86_64.json` / `1f5915592c596e87d66f3af7727b21d0f242f37c2058e6826adbc5525afe5cb3`        |
+| Dispatch             | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/dispatch-x86_64.json` / `d30fcae2b15d41a5d4b7553e668d4c9645a701857404f9a788fe162c8b1053dd`              |
+| Assistance           | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/assistance-x86_64/assistance.json` / `d549bdfed3f73320c4b0e56adbf195a19e6b1ec3f2b4b9483b217a01a0e49c01` |
+| Services             | pass                            | `~/.cache/lindm-arch-qualify/r7/arch/services-x86_64.json` / `d66570c2973f79ff504e10169b71e1314fcf8f941317afb836d156344543f214`              |
+| Self-update          | pass                            | `~/.cache/lindm-arch-qualify/r10/arch/self-update-x86_64.json` / `2da464d722b05863dac4d481a65d9b3a29db35094c1b7d3c5c1789b73e2d6173`          |
+| Advisories           | pass (partial tracker coverage) | `~/.cache/lindm-arch-qualify/r11/arch/advisories-x86_64.json` / `7c47a9264f23f333dfce5d1dda4f631da102424f799a124c8050e86b8224b140`           |
+| Wipe/loss/lock       | pass                            | `~/.cache/lindm-arch-qualify/r17/arch/device-actions-x86_64.json` / `c91fc71e19657f0f2e2b25e57dc9dd4d2de193b01abb9fc8082d81f92b74f987`       |
+| OS update            | pass                            | `~/.cache/lindm-arch-qualify/r20/arch/os-update-x86_64.json` / `9512995c2d40687e68d910785c27c1d18ea1fb3729bca9aa3022d598d8a60c61`            |
+| Encryption           | pass                            | `~/.cache/lindm-arch-qualify/r21/arch/encrypted-x86_64.json` / `0e23d06dc86839522785d381f26a0680bde5703e124065fa53805286cf47c673`            |
+| TPM unattended boots | pass (owner Secure Boot)        | `~/.cache/lindm-arch-qualify/r22/arch/tpm-unattended-boots-x86_64.json` / `eaad12e25e10acf6db07c4eebe36855cc2fad2f1befdbfb487dbde5463415532` |
 
 The os-update lane provisions its prerequisites at the image's Archive pin
 (2026-10-02) and gives the whole-system policy the registry's later
@@ -791,6 +802,14 @@ required); the native boot record alone is not signed evidence. The pacman
 lock-boundary probe requires the resource fixture root and its ancestry to be
 root-protected, not private: the root stays 0755 because it also holds the lab
 accounts' homes.
+
+Encryption escrow rotation confirms its server receipt within the device clock
+skew the control plane tolerates: these offline guests keep only the host RTC,
+and a just-stored receipt otherwise refused until the operator's 30 s retirement
+credential expired. The TPM cell ran on the owner-key path above: both clones
+cold-booted the owner-signed UKI with Secure Boot enforced, the bind left one
+`systemd-tpm2` token, the deliberately extended PCR 7 policy was refused and
+recovered with the revealed key, and all 30 cold boots unlocked without a prompt.
 
 The first encrypted GRUB golden boots only since installer umask 077 was scoped to
 credential writers: pacstrap's `mkdir -p -m` had created `/etc` and `/var` as 0700,
@@ -808,8 +827,8 @@ the station key locally signed into the system keyring and the site CA passed to
 
 ## Known gaps
 
-Whole-system upgrade, interruption/rollback, encryption, desktop consent and
-air-gap/physical gates remain open for this exact image/Archive pair. Each future
+Desktop consent and physical gates remain open for this exact image/Archive pair,
+as do the owner-Secure-Boot paths for GRUB and on real firmware. Each future
 rolling candidate needs its own evidence. Arch Linux ARM cannot close any official
 Arch x86_64 cell. Use the
 [verification ledger](../verification.md#1-launch-platform-qualification), not

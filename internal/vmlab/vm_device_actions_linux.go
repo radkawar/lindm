@@ -52,8 +52,11 @@ type VMDeviceActionsOptions struct {
 	// select a privately provisioned, digest-pinned copy.
 	Ukify string
 	// BootstrapFirmwareVars is the separately package-pinned noSB template for
-	// an unsigned installer. Final owner trust uses Encrypted.Firmware instead.
+	// an unsigned installer (owner-key original recovery, or the owner Secure
+	// Boot TPM phase). Final owner trust uses Encrypted.Firmware instead.
 	BootstrapFirmwareVars string
+	// ownerSecureBoot is the TPM phase's run-only owner signer and target.
+	ownerSecureBoot *actionOwnerSecureBoot
 }
 
 type VMDeviceActionsResult struct {
@@ -143,11 +146,14 @@ type VMDeviceActionsResult struct {
 	TPMPolicyRecoveryBoot *UnlockOutcome             `json:"tpm_policy_revealed_key_recovery,omitempty"`
 	PCRBefore             string                     `json:"pcr7_before_extension,omitempty"`
 	PCRAfter              string                     `json:"pcr7_after_extension,omitempty"`
-	StartedAt             time.Time                  `json:"started_at"`
-	FinishedAt            time.Time                  `json:"finished_at"`
-	Passed                bool                       `json:"passed"`
-	Failure               string                     `json:"failure,omitempty"`
-	Boundaries            []string                   `json:"boundaries"`
+	// OwnerSecureBoot records each TPM-phase clone's transition to owner
+	// Secure Boot trust on a release without vendor Secure Boot trust.
+	OwnerSecureBoot []*actionOwnerSecureBootEvidence `json:"owner_secure_boot,omitempty"`
+	StartedAt       time.Time                        `json:"started_at"`
+	FinishedAt      time.Time                        `json:"finished_at"`
+	Passed          bool                             `json:"passed"`
+	Failure         string                           `json:"failure,omitempty"`
+	Boundaries      []string                         `json:"boundaries"`
 }
 
 type actionMachine struct {
@@ -161,8 +167,9 @@ type actionMachine struct {
 	desktop              *labDesktop
 	// packages stays open only when the package set carries an upgrade: the
 	// legacy install's pinned trust and signed source serve UpgradeAgent.
-	packages *nativeGuestPackages
-	upgrade  packaging.Artifact
+	packages  *nativeGuestPackages
+	upgrade   packaging.Artifact
+	ownerBoot *actionOwnerSecureBootEvidence
 }
 
 func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, options VMDeviceActionsOptions, packages *actionNativePackage, fixture *devlab.AuthorityFixture, control *vmControlPlane, delegation *agentv1.UpdateExecutionTrustRequest) (_ *actionMachine, err error) {
@@ -204,6 +211,15 @@ func openActionMachine(ctx context.Context, manifest *labv1.ImageManifest, optio
 	vm.guest.captureDiagnostics = options.Encrypted.DiagnosticsDir != ""
 	if err := installActionPrerequisites(ctx, vm.guest, manifest, true); err != nil {
 		return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("install native action prerequisites: %w", err))
+	}
+	if options.ownerSecureBoot != nil {
+		if machine.ownerBoot, err = machine.enrollOwnerSecureBoot(ctx, options.ownerSecureBoot); err != nil {
+			return nil, diagnoseActionFailure(ctx, vm.guest, fmt.Errorf("enroll owner Secure Boot: %w", err))
+		}
+		vm.guest.captureDiagnostics = options.Encrypted.DiagnosticsDir != ""
+		if _, err := observeEncryptedGuest(ctx, vm, true); err != nil {
+			return nil, fmt.Errorf("observe owner Secure Boot guest: %w", err)
+		}
 	}
 	targets, err := observeActionTargets(ctx, vm)
 	if err != nil {
@@ -316,8 +332,8 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.WipePhase == "recovery-attestation-refusal" && options.RecoveryBootMode != recoveryBootMeasured {
 		return nil, errors.New("attestation refusal phase requires recovery boot mode measured-grub")
 	}
-	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) {
-		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase")
+	if options.BootstrapFirmwareVars != "" && !slices.Contains([]string{"recovery-nvme", "recovery-sata"}, options.WipePhase) && options.EncryptionPhase != "tpm" {
+		return nil, errors.New("bootstrap firmware variables require an explicit original-device recovery phase or the TPM encryption phase")
 	}
 	if err := validateEncryptionPhase(options); err != nil {
 		return nil, err
@@ -403,6 +419,14 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	result.LindmdSHA256, err = dispatchFileDigest(options.LindmdBinary)
 	if err != nil {
 		return result, err
+	}
+	if options.EncryptionPhase == "tpm" && options.BootstrapFirmwareVars != "" {
+		options.ownerSecureBoot, err = prepareActionOwnerSecureBoot(manifest, &options)
+		if err != nil {
+			return result, err
+		}
+		defer func() { err = errors.Join(err, options.ownerSecureBoot.signer.Close()) }()
+		result.Boundaries = append(result.Boundaries, "Owner Secure Boot: the official installer's unsigned boot chain was installed under the package-pinned noSB bootstrap template; a lab-private owner signer signed systemd-boot and a UKI built on each clone from its installed kernel and initramfs, only that certificate was added to the clone's private firmware db, and every TPM2 bind and unattended boot ran with Secure Boot enforced under that owner trust. This is not vendor shim trust or physical firmware.")
 	}
 	packages, err := buildActionPackages(ctx, manifest, VMBuildRepository(options.Repository, options.BuildRepository), options.LegacyAgentRevision, options.Encrypted.WorkDir)
 	if err != nil {
@@ -812,6 +836,9 @@ func nativeTPMScenario(ctx context.Context, manifest *labv1.ImageManifest, optio
 		return err
 	}
 	defer func() { err = errors.Join(err, machine.Close()) }()
+	if machine.ownerBoot != nil {
+		result.OwnerSecureBoot = append(result.OwnerSecureBoot, machine.ownerBoot)
+	}
 	if options.EncryptionPhase == "tpm" {
 		if err := machine.record(ctx, result); err != nil {
 			return err

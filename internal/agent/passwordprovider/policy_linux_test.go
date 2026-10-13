@@ -175,6 +175,21 @@ func TestUnsupportedControlsFailClosed(t *testing.T) {
 		t.Fatalf("root lockout accepted: %v", err)
 	}
 }
+
+// shadow's getdef skips a name without a value, as Arch's shadow 4.20
+// login.defs ships MOTD_FILE; two values remain refused.
+func TestLoginDefsBareNameDefinesNothing(t *testing.T) {
+	s := policyFixture()
+	setFileContent(nativeFile(s, 4), []byte("MOTD_FILE\nPASS_MAX_DAYS\t90\n"))
+	got, err := effectivePolicy(s, nil)
+	if err != nil || got.GetMaxAgeDays() != 90 {
+		t.Fatalf("bare login.defs name: %v %v", got, err)
+	}
+	setFileContent(nativeFile(s, 4), []byte("PASS_MAX_DAYS 90 30\n"))
+	if _, err := effectivePolicy(s, nil); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("ambiguous login.defs value accepted: %v", err)
+	}
+}
 func TestUnknownOwnershipNeverReplays(t *testing.T) {
 	err := acquisitionAllowed(&agentv1.ResourceOwnershipBinding{}, &agentv1.ResourceOwnershipLedger{State: agentv1.ResourceOwnershipState_RESOURCE_OWNERSHIP_STATE_UNKNOWN}, resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE)
 	if !errors.Is(err, ErrOutcomeUnknown) {

@@ -202,7 +202,9 @@ type Quirks struct {
 	// Read the release's own row, not Native(): qualification is not inherited.
 	SSHBannerUnit string
 	// RecoveryOwnerKey requires an owner-enrolled Secure Boot key for UKI
-	// recovery. This is a loader policy of the release itself, not its base.
+	// recovery: the release's media has no vendor Secure Boot trust, so lab
+	// Secure Boot cells (recovery, TPM unattended boots) enroll a run-only owner
+	// signer. This is a loader policy of the release itself, not its base.
 	RecoveryOwnerKey bool
 	// TPM2UnsealRetry is how the shipped systemd-tpm2 token survives a PCR
 	// extension during its unseal.

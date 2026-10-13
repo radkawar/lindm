@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"lindm/internal/labhost"
 )
 
 // A queued lane must boot the exact planned snapshot, not a newly edited pin.
@@ -88,6 +90,32 @@ func TestMatrixActionCellsRequireTheirCompleteNativeProof(t *testing.T) {
 		if len(cells) != 1 || cells[0].Spec.GetLane() != "device-actions" || !slices.Contains(cells[0].Spec.GetArgs(), tc.required) {
 			t.Fatalf("%s omitted native proof %s", tc.cell, tc.required)
 		}
+	}
+}
+
+// Arch media has no vendor Secure Boot trust: its Secure Boot TPM cell boots the
+// systemd-boot installer edition and enrolls a run-only owner signer, which
+// needs the noSB bootstrap template.
+func TestMatrixOwnerKeyTPMCellUsesOwnedBootTopology(t *testing.T) {
+	selection := matrixSelection{root: "../..", platforms: "arch", cells: "tpm-unattended-boots", architecture: "x86_64"}
+	in, cells, err := selection.plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cells) != 1 || cells[0].Manifest == nil || cells[0].Manifest.Image.GetEdition() != cells[0].Release.Lab.RecoveryInstallerEdition {
+		t.Fatal("owner-key TPM cell did not select the systemd-boot installer edition")
+	}
+	run := &matrixRun{root: "../..", archArgs: in.Matrix.GetArchitectureArgs(), secureBootArgs: in.Matrix.GetSecureBootArgs()}
+	if _, err := run.laneArgs(cells[0], t.TempDir()+"/cell"); err == nil {
+		t.Fatal("owner-key Secure Boot cell ran without a bootstrap template")
+	}
+	run.bootstrapFirmwareVars = "/usr/share/OVMF/OVMF_VARS_4M.fd"
+	args, err := run.laneArgs(cells[0], t.TempDir()+"/cell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if labhost.FlagValue(args, "bootstrap-firmware-vars") != run.bootstrapFirmwareVars || !slices.Contains(args, "-secure-boot") {
+		t.Fatalf("owner-key TPM cell args %v", args)
 	}
 }
 

@@ -177,6 +177,11 @@ func assignment(line string, login bool) (string, string, bool, error) {
 	var key, value string
 	if login {
 		parts := strings.Fields(text)
+		// shadow's getdef skips a name without a value ("only 1 field"); Arch's
+		// shadow 4.20 login.defs ships a bare MOTD_FILE, which defines nothing.
+		if len(parts) == 1 {
+			return "", "", false, nil
+		}
 		if len(parts) != 2 {
 			return "", "", false, ErrUnsupported
 		}

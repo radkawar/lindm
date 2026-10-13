@@ -406,7 +406,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.consoleBrowsers, "console-browser-config-dir", "", "private directory of Chromium capture configs, each owned mode0600: PLATFORM-ARCH.json (enroll-from-console) and PLATFORM-ARCH.LANE.json per provision-* lane (public-host origin with approver; each lane needs its own fresh evidenceDirectory)")
 	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
-	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key recovery only: package-owned noSB bootstrap NVRAM template on the selected host")
+	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key Secure Boot cells only (recovery, TPM unattended boots): package-owned noSB bootstrap NVRAM template on the selected host")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -811,12 +811,15 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		if c.Release.Quirks.RecoveryGRUB.Entries != "" && c.Release.Lab.MeasuredGRUBUnavailableFor(c.Architecture) == "" && !slices.Contains(c.Release.Lab.TPM.Unobservable, c.Architecture) {
 			args = labhost.SetFlag(args, "recovery-boot-mode", "measured-grub")
 		}
-		if c.Release.Quirks.RecoveryOwnerKey {
-			if r.bootstrapFirmwareVars == "" {
-				return nil, errors.New("owner-key matrix recovery requires -bootstrap-firmware-vars")
-			}
-			args = labhost.SetFlag(args, "bootstrap-firmware-vars", r.bootstrapFirmwareVars)
+	}
+	// Owner-key releases (no vendor Secure Boot trust) install under a noSB
+	// bootstrap template, then enroll a run-only owner signer: recovery and
+	// the TPM unattended-boot phase alike.
+	if c.Spec.GetSecureBoot() && c.Release.Quirks.RecoveryOwnerKey {
+		if r.bootstrapFirmwareVars == "" {
+			return nil, errors.New("owner-key Secure Boot matrix cells require -bootstrap-firmware-vars")
 		}
+		args = labhost.SetFlag(args, "bootstrap-firmware-vars", r.bootstrapFirmwareVars)
 	}
 	if c.Spec.GetCapabilityKinds() {
 		kinds := splitList(labhost.FlagValue(args, "kinds"))
