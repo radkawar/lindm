@@ -953,9 +953,7 @@ async function main() {
       await form.getByRole("combobox").first().click();
       await requester.getByRole("option", { name: "View and request control" }).click();
       step = "enter reason";
-      await form
-        .getByLabel("Reason (the user sees this; the audit log records it)")
-        .fill("UI review");
+      await form.locator('textarea[id$="-reason"]').fill("UI review");
       step = "submit request";
       await form.getByRole("button", { name: "Request remote assistance" }).click();
       step = "open viewer";

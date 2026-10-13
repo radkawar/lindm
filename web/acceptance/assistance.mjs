@@ -309,7 +309,7 @@ const commands = {
     await ui.click({ role: "tab", text: "Remote assistance" });
     await ui.select("Mode", label);
     await ui.fill({ label: "Maximum duration (minutes, 1 to 30)" }, String(args.minutes));
-    await ui.fill({ label: "Reason (shown to the local user and audited)" }, args.reason);
+    await ui.fill({ css: 'textarea[id$="-reason"]' }, args.reason);
     for (const [label, option] of Object.entries(args.capabilities ?? {}))
       await ui.select(label, option);
     await ui.click({ role: "button", text: "Request remote assistance" });

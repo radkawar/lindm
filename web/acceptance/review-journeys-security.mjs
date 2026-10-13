@@ -484,12 +484,7 @@ async function remoteHelp(ctx) {
   );
   const reason =
     "Help the user diagnose a frozen application; please share your screen only if you consent.";
-  await main
-    .getByRole("textbox", {
-      name: "Reason (the user sees this; the audit log records it)",
-      exact: true,
-    })
-    .fill(reason);
+  await main.locator('textarea[id$="-reason"]').fill(reason);
   await select(
     page,
     main.getByRole("combobox", { name: "Mode", exact: true }),
