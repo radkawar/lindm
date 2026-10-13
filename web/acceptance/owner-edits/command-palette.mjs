@@ -12,9 +12,15 @@ export const task = {
 
 const NOTHING = "zz-no-such-command";
 
-// Opens the palette and types into its search box; focus may still be returning
-// from a closed dialog when the shortcut fires, so the box is targeted directly.
+// Opens the palette and types into its search box. Ctrl+K is deliberately ignored
+// while a form field has focus (owner item 51), and a just-closed dialog returns
+// focus asynchronously, so wait until focus has left any text field first.
 async function search(page, text) {
+  await page.waitForFunction(
+    () => !document.activeElement?.matches("input, textarea, select, [contenteditable]"),
+    null,
+    { timeout: 10_000 },
+  );
   await page.keyboard.press("Control+k");
   const dialog = page.getByRole("dialog", { name: "Search console" });
   const box = dialog.getByRole("combobox");
