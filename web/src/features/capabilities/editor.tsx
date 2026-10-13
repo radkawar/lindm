@@ -177,7 +177,7 @@ export function CapabilityPolicyEditor({
                   <span className="font-medium">{copy.name}</span>
                   <span id={`${id}-${capability}`} className="text-muted-foreground">
                     {firewallBlocked
-                      ? "Needs the firewall settings for all devices first (management endpoints and a connectivity check)."
+                      ? "Set management addresses and the connectivity check for all devices first."
                       : copy.description}
                   </span>
                 </span>
@@ -246,13 +246,13 @@ export function CapabilityPolicyEditor({
             )}
           </p>
           <p>
-            Devices get a newly signed policy at their next check-in. Profile items that need a
-            capability that is off are blocked on those devices until it is on again.
+            Devices receive the signed policy at their next check-in. Devices block profile items
+            while a required capability is off.
           </p>
           {issuanceUnavailable ? (
             <p className="text-warning">
-              The server can&apos;t sign capability policies right now, so this is saved but
-              won&apos;t reach devices until the owner updates the execution delegation.
+              The server cannot sign policies now. It saves this change but cannot send it until the
+              owner updates signing authority.
             </p>
           ) : null}
         </div>
@@ -265,7 +265,7 @@ export function CapabilityPolicyEditor({
       {request.failure ? (
         <RpcError failure={request.failure}>
           {request.ambiguous ? (
-            <p>The outcome is unknown. Retry only this same change; don&apos;t start another.</p>
+            <p>The result is unknown. Retry this same change. Do not start another change.</p>
           ) : null}
         </RpcError>
       ) : null}

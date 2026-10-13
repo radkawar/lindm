@@ -70,8 +70,7 @@ export function sourceAnchor(feedId: string) {
 }
 
 // How the server's advisory sources are set up (operator documentation).
-export const advisorySourcesDocsUrl =
-  "https://github.com/radkawar/lindm/blob/main/docs/engineering.md#advisory-feed-operations";
+export const advisorySourcesDocsUrl = "/help/engineering.md#advisory-feed-operations";
 
 // Why a refreshed, unexpired source is still incomplete, as one sentence, and
 // its remedy in admin terms. The banner states the device consequence; this is

@@ -114,14 +114,14 @@ export function DeviceCapabilitiesView({
     <div className="grid min-w-0 gap-6" data-review-page="device-capabilities">
       <PageHeader
         title="Device capabilities"
-        description="Choose what the lindm agent may change on devices. A device gets what all devices get, plus what each of its groups allows."
+        description="Choose which changes the agent can make. Devices receive permissions from the policy for all devices and their group policies."
         onRefresh={editing ? undefined : refresh}
         refreshing={query.isFetching}
       />
       {query.isPending ? <p role="status">Loading capability policies…</p> : null}
       {query.isError ? (
         <RpcError failure={toRpcFailure(query.error)} title="Couldn't load capability policies">
-          {data ? <p>The policies below may be out of date.</p> : null}
+          {data ? <p>The policies below do not include a confirmed update.</p> : null}
         </RpcError>
       ) : null}
       {saved ? (
@@ -134,8 +134,7 @@ export function DeviceCapabilitiesView({
           <CapabilityIssuanceAlert reason={data.issuanceUnavailableReason} />
           {!canManage ? (
             <p className="text-sm text-muted-foreground">
-              Changing capabilities needs permission to change which signing keys devices trust for
-              commands, without a device scope.
+              You need permission to change trusted signing keys for all devices.
             </p>
           ) : null}
           <section className="grid min-w-0 gap-3 border-t pt-4" aria-labelledby="all-devices">
@@ -157,8 +156,7 @@ export function DeviceCapabilitiesView({
             </div>
             {!deployment ? (
               <p role="alert">
-                The server didn&apos;t return the policy for all devices. Refresh before editing;
-                nothing has been assumed.
+                The server did not return the policy for all devices. Refresh before editing.
               </p>
             ) : editing?.key === scopeKey(deployment.scope) ? (
               editor(editing.policy)
@@ -374,15 +372,15 @@ function PolicyCapabilities({
               {capability === ManagementCapability.FIREWALL && firewall ? (
                 firewall.missing.length ? (
                   <span className="text-warning">
-                    Can&apos;t be enabled yet: the firewall settings need{" "}
-                    {firewall.missing.join(" and ")}. Add them to the policy for all devices.
+                    Add {firewall.missing.join(" and ")} to the policy for all devices before
+                    enabling the firewall.
                   </span>
                 ) : (
                   <span>
                     {[
                       plural(
                         policy.firewall?.managementEndpoints.length ?? 0,
-                        "management endpoint",
+                        "management address",
                       ),
                       policy.firewall?.dnsServers.length
                         ? plural(policy.firewall.dnsServers.length, "DNS server")

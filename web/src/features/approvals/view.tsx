@@ -249,7 +249,7 @@ export function ApprovalsView({ rolloutNames }: { rolloutNames: RolloutApprovalN
         {list.data?.approvals.length === 0 ? (
           <EmptyState
             title="No approvals waiting"
-            description="Destructive actions, secret reveals and risk acceptances that need a second admin appear here."
+            description="Requests that need another administrator appear here."
           />
         ) : null}
         {list.data && list.data.approvals.length > 0 ? (
@@ -624,7 +624,7 @@ function ApprovalCard({
           {
             description:
               next.reason === "recent_step_up_required"
-                ? "Verify in the request card; it is sent again afterwards."
+                ? "Verify in the request card. lindm then sends the same request again."
                 : "Refresh before trying again.",
           },
         );

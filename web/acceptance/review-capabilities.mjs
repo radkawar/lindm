@@ -92,7 +92,7 @@ export async function reviewCapabilities({
           1
         )
           fail("The all-devices editor omits the firewall settings");
-        await form.getByRole("button", { name: "Add endpoint", exact: true }).click();
+        await form.getByRole("button", { name: "Add address", exact: true }).click();
         await form.getByLabel("IP address", { exact: true }).fill("192.0.2.10");
         await countsDevices(form, fail);
         const text = await form.innerText();

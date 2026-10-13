@@ -75,7 +75,7 @@ export function SecretsView({
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Secrets"
-        description="Passwords and keys that profiles can use. Values are never shown in this list."
+        description="Store passwords and keys for profiles. This list does not show secret values."
         onRefresh={() => {
           void list.refetch();
           void queryClient.invalidateQueries({ queryKey: ["secret-uses", lifetime.generation] });
@@ -94,7 +94,7 @@ export function SecretsView({
           <DialogContent keepMounted className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Create secret</DialogTitle>
-              <DialogDescription>You can't change the purpose later.</DialogDescription>
+              <DialogDescription>You cannot change the purpose later.</DialogDescription>
             </DialogHeader>
             <CreateSecretForm
               onCreated={(secretId) => {
@@ -117,7 +117,7 @@ export function SecretsView({
         pageToken === "" ? (
           <EmptyState
             title="No secrets stored"
-            description="Store a Wi-Fi key, password hash or other credential once, then select it in a profile."
+            description="Store a Wi-Fi key, password hash or other credential. Select the secret in a profile."
             action={
               canCreate ? (
                 <Button aria-haspopup="dialog" onClick={() => onCreatingChange(true)}>

@@ -152,9 +152,7 @@ export function SecretReveal({
         setAmbiguous(result.ambiguous ? "approval" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous
-            ? "Approval request may not have been sent"
-            : "Couldn't request approval",
+          result.ambiguous ? "Approval request result unknown" : "Couldn't request approval",
           {
             description: "Refresh before trying again.",
           },
@@ -203,7 +201,7 @@ export function SecretReveal({
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         material.fill(0);
-        setNotice("The page was hidden when the value arrived, so it wasn't shown. Try again.");
+        setNotice("The page was hidden when the value arrived. lindm did not show it. Try again.");
         return;
       }
       held.current = material;
@@ -218,7 +216,7 @@ export function SecretReveal({
         setAmbiguous(result.ambiguous ? "reveal" : null);
         setFailure(result);
         toast[classifyRpcFailure(result).tone === "destructive" ? "error" : "warning"](
-          result.ambiguous ? "Secret may not have been revealed" : "Couldn't reveal secret",
+          result.ambiguous ? "Secret reveal result unknown" : "Couldn't reveal secret",
           {
             description: "Refresh before trying again.",
           },

@@ -116,7 +116,9 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
         send({ payload, propose, status: "inflight", failure: null });
       }}
     >
-      <p className="text-sm">Accepting a risk doesn't fix the package. It expires automatically.</p>
+      <p className="text-sm">
+        Risk acceptance does not fix the package. The acceptance expires automatically.
+      </p>
       {attempt ? (
         <div className="grid gap-3 border bg-muted/30 p-4 text-sm">
           <TechnicalDetails items={[{ label: "Request ID", value: attempt.payload.requestId }]} />
@@ -125,7 +127,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
           <p role="status">
             {attempt.status === "succeeded"
               ? attempt.propose
-                ? "Proposed. A different administrator must review before this risk can be accepted."
+                ? "Proposal saved. Another administrator must approve it before lindm accepts this risk."
                 : "Risk accepted. Updating findings…"
               : attempt.status === "inflight"
                 ? "Saving…"
@@ -139,7 +141,9 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
           ) : null}
           {attempt.status === "ambiguous" ? (
             <>
-              <p>We couldn't confirm this was saved. Retry: it won't be recorded twice.</p>
+              <p>
+                The save result is unknown. Retry the same request to prevent duplicate records.
+              </p>
               <Button type="button" onClick={() => send(attempt)}>
                 Retry
               </Button>
@@ -190,7 +194,7 @@ export function AcceptanceForm({ deviceId, findingId }: { deviceId: string; find
             Ask another administrator to approve first (they have one hour to decide)
           </label>
           <p className="text-sm text-muted-foreground">
-            Accepting directly is refused when organisation policy requires approval.
+            Organisation policy can require approval before lindm accepts a risk.
           </p>
           <Button type="submit" className="w-fit">
             {propose ? "Propose risk acceptance" : "Accept risk"}

@@ -60,8 +60,8 @@ export function AdvisoryFleet() {
         title="Advisories"
         description={
           canReviewSources
-            ? "Security advisories affecting your devices, and whether advisory sources are up to date."
-            : "Security advisories affecting your devices."
+            ? "Review device exposure and advisory sources."
+            : "Review security advisories that affect devices."
         }
         onRefresh={() => {
           void summary.refetch();
@@ -102,7 +102,7 @@ export function AdvisoryFleet() {
           {summary.error ? <RpcError failure={toRpcFailure(summary.error)} /> : null}
           {canReviewSources && feedUnknown && !summary.data?.unknownDevices ? (
             <p className="text-sm text-muted-foreground">
-              Counts may be incomplete. Check advisory sources below.
+              Counts are incomplete when advisory sources are unavailable. Check the sources below.
             </p>
           ) : null}
           {summary.data ? (
@@ -171,7 +171,7 @@ export function AdvisoryFleet() {
               {!summary.data.advisories.length ? (
                 <EmptyState
                   title="No advisories on this page"
-                  description="If advisory sources aren't up to date, devices may still be affected."
+                  description="Outdated advisory sources do not confirm that devices are unaffected."
                 />
               ) : null}
             </>
@@ -195,15 +195,14 @@ export function AdvisoryFleet() {
               <h2>Advisory sources</h2>
             </CardTitle>
             <CardDescription>
-              Findings are only accurate when sources and device inventory are up to date. Sources
-              are set up on the lindm server:{" "}
+              Keep sources and device inventory current.{" "}
               <a
                 href={advisorySourcesDocsUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="underline underline-offset-4"
               >
-                how to add an advisory source
+                Configure advisory sources
               </a>
               .
             </CardDescription>

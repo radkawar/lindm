@@ -66,13 +66,12 @@ export async function check({ page, visit, require, capture, step }) {
   step("no server configuration jargon outside Details");
   const jargon = mainText.match(/advisories\.feeds|server configuration/gi) ?? [];
   require(jargon.length === 0, `server-config jargon shown without Details: ${jargon.join(", ")}`);
-  const docs = main.getByRole("link", { name: /how to add an advisory source/i });
-  require((await docs.count()) === 1, "no single docs link explains how to add an advisory source");
+  const docs = main.getByRole("link", { name: "Configure advisory sources", exact: true });
+  require((await docs.count()) === 1, "no single docs link explains advisory source configuration");
   if ((await docs.count()) === 1) {
     const href = (await docs.getAttribute("href")) ?? "";
-    require(/^https:\/\/.+docs\/.+#advisory-feed-operations$/.test(
-      href,
-    ), `docs link points elsewhere: ${href}`);
+    require(href ===
+      "/help/engineering.md#advisory-feed-operations", `docs link points elsewhere: ${href}`);
   }
 
   step("advisory table column means something per advisory");

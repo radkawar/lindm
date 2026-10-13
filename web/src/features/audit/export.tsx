@@ -108,7 +108,7 @@ export function AuditExport({
           <DialogHeader>
             <DialogTitle>Export filtered evidence</DialogTitle>
             <DialogDescription>
-              Includes every matching event, not just this page. Kept for 30 days.
+              Includes every matching event, not just this page. lindm keeps the export for 30 days.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 border p-3" aria-label="Export scope">
@@ -138,8 +138,8 @@ export function AuditExport({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            A signed selection, not a complete audit chain. More than 100,000 matches fails the
-            export; narrow the range and try again.
+            This signed selection is not a complete audit chain. Exports fail above 100,000 matches.
+            Narrow the range before exporting again.
           </p>
           {action.failure ? <RpcError failure={action.failure} /> : null}
           {action.invalid ? (
@@ -149,9 +149,7 @@ export function AuditExport({
           ) : null}
           {action.ambiguous ? (
             <div className="grid gap-2">
-              <p>
-                The export may already be queued. Retry the same export before starting another.
-              </p>
+              <p>The queue result is unknown. Retry the same export before starting another.</p>
               <Button disabled={action.busy} onClick={submit}>
                 Retry same export
               </Button>

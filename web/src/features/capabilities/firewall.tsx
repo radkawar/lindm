@@ -52,7 +52,7 @@ export function parseFirewall(draft: FirewallDraft): FirewallResult {
     .filter(Boolean);
   const guardText = draft.guard.trim();
   const missing = [
-    ...(endpoints.length ? [] : ["management endpoints"]),
+    ...(endpoints.length ? [] : ["management addresses"]),
     ...(guardText ? [] : ["a connectivity check"]),
   ];
   if (!endpoints.length && !dnsServers.length && !guardText) return { missing, problem: "" };
@@ -105,19 +105,19 @@ export function FirewallSettingsFields({
     <fieldset className="grid min-w-0 gap-4 border p-4">
       <legend className="px-1 text-base font-semibold">Firewall settings for all devices</legend>
       <p className="text-sm text-muted-foreground">
-        Firewall can be enabled once these are set. Firewall changes never block the management
-        endpoints, and the connectivity check rolls a change back if the device loses contact.
+        Set these values before enabling the firewall. Firewall changes preserve access to
+        management addresses. The connectivity check reverses changes if the device loses contact.
       </p>
       <div className="grid gap-2">
         <span id={`${id}-endpoints`} className="text-sm font-medium">
-          Management endpoints
+          Management addresses
         </span>
         <p className="text-sm text-muted-foreground">
-          Addresses and ports devices must always reach, such as this server and the connectivity
-          check peers.
+          Enter addresses and ports that devices must always reach, including this server and
+          connectivity check peers.
         </p>
         {draft.endpoints.length === 0 ? (
-          <p className="text-sm">No management endpoints yet.</p>
+          <p className="text-sm">No management addresses yet.</p>
         ) : null}
         <ul className="grid gap-2" aria-labelledby={`${id}-endpoints`}>
           {draft.endpoints.map((row, index) => (
@@ -161,7 +161,7 @@ export function FirewallSettingsFields({
                   onChange({ ...draft, endpoints: draft.endpoints.filter((_, i) => i !== index) })
                 }
               >
-                Remove endpoint {index + 1}
+                Remove address {index + 1}
               </Button>
             </li>
           ))}
@@ -175,7 +175,7 @@ export function FirewallSettingsFields({
             onChange({ ...draft, endpoints: [...draft.endpoints, { address: "", port: "443" }] })
           }
         >
-          Add endpoint
+          Add address
         </Button>
       </div>
       <label className="grid gap-2 text-sm font-medium">
@@ -192,8 +192,7 @@ export function FirewallSettingsFields({
           Connectivity check
         </label>
         <p id={`${id}-guard-hint`} className="text-sm text-muted-foreground">
-          Paste the connectivity check prepared for your probe peers: the same JSON a device takes
-          as <code className="font-mono text-xs">connectivity_guard</code> in{" "}
+          Paste the connectivity check JSON from{" "}
           <code className="font-mono text-xs">/etc/lindm/executor.json</code>.
         </p>
         <Textarea
@@ -216,7 +215,7 @@ export function FirewallSettingsFields({
         </p>
       ) : result.missing.length ? (
         <p className="text-sm text-warning">
-          Firewall can&apos;t be enabled yet: add {result.missing.join(" and ")}.
+          Add {result.missing.join(" and ")} before enabling the firewall.
         </p>
       ) : null}
     </fieldset>

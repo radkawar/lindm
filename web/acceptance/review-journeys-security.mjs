@@ -715,7 +715,7 @@ async function recoveryAudit(ctx) {
   const dialog = page.getByRole("dialog", { name: "Export filtered evidence", exact: true });
   await visible(dialog);
   await visible(
-    dialog.getByText("A signed selection, not a complete audit chain.", { exact: false }),
+    dialog.getByText("This signed selection is not a complete audit chain.", { exact: false }),
   );
   await shot(
     ctx,

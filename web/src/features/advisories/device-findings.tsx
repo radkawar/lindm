@@ -185,9 +185,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           <div className="grid gap-4 border bg-muted/30 p-3 text-sm">
             <p className="font-medium">Partly checked: {advisoryReasonText(freshness.reason)}.</p>
             <p>
-              The base distribution&apos;s advisories are applied only to packages verified as
-              installed from its signed archive. The other {freshness.uncoveredPackages.toString()}{" "}
-              installed packages are not checked, so this device is never shown as unaffected.
+              lindm checks distribution advisories only for packages from its verified signed
+              archive. It does not check {freshness.uncoveredPackages.toString()} other installed
+              packages. This device&apos;s exposure remains unknown.
             </p>
             <UncoveredPackages deviceId={deviceId} />
           </div>
@@ -229,7 +229,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
         {findings.data?.findings.length === 0 ? (
           <EmptyState
             title="No findings on this page"
-            description="If the inventory or advisory sources are out of date, the device may still be affected."
+            description="Outdated inventory or advisory sources do not confirm that this device is unaffected."
           />
         ) : null}
         {findings.data?.findings.length ? (
@@ -270,6 +270,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                         {finding.sourceUrl ? (
                           <a
                             href={finding.sourceUrl}
+                            data-console-link="vendor-advisory"
                             target="_blank"
                             rel="noreferrer"
                             className="font-medium underline underline-offset-4"
