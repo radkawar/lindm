@@ -11918,6 +11918,54 @@
       "recoveryManifest": "ubuntu-resolute-20260927-amd64",
       "recoveryManifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
       "mainlineRevision": "5f42b0f1470411307387ee2330cd536479513bd8"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-assistance-roadmap-20261011/ubuntu24-tier1-26/assistance.json",
+      "sha256": "8c9f36f9739b40301058b640225fa59ad8744fc141e323694855cb490b83e830",
+      "recorded": "2026-10-13T06:07:44.242693578Z",
+      "revision": "ceb4fc6ede24d57cc4ca3cad7ba2d7685bb1e4c7",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME; Tier 1 (monitors: console display command timeout before d6b9b500)",
+      "reference": "#commercial-assistance-capability-qualification",
+      "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistance-roadmap-20261011/ubuntu24-tier1-27/assistance.json",
+      "sha256": "9b262bf369c8114e0da697ada52cabdbc5b3bdbcd77b09a4de385c196141b637",
+      "recorded": "2026-10-13T14:52:49.081986683Z",
+      "revision": "ceb4fc6ede24d57cc4ca3cad7ba2d7685bb1e4c7-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME; Tier 1 clipboard, keyboard, displays, messages",
+      "reference": "#commercial-assistance-capability-qualification",
+      "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-44-1.7-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-assistance-roadmap-20261011/fedora44-tier1-27/assistance.json",
+      "sha256": "0401c6a653bafffabc164f4e564d86ab13f44ce3e5c14273871bbfe7cb88cfb7",
+      "recorded": "2026-10-13T14:37:33.515247358Z",
+      "revision": "ceb4fc6ede24d57cc4ca3cad7ba2d7685bb1e4c7-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME; Tier 1 (monitors: gnome-shell SIGSEGV on head unplug, upstream)",
+      "reference": "#commercial-assistance-capability-qualification",
+      "mainlineRevision": "d12e679c99072cb4a78d3a7acf002cd4d3d70b2c"
     }
   ]
 }
