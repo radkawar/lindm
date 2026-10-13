@@ -186,7 +186,7 @@ export function AssistanceControls({
     } catch {
       if (epoch === clipboardEpoch.current)
         setBrowserError(
-          "Couldn't read your clipboard. Allow clipboard access in your browser and try again.",
+          "Could not read your clipboard. Allow clipboard access in your browser. Retry sending the clipboard.",
         );
     } finally {
       clipboardInFlight.current = false;
@@ -218,7 +218,7 @@ export function AssistanceControls({
     } catch {
       if (epoch === clipboardEpoch.current)
         setBrowserError(
-          "Couldn't copy clipboard text. Allow clipboard access in your browser and try again.",
+          "Could not copy clipboard text. Allow clipboard access in your browser. Retry copying the clipboard.",
         );
     } finally {
       clipboardInFlight.current = false;
@@ -230,7 +230,7 @@ export function AssistanceControls({
   const outcome =
     result?.status === AssistanceCommandStatus.SUCCEEDED
       ? result.kind === AssistanceCommandKind.CLIPBOARD_READ && !commands.clipboardReady
-        ? "Clipboard text was cleared. Choose Read clipboard again."
+        ? "Clipboard text is no longer available. Choose Read clipboard again."
         : completedLabels[result.kind] || "Request completed."
       : result
         ? incompleteLabels[result.reason] ||
@@ -292,7 +292,8 @@ export function AssistanceControls({
           <p id={`${id}-read`} className="text-sm text-muted-foreground">
             {!clipboardAvailable
               ? "Copying requires clipboard access in a supported browser."
-              : readReason || "Read the device clipboard, then choose Copy clipboard."}
+              : readReason ||
+                "Read the device clipboard. Choose Copy clipboard to copy the received text."}
           </p>
         ) : null}
         {copied ? <p role="status">Clipboard text copied.</p> : null}
@@ -317,7 +318,7 @@ export function AssistanceControls({
           />
           <p id={`${id}-keyboard-help`} className="text-sm text-muted-foreground">
             {keyboardReason ||
-              "Text sends printable symbols; physical keys use the device's keyboard layout."}
+              "Text mode sends printable symbols. Physical keys use the device's keyboard layout."}
           </p>
         </div>
         <div className="grid gap-2">

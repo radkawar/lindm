@@ -29,26 +29,26 @@ export const modeLabels: Record<AssistanceMode, string> = {
 const endCauseLabels: Record<AssistanceEndCause, string> = {
   [AssistanceEndCause.UNSPECIFIED]: "Ended.",
   [AssistanceEndCause.DECLINED]: "The user declined.",
-  [AssistanceEndCause.CONSENT_TIMEOUT]: "The user didn't respond in time.",
+  [AssistanceEndCause.CONSENT_TIMEOUT]: "The user did not respond in time.",
   [AssistanceEndCause.OPERATOR_STOPPED]: "An admin stopped the session.",
   [AssistanceEndCause.USER_STOPPED]: "The user stopped the session.",
-  [AssistanceEndCause.PORTAL_CLOSED]: "Screen sharing was closed on the device.",
-  [AssistanceEndCause.SESSION_LOCKED]: "The device screen was locked.",
+  [AssistanceEndCause.PORTAL_CLOSED]: "The device stopped screen sharing.",
+  [AssistanceEndCause.SESSION_LOCKED]: "The device locked its screen.",
   [AssistanceEndCause.SESSION_ENDED]: "The user signed out or switched users.",
-  [AssistanceEndCause.EXPIRED]: "The time limit was reached.",
+  [AssistanceEndCause.EXPIRED]: "The session reached its time limit.",
   [AssistanceEndCause.AUTHORIZATION_LOST]: "The device lost contact with the server.",
-  [AssistanceEndCause.NO_ELIGIBLE_SESSION]: "No one was signed in and unlocked on the device.",
-  [AssistanceEndCause.UNAVAILABLE]: "Screen sharing isn't available on this device.",
+  [AssistanceEndCause.NO_ELIGIBLE_SESSION]: "No user had an unlocked desktop on the device.",
+  [AssistanceEndCause.UNAVAILABLE]: "This device cannot share its screen.",
   [AssistanceEndCause.CONNECTION_FAILED]: "The connection failed.",
-  [AssistanceEndCause.DISABLED]: "Remote assistance is turned off on this device.",
+  [AssistanceEndCause.DISABLED]: "The device configuration disables remote assistance.",
 };
 
 // Assistance is a device-local agent setting (packaged default: off); no console role
 // can turn it on remotely.
 export const disabledRemedy = (
   <>
-    Someone with root on the device can set <code>remote_assistance.enabled</code> in{" "}
-    <code>/etc/lindm/executor.json</code> and restart <code>lindm-executor</code>.
+    Ask an administrator with root access to enable <code>remote_assistance.enabled</code> in{" "}
+    <code>/etc/lindm/executor.json</code>. Restart <code>lindm-executor</code> on the device.
   </>
 );
 
@@ -57,11 +57,11 @@ export const disabledRemedy = (
 const startFailures: Partial<Record<AssistanceEndCause, ReactNode>> = {
   [AssistanceEndCause.DISABLED]: disabledRemedy,
   [AssistanceEndCause.NO_ELIGIBLE_SESSION]:
-    "Ask the person to sign in to their desktop and unlock it, then request again.",
+    "Ask the user to sign in to the desktop. Ask them to unlock it. Request assistance again.",
   [AssistanceEndCause.UNAVAILABLE]:
-    "The desktop's screen-sharing portal or PipeWire is missing or failed on the device. Fix its desktop packages, then request again.",
+    "The device reports a missing or failed screen-sharing portal or PipeWire. Repair the desktop packages. Request assistance again.",
   [AssistanceEndCause.CONNECTION_FAILED]:
-    "Check that the device and your browser can reach this server's assistance relay, then request again.",
+    "Check access to the assistance relay from the device and browser. Request assistance again.",
 };
 
 export function couldNotStart(session: AssistanceSession): boolean {
@@ -76,11 +76,11 @@ export function couldNotStart(session: AssistanceSession): boolean {
 // consent, lock or control. Every other detail keeps the packages remedy.
 const unsupportedDesktop: Record<string, string> = {
   notification_actions_hidden:
-    "This desktop's notification server shows no Allow or Decline buttons, so the person can't consent. Remote assistance isn't supported on this desktop.",
+    "This desktop shows no Allow or Decline buttons. The user cannot give consent. This desktop does not support remote assistance.",
   session_lock_state_unreported:
-    "This desktop doesn't report when its screen locks, so sharing couldn't stop at a lock. Remote assistance isn't supported on this desktop.",
+    "This desktop does not report screen locks. Sharing cannot stop when the screen locks. This desktop does not support remote assistance.",
   portal_remote_desktop_unavailable:
-    "This desktop's screen-sharing portal offers no remote control. Request view only instead.",
+    "This desktop cannot provide remote control. Request view only instead.",
 };
 
 export function startFailureRemedy(session: AssistanceSession): ReactNode {
@@ -158,18 +158,18 @@ const failureMessages: Record<string, ReactNode> = {
   [`${Code.FailedPrecondition}:assistance_unconfigured`]:
     "Remote assistance isn't set up on this server.",
   [`${Code.FailedPrecondition}:device_offline`]:
-    "The device is offline. Try again once it has checked in.",
+    "The device is offline. Wait for it to contact the server. Retry the request.",
   [`${Code.FailedPrecondition}:assistance_busy`]:
     "Another remote assistance session is already open on this device.",
   [`${Code.FailedPrecondition}:assistance_disabled`]: (
     <>Remote assistance is turned off on this device. {disabledRemedy}</>
   ),
   [`${Code.FailedPrecondition}:assistance_no_desktop`]:
-    "This device has no desktop session to share. Its latest inventory shows no one signed in to a desktop and no login screen.",
+    "The latest inventory shows no desktop session or sign-in screen. This device has no desktop to share.",
   [`${Code.FailedPrecondition}:assistance_capacity`]:
     "Too many remote assistance sessions are running. Try again later.",
   [`${Code.FailedPrecondition}:assistance_state`]:
-    "This session isn't waiting for a connection. It may be open in another tab.",
+    "This session is not waiting for a connection. Check for an open session in another tab.",
   [`${Code.FailedPrecondition}:assistance_ended`]: "The session has already ended.",
   [`${Code.FailedPrecondition}:assistance_non_relay`]:
     "Your browser couldn't connect through the server's relay.",

@@ -7,10 +7,10 @@ import { StepUpError, stepUp, type StepUpFailure } from "@/lib/step-up";
 
 const failureText: Record<StepUpFailure, string> = {
   password: "Password is incorrect. Repeated failures lock the account for a while.",
-  passkey: "Your passkey didn't confirm. Try again when you're ready.",
+  passkey: "Your passkey did not confirm your identity. Retry verification.",
   unavailable:
-    "This sign-in can't be re-verified here. Sign out, then sign in with your local account and passkey.",
-  failed: "Verification couldn't be completed. Try again.",
+    "This page cannot verify your identity again. Sign out. Sign in with your local account and passkey.",
+  failed: "Identity verification failed. Retry verification.",
 };
 
 // In-page "Verify it's you": password, then passkey, on the current session.

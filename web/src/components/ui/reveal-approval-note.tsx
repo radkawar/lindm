@@ -5,7 +5,7 @@ import { RevealApprovalRule, type RevealApproval } from "../../../gen/lindm/admi
 const sentences: Partial<Record<RevealApprovalRule, string>> = {
   [RevealApprovalRule.ANOTHER_APPROVER]: "Needs approval: another admin can approve.",
   [RevealApprovalRule.ONLY_APPROVER]:
-    "You're the only admin who can reveal this, so no approval is needed.",
+    "Only you can reveal this secret. This rule does not require approval.",
   [RevealApprovalRule.SERVER_SETTING]:
     "Needs approval: this server requires a second admin to approve every reveal.",
   [RevealApprovalRule.AUTHORIZATION_POLICY]:

@@ -85,8 +85,8 @@ export function toRpcFailure(error: unknown): RpcFailure {
   let message = raw === "" ? connectError.message.trim() : raw;
   if (message === "") {
     message = ambiguous
-      ? "The request ended without a result. Retry the same request ID before starting a new one."
-      : "The request was rejected.";
+      ? "The server returned no result. Retry this same request before starting a new one."
+      : "The server rejected the request.";
   }
   const fields =
     connectError.code === Code.InvalidArgument
@@ -116,25 +116,25 @@ export type RpcFailurePresentation = {
 
 const RECOVERY_READINESS_MESSAGES: Record<string, string> = {
   device_action_recovery_readiness_missing:
-    "No recovery readiness observed. Refresh inventory before continuing.",
+    "The device has not reported recovery readiness. Refresh inventory before continuing.",
   device_action_recovery_readiness_stale:
     "Recovery readiness is stale. Refresh inventory before continuing.",
   device_action_recovery_readiness_unsupported:
     "This device does not report the required recovery capability.",
   device_action_recovery_owner_key_required:
-    "Secure Boot not enforced: recovery sanitize requires an enrolled owner key",
+    "Secure Boot does not enforce an enrolled owner key. Recovery sanitize requires that key.",
   device_action_recovery_artifact_required:
     "Select the configured signed recovery image to check required space.",
   device_action_recovery_artifact_unavailable:
     "The signed recovery image is unavailable. Ask an administrator to check the recovery release.",
   device_action_recovery_attestation_unavailable:
-    "The device can't prove its boot state with its TPM, so recovery can't be verified.",
+    "The device cannot prove its boot state with its TPM. lindm cannot verify recovery.",
   device_action_recovery_boot_mode_mismatch:
     "The device now boots differently from when recovery was prepared. Prepare recovery again.",
   device_action_recovery_kernel_mismatch:
     "The device's kernel changed since recovery was prepared. Prepare recovery again.",
   device_action_esp_insufficient:
-    "Unsupported: ESP capacity. The signed recovery image does not fit the available EFI system partition space. Use separately qualified external recovery media with an on-site operator; do not remove ordinary boot files or resize the ESP to bypass this gate.",
+    "Unsupported: ESP capacity. The signed recovery image does not fit the EFI system partition. Use separately qualified external recovery media with an on-site operator. Do not remove ordinary boot files. Do not resize the ESP to bypass this gate.",
 };
 
 export function recoveryReadinessMessage(reason: string) {
@@ -166,19 +166,19 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
     "Blocked: the admin who set this policy lost access. Set the policy again to resume.",
   escrow_unconfigured: "Blocked: secret storage isn't set up on the server.",
   native_package_manager_busy:
-    "Waiting: another package manager (such as a release upgrade) was running. Nothing changed; it retries at the next check.",
+    "Another package manager was running. Nothing changed. lindm retries at the next check.",
   resource_executor_not_available:
-    "lindm can't manage this kind of setting on devices yet, so it isn't sent. Remove it from the profile or manage it another way.",
+    "lindm cannot manage this setting on devices. Remove it from the profile, or use another tool.",
   resource_ownership_operation_unavailable:
-    "lindm can't yet take over or undo this setting the way the profile asks, so it isn't sent. Change the profile's ownership choice for this item.",
+    "lindm cannot apply this item's ownership choice. Change the ownership choice in the profile.",
   resource_verification_not_available:
-    "lindm can't run the extra health checks this profile asks for, so it isn't sent. Keep only the device state check in the profile.",
+    "lindm cannot run the extra health checks. Keep only the device state check in the profile.",
   resource_feature_evidence_unavailable:
-    "No device reports the capabilities this setting requires yet, so it isn't sent. Remove the capability requirement from the profile.",
+    "No device reports the required capabilities. Remove the capability requirement from the profile.",
   resource_platform_not_applicable:
     "Not applicable to this device: the profile limits it to other platforms.",
   device_platform_facts_unavailable:
-    "Waiting for this device to report its operating system and architecture; lindm then decides whether this applies.",
+    "lindm needs this device's operating system and architecture before it can check applicability.",
   adoption_approval_required:
     "Taking over this existing setting needs an approved assignment. Assign the profile again with an approval.",
   assignment_authority_changed:
@@ -186,32 +186,32 @@ const BLOCKED_REASON_LABELS: Record<string, string> = {
   dependency_pending: "Waiting for the items it depends on to be applied first.",
   dependency_attention: "An item this depends on needs attention. Fix that item first.",
   dependency_not_applicable:
-    "An item this depends on doesn't apply to this device, so this can't be applied. Change the profile.",
-  native_unsupported: "The device reported it can't apply this setting. Nothing was changed.",
+    "A dependency does not apply to this device. lindm cannot apply this item. Change the profile.",
+  native_unsupported: "The device cannot apply this setting. Nothing changed.",
   admission_precondition:
-    "The device refused to start because a required condition wasn't met. Nothing was changed.",
+    "The device refused to start because a required condition failed. Nothing changed.",
   native_tool_path_unprotected:
-    "The device refused to run a system tool kept in an unprotected folder. Nothing was changed; the device inventory names the folder.",
+    "The device refused to run a system tool in an unprotected folder. Nothing changed. Device inventory names the folder.",
   not_applicable: "The device reported this setting doesn't apply to it.",
-  no_effect: "The last attempt ended before it started. Nothing was changed; lindm sends it again.",
+  no_effect: "The last attempt ended before it started. Nothing changed. lindm sends it again.",
   verification_unknown: "The device couldn't confirm this setting's current state.",
   verification_drifted: "The device found this setting changed away from the profile.",
   outcome_unknown:
     "The device couldn't confirm whether the last change finished. Check the device before assigning again.",
   execution_failed: "The last change failed on the device. Its report is under Latest change.",
   preparation_precondition_failed:
-    "The device stopped before changing anything because a safety check failed. Nothing was changed.",
+    "The device stopped because a safety check failed. Nothing changed.",
   ownership_baseline_unavailable:
-    "lindm has no record of this setting from before it took over, so it leaves the device as it is.",
+    "lindm has no record of this setting before management started. It leaves the setting unchanged.",
   precondition_failed:
-    "The device refused to undo this because a required condition wasn't met. Nothing was changed.",
+    "The device refused to undo this setting because a required condition failed. Nothing changed.",
   release_failed: "The device couldn't undo this setting. Its report is under Recent changes.",
-  expired_unstarted: "It expired before the device started it. Nothing was changed.",
-  assignment_changed: "The profile changed before the device started it. Nothing was changed.",
+  expired_unstarted: "The request expired before the device started it. Nothing changed.",
+  assignment_changed: "The profile changed before the device started it. Nothing changed.",
   targeting_paused_or_changed:
-    "The rollout paused or changed before the device started it. Nothing was changed.",
+    "The rollout paused or changed before the device started it. Nothing changed.",
   authority_changed:
-    "The assigning admin lost permission before the device started it. Nothing was changed.",
+    "The assigning admin lost permission before the device started it. Nothing changed.",
 };
 
 // Server-recorded blocked, refused or attention reasons as one plain sentence.
@@ -234,14 +234,14 @@ export type BlockedReasonCopy = {
 
 const ADOPTION_LINK = { to: "/rollouts", label: "Open Rollouts" } as const;
 const ADOPTION_REMEDY =
-  "Roll the profile out again with approved adoption, and approve it once, to let lindm take it over.";
+  "Start a rollout with approved adoption. Approve the rollout to let lindm take over this item.";
 
 // Causes a device names when a create-only item would overwrite something lindm
 // didn't create; only an approved adoption may take it over.
 const ADOPTION_CAUSES: Record<string, string> = {
   adoption_required: "Blocked: this item already exists on the device and lindm didn't create it.",
   existing_banner_file:
-    "Blocked: the device already has an SSH login banner file lindm didn't create (Ubuntu ships /etc/issue.net, for example).",
+    "Blocked: the device has an SSH sign-in banner file that lindm did not create.",
   existing_file: "Blocked: a file lindm didn't create already exists at this path.",
   existing_account: "Blocked: a local user or group with this name already exists on the device.",
   existing_definition: "Blocked: a systemd unit with this name already exists on the device.",
@@ -253,25 +253,25 @@ const ADOPTION_CAUSES: Record<string, string> = {
 // Causes only a change on the device can fix; approving adoption doesn't help.
 const DEVICE_CAUSES: Record<string, string> = {
   existing_banner_dropin:
-    "Blocked: an SSH configuration drop-in on the device already sets a login banner. Remove that setting on the device, or remove the banner from the profile.",
+    "Blocked: an SSH configuration file already sets a banner. Remove that device setting, or remove the banner from the profile.",
   existing_update_timer:
-    "Blocked: the device already has an automatic update setup lindm didn't create. Turn it off on the device, or remove the update policy from the profile.",
+    "Blocked: the device has automatic updates that lindm did not configure. Disable those updates, or remove the update policy from the profile.",
   existing_banner_symlink:
-    "Blocked: the device's SSH banner file is a symbolic link, so lindm won't take it over. Replace it with a regular file on the device, or remove the banner from the profile.",
+    "Blocked: the SSH banner file is a symbolic link. Replace it with a regular file, or remove the banner from the profile.",
   // The provider refuses as unsupported, so the row's status already says
   // Unsupported; these name why, with no second status word.
   native_tool_outdated:
-    "The device's system tool for this item is too old (on Fedora, dnf5 older than 5.4.6.0). Apply all OS updates on the device once: an OS update policy set to All updates, or Patch now with All updates. On Fedora a security-only policy doesn't update dnf5. lindm retries this item when the device's packages change.",
+    "The system tool is too old. Fedora requires dnf5 5.4.6.0 or newer. Apply All updates through an OS update policy or Patch now. Fedora security-only updates do not update dnf5. lindm retries when device packages change.",
   native_tool_missing:
     "Blocked: a system tool this item needs isn't installed on the device. Install it on the device.",
   existing_package_unverified:
-    "Blocked: this package was already installed without lindm, and lindm can't verify it came from the approved repository, so it won't take it over. Remove the package on the device, or remove it from the profile.",
+    "Blocked: lindm cannot verify this installed package's repository. Remove the package from the device, or remove it from the profile.",
   explicit_account_identity_required:
-    "Blocked: creating this local account needs its exact numeric ID in the profile (a GID for a group; a UID, primary group, home folder and login shell for a user). Add them to the profile.",
+    "Blocked: this local account needs explicit identity values. For a group, add its GID to the profile. For a user, add its UID, primary group, home folder and sign-in shell.",
   ssh_service_inactive:
     "Blocked: the SSH service isn't running on the device. Start SSH on the device, or remove the SSH setting from the profile.",
   ssh_config_invalid:
-    "Blocked: the device's SSH configuration fails sshd's own check, so lindm left it unchanged. Fix the SSH configuration on the device.",
+    "Blocked: sshd rejected the device's SSH configuration. lindm left it unchanged. Repair the SSH configuration on the device.",
   unit_not_installed:
     "The systemd unit this item needs isn't installed on the device. Install the package that provides it.",
   native_unsupported:
@@ -295,7 +295,7 @@ export function blockedReasonCopy(
   if (reason === "capability_firewall_settings_required")
     return {
       sentence:
-        "Blocked: Firewall needs the deployment's firewall settings (management endpoints and connectivity check). Add them in Settings → Device capabilities.",
+        "Blocked: Firewall needs management addresses and a connectivity check. Add these firewall settings in Settings → Device capabilities.",
       link: settingsLink,
       known: true,
     };
@@ -310,7 +310,7 @@ export function blockedReasonCopy(
   const localField = localCapabilityField[required];
   if (localField)
     return {
-      sentence: `Blocked: ${name} is set only on the device itself. Root on the device sets it in /etc/lindm/executor.json, field`,
+      sentence: `Blocked: ${name} requires local configuration. Ask an administrator with root access to set the field in /etc/lindm/executor.json:`,
       localField,
       known: true,
     };
@@ -328,29 +328,29 @@ export function blockedReasonCopy(
     if (required === ManagementCapability.PACKAGES)
       return {
         sentence:
-          "Blocked: this device installs packages only from repositories it approves, and this item's repository isn't one of them. Policies approve only the OS vendor's archive; root on the device approves other repositories in /etc/lindm/executor.json, field",
+          "Blocked: the device does not approve this item's repository. Policies approve only the OS vendor's archive. Root administrators approve other repositories in /etc/lindm/executor.json, field",
         localField: "package_provider.sources",
         known: true,
       };
     if (required === ManagementCapability.KERNEL_SETTINGS)
       return {
         sentence:
-          "Blocked: this kernel parameter isn't one the device may set. Add it to the kernel parameters of this device's group in Settings → Device capabilities.",
+          "Blocked: the device cannot set this kernel parameter. Add it to this device group's kernel parameters in Settings → Device capabilities.",
         link: settingsLink,
         known: true,
       };
   }
   if (capabilities?.granted.some((grant) => grant.capability === required))
     return {
-      sentence: `Blocked: a policy allows ${name} on this device, but the device hasn't applied that policy yet. lindm tries again once the device reports it.`,
+      sentence: `Blocked: the device has not applied the policy that allows ${name}. lindm retries after the device reports that policy.`,
       known: true,
     };
   return {
-    sentence: `Blocked: no policy allows ${name} on this device. Allow it for all devices or for one of this device's groups in Settings → Device capabilities${
+    sentence: `Blocked: no policy allows ${name}. Allow it for all devices or this device's group in Settings → Device capabilities.${
       required === ManagementCapability.FIREWALL
-        ? "; Firewall first needs the firewall settings for all devices"
+        ? " Configure firewall settings for all devices first."
         : ""
-    }.`,
+    }`,
     link: settingsLink,
     known: true,
   };
@@ -373,7 +373,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "neutral",
           title: "Feature not enabled",
           message: "The deployment does not allow one or more selected assistance features.",
-          action: "Refresh the assistance policy and choose from the available options.",
+          action: "Refresh the assistance policy. Choose available features.",
         };
       case "assistance_capability_not_granted":
         return {
@@ -416,7 +416,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Session is not ready",
           message: "The session cannot accept this request in its current state.",
-          action: "Refresh the session and wait for the user to accept and the screen to connect.",
+          action: "Refresh the session. Wait for user consent and a connected screen.",
         };
       case "assistance_ended":
         return {
@@ -485,7 +485,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "neutral",
           title: "TPM binding not supported",
           message:
-            "This OS release's systemd cannot bind the disk to the TPM (systemd 252 or newer is required).",
+            "This systemd version cannot bind the disk to the TPM. The device requires systemd 252 or newer.",
           action: "Keep using the recovery key, or upgrade the OS release before binding.",
         };
       case "device_action_inventory_unavailable":
@@ -493,14 +493,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "neutral",
           title: "Inventory not available",
           message: "The device has not reported the inventory required for this action.",
-          action: "Wait for a successful inventory report, then refresh.",
+          action: "Wait for the device to report inventory. Refresh the page.",
         };
       case "secret_version_conflict":
         return {
           tone: "warning",
           title: "Secret changed",
-          message: "Another version was added after this page loaded.",
-          action: "Reload the secret and rotate against its current version with a new request.",
+          message: "Another administrator added a secret version after this page loaded.",
+          action: "Reload the secret. Rotate its current version with a new request.",
         };
       case "secret_unavailable":
         return {
@@ -513,14 +513,15 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Secret in use",
-          message: "A profile or device still uses this secret, so it wasn't deleted.",
-          action: "Choose another secret in those profiles and publish them, then delete.",
+          message: "A profile or device still uses this secret. The server did not remove it.",
+          action:
+            "Choose another secret in those profiles. Publish the profiles. Remove the unused secret.",
         };
       case "secret_deleted":
         return {
           tone: "neutral",
-          title: "Secret deleted",
-          message: "This secret was deleted, so the request can't be repeated.",
+          title: "Secret removed",
+          message: "The server removed this secret. You cannot repeat the request.",
           action: "Create a new secret if you still need it.",
         };
       case "local_admin_policy_required":
@@ -534,7 +535,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Policy authority changed",
-          message: "The policy author's authorization changed or was revoked.",
+          message: "The policy author no longer has the required authorization.",
           action: "Set the policy again with current authority.",
         };
       case "snapshot_unavailable":
@@ -556,7 +557,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "This page expired",
           message:
-            "Result pages are kept for a limited time, and older ones are cleared when you start new searches.",
+            "The server retains result pages for a limited time. New searches remove older pages.",
           action: "Start a new search.",
         };
       case "device_action_inventory_stale":
@@ -565,7 +566,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           title: "Inventory needs refreshing",
           message:
             "The device's latest inventory is older than this action allows. Check-ins don't send inventory.",
-          action: "Request fresh inventory, then check again.",
+          action: "Request fresh inventory. Check again after the device reports it.",
         };
       case "device_action_offline":
         return {
@@ -579,35 +580,35 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Another action is still open",
           message: "This device has an action that hasn't finished or expired yet.",
-          action: "Open the device's actions and wait for it to finish, then check again.",
+          action: "Open the device's actions. Wait for the current action to finish. Check again.",
         };
       case "device_action_generation_rejected":
       case "device_action_session_unavailable":
         return {
           tone: "warning",
           title: "Device enrollment changed",
-          message: "This device was re-enrolled, revoked or hasn't connected since enrolling.",
+          message: "Enrollment changed, or the device has not connected since enrollment.",
           action: "Reload the device page before trying again.",
         };
       case "device_revoked":
         return {
           tone: "neutral",
           title: "Device revoked",
-          message: "This device was revoked, so it is read-only.",
+          message: "lindm revoked this device. You can only view its records.",
           action: "Recover its enrollment from the Encryption tab to manage it again.",
         };
       case "device_quarantined":
         return {
           tone: "warning",
           title: "Device is quarantined",
-          message: "Only undoing the network quarantine can be sent while it is in force.",
+          message: "The device accepts only requests to undo the active network quarantine.",
           action: "Undo the quarantine first, or wait for it to end.",
         };
       case "device_lock_release_required":
         return {
           tone: "warning",
           title: "Accounts are already locked",
-          message: "A new lock can't be sent while the current one is in force.",
+          message: "The device cannot accept a new lock while the current lock remains active.",
           action: "Undo the current account lock first.",
         };
       case "device_action_lock_changed":
@@ -616,7 +617,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Account lock changed",
           message: "The lock this undo refers to is no longer the device's current lock.",
-          action: "Reload the device page and undo the lock it shows now.",
+          action: "Reload the device page. Undo the current lock.",
         };
       case "device_action_session_lock_unsupported":
         return {
@@ -629,15 +630,16 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         return {
           tone: "warning",
           title: "Not every encrypted volume is included",
-          message: "This erase must include every volume whose recovery key lindm holds.",
-          action: "Select all the device's encrypted volumes, then review again.",
+          message:
+            "This recovery-key removal must include every encrypted volume whose recovery key lindm stores.",
+          action: "Select all the device's encrypted volumes. Review the request again.",
         };
       case "escrow_key_rejected":
         return {
           tone: "warning",
           title: "Recovery key settings changed",
           message: "The server's key for storing recovery keys changed after this page loaded.",
-          action: "Reload the page and start the action again.",
+          action: "Reload the page. Start the action again.",
         };
       case "authorization_unavailable":
         return {
@@ -665,7 +667,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Firewall settings needed",
           message:
-            "Firewall can be enabled only while the deployment has firewall settings (management endpoints and a connectivity check), and those settings can't be removed while any policy enables Firewall.",
+            "Firewall requires management addresses and a connectivity check. You cannot remove these settings while a policy enables Firewall.",
           action: "Save the deployment's firewall settings first, or leave Firewall off.",
         };
     }
@@ -674,15 +676,16 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     return {
       tone: "warning",
       title: "Policy changed",
-      message: "Another administrator changed this policy after you opened it. Nothing was saved.",
-      action: "Reload the policy, review it, and make your change again.",
+      message:
+        "Another administrator changed this policy after you opened it. The server saved nothing.",
+      action: "Reload the policy. Review it. Make your change again.",
     };
   }
   if (failure.code === Code.NotFound && failure.reason === "capability_policy_group_not_found") {
     return {
       tone: "warning",
       title: "Group not found",
-      message: "The group no longer exists. Nothing was saved.",
+      message: "The group no longer exists. The server saved nothing.",
       action: "Choose another group.",
     };
   }
@@ -716,7 +719,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       return {
         tone: "warning",
         title: "Only the requesting admin can continue",
-        message: "This session was requested by another admin.",
+        message: "Another admin requested this session.",
         action: "Ask that admin to continue, or request your own session after this one ends.",
       };
     }
@@ -725,9 +728,9 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         tone: "warning",
         title: "Sign in again",
         message:
-          "This change needs a fresh check of your account, and the identity provider no longer confirms that you may make it. Nothing was saved.",
+          "The identity provider no longer authorizes this change. The server saved nothing.",
         action:
-          "Sign out, sign in again, then retry. If it still fails, ask an owner to check your role.",
+          "Sign out. Sign in again. Retry the same change. Ask an owner to check your role if authorization still fails.",
       };
     }
     if (failure.reason === "recent_step_up_required") {
@@ -735,7 +738,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
         tone: "warning",
         title: "Verify it's you",
         message: "This needs a recent identity check.",
-        action: "Enter your password, then confirm with your passkey.",
+        action: "Enter your password. Confirm your identity with your passkey.",
       };
     }
     if (failure.reason === "approval_required" || failure.reason === "human_approval_required") {
@@ -786,7 +789,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       tone: "warning",
       title: "Assistance request needs updating",
       message: "The request does not meet the server's assistance requirements.",
-      action: "Review the selected features and text, then refresh the page before trying again.",
+      action: "Review the selected features and text. Refresh the page. Retry the request.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.reason === "request_invalid") {
@@ -794,7 +797,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       tone: "warning",
       title: "Check the form",
       message: failure.message,
-      action: "Nothing was sent. Correct the values, then try again.",
+      action: "The console sent nothing. Correct the values. Retry the request.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.fields && failure.fields.length > 0) {
@@ -802,7 +805,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       tone: "warning",
       title: "Check the form",
       message: failure.fields.map((field) => field.message).join(" "),
-      action: "Nothing was saved. Correct the values, then try again.",
+      action: "The server saved nothing. Correct the values. Retry the request.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.reason === "secret_purpose_mismatch") {
@@ -821,7 +824,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           title: "Address not accepted",
           message:
             "Webhooks need an https:// address and syslog needs tls://host:port, without a user name.",
-          action: "Correct the address and try again.",
+          action: "Correct the address. Retry the request.",
         };
       case "invalid_ca":
         return {
@@ -842,7 +845,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Some values weren't accepted",
           message: "The server rejected one or more of the values entered.",
-          action: "Check each field against its hint and try again.",
+          action: "Check each field against its hint. Retry the request.",
         };
     }
   }
@@ -870,11 +873,11 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     tone: "destructive",
     title: failure.ambiguous ? "Result unknown" : "Something went wrong",
     message: failure.ambiguous
-      ? "We couldn't confirm whether this went through."
-      : "The request couldn't be completed.",
+      ? "The console cannot confirm whether the server accepted this request."
+      : "The request failed.",
     action: failure.ambiguous
-      ? "Check the current state before trying again."
-      : "Try again. If it keeps failing, share the details below with support.",
+      ? "Check the current state. Retry only this same request before starting a new one."
+      : "Retry the request. Share Details with support if the request still fails.",
   };
 }
 

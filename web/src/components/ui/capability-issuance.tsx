@@ -8,19 +8,25 @@ export function CapabilityIssuanceAlert({ reason }: { reason: string }) {
   if (!reason) return null;
   return (
     <Alert className="border-warning/25 bg-warning/10">
-      <AlertTitle>Devices aren't receiving capability changes</AlertTitle>
+      <AlertTitle>Devices cannot receive capability changes</AlertTitle>
       <AlertDescription>
         <p>
           {reason === "execution_authority_unconfigured"
-            ? "This server has no execution authority yet, so it can't sign capability policies. "
+            ? "This server has no execution authority. It cannot sign capability policies. "
             : reason === "capability_policy_not_delegated"
-              ? "The execution delegation doesn't let this server sign capability policies. "
-              : "The server can't sign capability policies for a reason this console doesn't describe yet. "}
-          The owner must delegate <code className="font-mono text-xs">{DELEGATED_CAPABILITY}</code>{" "}
-          in the execution delegation, signed offline with{" "}
-          <code className="font-mono text-xs">lindmctl execution delegation sign</code>. Until then,
-          changes here don&apos;t reach devices.
+              ? "The execution delegation does not allow this server to sign capability policies. "
+              : "The server cannot sign capability policies. Details contain the recorded reason. "}
+          Changes do not reach devices until the owner delegates{" "}
+          <code className="font-mono text-xs">{DELEGATED_CAPABILITY}</code>.
         </p>
+        <details>
+          <summary>Details</summary>
+          <p>
+            Delegate the capability in the execution delegation. Sign it offline with{" "}
+            <code className="font-mono text-xs">lindmctl execution delegation sign</code>.
+          </p>
+        </details>
+        <p>Ask the owner to configure signing authority.</p>
       </AlertDescription>
     </Alert>
   );

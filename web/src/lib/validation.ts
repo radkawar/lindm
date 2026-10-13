@@ -253,7 +253,9 @@ export function checkRequest<T extends DescMessage>(
   } catch (error) {
     return (
       requestProblem(error, hints) ??
-      new RequestInvalidError([{ path: "", field: "", message: "Check the form and try again." }])
+      new RequestInvalidError([
+        { path: "", field: "", message: "Check the form. Retry the request." },
+      ])
     );
   }
   return undefined;
@@ -270,7 +272,7 @@ export function validateRequest<T extends DescMessage>(
 
 // Text for a form's inline error: client-side problems in plain words, other
 // errors by their own message.
-export function formErrorMessage(error: unknown, fallback = "Check the form and try again.") {
+export function formErrorMessage(error: unknown, fallback = "Check the form. Retry the request.") {
   const message =
     requestProblem(error)?.message ?? (error instanceof Error ? error.message : fallback);
   return RAW_VALIDATION_TEXT.test(message) ? fallback : message;

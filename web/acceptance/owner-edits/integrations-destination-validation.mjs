@@ -48,7 +48,9 @@ export async function check({ page, visit, require, capture, step }) {
   const text = await dialog.innerText();
   require(/Use an https:\/\/ address/.test(text), "no error for the http:// address");
   require(/Use 32 to 64 characters; this has 5/.test(text), "no error for the short secret");
-  require(/Reason must contain/.test(text), "no error for the missing reason");
+  require(/Enter a reason that contains visible text/.test(
+    text,
+  ), "no error for the missing reason");
   require((await dialog.locator("[aria-invalid='true']").count()) >=
     3, "invalid fields are not marked invalid");
   await capture("integrations-add-invalid");

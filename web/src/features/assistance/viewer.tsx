@@ -362,7 +362,7 @@ function SessionStatus({
           </p>
         ) : waiting ? (
           <p className="mt-1 text-sm text-muted-foreground" data-review-state="blocked">
-            No screen or input is shared yet. Wait for the user to accept, or stop the request.
+            The device shares no screen or input yet. Wait for user consent, or stop the request.
           </p>
         ) : null}
       </div>
@@ -653,7 +653,7 @@ function AssistanceConnection({
       const answerSdp = peer.localDescription?.sdp ?? "";
       if (!/^a=candidate:.* typ relay\b/m.test(answerSdp)) {
         throw new Error(
-          "Couldn't reach the server's relay within 10 seconds. Check your network and try again.",
+          "Could not reach the server's relay within 10 seconds. Check your network. Retry the connection.",
         );
       }
       const request = create(AnswerAssistanceSessionRequestSchema, { sessionId, answerSdp });
@@ -1024,16 +1024,15 @@ function AssistanceConnection({
           ) : null}
           {waitingForUser ? (
             <p role="status">
-              Waiting for the user on the device to accept. Keep this page open; leaving cancels the
-              request.
+              Waiting for the user to accept. Keep this page open. Leaving cancels the request.
             </p>
           ) : null}
           {attachedElsewhere ? (
             <Alert>
               <AlertTitle>Open in another tab</AlertTitle>
               <AlertDescription>
-                This session is already connected elsewhere. To reconnect here, stop it and request
-                a new session.
+                This session is connected elsewhere. Stop that session before requesting a new one
+                here.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -1072,7 +1071,7 @@ function AssistanceConnection({
               role="region"
               aria-label={
                 capturing
-                  ? "Remote screen. Keyboard and pointer input is sent to the device. Click outside to release the keyboard."
+                  ? "Remote screen. Your keyboard and pointer input goes to the device. Select outside the screen to release the keyboard."
                   : "Remote screen"
               }
               className={
@@ -1112,7 +1111,7 @@ function AssistanceConnection({
               />
               {stream && controlAvailable && !capturing ? (
                 <p className="pointer-events-none absolute bottom-2 left-2 bg-black/70 p-2 text-sm text-white">
-                  Click Take control to use the mouse and keyboard
+                  Select Take control to use the mouse and keyboard.
                 </p>
               ) : null}
             </div>
@@ -1139,8 +1138,8 @@ function AssistanceConnection({
           </div>
           {capturing ? (
             <p className="text-sm text-muted-foreground">
-              Control is on. Keys and clicks go to the device. Click outside the screen to release
-              the keyboard.
+              Control is on. Your keys and clicks go to the device. Select outside the screen to
+              release the keyboard.
             </p>
           ) : null}
           <AssistanceControls
@@ -1190,20 +1189,20 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
   const keyboard = consented("keyboard");
   const capabilityLines = [
     clipboard === AssistancePolicyMode.LIMITED
-      ? "Clipboard: allow the operator to send plain text to your clipboard, but not read it."
+      ? "Clipboard: the operator can send plain text to your clipboard. They cannot read it."
       : clipboard === AssistancePolicyMode.ON
-        ? "Clipboard: allow the operator to send plain text to your clipboard and explicitly read your clipboard text."
+        ? "Clipboard: the operator can send plain text to your clipboard and request its text."
         : "",
     keyboard === AssistancePolicyMode.LIMITED
-      ? "Keyboard: allow printable text symbols only; shortcuts are not allowed."
+      ? "Keyboard: the operator can send printable symbols only. They cannot send shortcuts."
       : keyboard === AssistancePolicyMode.ON
-        ? "Keyboard: allow text symbols, physical keys and special-key shortcuts."
+        ? "Keyboard: the operator can send text, physical keys and shortcuts."
         : "",
     consented("display") === AssistancePolicyMode.ON
-      ? "Displays: allow switching among the monitors you select in the system dialog."
+      ? "Displays: the operator can switch between the monitors you select in the system dialog."
       : "",
     consented("messages") !== AssistancePolicyMode.OFF
-      ? "Messages: allow plain-text operator notifications during this session."
+      ? "Messages: the operator can send plain-text notifications during this session."
       : "",
   ].filter(Boolean);
   return (
@@ -1215,8 +1214,8 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
       <h3 className="font-semibold">What the user sees</h3>
       <p className="text-muted-foreground">
         {prompted
-          ? "The device is showing this notification on the user's desktop. It stays until they choose."
-          : "The device hasn't shown the request yet. When it does, the user gets this notification on their desktop."}
+          ? "The device shows this notification until the user chooses Allow or Decline."
+          : "The device has not shown the request yet."}
       </p>
       <div className="grid max-w-md gap-2 rounded-md border bg-background p-3 shadow-sm">
         <p className="font-medium">Remote assistance request</p>
@@ -1230,8 +1229,8 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
         <p>Reason: {session.reason}</p>
         <p>
           {control
-            ? "Control is requested. The system dialog that follows lets you allow viewing only."
-            : "Control is not requested. The system dialog that follows selects what is shared."}
+            ? "The operator requests control. You can allow viewing only in the system dialog."
+            : "The operator does not request control. Select the shared screen in the system dialog."}
         </p>
         {capabilityLines.map((line) => (
           <p key={line}>{line}</p>

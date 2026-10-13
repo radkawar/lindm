@@ -9,8 +9,8 @@ export function NotFoundContent() {
       <h1 className="text-2xl font-semibold">Page not found</h1>
       <p className="text-sm text-muted-foreground">
         No console page matches{" "}
-        <span className="font-mono break-all text-foreground">{pathname}</span>. The link may be
-        mistyped or from an older console version.
+        <span className="font-mono break-all text-foreground">{pathname}</span>. Use the console
+        navigation to find the page.
       </p>
       <div className="flex flex-wrap gap-2" data-review-next-action="">
         <Button render={<Link to="/dashboard" />}>Go to dashboard</Button>

@@ -113,19 +113,18 @@ export function capabilityFromReason(reason: string): ManagementCapability | und
 const unavailableCauses: Record<string, string> = {
   platform_not_qualified: "lindm hasn't qualified this on the device's OS release.",
   vendor_key_unrecognized:
-    "The OS vendor's repository signing key on the device is missing or isn't one lindm recognizes. Restore the vendor keyring package on the device (ubuntu-keyring or fedora-gpg-keys); if it is intact, this lindm release may predate the vendor's current key.",
+    "The device lacks a recognized OS repository signing key. Restore ubuntu-keyring or fedora-gpg-keys on the device. Check lindm's support for the vendor's current key if the keyring is intact.",
   firewall_settings_missing:
-    "The deployment's firewall settings (management endpoints and connectivity check) aren't set.",
+    "The deployment lacks management addresses or a connectivity check for Firewall.",
   firewall_restore_unit_disabled:
-    "The firewall restore service (lindm-firewall-restore.service) isn't enabled on the device.",
+    "The device configuration disables lindm-firewall-restore.service.",
   native_tool_outdated:
-    "The device's system tool for this is too old (on Fedora, dnf5 older than 5.4.6.0). Apply all OS updates on the device once: an OS update policy set to All updates, or Patch now with All updates. On Fedora a security-only policy doesn't update dnf5.",
+    "The device's system tool is too old. Fedora requires dnf5 5.4.6.0 or newer. Apply All updates through an OS update policy or Patch now. Fedora security-only updates do not update dnf5.",
 };
 
 export function unavailableCause(detail: string): string {
   return (
-    unavailableCauses[detail] ??
-    "The device reported a cause this console can't describe yet; the code is in Details."
+    unavailableCauses[detail] ?? "The device reported an unknown cause. Details contain the code."
   );
 }
 

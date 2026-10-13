@@ -52,7 +52,7 @@ export function RevealedSecret({
           onClick={() => {
             navigator.clipboard.writeText(raw).then(
               () => toast.success(copiedMessage),
-              () => toast.error("Couldn't copy. Select the value and copy it instead."),
+              () => toast.error("Could not copy the value. Select the value. Copy it manually."),
             );
           }}
         >

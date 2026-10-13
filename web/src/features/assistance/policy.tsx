@@ -74,7 +74,7 @@ export function AssistancePolicyDialog({ deviceId }: { deviceId: string }) {
           <DialogHeader>
             <DialogTitle>Assistance policy</DialogTitle>
             <DialogDescription>
-              Set which features may be requested on this device.
+              Choose the features that operators can request on this device.
             </DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" onSubmit={submit}>
@@ -107,7 +107,7 @@ export function AssistancePolicyDialog({ deviceId }: { deviceId: string }) {
                 type="submit"
                 disabled={exact.busy || (!exact.ambiguous && (!query.data || !!query.error))}
               >
-                {exact.busy ? "Saving…" : exact.ambiguous ? "Try saving again" : "Save policy"}
+                {exact.busy ? "Saving…" : exact.ambiguous ? "Retry same save" : "Save policy"}
               </Button>
               <Button
                 type="button"

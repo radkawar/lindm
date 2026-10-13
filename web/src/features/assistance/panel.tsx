@@ -144,8 +144,8 @@ function AssistanceGateReason({
     case AssistanceReadinessState.DISABLED:
       return readiness.desktop === AssistanceDesktop.ABSENT ? (
         <>
-          No remote assistance: this device has no desktop session to share, and assistance is
-          turned off in its agent configuration.
+          This device has no desktop session to share. Its configuration also disables remote
+          assistance.
         </>
       ) : (
         <>Remote assistance is turned off on this device. {disabledRemedy}</>
@@ -153,9 +153,8 @@ function AssistanceGateReason({
     case AssistanceReadinessState.NO_DESKTOP:
       return (
         <>
-          No remote assistance: inventory from <TimeCell value={readiness.inventoryObservedAt} />{" "}
-          shows no desktop session or login screen on this device. If a desktop has started since,
-          refresh inventory from Actions.
+          Inventory from <TimeCell value={readiness.inventoryObservedAt} /> shows no desktop session
+          or sign-in screen. Refresh inventory from Actions after a desktop starts.
         </>
       );
     case AssistanceReadinessState.OFFLINE:
@@ -168,7 +167,7 @@ function AssistanceGateReason({
           ) : (
             "This device has not checked in yet."
           )}{" "}
-          You can request remote assistance once it is back online.
+          Wait for the device to contact the server before requesting assistance.
         </>
       );
     case AssistanceReadinessState.BUSY:
@@ -185,18 +184,16 @@ function AssistanceGateReason({
         </>
       );
     case AssistanceReadinessState.NOT_ENROLLED:
-      return <>This device isn&apos;t actively enrolled, so it can&apos;t receive a request.</>;
+      return <>This device is not enrolled. It cannot receive assistance requests.</>;
     case AssistanceReadinessState.UNCONFIGURED:
       return (
         <>
-          Remote assistance isn&apos;t set up on this server. A server administrator enables it with
-          the assistance relay in the lindmd configuration.
+          This server does not provide remote assistance. Ask a server administrator to configure
+          the assistance relay.
         </>
       );
     default:
-      return (
-        <>The server didn&apos;t say whether this device can be helped. Reload to check again.</>
-      );
+      return <>The server did not report assistance availability. Reload to check again.</>;
   }
 }
 
@@ -295,7 +292,9 @@ function AssistanceRequestForm({
     >
       <h3 className="text-base font-semibold">Ask to help</h3>
       <div className="grid gap-2">
-        <Label htmlFor={`${id}-reason`}>Reason (shown to the local user and audited)</Label>
+        <Label htmlFor={`${id}-reason`}>
+          Reason (the user sees this; the audit log records it)
+        </Label>
         <Textarea
           id={`${id}-reason`}
           data-freeform="support reason shown to the user"
@@ -338,7 +337,7 @@ function AssistanceRequestForm({
       <p id={`${id}-mode-help`} className="text-sm text-muted-foreground">
         {mode === AssistanceMode.CONTROL
           ? "The user can allow keyboard and mouse control, or choose viewing only."
-          : "View only: you can see the shared screen, but cannot type or click."}
+          : "You can view the shared screen. You cannot type or select items on the device."}
       </p>
       {!controlAllowed ? (
         <p className="text-sm text-muted-foreground">Your role allows viewing only, not control.</p>
@@ -373,19 +372,23 @@ function AssistanceRequestForm({
       {exact.failure ? (
         <RpcError failure={exact.failure} title="Remote assistance not requested">
           {precondition ? <p>{precondition}</p> : null}
-          {exact.ambiguous ? <p>Check the history below before trying again.</p> : null}
+          {exact.ambiguous ? <p>Check the history below. Retry only this same request.</p> : null}
         </RpcError>
       ) : null}
       <p className="text-sm text-muted-foreground">
-        Requesting asks for consent on this device; it does not start sharing. The session ends at
-        the time limit or when either person stops it.
+        The request asks for consent. Sharing starts only after the user accepts. Either person can
+        stop the session before its time limit.
         {policyUnknown
-          ? " This device's agent doesn't report whether remote assistance is turned on, so it may decline."
+          ? " The agent does not report whether assistance is enabled. The device can refuse the request."
           : ""}
       </p>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={exact.busy}>
-          {exact.busy ? "Requesting…" : exact.ambiguous ? "Try again" : "Request remote assistance"}
+          {exact.busy
+            ? "Requesting…"
+            : exact.ambiguous
+              ? "Retry same request"
+              : "Request remote assistance"}
         </Button>
         {exact.ambiguous ? (
           <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
