@@ -261,6 +261,14 @@ of color; optional dots are decorative. The five semantic tones have light/dark
 tokens, separate from the preset's blue action and neutral chart palette. Keep
 the preset's zero radius, bundled font and theme parity.
 
+`web/src/styles/globals.css` is the sole source of raw console colours. Use semantic
+variables and Tailwind tokens everywhere else, including chart strokes and selectors.
+`npm run lint:web` runs `lindm/no-raw-colours` over TS/TSX and
+`web/eslint/scan-css-colours.mjs` over CSS outside that one palette file. They reject
+hex and colour functions, named colour styles, raw-colour selectors and nonsemantic
+Tailwind palette/arbitrary values; prose, identifiers, URLs, `transparent`,
+`currentColor` and `none` are not raw styles. Their regression tests run in `make test`.
+
 Audit reasons contain only the operator's supplied explanation, unchanged; events
 without an operator reason store an empty string. Server-generated context belongs
 in the audit row's structured `details` object, with the device UUID in
@@ -1369,6 +1377,15 @@ each starting from scroll position zero:
   violation is confirmed by a second pass after running animations and transitions
   finish and counts only on an element both passes flag, so a control a background
   read re-enables mid-pass (measured at the start of its opacity fade) is not one;
+- semantic palette contrast (`review-contrast.mjs`): resolved light/dark text pairs,
+  primary/accent labels, selection labels and destructive-button labels meet 4.5:1;
+  semantic status text also meets 4.5:1 on its composited 10% tinted page/card surface,
+  including destructive interactions at 20% in both themes and 30% in dark mode.
+  Rings, control borders and input borders meet 3:1 against the page, card, popover,
+  muted, secondary and sidebar surfaces;
+  all five chart colours meet 3:1 against cards. The compact logo eye meets 3:1 against
+  both tile surfaces. Missing, unresolved or nonopaque palette values fail review.
+  Axe's `color-contrast` rule remains explicitly enabled for actual rendered text;
 - keyboard: the skip link is the first stop and lands in main content, Tab reaches
   every focusable control with a visible focus change that nothing covers, and every
   control or menu item declaring `aria-haspopup="dialog"` opens a named dialog that

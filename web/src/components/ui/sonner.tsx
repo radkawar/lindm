@@ -13,6 +13,7 @@ export function Toaster(props: ToasterProps) {
   return (
     <Sonner
       className="toaster group"
+      richColors
       icons={{
         success: <CircleCheckIcon className="size-4" />,
         info: <InfoIcon className="size-4" />,
@@ -29,7 +30,7 @@ export function Toaster(props: ToasterProps) {
         } as CSSProperties
       }
       toastOptions={{
-        classNames: { toast: "cn-toast", description: "text-popover-foreground!" },
+        classNames: { toast: "cn-toast", description: "text-inherit!" },
       }}
       closeButton
       {...props}

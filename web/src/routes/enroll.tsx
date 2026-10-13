@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { LocalForm } from "@/features/auth/local-form";
 import { fetchAuthenticationOptions } from "@/features/auth/local-api";
 
@@ -18,6 +19,7 @@ function EnrollmentRoute() {
     <main id="main" className="mx-auto max-w-md px-4 py-12">
       <Card>
         <CardHeader>
+          <BrandLogo stacked className="mx-auto mb-4" />
           <CardTitle>Enroll local administrator</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">

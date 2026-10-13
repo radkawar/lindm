@@ -81,7 +81,7 @@ audit: web-assets $(GOVULNCHECK)
 test: web-assets
 	node --test web/acceptance/assistance-input.test.mjs web/acceptance/assistance-presentation.test.mjs web/acceptance/assistance-marker.test.mjs
 	go test -race -timeout 45m $(GO_PACKAGES)
-	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/assistance-end.test.mjs web/acceptance/journey.test.mjs web/acceptance/review-edit-sheet.test.mjs web/eslint/freeform-input.test.mjs
+	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/assistance-end.test.mjs web/acceptance/journey.test.mjs web/acceptance/review-edit-sheet.test.mjs web/acceptance/review-contrast.test.mjs web/eslint/freeform-input.test.mjs web/eslint/no-raw-colours.test.mjs web/eslint/scan-css-colours.test.mjs
 
 build: web-assets
 	go build -trimpath -o artifacts/bin/lindmd ./cmd/lindmd
@@ -129,7 +129,7 @@ acceptance: acceptance-build
 	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
 
 ui-review: acceptance-build
-	node --test web/acceptance/review-ste.test.mjs web/acceptance/review-help.test.mjs
+	node --test web/acceptance/review-ste.test.mjs web/acceptance/review-help.test.mjs web/acceptance/review-contrast.test.mjs
 	artifacts/bin/lab console review -repo "$(UI_REVIEW_REPO)" -lindmd artifacts/bin/lindmd -evidence "$(UI_REVIEW_EVIDENCE)" $(UI_REVIEW_FLAGS)
 
 # Local CI (basecamp/gh-signoff): cmd/devenv signoff refuses an unpushed HEAD,

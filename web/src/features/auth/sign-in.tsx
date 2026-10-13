@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { RpcError } from "@/components/ui/rpc-error";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { toRpcFailure } from "@/lib/errors";
 import { rememberNextPath } from "@/lib/next-path";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export function SignIn({ notice, next }: { notice: string; next?: string }) {
     <main id="main" className="mx-auto flex min-h-svh w-full max-w-lg items-center px-4 py-8">
       <Card className="w-full">
         <CardHeader>
+          <BrandLogo stacked className="mx-auto mb-4" />
           <CardTitle>
             <h1 className="text-2xl font-semibold tracking-tight">lindm console</h1>
           </CardTitle>

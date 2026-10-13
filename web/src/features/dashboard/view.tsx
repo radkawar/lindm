@@ -623,7 +623,7 @@ function WorkItem({
   return (
     <div
       data-review-metric=""
-      className={`grid gap-3 px-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] ${primary ? "border-l-2 border-l-primary bg-accent/40" : ""}`}
+      className={`grid gap-3 px-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] ${primary ? "border-l-2 border-l-primary bg-selection/40" : ""}`}
     >
       <div className="grid min-w-0 gap-1 text-sm">
         {primary ? <p className="text-xs font-medium text-muted-foreground">Start here</p> : null}

@@ -3,7 +3,10 @@ import { defineConfig } from "eslint/config";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import lindm from "./web/eslint/freeform-input.mjs";
+import freeform from "./web/eslint/freeform-input.mjs";
+import { noRawColours } from "./web/eslint/no-raw-colours.mjs";
+
+const lindm = { rules: { ...freeform.rules, "no-raw-colours": noRawColours } };
 
 const featureNames = [
   "auth",
@@ -25,8 +28,9 @@ export default defineConfig([
     files: ["web/src/**/*.{ts,tsx}"],
     extends: [js.configs.recommended, tseslint.configs.recommended],
     languageOptions: { globals: globals.browser },
-    plugins: { "react-hooks": reactHooks },
+    plugins: { "react-hooks": reactHooks, lindm },
     rules: {
+      "lindm/no-raw-colours": "error",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "error",
       "no-restricted-syntax": [

@@ -1,5 +1,7 @@
 # lindm
 
+![lindm](docs/brand/stacked.svg)
+
 Greenfield Linux device management: desktop-first, servers included, self-hosted,
 single-tenant. The commercial launch contract is the entire P01–P21 specification
 on every named distro family, including encryption escrow, lock/quarantine/wipe,

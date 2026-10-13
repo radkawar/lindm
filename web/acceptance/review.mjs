@@ -31,6 +31,7 @@ import { reviewOwnerEdits } from "./review-owner-edits.mjs";
 import { reviewRoleWalkthroughs } from "./review-roles.mjs";
 import { popupStability } from "./review-popups.mjs";
 import { captureHelpDocument } from "./review-help.mjs";
+import { reviewContrast } from "./review-contrast.mjs";
 
 process.umask(0o077);
 
@@ -163,6 +164,7 @@ async function axePass(page, selector) {
       const context = selector ? document.querySelector(selector) : document;
       const run = await window.axe.run(context, {
         resultTypes: ["violations"],
+        rules: { "color-contrast": { enabled: true } },
         runOnly: {
           type: "tag",
           values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"],
@@ -642,6 +644,7 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
       await settleAnimations(page);
     }
   }
+  entry.checks.contrast = await reviewContrast(page, theme);
   const violations = await axe(page, null);
   entry.checks.axe = {
     violations,

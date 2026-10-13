@@ -174,8 +174,8 @@
   --scroll-fade-block: linear-gradient(
     to bottom,
     transparent 0,
-    #000 var(--scroll-fade-t, 0px),
-    #000 calc(100% - var(--scroll-fade-b, 0px)),
+    var(--mask-ink) var(--scroll-fade-t, 0px),
+    var(--mask-ink) calc(100% - var(--scroll-fade-b, 0px)),
     transparent 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask, var(--scroll-fade-block));
@@ -214,8 +214,8 @@
   --scroll-fade-block: linear-gradient(
     to bottom,
     transparent 0,
-    #000 var(--scroll-fade-t, 0px),
-    #000 calc(100% - var(--scroll-fade-b, 0px)),
+    var(--mask-ink) var(--scroll-fade-t, 0px),
+    var(--mask-ink) calc(100% - var(--scroll-fade-b, 0px)),
     transparent 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask, var(--scroll-fade-block));
@@ -254,16 +254,16 @@
   --scroll-fade-inline: linear-gradient(
     to right,
     transparent 0,
-    #000 var(--scroll-fade-s, 0px),
-    #000 calc(100% - var(--scroll-fade-e, 0px)),
+    var(--mask-ink) var(--scroll-fade-s, 0px),
+    var(--mask-ink) calc(100% - var(--scroll-fade-e, 0px)),
     transparent 100%
   );
   &:where([dir="rtl"], [dir="rtl"] *) {
     --scroll-fade-inline: linear-gradient(
       to left,
       transparent 0,
-      #000 var(--scroll-fade-s, 0px),
-      #000 calc(100% - var(--scroll-fade-e, 0px)),
+      var(--mask-ink) var(--scroll-fade-s, 0px),
+      var(--mask-ink) calc(100% - var(--scroll-fade-e, 0px)),
       transparent 100%
     );
   }
@@ -299,8 +299,8 @@
   --scroll-fade-mask: linear-gradient(
     to bottom,
     transparent 0,
-    #000 var(--scroll-fade-t, 0px),
-    #000 100%
+    var(--mask-ink) var(--scroll-fade-t, 0px),
+    var(--mask-ink) 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask);
   mask-image: var(--scroll-fade-mask);
@@ -328,8 +328,8 @@
   );
   --scroll-fade-mask: linear-gradient(
     to bottom,
-    #000 0,
-    #000 calc(100% - var(--scroll-fade-b, 0px)),
+    var(--mask-ink) 0,
+    var(--mask-ink) calc(100% - var(--scroll-fade-b, 0px)),
     transparent 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask);
@@ -359,8 +359,8 @@
   --scroll-fade-mask: linear-gradient(
     to right,
     transparent 0,
-    #000 var(--scroll-fade-s, 0px),
-    #000 100%
+    var(--mask-ink) var(--scroll-fade-s, 0px),
+    var(--mask-ink) 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask);
   mask-image: var(--scroll-fade-mask);
@@ -388,8 +388,8 @@
   );
   --scroll-fade-mask: linear-gradient(
     to right,
-    #000 0,
-    #000 calc(100% - var(--scroll-fade-e, 0px)),
+    var(--mask-ink) 0,
+    var(--mask-ink) calc(100% - var(--scroll-fade-e, 0px)),
     transparent 100%
   );
   -webkit-mask-image: var(--scroll-fade-mask);
@@ -419,15 +419,15 @@
   --scroll-fade-mask: linear-gradient(
     to right,
     transparent 0,
-    #000 var(--scroll-fade-s, 0px),
-    #000 100%
+    var(--mask-ink) var(--scroll-fade-s, 0px),
+    var(--mask-ink) 100%
   );
   &:where([dir="rtl"], [dir="rtl"] *) {
     --scroll-fade-mask: linear-gradient(
       to left,
       transparent 0,
-      #000 var(--scroll-fade-s, 0px),
-      #000 100%
+      var(--mask-ink) var(--scroll-fade-s, 0px),
+      var(--mask-ink) 100%
     );
   }
   -webkit-mask-image: var(--scroll-fade-mask);
@@ -456,15 +456,15 @@
   );
   --scroll-fade-mask: linear-gradient(
     to right,
-    #000 0,
-    #000 calc(100% - var(--scroll-fade-e, 0px)),
+    var(--mask-ink) 0,
+    var(--mask-ink) calc(100% - var(--scroll-fade-e, 0px)),
     transparent 100%
   );
   &:where([dir="rtl"], [dir="rtl"] *) {
     --scroll-fade-mask: linear-gradient(
       to left,
-      #000 0,
-      #000 calc(100% - var(--scroll-fade-e, 0px)),
+      var(--mask-ink) 0,
+      var(--mask-ink) calc(100% - var(--scroll-fade-e, 0px)),
       transparent 100%
     );
   }
@@ -545,7 +545,7 @@
 @utility shimmer {
   --_spread: var(--shimmer-spread, calc(3ch + 40px));
   --_base: currentColor;
-  --_highlight: var(--shimmer-color, oklch(from currentColor l c h / calc(alpha* 0.2)));
+  --_highlight: var(--shimmer-color, var(--muted-foreground));
 
   background-image: var(
     --shimmer-image,
@@ -567,10 +567,7 @@
   animation: tw-shimmer var(--shimmer-duration, 2s) linear infinite;
 
   @variant dark {
-    --_highlight: var(
-      --shimmer-color,
-      oklch(from currentColor max(0.8, calc(l + 0.4)) c h / calc(alpha + 0.4))
-    );
+    --_highlight: var(--shimmer-color, var(--muted-foreground));
   }
 
   &:where([dir="rtl"], [dir="rtl"] *) {

@@ -1077,8 +1077,8 @@ function AssistanceConnection({
               }
               className={
                 capturing
-                  ? "relative aspect-video w-full touch-none overflow-auto bg-black outline-none ring-2 ring-destructive"
-                  : "relative aspect-video w-full overflow-auto bg-black"
+                  ? "relative aspect-video w-full touch-none overflow-auto bg-viewer outline-none ring-2 ring-destructive"
+                  : "relative aspect-video w-full overflow-auto bg-viewer"
               }
             >
               <video
@@ -1111,7 +1111,7 @@ function AssistanceConnection({
                 disablePictureInPicture
               />
               {stream && controlAvailable && !capturing ? (
-                <p className="pointer-events-none absolute bottom-2 left-2 bg-black/70 p-2 text-sm text-white">
+                <p className="pointer-events-none absolute bottom-2 left-2 bg-viewer/70 p-2 text-sm text-viewer-foreground">
                   Select Take control to use the mouse and keyboard.
                 </p>
               ) : null}
@@ -1122,7 +1122,7 @@ function AssistanceConnection({
               ref={frameCoverRef}
               role="status"
               style={{ display: frameReady ? "none" : "grid" }}
-              className="absolute inset-0 place-items-center bg-black p-3 text-center text-sm text-white/70"
+              className="absolute inset-0 place-items-center bg-viewer p-3 text-center text-sm text-viewer-foreground/70"
             >
               {ended
                 ? "Session ended"

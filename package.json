@@ -11,7 +11,7 @@
     "check": "npm run format:check && npm run lint:docs && npm run lint:web && npm run typecheck:web",
     "build:web": "vite build --config web/vite.config.ts && npm run typecheck:web",
     "typecheck:web": "tsc -p web/tsconfig.json",
-    "lint:web": "eslint web/src --max-warnings=0",
+    "lint:web": "eslint web/src --max-warnings=0 && node web/eslint/scan-css-colours.mjs",
     "acceptance:browser": "node web/acceptance/run.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

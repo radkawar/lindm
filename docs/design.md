@@ -1,5 +1,7 @@
 # lindm design point of view
 
+![lindm](brand/logo.svg)
+
 **Accepted by the owner on 2026-10-12** as the console design standard. It is the
 working design contract, not a claim that current screens meet it.
 [Engineering](engineering.md#frontend-structure-and-framework) remains binding for
@@ -108,6 +110,92 @@ The owner walkthrough checks mixed SSH and OS update reference text in a new,
 unpublished draft, independently of earlier changes to the saved profile.
 Select assertions target the open popup; a closing popup can retain its options
 during the exit transition.
+
+## Colour and brand
+
+The owner selected **C5 monoline** on 2026-10-13. Keep its subtle penguin reading;
+do not add a literal bird. The open device outline and terminal corner form one
+continuous, round-ended line. The inline and stacked lockups use lowercase
+**lindm**, outlined from Inter 600 with −1.5 unit tracking. There is no font request
+or text element in the SVGs. Console body text remains bundled IBM Plex Sans.
+
+![Selected C5 lockups and neutral tile at 16, 32 and 48 pixels](brand/logo-sheet.png)
+
+Use the plain inline lockup beside text. Use the plain stacked lockup on sign-in,
+local administrator enrollment and the README. Use **Option 3, neutral tile** in
+the shell rail, favicon, app icons, GitHub avatar and social preview: foreground
+tile, surface-coloured C5 line, scaled to 0.72 and centred, with only the eye
+coloured. The 16/32/48px raster icons use respective line weights 14/10/8 and eye
+radii 11/10/9 before the 0.72 scale. The shell/app icon uses weight 8 and radius 9.
+Keep its open end; never close the shape to make a conventional rounded square.
+
+Assets are in [docs/brand](brand/) and the identical public assets are served from
+`/brand/`. `mark-*`, `logo-*` and `stacked-*` SVGs provide colour and monochrome,
+light and dark lockups. Monochrome SVGs use `currentColor`; inline them to inherit
+the surrounding text colour. Colour files use the accent variable with a theme
+fallback when displayed as an image. `BrandLogo` is the inline console equivalent.
+The favicon SVG responds to `prefers-color-scheme`; the ICO contains tuned 16/32/48px
+light fallbacks. Explicit light/dark neutral-icon PNGs are also available.
+Apple-touch, 192/512px PWA and safe-area maskable icons accompany the web manifest.
+GitHub previews are `brand/social-preview-light.png` and
+`brand/social-preview-dark.png` (1280×640); avatars are `brand/github-avatar-*.png`.
+Inter outline provenance and licensing are retained in `brand/Inter-LICENSE.txt`.
+
+### One semantic palette
+
+[`web/src/styles/globals.css`](../web/src/styles/globals.css) is the sole source
+of console colour literals. CSS variables feed Tailwind's semantic utilities,
+charts, focus and toasts. Never pick a Tailwind built-in hue or put a raw colour
+in a component. `transparent`, `currentColor` and token-based colour mixing are
+allowed. `lint:web` rejects raw colours in TypeScript, JSX and other source CSS.
+
+![Light and dark semantic palette swatches](brand/palette-sheet.png)
+
+Each small swatch below shows light on the left and dark on the right.
+
+| Role                    | Swatch                                                                  | Light     | Dark      | Meaning                                           |
+| ----------------------- | ----------------------------------------------------------------------- | --------- | --------- | ------------------------------------------------- |
+| Background              | ![Background swatch](brand/swatch-background.png)                       | `#ffffff` | `#101826` | Page surface                                      |
+| Foreground              | ![Foreground swatch](brand/swatch-foreground.png)                       | `#101826` | `#f5f7fa` | Primary text and icon tile                        |
+| Muted text / neutral    | ![Muted text / neutral swatch](brand/swatch-muted-text.png)             | `#49596d` | `#a8b6c7` | Supporting text; inactive or unknown              |
+| Accent / primary / info | ![Accent / primary / info swatch](brand/swatch-accent-primary-info.png) | `#2458b8` | `#91b8ff` | Action, selection and information; plain logo eye |
+| Success                 | ![Success swatch](brand/swatch-success.png)                             | `#176344` | `#79d6aa` | Named, confirmed condition                        |
+| Warning                 | ![Warning swatch](brand/swatch-warning.png)                             | `#805007` | `#f1c578` | Attention or uncertainty                          |
+| Danger (`destructive`)  | ![Danger (destructive) swatch](brand/swatch-danger.png)                 | `#af2838` | `#ff98a2` | Failure or destructive effect                     |
+| Border / input          | ![Border / input swatch](brand/swatch-border-input.png)                 | `#617188` | `#8292a6` | Control boundary                                  |
+| Focus ring              | ![Focus ring swatch](brand/swatch-focus-ring.png)                       | `#2458b8` | `#91b8ff` | Solid keyboard focus indicator                    |
+| Selection surface       | ![Selection surface swatch](brand/swatch-selection.png)                 | `#e9f0fc` | `#21385c` | Quiet menu/selected-row background                |
+
+Primary/accent foreground is white in light mode and `#101826` in dark mode.
+Selection text is `#17438e` / `#bed4ff`. Card/popover surfaces are `#ffffff` /
+`#172235`; sidebar surfaces are `#f5f7fa` / `#172235`. Secondary and muted surfaces
+are `#e8edf3` and `#f5f7fa` in light mode, both `#243145` in dark mode.
+The assistance video has a fixed black surface and white labels, independent of
+theme, so a received black frame is not altered.
+
+The plain logo's eye **is** the accent/primary token. The inverted neutral tile
+uses the dedicated `--brand-eye: #5287da` in both themes: 3.35:1 against the near-white
+tile and 4.94:1 against the near-black tile. This limited exception keeps the eye
+visible without weakening the AA action/text colours. It is not a status tone.
+
+The neutral primitive scale is shared by both themes; semantic roles select the
+appropriate step. It is not a menu of arbitrary component colours:
+`0 #ffffff`, `50 #f5f7fa`, `100 #e8edf3`, `200 #cbd5e1`, `300 #a8b6c7`,
+`400 #8292a6`, `500 #617188`, `600 #49596d`, `700 #344256`, `800 #243145`,
+`900 #172235`, `950 #101826`. Chart series 1–5 select `500/600/700/800/900` in
+light mode and `300/400/200/100/50` in dark mode. Charts stay neutral, retain exact
+labels and do not imply a status from a series colour.
+
+Badges, alerts and toast icons share the same semantic tones. A tint does not
+change its meaning. Always show words as well as colour. Sonner's bundled
+default colours are overridden by these tokens. Focus rings stay opaque.
+
+`make ui-review` resolves the actual browser palette in both themes: normal text
+pairs, semantic text on page/card and status tints meet 4.5:1; focus rings,
+control boundaries, chart series and the icon eye meet 3:1 on their documented surfaces. Rendered
+text also retains the axe colour-contrast check. These are WCAG AA checks of
+specified pairings, not a claim that every possible primitive combination is
+accessible. Do not use opacity to weaken text or focus.
 
 ## Current-console editing examples
 
