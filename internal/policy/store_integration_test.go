@@ -161,7 +161,7 @@ func TestProfileReadsNamePublisher(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	heads, _, err := f.store.List(t.Context(), uuid.Nil, 10)
+	heads, _, err := f.store.List(t.Context(), uuid.Nil, "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}

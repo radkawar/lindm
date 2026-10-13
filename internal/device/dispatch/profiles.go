@@ -123,7 +123,8 @@ func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1
 	if err := s.Rules.Validate(req.Msg); err != nil {
 		return nil, core.Invalid("invalid_profile_request")
 	}
-	after, err := core.DecodeProfileCursor(req.Msg.GetPageToken())
+	search := req.Msg.GetNameSearch()
+	after, err := core.DecodeProfileSearchCursor(req.Msg.GetPageToken(), search)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +132,7 @@ func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1
 	if limit == 0 {
 		limit = 50
 	}
-	rows, next, err := s.Profiles.List(ctx, after, int32(limit))
+	rows, next, err := s.Profiles.List(ctx, after, search, int32(limit))
 	if err != nil {
 		return nil, core.ProfileError(err)
 	}
@@ -153,7 +154,7 @@ func (s *Service) ListProfiles(ctx context.Context, req *connect.Request[adminv1
 			break
 		}
 	}
-	return core.NoStore(&adminv1.ListProfilesResponse{Profiles: rows, NextPageToken: core.EncodeProfileCursor(next)}), nil
+	return core.NoStore(&adminv1.ListProfilesResponse{Profiles: rows, NextPageToken: core.EncodeProfileSearchCursor(next, search)}), nil
 }
 
 // ListQualifiedResourceKinds reports the dispatch qualification the editor

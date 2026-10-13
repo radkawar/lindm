@@ -102,16 +102,20 @@ export function SearchPicker({
             />
             <CommandList aria-label={label}>
               <CommandEmpty>No matching options.</CommandEmpty>
-              <CommandItem
-                value="clear-selection"
-                onSelect={() => {
-                  onChange("");
-                  setOpen(false);
-                }}
-              >
-                {/* An optional filter's placeholder ("Any device") names its empty choice. */}
-                {placeholder === "Choose…" ? "No selection" : placeholder}
-              </CommandItem>
+              {/* Server-searched text hides the empty choice, as local filtering does,
+                  so typing a name and pressing Enter picks the first match. */}
+              {onSearchChange && search ? null : (
+                <CommandItem
+                  value="clear-selection"
+                  onSelect={() => {
+                    onChange("");
+                    setOpen(false);
+                  }}
+                >
+                  {/* An optional filter's placeholder ("Any device") names its empty choice. */}
+                  {placeholder === "Choose…" ? "No selection" : placeholder}
+                </CommandItem>
+              )}
               {options.map((option) => (
                 <CommandItem
                   key={option.value}

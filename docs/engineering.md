@@ -2886,7 +2886,11 @@ representations and the deterministic revision digest. Expected-head CAS,
 actor-bound request receipts, original-revision retries and append-only history
 remain independent of device activation.
 
-`ListProfiles` lists catalog heads. `ListProfileRevisions` lists one profile's
+`ListProfiles` lists catalog heads. Its `name_search` (at most 200 characters) is a
+case-insensitive literal substring of the head name (`%`/`_` are not wildcards);
+the page token carries a digest of the search and is refused for any other
+search, so the console's profile picker searches every profile, not one page.
+`ListProfileRevisions` lists one profile's
 retained revision metadata newest first by revision number, reusing `ProfileSummary`
 without loading resource specifications. Both require unrestricted `fleet.read`.
 Revision pages default to 50, accept at most 200 entries, and may be shortened by

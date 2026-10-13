@@ -159,11 +159,11 @@ func (s *Store) readRevisionRow(ctx context.Context, q *profiledb.Queries, row p
 
 // List returns metadata only, keeping page work independent of dependency-graph
 // density. The cursor identifies a catalog position, not a frozen deployment.
-func (s *Store) List(ctx context.Context, after uuid.UUID, pageSize int32) ([]*adminv1.ProfileSummary, uuid.UUID, error) {
+func (s *Store) List(ctx context.Context, after uuid.UUID, nameSearch string, pageSize int32) ([]*adminv1.ProfileSummary, uuid.UUID, error) {
 	if pageSize < 1 || pageSize > 100 {
 		return nil, uuid.Nil, ErrProfileRejected
 	}
-	rows, err := profiledb.New(s.pool).ListProfileHeads(ctx, profiledb.ListProfileHeadsParams{AfterID: after, PageLimit: pageSize + 1})
+	rows, err := profiledb.New(s.pool).ListProfileHeads(ctx, profiledb.ListProfileHeadsParams{AfterID: after, NameSearch: nameSearch, PageLimit: pageSize + 1})
 	if err != nil {
 		return nil, uuid.Nil, err
 	}

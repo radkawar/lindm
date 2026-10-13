@@ -33,6 +33,8 @@ SELECT r.id, r.profile_id, r.revision_number, r.name, r.description,
        r.resource_count, r.spec_digest, r.actor_id, r.published_at
 FROM profiles p JOIN profile_revisions r ON r.id = p.head_revision_id AND r.profile_id = p.id
 WHERE p.id > sqlc.arg(after_id)::uuid
+  -- strpos is a literal match: % and _ in the search are not wildcards.
+  AND (sqlc.arg('name_search')::text = '' OR strpos(lower(r.name), lower(sqlc.arg('name_search')::text)) > 0)
 ORDER BY p.id LIMIT sqlc.arg(page_limit)::integer;
 
 -- name: ListProfileRevisions :many

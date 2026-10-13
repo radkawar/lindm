@@ -270,16 +270,19 @@ SELECT r.id, r.profile_id, r.revision_number, r.name, r.description,
        r.resource_count, r.spec_digest, r.actor_id, r.published_at
 FROM profiles p JOIN profile_revisions r ON r.id = p.head_revision_id AND r.profile_id = p.id
 WHERE p.id > $1::uuid
-ORDER BY p.id LIMIT $2::integer
+  -- strpos is a literal match: % and _ in the search are not wildcards.
+  AND ($2::text = '' OR strpos(lower(r.name), lower($2::text)) > 0)
+ORDER BY p.id LIMIT $3::integer
 `
 
 type ListProfileHeadsParams struct {
-	AfterID   uuid.UUID
-	PageLimit int32
+	AfterID    uuid.UUID
+	NameSearch string
+	PageLimit  int32
 }
 
 func (q *Queries) ListProfileHeads(ctx context.Context, arg ListProfileHeadsParams) ([]ProfileRevision, error) {
-	rows, err := q.db.Query(ctx, listProfileHeads, arg.AfterID, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listProfileHeads, arg.AfterID, arg.NameSearch, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}

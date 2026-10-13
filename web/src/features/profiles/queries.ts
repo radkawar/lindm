@@ -3,13 +3,20 @@ import type { ApprovedReferenceKind } from "../../../gen/lindm/admin/v1/approved
 import { adminClient } from "@/lib/rpc";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 
-export function profilesQueryOptions(lifetime: AuthLifetime, pageSize: number, pageToken: string) {
+// nameSearch is a case-insensitive substring of the profile name; the server
+// binds pageToken to it, so the key carries both.
+export function profilesQueryOptions(
+  lifetime: AuthLifetime,
+  pageSize: number,
+  pageToken: string,
+  nameSearch = "",
+) {
   return queryOptions({
-    queryKey: ["profiles", lifetime.generation, pageSize, pageToken] as const,
+    queryKey: ["profiles", lifetime.generation, pageSize, pageToken, nameSearch] as const,
     meta: { authGeneration: lifetime.generation },
     queryFn: async ({ signal }) => {
       const response = await adminClient.listProfiles(
-        { pageSize, pageToken },
+        { pageSize, pageToken, nameSearch },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

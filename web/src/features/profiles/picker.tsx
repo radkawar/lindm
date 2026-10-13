@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import { SearchPicker, type PickerProps } from "@/components/ui/search-picker";
 import { Button } from "@/components/ui/button";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { SEARCH_DELAY_MS, useDelayed } from "@/hooks/use-delayed";
 import { toRpcFailure } from "@/lib/errors";
 import { formatRevisionNumber } from "./model";
 import {
@@ -20,18 +21,33 @@ export function ProfilePicker({
   ...props
 }: PickerProps & { onChoose?: (choice: ProfileChoice | null) => void }) {
   const lifetime = useAuthLifetime();
-  const [pageToken, setPageToken] = useState("");
-  const query = useQuery(profilesQueryOptions(lifetime, 100, pageToken));
+  const [search, setSearch] = useState("");
+  // The server searches every profile by name; typing waits briefly before asking.
+  const term = search.trim().slice(0, 200);
+  const nameSearch = useDelayed(term, SEARCH_DELAY_MS);
+  // Until the server answers for the typed text, loaded profiles that already
+  // match it stay choosable (typing then pressing Enter picks one at once).
+  const settling = term !== nameSearch;
+  // Paging restarts whenever the search changes: a token belongs to its search.
+  const [cursor, setCursor] = useState({ search: "", token: "" });
+  const pageToken = cursor.search === nameSearch ? cursor.token : "";
+  const query = useQuery({
+    ...profilesQueryOptions(lifetime, 100, pageToken, nameSearch),
+    placeholderData: keepPreviousData,
+  });
+  const provisional = settling || query.isPlaceholderData;
   const selected = useQuery({
     ...profileRevisionQueryOptions(lifetime, props.value, ""),
     enabled: !!props.value,
   });
-  const options = (query.data?.profiles ?? []).map((profile) => ({
-    value: profile.profileId,
-    label: profile.name,
-    description: `Latest version ${profile.revisionNumber}`,
-  }));
-  if (selected.data && !options.some((option) => option.value === props.value))
+  const options = (query.data?.profiles ?? [])
+    .filter((profile) => !provisional || profile.name.toLowerCase().includes(term.toLowerCase()))
+    .map((profile) => ({
+      value: profile.profileId,
+      label: profile.name,
+      description: `Latest version ${profile.revisionNumber}`,
+    }));
+  if (selected.data && !term && !options.some((option) => option.value === props.value))
     options.unshift({
       value: props.value,
       label: selected.data.spec?.name || "Unnamed profile",
@@ -54,11 +70,17 @@ export function ProfilePicker({
         );
       }}
       options={options}
-      note="Search within this page of up to 100 profiles."
+      search={search}
+      onSearchChange={setSearch}
+      note={
+        query.data?.nextPageToken && !provisional
+          ? `Showing the first ${query.data.profiles.length} ${nameSearch ? "matches" : "profiles"}. Use More profiles for the rest.`
+          : undefined
+      }
       footer={
-        query.isPending || query.error || pageToken || query.data?.nextPageToken ? (
+        provisional || query.isPending || query.error || pageToken || query.data?.nextPageToken ? (
           <>
-            {query.isPending ? <p role="status">Loading profiles…</p> : null}
+            {provisional || query.isPending ? <p role="status">Loading profiles…</p> : null}
             {query.error ? <RpcError failure={toRpcFailure(query.error)} /> : null}
             <div className="flex gap-2">
               {pageToken ? (
@@ -66,7 +88,7 @@ export function ProfilePicker({
                   type="button"
                   variant="outline"
                   disabled={props.disabled || query.isFetching}
-                  onClick={() => setPageToken("")}
+                  onClick={() => setCursor({ search: nameSearch, token: "" })}
                 >
                   First profiles
                 </Button>
@@ -76,7 +98,9 @@ export function ProfilePicker({
                   type="button"
                   variant="outline"
                   disabled={props.disabled || query.isFetching}
-                  onClick={() => setPageToken(query.data?.nextPageToken ?? "")}
+                  onClick={() =>
+                    setCursor({ search: nameSearch, token: query.data?.nextPageToken ?? "" })
+                  }
                 >
                   More profiles
                 </Button>
@@ -87,7 +111,7 @@ export function ProfilePicker({
       }
     >
       {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
-      {query.data?.profiles.length === 0 && !pageToken ? (
+      {query.data?.profiles.length === 0 && !pageToken && !nameSearch ? (
         <p className="text-sm text-muted-foreground">No profiles yet. Create one under Profiles.</p>
       ) : null}
     </SearchPicker>

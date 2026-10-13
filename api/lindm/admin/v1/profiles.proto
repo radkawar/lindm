@@ -69,6 +69,9 @@ message GetProfileRevisionResponse {
 message ListProfilesRequest {
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 100];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
+  // Case-insensitive literal substring of the head revision name; empty lists
+  // every profile. The page token is bound to the search it was issued for.
+  string name_search = 3 [(buf.validate.field).string.max_len = 200];
 }
 
 message ProfileSummary {

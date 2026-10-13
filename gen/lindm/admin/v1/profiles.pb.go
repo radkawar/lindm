@@ -351,9 +351,12 @@ func (x *GetProfileRevisionResponse) GetRevision() *ProfileRevision {
 }
 
 type ListProfilesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageSize      uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	PageSize  uint32                 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Case-insensitive literal substring of the head revision name; empty lists
+	// every profile. The page token is bound to the search it was issued for.
+	NameSearch    string `protobuf:"bytes,3,opt,name=name_search,json=nameSearch,proto3" json:"name_search,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -398,6 +401,13 @@ func (x *ListProfilesRequest) GetPageSize() uint32 {
 func (x *ListProfilesRequest) GetPageToken() string {
 	if x != nil {
 		return x.PageToken
+	}
+	return ""
+}
+
+func (x *ListProfilesRequest) GetNameSearch() string {
+	if x != nil {
+		return x.NameSearch
 	}
 	return ""
 }
@@ -865,11 +875,13 @@ const file_lindm_admin_v1_profiles_proto_rawDesc = "" +
 	"revisionId\x88\x01\x01B\x0e\n" +
 	"\f_revision_id\"a\n" +
 	"\x1aGetProfileRevisionResponse\x12C\n" +
-	"\brevision\x18\x01 \x01(\v2\x1f.lindm.admin.v1.ProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"d\n" +
+	"\brevision\x18\x01 \x01(\v2\x1f.lindm.admin.v1.ProfileRevisionB\x06\xbaH\x03\xc8\x01\x01R\brevision\"\x8f\x01\n" +
 	"\x13ListProfilesRequest\x12$\n" +
 	"\tpage_size\x18\x01 \x01(\rB\a\xbaH\x04*\x02\x18dR\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\xff\x02\n" +
+	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12)\n" +
+	"\vname_search\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\xc8\x01R\n" +
+	"nameSearch\"\xff\x02\n" +
 	"\x0eProfileSummary\x12\x1d\n" +
 	"\n" +
 	"profile_id\x18\x01 \x01(\tR\tprofileId\x12\x1f\n" +
