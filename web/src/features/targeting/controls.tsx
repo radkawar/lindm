@@ -1,14 +1,20 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate, timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
-import { type ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { TargetRefSchema, type TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { SelectField } from "@/components/ui/select-field";
 import { DynamicGroupPicker, useTargetPickers } from "./pickers";
 
-// Each control gets its own visible label: "<label> type" for the kind and
-// "<label>" for the chosen group or device, so no two fields share a name.
+const targetKinds = [
+  { value: "staticGroupId", label: "Device group" },
+  { value: "dynamicGroupId", label: "Dynamic group" },
+  { value: "deviceId", label: "One device" },
+] as const;
+
+// The kind is a visible segmented choice, so the Target picker lists only named
+// groups or devices, never the kinds themselves. Each control has its own label:
+// "<label> type" for the kind and "<label>" for the chosen group or device.
 export function TargetControl({
   label,
   value,
@@ -21,6 +27,7 @@ export function TargetControl({
   disabled?: boolean;
 }) {
   const { devicePicker: DevicePicker, groupPicker: GroupPicker } = useTargetPickers();
+  const name = useId();
   const kind = value?.target.case ?? "staticGroupId";
   const Picker =
     kind === "deviceId"
@@ -30,23 +37,25 @@ export function TargetControl({
         : GroupPicker;
   return (
     <div className="grid min-w-0 gap-3">
-      <label className="grid gap-1.5 text-sm font-medium">
-        {`${label} type`}
-        <SelectField
-          aria-label={`${label} type`}
-          disabled={disabled}
-          value={kind}
-          options={[
-            { value: "staticGroupId", label: "Device group" },
-            { value: "dynamicGroupId", label: "Dynamic group" },
-            { value: "deviceId", label: "One device" },
-          ]}
-          onValueChange={(next) => {
-            if (next === "deviceId" || next === "staticGroupId" || next === "dynamicGroupId")
-              onChange(create(TargetRefSchema, { target: { case: next, value: "" } }));
-          }}
-        />
-      </label>
+      <fieldset className="grid gap-1.5" disabled={disabled}>
+        <legend className="mb-1.5 text-sm font-medium">{`${label} type`}</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {targetKinds.map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={name}
+                value={option.value}
+                checked={kind === option.value}
+                onChange={() =>
+                  onChange(create(TargetRefSchema, { target: { case: option.value, value: "" } }))
+                }
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <Picker
         label={label}
         value={value?.target.value ?? ""}

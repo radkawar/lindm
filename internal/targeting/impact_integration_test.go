@@ -54,8 +54,13 @@ func (f *targetingFixture) impact(t *testing.T, request *adminv1.PreviewTargetAs
 func (f *targetingFixture) impactRequest(target *policyv1.TargetRef) *adminv1.PreviewTargetAssignmentImpactRequest {
 	return &adminv1.PreviewTargetAssignmentImpactRequest{Assignment: &policyv1.TargetAssignment{AssignmentId: uuid.NewString(), ProfileRevisionId: f.profileRevision, Target: target}, PageSize: 20}
 }
-func reviewedSave(report *adminv1.PreviewTargetAssignmentImpactResponse) *adminv1.SaveTargetAssignmentImpactRequest {
-	return &adminv1.SaveTargetAssignmentImpactRequest{RequestId: uuid.NewString(), PreviewId: report.PreviewId, ReviewSha256: report.ReviewSha256, Assignment: proto.CloneOf(report.Assignment), ExpectedRevision: report.ExpectedRevision, Reason: "Save the reviewed cohort baseline"}
+
+// reviewedStart rolls out exactly the reviewed proposal in one stage.
+func reviewedStart(report *adminv1.PreviewTargetAssignmentImpactResponse) *adminv1.StartRolloutRequest {
+	return &adminv1.StartRolloutRequest{RequestId: uuid.NewString(), PreviewId: report.PreviewId, ReviewSha256: report.ReviewSha256, Assignment: proto.CloneOf(report.Assignment), ExpectedRevision: report.ExpectedRevision, Rollout: singleStage(report.Assignment.Target), Reason: "Roll out the reviewed cohort baseline"}
+}
+func singleStage(target *policyv1.TargetRef) *policyv1.RolloutSpec {
+	return &policyv1.RolloutSpec{RolloutId: uuid.NewString(), Salt: make([]byte, 32), Name: "Cohort baseline", Rings: []*policyv1.RolloutRing{{Name: "all", Cohort: proto.CloneOf(target), CumulativeBasisPoints: 10000, MinimumCanaries: 1, MinimumObserved: 1, SoakSeconds: 3600, FailureBasisPoints: 2000, UnknownBasisPoints: 10000, UnavailableBasisPoints: 10000, HealthMaxAgeSeconds: 86400}}}
 }
 func impactDevice(id uuid.UUID) *policyv1.TargetRef {
 	return &policyv1.TargetRef{Target: &policyv1.TargetRef_DeviceId{DeviceId: id.String()}}
@@ -150,7 +155,7 @@ func TestImpactSaveFencesChangedInputs(t *testing.T) {
 				r.Assignment.Target = &policyv1.TargetRef{Target: &policyv1.TargetRef_DynamicGroupId{DynamicGroupId: dynamic.Group.GroupId}}
 			}
 			report := f.impact(t, r)
-			save := reviewedSave(report)
+			save := reviewedStart(report)
 			resolve := ImpactResolver(emptyImpact)
 			switch change {
 			case "new member":
@@ -187,7 +192,7 @@ func TestImpactSaveFencesChangedInputs(t *testing.T) {
 				f.actor.Bindings = []*authv1.RoleBinding{{Permissions: []string{string(identity.PermissionAssignResources)}}, {Permissions: []string{string(identity.PermissionReadFleet)}, Scopes: []*authv1.DeviceScope{{DeviceIds: []string{uuid.NewString()}}}}}
 			}
 			err := f.impactTransaction(t, func(tx pgx.Tx) error {
-				_, err := f.store.SaveImpact(t.Context(), tx, f.actor, save, resolve)
+				_, err := f.store.StartRollout(t.Context(), tx, f.actor, save, resolve)
 				return err
 			})
 			if !errors.Is(err, ErrImpactStale) {
@@ -208,7 +213,7 @@ func TestImpactEmptyGroupBecomingNonemptyIsStale(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(report), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(report), emptyImpact)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("empty cohort expanded during save: %v", err)
@@ -243,11 +248,11 @@ func TestImpactSaveReplaySurvivesReportEviction(t *testing.T) {
 	f := newTargetingFixture(t)
 	r := f.impactRequest(impactDevice(f.device))
 	report := f.impact(t, r)
-	save := reviewedSave(report)
-	var first *adminv1.PutTargetAssignmentResponse
+	save := reviewedStart(report)
+	var first *adminv1.StartRolloutResponse
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
 		var err error
-		first, err = f.store.SaveImpact(t.Context(), tx, f.actor, save, emptyImpact)
+		first, err = f.store.StartRollout(t.Context(), tx, f.actor, save, emptyImpact)
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -256,7 +261,7 @@ func TestImpactSaveReplaySurvivesReportEviction(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		got, err := f.store.SaveImpact(t.Context(), tx, f.actor, save, nil)
+		got, err := f.store.StartRollout(t.Context(), tx, f.actor, save, nil)
 		if err == nil && !proto.Equal(first, got) {
 			t.Error("replay replaced original result")
 		}
@@ -265,7 +270,7 @@ func TestImpactSaveReplaySurvivesReportEviction(t *testing.T) {
 		t.Fatalf("replay depended on live report or resolver: %v", err)
 	}
 	save.Reason = "different request content"
-	if err := f.impactTransaction(t, func(tx pgx.Tx) error { _, err := f.store.SaveImpact(t.Context(), tx, f.actor, save, nil); return err }); !errors.Is(err, ErrConflict) {
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error { _, err := f.store.StartRollout(t.Context(), tx, f.actor, save, nil); return err }); !errors.Is(err, ErrConflict) {
 		t.Fatalf("changed replay accepted: %v", err)
 	}
 	var revisions, heads int
@@ -332,11 +337,13 @@ func TestImpactTenThousandCandidatesAndOverflow(t *testing.T) {
 	if !report.Complete || report.EvaluatedDeviceCount != maxImpactDevices || report.CandidateCount != maxImpactDevices || len(report.Devices) != 20 {
 		t.Fatalf("normal 10k cohort not supported: %v", report)
 	}
+	// A complete 10k review passes every freshness check; these pending devices
+	// have no enrollment to change, so there is nothing to roll out.
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(report), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(report), emptyImpact)
 		return err
-	}); err != nil {
-		t.Fatalf("10k review could not save: %v", err)
+	}); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("10k review was not accepted up to planning: %v", err)
 	}
 	if _, err := f.pool.Exec(t.Context(), "INSERT INTO device_group_memberships(group_id,device_id) VALUES ($1,$2)", group, f.device); err != nil {
 		t.Fatal(err)
@@ -347,7 +354,7 @@ func TestImpactTenThousandCandidatesAndOverflow(t *testing.T) {
 		t.Fatalf("overflow disguised as full report: %v", overflow)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(overflow), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(overflow), emptyImpact)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("overflow saved: %v", err)
@@ -408,7 +415,7 @@ func TestImpactRetainedExpiredReviewRejectsBeforeResolver(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(report), nil)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(report), nil)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("expired review reached resolution/save: %v", err)
@@ -476,7 +483,7 @@ func TestImpactLocksCandidatePopulationUntilCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(report), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(report), emptyImpact)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("post-preview membership expansion saved: %v", err)
@@ -498,6 +505,23 @@ func TestImpactUsesFrozenRolloutAdmissionAndFencesPause(t *testing.T) {
 	if before.IncludedCount != 1 {
 		t.Fatal("frozen admitted canary missing from proposal")
 	}
+	// A reviewed rollout creates its own rollout; a proposal bound to another is refused.
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(before), emptyImpact)
+		return err
+	}); !errors.Is(err, ErrRejected) {
+		t.Fatalf("rollout-bound proposal started another rollout: %v", err)
+	}
+	// A saved assignment bound to the rollout is a dependency of an unbound review.
+	bound := f.putAssignment(t, impactDevice(f.device), 0)
+	bound.RequestId, bound.ExpectedRevision, bound.Assignment.RolloutId = uuid.NewString(), 1, &rollout.Rollout.RolloutId
+	if err := f.transaction(t, func(tx pgx.Tx) error {
+		_, err := f.store.PutAssignment(t.Context(), tx, f.actor, identity.PermissionAssignResources, bound)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	unbound := f.impact(t, f.impactRequest(impactDevice(f.device)))
 	if err := f.transaction(t, func(tx pgx.Tx) error {
 		_, err := f.store.ControlRollout(t.Context(), tx, f.actor, identity.PermissionAssignResources, &adminv1.ControlRolloutRequest{RequestId: uuid.NewString(), RolloutId: rollout.Rollout.RolloutId, ExpectedRevision: 1, Operation: adminv1.ControlRolloutRequest_OPERATION_PAUSE, Reason: "Pause before reviewed save"})
 		return err
@@ -505,7 +529,7 @@ func TestImpactUsesFrozenRolloutAdmissionAndFencesPause(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(before), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(unbound), emptyImpact)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("rollout changed after review but save proceeded: %v", err)
@@ -528,8 +552,17 @@ func TestImpactIgnoresLiveRolloutProjectionButFencesDurableChanges(t *testing.T)
 			if scenario.empty {
 				target = impactGroup(f.impactGroup(t, 0))
 			}
+			// The saved catalog holds an assignment bound to the rollout; reviews
+			// of unbound proposals depend on that rollout's durable state.
+			bound := f.putAssignment(t, target, 0)
+			bound.RequestId, bound.ExpectedRevision, bound.Assignment.RolloutId = uuid.NewString(), 1, proto.String(id.String())
+			if err := f.transaction(t, func(tx pgx.Tx) error {
+				_, err := f.store.PutAssignment(ctx, tx, f.actor, identity.PermissionAssignResources, bound)
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
 			request := f.impactRequest(target)
-			request.Assignment.RolloutId = proto.String(id.String())
 			reviewed := f.impact(t, request)
 			if scenario.empty && reviewed.CandidateCount != 0 {
 				t.Fatal("empty-cohort dependency fixture included a device")
@@ -537,10 +570,14 @@ func TestImpactIgnoresLiveRolloutProjectionButFencesDurableChanges(t *testing.T)
 			// Native receipts and elapsed soak change the live projection only.
 			// This also exercises catalog dependencies when there are no rows.
 			preparePromoterHealth(t, ctx, f, id, false)
+			want := error(nil)
+			if scenario.empty {
+				want = ErrNotReady
+			}
 			if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-				_, err := f.store.SaveImpact(ctx, tx, f.actor, reviewedSave(reviewed), emptyImpact)
+				_, err := f.store.StartRollout(ctx, tx, f.actor, reviewedStart(reviewed), emptyImpact)
 				return err
-			}); err != nil {
+			}); !errors.Is(err, want) {
 				t.Fatalf("live projection invalidated unchanged rollout admission: %v", err)
 			}
 			request.Assignment.AssignmentId = uuid.NewString()
@@ -554,10 +591,15 @@ func TestImpactIgnoresLiveRolloutProjectionButFencesDurableChanges(t *testing.T)
 			}); err != nil {
 				t.Fatal(err)
 			}
+			// With no evaluated device the review never depended on the rollout.
+			want = ErrImpactStale
+			if scenario.empty {
+				want = ErrNotReady
+			}
 			if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-				_, err := f.store.SaveImpact(ctx, tx, f.actor, reviewedSave(beforePause), emptyImpact)
+				_, err := f.store.StartRollout(ctx, tx, f.actor, reviewedStart(beforePause), emptyImpact)
 				return err
-			}); !errors.Is(err, ErrImpactStale) {
+			}); !errors.Is(err, want) {
 				t.Fatalf("durable rollout change did not invalidate reviewed impact: %v", err)
 			}
 		})
@@ -578,7 +620,7 @@ func TestImpactFencesDynamicDefinitionRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
-		_, err := f.store.SaveImpact(t.Context(), tx, f.actor, reviewedSave(before), emptyImpact)
+		_, err := f.store.StartRollout(t.Context(), tx, f.actor, reviewedStart(before), emptyImpact)
 		return err
 	}); !errors.Is(err, ErrImpactStale) {
 		t.Fatalf("dynamic definition changed after review: %v", err)

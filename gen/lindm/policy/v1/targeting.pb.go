@@ -517,10 +517,13 @@ func (x *RolloutRing) GetHealthMaxAgeSeconds() uint32 {
 }
 
 type RolloutSpec struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RolloutId     string                 `protobuf:"bytes,1,opt,name=rollout_id,json=rolloutId,proto3" json:"rollout_id,omitempty"`
-	Salt          []byte                 `protobuf:"bytes,2,opt,name=salt,proto3" json:"salt,omitempty"`
-	Rings         []*RolloutRing         `protobuf:"bytes,3,rep,name=rings,proto3" json:"rings,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RolloutId string                 `protobuf:"bytes,1,opt,name=rollout_id,json=rolloutId,proto3" json:"rollout_id,omitempty"`
+	Salt      []byte                 `protobuf:"bytes,2,opt,name=salt,proto3" json:"salt,omitempty"`
+	Rings     []*RolloutRing         `protobuf:"bytes,3,rep,name=rings,proto3" json:"rings,omitempty"`
+	// Administrator-facing label, e.g. "Workstation baseline v3 to engineering".
+	// Empty only for rollouts created before names existed.
+	Name          string `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -574,6 +577,13 @@ func (x *RolloutSpec) GetRings() []*RolloutRing {
 		return x.Rings
 	}
 	return nil
+}
+
+func (x *RolloutSpec) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
 }
 
 type TargetCandidate struct {
@@ -953,13 +963,14 @@ const file_lindm_policy_v1_targeting_proto_rawDesc = "" +
 	"\x18unavailable_basis_points\x18\t \x01(\rB\b\xbaH\x05*\x03\x18\x90NR\x16unavailableBasisPoints\x12)\n" +
 	"\x10manual_promotion\x18\n" +
 	" \x01(\bR\x0fmanualPromotion\x12@\n" +
-	"\x16health_max_age_seconds\x18\v \x01(\rB\v\xbaH\b*\x06\x18\x80\xa3\x05(<R\x13healthMaxAgeSeconds\"\xa9\x02\n" +
+	"\x16health_max_age_seconds\x18\v \x01(\rB\v\xbaH\b*\x06\x18\x80\xa3\x05(<R\x13healthMaxAgeSeconds\"\xcb\x02\n" +
 	"\vRolloutSpec\x12'\n" +
 	"\n" +
 	"rollout_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trolloutId\x12\x1b\n" +
 	"\x04salt\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x04salt\x12>\n" +
 	"\x05rings\x18\x03 \x03(\v2\x1c.lindm.policy.v1.RolloutRingB\n" +
-	"\xbaH\a\x92\x01\x04\b\x01\x10\x10R\x05rings:\x93\x01\xbaH\x8f\x01\x1a\x8c\x01\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10\x10R\x05rings\x12 \n" +
+	"\x04name\x18\x04 \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\x04name:\x93\x01\xbaH\x8f\x01\x1a\x8c\x01\n" +
 	"\rrollout.rings\x124ring names must be unique and percentages cumulative\x1aEthis.rings.all(r, this.rings.filter(s, s.name == r.name).size() == 1)\"\xbf\x01\n" +
 	"\x0fTargetCandidate\x12A\n" +
 	"\n" +

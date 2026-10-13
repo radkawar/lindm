@@ -57,8 +57,12 @@ func Apply(ctx context.Context, client adminv1connect.AdminServiceClient, plan *
 			result.Outcomes = append(result.Outcomes, outcome)
 			continue
 		}
-		if a, ok := request.(*adminv1.PutTargetAssignmentRequest); ok {
-			a.Assignment.ProfileRevisionId = revisions[op.profileID]
+		if _, ok := request.(*adminv1.StartRolloutRequest); ok {
+			if err := applyRollout(ctx, client, plan.spec.GetName(), op, revisions[op.profileID], &outcome); err != nil {
+				return result, fmt.Errorf("roll out %s %s: %w", outcome.Kind, outcome.Name, err)
+			}
+			result.Outcomes = append(result.Outcomes, outcome)
+			continue
 		}
 		if err := completeRequest(plan.spec.GetName(), outcome.Kind, outcome.Name+"\x00"+op.predecessorID, request); err != nil {
 			return result, err
@@ -67,16 +71,6 @@ func Apply(ctx context.Context, client adminv1connect.AdminServiceClient, plan *
 			return result, fmt.Errorf("apply %s %s: %w", outcome.Kind, outcome.Name, err)
 		}
 		result.Outcomes = append(result.Outcomes, outcome)
-	}
-	if len(plan.spec.GetAssignments()) > 0 {
-		if opts.AccountClient != nil {
-			if err := opts.AccountClient.CheckSession(ctx); err != nil {
-				return result, fmt.Errorf("browser session no longer authorizes activation: %w", err)
-			}
-		}
-		if err := activate(ctx, client, plan, result); err != nil {
-			return result, err
-		}
 	}
 	return result, nil
 }
@@ -150,12 +144,6 @@ func applyRequest(ctx context.Context, client adminv1connect.AdminServiceClient,
 		}
 		revisions[r.GetProfileId()] = response.Msg.GetRevision().GetRevisionId()
 		return nil
-	case *adminv1.PutRolloutRequest:
-		_, err := client.PutRollout(ctx, connect.NewRequest(r))
-		return err
-	case *adminv1.PutTargetAssignmentRequest:
-		_, err := client.PutTargetAssignment(ctx, connect.NewRequest(r))
-		return err
 	case *adminv1.CreateProvisioningTokenRequest:
 		response, err := client.CreateProvisioningToken(ctx, connect.NewRequest(r))
 		if err != nil {

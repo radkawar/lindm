@@ -79,6 +79,12 @@ message RolloutSpec {
     min_items: 1
     max_items: 16
   }];
+  // Administrator-facing label, e.g. "Workstation baseline v3 to engineering".
+  // Empty only for rollouts created before names existed.
+  string name = 4 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
 }
 
 enum TargetMatch {

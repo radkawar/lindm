@@ -63,15 +63,28 @@ func TestProposedImpactUsesCanonicalConflictResolverAndActualHead(t *testing.T) 
 	if head.String() != actual.AssignmentId || count != 1 {
 		t.Fatal("preview saved or activated the proposed assignment")
 	}
-	save := &adminv1.SaveTargetAssignmentImpactRequest{RequestId: uuid.NewString(), PreviewId: preview.Msg.PreviewId, ReviewSha256: preview.Msg.ReviewSha256, Assignment: preview.Msg.Assignment, Reason: "Save reviewed conflict without activation"}
-	if _, err := f.service.SaveTargetAssignmentImpact(f.adminCtx, connect.NewRequest(save)); err != nil {
+	// The current head is a direct per-device assignment: the review names the
+	// revision whose settings the rollout would replace, never a silent removal.
+	if !row.ReplacesDirectAssignment || preview.Msg.ReplacingDirectCount != 1 {
+		t.Fatalf("review does not say it replaces the direct assignment: %v %d", row.ReplacesDirectAssignment, preview.Msg.ReplacingDirectCount)
+	}
+	for _, item := range row.CurrentResolution.Resources {
+		if len(item.ContributingRevisionIds) != 1 || item.ContributingRevisionIds[0] != actual.RevisionId {
+			t.Fatalf("current head provenance missing: %v", item)
+		}
+	}
+	started, err := f.service.StartRollout(f.adminCtx, connect.NewRequest(reviewedRollout(preview.Msg, "Roll out reviewed conflict")))
+	if err != nil {
 		t.Fatal(err)
+	}
+	if state := started.Msg.Rollout; state.NeedsReviewCount != 1 || state.PlannedCount != 1 {
+		t.Fatalf("a conflicting reviewed change was planned for activation: %v", state)
 	}
 	if err := f.pool.QueryRow(t.Context(), "SELECT assignment_id FROM resource_assignment_heads WHERE generation_id=$1", f.principal.GenerationID).Scan(&head); err != nil {
 		t.Fatal(err)
 	}
 	if head.String() != actual.AssignmentId {
-		t.Fatal("save pretended assignment was activated")
+		t.Fatal("starting a rollout activated inside the request")
 	}
 }
 
@@ -94,7 +107,12 @@ func TestProposedImpactCanonicalAssignmentReplacement(t *testing.T) {
 	if len(review.Msg.Devices) != 1 || len(review.Msg.Devices[0].ProposedResolution.Resources) != 0 || review.Msg.ExcludedCount != 1 {
 		t.Fatalf("alternate UUID spelling retained old contributor: %v", review.Msg)
 	}
-	if _, err := f.service.SaveTargetAssignmentImpact(f.adminCtx, connect.NewRequest(&adminv1.SaveTargetAssignmentImpactRequest{RequestId: uuid.NewString(), PreviewId: review.Msg.PreviewId, ReviewSha256: review.Msg.ReviewSha256, Assignment: proposal, ExpectedRevision: 1, Reason: "Disable reviewed assignment"})); err != nil {
+	// Disabling removes settings only from devices whose head changes; this
+	// device was never activated, so there is nothing to roll out.
+	if _, err := f.service.StartRollout(f.adminCtx, connect.NewRequest(reviewedRollout(review.Msg, "Disable reviewed assignment"))); connect.CodeOf(err) != connect.CodeFailedPrecondition {
+		t.Fatalf("a rollout without any device change started: %v", err)
+	}
+	if _, err := f.service.PutTargetAssignment(f.adminCtx, connect.NewRequest(&adminv1.PutTargetAssignmentRequest{RequestId: uuid.NewString(), Assignment: proposal, ExpectedRevision: 1, Reason: "Disable reviewed assignment"})); err != nil {
 		t.Fatal(err)
 	}
 	actual, err := f.service.PreviewTargetAssignments(f.adminCtx, connect.NewRequest(&adminv1.PreviewTargetAssignmentsRequest{DeviceId: f.principal.DeviceID.String()}))
@@ -191,8 +209,21 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	saveStart := time.Now()
 	saveCtx, cancelSave := context.WithTimeout(f.adminCtx, 30*time.Second)
 	defer cancelSave()
-	if _, err := f.service.SaveTargetAssignmentImpact(saveCtx, connect.NewRequest(&adminv1.SaveTargetAssignmentImpactRequest{RequestId: uuid.NewString(), PreviewId: review.PreviewId, ReviewSha256: review.ReviewSha256, Assignment: review.Assignment, Reason: "Save fully reviewed 10000-device baseline"})); err != nil {
+	if _, err := f.service.StartRollout(saveCtx, connect.NewRequest(reviewedRollout(review, "Roll out fully reviewed 10000-device baseline"))); err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("10k impact build=%s pages=%s save=%s max_protobuf=%d max_json=%d persisted_rows=%d persisted_bytes=%d", buildDuration, pageDuration, time.Since(saveStart), maxProto, maxJSON, persistedRows, persistedBytes)
+}
+
+// reviewedRollout rolls out exactly the reviewed proposal to everyone at once.
+func reviewedRollout(review *adminv1.PreviewTargetAssignmentImpactResponse, reason string) *adminv1.StartRolloutRequest {
+	return &adminv1.StartRolloutRequest{
+		RequestId: uuid.NewString(), PreviewId: review.PreviewId, ReviewSha256: review.ReviewSha256,
+		Assignment: proto.CloneOf(review.Assignment), ExpectedRevision: review.ExpectedRevision, Reason: reason,
+		Rollout: &policyv1.RolloutSpec{RolloutId: uuid.NewString(), Salt: make([]byte, 32), Name: reason, Rings: []*policyv1.RolloutRing{{
+			Name: "everyone", Cohort: proto.CloneOf(review.Assignment.Target), CumulativeBasisPoints: 10000,
+			MinimumCanaries: 1, MinimumObserved: 1, SoakSeconds: 3600, HealthMaxAgeSeconds: 86400,
+			FailureBasisPoints: 500, UnknownBasisPoints: 1000, UnavailableBasisPoints: 1000,
+		}}},
+	}
 }

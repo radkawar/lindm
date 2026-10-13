@@ -17,6 +17,7 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	"lindm/internal/device/core"
 	"lindm/internal/orgapply"
+	"lindm/internal/targeting"
 )
 
 func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
@@ -78,14 +79,25 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	activated := false
+	rolledOut := false
 	for _, o := range result.Outcomes {
-		if o.Kind == "activation" && o.ID == enrolled.Msg.GetDeviceId() && o.Status == "updated" {
-			activated = true
+		if o.Kind == "assignment" && (o.Status == "created" || o.Status == "updated") {
+			rolledOut = true
 		}
 	}
-	if !activated {
-		t.Fatal("matching enrolled device not activated")
+	if !rolledOut {
+		t.Fatalf("matching enrolled device did not start a rollout: %+v", result.Outcomes)
+	}
+	// Activation is the promoter's: each assignment's rollout applies its exact
+	// reviewed change, the later review covering the earlier assignment.
+	promoter, err := targeting.NewPromoter(f.svc.Pool, f.svc.Identity, f.svc.Targeting, f.svc.RolloutHooks())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 3 {
+		if err := promoter.RunOnce(f.stepUp); err != nil {
+			t.Fatal(err)
+		}
 	}
 	state, err := f.svc.GetDeviceResourceState(f.stepUp, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: enrolled.Msg.GetDeviceId()}))
 	if err != nil {
@@ -104,8 +116,18 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, o := range result.Outcomes {
-		if o.Kind == "activation" && o.Status != "unchanged" {
+		// Assignments whose groups have no device stay pending, never rolled out.
+		if o.Kind == "assignment" && (o.Status == "created" || o.Status == "updated") {
 			t.Fatalf("target reapplied: %+v", o)
+		}
+	}
+	rollouts, err := f.svc.ListRollouts(f.stepUp, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rollouts.Msg.GetRollouts() {
+		if r.GetNeedsReviewCount() != 0 || r.GetStartingCount() != 0 {
+			t.Fatalf("sequential organization rollouts left a device for review: %v", r)
 		}
 	}
 	if len(result.Secrets) != 0 {

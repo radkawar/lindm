@@ -80,6 +80,8 @@ type DemoRoutes struct {
 	// A request an older agent refused before anything was shared, on
 	// RefusedAssistanceDeviceID: "Couldn't start", never "Ended".
 	RefusedAssistanceDeviceID, RefusedAssistanceSessionID string
+	// Active staged rollout with an in-progress pilot, for /rollouts.
+	RolloutID string
 }
 
 // demoSeed drives the real Admin, Enrollment and Device APIs for one fixture.
@@ -405,6 +407,10 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return errors.New("post-enrollment organization apply unexpectedly reissued credentials")
 	}
 	s.demo.Organization = applied.Outcomes
+	// Organization assignments roll out asynchronously through the promoter.
+	if err := s.awaitRollouts(ctx); err != nil {
+		return err
+	}
 	s.demo.Routes.ProfileID = s.organization.GetProfiles()[0].GetId()
 	if s.demo.Routes.FirewallProfileID, err = s.publishFirewallReviewProfile(ctx); err != nil {
 		return err
@@ -447,6 +453,9 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return err
 	}
 	if err := s.catalog(ctx); err != nil {
+		return err
+	}
+	if err := s.adoptionRollout(ctx); err != nil {
 		return err
 	}
 	if err := s.scale(ctx); err != nil {
@@ -959,6 +968,84 @@ func (s *demoSeed) catalog(ctx context.Context) error {
 	}
 	if _, err := reports.CreateAuditExport(ctx, connect.NewRequest(&integrationsv1.CreateAuditExportRequest{RequestId: uuid.NewString(), AfterHash: make([]byte, 32), MaxEvents: 1000, RetentionDays: 30, Reason: "Quarterly audit evidence export"})); err != nil {
 		return fmt.Errorf("create demo audit export: %w", err)
+	}
+	return nil
+}
+
+// awaitRollouts waits for the promoter to activate every admitted device of
+// the organization's rollouts, so later convergence observes their heads.
+func (s *demoSeed) awaitRollouts(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		listed, err := s.owner.Admin.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+		if err != nil {
+			return fmt.Errorf("list demo rollouts: %w", err)
+		}
+		starting := false
+		for _, r := range listed.Msg.GetRollouts() {
+			if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE {
+				continue
+			}
+			if s.demo.Routes.RolloutID == "" && r.GetPlannedCount() > 0 {
+				s.demo.Routes.RolloutID = r.GetRollout().GetRolloutId()
+			}
+			starting = starting || (!r.GetPaused() && r.GetStartingCount() > 0)
+		}
+		if !starting {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("wait for demo rollout activation: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// adoptionRollout seeds a kernel-setting adoption awaiting its one approval,
+// reviewed and requested through the real rollout RPCs.
+func (s *demoSeed) adoptionRollout(ctx context.Context) error {
+	target := s.organization.GetAssignments()[0].GetAssignment().GetTarget()
+	kernel, err := s.owner.Admin.PublishProfileRevision(ctx, connect.NewRequest(&adminv1.PublishProfileRevisionRequest{RequestId: uuid.NewString(), ProfileId: uuid.NewString(), Reason: "Publish console demo profile", Spec: &policyv1.ResourceProfile{
+		Name: "Kernel hardening", Description: "Hide kernel pointers from unprivileged users.",
+		Resources: []*policyv1.ProfileResource{{ResourceId: uuid.NewString(),
+			Desired:      &resourcev1.ResourceDesiredState{Ref: &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: "kernel.kptr_restrict"}, State: &resourcev1.ResourceDesiredState_Sysctl{Sysctl: &resourcev1.SysctlDesired{Key: "kernel.kptr_restrict", Value: "2"}}},
+			Ownership:    &resourcev1.OwnershipPolicy{Mode: resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION, Release: resourcev1.ReleaseBehavior_RELEASE_BEHAVIOR_RESTORE_OWNED},
+			Verification: &resourcev1.VerificationPolicy{MaxAgeSeconds: 7 * 24 * 3600, Checks: []resourcev1.HealthCheck{resourcev1.HealthCheck_HEALTH_CHECK_NATIVE_STATE}},
+		}},
+	}}))
+	if err != nil {
+		return fmt.Errorf("publish demo adoption profile: %w", err)
+	}
+	assignment := &policyv1.TargetAssignment{AssignmentId: uuid.NewString(), ProfileRevisionId: kernel.Msg.GetRevision().GetRevisionId(), Target: target}
+	review, err := s.owner.Admin.PreviewTargetAssignmentImpact(ctx, connect.NewRequest(&adminv1.PreviewTargetAssignmentImpactRequest{Assignment: assignment, PageSize: 20}))
+	if err != nil {
+		return fmt.Errorf("review demo adoption rollout: %w", err)
+	}
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return err
+	}
+	request := &adminv1.StartRolloutRequest{
+		RequestId: uuid.NewString(), PreviewId: review.Msg.GetPreviewId(), ReviewSha256: review.Msg.GetReviewSha256(), Assignment: assignment,
+		Rollout: &policyv1.RolloutSpec{RolloutId: uuid.NewString(), Salt: salt, Name: "Kernel hardening v1 to Engineering", Rings: []*policyv1.RolloutRing{{
+			Name: "everyone", Cohort: target, CumulativeBasisPoints: 10000, MinimumCanaries: 1, MinimumObserved: 1, SoakSeconds: 3600,
+			FailureBasisPoints: 500, UnknownBasisPoints: 10000, UnavailableBasisPoints: 10000, HealthMaxAgeSeconds: 86400,
+		}}},
+		Reason: "Adopt the existing kernel pointer restriction",
+	}
+	started, err := s.owner.Admin.StartRollout(ctx, connect.NewRequest(request))
+	if err != nil {
+		return fmt.Errorf("start demo adoption rollout: %w", err)
+	}
+	if started.Msg.GetRollout().GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL {
+		return fmt.Errorf("demo adoption rollout did not wait for approval: %v", started.Msg.GetRollout().GetStatus())
+	}
+	if _, err := s.owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_StartRollout{StartRollout: request}})); err != nil {
+		return fmt.Errorf("request demo rollout approval: %w", err)
 	}
 	return nil
 }

@@ -87,7 +87,8 @@ service AdminService {
   rpc ListTargetAssignments(ListTargetAssignmentsRequest) returns (ListTargetAssignmentsResponse);
   rpc PreviewTargetAssignments(PreviewTargetAssignmentsRequest) returns (PreviewTargetAssignmentsResponse);
   rpc PreviewTargetAssignmentImpact(PreviewTargetAssignmentImpactRequest) returns (PreviewTargetAssignmentImpactResponse);
-  rpc SaveTargetAssignmentImpact(SaveTargetAssignmentImpactRequest) returns (SaveTargetAssignmentImpactResponse);
+  rpc StartRollout(StartRolloutRequest) returns (StartRolloutResponse);
+  rpc ListRolloutDevices(ListRolloutDevicesRequest) returns (ListRolloutDevicesResponse);
   rpc ActivateTargetPreview(ActivateTargetPreviewRequest) returns (ActivateTargetPreviewResponse);
   rpc PutRollout(PutRolloutRequest) returns (PutRolloutResponse);
   rpc ControlRollout(ControlRolloutRequest) returns (ControlRolloutResponse);

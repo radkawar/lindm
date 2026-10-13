@@ -60,7 +60,7 @@ func newStore(clock func() time.Time) (*Store, error) {
 		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{}, &adminv1.PreviewDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{}, &adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{}, &adminv1.ActivateTargetPreviewRequest{},
-		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.SaveTargetAssignmentImpactRequest{},
+		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.StartRolloutRequest{}, &adminv1.ListRolloutDevicesRequest{},
 		&adminv1.PutRolloutRequest{}, &adminv1.ControlRolloutRequest{}, &adminv1.ListRolloutsRequest{},
 	), protovalidate.WithDisableLazy())
 	if err != nil {
@@ -279,40 +279,48 @@ func (s *Store) PutAssignment(ctx context.Context, tx pgx.Tx, p identity.Princip
 	return s.putAssignment(ctx, q, p, r, auditkind.TargetingAssignmentPut, r)
 }
 
-// The reviewed and legacy APIs share mutation semantics, but retain distinct
-// receipt methods and the exact request bytes supplied to each API.
 func (s *Store) putAssignment(ctx context.Context, q *targetingdb.Queries, p identity.Principal, r *adminv1.PutTargetAssignmentRequest, method auditkind.Kind, request proto.Message) (*adminv1.PutTargetAssignmentResponse, error) {
-	out := new(adminv1.PutTargetAssignmentResponse)
-	exists, err := q.TargetProfileRevisionExists(ctx, uuid.MustParse(r.Assignment.ProfileRevisionId))
+	candidate, err := s.storeAssignment(ctx, q, p, r.Assignment, r.ExpectedRevision)
+	if err != nil {
+		return nil, err
+	}
+	out := &adminv1.PutTargetAssignmentResponse{Assignment: candidate}
+	return out, saveReceipt(ctx, q, p, r.RequestId, method, candidate.Assignment.AssignmentId, r.Reason, "", request, out)
+}
+
+// storeAssignment is the one catalog mutation shared by the legacy put and a
+// started rollout; callers own receipts and audit.
+func (s *Store) storeAssignment(ctx context.Context, q *targetingdb.Queries, p identity.Principal, assignment *policyv1.TargetAssignment, expected uint64) (*policyv1.TargetCandidate, error) {
+	exists, err := q.TargetProfileRevisionExists(ctx, uuid.MustParse(assignment.ProfileRevisionId))
 	if err != nil {
 		return nil, err
 	}
 	if !exists {
 		return nil, ErrNotFound
 	}
-	if r.Assignment.RolloutId != nil {
-		if _, err := q.GetRollout(ctx, uuid.MustParse(*r.Assignment.RolloutId)); err != nil {
+	if assignment.RolloutId != nil {
+		if _, err := q.GetRollout(ctx, uuid.MustParse(*assignment.RolloutId)); err != nil {
 			return nil, err
 		}
 	}
-	if err := checkTarget(ctx, q, r.Assignment.Target); err != nil {
+	if err := checkTarget(ctx, q, assignment.Target); err != nil {
 		return nil, err
 	}
-	for _, t := range r.Assignment.Exclusions {
+	for _, t := range assignment.Exclusions {
 		if err := checkTarget(ctx, q, t); err != nil {
 			return nil, err
 		}
 	}
-	b, err := encodedCatalog(r.Assignment)
+	b, err := encodedCatalog(assignment)
 	if err != nil {
 		return nil, err
 	}
-	id := uuid.MustParse(r.Assignment.AssignmentId)
+	id := uuid.MustParse(assignment.AssignmentId)
 	var count int64
-	if r.ExpectedRevision == 0 {
+	if expected == 0 {
 		count, err = q.PutTargetAssignment(ctx, targetingdb.PutTargetAssignmentParams{ID: id, Definition: b, ActorID: p.ID})
 	} else {
-		count, err = q.UpdateTargetAssignment(ctx, targetingdb.UpdateTargetAssignmentParams{ID: id, Definition: b, ActorID: p.ID, Revision: int64(r.ExpectedRevision)})
+		count, err = q.UpdateTargetAssignment(ctx, targetingdb.UpdateTargetAssignmentParams{ID: id, Definition: b, ActorID: p.ID, Revision: int64(expected)})
 	}
 	if err != nil {
 		return nil, err
@@ -320,11 +328,10 @@ func (s *Store) putAssignment(ctx context.Context, q *targetingdb.Queries, p ide
 	if count != 1 {
 		return nil, ErrConflict
 	}
-	if err = q.InsertTargetAssignmentRevision(ctx, targetingdb.InsertTargetAssignmentRevisionParams{AssignmentID: id, Revision: int64(r.ExpectedRevision + 1), Definition: b, ActorID: p.ID}); err != nil {
+	if err = q.InsertTargetAssignmentRevision(ctx, targetingdb.InsertTargetAssignmentRevisionParams{AssignmentID: id, Revision: int64(expected + 1), Definition: b, ActorID: p.ID}); err != nil {
 		return nil, err
 	}
-	out.Assignment = &policyv1.TargetCandidate{Assignment: proto.CloneOf(r.Assignment), Revision: r.ExpectedRevision + 1, ActorId: p.ID.String()}
-	return out, saveReceipt(ctx, q, p, r.RequestId, method, id.String(), r.Reason, "", request, out)
+	return &policyv1.TargetCandidate{Assignment: proto.CloneOf(assignment), Revision: expected + 1, ActorId: p.ID.String()}, nil
 }
 func (s *Store) ListAssignments(ctx context.Context, tx pgx.Tx, p identity.Principal, perm identity.Permission, r *adminv1.ListTargetAssignmentsRequest) (*adminv1.ListTargetAssignmentsResponse, error) {
 	if err := s.validate(r); err != nil {
@@ -349,6 +356,18 @@ func (s *Store) ListAssignments(ctx context.Context, tx pgx.Tx, p identity.Princ
 			return nil, err
 		}
 		out.Assignments = append(out.Assignments, &policyv1.TargetCandidate{Assignment: a, Revision: uint64(row.Revision), ActorId: row.ActorID.String()})
+	}
+	seen := make(map[uuid.UUID]bool)
+	var ids []uuid.UUID
+	for _, c := range out.Assignments {
+		if id, err := uuid.Parse(c.Assignment.ProfileRevisionId); err == nil && !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	out.RevisionLabels, err = revisionLabels(ctx, q, ids)
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

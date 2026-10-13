@@ -426,7 +426,7 @@ func validatedMessages() []proto.Message {
 		&adminv1.PutTargetAssignmentRequest{},
 		&adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{},
-		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.SaveTargetAssignmentImpactRequest{},
+		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.StartRolloutRequest{}, &adminv1.ListRolloutDevicesRequest{},
 		&adminv1.ActivateTargetPreviewRequest{},
 		&adminv1.PutRolloutRequest{},
 		&adminv1.ControlRolloutRequest{},

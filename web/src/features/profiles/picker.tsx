@@ -179,9 +179,15 @@ export function ProfileRevisionPicker({
 // Names a saved profile version for read-only lists. An assignment carries
 // only the version identity, so older versions are found in the version
 // history of the first page of profiles, fetched only when no latest matches.
-export function ProfileVersionName({ value }: { value: string }) {
+// `text` is the full name ("Workstation baseline, version 2"); `short` is the
+// compact form for generated titles ("Workstation baseline v2").
+export function useProfileVersionLabel(value: string): {
+  text: string;
+  short: string;
+  ready: boolean;
+} {
   const lifetime = useAuthLifetime();
-  const heads = useQuery(profilesQueryOptions(lifetime, 100, ""));
+  const heads = useQuery({ ...profilesQueryOptions(lifetime, 100, ""), enabled: !!value });
   const latest = heads.data?.profiles.find((profile) => profile.revisionId === value);
   const histories = useQueries({
     queries:
@@ -195,16 +201,23 @@ export function ProfileVersionName({ value }: { value: string }) {
     .flatMap((history) => history.data?.revisions ?? [])
     .find((revision) => revision.revisionId === value);
   const match = latest ?? older;
-  if (match)
-    return (
-      <>
-        {match.name || "Unnamed profile"}, version {formatRevisionNumber(match.revisionNumber)}
-        {latest ? "" : " (a newer version exists)"}
-      </>
-    );
+  if (!value) return { text: "No profile version", short: "", ready: false };
+  if (match) {
+    const name = match.name || "Unnamed profile";
+    const number = formatRevisionNumber(match.revisionNumber);
+    return {
+      text: `${name}, version ${number}${latest ? "" : " (a newer version exists)"}`,
+      short: `${name} v${number}`,
+      ready: true,
+    };
+  }
   if (heads.isPending || histories.some((history) => history.isPending))
-    return <>Loading profile name…</>;
+    return { text: "Loading profile name…", short: "", ready: false };
   if (heads.error || histories.some((history) => history.error))
-    return <>Profile name unavailable</>;
-  return <>Profile version not found on the first page of profiles</>;
+    return { text: "Profile name unavailable", short: "", ready: false };
+  return {
+    text: "Profile version not found on the first page of profiles",
+    short: "",
+    ready: false,
+  };
 }

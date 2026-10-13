@@ -52,7 +52,7 @@ func TestRolloutGatesWithInjectedClock(t *testing.T) {
 }
 
 func TestPromoterRequiresDependencies(t *testing.T) {
-	if _, err := NewPromoter(nil, nil, nil); err == nil {
+	if _, err := NewPromoter(nil, nil, nil, RolloutHooks{}); err == nil {
 		t.Fatal("accepted missing dependencies")
 	}
 }

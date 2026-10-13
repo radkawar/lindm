@@ -38,16 +38,14 @@ type fakeAdmin struct {
 	requests        []proto.Message
 	failGrant       bool
 	fleet           []*adminv1.Device
-	preview         *policyv1.TargetPreview
-	active          *policyv1.TargetPreview
+	rollouts        []*adminv1.RolloutState
+	impactChanged   bool
+	staleStarts     int
+	noDevices       bool
 	requireApproval bool
 	approvals       []*adminv1.Approval
 	findings        []*adminv1.AdvisoryFinding
 	principalID     string
-	// previewConflicts makes the next N previews abort as a concurrent
-	// targeting revision would.
-	previewConflicts int
-	previewCalls     int
 	// findingSnapshotChanges makes the next N continuation pages abort as a
 	// newer host observation replacing the cursor's evidence snapshot would.
 	findingSnapshotChanges int
@@ -97,21 +95,6 @@ func (f *fakeAdmin) PublishProfileRevision(_ context.Context, r *connect.Request
 func (f *fakeAdmin) ListTargetAssignments(context.Context, *connect.Request[adminv1.ListTargetAssignmentsRequest]) (*connect.Response[adminv1.ListTargetAssignmentsResponse], error) {
 	return connect.NewResponse(&adminv1.ListTargetAssignmentsResponse{Assignments: f.assignments}), nil
 }
-func (f *fakeAdmin) PutTargetAssignment(_ context.Context, r *connect.Request[adminv1.PutTargetAssignmentRequest]) (*connect.Response[adminv1.PutTargetAssignmentResponse], error) {
-	f.requests = append(f.requests, proto.CloneOf(r.Msg))
-	candidate := &policyv1.TargetCandidate{Assignment: proto.CloneOf(r.Msg.GetAssignment()), Revision: r.Msg.GetExpectedRevision() + 1}
-	for i, a := range f.assignments {
-		if a.GetAssignment().GetAssignmentId() == candidate.GetAssignment().GetAssignmentId() {
-			if a.GetRevision() != r.Msg.GetExpectedRevision() {
-				return nil, connect.NewError(connect.CodeAborted, errors.New("stale assignment"))
-			}
-			f.assignments[i] = candidate
-			return connect.NewResponse(&adminv1.PutTargetAssignmentResponse{Assignment: candidate}), nil
-		}
-	}
-	f.assignments = append(f.assignments, candidate)
-	return connect.NewResponse(&adminv1.PutTargetAssignmentResponse{Assignment: candidate}), nil
-}
 func (f *fakeAdmin) ListProvisioningTokens(context.Context, *connect.Request[adminv1.ListProvisioningTokensRequest]) (*connect.Response[adminv1.ListProvisioningTokensResponse], error) {
 	return connect.NewResponse(&adminv1.ListProvisioningTokensResponse{Tokens: f.tokens}), nil
 }
@@ -138,34 +121,115 @@ func (f *fakeAdmin) CreateEnrollmentGrant(_ context.Context, r *connect.Request[
 func (f *fakeAdmin) ListDevices(context.Context, *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
 	return connect.NewResponse(&adminv1.ListDevicesResponse{Devices: f.fleet}), nil
 }
-func (f *fakeAdmin) GetDeviceResourceState(context.Context, *connect.Request[adminv1.GetDeviceResourceStateRequest]) (*connect.Response[adminv1.GetDeviceResourceStateResponse], error) {
-	return connect.NewResponse(&adminv1.GetDeviceResourceStateResponse{ActiveTargetPreview: f.active}), nil
-}
-func (f *fakeAdmin) PreviewTargetAssignments(context.Context, *connect.Request[adminv1.PreviewTargetAssignmentsRequest]) (*connect.Response[adminv1.PreviewTargetAssignmentsResponse], error) {
-	f.previewCalls++
-	if f.previewConflicts > 0 {
-		f.previewConflicts--
+
+// PreviewTargetAssignmentImpact reports one included device whose change is
+// controlled by impactChanged; a SYSCTL adoption requires approval.
+func (f *fakeAdmin) PreviewTargetAssignmentImpact(_ context.Context, r *connect.Request[adminv1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[adminv1.PreviewTargetAssignmentImpactResponse], error) {
+	saved := f.assignment(r.Msg.GetAssignment().GetAssignmentId())
+	if saved.GetRevision() != r.Msg.GetExpectedRevision() {
 		return nil, rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
 	}
-	return connect.NewResponse(&adminv1.PreviewTargetAssignmentsResponse{Preview: f.preview}), nil
+	report := &adminv1.PreviewTargetAssignmentImpactResponse{PreviewId: uuid.NewString(), Assignment: proto.CloneOf(r.Msg.GetAssignment()), ExpectedRevision: r.Msg.GetExpectedRevision(), Complete: true, ReviewSha256: make([]byte, 32), IncludedCount: 1, Devices: []*adminv1.TargetAssignmentDeviceImpact{{DeviceId: uuid.NewString(), Hostname: "laptop", Match: policyv1.TargetMatch_TARGET_MATCH_INCLUDED, Changed: saved == nil || f.impactChanged || f.profileChanged(r.Msg.GetAssignment())}}}
+	if f.requireApproval {
+		report.ApprovalRequired, report.AdoptingCount = true, 1
+	}
+	if report.Devices[0].Changed {
+		report.ChangedCount = 1
+	}
+	if f.noDevices {
+		report.Devices, report.IncludedCount = nil, 0
+	}
+	return connect.NewResponse(report), nil
 }
-func (f *fakeAdmin) ActivateTargetPreview(_ context.Context, r *connect.Request[adminv1.ActivateTargetPreviewRequest]) (*connect.Response[adminv1.ActivateTargetPreviewResponse], error) {
-	if f.requireApproval && r.Msg.GetApprovalId() == "" {
-		return nil, rpcreason.Error(connect.CodePermissionDenied, "approval_required")
+func (f *fakeAdmin) assignment(id string) *policyv1.TargetCandidate {
+	for _, a := range f.assignments {
+		if a.GetAssignment().GetAssignmentId() == id {
+			return a
+		}
+	}
+	return nil
+}
+func (f *fakeAdmin) profileChanged(a *policyv1.TargetAssignment) bool {
+	return f.assignment(a.GetAssignmentId()).GetAssignment().GetProfileRevisionId() != a.GetProfileRevisionId()
+}
+
+// StartRollout models the server: an approval-free rollout saves the assignment
+// at once; one needing approval saves nothing until it is decided.
+func (f *fakeAdmin) StartRollout(_ context.Context, r *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {
+	if f.staleStarts > 0 {
+		f.staleStarts--
+		return nil, rpcreason.Error(connect.CodeAborted, "targeting_impact_stale")
+	}
+	if f.noDevices {
+		return nil, rpcreason.Error(connect.CodeFailedPrecondition, "targeting_not_ready")
+	}
+	for _, existing := range f.rollouts {
+		if existing.GetRollout().GetRolloutId() == r.Msg.GetRollout().GetRolloutId() {
+			return nil, rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
+		}
+	}
+	saved := f.assignment(r.Msg.GetAssignment().GetAssignmentId())
+	if saved.GetRevision() != r.Msg.GetExpectedRevision() {
+		return nil, rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
 	}
 	f.requests = append(f.requests, proto.CloneOf(r.Msg))
-	f.active = proto.CloneOf(f.preview)
-	return connect.NewResponse(&adminv1.ActivateTargetPreviewResponse{Preview: f.active}), nil
+	state := &adminv1.RolloutState{Rollout: proto.CloneOf(r.Msg.GetRollout()), Assignment: proto.CloneOf(r.Msg.GetAssignment()), Status: adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE, PlannedCount: 1, ActivatedCount: 1, CreatedAt: timestamppb.New(time.Unix(1700000000+int64(len(f.rollouts)), 0))}
+	if f.requireApproval {
+		state.Status, state.ApprovalRequired, state.Paused = adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL, true, true
+		state.ActivatedCount, state.WaitingCount = 0, 1
+	} else {
+		assignment := proto.CloneOf(r.Msg.GetAssignment())
+		assignment.RolloutId = proto.String(r.Msg.GetRollout().GetRolloutId())
+		candidate := &policyv1.TargetCandidate{Assignment: assignment, Revision: r.Msg.GetExpectedRevision() + 1}
+		if saved == nil {
+			f.assignments = append(f.assignments, candidate)
+		} else {
+			saved.Assignment, saved.Revision = candidate.Assignment, candidate.Revision
+		}
+	}
+	f.rollouts = append(f.rollouts, state)
+	return connect.NewResponse(&adminv1.StartRolloutResponse{Rollout: proto.CloneOf(state)}), nil
+}
+func (f *fakeAdmin) PutTargetAssignment(_ context.Context, r *connect.Request[adminv1.PutTargetAssignmentRequest]) (*connect.Response[adminv1.PutTargetAssignmentResponse], error) {
+	saved := f.assignment(r.Msg.GetAssignment().GetAssignmentId())
+	if saved.GetRevision() != r.Msg.GetExpectedRevision() {
+		return nil, rpcreason.Error(connect.CodeAborted, "targeting_revision_conflict")
+	}
+	f.requests = append(f.requests, proto.CloneOf(r.Msg))
+	candidate := &policyv1.TargetCandidate{Assignment: proto.CloneOf(r.Msg.GetAssignment()), Revision: r.Msg.GetExpectedRevision() + 1}
+	if saved == nil {
+		f.assignments = append(f.assignments, candidate)
+	} else {
+		saved.Assignment, saved.Revision = candidate.Assignment, candidate.Revision
+	}
+	return connect.NewResponse(&adminv1.PutTargetAssignmentResponse{Assignment: candidate}), nil
+}
+func (f *fakeAdmin) ListRollouts(context.Context, *connect.Request[adminv1.ListRolloutsRequest]) (*connect.Response[adminv1.ListRolloutsResponse], error) {
+	out := make([]*adminv1.RolloutState, 0, len(f.rollouts))
+	for _, r := range f.rollouts {
+		out = append(out, proto.CloneOf(r))
+	}
+	return connect.NewResponse(&adminv1.ListRolloutsResponse{Rollouts: out}), nil
 }
 func (f *fakeAdmin) ListApprovals(context.Context, *connect.Request[adminv1.ListApprovalsRequest]) (*connect.Response[adminv1.ListApprovalsResponse], error) {
 	return connect.NewResponse(&adminv1.ListApprovalsResponse{Approvals: f.approvals, CurrentPrincipalId: f.principalID}), nil
 }
 func (f *fakeAdmin) CreateApproval(_ context.Context, r *connect.Request[adminv1.CreateApprovalRequest]) (*connect.Response[adminv1.CreateApprovalResponse], error) {
 	f.requests = append(f.requests, proto.CloneOf(r.Msg))
-	a := &adminv1.Approval{Id: uuid.NewString(), RequesterId: f.principalID, State: adminv1.ApprovalState_APPROVAL_STATE_PENDING, ExpiresAt: timestamppb.New(f.preview.GetEvaluatedAt().AsTime().Add(900 * time.Second)), TargetPreview: proto.CloneOf(f.preview), Payload: &adminv1.Approval_ActivateTargetPreview{ActivateTargetPreview: proto.CloneOf(r.Msg.GetActivateTargetPreview())}}
-	if request := r.Msg.GetAcceptAdvisoryFinding(); request != nil {
-		a.Payload = &adminv1.Approval_AcceptAdvisoryFinding{AcceptAdvisoryFinding: proto.CloneOf(request)}
-		a.ExpiresAt = timestamppb.New(time.Now().Add(time.Hour))
+	a := &adminv1.Approval{Id: uuid.NewString(), RequesterId: f.principalID, State: adminv1.ApprovalState_APPROVAL_STATE_PENDING, ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}
+	switch {
+	case r.Msg.GetAcceptAdvisoryFinding() != nil:
+		a.Payload = &adminv1.Approval_AcceptAdvisoryFinding{AcceptAdvisoryFinding: proto.CloneOf(r.Msg.GetAcceptAdvisoryFinding())}
+	case r.Msg.GetStartRollout() != nil:
+		request := r.Msg.GetStartRollout()
+		a.Payload = &adminv1.Approval_StartRollout{StartRollout: proto.CloneOf(request)}
+		for _, state := range f.rollouts {
+			if state.GetRollout().GetRolloutId() == request.GetRollout().GetRolloutId() {
+				state.ApprovalId = a.Id
+			}
+		}
+	default:
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("unexpected approval payload"))
 	}
 	f.approvals = append(f.approvals, a)
 	return connect.NewResponse(&adminv1.CreateApprovalResponse{Approval: a}), nil

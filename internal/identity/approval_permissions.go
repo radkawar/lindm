@@ -18,6 +18,7 @@ var approvalPayloadPermissions = map[protoreflect.FullName]Permission{
 	"lindm.admin.v1.RevokeDeviceRequest":                  PermissionRevokeDevice,
 	"lindm.admin.v1.SetResourceAssignmentRequest":         PermissionAssignResources,
 	"lindm.admin.v1.ActivateTargetPreviewRequest":         PermissionAssignResources,
+	"lindm.admin.v1.StartRolloutRequest":                  PermissionAssignResources,
 	"lindm.admin.v1.UpdateExecutionAuthorityRequest":      PermissionManageExecutionTrust,
 	"lindm.admin.v1.RevealRecoveryKeyRequest":             PermissionReadRecoveryKeys,
 	"lindm.admin.v1.RevealSecretRequest":                  PermissionRevealSecrets,

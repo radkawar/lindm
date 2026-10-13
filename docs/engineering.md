@@ -1100,10 +1100,13 @@ rollouts or enrollment credentials. The fixture configures the declared
 authorization policy and supplies its browser owner session for account operations;
 CLI bearer restrictions remain unchanged. Synthetic devices enroll through the
 organization's department provisioning tokens, retaining their static membership.
-The enrollment prerequisite pass omits rollouts and assignments: rollout creation
-freezes its cohort and correctly rejects an empty canary population. After device
-enrollment and inventory, the full unchanged source document is applied, including
-its rollouts and assignments. A separate post-seed apply verifies idempotence.
+The enrollment prerequisite pass omits rollouts and assignments: a rollout freezes
+its cohort and correctly rejects an empty canary population. After device
+enrollment and inventory, the full unchanged source document is applied; each
+assignment rolls out to its reviewed devices, and the seed waits until the
+promoter has started every device. The seed then starts one adoption rollout
+(Kernel hardening) that waits for its approval. A separate post-seed apply verifies
+idempotence.
 Normal devices retain their department targeting labels. Outcomes are retained in
 the sanitized demo report, including pending advisory selectors and unsupported
 operations; missing hosts or findings are never fabricated. The declared Engineering

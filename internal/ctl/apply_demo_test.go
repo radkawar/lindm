@@ -80,7 +80,7 @@ func TestDemoOrganizationPlan(t *testing.T) {
 	for _, outcome := range plan.Outcomes {
 		counts[outcome.Kind]++
 	}
-	for kind, want := range map[string]int{"group": 4, "dynamic_group": 4, "profile": 4, "rollout": 1, "assignment": 7, "provisioning_token": 4, "enrollment_grant": 1, "account": 4, "authorization": 1, "advisory_exception": 2, "capability_policy": 2} {
+	for kind, want := range map[string]int{"group": 4, "dynamic_group": 4, "profile": 4, "rollout": 0, "assignment": 7, "provisioning_token": 4, "enrollment_grant": 1, "account": 4, "authorization": 1, "advisory_exception": 2, "capability_policy": 2} {
 		if counts[kind] != want {
 			t.Errorf("%s outcomes=%d want %d", kind, counts[kind], want)
 		}

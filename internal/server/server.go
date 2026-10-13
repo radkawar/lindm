@@ -265,7 +265,7 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 	if err != nil {
 		return nil, err
 	}
-	promoter, err := targeting.NewPromoter(pool, auth, devices.Targeting)
+	promoter, err := targeting.NewPromoter(pool, auth, devices.Targeting, devices.RolloutHooks())
 	if err != nil {
 		return nil, fmt.Errorf("initialize rollout promoter: %w", err)
 	}

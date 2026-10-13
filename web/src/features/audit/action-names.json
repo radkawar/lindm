@@ -112,10 +112,10 @@
   "secret.reveal": "Revealed secret",
   "secret.rotated": "Rotated secret",
   "targeting.assignment.put": "Saved profile assignment",
-  "targeting.assignment.save_reviewed": "Saved reviewed profile assignment",
   "targeting.group.put": "Saved targeting group",
   "targeting.preview.activate": "Activated preview",
   "targeting.rollout.control": "Paused or resumed rollout",
   "targeting.rollout.pause": "Paused rollout automatically",
-  "targeting.rollout.put": "Saved rollout"
+  "targeting.rollout.put": "Saved rollout",
+  "targeting.rollout.start": "Started rollout"
 }

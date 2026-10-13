@@ -13,7 +13,7 @@ export const task = {
   route: "/rollouts",
   priority: "normal",
   acceptance:
-    "Opening the New rollout Profile picker and choosing a profile by pointer and by keyboard leaves the sidebar's Fleet group (and every other group) expanded; nothing in the navigation receives the picker's events; collapsed to icons, every navigation icon receives its own clicks.",
+    "Opening the New rollout dialog's Profile picker and choosing a profile by pointer and by keyboard leaves the sidebar's Fleet group (and every other group) expanded; nothing in the navigation receives the picker's events; collapsed to icons, every navigation icon receives its own clicks.",
 };
 
 const timeout = 30_000;
@@ -68,8 +68,11 @@ export async function check({ page, visit, settle, require, capture, step }) {
   require(initial.some((group) =>
     /^fleet=true$/i.test(group),
   ), `The Fleet group is not expanded on load (${initial.join(", ")})`);
+  // Open the dialog from a scrolled page: the original fault toggled the
+  // sidebar group under a picker opened below the fold.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await main.getByRole("button", { name: "New rollout", exact: true }).click();
-  const form = main.getByRole("region", { name: "New rollout", exact: true });
+  const form = page.getByRole("dialog", { name: "New rollout", exact: true });
   await form.waitFor({ timeout });
   await settle();
   // The console scrolls the form into view when it opens; lists above it may still
@@ -84,9 +87,6 @@ export async function check({ page, visit, settle, require, capture, step }) {
     await page.waitForTimeout(150);
   }
   await page.evaluate(listen, NAV);
-  const scrollY = await page.evaluate(() => window.scrollY);
-  require(scrollY >
-    0, "The rollouts page did not scroll to the form, so the scrolled case is not exercised");
 
   const profile = form.getByRole("button", { name: /^Profile\b/ });
   // The open picker's choice list: it always offers "No selection" first.
@@ -97,9 +97,11 @@ export async function check({ page, visit, settle, require, capture, step }) {
     const now = await groups(page);
     require(now.join() ===
       initial.join(), `After ${how} the navigation groups changed from ${initial.join(", ")} to ${now.join(", ")}`);
+    // The modal dialog hides the page from assistive technology while open,
+    // so look the links up including hidden roles and check their layout.
     for (const name of FLEET_LINKS)
       require(await nav
-        .getByRole("link", { name, exact: true })
+        .getByRole("link", { name, exact: true, includeHidden: true })
         .isVisible(), `After ${how} the Fleet link "${name}" is hidden`);
     const events = await page.evaluate(() => window.__ownerNavEvents.splice(0));
     require(events.length === 0, `After ${how} the navigation received ${events.join("; ")}`);
@@ -146,7 +148,7 @@ export async function check({ page, visit, settle, require, capture, step }) {
 
   step("close the form");
   await form.getByRole("button", { name: "Close", exact: true }).click();
-  await form.waitFor({ state: "detached", timeout });
+  await form.waitFor({ state: "hidden", timeout });
   await verify("closing the form");
 
   // Collapsed to icons, each group's label is invisible over the previous
@@ -156,8 +158,15 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await pointerClick(page, toggle);
   await page.locator('[data-slot="sidebar"][data-state="collapsed"]').waitFor({ timeout });
   try {
+    // Wait for the collapse transition only: an infinite animation (a loading
+    // skeleton's pulse under load) never finishes and would stall the review.
     await page.evaluate(() =>
-      Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {}))),
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => {})),
+      ),
     );
     const blocked = await page.evaluate(
       (selector) =>

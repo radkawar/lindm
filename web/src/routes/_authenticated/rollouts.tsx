@@ -1,13 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useProfileHeadLabel, useTargetRefLabel } from "@/app/target-names";
 import { RolloutsView } from "@/features/targeting/rollouts";
 import { canPermission } from "@/lib/permissions";
 import { DevicePicker } from "@/features/devices/picker";
-import { deviceQueryOptions } from "@/features/devices/queries";
-import { GroupName, GroupPicker } from "@/features/groups/picker";
-import { ProfileRevisionPicker, ProfileVersionName } from "@/features/profiles/picker";
+import { GroupPicker } from "@/features/groups/picker";
+import { ProfileRevisionPicker } from "@/features/profiles/picker";
 import { TargetPickerProvider } from "@/features/targeting/pickers";
-import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/rollouts")({
@@ -26,13 +24,6 @@ export const Route = createFileRoute("/_authenticated/rollouts")({
   component: RolloutsPage,
 });
 
-function DeviceName({ value }: { value: string }) {
-  const query = useQuery(deviceQueryOptions(useAuthLifetime(), value));
-  if (query.data?.device) return <>{query.data.device.hostname.trim() || "Unnamed device"}</>;
-  if (query.isPending) return <>(loading name…)</>;
-  return <>(name unavailable)</>;
-}
-
 function RolloutsPage() {
   const { device, create } = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -43,6 +34,7 @@ function RolloutsPage() {
         groupPicker: GroupPicker,
         profileRevisionPicker: ProfileRevisionPicker,
       }}
+      names={{ useTargetLabel: useTargetRefLabel, useProfileVersionLabel: useProfileHeadLabel }}
     >
       <RolloutsView
         initialDevice={device}
@@ -53,11 +45,6 @@ function RolloutsPage() {
             replace: true,
           })
         }
-        names={{
-          deviceName: DeviceName,
-          groupName: GroupName,
-          profileVersionName: ProfileVersionName,
-        }}
       />
     </TargetPickerProvider>
   );

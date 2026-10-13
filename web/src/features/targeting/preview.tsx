@@ -160,10 +160,10 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Inspect saved settings</CardTitle>
+        <CardTitle>Inspect one device</CardTitle>
         <CardDescription>
-          Review one device's saved assignments, then request approval or activate that exact
-          preview.
+          For a device a rollout couldn't change: preview its settings now, then activate that exact
+          preview or request approval for it.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">

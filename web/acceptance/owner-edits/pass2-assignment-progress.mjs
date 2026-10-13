@@ -41,13 +41,24 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     // The profile picker floats its choices; choosing a profile assigns its latest version.
     const picker = dialog.getByRole("button", { name: /^Profile / });
     await picker.waitFor({ timeout: 30_000 });
-    await picker.click();
-    await page.getByRole("combobox", { name: "Search profile", exact: true }).fill(profileName);
-    await page
+    // A seeded profile can sit on a later page of the picker; page forward with
+    // its own "More profiles" control, as an operator would.
+    const option = page
       .getByRole("option")
       .filter({ has: page.getByText(profileName, { exact: true }) })
-      .first()
-      .click();
+      .first();
+    await picker.click();
+    for (let turned = 0; ; turned++) {
+      await page.getByRole("combobox", { name: "Search profile", exact: true }).fill(profileName);
+      if (await option.isVisible().catch(() => false)) break;
+      await option.waitFor({ timeout: 2_000 }).catch(() => {});
+      if (await option.isVisible().catch(() => false)) break;
+      const more = page.getByRole("button", { name: "More profiles", exact: true });
+      if (turned >= 10 || !(await more.count()) || (await more.first().isDisabled()))
+        throw new Error(`profile "${profileName}" is not offered on any picker page`);
+      await more.first().click();
+    }
+    await option.click();
     await dialog
       .getByLabel("Reason (required)", { exact: true })
       .fill("Owner pass 2 assignment progress check");

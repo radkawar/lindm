@@ -45,6 +45,9 @@ type operation struct {
 	request       proto.Message
 	profileID     string
 	predecessorID string
+	// reviewOnly starts a rollout only when the apply-time review finds devices
+	// whose resolution differs from their current head.
+	reviewOnly bool
 }
 
 // Secret is returned only on the original issuance response. Callers must write

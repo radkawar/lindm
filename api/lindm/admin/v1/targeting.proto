@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/admin/v1/inventory_management.proto";
 import "lindm/policy/v1/targeting.proto";
+import "lindm/resource/v1/identity.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
@@ -135,6 +136,8 @@ message ListTargetAssignmentsRequest {
 }
 message ListTargetAssignmentsResponse {
   repeated lindm.policy.v1.TargetCandidate assignments = 1;
+  // Names of the profile versions this page's assignments deliver.
+  repeated ProfileVersionLabel revision_labels = 2 [(buf.validate.field).repeated.max_items = 100];
 }
 message PreviewTargetAssignmentsRequest {
   string device_id = 1 [(buf.validate.field).string.uuid = true];
@@ -177,6 +180,9 @@ message TargetAssignmentDeviceImpact {
   lindm.policy.v1.TargetResolution proposed_resolution = 10;
   bool changed = 11;
   repeated string reasons = 12;
+  // The device's current settings come from a direct per-device assignment
+  // (Assign profile on the device), which this change would replace.
+  bool replaces_direct_assignment = 13;
 }
 message PreviewTargetAssignmentImpactResponse {
   string preview_id = 1;
@@ -195,19 +201,94 @@ message PreviewTargetAssignmentImpactResponse {
   bytes review_sha256 = 14;
   uint32 candidate_count = 15;
   repeated string reasons = 16;
+  // Included devices whose proposed change adopts existing native state
+  // (OWNERSHIP_MODE_APPROVED_ADOPTION) and the distinct adopted settings.
+  uint32 adopting_count = 17;
+  repeated lindm.resource.v1.ResourceRef adopted = 18 [(buf.validate.field).repeated.max_items = 64];
+  // Rolling this out needs one independent approval: an adoption, or the
+  // reviewer's authorization policy requires approval for resources.assign.
+  bool approval_required = 19;
+  // Included devices whose settings change, and devices the proposal no longer
+  // includes whose settings change (removals). Both are planned by a rollout.
+  uint32 changed_count = 20;
+  uint32 removing_count = 21;
+  // Of the changed and removing devices, those whose current settings come
+  // from a direct per-device assignment that this change would replace.
+  uint32 replacing_direct_count = 23;
+  // Names of every profile version referenced by this page's resolutions.
+  repeated ProfileVersionLabel revision_labels = 22 [(buf.validate.field).repeated.max_items = 2048];
 }
-// This operation saves only the exact reviewed assignment. Activation remains
-// the separate, approved ActivateTargetPreview operation. Legacy Put is unchanged.
-message SaveTargetAssignmentImpactRequest {
+message ProfileVersionLabel {
+  string revision_id = 1;
+  string profile_name = 2;
+  uint64 revision_number = 3;
+}
+// Roll out one reviewed assignment. The request binds the exact impact report,
+// the assignment proposal (without rollout_id) and the stage plan; the server
+// retains every included device's reviewed resolution digest as its plan. When
+// approval is required the rollout waits for one approval of this exact request
+// (CreateApprovalRequest.start_rollout); the rollout-promoter then saves the
+// assignment, admits stages and activates each planned device's exact preview.
+// A device whose fresh preview differs from its reviewed change needs review.
+message StartRolloutRequest {
   string request_id = 1 [(buf.validate.field).string.uuid = true];
   string preview_id = 2 [(buf.validate.field).string.uuid = true];
   bytes review_sha256 = 3 [(buf.validate.field).bytes.len = 32];
   lindm.policy.v1.TargetAssignment assignment = 4 [(buf.validate.field).required = true];
   uint64 expected_revision = 5 [(buf.validate.field).uint64.lte = 9223372036854775806];
-  string reason = 6 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  // Every stage cohort equals the assignment target; the final stage covers 100%.
+  lindm.policy.v1.RolloutSpec rollout = 6 [(buf.validate.field).required = true];
+  string reason = 7 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  option (buf.validate.message).cel = {
+    id: "start_rollout.unbound_assignment"
+    message: "the reviewed assignment must not name a rollout"
+    expression: "!has(this.assignment.rollout_id)"
+  };
+  option (buf.validate.message).cel = {
+    id: "start_rollout.name"
+    message: "a rollout needs a name"
+    expression: "size(this.rollout.name) > 0"
+  };
 }
-message SaveTargetAssignmentImpactResponse {
-  lindm.policy.v1.TargetCandidate assignment = 1;
+message StartRolloutResponse {
+  RolloutState rollout = 1;
+}
+enum RolloutDeviceState {
+  ROLLOUT_DEVICE_STATE_UNSPECIFIED = 0;
+  // Planned for a stage that has not started.
+  ROLLOUT_DEVICE_STATE_WAITING = 1;
+  // Admitted; the promoter has not yet activated its reviewed change.
+  ROLLOUT_DEVICE_STATE_STARTING = 2;
+  // Activated; no verified device result yet.
+  ROLLOUT_DEVICE_STATE_APPLYING = 3;
+  ROLLOUT_DEVICE_STATE_APPLIED = 4;
+  ROLLOUT_DEVICE_STATE_FAILED = 5;
+  ROLLOUT_DEVICE_STATE_UNAVAILABLE = 6;
+  // Its fresh preview no longer matched the reviewed change; never applied.
+  ROLLOUT_DEVICE_STATE_NEEDS_REVIEW = 7;
+}
+message RolloutDevice {
+  string device_id = 1;
+  string hostname = 2;
+  RolloutDeviceState state = 3;
+  // snake_case cause for NEEDS_REVIEW, e.g. preview_changed, device_reenrolled.
+  string reason = 4;
+  // This device's reviewed change adopts existing native state.
+  bool adopts_existing = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+message ListRolloutDevicesRequest {
+  string rollout_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 100
+  }];
+  optional string after_device_id = 3 [(buf.validate.field).string.uuid = true];
+  // Only devices in this state; unspecified lists every planned device.
+  RolloutDeviceState state = 4 [(buf.validate.field).enum.defined_only = true];
+}
+message ListRolloutDevicesResponse {
+  repeated RolloutDevice devices = 1;
 }
 message ActivateTargetPreviewRequest {
   string request_id = 1 [(buf.validate.field).string.uuid = true];
@@ -245,6 +326,48 @@ message RolloutState {
   uint32 unavailable_count = 15;
   // Live gate assessment; pause_reason is the separately persisted safety decision.
   string gate_reason = 16;
+  RolloutStatus status = 17;
+  // The reviewed assignment this rollout delivers; absent for unplanned rollouts.
+  lindm.policy.v1.TargetAssignment assignment = 18;
+  string creator_id = 19;
+  string creator_display_name = 20;
+  google.protobuf.Timestamp created_at = 21;
+  // snake_case cause for a terminal status, e.g. assignment_changed.
+  string status_reason = 22;
+  // Present when this rollout's single approval exists (or was consumed).
+  string approval_id = 23;
+  bool approval_required = 24;
+  // Per-device plan progress. Counts cover every reviewed device, not a sample.
+  uint32 planned_count = 25;
+  uint32 waiting_count = 26;
+  uint32 starting_count = 27;
+  uint32 activated_count = 28;
+  uint32 needs_review_count = 29;
+  // Planned devices whose reviewed change adopts existing native state.
+  uint32 adopting_count = 30;
+  string reason = 31;
+  // Distinct settings the reviewed plan adopts from existing native state.
+  repeated lindm.resource.v1.ResourceRef adopted = 32 [(buf.validate.field).repeated.max_items = 64];
+  // Current names of what the rollout delivers, for display only.
+  ProfileVersionLabel profile_version = 33;
+  string target_name = 34;
+}
+enum RolloutStatus {
+  ROLLOUT_STATUS_UNSPECIFIED = 0;
+  // Nothing is saved or admitted until the single approval is decided.
+  ROLLOUT_STATUS_AWAITING_APPROVAL = 1;
+  // Stages admit devices; the promoter activates each reviewed change. A paused
+  // active rollout reports paused=true.
+  ROLLOUT_STATUS_ACTIVE = 2;
+  ROLLOUT_STATUS_REJECTED = 3;
+  ROLLOUT_STATUS_APPROVAL_EXPIRED = 4;
+  // The assignment changed after review; nothing was saved by this rollout.
+  ROLLOUT_STATUS_ASSIGNMENT_CHANGED = 5;
+  // A later rollout of the same assignment replaced its remaining devices.
+  ROLLOUT_STATUS_SUPERSEDED = 6;
+  // Created by PutRollout without a reviewed device plan; devices are activated
+  // individually.
+  ROLLOUT_STATUS_UNPLANNED = 7;
 }
 message PutRolloutResponse {
   RolloutState rollout = 1;
@@ -279,9 +402,8 @@ message ListRolloutsRequest {
   optional string after_id = 2 [(buf.validate.field).string.uuid = true];
   reserved 3;
   reserved "read_only";
-  // Case-insensitive literal substring of the rollout's name, its ring names in
-  // order joined by ", " (so a single ring name always matches); empty disables
-  // it. after_id is a position in ID order under any search: restart from no
+  // Case-insensitive literal substring of the rollout's name, or for an unnamed
+  // rollout its ring names in order joined by ", "; empty disables it. after_id is a position in ID order under any search: restart from no
   // after_id when the search changes.
   string name_search = 4 [(buf.validate.field).string = {
     max_len: 128

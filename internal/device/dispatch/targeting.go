@@ -53,7 +53,7 @@ func targetingRPC[Request, Response any](ctx context.Context, s *Service, req *c
 	}
 	isolation := pgx.RepeatableRead
 	switch any(req.Msg).(type) {
-	case *adminv1.PreviewTargetAssignmentImpactRequest, *adminv1.SaveTargetAssignmentImpactRequest:
+	case *adminv1.PreviewTargetAssignmentImpactRequest, *adminv1.StartRolloutRequest:
 		// Impact takes SHARE input-table locks before reading membership. A
 		// pre-lock repeatable snapshot could miss a just-committed new member.
 		isolation = pgx.ReadCommitted
@@ -175,19 +175,66 @@ func (s *Service) PreviewTargetAssignmentImpact(ctx context.Context, r *connect.
 	})
 }
 
-func (s *Service) SaveTargetAssignmentImpact(ctx context.Context, r *connect.Request[adminv1.SaveTargetAssignmentImpactRequest]) (*connect.Response[adminv1.SaveTargetAssignmentImpactResponse], error) {
-	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.SaveTargetAssignmentImpactRequest) (*adminv1.SaveTargetAssignmentImpactResponse, error) {
-		saved, err := s.Targeting.SaveImpact(ctx, tx, a.Principal(), r, s.targetImpactResolver())
+// StartRollout records one reviewed rollout. When approval is required it
+// waits; the response names any existing approval for this exact request.
+func (s *Service) StartRollout(ctx context.Context, r *connect.Request[adminv1.StartRolloutRequest]) (*connect.Response[adminv1.StartRolloutResponse], error) {
+	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.StartRolloutRequest) (*adminv1.StartRolloutResponse, error) {
+		out, err := s.Targeting.StartRollout(ctx, tx, a.Principal(), r, s.targetImpactResolver())
 		if err != nil {
 			return nil, err
 		}
-		return &adminv1.SaveTargetAssignmentImpactResponse{Assignment: saved.Assignment}, nil
+		return out, s.awaitingApproval(ctx, tx, out.Rollout)
 	})
+}
+func (s *Service) ListRolloutDevices(ctx context.Context, r *connect.Request[adminv1.ListRolloutDevicesRequest]) (*connect.Response[adminv1.ListRolloutDevicesResponse], error) {
+	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.ListRolloutDevicesRequest) (*adminv1.ListRolloutDevicesResponse, error) {
+		return s.Targeting.ListRolloutDevices(ctx, tx, a.Principal(), identity.PermissionAssignResources, r)
+	})
+}
+
+// awaitingApproval names the creator's approval request for a rollout that is
+// still waiting, so the console can show "waiting for approval" instead of
+// offering a second request. It reads only; the promoter consumes approvals.
+func (s *Service) awaitingApproval(ctx context.Context, tx pgx.Tx, state *adminv1.RolloutState) error {
+	if state.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL || state.GetApprovalId() != "" {
+		return nil
+	}
+	request, err := s.Targeting.PlanRequest(ctx, tx, state.GetRollout().GetRolloutId())
+	if err != nil {
+		return err
+	}
+	creator, err := uuid.Parse(state.GetCreatorId())
+	if err != nil {
+		return core.ErrInternalState
+	}
+	id, _, err := s.Identity.ApprovalForRequest(ctx, tx, creator, request)
+	if errors.Is(err, identity.ErrApprovalInvalid) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if id != uuid.Nil {
+		state.ApprovalId = id.String()
+	}
+	return nil
+}
+
+// RolloutHooks exposes the exact head write and approval scope used by the
+// ActivateTargetPreview RPC to the background rollout promoter.
+func (s *Service) RolloutHooks() targeting.RolloutHooks {
+	return targeting.RolloutHooks{
+		Resolve: s.resolveTargetCandidates,
+		Activate: func(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, version uint64, approval, reason string) error {
+			return s.activateTargetPreview(ctx, tx, preview, actor, version, approval, reason)
+		},
+		ApprovalScope: s.ApprovalScope,
+	}
 }
 func (s *Service) ActivateTargetPreview(ctx context.Context, r *connect.Request[adminv1.ActivateTargetPreviewRequest]) (*connect.Response[adminv1.ActivateTargetPreviewResponse], error) {
 	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.ActivateTargetPreviewRequest) (*adminv1.ActivateTargetPreviewResponse, error) {
 		p, err := s.Targeting.Activate(ctx, tx, a.Principal(), identity.PermissionAssignResources, r, func(ctx context.Context, tx pgx.Tx, p *policyv1.TargetPreview) error {
-			return s.activateTargetPreview(ctx, tx, p, a.ActorID(), a.Version(), r.GetApprovalId())
+			return s.activateTargetPreview(ctx, tx, p, a.ActorID(), a.Version(), r.GetApprovalId(), r.GetReason())
 		})
 		if err != nil {
 			return nil, err
@@ -207,7 +254,16 @@ func (s *Service) ControlRollout(ctx context.Context, r *connect.Request[adminv1
 }
 func (s *Service) ListRollouts(ctx context.Context, r *connect.Request[adminv1.ListRolloutsRequest]) (*connect.Response[adminv1.ListRolloutsResponse], error) {
 	return targetingRPC(ctx, s, r, identity.PermissionAssignResources, func(ctx context.Context, tx pgx.Tx, a *identity.Authorization, r *adminv1.ListRolloutsRequest) (*adminv1.ListRolloutsResponse, error) {
-		return s.Targeting.ListRollouts(ctx, tx, a.Principal(), identity.PermissionAssignResources, r)
+		out, err := s.Targeting.ListRollouts(ctx, tx, a.Principal(), identity.PermissionAssignResources, r)
+		if err != nil {
+			return nil, err
+		}
+		for _, state := range out.Rollouts {
+			if err := s.awaitingApproval(ctx, tx, state); err != nil {
+				return nil, err
+			}
+		}
+		return out, nil
 	})
 }
 
@@ -219,7 +275,7 @@ func (s *Service) GetDynamicGroup(ctx context.Context, r *connect.Request[adminv
 
 func targetingReadOnly(request any) bool {
 	switch request.(type) {
-	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.PreviewDynamicGroupRequest, *adminv1.ListTargetAssignmentsRequest, *adminv1.ListRolloutsRequest:
+	case *adminv1.GetDynamicGroupRequest, *adminv1.ListDynamicGroupsRequest, *adminv1.PreviewDynamicGroupRequest, *adminv1.ListTargetAssignmentsRequest, *adminv1.ListRolloutsRequest, *adminv1.ListRolloutDevicesRequest:
 		return true
 	default:
 		return false

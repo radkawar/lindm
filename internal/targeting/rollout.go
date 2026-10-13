@@ -50,8 +50,9 @@ func (s *Store) rolloutState(ctx context.Context, q *targetingdb.Queries, id uui
 	if err := proto.Unmarshal(row.Definition, spec); err != nil {
 		return nil, err
 	}
+	// A rollout awaiting approval has no frozen stage yet.
 	stage, err := q.GetRolloutStage(ctx, targetingdb.GetRolloutStageParams{RolloutID: id, RingIndex: row.RingIndex})
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 	counts, now, err := s.rolloutHealth(ctx, q, row, spec.Rings[row.RingIndex])
@@ -72,6 +73,9 @@ func (s *Store) rolloutState(ctx context.Context, q *targetingdb.Queries, id uui
 	if !row.Paused && !ring.ManualPromotion && int(row.RingIndex)+1 < len(spec.Rings) {
 		state.NextPromotionAt = timestamppb.New(row.StageStartedAt.Time.Add(time.Duration(ring.SoakSeconds) * time.Second))
 		state.PromotionReady = ready
+	}
+	if err := planState(ctx, q, row, state); err != nil {
+		return nil, err
 	}
 	return state, nil
 }
@@ -313,6 +317,9 @@ func (s *Store) controlRollout(ctx context.Context, tx pgx.Tx, p identity.Princi
 	if uint64(row.Revision) != r.ExpectedRevision {
 		return nil, ErrConflict
 	}
+	if err := planControlAllowed(ctx, q, id); err != nil {
+		return nil, err
+	}
 	spec := new(policyv1.RolloutSpec)
 	if err := proto.Unmarshal(row.Definition, spec); err != nil {
 		return nil, err
@@ -415,9 +422,13 @@ func (s *Store) ListRollouts(ctx context.Context, tx pgx.Tx, p identity.Principa
 	return out, nil
 }
 
-// rolloutName is the rollout's searchable name: its ring names in order, as the
-// console shows them. Ring names are required and unique, so it is never empty.
+// rolloutName is the rollout's searchable name, as the console shows it: its
+// own name, or for an unnamed rollout its ring names in order. Ring names are
+// required and unique, so it is never empty.
 func rolloutName(spec *policyv1.RolloutSpec) string {
+	if spec.GetName() != "" {
+		return spec.GetName()
+	}
 	names := make([]string, len(spec.GetRings()))
 	for i, ring := range spec.GetRings() {
 		names[i] = ring.GetName()

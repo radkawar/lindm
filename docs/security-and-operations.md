@@ -726,11 +726,12 @@ objects can be applied.
 
 The operation is not an atomic transaction. It stops on errors, returns a failing
 exit status and preserves outcomes and secrets from earlier successful operations.
-Mutations are never automatically retried. The one exception is a target preview
-the server rejected with `targeting_revision_conflict`: the transaction rolled back
-because a concurrent membership or head change committed first, and nothing was
-recorded. Apply requests a fresh preview up to five times, then fails with that
-conflict. Activation still consumes only the exact preview that was returned.
+Mutations are never automatically retried. The one exception is an assignment's
+rollout review the server rejected with `targeting_revision_conflict` or
+`targeting_impact_stale`: a concurrent membership or head change committed first
+and nothing was recorded. Apply reviews afresh up to three times, then reports
+that assignment `pending` instead of failing. A rollout still starts only from the
+exact review that was returned.
 Audit reasons are derived as
 `Apply organization NAME`; request IDs bind the organization, object identity and
 completed request, including observed compare-and-swap versions. Review current
@@ -789,7 +790,9 @@ row is one the server dispatches under its qualified ownership operations (check
 by a unit test); the rows removed for that reason are listed under
 [gaps](#declarative-organization-gaps).
 
-The declared Engineering rollout is prepared but not yet linked to an assignment:
+Declared rollouts are stage plans, not stored objects: an assignment that names
+one rolls out through its stages on each `apply`, and an unreferenced one creates
+nothing. The declared Engineering stage plan is not yet referenced by an assignment:
 Pilot admits 25% (at least one canary), then Fleet admits 100% after explicit
 promotion. Both rings require at least one observation, a 24-hour soak and health
 evidence no older than one hour. Failure, unknown and unavailable thresholds remain
@@ -1610,6 +1613,18 @@ not a deadline or proof that promotion will occur. `promotion_ready` covers heal
 and soak only; the worker still needs fresh creator authority and a valid next
 cohort. Manual rings require the existing explicit promotion action; the final
 ring remains health-monitored and is not a claim that every device completed.
+
+The same leader starts approved rollouts and activates their reviewed devices
+(at most 50 devices per tick; see [rollout flow](design-concepts/rollout-flow.md)).
+A rollout awaiting approval has saved nothing; it ends `approval_rejected` or
+`approval_expired` (no request within an hour, or the approval lapsed) without
+changing a device. `lindmctl apply` reports such an assignment as `pending` with
+the approval ID and never fails for it; an approver with `approvals.manage` and
+unrestricted `resources.assign` decides it in Approvals. A device marked
+**needs review** kept its previous head because its fresh preview no longer
+matched the reviewed change; review it from Rollouts (roll out again, which
+supersedes the remaining devices) or inspect and activate that device's exact
+preview. Never edit plan rows to force activation.
 
 For a paused rollout:
 

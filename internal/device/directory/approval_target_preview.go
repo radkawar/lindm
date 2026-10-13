@@ -58,6 +58,37 @@ func (s *Service) populateTargetApproval(ctx context.Context, actor identity.Pri
 	return core.MapErr(tx.Commit(ctx))
 }
 
+// populateRolloutApproval attaches the retained rollout and its reviewed plan
+// counts, so the approver decides on the exact devices and adoptions.
+func (s *Service) populateRolloutApproval(ctx context.Context, actor identity.Principal, approval *adminv1.Approval) error {
+	request := approval.GetStartRollout()
+	if request == nil || s.Targeting == nil {
+		return nil
+	}
+	authorization, err := s.Identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionAssignResources)
+	if err != nil {
+		return core.ExecutionError(err)
+	}
+	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
+	if err != nil {
+		return core.MapErr(err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionAssignResources); err != nil {
+		return core.ExecutionError(err)
+	}
+	approval.Rollout, err = s.Targeting.RolloutForApproval(ctx, tx, authorization.Principal(), request)
+	if errors.Is(err, targeting.ErrRejected) || errors.Is(err, targeting.ErrNotFound) {
+		approval.Rollout = nil
+	} else if err != nil {
+		return targetApprovalError(err)
+	}
+	if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionAssignResources); err != nil {
+		return core.ExecutionError(err)
+	}
+	return core.MapErr(tx.Commit(ctx))
+}
+
 func targetApprovalError(err error) error {
 	if errors.Is(err, targeting.ErrRejected) {
 		return core.Invalid("invalid_targeting_request")

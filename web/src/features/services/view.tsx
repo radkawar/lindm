@@ -207,6 +207,27 @@ export function DeviceResources({
                     Reason: {assignment.reason}
                   </p>
                 </>
+              ) : assignment?.sources.length ? (
+                <>
+                  <p className="break-words">
+                    From rollouts:{" "}
+                    {assignment.sources
+                      .map(
+                        (source) =>
+                          `${source.profileName || "Unnamed profile"}, version ${source.revisionNumber.toString()}`,
+                      )
+                      .join("; ")}
+                  </p>
+                  <p className="break-words text-muted-foreground">
+                    Applied by {actor} on {formatTimestamp(assignment.assignedAt).local}. Checked{" "}
+                    {checkInterval(assignment.reconcileIntervalSeconds)}.
+                  </p>
+                  {assignment.reason && assignment.reason !== "target_preview_activation" ? (
+                    <p className="whitespace-pre-wrap break-words text-muted-foreground">
+                      Reason: {assignment.reason}
+                    </p>
+                  ) : null}
+                </>
               ) : assignment ? (
                 <>
                   <p>None. The profile was removed.</p>

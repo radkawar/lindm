@@ -3,6 +3,7 @@ import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";
 import {
   TargetExpressionSchema,
+  type RolloutDeviceState,
   type TargetExpression,
 } from "../../../gen/lindm/admin/v1/targeting_pb";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
@@ -107,7 +108,7 @@ export function targetAssignmentsQueryOptions(lifetime: AuthLifetime, afterId: s
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();
-      return response.assignments;
+      return response;
     },
   });
 }
@@ -125,6 +126,33 @@ export function rolloutsQueryOptions(lifetime: AuthLifetime, afterId: string, na
       );
       lifetime.signal.throwIfAborted();
       return response.rollouts;
+    },
+  });
+}
+
+export function rolloutDevicesQueryOptions(
+  lifetime: AuthLifetime,
+  rolloutId: string,
+  afterDeviceId: string,
+  state: RolloutDeviceState,
+) {
+  return queryOptions({
+    queryKey: [
+      "targeting",
+      lifetime.generation,
+      "rollout-devices",
+      rolloutId,
+      state,
+      afterDeviceId,
+    ] as const,
+    meta: { authGeneration: lifetime.generation },
+    queryFn: async ({ signal }) => {
+      const response = await adminClient.listRolloutDevices(
+        { rolloutId, pageSize: 100, afterDeviceId: afterDeviceId || undefined, state },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      );
+      lifetime.signal.throwIfAborted();
+      return response.devices;
     },
   });
 }

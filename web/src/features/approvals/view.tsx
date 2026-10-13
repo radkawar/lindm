@@ -3,7 +3,7 @@ import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useId, useState } from "react";
+import { createContext, useContext, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 import {
   ApprovalEvidenceState,
@@ -12,6 +12,7 @@ import {
   type Approval,
 } from "../../../gen/lindm/admin/v1/approvals_pb";
 import { CryptoEraseMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
+import type { TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { PageHeader } from "@/components/ui/page-header";
@@ -60,6 +61,7 @@ const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> 
   approvePendingEnrollment: "Approve device enrollment",
   recoverDevice: "Recover device enrollment",
   activateTargetPreview: "Activate assignment rollout",
+  startRollout: "Roll out",
   revealSecret: "Reveal secret",
   revealLocalAdminPassword: "Reveal local-admin password",
   acceptAdvisoryFinding: "Accept advisory risk",
@@ -102,7 +104,83 @@ function destructiveConsequence(approval: Approval, hostname: string): string {
 // Revealed bytes stay in page memory only and are zeroized on dismissal.
 type Revealed = { label: string; secret: Uint8Array; note: string };
 
-export function ApprovalsView() {
+// Names for a rollout approval's profile version and target, composed by the route.
+type NameLabel = { text: string; ready: boolean };
+export type RolloutApprovalNames = {
+  useTargetLabel: (target?: TargetRef) => NameLabel;
+  useProfileVersionLabel: (id: string) => NameLabel;
+};
+const unnamed = () => ({ text: "Name unavailable", ready: false });
+const RolloutNames = createContext<RolloutApprovalNames>({
+  useTargetLabel: unnamed,
+  useProfileVersionLabel: unnamed,
+});
+
+// "Workstation baseline, version 2 to Engineering workstations".
+function RolloutTargetName({ approval }: { approval: Approval }) {
+  const names = useContext(RolloutNames);
+  const request = approval.payload.case === "startRollout" ? approval.payload.value : undefined;
+  const assignment = approval.rollout?.assignment ?? request?.assignment;
+  // Server-projected names first; the first-page lookups run only without them.
+  const version = approval.rollout?.profileVersion;
+  const profile = names.useProfileVersionLabel(
+    version ? "" : (assignment?.profileRevisionId ?? ""),
+  );
+  const target = names.useTargetLabel(
+    approval.rollout?.targetName ? undefined : assignment?.target,
+  );
+  return (
+    <>
+      {version
+        ? `${version.profileName}, version ${version.revisionNumber.toString()}`
+        : profile.text}{" "}
+      to {approval.rollout?.targetName || target.text}
+    </>
+  );
+}
+
+function RolloutApproval({ approval }: { approval: Approval }) {
+  const request = approval.payload.case === "startRollout" ? approval.payload.value : undefined;
+  const state = approval.rollout;
+  const rings = (state?.rollout ?? request?.rollout)?.rings ?? [];
+  const adopted = state?.adopted ?? [];
+  return (
+    <div className="grid gap-2 text-sm" data-slot="rollout-approval">
+      <p>
+        {state
+          ? `${state.plannedCount} ${state.plannedCount === 1 ? "device" : "devices"}`
+          : "Device count unavailable"}{" "}
+        ·{" "}
+        {rings.length === 1
+          ? "everyone at once"
+          : `${rings.length} stages: ${rings.map((ring) => ring.name).join(", ")}`}
+      </p>
+      {adopted.length && state ? (
+        <p className="text-warning">
+          Adopts the existing{" "}
+          {adopted.map((ref, index) => (
+            <span key={`${ref.kind}:${ref.canonicalKey}`}>
+              {index ? ", " : ""}
+              <code className="font-mono text-[0.92em] break-all">{ref.canonicalKey}</code>
+            </span>
+          ))}{" "}
+          on {state.adoptingCount} {state.adoptingCount === 1 ? "device" : "devices"}: lindm takes
+          over settings these devices already have.
+        </p>
+      ) : null}
+      <p className="text-muted-foreground">
+        {approval.state === ApprovalState.PENDING
+          ? "Approving starts the rollout within a minute. Nothing changes before that."
+          : "The rollout's progress is on Rollouts."}{" "}
+        <Link to="/rollouts" className="underline underline-offset-4">
+          Open Rollouts
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export function ApprovalsView({ rolloutNames }: { rolloutNames: RolloutApprovalNames }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
   const [revealed, setRevealed] = useState<Revealed | null>(null);
@@ -128,59 +206,67 @@ export function ApprovalsView() {
   const failure = list.error ? toRpcFailure(list.error) : null;
   const shown = revealed ? revealedText(revealed.secret) : null;
   return (
-    <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
-      <PageHeader
-        title="Approval inbox"
-        description="Approve or reject requests from other admins."
-        actions={
-          <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
-            Refresh
-          </Button>
-        }
-      />
-      {revealed ? (
-        <section
-          className="grid min-w-0 gap-3 border border-warning/30 bg-warning/10 p-4"
-          aria-label={`Revealed ${revealed.label}`}
-        >
-          <h2 className="font-semibold">Sensitive {revealed.label}</h2>
-          <p>Copy it now. It disappears after 30 seconds or when you leave this page.</p>
-          {revealed.note ? <p>{revealed.note}</p> : null}
-          {shown?.hex ? (
-            <p className="text-sm">Shown as hexadecimal because it isn't plain text.</p>
-          ) : null}
-          <pre className="whitespace-pre-wrap break-all select-all">{shown?.text}</pre>
-          <Button className="w-fit" variant="outline" onClick={() => setRevealed(null)}>
-            Dismiss {revealed.label}
-          </Button>
-        </section>
-      ) : null}
-      {list.isPending ? (
-        <div role="status" className="grid gap-3">
-          <span className="text-sm text-muted-foreground">Loading approvals…</span>
-          <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-40 w-full" />
-        </div>
-      ) : null}
-      {failure ? <RpcError failure={failure} /> : null}
-      {list.data?.approvals.length === 0 ? (
-        <EmptyState
-          title="No approvals waiting"
-          description="Destructive actions, secret reveals and risk acceptances that need a second admin appear here."
+    <RolloutNames value={rolloutNames}>
+      <section className="grid min-w-0 gap-6" aria-busy={list.isFetching}>
+        <PageHeader
+          title="Approval inbox"
+          description="Approve or reject requests from other admins."
+          actions={
+            <Button
+              variant="outline"
+              disabled={list.isFetching}
+              onClick={() => void list.refetch()}
+            >
+              Refresh
+            </Button>
+          }
         />
-      ) : null}
-      {list.data && list.data.approvals.length > 0 ? (
-        <ApprovalGroups approvals={list.data.approvals} onReveal={setRevealed} />
-      ) : null}
-      <ListPagination
-        label="Approval pages"
-        onPrevious={pageToken === "" ? undefined : () => setPageToken("")}
-        onNext={
-          list.data?.nextPageToken ? () => setPageToken(list.data?.nextPageToken ?? "") : undefined
-        }
-        busy={list.isFetching}
-      />
-    </section>
+        {revealed ? (
+          <section
+            className="grid min-w-0 gap-3 border border-warning/30 bg-warning/10 p-4"
+            aria-label={`Revealed ${revealed.label}`}
+          >
+            <h2 className="font-semibold">Sensitive {revealed.label}</h2>
+            <p>Copy it now. It disappears after 30 seconds or when you leave this page.</p>
+            {revealed.note ? <p>{revealed.note}</p> : null}
+            {shown?.hex ? (
+              <p className="text-sm">Shown as hexadecimal because it isn't plain text.</p>
+            ) : null}
+            <pre className="whitespace-pre-wrap break-all select-all">{shown?.text}</pre>
+            <Button className="w-fit" variant="outline" onClick={() => setRevealed(null)}>
+              Dismiss {revealed.label}
+            </Button>
+          </section>
+        ) : null}
+        {list.isPending ? (
+          <div role="status" className="grid gap-3">
+            <span className="text-sm text-muted-foreground">Loading approvals…</span>
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ) : null}
+        {failure ? <RpcError failure={failure} /> : null}
+        {list.data?.approvals.length === 0 ? (
+          <EmptyState
+            title="No approvals waiting"
+            description="Destructive actions, secret reveals and risk acceptances that need a second admin appear here."
+          />
+        ) : null}
+        {list.data && list.data.approvals.length > 0 ? (
+          <ApprovalGroups approvals={list.data.approvals} onReveal={setRevealed} />
+        ) : null}
+        <ListPagination
+          label="Approval pages"
+          onPrevious={pageToken === "" ? undefined : () => setPageToken("")}
+          onNext={
+            list.data?.nextPageToken
+              ? () => setPageToken(list.data?.nextPageToken ?? "")
+              : undefined
+          }
+          busy={list.isFetching}
+        />
+      </section>
+    </RolloutNames>
   );
 }
 
@@ -352,11 +438,16 @@ function ApprovalCard({
   const evidenceGoneId = useId();
   const hostname = approval.deviceHostname.trim() || "Unnamed device";
   const consequence = open ? destructiveConsequence(approval, hostname) : "";
+  // An approved rollout starts on its own; its requester has nothing to run.
   const executionAllowed =
     unexpired &&
     approval.state === ApprovalState.APPROVED &&
+    approval.payload.case !== "startRollout" &&
     principal.id === approval.requesterId &&
     canPermission(principal, approval.permission);
+  const rolloutRequest =
+    approval.payload.case === "startRollout" ? approval.payload.value : undefined;
+  const requestReason = actionRequest?.reason ?? rolloutRequest?.reason;
 
   async function act(action: "approve" | "reject" | "withdraw" | "execute") {
     if (busy || lifetime.signal.aborted) return;
@@ -549,7 +640,9 @@ function ApprovalCard({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="break-words font-semibold">
           {effect}
-          {approval.deviceId ? (
+          {rolloutRequest ? (
+            ` ${approval.rollout?.rollout?.name || rolloutRequest.rollout?.name || "a profile version"}`
+          ) : approval.deviceId ? (
             <>
               {" on "}
               <Link
@@ -601,6 +694,14 @@ function ApprovalCard({
         className="flex flex-wrap gap-x-4 gap-y-1 break-words text-sm text-muted-foreground [&_dd]:inline [&_dd]:text-foreground [&_dt]:inline"
         data-slot="approval-facts"
       >
+        {rolloutRequest ? (
+          <div>
+            <dt>Delivers: </dt>
+            <dd>
+              <RolloutTargetName approval={approval} />
+            </dd>
+          </div>
+        ) : null}
         <div>
           <dt>Requester: </dt>
           <dd>{approval.requesterDisplayName.trim() || "Unknown"}</dd>
@@ -624,12 +725,12 @@ function ApprovalCard({
           </div>
         ) : null}
       </dl>
-      {actionRequest?.reason || approval.decisionReason ? (
+      {requestReason || approval.decisionReason ? (
         <dl className="grid gap-3 break-words text-sm sm:grid-cols-2 [&_dt]:mb-1 [&_dt]:text-xs [&_dt]:text-muted-foreground">
-          {actionRequest?.reason ? (
+          {requestReason ? (
             <div>
               <dt>Request reason</dt>
-              <dd className="whitespace-pre-wrap">{actionRequest.reason}</dd>
+              <dd className="whitespace-pre-wrap">{requestReason}</dd>
             </div>
           ) : null}
           {approval.decisionReason ? (
@@ -640,6 +741,7 @@ function ApprovalCard({
           ) : null}
         </dl>
       ) : null}
+      {rolloutRequest ? <RolloutApproval approval={approval} /> : null}
       {approval.payload.case === "acceptAdvisoryFinding" ? (
         <div className="grid gap-2 border border-l-4 border-warning/40 p-3 text-sm">
           <p>This accepts risk on this device only; it does not fix the package.</p>
@@ -803,6 +905,7 @@ function ApprovalCard({
         items={[
           { label: "Approval ID", value: approval.id },
           { label: "Device ID", value: approval.deviceId },
+          { label: "Rollout ID", value: rolloutRequest?.rollout?.rolloutId },
           ...(approval.payload.case === "revealSecret"
             ? [{ label: "Secret ID", value: approval.payload.value.secretId }]
             : []),

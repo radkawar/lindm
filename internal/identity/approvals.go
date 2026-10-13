@@ -86,6 +86,14 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = nil
 		payload, err = b.bindDevice("resources.activate_preview", copy)
+	case *adminv1.StartRolloutRequest:
+		// One approval covers the whole reviewed rollout plan. It has no device
+		// target, so both principals need unrestricted resources.assign scope.
+		if request == nil {
+			return b, ErrApprovalInvalid
+		}
+		b.action, b.mutation = "resources.rollout", request.GetRequestId()
+		payload = request
 	case *adminv1.UpdateExecutionAuthorityRequest:
 		if request == nil {
 			return b, ErrApprovalInvalid
@@ -175,6 +183,8 @@ func approvalPayload(request *adminv1.CreateApprovalRequest) proto.Message {
 		return request.GetSetResourceAssignment()
 	case *adminv1.CreateApprovalRequest_ActivateTargetPreview:
 		return request.GetActivateTargetPreview()
+	case *adminv1.CreateApprovalRequest_StartRollout:
+		return request.GetStartRollout()
 	case *adminv1.CreateApprovalRequest_UpdateExecutionAuthority:
 		return request.GetUpdateExecutionAuthority()
 	case *adminv1.CreateApprovalRequest_CreateDeviceAction:
@@ -331,6 +341,49 @@ func (s *Service) freshApprovalPair(ctx context.Context, row identitydb.Approval
 		return nil, ErrAuthorizationChanged
 	}
 	return &ApprovalConsumption{service: s, id: row.ID, requester: requester, approver: reviewer}, nil
+}
+
+// ApprovalForRequest finds the requester's retained approval bound to exactly
+// this payload. It returns uuid.Nil when none exists yet. It only reads, on the
+// caller's transaction when it holds one (a second pool connection under an
+// open transaction can exhaust the pool): a background worker still consumes it
+// through PrepareApprovalConsumption and LockAndConsumeApproval.
+func (s *Service) ApprovalForRequest(ctx context.Context, db identitydb.DBTX, requester uuid.UUID, payload proto.Message) (uuid.UUID, adminv1.ApprovalState, error) {
+	if s == nil {
+		return uuid.Nil, adminv1.ApprovalState_APPROVAL_STATE_UNSPECIFIED, ErrApprovalInvalid
+	}
+	binding, err := bindApproval(payload)
+	if err != nil {
+		return uuid.Nil, adminv1.ApprovalState_APPROVAL_STATE_UNSPECIFIED, err
+	}
+	if db == nil {
+		db = s.pool
+	}
+	row, err := identitydb.New(db).GetApprovalForMutation(ctx, identitydb.GetApprovalForMutationParams{RequesterID: requester, Action: binding.action, MutationID: binding.mutation})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, adminv1.ApprovalState_APPROVAL_STATE_UNSPECIFIED, nil
+	}
+	if err != nil {
+		return uuid.Nil, adminv1.ApprovalState_APPROVAL_STATE_UNSPECIFIED, s.dbErr(err)
+	}
+	if !approvalMatches(row, requester, binding) {
+		return uuid.Nil, adminv1.ApprovalState_APPROVAL_STATE_UNSPECIFIED, ErrApprovalInvalid
+	}
+	state := adminv1.ApprovalState_APPROVAL_STATE_PENDING
+	switch row.State {
+	case "approved":
+		state = adminv1.ApprovalState_APPROVAL_STATE_APPROVED
+	case "rejected":
+		state = adminv1.ApprovalState_APPROVAL_STATE_REJECTED
+	case "consumed":
+		state = adminv1.ApprovalState_APPROVAL_STATE_CONSUMED
+	case "withdrawn":
+		state = adminv1.ApprovalState_APPROVAL_STATE_WITHDRAWN
+	}
+	if (row.State == "pending" || row.State == "approved") && !s.clock().Before(row.ExpiresAt.Time) {
+		state = adminv1.ApprovalState_APPROVAL_STATE_EXPIRED
+	}
+	return row.ID, state, nil
 }
 
 // PrepareApprovalConsumption performs external refreshes before any mutation locks.
@@ -607,6 +660,10 @@ func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Ap
 		request := &adminv1.ActivateTargetPreviewRequest{}
 		payload = request
 		out.Payload = &adminv1.Approval_ActivateTargetPreview{ActivateTargetPreview: request}
+	case "resources.rollout":
+		request := &adminv1.StartRolloutRequest{}
+		payload = request
+		out.Payload = &adminv1.Approval_StartRollout{StartRollout: request}
 	case "execution_trust.manage":
 		request := &adminv1.UpdateExecutionAuthorityRequest{}
 		payload = request

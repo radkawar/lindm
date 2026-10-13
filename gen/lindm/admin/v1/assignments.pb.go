@@ -181,8 +181,11 @@ type ResourceAssignment struct {
 	ReconcileIntervalSeconds uint32                 `protobuf:"varint,11,opt,name=reconcile_interval_seconds,json=reconcileIntervalSeconds,proto3" json:"reconcile_interval_seconds,omitempty"`
 	// Current display name of actor_id, filled on read; never stored in the head.
 	ActorDisplayName string `protobuf:"bytes,12,opt,name=actor_display_name,json=actorDisplayName,proto3" json:"actor_display_name,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// For a head activated by a rollout (no single profile), the profile
+	// versions it combines, by current name. Filled on read.
+	Sources       []*ProfileVersionLabel `protobuf:"bytes,13,rep,name=sources,proto3" json:"sources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ResourceAssignment) Reset() {
@@ -297,6 +300,13 @@ func (x *ResourceAssignment) GetActorDisplayName() string {
 		return x.ActorDisplayName
 	}
 	return ""
+}
+
+func (x *ResourceAssignment) GetSources() []*ProfileVersionLabel {
+	if x != nil {
+		return x.Sources
+	}
+	return nil
 }
 
 type SetResourceAssignmentRequest struct {
@@ -1046,7 +1056,7 @@ var File_lindm_admin_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xfd\x03\n" +
+	" lindm/admin/v1/assignments.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1elindm/admin/v1/targeting.proto\x1a'lindm/agent/v1/resource_execution.proto\x1a\x1dlindm/policy/v1/profile.proto\x1a\x1flindm/policy/v1/targeting.proto\x1a\x1elindm/resource/v1/common.proto\x1a lindm/resource/v1/identity.proto\x1a lindm/resource/v1/resource.proto\x1a&lindm/validation/v1/string_rules.proto\"\xc7\x04\n" +
 	"\x12ResourceAssignment\x12#\n" +
 	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -1063,7 +1073,8 @@ const file_lindm_admin_v1_assignments_proto_rawDesc = "" +
 	"\x06reason\x18\n" +
 	" \x01(\tR\x06reason\x12<\n" +
 	"\x1areconcile_interval_seconds\x18\v \x01(\rR\x18reconcileIntervalSeconds\x126\n" +
-	"\x12actor_display_name\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x10actorDisplayName\"\xdd\x05\n" +
+	"\x12actor_display_name\x18\f \x01(\tB\b\xbaH\x05r\x03\x18\x80\x02R\x10actorDisplayName\x12H\n" +
+	"\asources\x18\r \x03(\v2#.lindm.admin.v1.ProfileVersionLabelB\t\xbaH\x06\x92\x01\x03\x10\x80\x01R\asources\"\xdd\x05\n" +
 	"\x1cSetResourceAssignmentRequest\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12K\n" +
@@ -1194,47 +1205,49 @@ var file_lindm_admin_v1_assignments_proto_goTypes = []any{
 	(*GetDeviceResourceStateResponse)(nil), // 10: lindm.admin.v1.GetDeviceResourceStateResponse
 	(*ResourceRelease)(nil),                // 11: lindm.admin.v1.ResourceRelease
 	(*timestamppb.Timestamp)(nil),          // 12: google.protobuf.Timestamp
-	(*v1.ResourceExecutionStatus)(nil),     // 13: lindm.agent.v1.ResourceExecutionStatus
-	(*v11.ResourceDesiredState)(nil),       // 14: lindm.resource.v1.ResourceDesiredState
-	(*v12.ResourceDependency)(nil),         // 15: lindm.policy.v1.ResourceDependency
-	(*v11.Applicability)(nil),              // 16: lindm.resource.v1.Applicability
-	(*v11.ResourceRef)(nil),                // 17: lindm.resource.v1.ResourceRef
-	(*v12.TargetPreview)(nil),              // 18: lindm.policy.v1.TargetPreview
+	(*ProfileVersionLabel)(nil),            // 13: lindm.admin.v1.ProfileVersionLabel
+	(*v1.ResourceExecutionStatus)(nil),     // 14: lindm.agent.v1.ResourceExecutionStatus
+	(*v11.ResourceDesiredState)(nil),       // 15: lindm.resource.v1.ResourceDesiredState
+	(*v12.ResourceDependency)(nil),         // 16: lindm.policy.v1.ResourceDependency
+	(*v11.Applicability)(nil),              // 17: lindm.resource.v1.Applicability
+	(*v11.ResourceRef)(nil),                // 18: lindm.resource.v1.ResourceRef
+	(*v12.TargetPreview)(nil),              // 19: lindm.policy.v1.TargetPreview
 }
 var file_lindm_admin_v1_assignments_proto_depIdxs = []int32{
 	12, // 0: lindm.admin.v1.ResourceAssignment.assigned_at:type_name -> google.protobuf.Timestamp
-	4,  // 1: lindm.admin.v1.SetResourceAssignmentRequest.target:type_name -> lindm.admin.v1.ResourceAssignmentTarget
-	2,  // 2: lindm.admin.v1.SetResourceAssignmentResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
-	12, // 3: lindm.admin.v1.ResourceActionSummary.issued_at:type_name -> google.protobuf.Timestamp
-	12, // 4: lindm.admin.v1.ResourceActionSummary.expires_at:type_name -> google.protobuf.Timestamp
-	12, // 5: lindm.admin.v1.ResourceActionSummary.start_authorized_at:type_name -> google.protobuf.Timestamp
-	12, // 6: lindm.admin.v1.ResourceActionSummary.closed_at:type_name -> google.protobuf.Timestamp
-	13, // 7: lindm.admin.v1.ResourceActionSummary.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
-	12, // 8: lindm.admin.v1.ResourceActionSummary.attested_at:type_name -> google.protobuf.Timestamp
-	12, // 9: lindm.admin.v1.ResourceActionSummary.received_at:type_name -> google.protobuf.Timestamp
-	14, // 10: lindm.admin.v1.ResourceState.desired:type_name -> lindm.resource.v1.ResourceDesiredState
-	15, // 11: lindm.admin.v1.ResourceState.depends_on:type_name -> lindm.policy.v1.ResourceDependency
-	0,  // 12: lindm.admin.v1.ResourceState.disposition:type_name -> lindm.admin.v1.ResourceDisposition
-	7,  // 13: lindm.admin.v1.ResourceState.latest_action:type_name -> lindm.admin.v1.ResourceActionSummary
-	1,  // 14: lindm.admin.v1.ResourceState.compliance:type_name -> lindm.admin.v1.ResourceCompliance
-	12, // 15: lindm.admin.v1.ResourceState.last_verified_at:type_name -> google.protobuf.Timestamp
-	12, // 16: lindm.admin.v1.ResourceState.observed_at:type_name -> google.protobuf.Timestamp
-	16, // 17: lindm.admin.v1.ResourceState.applicability:type_name -> lindm.resource.v1.Applicability
-	17, // 18: lindm.admin.v1.DeviceResourceAction.ref:type_name -> lindm.resource.v1.ResourceRef
-	7,  // 19: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ResourceActionSummary
-	2,  // 20: lindm.admin.v1.GetDeviceResourceStateResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
-	8,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
-	9,  // 22: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction
-	11, // 23: lindm.admin.v1.GetDeviceResourceStateResponse.releases:type_name -> lindm.admin.v1.ResourceRelease
-	18, // 24: lindm.admin.v1.GetDeviceResourceStateResponse.active_target_preview:type_name -> lindm.policy.v1.TargetPreview
-	17, // 25: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
-	12, // 26: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
-	12, // 27: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	13, // 1: lindm.admin.v1.ResourceAssignment.sources:type_name -> lindm.admin.v1.ProfileVersionLabel
+	4,  // 2: lindm.admin.v1.SetResourceAssignmentRequest.target:type_name -> lindm.admin.v1.ResourceAssignmentTarget
+	2,  // 3: lindm.admin.v1.SetResourceAssignmentResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
+	12, // 4: lindm.admin.v1.ResourceActionSummary.issued_at:type_name -> google.protobuf.Timestamp
+	12, // 5: lindm.admin.v1.ResourceActionSummary.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 6: lindm.admin.v1.ResourceActionSummary.start_authorized_at:type_name -> google.protobuf.Timestamp
+	12, // 7: lindm.admin.v1.ResourceActionSummary.closed_at:type_name -> google.protobuf.Timestamp
+	14, // 8: lindm.admin.v1.ResourceActionSummary.status:type_name -> lindm.agent.v1.ResourceExecutionStatus
+	12, // 9: lindm.admin.v1.ResourceActionSummary.attested_at:type_name -> google.protobuf.Timestamp
+	12, // 10: lindm.admin.v1.ResourceActionSummary.received_at:type_name -> google.protobuf.Timestamp
+	15, // 11: lindm.admin.v1.ResourceState.desired:type_name -> lindm.resource.v1.ResourceDesiredState
+	16, // 12: lindm.admin.v1.ResourceState.depends_on:type_name -> lindm.policy.v1.ResourceDependency
+	0,  // 13: lindm.admin.v1.ResourceState.disposition:type_name -> lindm.admin.v1.ResourceDisposition
+	7,  // 14: lindm.admin.v1.ResourceState.latest_action:type_name -> lindm.admin.v1.ResourceActionSummary
+	1,  // 15: lindm.admin.v1.ResourceState.compliance:type_name -> lindm.admin.v1.ResourceCompliance
+	12, // 16: lindm.admin.v1.ResourceState.last_verified_at:type_name -> google.protobuf.Timestamp
+	12, // 17: lindm.admin.v1.ResourceState.observed_at:type_name -> google.protobuf.Timestamp
+	17, // 18: lindm.admin.v1.ResourceState.applicability:type_name -> lindm.resource.v1.Applicability
+	18, // 19: lindm.admin.v1.DeviceResourceAction.ref:type_name -> lindm.resource.v1.ResourceRef
+	7,  // 20: lindm.admin.v1.DeviceResourceAction.action:type_name -> lindm.admin.v1.ResourceActionSummary
+	2,  // 21: lindm.admin.v1.GetDeviceResourceStateResponse.assignment:type_name -> lindm.admin.v1.ResourceAssignment
+	8,  // 22: lindm.admin.v1.GetDeviceResourceStateResponse.resources:type_name -> lindm.admin.v1.ResourceState
+	9,  // 23: lindm.admin.v1.GetDeviceResourceStateResponse.recent_actions:type_name -> lindm.admin.v1.DeviceResourceAction
+	11, // 24: lindm.admin.v1.GetDeviceResourceStateResponse.releases:type_name -> lindm.admin.v1.ResourceRelease
+	19, // 25: lindm.admin.v1.GetDeviceResourceStateResponse.active_target_preview:type_name -> lindm.policy.v1.TargetPreview
+	18, // 26: lindm.admin.v1.ResourceRelease.ref:type_name -> lindm.resource.v1.ResourceRef
+	12, // 27: lindm.admin.v1.ResourceRelease.requested_at:type_name -> google.protobuf.Timestamp
+	12, // 28: lindm.admin.v1.ResourceRelease.completed_at:type_name -> google.protobuf.Timestamp
+	29, // [29:29] is the sub-list for method output_type
+	29, // [29:29] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_assignments_proto_init() }
@@ -1242,6 +1255,7 @@ func file_lindm_admin_v1_assignments_proto_init() {
 	if File_lindm_admin_v1_assignments_proto != nil {
 		return
 	}
+	file_lindm_admin_v1_targeting_proto_init()
 	file_lindm_admin_v1_assignments_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

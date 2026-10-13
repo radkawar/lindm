@@ -62,11 +62,29 @@ func (s *Service) CreateApproval(ctx context.Context, req *connect.Request[admin
 			return nil
 		}
 	}
+	if request := req.Msg.GetStartRollout(); request != nil {
+		base := scope
+		scope = func(ctx context.Context, tx pgx.Tx, principal identity.Principal, permission identity.Permission, target uuid.UUID) error {
+			if err := base(ctx, tx, principal, permission, target); err != nil {
+				return err
+			}
+			if s.Targeting == nil {
+				return rpcreason.Error(connect.CodeFailedPrecondition, "targeting_unavailable")
+			}
+			if err := s.Targeting.RolloutApprovalScope(ctx, tx, request); err != nil {
+				return targetApprovalError(err)
+			}
+			return nil
+		}
+	}
 	approval, err := s.Identity.CreateApproval(ctx, actor.ID, req.Msg, scope)
 	if err != nil {
 		return nil, core.ApprovalError(err)
 	}
 	approval.TargetPreview = targetPreview
+	if err := s.populateRolloutApproval(ctx, actor, approval); err != nil {
+		return nil, err
+	}
 	if err := s.populateAdvisoryApproval(ctx, actor, approval); err != nil {
 		return nil, err
 	}
@@ -97,6 +115,9 @@ func (s *Service) ListApprovals(ctx context.Context, req *connect.Request[adminv
 	var budget core.ResponsePageBudget
 	for i, item := range approvals {
 		if err := s.populateTargetApproval(ctx, actor, item); err != nil {
+			return nil, err
+		}
+		if err := s.populateRolloutApproval(ctx, actor, item); err != nil {
 			return nil, err
 		}
 		if err := s.populateAdvisoryApproval(ctx, actor, item); err != nil {

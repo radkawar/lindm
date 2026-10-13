@@ -28,6 +28,36 @@ type ResourceRollout struct {
 	Name           string
 }
 
+type ResourceRolloutDevicePlan struct {
+	RolloutID        uuid.UUID
+	DeviceID         uuid.UUID
+	GenerationID     uuid.UUID
+	ResolutionSha256 []byte
+	AdoptsExisting   bool
+	Included         bool
+	ReviewedHead     *uuid.UUID
+	State            int16
+	Reason           string
+	PreviewID        *uuid.UUID
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type ResourceRolloutPlan struct {
+	RolloutID        uuid.UUID
+	AssignmentID     uuid.UUID
+	ExpectedRevision int64
+	RequestID        uuid.UUID
+	Request          []byte
+	ApprovalRequired bool
+	Status           int16
+	StatusReason     string
+	ApprovalID       *uuid.UUID
+	Reason           string
+	Adopted          []byte
+	CreatedAt        pgtype.Timestamptz
+	StartedAt        pgtype.Timestamptz
+}
+
 type TargetAssignment struct {
 	ID         uuid.UUID
 	Revision   int64

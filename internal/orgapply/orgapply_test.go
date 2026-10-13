@@ -16,9 +16,7 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	orgv1 "lindm/gen/lindm/org/v1"
-	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
-	"lindm/internal/rpcreason"
 )
 
 func TestApplyIdempotencyAndProfileRevision(t *testing.T) {
@@ -200,18 +198,12 @@ func TestStaticGroupRenameCannotRestoreStaleMembership(t *testing.T) {
 	}
 }
 
-func TestTargetActivationApprovalAndExactHash(t *testing.T) {
+func TestAssignmentsRollOutAndRequireOneApproval(t *testing.T) {
 	for _, approval := range []bool{false, true} {
-		t.Run(map[bool]string{false: "direct", true: "approval"}[approval], func(t *testing.T) {
+		t.Run(map[bool]string{false: "direct", true: "adoption_approval"}[approval], func(t *testing.T) {
 			spec := organizationFixture()
 			client := newFakeAdmin()
-			deviceID, generationID := uuid.NewString(), uuid.NewString()
-			client.fleet = []*adminv1.Device{{Id: deviceID, Hostname: "laptop", LifecycleState: adminv1.DeviceState_DEVICE_STATE_ACTIVE}}
-			client.preview = &policyv1.TargetPreview{PreviewId: uuid.NewString(), DeviceId: deviceID, GenerationId: generationID, PreviewSha256: bytes.Repeat([]byte{1}, 32), ResolutionSha256: bytes.Repeat([]byte{2}, 32), Resolution: &policyv1.TargetResolution{}, Candidates: []*policyv1.TargetCandidate{{Assignment: spec.Assignments[0].Assignment, Revision: 1, Match: policyv1.TargetMatch_TARGET_MATCH_INCLUDED}}}
 			client.principalID = uuid.NewString()
-			client.preview.InputSha256 = bytes.Repeat([]byte{3}, 32)
-			client.preview.EvaluatedAt = timestamppb.New(time.Unix(1700000000, 0))
-			client.preview.ValidUntil = timestamppb.New(time.Unix(1700000600, 0))
 			client.requireApproval = approval
 			plan, err := Plan(t.Context(), client, spec)
 			if err != nil {
@@ -219,39 +211,27 @@ func TestTargetActivationApprovalAndExactHash(t *testing.T) {
 			}
 			first, err := Apply(t.Context(), client, plan, Options{})
 			if err != nil {
-				t.Fatal(err)
+				t.Fatalf("apply failed instead of reporting the rollout: %v", err)
 			}
-			last := first.Outcomes[len(first.Outcomes)-1]
+			last := assignmentOutcome(t, first)
+			if len(client.rollouts) != 1 {
+				t.Fatalf("started %d rollouts, want 1", len(client.rollouts))
+			}
+			start := client.rollouts[0]
+			if start.GetAssignment().GetRolloutId() != "" || start.GetRollout().GetName() != "baseline to Engineering" || len(start.GetRollout().GetRings()) != 1 || !proto.Equal(start.GetRollout().GetRings()[0].GetCohort(), spec.Assignments[0].GetAssignment().GetTarget()) {
+				t.Fatalf("rollout plan does not deliver the declared assignment: %v", start)
+			}
 			if approval {
-				if last.Status != "pending" || len(client.approvals) != 1 || client.active != nil {
-					t.Fatal("approval bypassed or not requested")
+				if last.Status != "pending" || len(client.approvals) != 1 || client.approvals[0].GetStartRollout() == nil || len(client.assignments) != 0 {
+					t.Fatalf("adoption did not yield one pending rollout approval: %+v %v", last, client.approvals)
 				}
-				again, err := Plan(t.Context(), client, spec)
-				if err != nil {
-					t.Fatal(err)
+				if !strings.Contains(last.Detail, client.approvals[0].GetId()) {
+					t.Fatalf("pending outcome does not name its approval: %+v", last)
 				}
-				if _, err := Apply(t.Context(), client, again, Options{}); err != nil {
-					t.Fatal(err)
-				}
-				if len(client.approvals) != 1 {
-					t.Fatal("pending approval duplicated")
-				}
-				client.approvals[0].State = adminv1.ApprovalState_APPROVAL_STATE_APPROVED
-				if _, err := Apply(t.Context(), client, again, Options{}); err != nil {
-					t.Fatal(err)
-				}
-			} else if last.Status != "updated" {
-				t.Fatal("target not activated")
+			} else if last.Status != "created" || len(client.assignments) != 1 {
+				t.Fatalf("approval-free rollout did not start: %+v", last)
 			}
-			var activation *adminv1.ActivateTargetPreviewRequest
-			for _, r := range client.requests {
-				if a, ok := r.(*adminv1.ActivateTargetPreviewRequest); ok {
-					activation = a
-				}
-			}
-			if activation == nil || activation.GetPreviewId() != client.preview.GetPreviewId() || !bytes.Equal(activation.GetPreviewSha256(), client.preview.GetPreviewSha256()) {
-				t.Fatal("activation lost exact preview identity")
-			}
+			// A re-run never forks a second rollout or approval.
 			again, err := Plan(t.Context(), client, spec)
 			if err != nil {
 				t.Fatal(err)
@@ -260,10 +240,50 @@ func TestTargetActivationApprovalAndExactHash(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.Outcomes[len(result.Outcomes)-1].Status != "unchanged" {
-				t.Fatal("identical active snapshot activated again")
+			last = assignmentOutcome(t, result)
+			if len(client.rollouts) != 1 || len(client.approvals) != map[bool]int{false: 0, true: 1}[approval] {
+				t.Fatalf("re-run repeated the rollout or approval: %d rollouts %d approvals", len(client.rollouts), len(client.approvals))
+			}
+			want := map[bool]string{false: "unchanged", true: "pending"}[approval]
+			if last.Status != want {
+				t.Fatalf("re-run outcome %+v, want %s", last, want)
 			}
 		})
+	}
+}
+
+func assignmentOutcome(t *testing.T, result *Result) Outcome {
+	t.Helper()
+	for _, o := range result.Outcomes {
+		if o.Kind == "assignment" {
+			return o
+		}
+	}
+	t.Fatal("no assignment outcome")
+	return Outcome{}
+}
+
+func TestUnchangedAssignmentRollsOutAgainOnlyForChangedDevices(t *testing.T) {
+	spec := organizationFixture()
+	client := newFakeAdmin()
+	plan, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Apply(t.Context(), client, plan, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	client.impactChanged = true
+	again, err := Plan(t.Context(), client, spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Apply(t.Context(), client, again, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if last := assignmentOutcome(t, result); last.Status != "updated" || len(client.rollouts) != 2 || client.rollouts[0].GetRollout().GetRolloutId() == client.rollouts[1].GetRollout().GetRolloutId() {
+		t.Fatalf("a newly matching device was not rolled out under a new rollout: %+v", last)
 	}
 }
 
@@ -366,17 +386,33 @@ func TestExceptionResolvesFindingBeyondCatalogCap(t *testing.T) {
 	}
 }
 
-func TestTargetApprovalReuseRejectsOtherActorsAndStaleInputs(t *testing.T) {
-	spec := organizationFixture()
+func TestRolloutReviewRetriesConcurrentChangesThenReportsPending(t *testing.T) {
+	for _, stale := range []int{2, 3} {
+		client := newFakeAdmin()
+		client.staleStarts = stale
+		plan, err := Plan(t.Context(), client, organizationFixture())
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := Apply(t.Context(), client, plan, Options{})
+		if err != nil {
+			t.Fatalf("a concurrently changing review failed the apply: %v", err)
+		}
+		got := assignmentOutcome(t, result)
+		if stale == 2 && (got.Status != "created" || len(client.rollouts) != 1) {
+			t.Fatalf("bounded retry did not start the fresh review: %+v", got)
+		}
+		if stale == 3 && (got.Status != "pending" || len(client.rollouts) != 0) {
+			t.Fatalf("exhausted retries were not reported pending: %+v", got)
+		}
+	}
+}
+
+func TestAssignmentWithoutMatchingDevicesIsSavedThenUnchanged(t *testing.T) {
 	client := newFakeAdmin()
-	deviceID := uuid.NewString()
-	client.fleet = []*adminv1.Device{{Id: deviceID, Hostname: "laptop", LifecycleState: adminv1.DeviceState_DEVICE_STATE_ACTIVE}}
-	client.principalID = uuid.NewString()
-	client.requireApproval = true
-	client.preview = &policyv1.TargetPreview{PreviewId: uuid.NewString(), DeviceId: deviceID, GenerationId: uuid.NewString(), InputSha256: bytes.Repeat([]byte{1}, 32), PreviewSha256: bytes.Repeat([]byte{2}, 32), ResolutionSha256: bytes.Repeat([]byte{3}, 32), EvaluatedAt: timestamppb.New(time.Unix(1700000000, 0)), ValidUntil: timestamppb.New(time.Unix(1700000600, 0)), Resolution: &policyv1.TargetResolution{}, Candidates: []*policyv1.TargetCandidate{{Assignment: spec.Assignments[0].Assignment, Match: policyv1.TargetMatch_TARGET_MATCH_INCLUDED}}}
-	applyPending := func(want int) {
-		t.Helper()
-		plan, err := Plan(t.Context(), client, spec)
+	client.noDevices = true
+	for _, want := range []string{"created", "unchanged"} {
+		plan, err := Plan(t.Context(), client, organizationFixture())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -384,57 +420,31 @@ func TestTargetApprovalReuseRejectsOtherActorsAndStaleInputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(client.approvals) != want || client.active != nil || result.Outcomes[len(result.Outcomes)-1].Status != "pending" {
-			t.Fatalf("approval count %d, want %d without activation", len(client.approvals), want)
+		if got := assignmentOutcome(t, result); got.Status != want || len(client.assignments) != 1 || len(client.rollouts) != 0 {
+			t.Fatalf("assignment with no matching device: %+v, want %s", got, want)
 		}
 	}
-	applyPending(1)
-	firstActor := client.principalID
-	client.approvals[0].State = adminv1.ApprovalState_APPROVAL_STATE_APPROVED
-	client.principalID = uuid.NewString()
-	applyPending(2)
-	if client.approvals[0].GetRequesterId() != firstActor || client.approvals[1].GetRequesterId() != client.principalID {
-		t.Fatal("second administrator adopted first administrator's approval")
-	}
-	applyPending(2)
-	client.preview.InputSha256[0] ^= 1
-	client.preview.PreviewId = uuid.NewString()
-	client.preview.PreviewSha256[0] ^= 1
-	applyPending(3)
-	client.preview.EvaluatedAt = timestamppb.New(time.Unix(1700000601, 0))
-	client.preview.ValidUntil = timestamppb.New(time.Unix(1700001200, 0))
-	client.preview.PreviewId = uuid.NewString()
-	client.preview.PreviewSha256[0] ^= 1
-	applyPending(4)
 }
 
-func TestActivationRetriesConcurrentTargetingConflict(t *testing.T) {
-	spec := organizationFixture()
-	deviceID := uuid.NewString()
-	setup := func(conflicts int) *fakeAdmin {
-		client := newFakeAdmin()
-		client.fleet = []*adminv1.Device{{Id: deviceID, Hostname: "laptop", LifecycleState: adminv1.DeviceState_DEVICE_STATE_ACTIVE}}
-		client.preview = &policyv1.TargetPreview{PreviewId: uuid.NewString(), DeviceId: deviceID, GenerationId: uuid.NewString(), InputSha256: bytes.Repeat([]byte{1}, 32), PreviewSha256: bytes.Repeat([]byte{2}, 32), ResolutionSha256: bytes.Repeat([]byte{3}, 32), EvaluatedAt: timestamppb.New(time.Unix(1700000000, 0)), ValidUntil: timestamppb.New(time.Unix(1700000600, 0)), Resolution: &policyv1.TargetResolution{}, Candidates: []*policyv1.TargetCandidate{{Assignment: spec.Assignments[0].Assignment, Match: policyv1.TargetMatch_TARGET_MATCH_INCLUDED}}}
-		client.previewConflicts = conflicts
-		return client
-	}
-	apply := func(client *fakeAdmin) (*Result, error) {
-		plan, err := Plan(t.Context(), client, spec)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return Apply(t.Context(), client, plan, Options{})
-	}
-	client := setup(previewAttempts - 1)
-	result, err := apply(client)
+func TestUnchangedAssignmentInFlightIsNotRolledOutAgain(t *testing.T) {
+	client := newFakeAdmin()
+	plan, err := Plan(t.Context(), client, organizationFixture())
 	if err != nil {
-		t.Fatalf("transient targeting conflicts must be retried: %v", err)
+		t.Fatal(err)
 	}
-	if last := result.Outcomes[len(result.Outcomes)-1]; last.Kind != "activation" || last.Status != "updated" || client.previewCalls != previewAttempts {
-		t.Fatalf("activation %+v after %d previews", last, client.previewCalls)
+	if _, err := Apply(t.Context(), client, plan, Options{}); err != nil {
+		t.Fatal(err)
 	}
-	client = setup(previewAttempts)
-	if _, err := apply(client); connect.CodeOf(err) != connect.CodeAborted || rpcreason.Get(err) != "targeting_revision_conflict" || client.previewCalls != previewAttempts {
-		t.Fatalf("persistent conflict must surface after %d previews, got %v after %d", previewAttempts, err, client.previewCalls)
+	client.rollouts[0].StartingCount, client.impactChanged = 1, true
+	again, err := Plan(t.Context(), client, organizationFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Apply(t.Context(), client, again, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := assignmentOutcome(t, result); got.Status != "unchanged" || !strings.Contains(got.Detail, "rolling out") || len(client.rollouts) != 1 {
+		t.Fatalf("in-flight rollout was forked or reported as drift: %+v", got)
 	}
 }

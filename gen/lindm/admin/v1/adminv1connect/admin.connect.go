@@ -185,9 +185,12 @@ const (
 	// AdminServicePreviewTargetAssignmentImpactProcedure is the fully-qualified name of the
 	// AdminService's PreviewTargetAssignmentImpact RPC.
 	AdminServicePreviewTargetAssignmentImpactProcedure = "/lindm.admin.v1.AdminService/PreviewTargetAssignmentImpact"
-	// AdminServiceSaveTargetAssignmentImpactProcedure is the fully-qualified name of the AdminService's
-	// SaveTargetAssignmentImpact RPC.
-	AdminServiceSaveTargetAssignmentImpactProcedure = "/lindm.admin.v1.AdminService/SaveTargetAssignmentImpact"
+	// AdminServiceStartRolloutProcedure is the fully-qualified name of the AdminService's StartRollout
+	// RPC.
+	AdminServiceStartRolloutProcedure = "/lindm.admin.v1.AdminService/StartRollout"
+	// AdminServiceListRolloutDevicesProcedure is the fully-qualified name of the AdminService's
+	// ListRolloutDevices RPC.
+	AdminServiceListRolloutDevicesProcedure = "/lindm.admin.v1.AdminService/ListRolloutDevices"
 	// AdminServiceActivateTargetPreviewProcedure is the fully-qualified name of the AdminService's
 	// ActivateTargetPreview RPC.
 	AdminServiceActivateTargetPreviewProcedure = "/lindm.admin.v1.AdminService/ActivateTargetPreview"
@@ -363,7 +366,8 @@ type AdminServiceClient interface {
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
 	PreviewTargetAssignmentImpact(context.Context, *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error)
-	SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error)
+	StartRollout(context.Context, *connect.Request[v1.StartRolloutRequest]) (*connect.Response[v1.StartRolloutResponse], error)
+	ListRolloutDevices(context.Context, *connect.Request[v1.ListRolloutDevicesRequest]) (*connect.Response[v1.ListRolloutDevicesResponse], error)
 	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
 	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
@@ -728,10 +732,16 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignmentImpact")),
 			connect.WithClientOptions(opts...),
 		),
-		saveTargetAssignmentImpact: connect.NewClient[v1.SaveTargetAssignmentImpactRequest, v1.SaveTargetAssignmentImpactResponse](
+		startRollout: connect.NewClient[v1.StartRolloutRequest, v1.StartRolloutResponse](
 			httpClient,
-			baseURL+AdminServiceSaveTargetAssignmentImpactProcedure,
-			connect.WithSchema(adminServiceMethods.ByName("SaveTargetAssignmentImpact")),
+			baseURL+AdminServiceStartRolloutProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("StartRollout")),
+			connect.WithClientOptions(opts...),
+		),
+		listRolloutDevices: connect.NewClient[v1.ListRolloutDevicesRequest, v1.ListRolloutDevicesResponse](
+			httpClient,
+			baseURL+AdminServiceListRolloutDevicesProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListRolloutDevices")),
 			connect.WithClientOptions(opts...),
 		),
 		activateTargetPreview: connect.NewClient[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse](
@@ -1030,7 +1040,8 @@ type adminServiceClient struct {
 	listTargetAssignments                *connect.Client[v1.ListTargetAssignmentsRequest, v1.ListTargetAssignmentsResponse]
 	previewTargetAssignments             *connect.Client[v1.PreviewTargetAssignmentsRequest, v1.PreviewTargetAssignmentsResponse]
 	previewTargetAssignmentImpact        *connect.Client[v1.PreviewTargetAssignmentImpactRequest, v1.PreviewTargetAssignmentImpactResponse]
-	saveTargetAssignmentImpact           *connect.Client[v1.SaveTargetAssignmentImpactRequest, v1.SaveTargetAssignmentImpactResponse]
+	startRollout                         *connect.Client[v1.StartRolloutRequest, v1.StartRolloutResponse]
+	listRolloutDevices                   *connect.Client[v1.ListRolloutDevicesRequest, v1.ListRolloutDevicesResponse]
 	activateTargetPreview                *connect.Client[v1.ActivateTargetPreviewRequest, v1.ActivateTargetPreviewResponse]
 	putRollout                           *connect.Client[v1.PutRolloutRequest, v1.PutRolloutResponse]
 	controlRollout                       *connect.Client[v1.ControlRolloutRequest, v1.ControlRolloutResponse]
@@ -1330,9 +1341,14 @@ func (c *adminServiceClient) PreviewTargetAssignmentImpact(ctx context.Context, 
 	return c.previewTargetAssignmentImpact.CallUnary(ctx, req)
 }
 
-// SaveTargetAssignmentImpact calls lindm.admin.v1.AdminService.SaveTargetAssignmentImpact.
-func (c *adminServiceClient) SaveTargetAssignmentImpact(ctx context.Context, req *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error) {
-	return c.saveTargetAssignmentImpact.CallUnary(ctx, req)
+// StartRollout calls lindm.admin.v1.AdminService.StartRollout.
+func (c *adminServiceClient) StartRollout(ctx context.Context, req *connect.Request[v1.StartRolloutRequest]) (*connect.Response[v1.StartRolloutResponse], error) {
+	return c.startRollout.CallUnary(ctx, req)
+}
+
+// ListRolloutDevices calls lindm.admin.v1.AdminService.ListRolloutDevices.
+func (c *adminServiceClient) ListRolloutDevices(ctx context.Context, req *connect.Request[v1.ListRolloutDevicesRequest]) (*connect.Response[v1.ListRolloutDevicesResponse], error) {
+	return c.listRolloutDevices.CallUnary(ctx, req)
 }
 
 // ActivateTargetPreview calls lindm.admin.v1.AdminService.ActivateTargetPreview.
@@ -1591,7 +1607,8 @@ type AdminServiceHandler interface {
 	ListTargetAssignments(context.Context, *connect.Request[v1.ListTargetAssignmentsRequest]) (*connect.Response[v1.ListTargetAssignmentsResponse], error)
 	PreviewTargetAssignments(context.Context, *connect.Request[v1.PreviewTargetAssignmentsRequest]) (*connect.Response[v1.PreviewTargetAssignmentsResponse], error)
 	PreviewTargetAssignmentImpact(context.Context, *connect.Request[v1.PreviewTargetAssignmentImpactRequest]) (*connect.Response[v1.PreviewTargetAssignmentImpactResponse], error)
-	SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error)
+	StartRollout(context.Context, *connect.Request[v1.StartRolloutRequest]) (*connect.Response[v1.StartRolloutResponse], error)
+	ListRolloutDevices(context.Context, *connect.Request[v1.ListRolloutDevicesRequest]) (*connect.Response[v1.ListRolloutDevicesResponse], error)
 	ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error)
 	PutRollout(context.Context, *connect.Request[v1.PutRolloutRequest]) (*connect.Response[v1.PutRolloutResponse], error)
 	ControlRollout(context.Context, *connect.Request[v1.ControlRolloutRequest]) (*connect.Response[v1.ControlRolloutResponse], error)
@@ -1952,10 +1969,16 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("PreviewTargetAssignmentImpact")),
 		connect.WithHandlerOptions(opts...),
 	)
-	adminServiceSaveTargetAssignmentImpactHandler := connect.NewUnaryHandler(
-		AdminServiceSaveTargetAssignmentImpactProcedure,
-		svc.SaveTargetAssignmentImpact,
-		connect.WithSchema(adminServiceMethods.ByName("SaveTargetAssignmentImpact")),
+	adminServiceStartRolloutHandler := connect.NewUnaryHandler(
+		AdminServiceStartRolloutProcedure,
+		svc.StartRollout,
+		connect.WithSchema(adminServiceMethods.ByName("StartRollout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListRolloutDevicesHandler := connect.NewUnaryHandler(
+		AdminServiceListRolloutDevicesProcedure,
+		svc.ListRolloutDevices,
+		connect.WithSchema(adminServiceMethods.ByName("ListRolloutDevices")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceActivateTargetPreviewHandler := connect.NewUnaryHandler(
@@ -2302,8 +2325,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServicePreviewTargetAssignmentsHandler.ServeHTTP(w, r)
 		case AdminServicePreviewTargetAssignmentImpactProcedure:
 			adminServicePreviewTargetAssignmentImpactHandler.ServeHTTP(w, r)
-		case AdminServiceSaveTargetAssignmentImpactProcedure:
-			adminServiceSaveTargetAssignmentImpactHandler.ServeHTTP(w, r)
+		case AdminServiceStartRolloutProcedure:
+			adminServiceStartRolloutHandler.ServeHTTP(w, r)
+		case AdminServiceListRolloutDevicesProcedure:
+			adminServiceListRolloutDevicesHandler.ServeHTTP(w, r)
 		case AdminServiceActivateTargetPreviewProcedure:
 			adminServiceActivateTargetPreviewHandler.ServeHTTP(w, r)
 		case AdminServicePutRolloutProcedure:
@@ -2597,8 +2622,12 @@ func (UnimplementedAdminServiceHandler) PreviewTargetAssignmentImpact(context.Co
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.PreviewTargetAssignmentImpact is not implemented"))
 }
 
-func (UnimplementedAdminServiceHandler) SaveTargetAssignmentImpact(context.Context, *connect.Request[v1.SaveTargetAssignmentImpactRequest]) (*connect.Response[v1.SaveTargetAssignmentImpactResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.SaveTargetAssignmentImpact is not implemented"))
+func (UnimplementedAdminServiceHandler) StartRollout(context.Context, *connect.Request[v1.StartRolloutRequest]) (*connect.Response[v1.StartRolloutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.StartRollout is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListRolloutDevices(context.Context, *connect.Request[v1.ListRolloutDevicesRequest]) (*connect.Response[v1.ListRolloutDevicesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListRolloutDevices is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) ActivateTargetPreview(context.Context, *connect.Request[v1.ActivateTargetPreviewRequest]) (*connect.Response[v1.ActivateTargetPreviewResponse], error) {

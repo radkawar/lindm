@@ -71,7 +71,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes
-	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.FirewallProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID, routes.FactsPendingDeviceID} {
+	for _, id := range []string{routes.DeviceID, routes.ProfileID, routes.FirewallProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID, routes.FactsPendingDeviceID, routes.RolloutID} {
 		if id == "" {
 			t.Fatalf("missing route ID: %+v", routes)
 		}
@@ -205,6 +205,27 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		return action.GetSpec().GetReleaseLock() != nil && action.GetClosedReason() == "expired_unstarted"
 	}) {
 		t.Fatalf("route device action history: %v %v", actions, err)
+	}
+	rollouts, err := admin.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var staged, adopting *adminv1.RolloutState
+	for _, r := range rollouts.Msg.GetRollouts() {
+		switch {
+		case r.GetRollout().GetRolloutId() == routes.RolloutID:
+			staged = r
+		case r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL:
+			adopting = r
+		}
+	}
+	// The reviewed rollout flow: a named staged rollout whose pilot the
+	// promoter activated, and an adoption waiting for its single approval.
+	if staged.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE || staged.GetRollout().GetName() == "" || staged.GetActivatedCount() == 0 {
+		t.Fatalf("staged demo rollout: %v", staged)
+	}
+	if adopting.GetApprovalId() == "" || adopting.GetAdoptingCount() == 0 || len(adopting.GetAdopted()) != 1 {
+		t.Fatalf("adoption demo rollout: %v", adopting)
 	}
 	approvals, err := admin.ListApprovals(ctx, connect.NewRequest(&adminv1.ListApprovalsRequest{PageSize: 50}))
 	if err != nil || !slices.ContainsFunc(approvals.Msg.GetApprovals(), func(approval *adminv1.Approval) bool {

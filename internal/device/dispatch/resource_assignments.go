@@ -265,6 +265,11 @@ func (s *Service) GetDeviceResourceState(ctx context.Context, req *connect.Reque
 			if err := populateResourceStates(ctx, q, head, response, now); err != nil {
 				return nil, err
 			}
+			if response.Assignment != nil && response.Assignment.GetProfileId() == "" && response.ActiveTargetPreview != nil {
+				if err := s.rolloutSources(ctx, tx, response.ActiveTargetPreview, response.Assignment); err != nil {
+					return nil, core.MapErr(err)
+				}
+			}
 		}
 		recent, err := q.RecentResourceActions(ctx, *device.CurrentGenerationID)
 		if err != nil {
@@ -503,4 +508,27 @@ func (s *Service) ActivateProvisioningProfile(ctx context.Context, tx pgx.Tx, to
 		return err
 	}
 	return core.DeviceAudit(ctx, q, &token.CreatedBy, auditkind.ResourceAssignmentAssign, id.String(), receipt.DeviceID, token.Reason)
+}
+
+// rolloutSources names the profile versions a rollout-activated head combines,
+// so a device page reads "From rollouts: …" rather than "profile removed".
+func (s *Service) rolloutSources(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, assignment *adminv1.ResourceAssignment) error {
+	seen := make(map[string]bool)
+	for _, candidate := range preview.GetCandidates() {
+		id := candidate.GetAssignment().GetProfileRevisionId()
+		if candidate.GetMatch() != policyv1.TargetMatch_TARGET_MATCH_INCLUDED || seen[id] {
+			continue
+		}
+		seen[id] = true
+		revision, err := uuid.Parse(id)
+		if err != nil {
+			return core.ErrInternalState
+		}
+		profile, err := s.Profiles.GetRevisionInTransaction(ctx, tx, revision)
+		if err != nil {
+			return err
+		}
+		assignment.Sources = append(assignment.Sources, &adminv1.ProfileVersionLabel{RevisionId: id, ProfileName: profile.GetSpec().GetName(), RevisionNumber: profile.GetRevisionNumber()})
+	}
+	return nil
 }

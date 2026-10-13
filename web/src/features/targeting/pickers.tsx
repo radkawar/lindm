@@ -1,7 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import type { RolloutState } from "../../../gen/lindm/admin/v1/targeting_pb";
+import type { TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
 import {
   SearchPicker,
   pickerFooter,
@@ -13,39 +13,69 @@ import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { SEARCH_DELAY_MS, useDelayed } from "@/hooks/use-delayed";
 import { toRpcFailure } from "@/lib/errors";
-import {
-  dynamicGroupQueryOptions,
-  dynamicGroupsQueryOptions,
-  rolloutsQueryOptions,
-} from "./queries";
+import { dynamicGroupQueryOptions, dynamicGroupsQueryOptions } from "./queries";
 
-const Context = createContext<TargetPickers | null>(null);
-export function TargetPickerProvider({
-  pickers,
-  children,
-}: {
-  pickers: TargetPickers;
-  children: ReactNode;
-}) {
-  return <Context value={pickers}>{children}</Context>;
-}
-export function useTargetPickers() {
-  const pickers = useContext(Context);
-  if (!pickers) throw new Error("Targeting pickers must be composed by the route.");
-  return pickers;
-}
+// A display name resolved from an identity; `ready` is false while loading or
+// when the name could not be found, and `text` then says why.
+export type NameLabel = { text: string; ready: boolean };
+export type ProfileVersionLabel = NameLabel & { short: string };
+// A name rendered for an identity, composed by the route (groups pages).
+export type NameSlot = (props: { value: string }) => ReactNode;
+
 export type TargetPickers = {
   devicePicker: PickerSlot;
   groupPicker: PickerSlot;
   profileRevisionPicker: PickerSlot;
 };
 // Read-only names for saved records, composed by the route like the pickers.
-export type NameSlot = (props: { value: string }) => ReactNode;
 export type TargetNames = {
-  deviceName: NameSlot;
-  groupName: NameSlot;
-  profileVersionName: NameSlot;
+  useTargetLabel: (target?: TargetRef) => NameLabel;
+  useProfileVersionLabel: (id: string) => ProfileVersionLabel;
 };
+
+const Context = createContext<{ pickers: TargetPickers; names?: TargetNames } | null>(null);
+export function TargetPickerProvider({
+  pickers,
+  names,
+  children,
+}: {
+  pickers: TargetPickers;
+  names?: TargetNames;
+  children: ReactNode;
+}) {
+  return <Context value={{ pickers, names }}>{children}</Context>;
+}
+export function useTargetPickers() {
+  const value = useContext(Context);
+  if (!value) throw new Error("Targeting pickers must be composed by the route.");
+  return value.pickers;
+}
+export function useTargetNames() {
+  const names = useContext(Context)?.names;
+  if (!names) throw new Error("Targeting names must be composed by the route.");
+  return names;
+}
+
+export function useDynamicGroupLabel(id: string): NameLabel {
+  const query = useQuery({ ...dynamicGroupQueryOptions(useAuthLifetime(), id), enabled: !!id });
+  const group = query.data;
+  if (group) return { text: group.name || "Unnamed dynamic group", ready: true };
+  if (query.isPending) return { text: "Loading name…", ready: false };
+  if (query.error) return { text: "Name unavailable", ready: false };
+  return { text: "Dynamic group not found", ready: false };
+}
+
+export function useTargetLabel(target?: TargetRef): NameLabel {
+  return useTargetNames().useTargetLabel(target);
+}
+
+export function TargetName({ target }: { target?: TargetRef }) {
+  return <>{useTargetLabel(target).text}</>;
+}
+
+export function ProfileVersionName({ value }: { value: string }) {
+  return <>{useTargetNames().useProfileVersionLabel(value).text}</>;
+}
 
 const PAGE_SIZE = 100;
 
@@ -112,54 +142,5 @@ export function DynamicGroupPicker(props: PickerProps) {
     >
       {selected.error ? <RpcError failure={toRpcFailure(selected.error)} /> : null}
     </SearchPicker>
-  );
-}
-// A rollout has no name of its own; its stage names identify it everywhere.
-export function rolloutName(state: RolloutState) {
-  return state.rollout?.rings.map((ring) => ring.name).join(", ") || "Unnamed rollout";
-}
-
-// The server searches every rollout by any part of its name (its stage names).
-export function RolloutPicker(props: PickerProps) {
-  const search = useServerSearch();
-  const query = useQuery({
-    ...rolloutsQueryOptions(useAuthLifetime(), search.after, search.nameSearch),
-    placeholderData: keepPreviousData,
-  });
-  const rollouts = query.error ? [] : (query.data ?? []);
-  const settled = !query.isFetching && search.nameSearch === search.typed;
-  const last = rollouts.length === PAGE_SIZE ? (rollouts.at(-1)?.rollout?.rolloutId ?? "") : "";
-  return (
-    <SearchPicker
-      {...props}
-      search={search.search}
-      onSearchChange={search.setSearch}
-      options={rollouts.flatMap((state) =>
-        state.rollout
-          ? [
-              {
-                value: state.rollout.rolloutId,
-                label: rolloutName(state),
-                description: state.paused ? "Paused" : "In progress",
-              },
-            ]
-          : [],
-      )}
-      note="Type any part of a stage name. Up to 100 rollouts at a time."
-      footer={pickerFooter({
-        loading: query.isPending,
-        error: query.error,
-        onRetry: () => void query.refetch(),
-        empty:
-          query.isSuccess && settled && rollouts.length === 0
-            ? search.nameSearch
-              ? `No staged rollouts have a stage name containing “${search.nameSearch}”.`
-              : "No staged rollouts yet. Leave this optional selection empty, or plan one under Staged rollouts above."
-            : undefined,
-        fetching: query.isFetching,
-        onFirst: search.after ? () => search.goTo("") : undefined,
-        onMore: last ? () => search.goTo(last) : undefined,
-      })}
-    />
   );
 }

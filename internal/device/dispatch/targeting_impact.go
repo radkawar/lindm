@@ -11,6 +11,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/resource"
 	"lindm/internal/targeting"
@@ -56,6 +57,24 @@ func (s *Service) targetImpactResolver() targeting.ImpactResolver {
 		if err != nil {
 			return nil, nil, err
 		}
+		// Provenance lets a reviewer see which profile's settings the change
+		// replaces or stops managing, including a direct per-device assignment.
+		contributors := make(map[string][]string)
+		if head.RevisionID != nil {
+			for _, row := range rows {
+				item := new(policyv1.ProfileResource)
+				if err := proto.Unmarshal(row.Document, item); err != nil {
+					return nil, nil, err
+				}
+				contributors[refKey(item.GetDesired().GetRef())] = []string{head.RevisionID.String()}
+			}
+		} else if preview, err := s.Targeting.ExecutionPreview(ctx, tx, head.DeviceID, head.GenerationID, head.ID); err == nil {
+			for _, item := range preview.GetResolution().GetResources() {
+				contributors[refKey(item.GetRef())] = item.GetContributingRevisionIds()
+			}
+		} else if !errors.Is(err, targeting.ErrNotFound) {
+			return nil, nil, err
+		}
 		for _, row := range rows {
 			item := new(policyv1.ProfileResource)
 			if err := proto.Unmarshal(row.Document, item); err != nil {
@@ -66,7 +85,7 @@ func (s *Service) targetImpactResolver() targeting.ImpactResolver {
 				return nil, nil, err
 			}
 			unsupported := ResourceDispatchUnsupported(item)
-			resolved := &policyv1.ResolvedResource{Ref: item.GetDesired().GetRef(), Resource: item, Disposition: policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_READY, CapabilityId: capability, DispatchSupported: unsupported == "", Reason: unsupported}
+			resolved := &policyv1.ResolvedResource{Ref: item.GetDesired().GetRef(), Resource: item, Disposition: policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_READY, CapabilityId: capability, DispatchSupported: unsupported == "", Reason: unsupported, ContributingRevisionIds: contributors[refKey(item.GetDesired().GetRef())]}
 			if head.BlockedReason != "" {
 				resolved.Disposition = policyv1.ResourceResolutionDisposition_RESOURCE_RESOLUTION_DISPOSITION_BLOCKED
 				resolved.Reason = head.BlockedReason
@@ -75,4 +94,8 @@ func (s *Service) targetImpactResolver() targeting.ImpactResolver {
 		}
 		return current, proposed, nil
 	}
+}
+
+func refKey(ref *resourcev1.ResourceRef) string {
+	return ref.GetKind().String() + "\x00" + ref.GetCanonicalKey()
 }

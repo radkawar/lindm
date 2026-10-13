@@ -83,6 +83,7 @@ message Approval {
     RevealSecretRequest reveal_secret = 23;
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 24;
     AcceptAdvisoryFindingRequest accept_advisory_finding = 26;
+    StartRolloutRequest start_rollout = 30;
   }
   // Current labels projected only for authorized approval responses.
   string requester_display_name = 20;
@@ -94,6 +95,8 @@ message Approval {
   // Exact finding identity when still retained; absence means evidence unavailable.
   AdvisoryFinding advisory_finding = 27;
   ApprovalEvidenceState evidence_state = 28;
+  // The retained rollout and its reviewed device plan for a start_rollout payload.
+  RolloutState rollout = 29;
 }
 
 message CreateApprovalRequest {
@@ -114,6 +117,7 @@ message CreateApprovalRequest {
     RevealSecretRequest reveal_secret = 10;
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 11;
     AcceptAdvisoryFindingRequest accept_advisory_finding = 12;
+    StartRolloutRequest start_rollout = 13;
   }
 }
 message CreateApprovalResponse {

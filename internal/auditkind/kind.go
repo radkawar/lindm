@@ -230,11 +230,11 @@ var (
 // Targeting: groups, assignments, previews and rollouts. The code is also the
 // idempotency receipt method.
 var (
-	TargetingAssignmentPut          = kind("targeting.assignment.put")
-	TargetingAssignmentSaveReviewed = kind("targeting.assignment.save_reviewed")
-	TargetingGroupPut               = kind("targeting.group.put")
-	TargetingPreviewActivate        = kind("targeting.preview.activate")
-	TargetingRolloutControl         = kind("targeting.rollout.control")
-	TargetingRolloutPause           = kind("targeting.rollout.pause")
-	TargetingRolloutPut             = kind("targeting.rollout.put")
+	TargetingAssignmentPut   = kind("targeting.assignment.put")
+	TargetingGroupPut        = kind("targeting.group.put")
+	TargetingPreviewActivate = kind("targeting.preview.activate")
+	TargetingRolloutControl  = kind("targeting.rollout.control")
+	TargetingRolloutPause    = kind("targeting.rollout.pause")
+	TargetingRolloutPut      = kind("targeting.rollout.put")
+	TargetingRolloutStart    = kind("targeting.rollout.start")
 )

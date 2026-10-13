@@ -49,7 +49,7 @@ func newPromoterFixture(t *testing.T) (*targetingFixture, *identity.Service, *Pr
 	if unrestricted, _ := identity.DeviceScopes(f.actor, identity.PermissionAssignResources); !unrestricted {
 		t.Fatal("creator did not begin with unrestricted resources.assign authority")
 	}
-	promoter, err := NewPromoter(f.pool, auth, f.store)
+	promoter, err := NewPromoter(f.pool, auth, f.store, testRolloutHooks(f))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +193,7 @@ func TestPromoterPromotesWithoutListAndDoesNotRepeatPromotion(t *testing.T) {
 	assertPromoterState(t, ctx, f, id, 1, 2, "")
 	// A new worker instance must observe the durable CAS result, not rely on
 	// process-local deduplication. The next ring has neither soak nor proof yet.
-	restarted, err := NewPromoter(f.pool, auth, f.store)
+	restarted, err := NewPromoter(f.pool, auth, f.store, testRolloutHooks(f))
 	if err != nil {
 		t.Fatal(err)
 	}

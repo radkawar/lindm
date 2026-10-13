@@ -1,11 +1,12 @@
 package targeting
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,7 +17,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
-	"lindm/internal/auditkind"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
@@ -66,10 +67,13 @@ func (s *Store) Impact(ctx context.Context, tx pgx.Tx, p identity.Principal, r *
 		return nil, err
 	}
 	id := uuid.New()
-	report, input, err := s.evaluateImpact(ctx, tx, q, p, r.Assignment, r.ExpectedRevision, resolve, &id)
+	report, input, err := s.evaluateImpact(ctx, tx, q, p, r.Assignment, r.ExpectedRevision, resolve, &id, nil)
 	if err != nil {
 		return nil, err
 	}
+	// A rollout of this exact report needs one independent approval when any
+	// included change adopts native state or policy requires approval.
+	report.ApprovalRequired = report.AdoptingCount > 0 || p.ApprovalRequired(identity.PermissionAssignResources)
 	report.PreviewId = id.String()
 	b, err := encoded(report)
 	if err != nil {
@@ -148,72 +152,29 @@ func impactPage(ctx context.Context, q *targetingdb.Queries, p identity.Principa
 	if len(rows) > len(report.Devices) && len(report.Devices) > 0 {
 		report.NextAfterDeviceId = proto.String(report.Devices[len(report.Devices)-1].DeviceId)
 	}
+	if err := impactLabels(ctx, q, report); err != nil {
+		return nil, err
+	}
+	// Labels are display aids; a page that only fits without them drops them.
+	if ValidateResponse(report) != nil {
+		report.RevisionLabels = nil
+	}
 	return report, nil
 }
 
-// SaveImpact checks exact durable replay before looking up the ephemeral report.
-// It never activates resources, even when all server resolutions are ready.
-func (s *Store) SaveImpact(ctx context.Context, tx pgx.Tx, p identity.Principal, r *adminv1.SaveTargetAssignmentImpactRequest, resolve ImpactResolver) (*adminv1.PutTargetAssignmentResponse, error) {
-	if err := s.validate(r); err != nil {
-		return nil, err
-	}
-	q, err := begin(ctx, tx, p, identity.PermissionAssignResources, true)
-	if err != nil {
-		return nil, err
-	}
-	out := new(adminv1.PutTargetAssignmentResponse)
-	method := auditkind.TargetingAssignmentSaveReviewed
-	if ok, err := receipt(ctx, q, p, r.RequestId, method, r, out); ok || err != nil {
-		return out, err
-	}
-	report, input, err := loadImpactReport(ctx, q, p, r.PreviewId)
-	if errors.Is(err, ErrNotFound) {
-		return nil, ErrImpactStale
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !report.Complete || !bytes.Equal(report.ReviewSha256, r.ReviewSha256) || !impactProposalEqual(report, r.Assignment, r.ExpectedRevision) {
-		return nil, ErrImpactStale
-	}
-	if err := q.LockTargetImpactInputs(ctx); err != nil {
-		return nil, err
-	}
-	now, err := q.TargetingClock(ctx)
-	if err != nil {
-		return nil, err
-	}
-	isolation, err := q.ImpactIsolation(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if isolation != "read committed" {
-		return nil, ErrRejected
-	}
-	if !now.Time.Before(report.ValidUntil.AsTime()) {
-		return nil, ErrImpactStale
-	}
-	current, currentInput, err := s.evaluateImpact(ctx, tx, q, p, r.Assignment, r.ExpectedRevision, resolve, nil)
-	if errors.Is(err, ErrConflict) || errors.Is(err, ErrNotFound) {
-		return nil, ErrImpactStale
-	}
-	if err != nil {
-		return nil, err
-	}
-	if !current.Complete || !bytes.Equal(input, currentInput) {
-		return nil, ErrImpactStale
-	}
-	now, err = q.TargetingClock(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !now.Time.Before(report.ValidUntil.AsTime()) || !now.Time.Before(current.ValidUntil.AsTime()) {
-		return nil, ErrImpactStale
-	}
-	return s.putAssignment(ctx, q, p, &adminv1.PutTargetAssignmentRequest{RequestId: r.RequestId, Assignment: r.Assignment, ExpectedRevision: r.ExpectedRevision, Reason: r.Reason}, method, r)
+// plannedDevice is one evaluated device's reviewed change, captured while a
+// StartRollout re-evaluates the exact report inputs.
+type plannedDevice struct {
+	id         uuid.UUID
+	generation *uuid.UUID
+	state      string
+	match      policyv1.TargetMatch
+	proposed   *policyv1.TargetResolution
+	changed    bool
+	head       string
 }
 
-func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Queries, p identity.Principal, proposal *policyv1.TargetAssignment, expected uint64, resolve ImpactResolver, retain *uuid.UUID) (*adminv1.PreviewTargetAssignmentImpactResponse, []byte, error) {
+func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Queries, p identity.Principal, proposal *policyv1.TargetAssignment, expected uint64, resolve ImpactResolver, retain *uuid.UUID, plan func(plannedDevice) error) (*adminv1.PreviewTargetAssignmentImpactResponse, []byte, error) {
 	if resolve == nil {
 		return nil, nil, ErrRejected
 	}
@@ -221,31 +182,17 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 	if err != nil {
 		return nil, nil, err
 	}
-	u, scopes, err := scope(p, identity.PermissionReadFleet)
+	params, err := impactCandidates(p, proposal, previous)
 	if err != nil {
 		return nil, nil, err
 	}
-	params := targetingdb.ListImpactCandidatesParams{Unrestricted: u, Scopes: scopes, AfterID: uuid.Nil, DeviceIds: []uuid.UUID{}, GroupIds: []uuid.UUID{}}
-	addImpactScope(&params, proposal.Target)
-	if previous != nil {
-		addImpactScope(&params, previous.Target)
-	}
+	u, scopes := params.Unrestricted, params.Scopes
 	now, err := q.TargetingClock(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	report := &adminv1.PreviewTargetAssignmentImpactResponse{Assignment: proto.CloneOf(proposal), ExpectedRevision: expected, EvaluatedAt: timestamppb.New(now.Time), ValidUntil: timestamppb.New(now.Time.Add(15 * time.Minute)), Complete: true}
-	// Reserve maximum final counts and every completeness reason before accepting
-	// a row: late report metadata must not make an earlier row unreviewable.
-	envelope := &adminv1.PreviewTargetAssignmentImpactResponse{
-		PreviewId: uuid.Nil.String(), Assignment: proposal, ExpectedRevision: expected,
-		EvaluatedAt: report.EvaluatedAt, ValidUntil: report.ValidUntil, Complete: true,
-		ReviewSha256: make([]byte, sha256.Size), CandidateCount: maxImpactDevices,
-		EvaluatedDeviceCount: maxImpactDevices, TargetCount: maxImpactDevices,
-		IncludedCount: maxImpactDevices, ExcludedCount: maxImpactDevices, UnknownCount: maxImpactDevices,
-		Reasons: []string{"candidate_limit", "report_byte_limit", "device_visibility_incomplete", "response_envelope_reserve"},
-		Devices: make([]*adminv1.TargetAssignmentDeviceImpact, 1),
-	}
+	envelope := impactEnvelope(proposal, expected, report)
 	h := sha256.New()
 	_, _ = h.Write(catalog.digest)
 	totalBytes, scanned := 0, 0
@@ -300,7 +247,11 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 				return nil, nil, ErrRejected
 			}
 			d := e.input.Device
-			b, err := encodeImpactDevice(e, current, proposed, match, envelope)
+			changed, direct, err := deviceImpactChange(ctx, q, d, current, proposed, match, proposal.AssignmentId)
+			if err != nil {
+				return nil, nil, err
+			}
+			b, err := encodeImpactDevice(e, current, proposed, match, changed, direct, envelope)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -323,21 +274,39 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 				}
 			}
 			countImpactDevice(report, rawMatch, match, e.timeLimit)
+			if match == included {
+				countAdoption(report, proposed)
+			}
+			countImpactChange(report, match, changed, direct)
+			if plan != nil {
+				if err := plan(plannedDevice{id: d.ID, generation: d.CurrentGenerationID, state: d.State, match: match, proposed: proposed, changed: changed, head: d.ResourceAssignmentID}); err != nil {
+					return nil, nil, err
+				}
+			}
 		}
 		if stop || len(rows) < 200 {
 			break
 		}
 	}
+	dependencies, err := catalog.dependencyDigest()
+	if err != nil {
+		return nil, nil, err
+	}
+	_, _ = h.Write(dependencies)
+	return report, h.Sum(nil), nil
+}
+
+// dependencyDigest binds the groups, definitions and rollouts the report read.
+func (c *impactCatalog) dependencyDigest() ([]byte, error) {
 	dependencies, err := json.Marshal(struct {
 		Groups      map[string]targetingdb.DynamicTargetGroup
 		Definitions map[string]impactDefinitions
 		Rollouts    map[string]*rolloutInput
-	}{catalog.groups, catalog.definitions, catalog.rollouts})
+	}{c.groups, c.definitions, c.rollouts})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	_, _ = h.Write(digest("impact.dependencies", dependencies))
-	return report, h.Sum(nil), nil
+	return digest("impact.dependencies", dependencies), nil
 }
 
 func (s *Store) prepareImpactCatalog(ctx context.Context, q *targetingdb.Queries, proposal *policyv1.TargetAssignment, expected uint64) (*impactCatalog, *policyv1.TargetAssignment, error) {
@@ -381,9 +350,29 @@ func (s *Store) prepareImpactCatalog(ctx context.Context, q *targetingdb.Queries
 	return catalog, previous, nil
 }
 
-func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, envelope *adminv1.PreviewTargetAssignmentImpactResponse) ([]byte, error) {
+// impactEnvelope reserves maximum final counts and every completeness reason
+// before a row is accepted: late report metadata must not make an earlier row
+// unreviewable.
+func impactEnvelope(proposal *policyv1.TargetAssignment, expected uint64, report *adminv1.PreviewTargetAssignmentImpactResponse) *adminv1.PreviewTargetAssignmentImpactResponse {
+	envelope := &adminv1.PreviewTargetAssignmentImpactResponse{
+		PreviewId: uuid.Nil.String(), Assignment: proposal, ExpectedRevision: expected,
+		EvaluatedAt: report.EvaluatedAt, ValidUntil: report.ValidUntil, Complete: true,
+		ReviewSha256: make([]byte, sha256.Size), CandidateCount: maxImpactDevices,
+		EvaluatedDeviceCount: maxImpactDevices, TargetCount: maxImpactDevices,
+		IncludedCount: maxImpactDevices, ExcludedCount: maxImpactDevices, UnknownCount: maxImpactDevices,
+		Reasons:       []string{"candidate_limit", "report_byte_limit", "device_visibility_incomplete", "response_envelope_reserve"},
+		Devices:       make([]*adminv1.TargetAssignmentDeviceImpact, 1),
+		AdoptingCount: maxImpactDevices, ApprovalRequired: true, ChangedCount: maxImpactDevices, RemovingCount: maxImpactDevices, ReplacingDirectCount: maxImpactDevices, Adopted: make([]*resourcev1.ResourceRef, maxAdoptedRefs),
+	}
+	for i := range envelope.Adopted {
+		envelope.Adopted[i] = &resourcev1.ResourceRef{Kind: resourcev1.ResourceKind_RESOURCE_KIND_SYSCTL, CanonicalKey: strings.Repeat("k", 1024)}
+	}
+	return envelope
+}
+
+func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, changed, direct bool, envelope *adminv1.PreviewTargetAssignmentImpactResponse) ([]byte, error) {
 	d := e.input.Device
-	item := &adminv1.TargetAssignmentDeviceImpact{DeviceId: d.ID.String(), Hostname: d.Hostname, OsId: d.OsID, OsVersion: d.OsVersion, Architecture: d.Architecture, State: d.State, Match: match, CurrentResolution: current, ProposedResolution: proposed, Changed: impactChanged(current, proposed), Reasons: []string{"native_capabilities_unknown"}}
+	item := &adminv1.TargetAssignmentDeviceImpact{DeviceId: d.ID.String(), Hostname: d.Hostname, OsId: d.OsID, OsVersion: d.OsVersion, Architecture: d.Architecture, State: d.State, Match: match, CurrentResolution: current, ProposedResolution: proposed, Changed: changed, ReplacesDirectAssignment: direct, Reasons: []string{"native_capabilities_unknown"}}
 	if d.HostReceivedAt.Valid {
 		item.HostReceivedAt = timestamppb.New(d.HostReceivedAt.Time)
 		if !e.now.Before(d.HostReceivedAt.Time.Add(24 * time.Hour)) {
@@ -422,6 +411,32 @@ func encodeImpactDevice(e *evaluation, current, proposed *policyv1.TargetResolut
 	return encoded(item)
 }
 
+// headHasAssignment reports whether the device's active execution head included
+// the assignment.
+func headHasAssignment(ctx context.Context, q *targetingdb.Queries, head, assignment string) (bool, error) {
+	id, err := uuid.Parse(head)
+	if err != nil {
+		return false, nil
+	}
+	row, err := q.GetTargetPreview(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	preview := new(policyv1.TargetPreview)
+	if err := proto.Unmarshal(row.Document, preview); err != nil {
+		return false, err
+	}
+	for _, c := range preview.Candidates {
+		if c.Match == included && strings.EqualFold(c.GetAssignment().GetAssignmentId(), assignment) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func countImpactDevice(report *adminv1.PreviewTargetAssignmentImpactResponse, rawMatch, match policyv1.TargetMatch, limit time.Time) {
 	report.EvaluatedDeviceCount++
 	if rawMatch != excluded {
@@ -437,6 +452,36 @@ func countImpactDevice(report *adminv1.PreviewTargetAssignmentImpactResponse, ra
 	}
 	if limit.Before(report.ValidUntil.AsTime()) {
 		report.ValidUntil = timestamppb.New(limit)
+	}
+}
+
+// adoptedRefs lists the resources whose ownership adopts existing native state;
+// such a change needs the rollout's independent approval.
+func adoptedRefs(resolution *policyv1.TargetResolution) []*resourcev1.ResourceRef {
+	var refs []*resourcev1.ResourceRef
+	for _, item := range resolution.GetResources() {
+		if item.GetResource().GetOwnership().GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
+			refs = append(refs, item.GetRef())
+		}
+	}
+	return refs
+}
+
+const maxAdoptedRefs = 64
+
+func countAdoption(report *adminv1.PreviewTargetAssignmentImpactResponse, proposed *policyv1.TargetResolution) {
+	refs := adoptedRefs(proposed)
+	if len(refs) == 0 {
+		return
+	}
+	report.AdoptingCount++
+	for _, ref := range refs {
+		if len(report.Adopted) == maxAdoptedRefs {
+			return
+		}
+		if !slices.ContainsFunc(report.Adopted, func(known *resourcev1.ResourceRef) bool { return proto.Equal(known, ref) }) {
+			report.Adopted = append(report.Adopted, proto.CloneOf(ref))
+		}
 	}
 }
 
@@ -488,4 +533,51 @@ func impactChanged(current, proposed *policyv1.TargetResolution) bool {
 		}
 	}
 	return false
+}
+
+// deviceImpactChange reports whether the proposal changes the device and, if
+// so, whether the change replaces a direct per-device assignment (a resource
+// head that is not the device's execution preview).
+func deviceImpactChange(ctx context.Context, q *targetingdb.Queries, d targetingdb.TargetingDeviceRow, current, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, assignmentID string) (changed, direct bool, err error) {
+	changed = impactChanged(current, proposed)
+	if changed && match != included {
+		// A device the proposal does not include changes because of it only
+		// when its active head was built with this assignment (a removal);
+		// otherwise the difference belongs to other assignments' rollouts.
+		changed, err = headHasAssignment(ctx, q, d.PreviousPreviewID, assignmentID)
+		if err != nil {
+			return false, false, err
+		}
+	}
+	return changed, changed && d.ResourceAssignmentID != "" && d.ResourceAssignmentID != d.PreviousPreviewID, nil
+}
+
+func countImpactChange(report *adminv1.PreviewTargetAssignmentImpactResponse, match policyv1.TargetMatch, changed, direct bool) {
+	if !changed {
+		return
+	}
+	switch match {
+	case included:
+		report.ChangedCount++
+	case excluded:
+		report.RemovingCount++
+	}
+	if direct && match != unknown {
+		report.ReplacingDirectCount++
+	}
+}
+
+// impactCandidates scans devices the proposal or its previous revision targets,
+// within the principal's fleet read scope.
+func impactCandidates(p identity.Principal, proposal, previous *policyv1.TargetAssignment) (targetingdb.ListImpactCandidatesParams, error) {
+	u, scopes, err := scope(p, identity.PermissionReadFleet)
+	if err != nil {
+		return targetingdb.ListImpactCandidatesParams{}, err
+	}
+	params := targetingdb.ListImpactCandidatesParams{Unrestricted: u, Scopes: scopes, AfterID: uuid.Nil, DeviceIds: []uuid.UUID{}, GroupIds: []uuid.UUID{}}
+	addImpactScope(&params, proposal.Target)
+	if previous != nil {
+		addImpactScope(&params, previous.Target)
+	}
+	return params, nil
 }

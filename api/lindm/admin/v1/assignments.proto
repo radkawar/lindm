@@ -4,6 +4,7 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/resource_execution.proto";
 import "lindm/policy/v1/profile.proto";
 import "lindm/policy/v1/targeting.proto";
@@ -31,6 +32,9 @@ message ResourceAssignment {
   uint32 reconcile_interval_seconds = 11;
   // Current display name of actor_id, filled on read; never stored in the head.
   string actor_display_name = 12 [(buf.validate.field).string.max_len = 256];
+  // For a head activated by a rollout (no single profile), the profile
+  // versions it combines, by current name. Filled on read.
+  repeated ProfileVersionLabel sources = 13 [(buf.validate.field).repeated.max_items = 128];
 }
 
 message SetResourceAssignmentRequest {

@@ -1,50 +1,70 @@
 import { create, createRegistry } from "@bufbuild/protobuf";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { createValidator } from "@bufbuild/protovalidate";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { toast } from "sonner";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   PreviewTargetAssignmentImpactRequestSchema,
-  SaveTargetAssignmentImpactRequestSchema,
-  type PreviewTargetAssignmentImpactResponse,
+  RolloutStatus,
+  StartRolloutRequestSchema,
   type PreviewTargetAssignmentImpactRequest,
-  type SaveTargetAssignmentImpactRequest,
+  type PreviewTargetAssignmentImpactResponse,
+  type RolloutState,
+  type StartRolloutRequest,
 } from "../../../gen/lindm/admin/v1/targeting_pb";
 import {
+  RolloutSpecSchema,
   TargetAssignmentSchema,
   TargetRefSchema,
   type TargetCandidate,
 } from "../../../gen/lindm/policy/v1/targeting_pb";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { RpcError } from "@/components/ui/rpc-error";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
-import { getAuthLifetime, subscribeAuthLifetime } from "@/lib/auth-lifetime";
+import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";
 import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { describeViolations } from "@/lib/validation";
-import {
-  NumberControl,
-  OptionalControls,
-  ReasonControl,
-  TargetControl,
-  TimeControl,
-} from "./controls";
-import { RolloutPicker, useTargetPickers } from "./pickers";
+import { NumberControl, ReasonControl, TargetControl, TimeControl } from "./controls";
 import { AssignmentImpact } from "./impact";
+import { useTargetLabel, useTargetPickers } from "./pickers";
+import {
+  initialStagePlan,
+  planProblem,
+  planRings,
+  StagesEditor,
+  type StagePlan,
+} from "./rollout-form";
 
 const validator = createValidator({ registry: createRegistry(audit_reason) });
+
+// One StartRollout request and, when approval is required, its single approval
+// request. Ambiguous outcomes retry this exact request; nothing creates another.
+type Phase =
+  | "starting"
+  | "start-ambiguous"
+  | "start-rejected"
+  | "requesting"
+  | "request-failed"
+  | "awaiting"
+  | "started";
 type Attempt = {
-  request: SaveTargetAssignmentImpactRequest;
+  request: StartRolloutRequest;
   review: PreviewTargetAssignmentImpactResponse;
-  status: "pending" | "ambiguous" | "accepted" | "rejected";
+  phase: Phase;
+  rollout?: RolloutState;
+  approvalId?: string;
   failure?: RpcFailure;
 };
 const attempts = new Map<string, Attempt>();
 const listeners = new Set<() => void>();
-function notify() {
+function update(key: string, next?: Attempt) {
+  if (next) attempts.set(key, next);
+  else attempts.delete(key);
   for (const listener of listeners) listener();
 }
 function subscribe(listener: () => void) {
@@ -53,34 +73,142 @@ function subscribe(listener: () => void) {
 }
 subscribeAuthLifetime(() => {
   attempts.clear();
-  notify();
+  for (const listener of listeners) listener();
 });
 
-export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
+function current(key: string, lifetime: AuthLifetime) {
+  if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return undefined;
+  return attempts.get(key);
+}
+
+async function requestApproval(key: string, lifetime: AuthLifetime, client: QueryClient) {
+  const attempt = current(key, lifetime);
+  if (!attempt) return;
+  update(key, { ...attempt, phase: "requesting", failure: undefined });
+  try {
+    const response = await adminClient.createApproval(
+      { lifetimeSeconds: 3600, payload: { case: "startRollout", value: attempt.request } },
+      { signal: lifetime.signal },
+    );
+    lifetime.signal.throwIfAborted();
+    if (!response.approval?.id) throw new Error("The server didn't confirm the approval request.");
+    const latest = current(key, lifetime);
+    if (latest) update(key, { ...latest, phase: "awaiting", approvalId: response.approval.id });
+    void client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
+    void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
+  } catch (cause) {
+    const latest = current(key, lifetime);
+    if (latest) update(key, { ...latest, phase: "request-failed", failure: toRpcFailure(cause) });
+  }
+}
+
+async function startRollout(key: string, lifetime: AuthLifetime, client: QueryClient) {
+  const attempt = current(key, lifetime);
+  if (!attempt) return;
+  update(key, { ...attempt, phase: "starting", failure: undefined });
+  try {
+    const response = await adminClient.startRollout(attempt.request, { signal: lifetime.signal });
+    lifetime.signal.throwIfAborted();
+    const rollout = response.rollout;
+    const latest = current(key, lifetime);
+    if (!latest) return;
+    void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
+    if (rollout?.status !== RolloutStatus.AWAITING_APPROVAL) {
+      update(key, { ...latest, phase: "started", rollout });
+      return;
+    }
+    if (rollout.approvalId) {
+      update(key, { ...latest, phase: "awaiting", rollout, approvalId: rollout.approvalId });
+      return;
+    }
+    update(key, { ...latest, rollout });
+    await requestApproval(key, lifetime, client);
+  } catch (cause) {
+    const latest = current(key, lifetime);
+    const failure = toRpcFailure(cause);
+    if (latest)
+      update(key, {
+        ...latest,
+        phase: failure.ambiguous ? "start-ambiguous" : "start-rejected",
+        failure,
+      });
+  }
+}
+
+const startRefusals: Record<string, string> = {
+  targeting_impact_stale:
+    "Devices or settings changed after your review. Review impact again, then roll out.",
+  targeting_not_ready:
+    "No active device would change, so nothing was saved. Check the target and version.",
+  invalid_targeting_request:
+    "The server refused this rollout plan. Check the stages and target, then review again.",
+};
+
+function freshAssignment(candidate?: TargetCandidate) {
+  return create(
+    TargetAssignmentSchema,
+    candidate?.assignment
+      ? { ...candidate.assignment, rolloutId: undefined }
+      : { assignmentId: newRequestId(), target: create(TargetRefSchema) },
+  );
+}
+
+// The whole "Roll out" job: what and where, stages and name, the reviewed
+// impact, then one reasoned request. Nothing changes before Roll out, and
+// nothing changes before another administrator approves when approval is needed.
+export function RolloutFlow({
+  candidate,
+  onClose,
+}: {
+  candidate?: TargetCandidate;
+  onClose: () => void;
+}) {
   const lifetime = useAuthLifetime();
   const client = useQueryClient();
   const { profileRevisionPicker: ProfileRevisionPicker } = useTargetPickers();
   const key = candidate?.assignment?.assignmentId ?? "new";
   const attempt = useSyncExternalStore(subscribe, () => attempts.get(key));
-  const [draft, setDraft] = useState(() =>
-    create(TargetAssignmentSchema, candidate?.assignment ?? { assignmentId: newRequestId() }),
-  );
+  const [draft, setDraft] = useState(() => freshAssignment(candidate));
+  const [plan, setPlan] = useState<StagePlan>(initialStagePlan);
+  const [name, setName] = useState<string>();
   const [review, setReview] = useState<PreviewTargetAssignmentImpactResponse>();
   const [pageAfter, setPageAfter] = useState("");
   const [reason, setReason] = useState("");
-  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState("");
   const [readFailure, setReadFailure] = useState<RpcFailure>();
   const [now, setNow] = useState(Date.now);
-  const evidence = attempt?.status === "rejected" ? review : (attempt?.review ?? review);
-  const assignment =
-    attempt?.status === "rejected" ? draft : (attempt?.request.assignment ?? draft);
+  const impact = useRef<HTMLDivElement>(null);
+  // A prefilled change shows the options it already carries.
+  const [moreOptions, setMoreOptions] = useState(
+    () =>
+      !!candidate?.assignment &&
+      (candidate.assignment.priority !== 0 ||
+        candidate.assignment.exclusions.length > 0 ||
+        !!candidate.assignment.activatesAt ||
+        !!candidate.assignment.expiresAt),
+  );
+  const rejected = attempt?.phase === "start-rejected";
+  const frozen = !!attempt && !rejected;
+  const assignment = frozen ? (attempt.request.assignment ?? draft) : draft;
+  const evidence = frozen ? attempt.review : review;
   const expectedRevision = candidate?.revision ?? 0n;
-  const frozen = !!attempt && attempt.status !== "rejected";
-  const ProposalContainer = frozen ? "section" : "form";
-  const ConfirmationContainer = attempt?.status === "accepted" ? "section" : "form";
+  // The reviewed impact names the version (the picker lookup would fan out over
+  // every profile's history); the default name appears once the review does.
+  const version = evidence?.revisionLabels.find(
+    (label) => label.revisionId === assignment.profileRevisionId,
+  );
+  const target = useTargetLabel(assignment.target);
+  const defaultName =
+    version && target.ready
+      ? `${version.profileName} v${version.revisionNumber.toString()} to ${target.text}`.slice(
+          0,
+          128,
+        )
+      : "";
+  const rolloutName = frozen ? (attempt.request.rollout?.name ?? "") : (name ?? defaultName);
   const expired =
     !!evidence && (!evidence.validUntil || timestampDate(evidence.validUntil).getTime() <= now);
+  const problem = planProblem(plan);
   useEffect(() => {
     if (!evidence) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -96,12 +224,17 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
       });
       lifetime.signal.throwIfAborted();
       if (!result.previewId || !result.assignment || result.reviewSha256.length !== 32)
-        throw new Error("The impact review was incomplete. Review again before saving.");
+        throw new Error("The impact review was incomplete. Review again.");
       return result;
     },
     onSuccess: (result, request) => {
       if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
       setReview(result);
+      // Bring the reviewed consequences into view and focus, where the decision is.
+      requestAnimationFrame(() => {
+        impact.current?.scrollIntoView({ block: "start" });
+        impact.current?.focus({ preventScroll: true });
+      });
       setReadFailure(undefined);
       setNow(Date.now());
       setPageAfter(request.afterDeviceId ?? "");
@@ -111,55 +244,19 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
       setReadFailure(toRpcFailure(cause));
     },
   });
-  const save = useMutation({
-    retry: false,
-    gcTime: 0,
-    meta: { authGeneration: lifetime.generation },
-    mutationFn: async (request: SaveTargetAssignmentImpactRequest) => {
-      const result = await adminClient.saveTargetAssignmentImpact(request, {
-        signal: lifetime.signal,
-      });
-      lifetime.signal.throwIfAborted();
-      return result;
-    },
-    onSuccess: () => {
-      if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
-      const current = attempts.get(key);
-      if (current) attempts.set(key, { ...current, status: "accepted", failure: undefined });
-      notify();
-      toast.success("Assignment saved", { description: "No device changes were activated." });
-      void client.invalidateQueries({ queryKey: ["targeting", lifetime.generation] });
-    },
-    onError: (cause) => {
-      if (getAuthLifetime() !== lifetime || lifetime.signal.aborted) return;
-      const current = attempts.get(key);
-      const failure = toRpcFailure(cause);
-      if (current)
-        attempts.set(key, {
-          ...current,
-          status: failure.ambiguous ? "ambiguous" : "rejected",
-          failure,
-        });
-      if (!failure.ambiguous) {
-        setReview(undefined);
-        setAcknowledged(false);
-      }
-      notify();
-    },
-  });
   function change(next: typeof draft) {
     setDraft(next);
     setReview(undefined);
-    setAcknowledged(false);
     setReadFailure(undefined);
     setError("");
-    if (attempt?.status === "rejected") {
-      attempts.delete(key);
-      notify();
-    }
+    if (rejected) update(key);
   }
   function loadPage(afterDeviceId?: string) {
     if (frozen || read.isPending) return;
+    if (!draft.profileRevisionId || !draft.target?.target.value) {
+      setError("Choose a profile version and a target first.");
+      return;
+    }
     const request = create(PreviewTargetAssignmentImpactRequestSchema, {
       assignment: draft,
       expectedRevision,
@@ -176,22 +273,60 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
     }
     if (afterDeviceId === undefined) {
       setReview(undefined);
-      setAcknowledged(false);
       setPageAfter("");
     }
-    if (attempt?.status === "rejected") {
-      attempts.delete(key);
-      notify();
-    }
+    if (rejected) update(key);
     setReadFailure(undefined);
     setError("");
     read.mutate(request);
   }
+  function rollOut() {
+    if (attempt && attempt.phase === "start-ambiguous") {
+      void startRollout(key, lifetime, client);
+      return;
+    }
+    if (attempt && attempt.phase === "request-failed") {
+      void requestApproval(key, lifetime, client);
+      return;
+    }
+    if (frozen || !review || !review.complete || expired || read.isPending || readFailure) return;
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    const request = create(StartRolloutRequestSchema, {
+      requestId: newRequestId(),
+      previewId: review.previewId,
+      reviewSha256: review.reviewSha256,
+      assignment: review.assignment,
+      expectedRevision: review.expectedRevision,
+      rollout: create(RolloutSpecSchema, {
+        rolloutId: newRequestId(),
+        salt: crypto.getRandomValues(new Uint8Array(32)),
+        name: rolloutName.trim(),
+        rings: planRings(plan, review.assignment?.target),
+      }),
+      reason: reason.trim(),
+    });
+    const result = validator.validate(StartRolloutRequestSchema, request);
+    if (result.kind !== "valid") {
+      setError(
+        result.kind === "invalid" ? describeViolations(result.violations) : result.error.message,
+      );
+      return;
+    }
+    setError("");
+    update(key, { request, review, phase: "starting" });
+    void startRollout(key, lifetime, client);
+  }
+  const approvalRequired = evidence?.approvalRequired ?? false;
+  const busy = attempt?.phase === "starting" || attempt?.phase === "requesting";
+  const settled = attempt?.phase === "awaiting" || attempt?.phase === "started";
   return (
-    <section
-      className="grid min-w-0 gap-4"
+    <div
+      className="grid min-w-0 gap-5"
       data-review-state={
-        attempt?.status ??
+        attempt?.phase ??
         (read.isPending
           ? "loading"
           : readFailure
@@ -203,9 +338,9 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
                 : "draft")
       }
     >
-      <ProposalContainer
-        className="grid min-w-0 gap-4"
-        aria-label="Assignment proposal"
+      <form
+        className="grid min-w-0 gap-5"
+        aria-label="Rollout plan"
         onSubmit={(event) => {
           event.preventDefault();
           loadPage();
@@ -213,12 +348,6 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
       >
         <fieldset disabled={frozen || read.isPending} className="grid min-w-0 gap-4">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-            <TargetControl
-              label="Target"
-              value={assignment.target}
-              disabled={frozen || read.isPending}
-              onChange={(target) => change(create(TargetAssignmentSchema, { ...draft, target }))}
-            />
             <ProfileRevisionPicker
               label="Version"
               value={assignment.profileRevisionId}
@@ -227,38 +356,60 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
                 change(create(TargetAssignmentSchema, { ...draft, profileRevisionId }))
               }
             />
+            <TargetControl
+              label="Target"
+              value={assignment.target}
+              disabled={frozen || read.isPending}
+              onChange={(next) =>
+                change(create(TargetAssignmentSchema, { ...draft, target: next }))
+              }
+            />
           </div>
-          <OptionalControls title="Timing, exclusions and priority">
+          <StagesEditor plan={plan} onChange={setPlan} disabled={frozen} />
+          <label className="grid gap-1.5 text-sm">
+            Rollout name
+            <Input
+              data-freeform="rollout name"
+              maxLength={128}
+              value={rolloutName}
+              placeholder="Profile version to target"
+              onChange={(event) => setName(event.target.value)}
+            />
+          </label>
+          {/* A toggle, not a disclosure: the reviewed impact keeps the dialog's one disclosure. */}
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-fit px-0"
+            aria-expanded={moreOptions}
+            aria-controls="rollout-more-options"
+            onClick={() => setMoreOptions(!moreOptions)}
+          >
+            {moreOptions
+              ? "Hide priority, exclusions and timing"
+              : "Priority, exclusions and timing"}
+          </Button>
+          <div id="rollout-more-options" hidden={!moreOptions} className="grid min-w-0 gap-4">
             <NumberControl
-              label="Assignment priority"
+              label="Priority"
               value={assignment.priority}
               onChange={(priority) =>
                 change(create(TargetAssignmentSchema, { ...draft, priority }))
               }
             />
             <p className="text-sm text-muted-foreground">
-              Higher priority wins where settings overlap. Equal priority can conflict.
+              Where two assignments manage the same setting, the higher priority wins.
             </p>
-            <RolloutPicker
-              label="Optional staged rollout"
-              value={assignment.rolloutId ?? ""}
-              disabled={frozen || read.isPending}
-              onChange={(rolloutId) =>
-                change(
-                  create(TargetAssignmentSchema, { ...draft, rolloutId: rolloutId || undefined }),
-                )
-              }
-            />
             <div className="grid gap-3 sm:grid-cols-2">
               <TimeControl
-                label="Eligible from (local time, optional)"
+                label="Starts applying at (local time, optional)"
                 value={assignment.activatesAt}
                 onChange={(activatesAt) =>
                   change(create(TargetAssignmentSchema, { ...draft, activatesAt }))
                 }
               />
               <TimeControl
-                label="Expires at (local time, optional)"
+                label="Stops applying at (local time, optional)"
                 value={assignment.expiresAt}
                 onChange={(expiresAt) =>
                   change(create(TargetAssignmentSchema, { ...draft, expiresAt }))
@@ -283,6 +434,7 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
                 <Button
                   type="button"
                   variant="outline"
+                  className="w-fit"
                   onClick={() =>
                     change(
                       create(TargetAssignmentSchema, {
@@ -292,7 +444,7 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
                     )
                   }
                 >
-                  Remove exclusion {index + 1}
+                  {`Remove exclusion ${index + 1}`}
                 </Button>
               </div>
             ))}
@@ -311,31 +463,38 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
             >
               Add exclusion
             </Button>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={assignment.disabled}
-                onChange={(event) =>
-                  change(
-                    create(TargetAssignmentSchema, { ...draft, disabled: event.target.checked }),
-                  )
-                }
-              />
-              Disable this assignment, keeping its history
-            </label>
-          </OptionalControls>
+            {candidate ? (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={assignment.disabled}
+                  onChange={(event) =>
+                    change(
+                      create(TargetAssignmentSchema, { ...draft, disabled: event.target.checked }),
+                    )
+                  }
+                />
+                Stop this assignment: its devices stop getting these settings
+              </label>
+            ) : null}
+          </div>
         </fieldset>
         {!frozen ? (
           <Button
             type="submit"
+            variant={review ? "outline" : "default"}
             className="w-fit"
             disabled={read.isPending}
             data-review-next-action="review-impact"
           >
-            {read.isPending ? "Reviewing affected devices…" : "Review affected devices"}
+            {read.isPending
+              ? "Reviewing impact…"
+              : review
+                ? "Review impact again"
+                : "Review impact"}
           </Button>
         ) : null}
-      </ProposalContainer>
+      </form>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -343,155 +502,136 @@ export function AssignmentForm({ candidate }: { candidate?: TargetCandidate }) {
       ) : null}
       {readFailure ? (
         <RpcError failure={readFailure}>
-          <p>Impact could not be confirmed. Review again; nothing has been saved.</p>
+          <p>Impact could not be reviewed. Nothing has changed; review again.</p>
         </RpcError>
       ) : null}
-      {evidence && attempt?.status !== "rejected" ? (
+      {evidence ? (
         <>
-          <AssignmentImpact review={evidence} expired={expired} />
-          {pageAfter && !frozen ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={read.isPending}
-              onClick={() => loadPage("")}
-            >
-              First affected devices
-            </Button>
+          <div ref={impact} tabIndex={-1} className="scroll-mt-4 outline-none">
+            <AssignmentImpact review={evidence} expired={expired && !frozen} />
+          </div>
+          {!frozen && (pageAfter || evidence.nextAfterDeviceId) ? (
+            <div className="flex flex-wrap gap-2">
+              {pageAfter ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={read.isPending}
+                  onClick={() => loadPage("")}
+                >
+                  First devices
+                </Button>
+              ) : null}
+              {evidence.nextAfterDeviceId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={read.isPending}
+                  onClick={() => loadPage(evidence.nextAfterDeviceId)}
+                >
+                  More devices
+                </Button>
+              ) : null}
+            </div>
           ) : null}
-          {evidence.nextAfterDeviceId && !frozen ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={read.isPending}
-              onClick={() => loadPage(evidence.nextAfterDeviceId)}
-            >
-              More affected devices
-            </Button>
-          ) : null}
-          <ConfirmationContainer
+          <form
             className="grid gap-3 border-t pt-4"
-            aria-label="Assignment confirmation"
+            aria-label="Roll out"
             onSubmit={(event) => {
               event.preventDefault();
-              if (attempt && attempt.status !== "ambiguous") return;
-              if (
-                !attempt &&
-                (!review ||
-                  !review.complete ||
-                  expired ||
-                  !acknowledged ||
-                  !reason.trim() ||
-                  read.isPending ||
-                  readFailure)
-              )
-                return;
-              const request =
-                attempt?.request ??
-                create(SaveTargetAssignmentImpactRequestSchema, {
-                  requestId: newRequestId(),
-                  previewId: evidence.previewId,
-                  reviewSha256: evidence.reviewSha256,
-                  assignment: evidence.assignment,
-                  expectedRevision: evidence.expectedRevision,
-                  reason,
-                });
-              const result = validator.validate(SaveTargetAssignmentImpactRequestSchema, request);
-              if (result.kind !== "valid") {
-                setError(
-                  result.kind === "invalid"
-                    ? describeViolations(result.violations)
-                    : result.error.message,
-                );
-                return;
-              }
-              attempts.set(key, { request, review: evidence, status: "pending" });
-              notify();
-              setError("");
-              save.mutate(request);
+              rollOut();
             }}
           >
-            <p className="text-sm">
-              Saving records this assignment only. To change a device, separately inspect its saved
-              settings and activate the exact approved preview.
-            </p>
             <fieldset disabled={frozen} className="grid gap-3">
               <ReasonControl
-                label="Reason for this assignment"
-                value={attempt?.request.reason ?? reason}
+                label="Reason for this rollout"
+                value={frozen ? attempt.request.reason : reason}
                 onChange={setReason}
               />
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={acknowledged || !!attempt}
-                  onChange={(event) => setAcknowledged(event.target.checked)}
-                />
-                I reviewed the affected devices and consequences
-              </label>
             </fieldset>
-            {attempt?.status !== "accepted" ? (
+            {approvalRequired && !settled ? (
+              <p className="text-sm">
+                Another administrator must approve this rollout. Nothing changes on any device until
+                they do.
+              </p>
+            ) : null}
+            {!settled ? (
               <Button
                 type="submit"
                 className="w-fit"
-                data-review-next-action="save-assignment"
+                data-review-next-action="roll-out"
                 disabled={
-                  attempt?.status === "pending" ||
+                  busy ||
                   (!attempt &&
                     (!evidence.complete ||
                       expired ||
-                      !acknowledged ||
                       !reason.trim() ||
+                      !rolloutName.trim() ||
+                      !!problem ||
                       read.isPending ||
                       !!readFailure))
                 }
               >
-                {attempt?.status === "pending"
-                  ? "Saving assignment…"
-                  : attempt?.status === "ambiguous"
-                    ? "Retry exact save"
-                    : "Save reviewed assignment"}
+                {attempt?.phase === "starting"
+                  ? "Rolling out…"
+                  : attempt?.phase === "requesting"
+                    ? "Requesting approval…"
+                    : attempt?.phase === "start-ambiguous"
+                      ? "Retry the same rollout"
+                      : attempt?.phase === "request-failed"
+                        ? "Request approval again"
+                        : approvalRequired
+                          ? "Request approval to roll out"
+                          : "Roll out"}
               </Button>
             ) : null}
-          </ConfirmationContainer>
+          </form>
         </>
       ) : null}
       {attempt?.failure ? (
         <RpcError failure={attempt.failure}>
           <p>
-            {attempt.status === "ambiguous"
-              ? "The save outcome is unknown. Retry the same reviewed request; do not create another assignment."
-              : "The assignment was not saved. Refresh saved assignments if another administrator edited it, then review the current impact again."}
+            {attempt.phase === "start-ambiguous"
+              ? "We couldn't confirm the rollout started. Retry the same rollout; it can't start twice."
+              : attempt.phase === "request-failed"
+                ? "The rollout is waiting for approval, but the approval request wasn't confirmed. Request it again; it is the same request."
+                : (startRefusals[attempt.failure.reason] ??
+                  "The rollout didn't start and nothing changed. Review impact again.")}
           </p>
         </RpcError>
       ) : null}
-      {attempt?.status === "accepted" ? (
-        <div role="status" className="grid gap-3 text-sm">
-          <p>Assignment saved. No device changes were activated.</p>
+      {attempt?.phase === "awaiting" ? (
+        <div role="status" className="grid gap-2 border bg-muted/30 p-3 text-sm">
+          <p className="font-medium">Waiting for approval from another administrator</p>
+          <p>
+            Nothing changes until they approve. Then the rollout starts within a minute. Without a
+            decision, the request expires in an hour.
+          </p>
+          <Link to="/approvals" className="w-fit underline underline-offset-4">
+            Open Approvals
+          </Link>
+        </div>
+      ) : null}
+      {attempt?.phase === "started" ? (
+        <p role="status" className="border bg-muted/30 p-3 text-sm">
+          Rolling out to {attempt.rollout?.plannedCount ?? 0}{" "}
+          {attempt.rollout?.plannedCount === 1 ? "device" : "devices"}. Follow its progress in the
+          list.
+        </p>
+      ) : null}
+      {settled ? (
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
-            variant="outline"
-            className="w-fit"
             onClick={() => {
-              attempts.delete(key);
-              notify();
-              setDraft(
-                create(
-                  TargetAssignmentSchema,
-                  candidate?.assignment ?? { assignmentId: newRequestId() },
-                ),
-              );
-              setReview(undefined);
-              setReason("");
-              setAcknowledged(false);
+              update(key);
+              onClose();
             }}
           >
-            {candidate ? "Review another change" : "Start another rollout"}
+            Done
           </Button>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }

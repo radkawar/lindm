@@ -51,6 +51,7 @@ import * as pass2SafetyAssistance from "./pass2-safety-assistance.mjs";
 import * as pass2SafetyReveal from "./pass2-safety-reveal.mjs";
 import * as accounts from "./accounts.mjs";
 import * as authorization from "./authorization.mjs";
+import * as rolloutHead from "./rollout-head.mjs";
 import * as pass2AssignmentProgress from "./pass2-assignment-progress.mjs";
 import * as pass2SecretReveal from "./pass2-secret-reveal.mjs";
 import * as pass2SafetyWipe from "./pass2-safety-wipe.mjs";
@@ -153,5 +154,6 @@ export const ownerEdits = [
   // Creates a dynamic group.
   groupsDynamicCreate,
   // Changes and restores the route device profile; keep last.
+  rolloutHead,
   pass2AssignmentProgress,
 ];

@@ -1,74 +1,40 @@
-// Owner task: /rollouts shows staged rollouts and saved assignments as visible
-// lists, keeps the form behind "New rollout" with distinct field labels, and
-// uses Profile/Version wording. Read-only: opens and closes the form without
-// reviewing or saving anything.
+// Owner task (pass 2, items 25-32, 50, bug 8): /rollouts has one "Roll out"
+// flow. Rollouts carry real names and live device results, controls are
+// secondary buttons with their own confirmation, and New rollout is a dialog
+// whose stages, target picker and one-line impact summary meet the owner's
+// edits. Read-only: it opens dialogs and reviews impact but never rolls out,
+// pauses or advances anything.
 export const task = {
-  name: "Rollouts visible state",
+  name: "Rollouts one roll-out flow",
   screenId: "2031ff7e60ccbf0eb971b2a4",
   route: "/rollouts",
-  priority: "normal",
+  priority: "high",
   acceptance:
-    "No two fields share a label; the words 'baseline revision' no longer appear; with any active rollout seeded, it is visible without expanding anything.",
+    "No 'not proof of device execution' disclaimer or 'Saving records this assignment only'; no rollout is titled by its stage list; pausing is a secondary button with its own dialog; New rollout opens a dialog whose Target picker lists no type names, whose Profile picker leaves the sidebar groups alone, whose final stage stays at 100%, and whose impact summary is one line that never calls an excluded device 'Settings would change'.",
 };
 
 const timeout = 30_000;
-const ACTIVE = /^(Not delivering yet|Waiting to advance|Manual promotion required|Final stage)$/;
-const SUMMARY = /^(\d+) in progress, (\d+) paused/;
+const TYPE_NAMES = ["Device group", "Dynamic group", "One device"];
+// A title made only of stage names, e.g. "pilot, fleet" or "Stage-1".
+const STAGE_LIST = /^[A-Za-z0-9_.-]+(, [A-Za-z0-9_.-]+)*$/;
+const SUMMARY =
+  /^(At least )?\d+ devices? will change( · \d+ unchanged)?( · \d+ not targeted)?( · \d+ unknown)?$/;
 
-// Visible on screen and not inside a closed disclosure or hidden subtree.
-async function shownWithoutExpanding(locator) {
-  if (!(await locator.isVisible())) return false;
-  return locator.evaluate(
-    (node) =>
-      !node.closest("details:not([open])") && !node.closest('[hidden],[aria-hidden="true"]'),
-  );
+// Expanded state of every sidebar group toggle, in order.
+function navGroups(page) {
+  return page
+    .locator('[data-sidebar="group-label"][aria-expanded], [data-slot="sidebar-group-label"]')
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-expanded")));
 }
 
-// Primary text only: rendered text nodes outside Technical details.
-function primaryText(root) {
-  return root.evaluate((node) => {
-    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-    const parts = [];
-    for (let text = walker.nextNode(); text; text = walker.nextNode()) {
-      const parent = text.parentElement;
-      if (!parent || parent.closest('[data-slot="technical-details"]')) continue;
-      if (!parent.checkVisibility()) continue;
-      parts.push(text.textContent ?? "");
-    }
-    return parts.join(" ").replace(/\s+/g, " ");
-  });
-}
-
-// Every labelled control: aria-label, the first aria-labelledby element (the
-// picker label, not its current value), label[for], or the wrapping label text.
-function controlLabels(root) {
-  return root.evaluate((node) => {
-    const text = (element) => (element?.textContent ?? "").replace(/\s+/g, " ").trim();
-    const controls = node.querySelectorAll(
-      'input:not([type="hidden"]):not([aria-hidden="true"]), select, textarea, [role="combobox"], button[aria-labelledby]',
-    );
-    const labels = [];
-    for (const control of controls) {
-      let label = control.getAttribute("aria-label") ?? "";
-      const labelledBy = control.getAttribute("aria-labelledby");
-      if (!label && labelledBy)
-        label = text(document.getElementById(labelledBy.trim().split(/\s+/)[0]));
-      if (!label && control.id)
-        label = text(node.querySelector(`label[for="${CSS.escape(control.id)}"]`));
-      if (!label) {
-        const wrapper = control.closest("label");
-        if (wrapper) {
-          const clone = wrapper.cloneNode(true);
-          clone
-            .querySelectorAll('input, select, textarea, button, [role="combobox"]')
-            .forEach((child) => child.remove());
-          label = text(clone);
-        }
-      }
-      if (label) labels.push(label);
-    }
-    return labels;
-  });
+// Choose the first named option of a SearchPicker whose label is `label`.
+async function chooseFirst(page, container, label) {
+  await container.getByRole("button", { name: new RegExp(`^${label} `) }).click();
+  const options = page.getByRole("option").filter({ hasNotText: "No selection" });
+  await options.first().waitFor({ timeout });
+  const names = (await options.allInnerTexts()).map((text) => text.split("\n")[0].trim());
+  await options.first().click();
+  return names;
 }
 
 export async function check({ page, visit, settle, require, capture, step }) {
@@ -76,97 +42,117 @@ export async function check({ page, visit, settle, require, capture, step }) {
   step("open rollouts");
   await visit("/rollouts");
   await main.getByRole("heading", { name: "Rollouts", exact: true }).waitFor({ timeout });
-  const staged = main.getByRole("region", { name: "Staged rollouts", exact: true });
-  const saved = main.getByRole("region", { name: "Saved assignments", exact: true });
-  // A loaded list shows its in-progress summary; an empty one its empty state.
-  await staged
-    .getByText(SUMMARY)
-    .or(staged.getByText("No staged rollouts yet", { exact: true }))
+  await main
+    .locator("article")
     .first()
-    .waitFor({ timeout });
-  await saved
-    .getByRole("listitem")
-    .or(saved.getByText("No saved assignments yet", { exact: true }))
-    .first()
+    .or(main.getByText("No rollouts yet", { exact: true }))
     .waitFor({ timeout });
   await settle();
 
-  step("active rollout visible without expanding");
-  const cards = await staged.getByRole("article").all();
-  let active = 0;
-  let activeShown = 0;
-  for (const card of cards) {
-    const status = card.getByText(ACTIVE);
-    if ((await status.count()) === 0) continue;
-    active++;
-    // The rollout's name is the card's first heading; its decision form follows.
-    const heading = card.getByRole("heading", { level: 3 }).first();
-    const stage = card.getByText(/^Stage \d+ of \d+: /);
-    if (
-      (await shownWithoutExpanding(heading)) &&
-      (await shownWithoutExpanding(status.first())) &&
-      (await stage.count()) === 1 &&
-      (await shownWithoutExpanding(stage))
-    )
-      activeShown++;
+  step("no disclaimers");
+  const text = (await main.textContent()) ?? "";
+  require(!/not proof of device execution/i.test(
+    text,
+  ), "The saved-counts disclaimer is still shown");
+  require(!/Saving records this assignment only/i.test(
+    text,
+  ), "'Saving records this assignment only' is still shown");
+
+  step("rollout names are not stage lists");
+  const titles = await main.locator("article h3").allInnerTexts();
+  require(titles.length > 0, "No rollout is listed on /rollouts");
+  for (const title of titles)
+    require(!STAGE_LIST.test(
+      title.trim(),
+    ), `Rollout "${title.trim()}" is titled by its stage names`);
+
+  step("controls are secondary buttons");
+  require((await main.getByRole("combobox", { name: "Rollout decision" }).count()) ===
+    0, "The always-expanded rollout decision form is still shown");
+  require((await main.getByRole("textbox", { name: /^Reason/ }).count()) ===
+    0, "A reason field is shown before choosing a rollout action");
+  // An active rollout offers Pause, or Resume when its guardrails paused it.
+  const control = main.getByRole("button", { name: /^(Pause|Resume)$/ }).first();
+  require((await control.count()) === 1, "No active rollout offers Pause or Resume");
+  if (await control.count()) {
+    const action = (await control.innerText()).trim();
+    await control.click();
+    const confirm = page.getByRole("dialog", { name: new RegExp(`^${action}: `) });
+    await confirm.waitFor({ timeout });
+    require(await confirm
+      .getByRole("textbox", { name: "Reason", exact: true })
+      .isVisible(), `${action} doesn't ask for a reason`);
+    await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+    await confirm.waitFor({ state: "detached", timeout });
   }
-  require(active > 0, "No active (not paused) staged rollout is listed on /rollouts");
-  require(activeShown ===
-    active, `${active - activeShown} of ${active} active rollout(s) are hidden or need expanding`);
-  const summary = staged.getByText(SUMMARY);
-  const summaryText = (await summary.count()) === 1 ? (await summary.innerText()).trim() : "";
-  require(summaryText !== "", "Staged rollouts has no 'N in progress, N paused' summary");
-  require(!summaryText ||
-    Number(SUMMARY.exec(summaryText)?.[1]) ===
-      active, `Summary "${summaryText}" does not match ${active} active rollout card(s)`);
-  require(await shownWithoutExpanding(
-    saved.getByRole("heading", { name: "Saved assignments" }),
-  ), "Saved assignments list is not visible without expanding");
-  const form = main.getByRole("region", { name: "New rollout", exact: true });
-  require((await form.count()) === 0, "The rollout form is shown before choosing New rollout");
-  await capture("lists visible");
+  await capture("rollouts list");
 
-  step("open new rollout");
-  const open = main.getByRole("button", { name: "New rollout", exact: true });
-  await open.click();
-  await form.waitFor({ timeout });
-  const listBottom = await saved.boundingBox();
-  const formTop = await form.boundingBox();
-  require(!!listBottom &&
-    !!formTop &&
-    formTop.y >=
-      listBottom.y +
-        listBottom.height -
-        1, "The new rollout form is not below the rollout and assignment lists");
+  step("new rollout is a dialog");
+  await main.getByRole("button", { name: "New rollout", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "New rollout", exact: true });
+  await dialog.waitFor({ timeout });
+  require(await dialog.isVisible(), "New rollout does not open a dialog");
 
-  step("distinct field labels");
-  const labels = await controlLabels(form);
-  const seen = new Map();
-  for (const label of labels) seen.set(label, (seen.get(label) ?? 0) + 1);
-  const shared = [...seen].filter(([, count]) => count > 1).map(([label]) => label);
-  require(shared.length === 0, `Fields share a label: ${shared.join(", ")}`);
-  for (const expected of ["Target type", "Target", "Profile", "Version"])
-    require(seen.has(expected), `New rollout has no field labelled "${expected}"`);
-  require(!seen.has("Cohort"), "A field is still labelled 'Cohort'");
+  step("profile picker leaves the sidebar alone");
+  const before = await navGroups(page);
+  await dialog.getByRole("button", { name: /^Profile / }).click();
+  await page.getByRole("combobox", { name: "Search profile", exact: true }).waitFor({ timeout });
+  const during = await navGroups(page);
+  await page.keyboard.press("Escape");
+  require(before.length > 0 &&
+    JSON.stringify(before) ===
+      JSON.stringify(
+        during,
+      ), `Opening the Profile picker changed the sidebar groups (${before} → ${during})`);
+  const profiles = await chooseFirst(page, dialog, "Profile");
+  require(profiles.length > 0, "The Profile picker offers no profile");
 
-  step("profile and version wording on /rollouts");
-  const rolloutsText = (await main.textContent()) ?? "";
-  require(!/baseline revision/i.test(rolloutsText), "/rollouts still says 'baseline revision'");
-  const rolloutsPrimary = await primaryText(main);
-  require(!/\brevisions?\b/i.test(
-    rolloutsPrimary,
-  ), "/rollouts primary text says 'revision' instead of 'version'");
-  await capture("new rollout form");
-  await form.getByRole("button", { name: "Close", exact: true }).click();
-  await form.waitFor({ state: "detached", timeout });
+  step("target picker lists names only");
+  require((await dialog.getByRole("combobox", { name: "Target type" }).count()) ===
+    0, "Target type is still a dropdown");
+  const targets = await chooseFirst(page, dialog, "Target");
+  const listed = targets.filter((name) => TYPE_NAMES.includes(name));
+  require(listed.length === 0, `The Target picker lists type names: ${listed.join(", ")}`);
 
-  step("profile and version wording on /profiles");
-  await visit("/profiles");
-  await main.getByRole("heading", { name: "Profiles", exact: true }).waitFor({ timeout });
-  await settle();
-  const profilesText = (await main.textContent()) ?? "";
-  require(!/baseline revision/i.test(profilesText), "/profiles still says 'baseline revision'");
-  require(!/\brevisions?\b/i.test(
-    await primaryText(main),
-  ), "/profiles primary text says 'revision' instead of 'version'");
+  step("final stage stays at 100%");
+  await dialog.getByRole("radio", { name: "In stages", exact: true }).check();
+  const shares = dialog.getByRole("spinbutton", { name: /^Stage \d+ share of devices/ });
+  const final = shares.last();
+  require((await shares.count()) >= 2, "In stages does not offer a stage before the final one");
+  require(!(await final.isEditable()), "The final stage's share can be edited below 100%");
+  require((await final.inputValue()) === "100", "The final stage does not cover 100%");
+  require((await dialog.getByRole("textbox", { name: "Stage 1 name" }).inputValue()) !==
+    "Stage-1", "The first stage is still named 'Stage-1'");
+  await capture("new rollout stages");
+
+  step("one-line impact summary");
+  await dialog.getByRole("button", { name: "Review impact", exact: true }).click();
+  const summary = dialog.locator("[data-impact-summary]");
+  await summary.or(dialog.getByRole("alert")).first().waitFor({ timeout });
+  require((await summary.count()) === 1, "Review impact shows no impact summary");
+  if (await summary.count()) {
+    const line = (await summary.innerText()).trim();
+    require(SUMMARY.test(
+      line,
+    ), `Impact summary "${line}" is not "N devices will change · N unchanged · N not targeted · N unknown"`);
+    const lines = await summary.evaluate((node) =>
+      Math.round(
+        node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight),
+      ),
+    );
+    require(lines === 1, `Impact summary wraps to ${lines} lines`);
+  }
+  const dialogText = (await dialog.textContent()) ?? "";
+  require(!/Settings would change/.test(
+    dialogText,
+  ), "The impact still says 'Settings would change'");
+  require(!/Saving records this assignment only/i.test(
+    dialogText,
+  ), "The dialog still says 'Saving records this assignment only'");
+  require((await dialog
+    .getByRole("button", { name: /^(Roll out|Request approval to roll out)$/ })
+    .count()) === 1, "The reviewed impact has no Roll out action");
+  await capture("new rollout impact");
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "hidden", timeout });
 }

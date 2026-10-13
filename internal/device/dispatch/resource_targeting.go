@@ -95,7 +95,9 @@ func (s *Service) resolveTargetCandidatesCached(ctx context.Context, tx pgx.Tx, 
 	return out, nil
 }
 
-func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, authorizationVersion uint64, adoptionApprovalID string) error {
+// reason is the activation's human reason (a rollout's or an administrator's),
+// shown on the device as why its settings changed.
+func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview *policyv1.TargetPreview, actor uuid.UUID, authorizationVersion uint64, adoptionApprovalID, reason string) error {
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(preview.GetResolution())
 	if err != nil {
 		return err
@@ -144,7 +146,7 @@ func (s *Service) activateTargetPreview(ctx context.Context, tx pgx.Tx, preview 
 	if err != nil {
 		return err
 	}
-	assignment := &adminv1.ResourceAssignment{AssignmentId: id.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generation.String(), ActorId: actor.String(), AssignedAt: timestamppb.New(now), Reason: "target_preview_activation", ReconcileIntervalSeconds: 900}
+	assignment := &adminv1.ResourceAssignment{AssignmentId: id.String(), DeviceId: deviceID.String(), EnrollmentGeneration: generation.String(), ActorId: actor.String(), AssignedAt: timestamppb.New(now), Reason: reason, ReconcileIntervalSeconds: 900}
 	document, err := proto.Marshal(assignment)
 	if err != nil {
 		return err

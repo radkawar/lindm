@@ -433,136 +433,130 @@ async function baseline(ctx) {
     "A new version is saved. No existing profile was edited, and no device has been activated.",
   );
   await navigate(ctx, "Rollouts", "Rollouts");
-  await visible(page.getByRole("heading", { name: "Staged rollouts", exact: true }));
-  await visible(page.getByRole("heading", { name: "Saved assignments", exact: true }));
+  await visible(page.getByRole("heading", { name: "Recent rollouts", exact: true }));
   await shot(
     ctx,
     "baseline-rollouts",
-    "Rollouts / staged rollouts and saved assignments",
+    "Rollouts / current rollouts",
     "yes",
-    "Rollouts in progress and saved assignments lead the page; the new-rollout form waits behind its button.",
-    "Owner should verify that existing assignments and stage controls stay visible without crowding the new rollout.",
-    "No assignment has been saved; the new profile version remains catalog-only.",
+    "Named rollouts with live device results lead the page; New rollout opens its own dialog.",
+    "Owner should verify that live results and the next decision stay visible without opening anything.",
+    "No rollout has been started; the new profile version remains catalog-only.",
   );
   await page.getByRole("button", { name: "New rollout", exact: true }).click();
-  const proposal = page.getByRole("region", { name: "New rollout", exact: true });
+  const proposal = page.getByRole("dialog", { name: "New rollout", exact: true });
   await visible(proposal);
-  await chooseNamed(ctx, proposal, "Target", group.name, "baseline-cohort");
   await chooseNamed(ctx, proposal, "Profile", profileName, "baseline-profile-choice");
   await chooseNamed(ctx, proposal, "Version", `${profileName}, version 1`, "baseline-revision");
+  await chooseNamed(ctx, proposal, "Target", group.name, "baseline-cohort");
   await shot(
     ctx,
     "baseline-proposed-scope",
-    "Rollouts / proposed Finance scope",
+    "Rollouts / new rollout",
     "yes",
-    "The proposal carries named Finance membership and the selected profile version.",
-    "Keep review invalidation obvious when any target, revision, exclusion or timing input changes.",
-    "Finance and the new read-only encryption-compliance baseline are selected; no assignment exists yet.",
+    "The dialog carries the named Finance group, the selected profile version, everyone-at-once stages and a generated name.",
+    "Keep review invalidation obvious when the target, version, exclusions or timing change.",
+    "Finance and the new read-only encryption-compliance baseline are selected; nothing has been saved.",
   );
-  await page.getByRole("button", { name: "Review affected devices", exact: true }).click();
-  await visible(page.getByRole("heading", { name: "Affected devices", exact: true }));
-  await visible(page.getByText(device.Hostname, { exact: true }).first());
+  await proposal.getByRole("button", { name: "Review impact", exact: true }).click();
+  await visible(proposal.locator("[data-impact-summary]"));
+  await visible(proposal.getByRole("link", { name: device.Hostname, exact: true }));
   await shot(
     ctx,
     "baseline-before-save-impact",
-    "Rollouts / proposed affected-device evidence",
+    "Rollouts / reviewed impact",
     "yes",
-    "The named device consequences are reviewed before assignment, with incomplete and unknown states retained.",
-    "Owner should check reading order of differences/conflicts and distinguish catalog resolution from actual applied/native state.",
-    "The actual server-generated proposed impact is visible before save. No client-side impact estimate or temporary assignment was used.",
+    "One summary line, then each included device with what changes, including settings that stop being managed.",
+    "Owner should check that replaced direct assignments and precedence read as consequences, not footnotes.",
+    "The actual server-generated impact is visible before rolling out. No client-side estimate or temporary assignment was used.",
   );
-  const save = page.getByRole("button", { name: "Save reviewed assignment", exact: true });
-  if (!(await save.isDisabled())) throw new Error("baseline_save_without_acknowledgement");
-  await page
-    .getByRole("textbox", { name: "Reason for this assignment", exact: true })
-    .fill(
-      "Assign the reviewed read-only Finance encryption-compliance baseline; native activation remains a separate reviewed action.",
-    );
-  await page
-    .getByRole("checkbox", {
-      name: "I reviewed the affected devices and consequences",
-      exact: true,
-    })
-    .check();
+  const rollOut = proposal.getByRole("button", {
+    name: /^(Roll out|Request approval to roll out)$/,
+  });
+  if (!(await rollOut.isDisabled())) throw new Error("baseline_roll_out_without_reason");
+  await proposal
+    .getByRole("textbox", { name: "Reason for this rollout", exact: true })
+    .fill("Roll out the reviewed read-only Finance encryption-compliance baseline.");
   await shot(
     ctx,
     "baseline-reviewed-confirmation",
-    "Rollouts / reviewed assignment confirmation",
+    "Rollouts / reasoned roll out",
     "yes",
-    "The reason and acknowledgement follow visible named impact, not a generic confirmation dialog.",
-    "Ensure incomplete/oversized/stale impact can never be accepted merely by checking the acknowledgement.",
-    "The exact displayed proposal is acknowledged. Saving assignment is not activating or enforcing native settings.",
+    "The reason and the single Roll out action follow the named impact, not a generic confirmation.",
+    "Ensure incomplete or expired impact can never be rolled out merely by giving a reason.",
+    "The exact reviewed impact is rolled out with one request; approval is requested automatically when required.",
   );
-  await save.click();
+  await rollOut.click();
   await visible(
-    page.getByText("Assignment saved. No device changes were activated.", { exact: true }),
+    proposal
+      .getByText(/^Rolling out to \d+ devices?\./)
+      .or(proposal.getByText("Waiting for approval from another administrator", { exact: true })),
   );
   await shot(
     ctx,
     "baseline-assignment-saved",
-    "Rollouts / saved reviewed assignment",
+    "Rollouts / rollout started",
     "yes",
-    "The result distinguishes saved assignment from device activation.",
-    "Keep the next authorized activation and its full combined-device effects explicit.",
-    "The real save accepted the reviewed proposal; no native activation or policy execution is claimed.",
+    "The outcome names how many devices the rollout covers, or that it waits for another administrator.",
+    "Keep device results visible on the rollout itself; starting is not proof that a device applied it.",
+    "The real StartRollout accepted the reviewed impact; no device result is claimed.",
   );
-  await visible(page.getByRole("heading", { name: "Staged rollouts", exact: true }));
+  await proposal.getByRole("button", { name: "Done", exact: true }).click();
+  await proposal.waitFor({ state: "hidden", timeout });
+  const rolloutName = `${profileName} v1 to ${group.name}`;
   const staged = page.locator("article").filter({
-    has: page.getByRole("heading", { name: "pilot, fleet", exact: true }),
+    has: page.getByRole("heading", { name: rolloutName, exact: true }),
   });
-  await visible(
-    staged.getByText(/^(Paused|Waiting to advance|Manual promotion required|Final stage)$/),
-  );
-  await staged.getByRole("combobox", { name: "Rollout decision", exact: true }).click();
-  await visible(page.getByRole("option", { name: "Pause this rollout", exact: true }));
-  await visible(page.getByRole("option", { name: "Resume this rollout", exact: true }));
-  if (await page.getByRole("option", { name: /Advance to|Check promotion/ }).count()) {
-    throw new Error("automatic_rollout_exposes_manual_advancement");
+  await visible(staged.getByText(/^(Rolling out|Waiting for approval|Finished)$/));
+  if (await staged.getByRole("button", { name: /^Advance to/ }).count()) {
+    throw new Error("everyone_at_once_rollout_offers_advancement");
   }
-  await shot(
-    ctx,
-    "baseline-staged-actions",
-    "Rollouts / automatic-stage controls",
-    "yes",
-    "The automatic pilot exposes pause and resume, not a manual progress-check workaround.",
-    "Only a manual ring with a following stage should offer administrator advancement.",
-    "The actual automatic campaign has no manual advancement option. No rollout control is sent.",
-  );
-  await page.keyboard.press("Escape");
-  await page.getByRole("option", { name: "Pause this rollout", exact: true }).waitFor({
-    state: "hidden",
-  });
-  const draftReason = "Inspecting pilot health; no rollout change authorized in this walkthrough.";
-  const reasonField = staged.getByRole("textbox", { name: "Reason for this change", exact: true });
-  await reasonField.fill(draftReason);
-  const observationStarted = Date.now();
-  await page.waitForResponse(
-    (response) =>
-      response.url().endsWith("/lindm.admin.v1.AdminService/ListRollouts") &&
-      response.status() === 200 &&
-      Date.now() - observationStarted >= 9_000,
-    { timeout: 30_000 },
-  );
-  if ((await reasonField.inputValue()) !== draftReason) {
-    throw new Error("passive_rollout_refresh_replaced_unsent_draft");
+  const pause = staged.getByRole("button", { name: "Pause", exact: true });
+  if (await pause.count()) {
+    await pause.click();
+    const confirm = page.getByRole("dialog", { name: `Pause: ${rolloutName}`, exact: true });
+    await visible(confirm);
+    const draftReason =
+      "Inspecting pilot health; no rollout change authorized in this walkthrough.";
+    const reasonField = confirm.getByRole("textbox", { name: "Reason", exact: true });
+    await reasonField.fill(draftReason);
+    const observationStarted = Date.now();
+    await page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/lindm.admin.v1.AdminService/ListRollouts") &&
+        response.status() === 200 &&
+        Date.now() - observationStarted >= 9_000,
+      { timeout: 30_000 },
+    );
+    if ((await reasonField.inputValue()) !== draftReason) {
+      throw new Error("passive_rollout_refresh_replaced_unsent_draft");
+    }
+    await shot(
+      ctx,
+      "baseline-staged-actions",
+      "Rollouts / pause confirmation",
+      "yes",
+      "Pause is a secondary action with its own consequence and reason; a passive refresh keeps the unsent draft.",
+      "Only a stage that waits for an administrator should offer advancement.",
+      "The pause dialog is open with an unsent reason. No rollout control is sent.",
+    );
+    await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
+    await confirm.waitFor({ state: "hidden", timeout });
   }
-  await staged.getByText("Promotion evidence", { exact: true }).click();
-  await visible(staged.getByText(/Across all stages reached:/));
-  await visible(staged.getByText(/Stage started:/));
   await staged.scrollIntoViewIfNeeded();
   await shot(
     ctx,
     "baseline-staged-progress",
-    "Rollouts / retained stage progress",
+    "Rollouts / live progress",
     "yes",
-    "The stage state distinguishes waiting, paused, manual promotion and final-stage entry from completed device execution.",
-    "Keep background advancement and current health evidence explicit; reading or refreshing must never promote a stage.",
-    "The existing pilot/fleet campaign passively refreshed while preserving an unsent control draft. No promotion command, manual refresh or native-success claim was made.",
+    "The rollout shows applied, in-progress, failed, waiting and needs-review devices from device results.",
+    "Keep background activation and current health explicit; reading or refreshing never advances a stage.",
+    "The Finance rollout is listed by name with its live device results. No control was sent.",
   );
   return {
     outcome: "completed",
     reason:
-      "Created an isolated named Finance group and read-only baseline, reviewed actual proposed affected-device evidence before saving, and saved through the review-bound operation. Device activation and native enforcement remain separate tasks; this walk never activates unrelated existing seed policy.",
+      "Created an isolated named Finance group and read-only baseline, reviewed the actual impact (including settings that stop being managed), and rolled it out through the single review-bound StartRollout. Device results are reported by the rollout, not claimed by the walkthrough.",
   };
 }
 

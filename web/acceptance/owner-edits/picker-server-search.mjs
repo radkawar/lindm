@@ -1,16 +1,16 @@
 // Owner report: pickers over paged lists searched only the loaded page, so on the
 // scale seed (120 device groups) typing a group that was not among the first 50
-// read "No matching options". Device group, dynamic group and rollout pickers now
-// ask the server for any part of the name, page inside the open picker with
-// More choices, and name an empty search result.
-// Read-only: searches in the New rollout form and closes it without saving.
+// read "No matching options". Device group and dynamic group pickers now ask the
+// server for any part of the name, page inside the open picker with More
+// choices, and name an empty search result.
+// Read-only: searches in the New rollout dialog and closes it without saving.
 export const task = {
-  name: "Pickers search every group and rollout, not one page",
+  name: "Pickers search every group, not one page",
   screenId: "owner-picker-server-search",
   route: "/rollouts",
   priority: "normal",
   acceptance:
-    "In the New rollout form, a device group that is only on the Target picker's second page (More choices) is found by typing part of its name in another case and can be chosen; a search with no match says no group names contain it; the dynamic group Target picker finds 'Finance devices' by 'NANCE' and lists nothing else; the Optional staged rollout picker finds the seeded 'Pilot, Fleet' rollout by part of a stage name in another case and names an empty search.",
+    "In the New rollout dialog, a device group that is only on the Target picker's second page (More choices) is found by typing part of its name in another case and can be chosen; a search with no match says no group names contain it; the dynamic group Target picker finds 'Finance devices' by 'NANCE' and lists nothing else.",
 };
 
 const timeout = 30_000;
@@ -47,7 +47,7 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await main.getByRole("heading", { name: "Rollouts", exact: true }).waitFor({ timeout });
   await settle();
   await main.getByRole("button", { name: "New rollout", exact: true }).click();
-  const form = main.getByRole("region", { name: "New rollout", exact: true });
+  const form = page.getByRole("dialog", { name: "New rollout", exact: true });
   await form.waitFor({ timeout });
   await settle();
 
@@ -98,8 +98,7 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await page.keyboard.press("Escape");
 
   step("find a dynamic group by part of its name");
-  await form.getByRole("combobox", { name: "Target type", exact: true }).click();
-  await page.getByRole("option", { name: "Dynamic group", exact: true }).click();
+  await form.getByRole("radio", { name: "Dynamic group", exact: true }).check();
   await form.getByRole("button", { name: /^Target Choose/ }).click();
   const dynamic = openChoices(page);
   await page.getByRole("combobox", { name: "Search target", exact: true }).fill("NANCE");
@@ -110,29 +109,6 @@ export async function check({ page, visit, settle, require, capture, step }) {
     dynamicFound[0] ===
       "Finance devices", `searching "NANCE" listed ${JSON.stringify(dynamicFound)}, not only "Finance devices"`);
   await capture("dynamic-group-picker-server-search");
-  await page.keyboard.press("Escape");
-
-  step("find the seeded rollout by part of a stage name");
-  await form.locator("summary", { hasText: "Timing, exclusions and priority" }).click();
-  await form.getByRole("button", { name: /^Optional staged rollout/ }).click();
-  const rolloutSearch = page.getByRole("combobox", {
-    name: "Search optional staged rollout",
-    exact: true,
-  });
-  const rollouts = openChoices(page);
-  await rolloutSearch.fill("FLEE");
-  const found = await waitForLabels(page, rollouts, (name) => name.toLowerCase().includes("flee"));
-  require(found.some(
-    (name) => name.toLowerCase() === "pilot, fleet",
-  ), `searching "FLEE" listed ${JSON.stringify(found)}, not the "Pilot, Fleet" rollout`);
-  await capture("rollout-picker-server-search");
-  await rolloutSearch.fill("zq-no-such-stage");
-  const noRollout = page.getByText(
-    "No staged rollouts have a stage name containing “zq-no-such-stage”.",
-    { exact: true },
-  );
-  await noRollout.waitFor({ timeout }).catch(() => {});
-  require(await noRollout.isVisible(), "an unmatched rollout search does not say that no stage names contain it");
   await page.keyboard.press("Escape");
 
   await form.getByRole("button", { name: "Close", exact: true }).click();

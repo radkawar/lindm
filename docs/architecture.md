@@ -776,28 +776,45 @@ still constrain row visibility. Neither a target nor a pagination cursor grants
 access to hidden devices. Pages recheck visibility and retain the same actor,
 proposal, digest and evaluation timestamp.
 
-`SaveTargetAssignmentImpact` binds the exact proposal, expected assignment revision
-and report digest. After fresh authorization it checks exact successful request
-replay before consulting report expiry or recomputing inputs. A new save rechecks
-the entire candidate population, membership/host inputs, saved catalog, referenced
-definitions and rollout state, current resource head and resulting server
-resolution, rejecting changes with `targeting_impact_stale`. The impact operations
-require READ COMMITTED and acquire the targeting fence and SHARE locks on relevant
-device, membership, inventory, profile and resource-head tables before reading
-inputs. Locks remain through mutation/receipt commit, including for initially
-empty cohorts, preventing concurrent membership insertion or enrollment from
-silently expanding the reviewed population. These bounded transactions can block
-fleet writes; they perform no network work and retain the request deadline and
-explicit deadlock/serialization conflict behavior. This is not a measured
-10,000-device latency qualification.
+`StartRollout` is the one reviewed mutation (design note:
+[rollout flow](design-concepts/rollout-flow.md)). It binds the exact proposal (which
+must not name a rollout), expected assignment revision, report digest and a stage
+plan whose every cohort is the assignment target and whose final stage covers 100%.
+After fresh authorization it checks exact successful request replay before
+consulting report expiry or recomputing inputs. A new start rechecks the entire
+candidate population, membership/host inputs, saved catalog, referenced definitions
+and rollout state, current resource head and resulting server resolution, rejecting
+changes with `targeting_impact_stale`. The impact operations require READ COMMITTED
+and acquire the targeting fence and SHARE locks on relevant device, membership,
+inventory, profile and resource-head tables before reading inputs. Locks remain
+through mutation/receipt commit, including for initially empty cohorts, preventing
+concurrent membership insertion or enrollment from silently expanding the reviewed
+population. These bounded transactions can block fleet writes; they perform no
+network work and retain the request deadline and explicit deadlock/serialization
+conflict behavior. This is not a measured 10,000-device latency qualification.
+
+The start retains a per-device plan: every included active device, and every device
+the proposal no longer includes whose settings change (a removal), with its
+enrollment generation and the digest of its reviewed proposed resolution (the same
+`resolution_sha256` a per-device preview computes). The impact device rows name the
+revisions currently managing each setting, including a direct per-device
+assignment, so replacement and precedence are reviewable before anything changes.
+When any planned change adopts existing native state
+(`OWNERSHIP_MODE_APPROVED_ADOPTION`) or authorization policy requires approval for
+`resources.assign`, the rollout waits: nothing is saved or admitted, and the
+requester creates one approval (`resources.rollout`, no device target, so both
+humans need unrestricted `resources.assign`) whose payload is the exact request.
+Without a request within an hour, or on rejection or expiry, the rollout ends
+visibly. Otherwise, the start saves the assignment bound to the new rollout and
+freezes the first stage in the same transaction; a start never activates a device.
 
 Impact reports are immutable while retained, expire within 15 minutes (earlier at
 relevant freshness/window boundaries), and are capped at five reports per actor.
 Creation evicts older actor reports and prunes at most 100 expired report headers,
-cascading their device rows. Successful save receipts survive report eviction.
-Legacy `PutTargetAssignment` retains its existing mutation/replay semantics.
-Reviewed save changes only the assignment catalog; exact approved activation
-remains a separate operation with its existing authority and native-effect fences.
+cascading their device rows. Successful start receipts survive report eviction.
+Legacy `PutTargetAssignment`, `PutRollout` and per-device `ActivateTargetPreview`
+retain their mutation/replay semantics; per-device exact activation remains the
+exception path for devices a rollout marks for review.
 
 Rollouts retain cohort membership, stable salted percentage buckets and ring
 state. Soak, minimum observations and failure/unknown/unavailable thresholds gate
@@ -830,6 +847,24 @@ as scheduled reports do. Lost authority pauses with
 `rollout_authorization_denied`; a service identity never substitutes for the human.
 Health-budget pauses and authorization pauses persist a rollout event and audit.
 There is no automatic rollback in the current rollout model.
+
+The same job performs reviewed rollouts. For a rollout awaiting approval it reads
+the creator's approval of the exact retained request: an approved one is consumed
+(both humans freshly authorized, versions unchanged, unexpired) in the transaction
+that saves the assignment under the reviewed expected revision and freezes the
+first stage; a changed assignment revision ends the rollout as
+`assignment_changed`, never merged. It then activates at most 50 admitted, pending
+planned devices per tick, each in its own transaction under the creator's fresh
+authority: a creator-bound per-device `Preview`, then the normal `Activate` fences.
+A preview is activated only when its generation and `resolution_sha256` equal the
+reviewed plan; adoption heads record the rollout's consumed approval. Otherwise the
+device is marked for review (`preview_changed`, `device_reenrolled`,
+`assigned_directly`, `device_not_active`, `resolution_not_ready`) and never
+silently applied; a direct per-device assignment made after the review counts
+as drift. Reviews report devices whose direct assignment the change replaces,
+and an unchanged declarative `apply` never replaces them. Other
+devices continue. Unknown membership leaves a device pending. A newer rollout of
+the same assignment supersedes the remaining devices of an earlier one.
 
 Promotion shares the manual compare-and-swap, frozen-cohort, receipt and audit
 transaction. The scanned revision, updating targeting fence and unique

@@ -50,9 +50,6 @@ func Plan(ctx context.Context, client adminv1connect.AdminServiceClient, spec *o
 		return nil, err
 	}
 	p.revisions = revisions
-	if err := p.rollouts(ctx, client); err != nil {
-		return nil, err
-	}
 	if err := p.assignments(ctx, client, revisions, changed); err != nil {
 		return nil, err
 	}
@@ -167,43 +164,10 @@ func (p *ChangePlan) profiles(ctx context.Context, client adminv1connect.AdminSe
 	return revisions, changed, nil
 }
 
-func (p *ChangePlan) rollouts(ctx context.Context, client adminv1connect.AdminServiceClient) error {
-	if len(p.spec.GetRollouts()) == 0 {
-		return nil
-	}
-	existing, err := pages(func(after string) ([]*adminv1.RolloutState, string, error) {
-		r, e := client.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100, AfterId: optional(after)}))
-		if e != nil {
-			return nil, "", e
-		}
-		next := ""
-		if len(r.Msg.GetRollouts()) == 100 {
-			next = r.Msg.GetRollouts()[99].GetRollout().GetRolloutId()
-		}
-		return r.Msg.GetRollouts(), next, nil
-	})
-	if err != nil {
-		return fmt.Errorf("list rollouts: %w", err)
-	}
-	byID := make(map[string]*adminv1.RolloutState, len(existing))
-	for _, r := range existing {
-		byID[r.GetRollout().GetRolloutId()] = r
-	}
-	for _, r := range p.spec.GetRollouts() {
-		old := byID[r.GetRolloutId()]
-		if old != nil {
-			if proto.Equal(old.GetRollout(), r) {
-				p.add("rollout", r.GetRolloutId(), r.GetRolloutId(), "unchanged", "", nil)
-			} else {
-				p.add("rollout", r.GetRolloutId(), r.GetRolloutId(), "unsupported", "rollout specifications are immutable; use a new stable ID", nil)
-			}
-			continue
-		}
-		p.add("rollout", r.GetRolloutId(), r.GetRolloutId(), "created", "", &adminv1.PutRolloutRequest{Rollout: r, Reason: reason(p.spec)})
-	}
-	return nil
-}
-
+// assignments plans one reviewed rollout per declared assignment whose definition
+// or pinned profile revision changed. An unchanged definition is still re-reviewed
+// at apply time: devices that newly match, or drifted, get a new rollout. A rollout
+// awaiting approval or still admitting devices is reported pending, never restarted.
 func (p *ChangePlan) assignments(ctx context.Context, client adminv1connect.AdminServiceClient, revisions map[string]string, changed map[string]bool) error {
 	if len(p.spec.GetAssignments()) == 0 {
 		return nil
@@ -222,26 +186,67 @@ func (p *ChangePlan) assignments(ctx context.Context, client adminv1connect.Admi
 	if err != nil {
 		return fmt.Errorf("list target assignments: %w", err)
 	}
+	rollouts, err := pages(func(after string) ([]*adminv1.RolloutState, string, error) {
+		r, e := client.ListRollouts(ctx, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100, AfterId: optional(after)}))
+		if e != nil {
+			return nil, "", e
+		}
+		next := ""
+		if len(r.Msg.GetRollouts()) == 100 {
+			next = r.Msg.GetRollouts()[99].GetRollout().GetRolloutId()
+		}
+		return r.Msg.GetRollouts(), next, nil
+	})
+	if err != nil {
+		return fmt.Errorf("list rollouts: %w", err)
+	}
 	byID := make(map[string]*policyv1.TargetCandidate, len(existing))
 	for _, a := range existing {
 		byID[a.GetAssignment().GetAssignmentId()] = a
 	}
+	templates := make(map[string]*policyv1.RolloutSpec, len(p.spec.GetRollouts()))
+	for _, r := range p.spec.GetRollouts() {
+		templates[r.GetRolloutId()] = r
+	}
 	for _, a := range p.spec.GetAssignments() {
 		desired := proto.CloneOf(a.GetAssignment())
 		desired.ProfileRevisionId = revisions[a.GetProfileId()]
-		old := byID[desired.GetAssignmentId()]
-		status := "created"
+		template := templates[desired.GetRolloutId()]
+		desired.RolloutId = nil
+		id := desired.GetAssignmentId()
+		old := byID[id]
+		latest := latestRollout(rollouts, id)
+		status, detail := "created", "rolls out after reviewing affected devices"
 		var revision uint64
+		reviewOnly := false
 		if old != nil {
 			revision = old.GetRevision()
+			saved := proto.CloneOf(old.GetAssignment())
+			saved.RolloutId = nil
 			status = "updated"
-			if !changed[a.GetProfileId()] && proto.Equal(old.GetAssignment(), desired) {
-				p.add("assignment", desired.GetAssignmentId(), desired.GetAssignmentId(), "unchanged", "", nil)
-				continue
+			if !changed[a.GetProfileId()] && proto.Equal(saved, desired) {
+				status, detail, reviewOnly = "unchanged", "", true
 			}
 		}
-		p.add("assignment", desired.GetAssignmentId(), desired.GetAssignmentId(), status, "activate matching devices after catalog changes", &adminv1.PutTargetAssignmentRequest{Assignment: desired, ExpectedRevision: revision, Reason: reason(p.spec)})
-		p.operations[len(p.operations)-1].profileID = a.GetProfileId()
+		// An unchanged declaration never forks a rollout still in flight; a
+		// changed one starts a new rollout that supersedes it.
+		pendingSame := false
+		if latest != nil {
+			awaiting := proto.CloneOf(latest.GetAssignment())
+			awaiting.RolloutId = nil
+			pendingSame = proto.Equal(awaiting, desired)
+		}
+		if held, why := rolloutHeld(latest); (reviewOnly || pendingSame) && held != "" {
+			p.add("assignment", id, id, held, why, nil)
+			continue
+		}
+		previous := ""
+		if latest != nil {
+			previous = latest.GetRollout().GetRolloutId()
+		}
+		p.add("assignment", id, id, status, detail, &adminv1.StartRolloutRequest{Assignment: desired, ExpectedRevision: revision, Rollout: rolloutPlan(p.spec, a, desired, template), Reason: reason(p.spec)})
+		op := &p.operations[len(p.operations)-1]
+		op.profileID, op.predecessorID, op.reviewOnly = a.GetProfileId(), previous, reviewOnly
 	}
 	return nil
 }
