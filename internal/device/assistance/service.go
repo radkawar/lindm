@@ -11,12 +11,27 @@
 // device user's consent recorded by the agent.
 package assistance
 
-import "lindm/internal/device/core"
+import (
+	"errors"
 
-// Service implements the assistance RPCs over the shared device core.
+	"lindm/internal/device/core"
+)
+
+// Service implements the assistance RPCs using its own SQL core and shared runtime.
 type Service struct {
 	*core.Service
+	runtime *Runtime
 }
 
-// New returns the assistance service.
-func New(c *core.Service) *Service { return &Service{Service: c} }
+// New returns an assistance service. Services handling admission and device sync
+// for the same process must receive the same runtime, but retain their own cores.
+func New(c *core.Service, runtime *Runtime) (*Service, error) {
+	if c == nil {
+		return nil, errors.New("assistance: device core is required")
+	}
+	if runtime == nil {
+		return nil, errors.New("assistance: runtime is required")
+	}
+	c.AssistanceCeiling = assistancePolicy(c.AssistanceCeiling)
+	return &Service{Service: c, runtime: runtime}, nil
+}

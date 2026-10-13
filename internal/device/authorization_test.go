@@ -131,13 +131,17 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"RevealLocalAdminPassword":          {identity.PermissionRevealSecrets, admins, false},
 		// Join/Answer additionally require the creating operator; scoped grants
 		// are exercised by the assistance integration tests.
-		"CreateAssistanceSession": {identity.PermissionRunRemoteAssistance, admins, false},
+		"CreateAssistanceSession": {identity.PermissionViewRemoteAssistance, admins, false},
 		"ListAssistanceSessions":  {identity.PermissionReadFleet, readers, false},
 		"GetAssistanceSession":    {identity.PermissionReadFleet, readers, false},
-		"JoinAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
-		"AnswerAssistanceSession": {identity.PermissionRunRemoteAssistance, admins, false},
-		"StopAssistanceSession":   {identity.PermissionRunRemoteAssistance, admins, false},
-		"GetAssistanceReadiness":  {identity.PermissionRunRemoteAssistance, admins, false},
+		"JoinAssistanceSession":   {identity.PermissionViewRemoteAssistance, admins, false},
+		"AnswerAssistanceSession": {identity.PermissionViewRemoteAssistance, admins, false},
+		"StopAssistanceSession":   {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistanceReadiness":  {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistancePolicy":     {identity.PermissionReadFleet, readers, false},
+		"UpdateAssistancePolicy":  {identity.PermissionManageAssistancePolicy, admins, false},
+		"RunAssistanceCommand":    {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistanceCommand":    {identity.PermissionViewRemoteAssistance, admins, false},
 	}
 }
 
@@ -145,7 +149,7 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 // dispatcher. A zero service must be safe because denial precedes dependencies.
 func invokeDeniedAdminRPC(t *testing.T, name string, ctx context.Context) error {
 	t.Helper()
-	method := reflect.ValueOf(composed(&core.Service{})).MethodByName(name)
+	method := reflect.ValueOf(composed(t, &core.Service{})).MethodByName(name)
 	if !method.IsValid() {
 		t.Fatalf("missing admin handler %s", name)
 	}
@@ -165,9 +169,14 @@ func invokeDeniedAdminRPC(t *testing.T, name string, ctx context.Context) error 
 
 // composed wires the domain services over c exactly as New does, without
 // constructing dependencies; a zero core serves denial-first tests.
-func composed(c *core.Service) *Service {
+func composed(t *testing.T, c *core.Service) *Service {
+	t.Helper()
+	support, err := assistance.New(c, assistance.NewRuntime())
+	if err != nil {
+		t.Fatal(err)
+	}
 	facts, custody := inventory.New(c), secrets.New(c)
-	return &Service{Service: c, assistanceService: assistance.New(c), directoryService: directory.New(c, facts), dispatchService: dispatch.New(c, custody, facts), inventoryService: facts, secretsService: custody}
+	return &Service{Service: c, assistanceService: support, directoryService: directory.New(c, facts), dispatchService: dispatch.New(c, custody, facts), inventoryService: facts, secretsService: custody}
 }
 
 func TestAdminRPCDenialMatrix(t *testing.T) {

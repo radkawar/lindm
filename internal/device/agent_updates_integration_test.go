@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -56,7 +57,7 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 	if err := proto.Unmarshal(stored.Status, persisted); err != nil || !proto.Equal(persisted, status) {
 		t.Fatalf("durable report changed: %v", err)
 	}
-	restarted, err := New(f.svc.Pool, core.Config{DeploymentID: f.svc.DeploymentID.String(), CACertificate: f.svc.CA, CAKey: f.svc.CAKey, Identity: f.svc.Identity})
+	restarted, err := New(f.svc.Pool, core.Config{DeploymentID: f.svc.DeploymentID.String(), CACertificate: f.svc.CA, CAKey: f.svc.CAKey, Identity: f.svc.Identity}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

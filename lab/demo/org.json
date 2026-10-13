@@ -158,7 +158,7 @@
     "roles": [
       {
         "name": "demo-helpdesk",
-        "permissions": ["fleet.read", "remote_assistance.run", "actions.lock"]
+        "permissions": ["fleet.read", "remote_assistance.view", "actions.lock"]
       },
       {
         "name": "demo-security-analyst",

@@ -20,6 +20,7 @@ import (
 	"lindm/internal/auditkind"
 	"lindm/internal/device/inventory"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -41,7 +42,7 @@ func TestDurableEnrollmentBoundaries(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))
 	deployment := uuid.New()
-	svc, err := New(pool, core.Config{DeploymentID: deployment.String(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: deployment.String(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +376,7 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				pool, conn := testdb.Open(t)
 				start := time.Now().UTC().Truncate(time.Second)
 				ca, signer := testCA(t, start.Add(90*24*time.Hour))
-				svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
+				svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -564,7 +565,7 @@ func TestEnrollmentReplayAfterRenewal(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: signer, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

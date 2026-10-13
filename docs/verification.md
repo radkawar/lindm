@@ -6465,6 +6465,123 @@ initramfs and attached software TPM, **not TPM binding or unattended unlock**.
 Physical displays/TPMs, enforced Secure Boot, split/routed media, KDE and X11
 remain outside this record.
 
+##### Clipboard `OpenPipeWireRemote` deadlock
+
+Four Tier 1 runs on this tuple ended a `clipboard` or `clipboard-limited`
+session `UNAVAILABLE` (`pipewire_unavailable`): `OpenPipeWireRemote` never
+replied within the helper's 10-second bound, nor did an immediate retry. No
+other session type failed. Retained under
+`$HOME/.cache/lindm-assistance-roadmap-20261011/`:
+
+| Record                                 | SHA-256                                                            |
+| -------------------------------------- | ------------------------------------------------------------------ |
+| `fedora44arm-tier1-11/assistance.json` | `1d4c6bd2e06d9647f90a4dec9fdc5efd62cdd6405b7ec05b434793aab9799e20` |
+| `fedora44arm-tier1-16/assistance.json` | `2b816d21fae5e65648ae130febfd662df368b624f6780ac24d64c669eb2575d1` |
+| `fedora44arm-tier1-20/assistance.json` | `fdff691ddce062ad95f21b9c96c4e461ad58a7c5d1487ce4aaaacafcd9f4c3c6` |
+| `fedora44arm-tier1-21/assistance.json` | `8078b002b87dbe27acd63fd4143d0ffd6859aae4f6a218d2f0f640c44293ef0c` |
+
+The portal journal stayed empty, so the portal's own 10-second PipeWire
+roundtrip timeout never fired: PipeWire answered. Two held diagnostic runs with
+an uncommitted instrumented helper (same revision) located the stall. The
+retained `pipewire-diag-instrumentation.patch`
+(`6f9e8c91dbaf9f0ddaf9e9865984c20f8c9b754ec2f42b28737d494a6e21f6b7`) is the
+second run's state; the first lacked the forced disconnects.
+
+- `pipewire-diag-03/journal-session-helper.txt`
+  (`5a8aaf2175aa5d39f07336ff491c186c60fb800488c5bf3b4e58bd6d97b914fd`):
+  `OpenPipeWireRemote` normally returns in 2–10 ms. In both clipboard sessions
+  the portal forwarded the session's `SelectionOwnerChanged` within 0.7 ms of
+  the Start response, the moment the helper sends that call; the instrumentation
+  delayed the call slightly, and both sessions passed.
+- `pipewire-diag-04/journal-session-helper.txt`
+  (`3be200a3cc91aee6d356303061719033f04a61673859541d692c3002c4e71883`):
+  closing eight extra session-bus connections 0.4–3.2 ms after sending the call
+  reproduced the stall on a control session without clipboard. After 12 s the
+  portal's main thread and one pool thread waited in `futex_do_wait` and a new
+  `module-rt` thread in `poll`; the call returned after 75.08 s, three libdbus
+  25-second default timeouts.
+
+This matches
+[flatpak/xdg-desktop-portal#2091](https://github.com/flatpak/xdg-desktop-portal/issues/2091)
+and the [platform analysis](platforms/fedora.md#desktop-session-helper-and-remote-assistance).
+With the helper ordering the call after the announcement, held runs of
+`control,view,lock,clipboard,clipboard-limited,clipboard-policy` passed every
+scenario, native clipboard witness and boundary:
+
+| Record                                       | SHA-256                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| `pipewire-fix-01/journal-session-helper.txt` | `27db9acbda60dcd1899de5fb94e359e2558941aff593c640e8629ab12720e241` |
+| `pipewire-fix-02/journal-session-helper.txt` | `82b837c083ab6ed638a3648a77f78ee752505e70b684602bd44927e455a58547` |
+| `pipewire-fix-04/journal-session-helper.txt` | `c2f7029d6014df83cc3a4b5b37da8dd1e0e04f2f274df5ddee3b34f964c4ef45` |
+| `pipewire-fix-05/journal-session-helper.txt` | `1546387dda1024cfa4e79415d07eb07106ed3bfbb9e3c4719d7bc5b8660d4663` |
+
+All twelve clipboard sessions started capture 37–86 ms after Start, so the
+owner announcement, not the one-second bound, released the call; before the
+change 4 of 22 such sessions in the Tier 1 runs failed. Held runs are not
+qualification records. The full lane did not reach a clipboard capture:
+`pipewire-fix-03/assistance.json`
+(`f0c99092eca93c0a31b523086546f2467a4e82232a007abdc234a95b9ae95d7e`) stopped
+at `authority-view` because the console had moved assistance to its own device
+tab (acceptance fix `2635612a`). With that fix,
+`pipewire-fix-06/assistance.json`
+(`61998c30068792939ba497daace62c491483791f50ffc62ee4df755332d3bfc3`) passed
+through `lock`, then the `clipboard` consent banner never appeared on screen
+although the helper had posted the prompt, before any portal call, as in
+`fedora44arm-tier1-10`.
+
+##### GNOME consent banner queue
+
+`pipewire-fix-06` ended at `clipboard` after `lock` with
+`guest notification banner did not appear`: the helper had logged
+`prompt shown`, no banner appeared for 52 s, and its first saved capture
+(`guest-missing-banner-1791819716.png`,
+`173a0344b757ffc1333abdfbcd2c86ba4f76cffdfd583c684939c6443a7f740d`) is 10 s after
+the prompt. With 5-second polls that means the lab had first found and waited
+out a shorter notice. Do-not-disturb, fullscreen, lock-screen and session-mode
+causes were excluded by diagnostic runs at `ee866328` (`banner-diag-01` to
+`-05`) that enabled `org.gnome.Shell.Eval` through Looking Glass and dumped the message tray at every
+prompt, lock and unlock. Mode was `user`, not busy, not fullscreen, banners not
+blocked, and `St.Settings.enable_animations` false throughout. The uncommitted
+lab instrumentation is `banner-diag-instrumentation.patch`
+(`f8f7c3d9bf2144e4fc528f3b0cf5de92f8e5f52cb912ae0600112688e5cd109e`); all paths
+are under `$HOME/.cache/lindm-assistance-roadmap-20261011/`.
+
+Controlled probes in that guest (`banner-diag-05`) posted a normal notification,
+then a critical one, which waited in the queue behind it. After the normal one
+was withdrawn (`shell-state-04-probeA-after-withdraw.txt`,
+`1f481aed6db65706be0b8a649f9db6466cdd7b29fe5b2377b2ae4a98d2f1c581`) or expired
+on pointer activity (`shell-state-07-probeB-after-expire.txt`,
+`7cf6a2cd05fa8a85e3aaf9f51640a9209ca43d290d6116b61b89f73f55be6ee8`), the tray
+was hidden with the critical notification still queued. Re-posting it in place
+did not show it (`shell-state-10-probeC-after-update.txt`,
+`abdb7412713a6c5222bf95171388dc31b78b3343538a2efc8638445a328c2c9f`). One new
+normal notification did, and withdrawing that left it shown
+(`shell-state-13-probeD-after-kick.txt`,
+`3995d2ee77727c7c9a9036986183576b13da9713dae5c8e501e37e5af58467d2`;
+`shell-state-14-probeD-kick-closed.txt`,
+`65a7137586cd7e95e9235688d260ee0a7c71d0141a3d22cbba0cfc9a7ac69310`).
+GNOME Shell's Introspect `AnimationsEnabled` read `false`.
+
+An A/B pair posted a foreign normal notice right after the `control` request, so
+it was on screen when the prompt arrived:
+
+| Record                                                   | Helper       | Result                                                                                                                      | SHA-256                                                            |
+| -------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `banner-ab-unfixed-01/shell-state-03-control-prompt.txt` | `ee866328`   | Lab waited out the notice; prompt never shown; tray hidden with the prompt queued; the lab's next probe surfaced it at once | `2560683c96cde47152583c3651259822f205dfc40479cd3dc81445927d145db4` |
+| `banner-ab-fixed-01/shell-state-03-control-prompt.txt`   | queue nudges | Notice captured, then the prompt shown and `control` passed                                                                 | `2b909cf8a4ca5dc028c00e600b55c4d2e70593d2ee1744a7733e194376d3fb01` |
+
+The unfixed record reproduces `pipewire-fix-06`'s failure on demand. Held
+diagnostic runs are not qualification records.
+
+The documented full lane from `ee866328` plus `703fbcc6`,
+`banner-fix-full-01/assistance.json`
+(`2b8349bd0212028b07a785e8f6d67068c8d55d15f2d00643c1cbd6a340962cc2`), passed
+the 14 scenarios from `control` through `display`. That includes `clipboard`
+after `lock` and every consent prompt. It then failed `message` when the host's
+OCR command timed out (`env failed: labexec: env: context deadline exceeded`),
+the host-side Tesseract failure that `fedora44arm-tier1-17` to `-19` also hit.
+No shorter notice preceded any prompt in that run.
+
 #### Fedora 44 aarch64 encryption and TPM
 
 A separate full `vm device-actions -scenario encryption` record **passed** on
@@ -6642,11 +6759,183 @@ lock was disabled in the lab session.
 #### Commercial assistance capability qualification
 
 The [capability contract](product-specification.md#remote-assistance-capabilities)
-extends the already recorded view/control baseline. All rows below are **not run**;
-neither upstream source inspection nor the earlier assistance records qualify them.
+extends the already recorded view/control baseline. Tier 1 results are recorded per
+run below; no row is qualified until `monitors` passes. Failed attempts are
+distinguished from scenarios not yet run.
+Neither upstream source inspection nor the earlier assistance records qualify them.
 Each future record must identify the code commit, OS/architecture, session type,
 portal frontend/backend and compositor versions, scenario outcomes and SHA-256-bound
 artifacts. A capability refusal is not a capability pass.
+
+Maintained scenario names are `clipboard`, `clipboard-limited`, `clipboard-policy`,
+`clipboard-permission`, `keyboard`, `display`, `message` and `monitors`, in addition
+to the original consent/control/termination scenarios.
+They record independent GTK Wayland clipboard/key/pointer witnesses and original
+guest screenshots; message visibility requires the nonce and authenticated sender
+identity in the same actual notification pixels.
+The monitor scenario creates two real virtio-gpu heads and records per-head
+geometry and fresh nonce-bound pixel markers, matched in both streamed video
+and independent QMP scanout. Native Mutter binary and source-package identities accompany
+the portal versions. `tier_one_passed` is separate from the historical baseline
+result: a gated optional capability is explicitly not run, never inherited from
+an overall baseline pass. Zero-scenario held demos remain non-qualification runs.
+The Tier 1 result additionally requires separate SHA-bound witnesses for denied
+clipboard direction, restrictive per-device policy revocation, a creator with
+`remote_assistance.view` and `remote_assistance.control` but without
+`remote_assistance.clipboard`, oversized writes,
+ended-session refusal, modifier release and selected-head hot-unplug without fallback.
+Permission masking must be corroborated by the exact actor/request denial audit,
+including typed `actor_id`, session `resource_id`, `target_device_id` and command
+metadata in `details`; operator-authored `reason` text and a generic not-found
+response do not qualify. Denied writes require a fresh
+independent local GTK clipboard observation. These cases do not qualify changes
+to the deployment or agent configuration ceilings.
+Hot-unplug must produce the observed capture/portal failure, not expiry or an
+operator-initiated stop.
+
+The separate `authority-view` and `authority-control` scenarios qualify the split
+permission contract only on the exact tested revision. The former enrolls distinct
+local view-only and control-only actors, records real denied mode RPCs and console
+availability, then exercises consent, live view-only media and local Stop. The
+latter proves native control input, changes that actor to view-only through the
+authenticated account API and requires authorization-loss termination, capture
+shutdown and a new real sign-in showing the reduced grant. Historical assistance
+receipts do not qualify this cutover. Disjoint view/control scope intersections
+are separately covered by real-PostgreSQL integration tests, not claimed as native
+directory qualification.
+
+The permission-cutover source `c39c6d12` passed focused race tests, real-PostgreSQL
+assistance/denial integration, affected-package lint and web/schema checks.
+The bounded receipt is
+`$HOME/.cache/lindm-assistance-roadmap-20261011/authority-c39c6d12-checks.json`,
+SHA-256 `1f8ba0ccdacc8a32f66ea2800a5e856c40acb880b40d4325bb48afaf3ca85d13`.
+Its real-console review passed 168/168 captures:
+`authority-ui-review-02/report.json`, SHA-256
+`57a1fac2e9a66436cd4a12a09fdad64aa6d738352faac87fcf1ce4aed9176827`,
+with server binary SHA-256
+`49b08b4f478bafecda8d33d5c83d288528eb2e10f180989386e4ee62c051ea4b`.
+The before/after contact sheets are `tier1-ui-review-05/index.html` and
+`authority-ui-review-02/index.html` in that same evidence root; requested-session
+light/dark desktop/mobile screenshots were visually inspected. These owner-role
+synthetic fixtures do not qualify restricted native actors, and automated green
+does not constitute the owner's design approval.
+
+After database maintenance `290da277`, the rebased cutover source `c806598a` passed
+all focused `TestAssistance*` and `TestAdminRPCDenialMatrix` real-PostgreSQL race
+tests with the unchanged ten-minute test deadline. Receipt:
+`authority-c806598a-postmaintenance-postgres.json` in that evidence root,
+SHA-256 `8610943a9dec3f6cf0c060412c40be1b2e1af14e3c19a0c2211d72b9c9bc529c`.
+The earlier no-output outer-deadline failure remains retained separately.
+This is not native desktop/directory evidence, nor a claim about the later
+runtime-authorization implementation or a completed assistance capability suite.
+
+The first x86_64 runs from private commit
+`e73e89380639ecde930682487401dbb27dea515f` reached unlocked GNOME Wayland guests,
+but failed while installing the native GTK witness prerequisites, before any
+browser or capability scenario. Both remain **not qualified**. The installer
+was incorrectly using the empty-stderr machine-probe contract; package-manager
+progress requires the bounded process-result contract. The corrected harness
+retains both native streams and exit status in SHA-bound setup journals and
+still fails on nonzero exit or transport error. The original failures contain
+no captured stderr and do not identify its particular text.
+
+- Ubuntu: `$HOME/.cache/lindm-assistance-roadmap-20261011/ubuntu24-tier1-01/assistance.json`,
+  SHA-256 `ce439d17e34a0b5e2b670310955f11ba207c99f77993432e3f845ab0120ab0e3`.
+- Fedora: `$HOME/.cache/lindm-assistance-roadmap-20261011/fedora44-tier1-01/assistance.json`,
+  SHA-256 `569725f8b40768a9392eee676121df9d44b7eafd16997d3415d67f814e03e29b`.
+
+The Tier 1 console review at private source `8ff53b6` completed all 168 captures:
+164 passed; four requested-assistance captures failed axe `aria-prohibited-attr`
+because the labelled remote-display `div` lacked a valid semantic role. Evidence:
+`$HOME/.cache/lindm-assistance-roadmap-20261011/tier1-ui-review-02/report.json`,
+SHA-256 `84b1e915e9bcf6d2d0f6722847c036bf4b084b56cf1961cb5fb8eb360bc8e43f`.
+The correction names the actual display region with `role="region"`; it does not
+suppress the accessibility rule. It also distinguishes waiting for consent from
+an actual viewing-only decision and shares identical clipboard prerequisite copy.
+
+The fresh real-console review `tier1-ui-review-04/report.json` passed all 168
+captures, SHA-256
+`57800eab6142eac5014e60d3467f3320427c2f1ee501b67026e216f06c130d28`.
+The requested-assistance light/dark desktop/mobile captures were visually inspected.
+They contain no live video and qualify only the requested-session UI, not portal
+consent, clipboard, input, displays, messages or owner design approval. The record
+retains nonblocking heading-order and desktop sidebar-landmark observations.
+The assistance clipboard heading has subsequently been corrected to level 2;
+an empty active-session prerequisite no longer points to an absent help element.
+The subsequent current-main-rebased review at
+`7319da2de5fc00a8f498aa9337687cafdd45c92c` passed all 168 captures:
+`tier1-ui-review-05/report.json`, SHA-256
+`3447ab0052edb73a382e4585d167f22ea3b8f919dfbbecc4b13bae538fddc428`.
+Its real requested-session assertions include the named display region, a level-2
+clipboard heading and no false viewing-only consent claim. All four requested
+light/dark desktop/mobile full captures were visually inspected. The heading
+observation is resolved; the unrelated nonblocking desktop sidebar-landmark
+observation remains visible in the report. `make lint` passed on that revision.
+Neither this review nor its disabled controls prove a native capability pass.
+
+The second x86_64 runs at private source `8ff53b6` passed native setup and
+reached the clipboard scenario, but the independent GTK witness failed before
+any capability proof: its `Gdk` import selected version 4 before the explicitly
+requested GTK 3 import. Both actual guest journals show
+`Requiring namespace 'Gdk' version '3.0', but '4.0' is already loaded`.
+The fixture now explicitly requires both GTK 3 and GDK 3 before importing either.
+No Tier 1 qualification is claimed; fresh full native runs are required.
+
+- Ubuntu `ubuntu24-tier1-02/assistance.json`: SHA-256
+  `f23b5068cf72ec94e431354779e35a0fb273eda35fc66ee4a10e5831f79b7a39`;
+  `journal-native-witness.txt`:
+  `9bc80cabe697a16fd36a50f3b992fbe9da055e84e96f5ec61236a1c6f57fed81`.
+- Fedora `fedora44-tier1-02/assistance.json`: SHA-256
+  `6eb72335840004bed92f101919be4fd9d4a0290addf1ee0f2548a73130ab56b6`;
+  `journal-native-witness.txt`:
+  `e998e1e0aa36484e1e567a579f14b9e9854a8f423bc24bd4d3188b6e1429f687`.
+  These directories are beneath the same
+  `$HOME/.cache/lindm-assistance-roadmap-20261011/` evidence root.
+
+The third x86_64 runs at private source `b8a63163` got past the GTK/GDK import
+failure but still did not qualify Tier 1:
+
+- Ubuntu `ubuntu24-tier1-03/assistance.json`, SHA-256
+  `a3cd6c4d400755dd4718d874588bb000c865ddd58ff565f3cafca82a0a9ad77f`,
+  failed the native `clipboardRead` command with `guest_command_failed`.
+  The helper journal did not retain its underlying cause. A stable stage/category
+  diagnostic now distinguishes ownership/MIME refusal, portal read and FD failures
+  without logging clipboard contents, hashes, arbitrary MIME values or raw errors.
+  This is diagnostic support, not a proven clipboard fix.
+- Fedora `fedora44-tier1-03/assistance.json`, SHA-256
+  `21a912679152744dd438932deda705a8b80a5cf3db06fa977fc40ccd69bb277b`,
+  failed because the old single-color detector accepted blue Fedora wallpaper as
+  the second-head marker before the GTK witness appeared. The actual
+  `console-clipboard-failure.png` SHA-256 is
+  `0a93a07ae88251ea7ebaab205fb7ae1c5881d0a06263a7cd3df4c6039242822a`.
+  The replacement requires a framed, complementary black/white cell pattern,
+  the exact independently generated 96-bit session-fixture nonce and a valid head
+  in both browser video and QMP pixels. Color alone cannot satisfy readiness.
+
+Both records retain `tier_one_passed=false`. Fresh rebuilt native runs are
+required; no individual capability pass is inferred from an incomplete witness.
+Future failure records also retain bounded portal frontend/backend and GNOME
+Shell journals from the disposable guest.
+
+The fourth attempts used source `6f8e8afa` but mistakenly used `make build`,
+which produced a `(devel)` server without the required release stamp. Both
+failed at isolated server release registration, before starting a guest or any
+scenario. Ubuntu `ubuntu24-tier1-04/assistance.json` has SHA-256
+`d27e2d338b9c7ed3be6d2cbcad572607bdf36e0c48f4c83f9782ee1c46c73f89`;
+Fedora `fedora44-tier1-04/assistance.json` has SHA-256
+`acd9204176d48041dc99e806c84b458b4772faa3f5f73eea540e101fa24d4621`,
+in the same evidence root. These are invocation prerequisite failures, not
+portal or capability outcomes. The corrected invocation uses the documented
+`make acceptance-build` release stamp and fresh evidence directories; the
+fixture's release-version enforcement remains unchanged.
+
+The fifth attempts (`d412ccb2`, correctly release-stamped) were cancelled after
+the later combined file UI review failed isolated-database migration and
+inspection found that rebasing had retained provisional assistance migration
+28 alongside main's audit migration 28. Neither attempt is a capability pass.
+Private assistance migrations are renumbered above main's actual maximum before
+fresh fixture execution and again at landing; the failed UI review retained no
+more specific migration error, so its exact cause is not asserted.
 
 Source research on 2026-10-11, not native qualification:
 `$HOME/.cache/lindm-assistance-roadmap-20261011/portal-source-evidence.json`,
@@ -6663,6 +6952,15 @@ records 63 source-file digests and immutable citations. Clones are under
 | mutter                   | 46.0          | `c4753689e3413cd9332d885dd0297b3b7d9ba9ca` |
 | mutter                   | 50.0          | `e25c42e63234a9e3480567ab46ecf20fcefdf938` |
 
+An additional Mutter 46.2 checkout at
+`02050414855b370dbf2b08a971c8b332f7b3c9f4` and Ubuntu source package
+`46.2-1ubuntu0.24.04.18` patch inspection are recorded in
+`$HOME/.cache/lindm-assistance-roadmap-20261011/mutter-46.2-ubuntu-source-evidence.json`,
+SHA-256 `27c767988d74fbfe6e5145e7abb87c3094a35958f0322d67b10f6f00780fd2c3`.
+The verified distro patch archive matches Launchpad's published digest. The
+patches are inspected, not applied or built; this package version was observed
+in a prior aarch64 baseline, not the pending x86_64 capability qualification.
+
 Both source stacks implement Clipboard v1 and multiple selected monitors on an
 existing RemoteDesktop session. GNOME 46 has a MIME `(as)`/`as` forwarding quirk;
 GNOME 50 normalizes it. See the
@@ -6671,24 +6969,45 @@ The old native records omit Mutter packages; inspected Mutter tags are not proof
 of exact installed distro builds. New qualification must collect those versions,
 distro patch correspondence and the actual Clipboard wire/grant behavior.
 
-| Capability / maintained scenario requirement | Ubuntu 24.04 x86_64, GNOME 46 Wayland                | Fedora 44 x86_64, GNOME 50 Wayland                   | Required independent evidence                                                                                                                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clipboard text round-trip                    | Not run; portal source/runtime gate required         | Not run; portal source/runtime gate required         | Fresh nonce copied in each direction into the actual opposite clipboard, policy/consent denial, bounds, withdrawal and session-end refusal                                                                                        |
-| Special keys and keyboard layouts            | Not run                                              | Not run                                              | Guest-observed shortcut effect, differing US/non-US layouts, modifier release and no stuck keys                                                                                                                                   |
-| Full screen and scaling                      | Not run                                              | Not run                                              | Browser full screen, fit/actual size and correct guest input coordinates without expanding capture authority                                                                                                                      |
-| Monitor selection                            | Not run                                              | Not run                                              | Two-head virtio-gpu guest, distinct per-head markers, granted stream selection, pointer mapping and hot-unplug refusal                                                                                                            |
-| Operator-to-user notifications               | Not run                                              | Not run                                              | Guest screenshot visibly containing message nonce and correct operator identity; wrong-session denial                                                                                                                             |
-| File transfer, admin-to-user                 | Not run                                              | Not run                                              | Downloads file independently hashed, visible completion notification, locally accepted with all remote input paused, no overwrite/execute/traversal/symlink escape; size/type and cancellation tests; independent security review |
-| File transfer, user-to-admin                 | Not run                                              | Not run                                              | Actual portal FileChooser selection/cancel with remote input paused, operator cannot approve/select, descriptor-bound regular file and received SHA-256; no arbitrary remote path; permission/size/type rejection                 |
-| Reconnect after reboot                       | Not run                                              | Not run                                              | Real reboot, ended old grant, new device epoch/session and fresh consent; expiry/revocation and no pre-consent media/input                                                                                                        |
-| Reconnect after logout                       | Not run                                              | Not run                                              | Real logout/login, changed-user isolation, fresh consent and rejected stale session/credentials                                                                                                                                   |
-| Recording                                    | Not run                                              | Not run                                              | Visible recording disclosure, playable known screen changes, encrypted-at-rest evidence, retrieval denial, retention deletion, storage failure and termination boundary                                                           |
-| Unattended access                            | Not run; implementation requires parent confirmation | Not run; implementation requires parent confirmation | Native persistent-grant capability, local opt-in, independent approval, banner/stop, expiry/revocation and lock/login-screen denial                                                                                               |
-| Elevation-prompt guidance                    | Not run                                              | Not run                                              | Real polkit prompt with employee-only typing and remote input paused; no credential collection or bypass                                                                                                                          |
-| Pointer/annotation                           | Not run                                              | Not run                                              | Native overlay permission, actual guest-visible marks, stream/scaling alignment, local input unaffected and clear/stop                                                                                                            |
-| Audio                                        | Not run                                              | Not run                                              | Separate source consent, known tone received, microphone distinction, local mute and stop/revocation                                                                                                                              |
-| KDE Plasma qualification                     | Not run; parent confirmation required                | Not run; parent confirmation required                | Pinned Plasma/KWin/portal-kde versions and independent consent/input/notification/lock plus each supported Tier 1/2 scenario                                                                                                      |
-| X11 qualification                            | Not run                                              | Not run                                              | Explicit portal-backed capture/input and local stop, no silent X11 fallback, UID/seat/lock/logout isolation                                                                                                                       |
+Tier 1 is implemented and partially qualified. The runs below used
+`lab vm assistance` with every maintained scenario; each record retains
+`tier_one_passed=false` because `monitors` has not passed, so no platform
+capability row is promoted beyond implemented. Records are under
+`$HOME/.cache/lindm-assistance-roadmap-20261011/`:
+
+| Record                                 | Source       | Platform             | Outcome                                                                                                                                                                                                                                                                                     | SHA-256                                                            |
+| -------------------------------------- | ------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `ubuntu24-tier1-25/assistance.json`    | `2b10d037`   | Ubuntu 24.04 x86_64  | Passed `control`, `rerequest`, `view`, `authority-view`, `authority-control`, `decline`, `portal-cancel`, `lock`, `clipboard`, `clipboard-limited`, `clipboard-policy`, `clipboard-permission`, `keyboard`, `display`, `message`; `monitors` failed in the lab driver's display-select read | `482aa80deb78b6ef6d96c96f4480246245b9c89efc67cf6c00ccd97a42b35c87` |
+| `fedora44-tier1-25/assistance.json`    | `2b10d037`   | Fedora 44 x86_64     | Same as Ubuntu 24.04 x86_64                                                                                                                                                                                                                                                                 | `42f16d01034dd6899b35fa4a56c413bc5856d70c0d0d20583e02a82904b2fd2f` |
+| `fedora44arm-tier1-24/assistance.json` | `08eea2d5`   | Fedora 44 aarch64    | Passed every scenario through `message`; `monitors` failed in the then-unfixed tile locator. Reruns blocked: lab hosts offline                                                                                                                                                              | `c1aab450f953db4c263ed55b448822cb619f646f984425c4087c6ce7aeb479c8` |
+| `ubuntu24arm-tier1-24/assistance.json` | not recorded | Ubuntu 24.04 aarch64 | Partial: reached `clipboard`, then `viewer_navigation_timeout` from host network churn (root-caused in `d71ea689`). Reruns blocked: lab hosts offline                                                                                                                                       | `0f2613e101edbd26f7db4fbfae159612bf87fea68fc499ceb0eadb072bbddbf2` |
+
+The lab driver display-select fix (`ab3a3a38`, `0d8b54b8`) and the console
+display-select fix `d6b9b500` (an always-controlled SelectField, so choosing the
+already-streamed monitor still sends `SELECT_DISPLAY`) both came after these x86_64
+runs and are not covered by them. The final full x86_64 run `ubuntu24-tier1-26`
+from `0d8b54b8` is queued and not yet recorded.
+
+| Capability / maintained scenario requirement | Ubuntu 24.04 x86_64, GNOME 46 Wayland                                                                             | Fedora 44 x86_64, GNOME 50 Wayland                                                    | Required independent evidence                                                                                                                                                                                                     |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clipboard text round-trip                    | Passed (`ubuntu24-tier1-25`)                                                                                      | Passed (`fedora44-tier1-25`)                                                          | Fresh nonce copied in each direction into the actual opposite clipboard, policy/consent denial, bounds, withdrawal and session-end refusal                                                                                        |
+| Clipboard policy and permission boundaries   | Passed (`ubuntu24-tier1-25`)                                                                                      | Passed (`fedora44-tier1-25`)                                                          | Real restrictive device-policy mutation and separately authenticated missing-capability creator, exact denial audit, unchanged native clipboard and terminated authority where required                                           |
+| Special keys and keyboard layouts            | Passed (`ubuntu24-tier1-25`)                                                                                      | Passed (`fedora44-tier1-25`)                                                          | Guest-observed shortcut effect after Take control, differing layouts, canonical Euro/Cyrillic symbols, physical y/z, modifier release and no stuck keys                                                                           |
+| Full screen and scaling                      | Passed (`ubuntu24-tier1-25`)                                                                                      | Passed (`fedora44-tier1-25`)                                                          | Browser full screen, fit/actual size and correct guest input coordinates without expanding capture authority                                                                                                                      |
+| Monitor selection                            | Failed: lab driver display-select read (fixed after the run in `ab3a3a38`/`0d8b54b8`); `ubuntu24-tier1-26` queued | Failed: lab driver display-select read (fixed after the run in `ab3a3a38`/`0d8b54b8`) | Two-head virtio-gpu guest, distinct per-head markers, granted stream selection, pointer mapping and hot-unplug refusal                                                                                                            |
+| Presented display-generation fence           | Not run                                                                                                           | Not run                                                                               | Actual emitted RTP identity and browser-presented metadata agree before input; reordered metadata/frame, timestamp wrap and stale-frame refusal regressions                                                                       |
+| Operator-to-user notifications               | Passed (`ubuntu24-tier1-25`)                                                                                      | Passed (`fedora44-tier1-25`)                                                          | Guest screenshot visibly containing message nonce and correct operator identity; wrong-session denial                                                                                                                             |
+| File transfer, admin-to-user                 | Not run                                                                                                           | Not run                                                                               | Downloads file independently hashed, visible completion notification, locally accepted with all remote input paused, no overwrite/execute/traversal/symlink escape; size/type and cancellation tests; independent security review |
+| File transfer, user-to-admin                 | Not run                                                                                                           | Not run                                                                               | Actual portal FileChooser selection/cancel with remote input paused, operator cannot approve/select, descriptor-bound regular file and received SHA-256; no arbitrary remote path; permission/size/type rejection                 |
+| Reconnect after reboot                       | Not run                                                                                                           | Not run                                                                               | Real reboot, ended old grant, new device epoch/session and fresh consent; expiry/revocation and no pre-consent media/input                                                                                                        |
+| Reconnect after logout                       | Not run                                                                                                           | Not run                                                                               | Real logout/login, changed-user isolation, fresh consent and rejected stale session/credentials                                                                                                                                   |
+| Recording                                    | Not run                                                                                                           | Not run                                                                               | Visible recording disclosure, playable known screen changes, encrypted-at-rest evidence, retrieval denial, retention deletion, storage failure and termination boundary                                                           |
+| Unattended access                            | Not run; owner approved implementation after Tier 2                                                               | Not run; owner approved implementation after Tier 2                                   | Native persistent-grant capability, local opt-in, independent approval, banner/stop, expiry/revocation and lock/login-screen denial; independent security review before landing                                                   |
+| Elevation-prompt guidance                    | Not run                                                                                                           | Not run                                                                               | Real polkit prompt with employee-only typing and remote input paused; no credential collection or bypass                                                                                                                          |
+| Pointer/annotation                           | Not run                                                                                                           | Not run                                                                               | Native overlay permission, actual guest-visible marks, stream/scaling alignment, local input unaffected and clear/stop                                                                                                            |
+| Audio                                        | Not run                                                                                                           | Not run                                                                               | Separate source consent, known tone received, microphone distinction, local mute and stop/revocation                                                                                                                              |
+| KDE Plasma qualification                     | Not run; owner approved qualification after Tier 2                                                                | Not run; owner approved qualification after Tier 2                                    | Pinned Plasma/KWin/portal-kde versions and independent consent/input/notification/lock plus each supported Tier 1/2 scenario                                                                                                      |
+| X11 qualification                            | Not run                                                                                                           | Not run                                                                               | Explicit portal-backed capture/input and local stop, no silent X11 fallback, UID/seat/lock/logout isolation                                                                                                                       |
 
 Other architectures, Ubuntu 26.04, Fedora 43, derivatives and physical hardware
 remain **not run** for these added capabilities unless a later exact-platform

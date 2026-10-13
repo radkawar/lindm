@@ -64,10 +64,10 @@ func TestCryptsetupConsoleRebuildsRegistryInitrd(t *testing.T) {
 // QMP send-key needs a keyboard: q35 always has i8042, aarch64 virt has none,
 // so Escape never closed Debian GNOME's login overview on the Sparks.
 func TestEncryptedDesktopHasKeyboardOnEveryArchitecture(t *testing.T) {
-	if devices := encryptedDesktopDevices("aarch64"); !slices.Contains(devices, "usb-kbd,bus=usb.0") {
+	if devices := encryptedDesktopInputDevices("aarch64"); !slices.Contains(devices, "usb-kbd,bus=usb.0") {
 		t.Fatalf("aarch64 desktop has no keyboard: %q", devices)
 	}
-	if devices := encryptedDesktopDevices("x86_64"); slices.Contains(devices, "usb-kbd,bus=usb.0") {
+	if devices := encryptedDesktopInputDevices("x86_64"); slices.Contains(devices, "usb-kbd,bus=usb.0") {
 		t.Fatalf("x86_64 desktop tuple changed: %q", devices)
 	}
 }

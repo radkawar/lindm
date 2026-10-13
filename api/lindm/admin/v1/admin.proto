@@ -103,6 +103,10 @@ service AdminService {
   rpc JoinAssistanceSession(JoinAssistanceSessionRequest) returns (JoinAssistanceSessionResponse);
   rpc AnswerAssistanceSession(AnswerAssistanceSessionRequest) returns (AnswerAssistanceSessionResponse);
   rpc StopAssistanceSession(StopAssistanceSessionRequest) returns (StopAssistanceSessionResponse);
+  rpc GetAssistancePolicy(GetAssistancePolicyRequest) returns (GetAssistancePolicyResponse);
+  rpc UpdateAssistancePolicy(UpdateAssistancePolicyRequest) returns (UpdateAssistancePolicyResponse);
+  rpc RunAssistanceCommand(RunAssistanceCommandRequest) returns (RunAssistanceCommandResponse);
+  rpc GetAssistanceCommand(GetAssistanceCommandRequest) returns (GetAssistanceCommandResponse);
   // Whether a new request can reach a person on the device, and the evidence.
   rpc GetAssistanceReadiness(GetAssistanceReadinessRequest) returns (GetAssistanceReadinessResponse);
   rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);

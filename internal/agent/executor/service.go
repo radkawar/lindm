@@ -150,6 +150,7 @@ type Service struct {
 	updates               *update.Engine
 	updateHold            bool
 	assistanceEnabled     bool
+	assistanceCeiling     *agentv1.AssistancePolicy
 	assistance            *assistanceBroker
 	patchStatus           *patchStatusReader
 }
@@ -306,7 +307,7 @@ func New(ctx context.Context, directory string, opts ...Option) (*Service, error
 		opt(svc)
 	}
 	svc.patchStatus = newPatchStatusReader(svc)
-	svc.assistance, err = newAssistanceBroker(svc.assistanceEnabled, svc.now, actionprovider.ReadLogindSessions)
+	svc.assistance, err = newAssistanceBroker(svc.assistanceEnabled, svc.assistanceCeiling, svc.now, actionprovider.ReadLogindSessions)
 	if err != nil {
 		_ = svc.Close()
 		return nil, err

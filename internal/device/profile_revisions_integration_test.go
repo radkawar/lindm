@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 	"lindm/internal/device/dispatch"
 	"lindm/internal/identity"
@@ -23,7 +24,7 @@ func TestListProfileRevisions(t *testing.T) {
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))
-	service, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)})
+	service, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

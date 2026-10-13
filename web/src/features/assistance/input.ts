@@ -1,7 +1,9 @@
-// Input capture for the "lindm-input" data channel. Messages follow the assistance
-// contract: {"t":"move","x","y"} with coordinates normalized to the video frame,
-// {"t":"button","b","down"}, {"t":"wheel","dx","dy"} in discrete steps (DOM sign:
-// positive is down/right) and {"t":"key","code","down"} with KeyboardEvent.code.
+// Input capture for the authenticated "lindm-input" data channel. Every press
+// carries the selected display and its generation so queued coordinates AND
+// keyboard events cannot cross a switch. Release remains safe across generations.
+// Semantic keys follow KeyboardEvent.key; physical keys follow code.
+
+import { unicodeLegacyKeysyms } from "./keysym-table.generated.ts";
 
 const MOVE_INTERVAL_MS = 1000 / 60;
 const MAX_WHEEL_STEPS = 10;
@@ -10,6 +12,7 @@ const MAX_CODE_LENGTH = 64;
 const MAX_BUFFERED_BYTES = 64 * 1024;
 const WHEEL_PIXELS_PER_STEP = 100;
 const WHEEL_LINES_PER_STEP = 3;
+const PRINTABLE_KEY = /^[\p{L}\p{M}\p{N}\p{P}\p{S} ]$/u;
 
 const buttonNames: Record<number, "left" | "middle" | "right"> = {
   0: "left",
@@ -17,11 +20,32 @@ const buttonNames: Record<number, "left" | "middle" | "right"> = {
   2: "right",
 };
 
+export type KeyboardMode = "text" | "physical";
+
 type InputMessage =
-  | { t: "move"; x: number; y: number }
-  | { t: "button"; b: "left" | "middle" | "right"; down: boolean }
-  | { t: "wheel"; dx: number; dy: number }
-  | { t: "key"; code: string; down: boolean };
+  | { t: "move"; x: number; y: number; display: string; generation: number }
+  | {
+      t: "button";
+      b: "left" | "middle" | "right";
+      down: boolean;
+      display: string;
+      generation: number;
+    }
+  | { t: "wheel"; dx: number; dy: number; display: string; generation: number }
+  | { t: "key"; code: string; down: boolean; display: string; generation: number }
+  | { t: "keysym"; keysym: number; down: boolean; display: string; generation: number }
+  | { t: "release" };
+
+export function printableKeysym(key: string): number | null {
+  const point = key.codePointAt(0);
+  if (point === undefined || key.length !== (point > 0xffff ? 2 : 1)) return null;
+  // Match the native printable categories, not merely "not a control". Format,
+  // surrogate, private-use and unassigned characters are not printable input.
+  if (!PRINTABLE_KEY.test(key)) return null;
+  // Mutter matches exact XKB symbols in its active keymap. Prefer maintained
+  // legacy symbols (Euro, Cyrillic, Greek, etc.), as xkb_utf32_to_keysym does.
+  return point <= 0xff ? point : (unicodeLegacyKeysyms[point] ?? 0x01000000 | point);
+}
 
 // Maps a client point to the displayed frame of an object-fit: contain video, excluding
 // the letterbox bars. Returns null outside the frame unless clamping (during a drag).
@@ -49,7 +73,10 @@ export function videoFramePoint(
 }
 
 export class InputCapture {
-  private readonly pressedKeys = new Set<string>();
+  private readonly channel: RTCDataChannel;
+  private readonly display: string;
+  private readonly generation: number;
+  private readonly pressedKeys = new Map<string, Extract<InputMessage, { t: "key" | "keysym" }>>();
   private readonly pressedButtons = new Set<"left" | "middle" | "right">();
   private pendingMove: { x: number; y: number } | null = null;
   private moveTimer: number | undefined;
@@ -57,7 +84,11 @@ export class InputCapture {
   private wheelX = 0;
   private wheelY = 0;
 
-  constructor(private readonly channel: RTCDataChannel) {}
+  constructor(channel: RTCDataChannel, display: string, generation: number) {
+    this.channel = channel;
+    this.display = display;
+    this.generation = generation;
+  }
 
   get dragging(): boolean {
     return this.pressedButtons.size > 0;
@@ -84,7 +115,7 @@ export class InputCapture {
     this.flushMove();
     if (down) this.pressedButtons.add(name);
     else this.pressedButtons.delete(name);
-    this.send({ t: "button", b: name, down });
+    this.send({ t: "button", b: name, down, display: this.display, generation: this.generation });
     return true;
   }
 
@@ -104,23 +135,54 @@ export class InputCapture {
     this.wheelX = Math.abs(this.wheelX - dx) < 1 ? this.wheelX - dx : 0;
     this.wheelY = Math.abs(this.wheelY - dy) < 1 ? this.wheelY - dy : 0;
     this.flushMove();
-    this.send({ t: "wheel", dx, dy });
+    this.send({ t: "wheel", dx, dy, display: this.display, generation: this.generation });
   }
 
-  key(code: string, down: boolean): boolean {
+  key(event: KeyboardEvent, mode: KeyboardMode): boolean {
+    const { code } = event;
+    const down = event.type === "keydown";
     if (code === "" || code === "Unidentified" || code.length > MAX_CODE_LENGTH) return false;
-    if (!down && !this.pressedKeys.has(code)) return true;
-    if (down) this.pressedKeys.add(code);
-    else this.pressedKeys.delete(code);
-    this.send({ t: "key", code, down });
+    const held = this.pressedKeys.get(code);
+    if (!down) {
+      if (!held) return false;
+      this.pressedKeys.delete(code);
+      this.send({ ...held, down: false });
+      return true;
+    }
+    if (event.isComposing) return false;
+    if (held) {
+      this.send(held);
+      return true;
+    }
+    let message: Extract<InputMessage, { t: "key" | "keysym" }>;
+    if (mode === "physical") {
+      message = { t: "key", code, down: true, display: this.display, generation: this.generation };
+    } else {
+      // AltGraph may produce a printable symbol; ordinary shortcuts stay physical.
+      if (event.metaKey || ((event.ctrlKey || event.altKey) && !event.getModifierState("AltGraph")))
+        return false;
+      const keysym = printableKeysym(event.key);
+      if (keysym === null) return false;
+      message = {
+        t: "keysym",
+        keysym,
+        down: true,
+        display: this.display,
+        generation: this.generation,
+      };
+    }
+    this.pressedKeys.set(code, message);
+    this.send(message);
     return true;
   }
 
   // Releases every key and button this page pressed, e.g. on blur or when control stops.
   releaseAll() {
-    for (const code of this.pressedKeys) this.send({ t: "key", code, down: false });
+    clearTimeout(this.moveTimer);
+    this.moveTimer = undefined;
+    this.pendingMove = null;
+    this.send({ t: "release" });
     this.pressedKeys.clear();
-    for (const name of this.pressedButtons) this.send({ t: "button", b: name, down: false });
     this.pressedButtons.clear();
     this.wheelX = 0;
     this.wheelY = 0;
@@ -141,7 +203,13 @@ export class InputCapture {
     if (!point) return;
     this.lastMoveAt = performance.now();
     if (this.channel.bufferedAmount > MAX_BUFFERED_BYTES) return;
-    this.send({ t: "move", x: point.x, y: point.y });
+    this.send({
+      t: "move",
+      x: point.x,
+      y: point.y,
+      display: this.display,
+      generation: this.generation,
+    });
   }
 
   private send(message: InputMessage) {

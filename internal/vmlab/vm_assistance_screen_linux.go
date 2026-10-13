@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"math"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -20,10 +19,12 @@ import (
 // local user's consent and stop controls. Every capture it reports is saved
 // as bound evidence by the caller.
 type assistanceScreen struct {
-	vm        *guestVM
-	evidence  *assistanceEvidence
-	result    *VMAssistanceResult
-	reference *image.RGBA
+	vm            *guestVM
+	evidence      *assistanceEvidence
+	result        *VMAssistanceResult
+	reference     *image.RGBA
+	desktopBounds image.Rectangle
+	headOrigin    image.Point
 }
 
 // screenPollInterval paces screendumps; each is a full-frame QMP capture.
@@ -53,14 +54,14 @@ func (s *assistanceScreen) save(name string, img *image.RGBA) (string, error) {
 // transient login notification (GNOME hides normal banners ~5 s after local
 // activity; each round nudges the parked pointer) is never mistaken for the
 // clean desktop.
-func (s *assistanceScreen) captureReference(ctx context.Context) (string, error) {
+func (s *assistanceScreen) captureReference(ctx context.Context, name string) (string, error) {
 	first, err := s.vm.screendump(ctx)
 	if err != nil {
 		return "", err
 	}
 	for round := range 10 {
 		park := parkPoint(first.Bounds()).Add(image.Pt(round%2, 0))
-		if err := s.vm.pointerMove(ctx, first.Bounds(), park); err != nil {
+		if err := s.move(ctx, first.Bounds(), park); err != nil {
 			return "", err
 		}
 		select {
@@ -84,7 +85,7 @@ func (s *assistanceScreen) captureReference(ctx context.Context) (string, error)
 			}
 			if !strings.Contains(text, "lindm") && !strings.Contains(text, "remote assistance") {
 				s.reference = second
-				return s.save("desktop-reference", second)
+				return s.save(name, second)
 			}
 		}
 		first = second
@@ -103,6 +104,8 @@ func (s *assistanceScreen) ocr(ctx context.Context, img *image.RGBA, region imag
 	if err != nil {
 		return "", err
 	}
+	// One OpenMP thread: colocated on a busy dgx host, tesseract's default
+	// pool overran the one-minute bound (fedora44arm-tier1-19).
 	out, err := hostCommand(ctx, s.evidence.dir, "env", nil, "OMP_THREAD_LIMIT=1", "tesseract", filepath.Join(s.evidence.dir, path), "stdout", "--psm", "6")
 	if err != nil {
 		return "", err
@@ -175,17 +178,32 @@ func (s *assistanceScreen) waitBanner(ctx context.Context, timeout time.Duration
 const consentPromptMinHeight = 140
 
 // waitPromptBanner waits for the consent prompt banner, letting any shorter
-// notice shown first expire instead of mistaking it for the prompt.
+// notice shown first expire instead of mistaking it for the prompt. Between
+// short polls it nudges the parked pointer as local activity, as waitNoBanner
+// does: on fedora44arm-tier1-10 GNOME showed no banner for a prompt posted
+// right after the fullscreen witness window closed. Each shorter notice is
+// kept as evidence: GNOME queues the prompt behind it (pipewire-fix-06).
 func (s *assistanceScreen) waitPromptBanner(ctx context.Context, timeout time.Duration) (*image.RGBA, image.Rectangle, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	for {
-		img, banner, err := s.waitBanner(ctx, timeout)
-		if err != nil || banner.Dy() >= consentPromptMinHeight {
+	for poll := 0; ; poll++ {
+		img, banner, err := s.waitBanner(ctx, 5*time.Second)
+		switch {
+		case err == nil && banner.Dy() >= consentPromptMinHeight:
+			return img, banner, nil
+		case err == nil:
+			if _, err := s.save(fmt.Sprintf("short-notice-%d", time.Now().UnixNano()), img); err != nil {
+				return img, image.Rectangle{}, err
+			}
+			if err := s.waitNoBanner(ctx, timeout); err != nil {
+				return img, image.Rectangle{}, fmt.Errorf("a %d px notice stayed visible instead of the consent prompt: %w", banner.Dy(), err)
+			}
+		case ctx.Err() != nil || img == nil:
 			return img, banner, err
-		}
-		if err := s.waitNoBanner(ctx, timeout); err != nil {
-			return img, image.Rectangle{}, fmt.Errorf("a %d px notice stayed visible instead of the consent prompt: %w", banner.Dy(), err)
+		default:
+			if err := s.move(ctx, img.Bounds(), parkPoint(img.Bounds()).Add(image.Pt(poll%2, 0))); err != nil {
+				return img, image.Rectangle{}, err
+			}
 		}
 	}
 }
@@ -206,7 +224,7 @@ func (s *assistanceScreen) waitNoBanner(ctx context.Context, timeout time.Durati
 			return nil
 		}
 		park := parkPoint(img.Bounds()).Add(image.Pt(poll%2, 0))
-		if err := s.vm.pointerMove(ctx, img.Bounds(), park); err != nil {
+		if err := s.move(ctx, img.Bounds(), park); err != nil {
 			return err
 		}
 		select {
@@ -362,11 +380,85 @@ func (s *assistanceScreen) click(ctx context.Context, display image.Rectangle, p
 	if err := s.waitPointerHover(ctx, point, target); err != nil {
 		return err
 	}
-	if err := s.vm.pointerClick(ctx, display, point, "left"); err != nil {
+	if err := s.pointerClick(ctx, display, point); err != nil {
 		return fmt.Errorf("click %s: %w", target, err)
 	}
 	scenario.Clicks = append(scenario.Clicks, assistanceClickEvidence{Target: target, X: point.X, Y: point.Y})
-	return s.vm.pointerMove(ctx, display, parkPoint(display))
+	return s.move(ctx, display, parkPoint(display))
+}
+
+// QEMU's USB tablet maps the whole desktop, not a single screendump. Once the
+// second head is active, local clicks include its observed layout.
+func (s *assistanceScreen) localPoint(display image.Rectangle, point image.Point) (image.Rectangle, image.Point) {
+	if s.desktopBounds.Empty() {
+		return display, point
+	}
+	return s.desktopBounds, point.Sub(display.Min).Add(s.headOrigin)
+}
+
+// move and pointerClick are the only local-seat pointer paths: both take
+// head-0 screendump coordinates and send desktop-mapped QMP input. A click
+// normalized against the screendump alone lands elsewhere once the second
+// head widens the desktop, while the hover (already mapped) still settles.
+func (s *assistanceScreen) move(ctx context.Context, display image.Rectangle, point image.Point) error {
+	display, point = s.localPoint(display, point)
+	return s.vm.pointerMove(ctx, display, point)
+}
+
+func (s *assistanceScreen) pointerClick(ctx context.Context, display image.Rectangle, point image.Point) error {
+	display, point = s.localPoint(display, point)
+	return s.vm.pointerClick(ctx, display, point, "left")
+}
+
+func (s *assistanceScreen) selectMonitors(ctx context.Context, dialog image.Rectangle, scenario *assistanceScenarioEvidence) error {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	var borders [2]image.Rectangle
+	for {
+		img, err := s.vm.screendump(ctx)
+		if err != nil {
+			return err
+		}
+		var found bool
+		borders, found = portalMonitorTiles(img, dialog)
+		if found {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("portal did not show two native monitor choices: %w", ctx.Err())
+		case <-time.After(screenPollInterval):
+		}
+	}
+	for i, border := range borders {
+		point := image.Pt((border.Min.X+border.Max.X)/2, border.Min.Y+15)
+		img, err := s.vm.screendump(ctx)
+		if err != nil {
+			return err
+		}
+		if err := s.click(ctx, img.Bounds(), point, fmt.Sprintf("portal-select-monitor-%d", i), scenario); err != nil {
+			return err
+		}
+	}
+	for {
+		img, err := s.vm.screendump(ctx)
+		if err != nil {
+			return err
+		}
+		if portalMonitorSelected(img, borders[0]) && portalMonitorSelected(img, borders[1]) {
+			path, err := s.save("portal-two-monitors-selected", img)
+			if err != nil {
+				return err
+			}
+			scenario.Screenshots = append(scenario.Screenshots, path)
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("portal monitor choices did not both become selected: %w", ctx.Err())
+		case <-time.After(screenPollInterval):
+		}
+	}
 }
 
 // clickNotificationAction clicks action index of a banner declaring actions
@@ -388,11 +480,11 @@ func (s *assistanceScreen) clickNotificationAction(ctx context.Context, banner i
 		}
 		current, found := locateNotificationBanner(s.reference, hovered)
 		if found && current == banner {
-			if err := s.vm.pointerClick(ctx, hovered.Bounds(), point, "left"); err != nil {
+			if err := s.pointerClick(ctx, hovered.Bounds(), point); err != nil {
 				return fmt.Errorf("click %s: %w", target, err)
 			}
 			scenario.Clicks = append(scenario.Clicks, assistanceClickEvidence{Target: target, X: point.X, Y: point.Y})
-			return s.vm.pointerMove(ctx, hovered.Bounds(), parkPoint(hovered.Bounds()))
+			return s.move(ctx, hovered.Bounds(), parkPoint(hovered.Bounds()))
 		}
 		if attempt == 0 {
 			if _, err := s.save(fmt.Sprintf("banner-moved-%s-%d", target, time.Now().Unix()), hovered); err != nil {
@@ -403,7 +495,7 @@ func (s *assistanceScreen) clickNotificationAction(ctx context.Context, banner i
 			return fmt.Errorf("notification banner did not hold still under the pointer for %s (last %v, found %t)", target, current, found)
 		}
 		banner, point = current, notificationActionPoint(current, actions, index)
-		if err := s.vm.pointerMove(ctx, hovered.Bounds(), point); err != nil {
+		if err := s.move(ctx, hovered.Bounds(), point); err != nil {
 			return err
 		}
 		select {
@@ -421,7 +513,7 @@ func (s *assistanceScreen) waitPointerHover(ctx context.Context, point image.Poi
 	if err != nil {
 		return err
 	}
-	if err := s.vm.pointerMove(ctx, before.Bounds(), point); err != nil {
+	if err := s.move(ctx, before.Bounds(), point); err != nil {
 		return err
 	}
 	previous := before
@@ -441,32 +533,4 @@ func (s *assistanceScreen) waitPointerHover(ctx context.Context, point image.Poi
 		case <-time.After(screenPollInterval):
 		}
 	}
-}
-
-// upscaleGray returns region of img as grayscale, bilinearly scaled by
-// factor, in an RGBA image for the evidence PNG encoder.
-func upscaleGray(img *image.RGBA, region image.Rectangle, factor int) *image.RGBA {
-	region = region.Intersect(img.Bounds())
-	width, height := region.Dx()*factor, region.Dy()*factor
-	out := image.NewRGBA(image.Rect(0, 0, width, height))
-	luma := func(x, y int) float64 {
-		x = min(max(x, region.Min.X), region.Max.X-1)
-		y = min(max(y, region.Min.Y), region.Max.Y-1)
-		i := img.PixOffset(x, y)
-		return 0.299*float64(img.Pix[i]) + 0.587*float64(img.Pix[i+1]) + 0.114*float64(img.Pix[i+2])
-	}
-	for y := range height {
-		sy := float64(region.Min.Y) + (float64(y)+0.5)/float64(factor) - 0.5
-		y0, fy := int(math.Floor(sy)), sy-math.Floor(sy)
-		for x := range width {
-			sx := float64(region.Min.X) + (float64(x)+0.5)/float64(factor) - 0.5
-			x0, fx := int(math.Floor(sx)), sx-math.Floor(sx)
-			top := luma(x0, y0)*(1-fx) + luma(x0+1, y0)*fx
-			bottom := luma(x0, y0+1)*(1-fx) + luma(x0+1, y0+1)*fx
-			v := uint8(math.Round(top*(1-fy) + bottom*fy))
-			i := out.PixOffset(x, y)
-			out.Pix[i], out.Pix[i+1], out.Pix[i+2], out.Pix[i+3] = v, v, v, 255
-		}
-	}
-	return out
 }

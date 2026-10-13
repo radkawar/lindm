@@ -16,6 +16,7 @@ import (
 
 	"lindm/internal/device/secrets"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -74,7 +75,7 @@ func newSecretFixture(t *testing.T) *secretFixture {
 		t.Fatal(err)
 	}
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: authority, Escrow: custody})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: authority, Escrow: custody}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

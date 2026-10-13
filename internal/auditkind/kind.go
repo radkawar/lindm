@@ -61,14 +61,20 @@ var (
 
 // Remote assistance sessions.
 var (
-	AssistanceAnswer  = kind("assistance.answer")
-	AssistanceConsent = kind("assistance.consent")
-	AssistanceEnd     = kind("assistance.end")
-	AssistanceJoin    = kind("assistance.join")
-	AssistancePrompt  = kind("assistance.prompt")
-	AssistanceRequest = kind("assistance.request")
-	AssistanceStart   = kind("assistance.start")
-	AssistanceStop    = kind("assistance.stop")
+	AssistanceAnswer        = kind("assistance.answer")
+	AssistanceClipboard     = kind("assistance.clipboard")
+	AssistanceCommandDenied = kind("assistance.command_denied")
+	AssistanceConsent       = kind("assistance.consent")
+	AssistanceDisplay       = kind("assistance.display")
+	AssistanceEnd           = kind("assistance.end")
+	AssistanceJoin          = kind("assistance.join")
+	AssistanceMessage       = kind("assistance.message")
+	AssistancePolicy        = kind("assistance.policy")
+	AssistancePrompt        = kind("assistance.prompt")
+	AssistanceRequest       = kind("assistance.request")
+	AssistanceSpecialKeys   = kind("assistance.special_keys")
+	AssistanceStart         = kind("assistance.start")
+	AssistanceStop          = kind("assistance.stop")
 )
 
 // Device management capability policies: an administrator's scope change and

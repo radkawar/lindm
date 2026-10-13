@@ -14,6 +14,7 @@ import (
 
 	"lindm/internal/device/dispatch"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -107,7 +108,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.svc, err = New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: s.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}, Escrow: custody})
+	f.svc, err = New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: s.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}, Escrow: custody}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

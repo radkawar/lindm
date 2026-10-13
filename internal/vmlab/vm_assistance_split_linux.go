@@ -86,7 +86,9 @@ func openAssistanceController(ctx context.Context, repository, binary, stateDir 
 	if err != nil {
 		return nil, err
 	}
-	if err := fixture.ConfigureAssistance(ctx, assistance); err != nil {
+	assistance.PolicyCeiling = assistanceFullPolicy()
+	roles := assistanceQualificationRoles()
+	if err := fixture.ConfigureAssistance(ctx, assistance, roles); err != nil {
 		return nil, err
 	}
 	controller.control, err = openVMControlPlane(ctx, repository, fixture)
@@ -234,7 +236,9 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}
-	if err := fixture.ConfigureAssistance(ctx, assistance); err != nil {
+	assistance.PolicyCeiling = assistanceFullPolicy()
+	roles := assistanceQualificationRoles()
+	if err := fixture.ConfigureAssistance(ctx, assistance, roles); err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}
 	relay := assistance.GetRelay()

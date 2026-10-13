@@ -331,12 +331,12 @@ const file_lindm_auth_v1_authorization_proto_rawDesc = "" +
 	"\vRoleBinding\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12 \n" +
 	"\vpermissions\x18\x02 \x03(\tR\vpermissions\x122\n" +
-	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeR\x06scopes\"\xea\x04\n" +
+	"\x06scopes\x18\x03 \x03(\v2\x1a.lindm.auth.v1.DeviceScopeR\x06scopes\"\x96\x06\n" +
 	"\x0eRoleDefinition\x12]\n" +
-	"\x04name\x18\x01 \x01(\tBI\xbaHFrD\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$Z\x05ownerZ\x05adminZ\boperatorZ\bhelpdeskZ\aauditorR\x04name\x12\xf8\x03\n" +
-	"\vpermissions\x18\x02 \x03(\tB\xd5\x03\xbaH\xd1\x03\x92\x01\xcd\x03\b\x01\x10\x18\x18\x01\"\xc4\x03r\xc1\x03R\n" +
+	"\x04name\x18\x01 \x01(\tBI\xbaHFrD\x10\x01\x18@2\x13^[a-z][a-z0-9_.-]*$Z\x05ownerZ\x05adminZ\boperatorZ\bhelpdeskZ\aauditorR\x04name\x12\xa4\x05\n" +
+	"\vpermissions\x18\x02 \x03(\tB\x81\x05\xbaH\xfd\x04\x92\x01\xf9\x04\b\x01\x10\x19\x18\x01\"\xf0\x04r\xed\x04R\n" +
 	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
-	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x15remote_assistance.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\vpermissions\"\xa2\x01\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x16remote_assistance.viewR\x19remote_assistance.controlR\x1fremote_assistance.policy.manageR\x1bremote_assistance.clipboardR\x1aremote_assistance.keyboardR\x19remote_assistance.displayR\x19remote_assistance.messageR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\vpermissions\"\xa2\x01\n" +
 	"\fGroupBinding\x12 \n" +
 	"\x05group\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x04R\x05group\x122\n" +

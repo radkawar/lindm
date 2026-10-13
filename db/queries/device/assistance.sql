@@ -141,6 +141,61 @@ UPDATE assistance_sessions
 SET device_ended = true
 WHERE id = sqlc.arg('id') AND state = 6;
 
+-- name: SetAssistanceCapabilities :exec
+UPDATE assistance_sessions
+SET requested_capabilities = sqlc.arg('requested_capabilities'),
+    effective_capabilities = sqlc.arg('effective_capabilities')
+WHERE id = sqlc.arg('id');
+
+-- name: SetAssistanceProjection :exec
+UPDATE assistance_sessions
+SET capability_projection = sqlc.arg('capability_projection')
+WHERE id = sqlc.arg('id') AND state <> 6;
+
+-- name: GetOpenAssistanceSession :one
+SELECT * FROM assistance_sessions WHERE device_id = sqlc.arg('device_id') AND state <> 6;
+
+-- name: GetAssistancePolicy :one
+SELECT policy FROM assistance_policies WHERE device_id = sqlc.arg('device_id');
+
+-- name: PutAssistancePolicy :exec
+INSERT INTO assistance_policies(device_id, policy)
+VALUES (sqlc.arg('device_id'), sqlc.arg('policy'))
+ON CONFLICT (device_id) DO UPDATE SET policy = EXCLUDED.policy;
+
+-- name: GetAssistancePolicyRequest :one
+SELECT * FROM assistance_policy_requests WHERE request_id = sqlc.arg('request_id');
+
+-- name: InsertAssistancePolicyRequest :exec
+INSERT INTO assistance_policy_requests(request_id, device_id, operator_id, request_digest, policy)
+VALUES (sqlc.arg('request_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('request_digest'), sqlc.arg('policy'));
+
+-- name: InsertAssistanceCommand :exec
+INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status)
+VALUES (sqlc.arg('request_id'), sqlc.arg('session_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('request_digest'), sqlc.arg('kind'), sqlc.arg('policy'), sqlc.arg('byte_count'), sqlc.arg('special_key'), sqlc.arg('display_id'), sqlc.arg('deadline'), 1);
+
+-- name: GetAssistanceCommand :one
+SELECT * FROM assistance_commands WHERE request_id = sqlc.arg('request_id');
+
+-- name: GetPendingAssistanceCommand :one
+SELECT * FROM assistance_commands WHERE session_id = sqlc.arg('session_id') AND status = 1;
+
+-- name: FinishAssistanceCommand :exec
+UPDATE assistance_commands
+SET status = sqlc.arg('status'), reason = sqlc.arg('reason'), completed_at = sqlc.arg('completed_at'), byte_count = sqlc.arg('byte_count')
+WHERE request_id = sqlc.arg('request_id') AND status = 1;
+
+-- name: AuthorizeAssistanceSession :exec
+UPDATE assistance_sessions SET authorized_until = sqlc.arg('authorized_until')
+WHERE id = sqlc.arg('id') AND state <> 6;
+
+-- name: SetAssistanceEffectiveCapabilities :exec
+UPDATE assistance_sessions SET effective_capabilities = sqlc.arg('effective_capabilities')
+WHERE id = sqlc.arg('id') AND state <> 6;
+
+-- name: CountAssistanceCommands :one
+SELECT count(*)::bigint FROM assistance_commands WHERE session_id = sqlc.arg('session_id');
+
 -- name: SetAssistanceDevicePolicy :exec
 -- Writes only when the reported value changes, not on every idle sync.
 INSERT INTO assistance_device_policies (device_id, policy, changed_at)

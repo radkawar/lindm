@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"connectrpc.com/connect"
+	"github.com/google/uuid"
+
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
@@ -114,6 +117,11 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		"Media and control proofs are the console's own WebRTC statistics and decoded frames plus a guest-side typed nonce; video quality, latency and bandwidth are not qualified.",
 		"Idle blanking and automatic lock are disabled in the lab " + desktop.name + " session; the lock scenario uses loginctl lock-session.",
 		"Scenarios that must end UNAVAILABLE prove the visible refusal before consent on this desktop, not that the capability works.",
+		"Tier1 witnesses use a disposable native GTK client and fresh nonces; clipboard automation is explicit, never continuous synchronization. Message visibility is OCR of QMP pixels, not notification command acceptance.",
+		"The GTK witness requires and records GdkWaylandDisplay, observed UID and logind display-session identity. XWayland applications and Wayland/XWayland clipboard interoperability are not qualified.",
+		"Mandatory native negative witnesses cover per-device policy revocation, a real custom-role creator with remote_assistance.view and remote_assistance.control but no remote_assistance.clipboard, denied direction, and oversized/ended-session RPC refusals with independent fresh unchanged GTK clipboard observations; modifier release and selected-monitor hot-unplug are also required. Selected subsets do not inherit these proofs.",
+		"The policy scenario exercises an administrative per-device POLICY downgrade and matching session revocation. Neither agent nor deployment CONFIG ceiling restriction is exercised; both configured ceilings remain ON. FD cancellation and unmappable-Unicode injection remain separate deterministic criteria, not native passes.",
+		"Two-head qualification requires two active native GDK monitors backed by distinct virtio-gpu scanouts activated with private RFB SetDesktopSize. No physical multi-monitor, other compositor, IME, file transfer or secure-attention claim is made.",
 	}}
 	if options.ControlPlane != nil {
 		options.ConsoleTURNTCP = true
@@ -129,6 +137,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 			err = verifyAssistanceEvidence(options.EvidenceDir, result)
 		}
 		result.Passed = err == nil && options.RebootPolicy == nil
+		result.TierOnePassed = result.Passed && len(result.Witnesses) == 6 && len(result.NotRun) == 0 && completeAssistanceNativeBoundaries(result)
 		if err != nil {
 			result.Failure = err.Error()
 		}
@@ -142,6 +151,30 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	scenarios, err := selectAssistanceScenarios(desktop.assistance, options.Scenarios)
 	if err != nil {
 		return result, err
+	}
+	tierOne := false
+	selected := make([]assistanceScenarioSpec, 0, len(scenarios))
+	for _, scenario := range scenarios {
+		if scenario.capability != "" {
+			if gateErr := release.Gate(scenario.capability); gateErr != nil {
+				if options.Scenarios != nil {
+					return result, gateErr
+				}
+				result.NotRun = append(result.NotRun, assistanceNotRunEvidence{Scenario: scenario.name, Capability: string(scenario.capability), Reason: gateErr.Error()})
+				continue
+			}
+			tierOne = true
+		}
+		selected = append(selected, scenario)
+	}
+	scenarios = selected
+	if slices.ContainsFunc(scenarios, func(scenario assistanceScenarioSpec) bool { return scenario.name == "monitors" }) {
+		hardware := *options.Encrypted.Hardware
+		hardware.DisplayHeads = 2
+		options.Encrypted.Hardware = &hardware
+	}
+	if len(result.NotRun) != 0 {
+		result.Boundaries = append(result.Boundaries, "Passed covers only the recorded scenarios; capability not-run entries are unsupported/not-qualified, never capability passes. tier_one_passed remains false.")
 	}
 	if result.LabSHA256, err = dispatchFileDigest(options.LabBinary); err != nil {
 		return result, err
@@ -251,6 +284,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	} else {
 		result.DeviceID = saved.DeviceID
 	}
+	if _, err := control.session.Admin.UpdateAssistancePolicy(ctx, connect.NewRequest(&adminv1.UpdateAssistancePolicyRequest{RequestId: uuid.NewString(), DeviceId: result.DeviceID, Policy: assistanceFullPolicy()})); err != nil {
+		return result, fmt.Errorf("enable disposable device Tier1 policy: %w", err)
+	}
 	if err := waitNativeActionPresence(ctx, control.session, result.DeviceID); err != nil {
 		return result, err
 	}
@@ -260,14 +296,19 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := waitAssistanceSessionUnit(ctx, vm.guest, desktop, result.Guest); err != nil {
 		return result, err
 	}
-	if result.Guest.Packages, err = observeAssistancePackages(ctx, vm.guest, release); err != nil {
+	if tierOne {
+		if err := installAssistanceFixture(ctx, vm.guest, desktop, release, evidence, result); err != nil {
+			return result, err
+		}
+	}
+	if result.Guest.Packages, err = observeAssistancePackages(ctx, vm.guest, release, tierOne); err != nil {
 		return result, err
 	}
 	if result.Guest.Capabilities, err = observeAssistanceCapabilities(ctx, vm.guest, desktop); err != nil {
 		return result, err
 	}
 	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
-	if _, err := screen.captureReference(ctx); err != nil {
+	if _, err := screen.captureReference(ctx, "desktop-reference"); err != nil {
 		return result, err
 	}
 	if options.RebootPolicy != nil {
@@ -323,7 +364,7 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 	if options.ControlPlane != nil {
 		run.forwardedTURNURL = options.ControlPlane.forwardedTURNURL()
 	}
-	if run.browser, err = openAssistanceOperator(ctx, fixture, options, private); err != nil {
+	if run.browser, err = openAssistanceOperator(ctx, fixture, options, private, assistanceOperator, "owner"); err != nil {
 		return err
 	}
 	defer func() {
@@ -334,6 +375,18 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 	}()
 	run.result.Browser.Version = run.browser.version
 	for _, scenario := range scenarios {
+		if scenario.name == "authority-view" || scenario.name == "authority-control" {
+			if err := run.modeAuthorityScenario(ctx, fixture, options, private, scenario); err != nil {
+				return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
+			}
+			continue
+		}
+		if scenario.name == "clipboard-permission" {
+			if err := run.restrictedClipboardScenario(ctx, fixture, options, private, scenario); err != nil {
+				return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
+			}
+			continue
+		}
 		if err := run.scenario(ctx, scenario); err != nil {
 			// Preserve the console's actual negotiation failure before closing
 			// Chromium; an earlier awaiting-consent screenshot cannot explain
@@ -368,11 +421,11 @@ func selectAssistanceScenarios(available []assistanceScenarioSpec, names []strin
 	return selected, nil
 }
 
-// openAssistanceOperator issues a distinct owner account through the real
-// account API and lets Chromium enroll and sign in through the console UI.
+// openAssistanceOperator issues a distinct account with the requested configured
+// role through the real account API, then enrolls and signs in through the UI.
 // The browser driver comes from the checkout under test, like the packages.
-func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private string) (_ *assistanceBrowser, err error) {
-	username, enrollment, err := createAssistanceOperator(ctx, fixture, options.PersistentDir != "")
+func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private, username, role string) (_ *assistanceBrowser, err error) {
+	username, enrollment, err := createAssistanceOperator(ctx, fixture, options.PersistentDir != "", username, role)
 	if err != nil {
 		return nil, err
 	}
@@ -404,16 +457,27 @@ type assistanceScenarioSpec struct {
 	portalCancel bool
 	// detail is the exact UNAVAILABLE end detail of a session the desktop
 	// cannot serve; such a session must end before any consent prompt.
-	detail string
+	detail     string
+	capability platform.Capability
 }
 
 var assistanceScenarios = []assistanceScenarioSpec{
 	{name: "control", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED},
 	{name: "rerequest", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED},
 	{name: "view", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED},
+	{name: "authority-view", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED},
+	{name: "authority-control", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST},
 	{name: "decline", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED},
 	{name: "portal-cancel", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, portalCancel: true},
 	{name: "lock", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED},
+	{name: "clipboard", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceClipboard},
+	{name: "clipboard-limited", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceClipboard},
+	{name: "clipboard-policy", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, capability: platform.AssistanceClipboard},
+	{name: "clipboard-permission", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceClipboard},
+	{name: "keyboard", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceKeyboard},
+	{name: "display", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceDisplays},
+	{name: "message", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceMessages},
+	{name: "monitors", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceDisplays},
 }
 
 // unavailableScenarios are a desktop's visible pre-consent refusals.
@@ -427,14 +491,18 @@ func unavailableScenarios(view, control string) []assistanceScenarioSpec {
 // assistanceAuditExpectations are the audit actions each scenario must leave,
 // in addition to assistance.end carrying its cause.
 var assistanceAuditExpectations = map[string][]string{
-	"control":             {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.stop"},
-	"view":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
-	"lock":                {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
-	"decline":             {"assistance.request", "assistance.prompt"},
-	"rerequest":           {"assistance.request", "assistance.prompt"},
-	"portal-cancel":       {"assistance.request", "assistance.prompt"},
-	"view-unavailable":    {"assistance.request"},
-	"control-unavailable": {"assistance.request"},
+	"control":              {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.stop"},
+	"view":                 {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"authority-view":       {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"authority-control":    {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"lock":                 {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"},
+	"decline":              {"assistance.request", "assistance.prompt"},
+	"rerequest":            {"assistance.request", "assistance.prompt"},
+	"portal-cancel":        {"assistance.request", "assistance.prompt"},
+	"clipboard-policy":     {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.clipboard"},
+	"clipboard-permission": {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.clipboard", "assistance.stop"},
+	"view-unavailable":     {"assistance.request"},
+	"control-unavailable":  {"assistance.request"},
 }
 
 // assistanceAuditForbidden are audit actions a scenario must never leave.

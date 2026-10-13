@@ -253,8 +253,8 @@ are also privileged code; publisher approval and source integrity are required.
 
 ### Remote assistance capabilities
 
-This is the delivery contract for P13/P14 and L09/L12/L16, not a claim that the
-capabilities below have shipped. Existing consent-controlled view/control evidence
+This is the delivery contract for P13/P14 and L09/L12/L16. Status: Tier 1 is
+implemented and partially qualified; Tier 2 and later capabilities have not shipped. Existing consent-controlled view/control evidence
 does not qualify clipboard, file transfer, recording or unattended access. The
 [assistance evidence ledger](verification.md#built-in-graphical-remote-assistance-l09-l12)
 records each platform/capability separately.
@@ -272,7 +272,9 @@ The built-in owner/admin roles may configure policy and use authorized capabilit
 operator/helpdesk roles receive none implicitly and require explicit scoped grants.
 Auditors receive metadata through `audit.read`, not live-screen or content access.
 Recording retrieval requires a separate explicit scoped grant, including for an
-auditor. Live capability permissions below add to `remote_assistance.run`; recording
+auditor. Viewing requires `remote_assistance.view`; control additionally requires
+`remote_assistance.control` on the same device. Live capability permissions below
+add to those mode-specific grants and never imply view or control. Recording
 retrieval/deletion instead use their own permissions and device scope without
 granting live assistance. Policy administration uses `remote_assistance.policy.manage`.
 No role, including owner, bypasses local consent. Policy changes, denied operations,

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -59,7 +60,7 @@ func newLAPSFixture(t *testing.T, revealApproval bool) *lapsFixture {
 func (f *lapsFixture) rebuild(t *testing.T, authority *identity.Service, custody *escrow.Custody, revealApproval bool) *Service {
 	t.Helper()
 	s := f.svc
-	svc, err := New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: authority, ExecutionAuthority: s.Execution, ExecutionSigning: s.Signing, Escrow: custody, EscrowRevealApprovalRequired: revealApproval})
+	svc, err := New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: authority, ExecutionAuthority: s.Execution, ExecutionSigning: s.Signing, Escrow: custody, EscrowRevealApprovalRequired: revealApproval}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

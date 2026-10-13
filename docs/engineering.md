@@ -1473,6 +1473,39 @@ records, source author, assignee, acceptance criteria and screenshot references;
 it does not create tracker issues or infer owner approval. Keep the original
 evidence directory with those records. Reports and annotations may contain
 sensitive fleet information: keep them private and never enter credentials.
+The interactive capability scenarios are `clipboard`, `clipboard-limited`,
+`clipboard-policy`, `clipboard-permission`, `keyboard`, `display`, `message` and
+`monitors`. They use the product UI and an independent native GTK witness, not
+test-only product endpoints. Witness packages are installed only in
+the disposable Tier 1 assistance guest, never baked into unrelated action goldens:
+Ubuntu uses `python3-gi`, `python3-gi-cairo` and `gir1.2-gtk-3.0`; Fedora uses
+`python3-gobject`, `python3-cairo` and `gtk3`. The registry owns these package lists.
+The `message` scenario additionally requires host `tesseract` and English language
+data to read the nonce, authenticated sender and product identity from the same
+actual guest notification pixels. On the Ubuntu lab
+host, the inspected packages are `tesseract-ocr=5.3.4-1build5` and
+`tesseract-ocr-eng=1:4.1.0-2`. Missing OCR is an explicit prerequisite failure,
+not a screenshot-only pass; a zero-scenario held demo does not require it.
+
+The policy case changes the real per-device administrative policy; it does not
+qualify deployment/agent configuration changes. The permission case enrolls a real
+restricted account with session-run permission but no clipboard permission. A
+masked not-found response needs the exact actor/request denial audit and fresh
+native unchanged-clipboard evidence. Audit witnesses use typed `actor_id`,
+`resource_id`, `target_device_id` and `details` fields; operator-authored `reason`
+text is not an identity, policy or outcome oracle. Baseline and held-demo runs do
+not create that account. Keyboard qualification combines physical y/z with canonical Euro
+and Cyrillic symbols, through Chromium keyboard events and production input
+capture, observed independently in the guest's selected native XKB layout.
+
+The monitor scenario enables a real second virtio-gpu scanout through a private
+head-bound VNC client display-size request, then observes both guest monitors.
+`max_outputs=2` alone does not enable QEMU 8.2's second output. No extra public VNC
+listener, fake browser display or compositor-private capture path is used.
+Keep helper messages/clipboard and input witnesses separate from local QMP consent
+clicks. Qualification records exact portal and Mutter package/source versions and
+SHA-256-bound witness data/screenshots; source inspection and a held demo remain
+distinct from a passed native capability row.
 
 Imported owner tasks become machine acceptance checks: one module per task in
 `web/acceptance/owner-edits/` (registered in its `index.mjs`) asserts the task's

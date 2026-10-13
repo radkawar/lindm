@@ -31,13 +31,21 @@ message SessionAssistanceReport {
       5
     ]
   }];
-  string offer_sdp = 3 [(buf.validate.field).string.max_len = 16384];
+  string offer_sdp = 3 [(buf.validate.field).string.max_bytes = 16384];
   bool control_granted = 4;
   AssistanceEndCause end_cause = 5 [(buf.validate.field).enum.defined_only = true];
   string end_detail = 6 [(buf.validate.field).string = {
     max_len: 256
     pattern: "^[ -~]*$"
   }];
+  AssistanceCapabilities granted_capabilities = 7;
+  repeated AssistanceDisplay displays = 8 [(buf.validate.field).repeated.max_items = 8];
+  string selected_display_id = 9 [(buf.validate.field).string.max_len = 64];
+  AssistanceCommandResult command_result = 10;
+  uint32 display_generation = 11;
+  AssistancePolicy requested_capabilities = 12;
+  AssistancePolicy effective_capabilities = 13;
+  AssistanceDisplayFrame display_frame = 14;
   option (buf.validate.message).cel = {
     id: "session_assistance_report.offer"
     message: "offer_sdp is required from OFFERED and absent before it"
@@ -48,11 +56,26 @@ message SessionAssistanceReport {
     message: "end_cause is required exactly when ENDED"
     expression: "(this.phase == 5) == (this.end_cause != 0)"
   };
+  option (buf.validate.message).cel = {
+    id: "session_assistance_report.command_result"
+    message: "command reports are terminal and ended sessions cannot retain content"
+    expression: "!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))"
+  };
+  option (buf.validate.message).cel = {
+    id: "session_assistance_report.display_frame"
+    message: "frame identity must name the currently shared display generation"
+    expression: "!has(this.display_frame) || ((this.phase == 3 || this.phase == 4) && this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))"
+  };
 }
 
 message SyncSessionRequest {
   repeated SessionAssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 4];
   OSUpdateRebootDeferralRequest reboot_deferral = 2;
+  option (buf.validate.message).cel = {
+    id: "sync_session.one_content"
+    message: "only one command result may carry content"
+    expression: "this.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1"
+  };
 }
 
 message SyncSessionResponse {

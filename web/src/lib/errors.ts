@@ -361,6 +361,70 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
   // An internal error carrying a familiar reason must remain a real failure.
   if (failure.code === Code.FailedPrecondition) {
     switch (failure.reason) {
+      case "assistance_unconfigured":
+        return {
+          tone: "neutral",
+          title: "Remote assistance is not configured",
+          message: "This server is not configured to provide remote assistance.",
+          action: "Ask an administrator to review the assistance and relay settings.",
+        };
+      case "assistance_policy_ceiling":
+        return {
+          tone: "neutral",
+          title: "Feature not enabled",
+          message: "The deployment does not allow one or more selected assistance features.",
+          action: "Refresh the assistance policy and choose from the available options.",
+        };
+      case "assistance_capability_not_granted":
+        return {
+          tone: "neutral",
+          title: "Feature not shared",
+          message: "The current session does not allow this feature.",
+          action: "Review the assistance policy and the features the user shared.",
+        };
+      case "assistance_content_expired":
+        return {
+          tone: "warning",
+          title: "Clipboard text is no longer available",
+          message: "The previously read clipboard text has expired or was cleared.",
+          action: "Choose Read clipboard to request the current text again.",
+        };
+      case "assistance_command_busy":
+        return {
+          tone: "warning",
+          title: "Another request is still running",
+          message: "The device has not finished the current assistance request.",
+          action: "Check its result before sending another request.",
+        };
+      case "assistance_busy":
+        return {
+          tone: "warning",
+          title: "An assistance session is already open",
+          message: "This device already has a pending or active assistance session.",
+          action: "Review the session history and finish that session before requesting another.",
+        };
+      case "assistance_capacity":
+        return {
+          tone: "warning",
+          title: "Assistance is at capacity",
+          message: "The server has reached its limit for concurrent assistance sessions.",
+          action: "Wait for another session to end before requesting a new one.",
+        };
+      case "assistance_not_active":
+      case "assistance_state":
+        return {
+          tone: "warning",
+          title: "Session is not ready",
+          message: "The session cannot accept this request in its current state.",
+          action: "Refresh the session and wait for the user to accept and the screen to connect.",
+        };
+      case "assistance_ended":
+        return {
+          tone: "neutral",
+          title: "Assistance session ended",
+          message: "This session no longer accepts requests.",
+          action: "Request a new session if the user still needs assistance.",
+        };
       case "device_action_recovery_readiness_missing":
       case "device_action_recovery_readiness_stale":
       case "device_action_recovery_readiness_unsupported":
@@ -640,6 +704,22 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     };
   }
   if (failure.code === Code.PermissionDenied) {
+    if (failure.reason === "assistance_policy_changed") {
+      return {
+        tone: "warning",
+        title: "Assistance policy changed",
+        message: "The current policy no longer allows this session's requested features.",
+        action: "Review the policy and request a new session with the features now allowed.",
+      };
+    }
+    if (failure.reason === "assistance_not_creator") {
+      return {
+        tone: "warning",
+        title: "Only the requesting admin can continue",
+        message: "This session was requested by another admin.",
+        action: "Ask that admin to continue, or request your own session after this one ends.",
+      };
+    }
     if (failure.reason === "actor_authorization_rejected") {
       return {
         tone: "warning",
@@ -687,6 +767,26 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Sign-in required",
       message: "Your session could not authorize this request.",
       action: "Sign in again to continue.",
+    };
+  }
+  if (failure.code === Code.ResourceExhausted && failure.reason === "assistance_command_capacity") {
+    return {
+      tone: "warning",
+      title: "Assistance requests are at capacity",
+      message: "The server cannot accept another assistance request right now.",
+      action: "Wait for running requests to finish before sending this request again.",
+    };
+  }
+  if (
+    failure.code === Code.InvalidArgument &&
+    (failure.reason === "invalid_assistance_command" ||
+      failure.reason === "invalid_assistance_policy")
+  ) {
+    return {
+      tone: "warning",
+      title: "Assistance request needs updating",
+      message: "The request does not meet the server's assistance requirements.",
+      action: "Review the selected features and text, then refresh the page before trying again.",
     };
   }
   if (failure.code === Code.InvalidArgument && failure.reason === "request_invalid") {

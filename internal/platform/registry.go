@@ -17,6 +17,9 @@ var (
 	// actionLanes have a maintained encrypted-installer recipe, native action
 	// prerequisites and a graphical golden.
 	actionLanes = []Capability{Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, Assistance}
+	// assistanceInteractive requires the base session gate and runtime portal
+	// grants; source support alone is not native qualification.
+	assistanceInteractive = []Capability{AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages}
 )
 
 // RepositorySnapshotRecipes is the trust/source and explicit lane input set for
@@ -125,6 +128,14 @@ func designOnly() map[Capability]string {
 		m[c] = reasonDesignOnly
 	}
 	return m
+}
+
+// assistanceSession keeps lane-only witness packages out of installer desktop
+// group names while including them in the native package evidence.
+func assistanceSession(session LabSession, fixtures []string) LabSession {
+	session.AssistanceFixtures = fixtures
+	session.Capture = slices.Concat(session.Capture, fixtures)
+	return session
 }
 
 // nixosGates keeps NixOS design-only and names the installation boundary:
@@ -455,13 +466,16 @@ var registry = []*Release{
 		ModuleBlocklist:    ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
 		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
-			Installer: Subiquity, Session: withCapture(ubuntuSession, "libmutter-14-0"), Guest: ubuntuGuest,
+			Installer: Subiquity,
+			Session: assistanceSession(withCapture(ubuntuSession, "libmutter-14-0"),
+				[]string{"python3-gi", "python3-gi-cairo", "gir1.2-gtk-3.0"}),
+			Guest: ubuntuGuest,
 			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
 			// Image that GRUB unpacks; systemd 255's stub cannot embed it in a UKI.
 			OwnedBootUnavailableOn: map[string]string{"aarch64": "the arm64 vendor kernel is a gzip-compressed Image that systemd-stub cannot embed in the owned ordinary UKI"},
 			TPM:                    LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		// ReleaseUpgrade: do-release-upgrade to UpgradeTo, `lab vm resources -phase release-upgrade`.
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade}, actionLanes),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade}, actionLanes, assistanceInteractive),
 		Gates:    without(gates(), OSUpdate, ReleaseUpgrade),
 	},
 	{
@@ -583,11 +597,14 @@ var registry = []*Release{
 		ModuleBlocklist:    ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initramfs-%s.img", Rebuild: "/usr/bin/dracut", RebuildArgs: []string{"--regenerate-all", "--force"}, RebuildWithFileArgs: []string{"--regenerate-all", "--force", "--include", "/etc/modprobe.d/99-lindm-blocklist.conf", "/etc/modprobe.d/99-lindm-blocklist.conf"}, WritePaths: []string{"/boot"}},
 		VendorRepositories: []VendorRepository{fedora44Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
-			Installer: Anaconda, Session: fedoraSession, Guest: fedoraGuest,
+			Installer: Anaconda,
+			Session: assistanceSession(fedoraSession,
+				[]string{"python3-gobject", "python3-cairo", "gtk3"}),
+			Guest:     fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM:                     LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}},
 			SecureBootUnavailableOn: fedoraARMNoSecureBoot},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes),
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes, assistanceInteractive),
 		Gates:    without(gates(), OSUpdate),
 		// Recovery needs Secure Boot (measured GRUB: PCR 7 SecureBoot=1; owned
 		// UKI: signed recovery). Under AAVMF Secure Boot shim refuses Fedora's

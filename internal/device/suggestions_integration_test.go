@@ -15,6 +15,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/device/inventory"
 	"lindm/internal/identity"
+	"lindm/internal/rpcreason"
 )
 
 func suggest(t *testing.T, svc *Service, ctx context.Context, req *adminv1.SuggestValuesRequest) *adminv1.SuggestValuesResponse {
@@ -74,7 +75,7 @@ func TestSuggestValuesPackagesReadCurrentSnapshotsWithinScope(t *testing.T) {
 	wantSuggestions(t, suggest(t, f.svc, f.ownerCtx, &adminv1.SuggestValuesRequest{Field: pkg, Manager: "apt", Prefix: "b"}), "", "bash")
 	managers := adminv1.SuggestionField_SUGGESTION_FIELD_PACKAGE_MANAGER
 	wantSuggestions(t, suggest(t, f.svc, f.ownerCtx, &adminv1.SuggestValuesRequest{Field: managers, DeviceId: f.deviceID}), "", "apt")
-	if _, err := f.svc.SuggestValues(f.ownerCtx, connect.NewRequest(&adminv1.SuggestValuesRequest{Field: managers})); connect.CodeOf(err) != connect.CodeInvalidArgument || reasonOf(err) != "device_required" {
+	if _, err := f.svc.SuggestValues(f.ownerCtx, connect.NewRequest(&adminv1.SuggestValuesRequest{Field: managers})); connect.CodeOf(err) != connect.CodeInvalidArgument || rpcreason.Get(err) != "device_required" {
 		t.Fatalf("fleet-wide managers admitted: %v", err)
 	}
 

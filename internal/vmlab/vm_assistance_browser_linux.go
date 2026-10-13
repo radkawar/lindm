@@ -21,8 +21,9 @@ import (
 
 // assistanceBrowser drives one real headless Chromium through the maintained
 // Playwright runner (web/acceptance/assistance.mjs) with a line-oriented
-// private protocol. The operator signs in through the console UI; the lane
-// never injects cookies, RPCs or alternate application code into the page.
+// private protocol. The operator signs in through the console UI. Negative
+// probes use that creator's real RPC cookie/CSRF authority; the lane never
+// injects cookies, product data-channel frames or alternate application code.
 type assistanceBrowser struct {
 	process *labexec.Process
 	stdin   *os.File

@@ -58,10 +58,10 @@ func configureAssistanceGuest(ctx context.Context, vm *guestVM) error {
 	if err := protojson.Unmarshal(data, config); err != nil {
 		return err
 	}
-	if config.GetRemoteAssistance().GetEnabled() {
+	if config.GetRemoteAssistance().GetEnabled() && config.GetRemoteAssistance().GetPolicyCeiling() != nil {
 		return pollGuest(ctx, vm, time.Minute, "executor session socket", "test -S "+nativeQuote(localrpc.DefaultSessionSocketPath))
 	}
-	config.RemoteAssistance = &agentv1.RemoteAssistanceConfig{Enabled: true}
+	config.RemoteAssistance = &agentv1.RemoteAssistanceConfig{Enabled: true, PolicyCeiling: assistanceFullPolicy()}
 	data, err = protojson.Marshal(config)
 	if err != nil {
 		return err
@@ -280,14 +280,18 @@ func installAssistanceCapture(ctx context.Context, vm *guestVM, release *platfor
 }
 
 // observeAssistancePackages records the guest's capture stack versions.
-func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platform.Release) ([]string, error) {
-	packages := strings.Join(append(slices.Clone(release.Lab.Session.Capture), packaging.PackageName), " ")
+func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platform.Release, tierOne bool) ([]string, error) {
+	observed := slices.Clone(release.Lab.Session.Capture)
+	if !tierOne {
+		observed = slices.DeleteFunc(observed, func(name string) bool { return slices.Contains(release.Lab.Session.AssistanceFixtures, name) })
+	}
+	packages := strings.Join(append(observed, packaging.PackageName), " ")
 	var command string
 	switch release.Native().Packages.Backend.PackageDB() {
 	case platform.PackageDBDpkg:
-		command = `dpkg-query -W -f='${Package}=${Version}\n' ` + packages
+		command = `dpkg-query -W -f='${Package}=${Version} source=${source:Package} source-version=${source:Version}\n' ` + packages
 	case platform.PackageDBRPM:
-		command = "rpm -q " + packages
+		command = `rpm -q --qf '%{NAME}=%{EVR}.%{ARCH} source=%{SOURCERPM}\n' ` + packages
 	case platform.PackageDBPacman:
 		// A refusal-only desktop's stack is recorded, not required: pacman's
 		// "not found" lines are kept as evidence of what is absent.
@@ -299,10 +303,7 @@ func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platfo
 	if err != nil {
 		return nil, fmt.Errorf("observe capture stack packages: %w", err)
 	}
-	if release.Native().Packages.Backend.PackageDB() == platform.PackageDBPacman {
-		return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
-	}
-	return strings.Fields(string(out)), nil
+	return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
 }
 
 // observeAssistanceCapabilities records, before any scenario, what the
@@ -339,12 +340,16 @@ done`)
 	return evidence, nil
 }
 
-// assistanceJournalUnits are the bounded, nonsecret journal excerpts recorded
-// as evidence: executor broker, network relay and the session helper.
+// assistanceJournalUnits are bounded diagnostic excerpts from the disposable
+// guest, including the public portal path used by the session helper.
 var assistanceJournalUnits = []struct{ name, selector string }{
 	{"executor", "-u lindm-executor.service"},
 	{"agent", "-u lindm-agent.service"},
 	{"session-helper", "_SYSTEMD_USER_UNIT=lindm-session.service"},
+	{"native-witness", "_SYSTEMD_USER_UNIT=lindm-assistance-fixture.service"},
+	{"portal", "_SYSTEMD_USER_UNIT=xdg-desktop-portal.service"},
+	{"portal-gnome", "_SYSTEMD_USER_UNIT=xdg-desktop-portal-gnome.service"},
+	{"gnome-shell", "_COMM=gnome-shell"},
 }
 
 func collectAssistanceJournals(ctx context.Context, vm *guestVM, since int64, evidence *assistanceEvidence) ([]assistanceEvidenceFile, error) {

@@ -10,6 +10,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -178,6 +179,52 @@ func TestStrictValidationAndBrowserBoundary(t *testing.T) {
 	}
 	if result.Outcomes[0].Status != "updated" || result.Outcomes[1].Status != "pending" || !strings.Contains(result.Outcomes[1].Detail, "browser session") {
 		t.Fatal("CLI failed runtime policy or claimed browser account authority")
+	}
+}
+
+func TestAssistancePermissionAuthorityDecode(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		permissions []string
+		valid       bool
+	}{
+		{"view-only helpdesk", []string{"fleet.read", "remote_assistance.view"}, true},
+		{"control does not imply view", []string{"remote_assistance.control"}, true},
+		{"view and control", []string{"remote_assistance.view", "remote_assistance.control"}, true},
+		{"legacy combined authority rejected", []string{"remote_assistance.run"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			want := &orgv1.Organization{
+				Name: "org",
+				Authorization: &authv1.AuthorizationPolicy{
+					Roles: []*authv1.RoleDefinition{
+						{Name: "assistance", Permissions: test.permissions},
+						{Name: "controller", Permissions: []string{"remote_assistance.control"}},
+					},
+					GroupBindings: []*authv1.GroupBinding{
+						{Group: "/helpdesk", Role: "assistance", Scopes: []*authv1.DeviceScope{{Labels: []string{"department/helpdesk"}}}},
+						{Group: "/control", Role: "controller", Scopes: []*authv1.DeviceScope{{Labels: []string{"department/operations"}}}},
+					},
+				},
+			}
+			body, err := protojson.Marshal(want)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := Decode(body)
+			if !test.valid {
+				if err == nil {
+					t.Fatal("accepted removed permission through declarative apply")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !proto.Equal(got, want) {
+				t.Fatal("decoding changed explicit permissions or device scopes")
+			}
+		})
 	}
 }
 

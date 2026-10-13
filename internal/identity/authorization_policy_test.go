@@ -6,24 +6,30 @@ import (
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	authv1 "lindm/gen/lindm/auth/v1"
+	configv1 "lindm/gen/lindm/config/v1"
 )
 
 func TestBuiltInPermissionMatrix(t *testing.T) {
-	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionRunRemoteAssistance}
+	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionViewRemoteAssistance}
+	all = append(all, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage)
 	for _, test := range []struct {
 		role   string
 		grants []Permission
 	}{
 		{RoleOwner, all},
-		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionRunRemoteAssistance}},
+		{RoleAdmin, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionViewRemoteAssistance}},
 		{RoleOperator, []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionManageProfiles, PermissionAssignResources}},
 		{RoleHelpdesk, []Permission{PermissionReadFleet, PermissionManageEnrollment}},
 		{RoleAuditor, []Permission{PermissionReadFleet, PermissionReadAudit}},
 		{"missing", nil},
 	} {
 		t.Run(test.role, func(t *testing.T) {
+			if test.role == RoleAdmin {
+				test.grants = append(test.grants, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage)
+			}
 			for _, permission := range append(append([]Permission(nil), all...), Permission("unknown.permission")) {
 				if got := Authorize(Principal{Role: test.role}, permission); got != slices.Contains(test.grants, permission) {
 					t.Fatalf("%s grant=%v", permission, got)
@@ -159,6 +165,75 @@ func TestReleaseLockPermissionDoesNotInheritLockScope(t *testing.T) {
 	unrestricted, scopes := DeviceScopes(principal, PermissionReleaseLockDevice)
 	if unrestricted || len(scopes) != 1 || !proto.Equal(scopes[0], releaseScope) {
 		t.Fatal("release inherited another grant's lock scope")
+	}
+}
+
+func TestAssistancePermissionsRequireIndependentScopedGrants(t *testing.T) {
+	permissions := []Permission{PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage}
+	for _, permission := range permissions {
+		t.Run(string(permission), func(t *testing.T) {
+			scope := &authv1.DeviceScope{Labels: []string{"support-owned"}}
+			principal := Principal{Role: RoleHelpdesk, Bindings: []*authv1.RoleBinding{
+				{Role: "support", Permissions: []string{string(PermissionViewRemoteAssistance)}},
+				{Role: "capability", Permissions: []string{string(permission)}, Scopes: []*authv1.DeviceScope{scope}},
+			}}
+			unrestricted, scopes := DeviceScopes(principal, permission)
+			if unrestricted || len(scopes) != 1 || !proto.Equal(scopes[0], scope) {
+				t.Fatal("unrestricted view permission widened capability scope")
+			}
+			for _, other := range permissions {
+				if Authorize(principal, other) != (other == permission) {
+					t.Fatal("capability permission implied an unrelated grant")
+				}
+			}
+			principal.Bindings = principal.Bindings[:1]
+			if Authorize(principal, permission) {
+				t.Fatal("view grant implicitly enabled control or another capability")
+			}
+		})
+	}
+}
+
+func TestAssistanceControlAndCapabilitiesNeverImplyView(t *testing.T) {
+	for _, permission := range []Permission{PermissionControlRemoteAssistance, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage} {
+		principal := Principal{Role: RoleOwner, Bindings: []*authv1.RoleBinding{{Permissions: []string{string(permission)}}}}
+		if Authorize(principal, PermissionViewRemoteAssistance) {
+			t.Fatalf("%s implicitly granted view", permission)
+		}
+	}
+}
+
+func TestAssistanceSplitPreservesFullPermissionListCapacity(t *testing.T) {
+	// Every formerly valid 24-entry list must have room for both explicit mode
+	// names when its single combined grant is replaced. No capability is added.
+	permissions := []string{
+		"fleet.read", "enrollment.manage", "device.revoke", "audit.read",
+		"execution_trust.manage", "profiles.manage", "resources.assign", "accounts.manage",
+		"inventory.manage", "recovery_keys.read", "remote_execution.run",
+		"remote_assistance.view", "remote_assistance.control", "scripts.run",
+		"destructive.execute", "approvals.manage", "integrations.manage", "release_updates.manage",
+		"advisory_exceptions.manage", "encryption.manage", "actions.lock", "actions.release-lock",
+		"actions.quarantine", "secrets.manage", "secrets.reveal",
+	}
+	if len(permissions) != 25 {
+		t.Fatal("fixture no longer represents the exact old full-list conversion")
+	}
+	for _, message := range []proto.Message{
+		&authv1.RoleDefinition{Name: "support", Permissions: permissions},
+		&configv1.BreakGlassPolicy{AllowedPermissions: permissions, MaxSessionLifetime: &durationpb.Duration{Seconds: 300}, RequireIncidentReason: true},
+	} {
+		if err := protovalidate.Validate(message); err != nil {
+			t.Fatalf("explicit mode split lost full-list capacity: %v", err)
+		}
+	}
+	over := append(slices.Clone(permissions), "remote_assistance.clipboard")
+	for _, message := range []proto.Message{
+		&authv1.RoleDefinition{Name: "support", Permissions: over},
+		&configv1.BreakGlassPolicy{AllowedPermissions: over, MaxSessionLifetime: &durationpb.Duration{Seconds: 300}, RequireIncidentReason: true},
+	} {
+		if err := protovalidate.Validate(message); err == nil {
+			t.Fatal("permission list exceeded the exact cutover capacity increase")
+		}
 	}
 }
 

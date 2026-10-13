@@ -33,6 +33,9 @@ type VMHardwareOptions struct {
 	StorageBus   string
 	ExtraDisks   int
 	Desktop      bool
+	// DisplayHeads reserves real virtio-gpu scanouts; zero retains one head.
+	// Assistance activates the second head through its private VNC endpoint.
+	DisplayHeads int
 	// AllowNetwork explicitly permits user-mode egress for signed package setup.
 	// It never adds a host bridge or changes host firewall rules.
 	AllowNetwork bool
@@ -139,6 +142,9 @@ func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareO
 		// ArmVirtQemu (AAVMF) has no AHCI driver: the firmware lists no disk
 		// and falls through to network boot, so the guest could never start.
 		return h, errors.New("aarch64 AAVMF cannot boot from the SATA (AHCI) controller; use nvme, virtio-scsi or virtio-blk")
+	}
+	if h.DisplayHeads < 0 || h.DisplayHeads > 2 || h.DisplayHeads > 0 && !h.Desktop {
+		return h, errors.New("VM display heads require a desktop and must be one or two")
 	}
 	if h.Architecture == "aarch64" && h.Firmware == nil {
 		return h, errors.New("aarch64 VM requires explicit pinned EFI firmware")
@@ -313,9 +319,16 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 		args = append(args, "-chardev", "socket,id=tpm,path=tpm.sock", "-tpmdev", "emulator,id=tpm0,chardev=tpm", "-device", device+",tpmdev=tpm0")
 	}
 	if h.Desktop {
-		args = append(args, "-device", "virtio-gpu-pci", "-vnc", "unix:display.sock")
+		args = append(args, vmDisplayArguments(h)...)
 	}
 	return args, nil
+}
+
+func vmDisplayArguments(h VMHardwareOptions) []string {
+	if h.DisplayHeads == 2 {
+		return []string{"-device", "virtio-gpu-pci,id=lab-display,max_outputs=2", "-vnc", "unix:display.sock,display=lab-display,head=0", "-vnc", "unix:display-head1.sock,display=lab-display,head=1"}
+	}
+	return []string{"-device", "virtio-gpu-pci", "-vnc", "unix:display.sock"}
 }
 
 // vmStorageArguments attaches already-defined private block nodes in root-first

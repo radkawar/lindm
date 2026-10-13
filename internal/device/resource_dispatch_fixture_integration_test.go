@@ -15,6 +15,7 @@ import (
 
 	"lindm/internal/device/dispatch"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -120,7 +121,7 @@ func newDispatchFixtureWithDelegationAge(t *testing.T, age time.Duration, capabi
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	f.service, err = New(pool, core.Config{DeploymentID: deployment, CACertificate: ca, CAKey: caKey, Identity: identityService, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
+	f.service, err = New(pool, core.Config{DeploymentID: deployment, CACertificate: ca, CAKey: caKey, Identity: identityService, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

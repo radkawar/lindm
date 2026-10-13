@@ -1961,8 +1961,10 @@ type AssistanceConfig struct {
 	Relay *AssistanceRelayConfig `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
 	// Admission bound for non-ended sessions; zero selects 16.
 	MaxConcurrentSessions uint32 `protobuf:"varint,2,opt,name=max_concurrent_sessions,json=maxConcurrentSessions,proto3" json:"max_concurrent_sessions,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Deployment ceiling, not an implicit per-device grant.
+	PolicyCeiling *v11.AssistancePolicy `protobuf:"bytes,3,opt,name=policy_ceiling,json=policyCeiling,proto3" json:"policy_ceiling,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AssistanceConfig) Reset() {
@@ -2007,6 +2009,13 @@ func (x *AssistanceConfig) GetMaxConcurrentSessions() uint32 {
 		return x.MaxConcurrentSessions
 	}
 	return 0
+}
+
+func (x *AssistanceConfig) GetPolicyCeiling() *v11.AssistancePolicy {
+	if x != nil {
+		return x.PolicyCeiling
+	}
+	return nil
 }
 
 type AssistanceRelayConfig struct {
@@ -2101,7 +2110,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xf8\x1b\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xf8\x1b\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -2285,17 +2294,18 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"providerId\x12$\n" +
 	"\x06issuer\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x06issuer\x12$\n" +
 	"\asubject\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\xdf\x05\n" +
-	"\x10BreakGlassPolicy\x12\x87\x04\n" +
-	"\x13allowed_permissions\x18\x01 \x03(\tB\xd5\x03\xbaH\xd1\x03\x92\x01\xcd\x03\b\x01\x10\x18\x18\x01\"\xc4\x03r\xc1\x03R\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\x8b\a\n" +
+	"\x10BreakGlassPolicy\x12\xb3\x05\n" +
+	"\x13allowed_permissions\x18\x01 \x03(\tB\x81\x05\xbaH\xfd\x04\x92\x01\xf9\x04\b\x01\x10\x19\x18\x01\"\xf0\x04r\xed\x04R\n" +
 	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
-	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x15remote_assistance.runR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x16remote_assistance.viewR\x19remote_assistance.controlR\x1fremote_assistance.policy.manageR\x1bremote_assistance.clipboardR\x1aremote_assistance.keyboardR\x19remote_assistance.displayR\x19remote_assistance.messageR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
 	"\fconsole_only\x18\x02 \x01(\bR\vconsoleOnly\x12]\n" +
 	"\x14max_session_lifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xc8\x01\x01\xaa\x01\a\"\x03\b\x90\x1c*\x00R\x12maxSessionLifetime\x12?\n" +
-	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReason\"\x9a\x01\n" +
+	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReason\"\xe3\x01\n" +
 	"\x10AssistanceConfig\x12D\n" +
 	"\x05relay\x18\x01 \x01(\v2&.lindm.config.v1.AssistanceRelayConfigB\x06\xbaH\x03\xc8\x01\x01R\x05relay\x12@\n" +
-	"\x17max_concurrent_sessions\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\x80\x02R\x15maxConcurrentSessions\"\xd6\x03\n" +
+	"\x17max_concurrent_sessions\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\x80\x02R\x15maxConcurrentSessions\x12G\n" +
+	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\"\xd6\x03\n" +
 	"\x15AssistanceRelayConfig\x12C\n" +
 	"\blistener\x18\x01 \x01(\v2\x1f.lindm.config.v1.ListenerConfigB\x06\xbaH\x03\xc8\x01\x01R\blistener\x12,\n" +
 	"\rrelay_address\x18\x02 \x01(\tB\a\xbaH\x04r\x02p\x01R\frelayAddress\x122\n" +
@@ -2351,6 +2361,7 @@ var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*v11.ConnectivityProbeTarget)(nil), // 29: lindm.agent.v1.ConnectivityProbeTarget
 	(*v12.FeedSource)(nil),              // 30: lindm.advisory.v1.FeedSource
 	(*durationpb.Duration)(nil),         // 31: google.protobuf.Duration
+	(*v11.AssistancePolicy)(nil),        // 32: lindm.agent.v1.AssistancePolicy
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	10, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
@@ -2386,12 +2397,13 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	24, // 30: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
 	31, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
 	27, // 32: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
-	10, // 33: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	34, // [34:34] is the sub-list for method output_type
-	34, // [34:34] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	32, // 33: lindm.config.v1.AssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	10, // 34: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	35, // [35:35] is the sub-list for method output_type
+	35, // [35:35] is the sub-list for method input_type
+	35, // [35:35] is the sub-list for extension type_name
+	35, // [35:35] is the sub-list for extension extendee
+	0,  // [0:35] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }

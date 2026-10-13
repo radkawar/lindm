@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -34,7 +35,7 @@ func TestRenewalProofAndLostIssuanceRetrieval(t *testing.T) {
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
-	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

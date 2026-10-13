@@ -232,57 +232,280 @@ func (AssistanceEndCause) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{2}
 }
 
-// AssistancePolicy is the device's applied remote-assistance setting, so the
+// AssistanceEnablement is the device's applied remote-assistance setting, so the
 // server can refuse a request before it reaches a device that would decline it.
-type AssistancePolicy int32
+type AssistanceEnablement int32
 
 const (
 	// Not reported: an agent that predates this field.
-	AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED AssistancePolicy = 0
-	AssistancePolicy_ASSISTANCE_POLICY_ENABLED     AssistancePolicy = 1
+	AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED AssistanceEnablement = 0
+	AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED     AssistanceEnablement = 1
 	// Absent or disabled RemoteAssistanceConfig: invitations end DISABLED.
-	AssistancePolicy_ASSISTANCE_POLICY_DISABLED AssistancePolicy = 2
+	AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED AssistanceEnablement = 2
 )
 
-// Enum value maps for AssistancePolicy.
+// Enum value maps for AssistanceEnablement.
 var (
-	AssistancePolicy_name = map[int32]string{
-		0: "ASSISTANCE_POLICY_UNSPECIFIED",
-		1: "ASSISTANCE_POLICY_ENABLED",
-		2: "ASSISTANCE_POLICY_DISABLED",
+	AssistanceEnablement_name = map[int32]string{
+		0: "ASSISTANCE_ENABLEMENT_UNSPECIFIED",
+		1: "ASSISTANCE_ENABLEMENT_ENABLED",
+		2: "ASSISTANCE_ENABLEMENT_DISABLED",
 	}
-	AssistancePolicy_value = map[string]int32{
-		"ASSISTANCE_POLICY_UNSPECIFIED": 0,
-		"ASSISTANCE_POLICY_ENABLED":     1,
-		"ASSISTANCE_POLICY_DISABLED":    2,
+	AssistanceEnablement_value = map[string]int32{
+		"ASSISTANCE_ENABLEMENT_UNSPECIFIED": 0,
+		"ASSISTANCE_ENABLEMENT_ENABLED":     1,
+		"ASSISTANCE_ENABLEMENT_DISABLED":    2,
 	}
 )
 
-func (x AssistancePolicy) Enum() *AssistancePolicy {
-	p := new(AssistancePolicy)
+func (x AssistanceEnablement) Enum() *AssistanceEnablement {
+	p := new(AssistanceEnablement)
 	*p = x
 	return p
 }
 
-func (x AssistancePolicy) String() string {
+func (x AssistanceEnablement) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (AssistancePolicy) Descriptor() protoreflect.EnumDescriptor {
+func (AssistanceEnablement) Descriptor() protoreflect.EnumDescriptor {
 	return file_lindm_agent_v1_assistance_proto_enumTypes[3].Descriptor()
 }
 
-func (AssistancePolicy) Type() protoreflect.EnumType {
+func (AssistanceEnablement) Type() protoreflect.EnumType {
 	return &file_lindm_agent_v1_assistance_proto_enumTypes[3]
 }
 
-func (x AssistancePolicy) Number() protoreflect.EnumNumber {
+func (x AssistanceEnablement) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use AssistancePolicy.Descriptor instead.
-func (AssistancePolicy) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use AssistanceEnablement.Descriptor instead.
+func (AssistanceEnablement) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{3}
+}
+
+type AssistancePolicyMode int32
+
+const (
+	AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED AssistancePolicyMode = 0
+	AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF         AssistancePolicyMode = 1
+	AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED     AssistancePolicyMode = 2
+	AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON          AssistancePolicyMode = 3
+)
+
+// Enum value maps for AssistancePolicyMode.
+var (
+	AssistancePolicyMode_name = map[int32]string{
+		0: "ASSISTANCE_POLICY_MODE_UNSPECIFIED",
+		1: "ASSISTANCE_POLICY_MODE_OFF",
+		2: "ASSISTANCE_POLICY_MODE_LIMITED",
+		3: "ASSISTANCE_POLICY_MODE_ON",
+	}
+	AssistancePolicyMode_value = map[string]int32{
+		"ASSISTANCE_POLICY_MODE_UNSPECIFIED": 0,
+		"ASSISTANCE_POLICY_MODE_OFF":         1,
+		"ASSISTANCE_POLICY_MODE_LIMITED":     2,
+		"ASSISTANCE_POLICY_MODE_ON":          3,
+	}
+)
+
+func (x AssistancePolicyMode) Enum() *AssistancePolicyMode {
+	p := new(AssistancePolicyMode)
+	*p = x
+	return p
+}
+
+func (x AssistancePolicyMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistancePolicyMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_assistance_proto_enumTypes[4].Descriptor()
+}
+
+func (AssistancePolicyMode) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_assistance_proto_enumTypes[4]
+}
+
+func (x AssistancePolicyMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistancePolicyMode.Descriptor instead.
+func (AssistancePolicyMode) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{4}
+}
+
+type AssistanceCommandKind int32
+
+const (
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_UNSPECIFIED     AssistanceCommandKind = 0
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE AssistanceCommandKind = 1
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ  AssistanceCommandKind = 2
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS    AssistanceCommandKind = 3
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY  AssistanceCommandKind = 4
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_MESSAGE         AssistanceCommandKind = 5
+)
+
+// Enum value maps for AssistanceCommandKind.
+var (
+	AssistanceCommandKind_name = map[int32]string{
+		0: "ASSISTANCE_COMMAND_KIND_UNSPECIFIED",
+		1: "ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE",
+		2: "ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ",
+		3: "ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS",
+		4: "ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY",
+		5: "ASSISTANCE_COMMAND_KIND_MESSAGE",
+	}
+	AssistanceCommandKind_value = map[string]int32{
+		"ASSISTANCE_COMMAND_KIND_UNSPECIFIED":     0,
+		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE": 1,
+		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ":  2,
+		"ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS":    3,
+		"ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY":  4,
+		"ASSISTANCE_COMMAND_KIND_MESSAGE":         5,
+	}
+)
+
+func (x AssistanceCommandKind) Enum() *AssistanceCommandKind {
+	p := new(AssistanceCommandKind)
+	*p = x
+	return p
+}
+
+func (x AssistanceCommandKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceCommandKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_assistance_proto_enumTypes[5].Descriptor()
+}
+
+func (AssistanceCommandKind) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_assistance_proto_enumTypes[5]
+}
+
+func (x AssistanceCommandKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceCommandKind.Descriptor instead.
+func (AssistanceCommandKind) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{5}
+}
+
+type AssistanceSpecialKey int32
+
+const (
+	AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_UNSPECIFIED       AssistanceSpecialKey = 0
+	AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW     AssistanceSpecialKey = 1
+	AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS AssistanceSpecialKey = 2
+	AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL     AssistanceSpecialKey = 3
+	AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW      AssistanceSpecialKey = 4
+)
+
+// Enum value maps for AssistanceSpecialKey.
+var (
+	AssistanceSpecialKey_name = map[int32]string{
+		0: "ASSISTANCE_SPECIAL_KEY_UNSPECIFIED",
+		1: "ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW",
+		2: "ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS",
+		3: "ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL",
+		4: "ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW",
+	}
+	AssistanceSpecialKey_value = map[string]int32{
+		"ASSISTANCE_SPECIAL_KEY_UNSPECIFIED":       0,
+		"ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW":     1,
+		"ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS": 2,
+		"ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL":     3,
+		"ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW":      4,
+	}
+)
+
+func (x AssistanceSpecialKey) Enum() *AssistanceSpecialKey {
+	p := new(AssistanceSpecialKey)
+	*p = x
+	return p
+}
+
+func (x AssistanceSpecialKey) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceSpecialKey) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_assistance_proto_enumTypes[6].Descriptor()
+}
+
+func (AssistanceSpecialKey) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_assistance_proto_enumTypes[6]
+}
+
+func (x AssistanceSpecialKey) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceSpecialKey.Descriptor instead.
+func (AssistanceSpecialKey) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{6}
+}
+
+type AssistanceCommandStatus int32
+
+const (
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_UNSPECIFIED AssistanceCommandStatus = 0
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_PENDING     AssistanceCommandStatus = 1
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_SUCCEEDED   AssistanceCommandStatus = 2
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_FAILED      AssistanceCommandStatus = 3
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_CANCELLED   AssistanceCommandStatus = 4
+	AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_EXPIRED     AssistanceCommandStatus = 5
+)
+
+// Enum value maps for AssistanceCommandStatus.
+var (
+	AssistanceCommandStatus_name = map[int32]string{
+		0: "ASSISTANCE_COMMAND_STATUS_UNSPECIFIED",
+		1: "ASSISTANCE_COMMAND_STATUS_PENDING",
+		2: "ASSISTANCE_COMMAND_STATUS_SUCCEEDED",
+		3: "ASSISTANCE_COMMAND_STATUS_FAILED",
+		4: "ASSISTANCE_COMMAND_STATUS_CANCELLED",
+		5: "ASSISTANCE_COMMAND_STATUS_EXPIRED",
+	}
+	AssistanceCommandStatus_value = map[string]int32{
+		"ASSISTANCE_COMMAND_STATUS_UNSPECIFIED": 0,
+		"ASSISTANCE_COMMAND_STATUS_PENDING":     1,
+		"ASSISTANCE_COMMAND_STATUS_SUCCEEDED":   2,
+		"ASSISTANCE_COMMAND_STATUS_FAILED":      3,
+		"ASSISTANCE_COMMAND_STATUS_CANCELLED":   4,
+		"ASSISTANCE_COMMAND_STATUS_EXPIRED":     5,
+	}
+)
+
+func (x AssistanceCommandStatus) Enum() *AssistanceCommandStatus {
+	p := new(AssistanceCommandStatus)
+	*p = x
+	return p
+}
+
+func (x AssistanceCommandStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceCommandStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_agent_v1_assistance_proto_enumTypes[7].Descriptor()
+}
+
+func (AssistanceCommandStatus) Type() protoreflect.EnumType {
+	return &file_lindm_agent_v1_assistance_proto_enumTypes[7]
+}
+
+func (x AssistanceCommandStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceCommandStatus.Descriptor instead.
+func (AssistanceCommandStatus) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{7}
 }
 
 type AssistanceIceServer struct {
@@ -359,9 +582,11 @@ type AssistanceInvitation struct {
 	// Empty selects the user of the active local graphical session.
 	TargetUsername string `protobuf:"bytes,7,opt,name=target_username,json=targetUsername,proto3" json:"target_username,omitempty"`
 	// Relay-only ICE configuration with per-session credentials.
-	IceServers    []*AssistanceIceServer `protobuf:"bytes,8,rep,name=ice_servers,json=iceServers,proto3" json:"ice_servers,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	IceServers            []*AssistanceIceServer `protobuf:"bytes,8,rep,name=ice_servers,json=iceServers,proto3" json:"ice_servers,omitempty"`
+	RequestedCapabilities *AssistancePolicy      `protobuf:"bytes,9,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
+	EffectiveCapabilities *AssistancePolicy      `protobuf:"bytes,10,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AssistanceInvitation) Reset() {
@@ -450,6 +675,20 @@ func (x *AssistanceInvitation) GetIceServers() []*AssistanceIceServer {
 	return nil
 }
 
+func (x *AssistanceInvitation) GetRequestedCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.RequestedCapabilities
+	}
+	return nil
+}
+
+func (x *AssistanceInvitation) GetEffectiveCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.EffectiveCapabilities
+	}
+	return nil
+}
+
 // AssistanceDirective is the authority's complete desired state for one
 // session. Receivers apply it idempotently.
 type AssistanceDirective struct {
@@ -458,8 +697,11 @@ type AssistanceDirective struct {
 	AnswerSdp      string                 `protobuf:"bytes,2,opt,name=answer_sdp,json=answerSdp,proto3" json:"answer_sdp,omitempty"`
 	Terminate      bool                   `protobuf:"varint,3,opt,name=terminate,proto3" json:"terminate,omitempty"`
 	TerminateCause AssistanceEndCause     `protobuf:"varint,4,opt,name=terminate_cause,json=terminateCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"terminate_cause,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	Command        *AssistanceCommand     `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	// Absolute fresh operator authority bound; polling never extends it.
+	AuthorizedUntil *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=authorized_until,json=authorizedUntil,proto3" json:"authorized_until,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AssistanceDirective) Reset() {
@@ -518,6 +760,20 @@ func (x *AssistanceDirective) GetTerminateCause() AssistanceEndCause {
 		return x.TerminateCause
 	}
 	return AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED
+}
+
+func (x *AssistanceDirective) GetCommand() *AssistanceCommand {
+	if x != nil {
+		return x.Command
+	}
+	return nil
+}
+
+func (x *AssistanceDirective) GetAuthorizedUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AuthorizedUntil
+	}
+	return nil
 }
 
 // AssistanceLocalSession identifies the consenting local session. The
@@ -601,16 +857,24 @@ func (x *AssistanceLocalSession) GetDesktop() string {
 
 // AssistanceReport is the device's complete observed state for one session.
 type AssistanceReport struct {
-	state          protoimpl.MessageState  `protogen:"open.v1"`
-	SessionId      string                  `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Phase          AssistancePhase         `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
-	OfferSdp       string                  `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
-	ControlGranted bool                    `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
-	EndCause       AssistanceEndCause      `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
-	EndDetail      string                  `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
-	LocalSession   *AssistanceLocalSession `protobuf:"bytes,7,opt,name=local_session,json=localSession,proto3" json:"local_session,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                 protoimpl.MessageState   `protogen:"open.v1"`
+	SessionId             string                   `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Phase                 AssistancePhase          `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
+	OfferSdp              string                   `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
+	ControlGranted        bool                     `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
+	EndCause              AssistanceEndCause       `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
+	EndDetail             string                   `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
+	LocalSession          *AssistanceLocalSession  `protobuf:"bytes,7,opt,name=local_session,json=localSession,proto3" json:"local_session,omitempty"`
+	GrantedCapabilities   *AssistanceCapabilities  `protobuf:"bytes,8,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
+	Displays              []*AssistanceDisplay     `protobuf:"bytes,9,rep,name=displays,proto3" json:"displays,omitempty"`
+	SelectedDisplayId     string                   `protobuf:"bytes,10,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
+	CommandResult         *AssistanceCommandResult `protobuf:"bytes,11,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
+	DisplayGeneration     uint32                   `protobuf:"varint,12,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
+	RequestedCapabilities *AssistancePolicy        `protobuf:"bytes,13,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
+	EffectiveCapabilities *AssistancePolicy        `protobuf:"bytes,14,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
+	DisplayFrame          *AssistanceDisplayFrame  `protobuf:"bytes,15,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AssistanceReport) Reset() {
@@ -692,6 +956,62 @@ func (x *AssistanceReport) GetLocalSession() *AssistanceLocalSession {
 	return nil
 }
 
+func (x *AssistanceReport) GetGrantedCapabilities() *AssistanceCapabilities {
+	if x != nil {
+		return x.GrantedCapabilities
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetDisplays() []*AssistanceDisplay {
+	if x != nil {
+		return x.Displays
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetSelectedDisplayId() string {
+	if x != nil {
+		return x.SelectedDisplayId
+	}
+	return ""
+}
+
+func (x *AssistanceReport) GetCommandResult() *AssistanceCommandResult {
+	if x != nil {
+		return x.CommandResult
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetDisplayGeneration() uint32 {
+	if x != nil {
+		return x.DisplayGeneration
+	}
+	return 0
+}
+
+func (x *AssistanceReport) GetRequestedCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.RequestedCapabilities
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetEffectiveCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.EffectiveCapabilities
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetDisplayFrame() *AssistanceDisplayFrame {
+	if x != nil {
+		return x.DisplayFrame
+	}
+	return nil
+}
+
 type SyncAssistanceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Directives    []*AssistanceDirective `protobuf:"bytes,1,rep,name=directives,proto3" json:"directives,omitempty"`
@@ -740,7 +1060,7 @@ type SyncAssistanceResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Reports []*AssistanceReport    `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
 	// The executor's applied RemoteAssistanceConfig, reported on every sync.
-	Policy        AssistancePolicy `protobuf:"varint,2,opt,name=policy,proto3,enum=lindm.agent.v1.AssistancePolicy" json:"policy,omitempty"`
+	Policy        AssistanceEnablement `protobuf:"varint,2,opt,name=policy,proto3,enum=lindm.agent.v1.AssistanceEnablement" json:"policy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -782,11 +1102,11 @@ func (x *SyncAssistanceResponse) GetReports() []*AssistanceReport {
 	return nil
 }
 
-func (x *SyncAssistanceResponse) GetPolicy() AssistancePolicy {
+func (x *SyncAssistanceResponse) GetPolicy() AssistanceEnablement {
 	if x != nil {
 		return x.Policy
 	}
-	return AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED
+	return AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED
 }
 
 // RemoteAssistanceConfig is device policy. Disabled devices end every
@@ -796,8 +1116,10 @@ type RemoteAssistanceConfig struct {
 	Enabled bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	// Directory for the session-helper socket; defaults to /run/lindm-session.
 	SessionRuntimeDirectory string `protobuf:"bytes,2,opt,name=session_runtime_directory,json=sessionRuntimeDirectory,proto3" json:"session_runtime_directory,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// Absent or UNSPECIFIED fields deny optional capabilities.
+	PolicyCeiling *AssistancePolicy `protobuf:"bytes,3,opt,name=policy_ceiling,json=policyCeiling,proto3" json:"policy_ceiling,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoteAssistanceConfig) Reset() {
@@ -844,6 +1166,458 @@ func (x *RemoteAssistanceConfig) GetSessionRuntimeDirectory() string {
 	return ""
 }
 
+func (x *RemoteAssistanceConfig) GetPolicyCeiling() *AssistancePolicy {
+	if x != nil {
+		return x.PolicyCeiling
+	}
+	return nil
+}
+
+type AssistancePolicy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Clipboard     AssistancePolicyMode   `protobuf:"varint,1,opt,name=clipboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"clipboard,omitempty"`
+	Keyboard      AssistancePolicyMode   `protobuf:"varint,2,opt,name=keyboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"keyboard,omitempty"`
+	Display       AssistancePolicyMode   `protobuf:"varint,3,opt,name=display,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"display,omitempty"`
+	Messages      AssistancePolicyMode   `protobuf:"varint,4,opt,name=messages,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistancePolicy) Reset() {
+	*x = AssistancePolicy{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistancePolicy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistancePolicy) ProtoMessage() {}
+
+func (x *AssistancePolicy) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistancePolicy.ProtoReflect.Descriptor instead.
+func (*AssistancePolicy) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *AssistancePolicy) GetClipboard() AssistancePolicyMode {
+	if x != nil {
+		return x.Clipboard
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetKeyboard() AssistancePolicyMode {
+	if x != nil {
+		return x.Keyboard
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetDisplay() AssistancePolicyMode {
+	if x != nil {
+		return x.Display
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetMessages() AssistancePolicyMode {
+	if x != nil {
+		return x.Messages
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+type AssistanceCapabilities struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Policy          *AssistancePolicy      `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
+	ClipboardReason string                 `protobuf:"bytes,2,opt,name=clipboard_reason,json=clipboardReason,proto3" json:"clipboard_reason,omitempty"`
+	KeyboardReason  string                 `protobuf:"bytes,3,opt,name=keyboard_reason,json=keyboardReason,proto3" json:"keyboard_reason,omitempty"`
+	DisplayReason   string                 `protobuf:"bytes,4,opt,name=display_reason,json=displayReason,proto3" json:"display_reason,omitempty"`
+	MessagesReason  string                 `protobuf:"bytes,5,opt,name=messages_reason,json=messagesReason,proto3" json:"messages_reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AssistanceCapabilities) Reset() {
+	*x = AssistanceCapabilities{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceCapabilities) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceCapabilities) ProtoMessage() {}
+
+func (x *AssistanceCapabilities) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceCapabilities.ProtoReflect.Descriptor instead.
+func (*AssistanceCapabilities) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *AssistanceCapabilities) GetPolicy() *AssistancePolicy {
+	if x != nil {
+		return x.Policy
+	}
+	return nil
+}
+
+func (x *AssistanceCapabilities) GetClipboardReason() string {
+	if x != nil {
+		return x.ClipboardReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetKeyboardReason() string {
+	if x != nil {
+		return x.KeyboardReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetDisplayReason() string {
+	if x != nil {
+		return x.DisplayReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetMessagesReason() string {
+	if x != nil {
+		return x.MessagesReason
+	}
+	return ""
+}
+
+// Only locally consented portal streams may appear here.
+type AssistanceDisplay struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Width         uint32                 `protobuf:"varint,3,opt,name=width,proto3" json:"width,omitempty"`
+	Height        uint32                 `protobuf:"varint,4,opt,name=height,proto3" json:"height,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceDisplay) Reset() {
+	*x = AssistanceDisplay{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceDisplay) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceDisplay) ProtoMessage() {}
+
+func (x *AssistanceDisplay) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceDisplay.ProtoReflect.Descriptor instead.
+func (*AssistanceDisplay) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *AssistanceDisplay) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AssistanceDisplay) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *AssistanceDisplay) GetWidth() uint32 {
+	if x != nil {
+		return x.Width
+	}
+	return 0
+}
+
+func (x *AssistanceDisplay) GetHeight() uint32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+// The first RTP timestamp actually emitted for a selected capture generation.
+// It is not a wall-clock readiness estimate or evidence of browser presentation.
+type AssistanceDisplayFrame struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DisplayId     string                 `protobuf:"bytes,1,opt,name=display_id,json=displayId,proto3" json:"display_id,omitempty"`
+	Generation    uint32                 `protobuf:"varint,2,opt,name=generation,proto3" json:"generation,omitempty"`
+	RtpTimestamp  uint32                 `protobuf:"varint,3,opt,name=rtp_timestamp,json=rtpTimestamp,proto3" json:"rtp_timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceDisplayFrame) Reset() {
+	*x = AssistanceDisplayFrame{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceDisplayFrame) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceDisplayFrame) ProtoMessage() {}
+
+func (x *AssistanceDisplayFrame) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceDisplayFrame.ProtoReflect.Descriptor instead.
+func (*AssistanceDisplayFrame) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *AssistanceDisplayFrame) GetDisplayId() string {
+	if x != nil {
+		return x.DisplayId
+	}
+	return ""
+}
+
+func (x *AssistanceDisplayFrame) GetGeneration() uint32 {
+	if x != nil {
+		return x.Generation
+	}
+	return 0
+}
+
+func (x *AssistanceDisplayFrame) GetRtpTimestamp() uint32 {
+	if x != nil {
+		return x.RtpTimestamp
+	}
+	return 0
+}
+
+// Content is ephemeral. Neither this message nor its digest is audit detail.
+type AssistanceCommand struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Kind      AssistanceCommandKind  `protobuf:"varint,2,opt,name=kind,proto3,enum=lindm.agent.v1.AssistanceCommandKind" json:"kind,omitempty"`
+	// Omitted by admin callers; stamped by the server before delivery.
+	Deadline      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	Text          string                 `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
+	SpecialKey    AssistanceSpecialKey   `protobuf:"varint,5,opt,name=special_key,json=specialKey,proto3,enum=lindm.agent.v1.AssistanceSpecialKey" json:"special_key,omitempty"`
+	DisplayId     string                 `protobuf:"bytes,6,opt,name=display_id,json=displayId,proto3" json:"display_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceCommand) Reset() {
+	*x = AssistanceCommand{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceCommand) ProtoMessage() {}
+
+func (x *AssistanceCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceCommand.ProtoReflect.Descriptor instead.
+func (*AssistanceCommand) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *AssistanceCommand) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AssistanceCommand) GetKind() AssistanceCommandKind {
+	if x != nil {
+		return x.Kind
+	}
+	return AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_UNSPECIFIED
+}
+
+func (x *AssistanceCommand) GetDeadline() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Deadline
+	}
+	return nil
+}
+
+func (x *AssistanceCommand) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *AssistanceCommand) GetSpecialKey() AssistanceSpecialKey {
+	if x != nil {
+		return x.SpecialKey
+	}
+	return AssistanceSpecialKey_ASSISTANCE_SPECIAL_KEY_UNSPECIFIED
+}
+
+func (x *AssistanceCommand) GetDisplayId() string {
+	if x != nil {
+		return x.DisplayId
+	}
+	return ""
+}
+
+type AssistanceCommandResult struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	RequestId     string                  `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Kind          AssistanceCommandKind   `protobuf:"varint,2,opt,name=kind,proto3,enum=lindm.agent.v1.AssistanceCommandKind" json:"kind,omitempty"`
+	Status        AssistanceCommandStatus `protobuf:"varint,3,opt,name=status,proto3,enum=lindm.agent.v1.AssistanceCommandStatus" json:"status,omitempty"`
+	Reason        string                  `protobuf:"bytes,4,opt,name=reason,proto3" json:"reason,omitempty"`
+	Text          string                  `protobuf:"bytes,5,opt,name=text,proto3" json:"text,omitempty"`
+	CompletedAt   *timestamppb.Timestamp  `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceCommandResult) Reset() {
+	*x = AssistanceCommandResult{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceCommandResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceCommandResult) ProtoMessage() {}
+
+func (x *AssistanceCommandResult) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceCommandResult.ProtoReflect.Descriptor instead.
+func (*AssistanceCommandResult) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AssistanceCommandResult) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AssistanceCommandResult) GetKind() AssistanceCommandKind {
+	if x != nil {
+		return x.Kind
+	}
+	return AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_UNSPECIFIED
+}
+
+func (x *AssistanceCommandResult) GetStatus() AssistanceCommandStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_UNSPECIFIED
+}
+
+func (x *AssistanceCommandResult) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AssistanceCommandResult) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *AssistanceCommandResult) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
 var File_lindm_agent_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
@@ -856,7 +1630,7 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"credential\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\n" +
-	"credential\"\x8b\x04\n" +
+	"credential\"\xbd\x05\n" +
 	"\x14AssistanceInvitation\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12>\n" +
@@ -870,44 +1644,112 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x0ftarget_username\x18\a \x01(\tB)\xbaH&r$2\"^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$R\x0etargetUsername\x12P\n" +
 	"\vice_servers\x18\b \x03(\v2#.lindm.agent.v1.AssistanceIceServerB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10\x04R\n" +
-	"iceServers\"\x82\x02\n" +
+	"iceServers\x12W\n" +
+	"\x16requested_capabilities\x18\t \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
+	"\x16effective_capabilities\x18\n" +
+	" \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\"\xad\x05\n" +
 	"\x13AssistanceDirective\x12L\n" +
 	"\n" +
 	"invitation\x18\x01 \x01(\v2$.lindm.agent.v1.AssistanceInvitationB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"invitation\x12(\n" +
 	"\n" +
-	"answer_sdp\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x18\x80\x80\x01R\tanswerSdp\x12\x1c\n" +
+	"answer_sdp\x18\x02 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\tanswerSdp\x12\x1c\n" +
 	"\tterminate\x18\x03 \x01(\bR\tterminate\x12U\n" +
-	"\x0fterminate_cause\x18\x04 \x01(\x0e2\".lindm.agent.v1.AssistanceEndCauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0eterminateCause\"\x9d\x02\n" +
+	"\x0fterminate_cause\x18\x04 \x01(\x0e2\".lindm.agent.v1.AssistanceEndCauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0eterminateCause\x12;\n" +
+	"\acommand\x18\x05 \x01(\v2!.lindm.agent.v1.AssistanceCommandR\acommand\x12E\n" +
+	"\x10authorized_until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0fauthorizedUntil:\xa4\x02\xbaH\xa0\x02\x1a\x88\x01\n" +
+	"&assistance_directive.operator_deadline\x120live directives require fresh operator authority\x1a,this.terminate || has(this.authorized_until)\x1a\x92\x01\n" +
+	"%assistance_directive.command_deadline\x127a delivered command requires its server-issued deadline\x1a0!has(this.command) || has(this.command.deadline)\"\x9d\x02\n" +
 	"\x16AssistanceLocalSession\x12B\n" +
 	"\busername\x18\x01 \x01(\tB&\xbaH#r!2\x1f^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$R\busername\x12\x10\n" +
 	"\x03uid\x18\x02 \x01(\rR\x03uid\x12H\n" +
 	"\x11logind_session_id\x18\x03 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18@2\x11^[A-Za-z0-9_.-]+$R\x0flogindSessionId\x126\n" +
 	"\fsession_type\x18\x04 \x01(\tB\x13\xbaH\x10r\x0eR\awaylandR\x03x11R\vsessionType\x12+\n" +
-	"\adesktop\x18\x05 \x01(\tB\x11\xbaH\x0er\f\x18@2\b^[ -~]*$R\adesktop\"\xd4\x05\n" +
+	"\adesktop\x18\x05 \x01(\tB\x11\xbaH\x0er\f\x18@2\b^[ -~]*$R\adesktop\"\xf8\x0e\n" +
 	"\x10AssistanceReport\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12A\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1f.lindm.agent.v1.AssistancePhaseB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x05phase\x12&\n" +
-	"\toffer_sdp\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x18\x80\x80\x01R\bofferSdp\x12'\n" +
+	"\toffer_sdp\x18\x03 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\bofferSdp\x12'\n" +
 	"\x0fcontrol_granted\x18\x04 \x01(\bR\x0econtrolGranted\x12I\n" +
 	"\tend_cause\x18\x05 \x01(\x0e2\".lindm.agent.v1.AssistanceEndCauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\bendCause\x121\n" +
 	"\n" +
 	"end_detail\x18\x06 \x01(\tB\x12\xbaH\x0fr\r\x18\x80\x022\b^[ -~]*$R\tendDetail\x12K\n" +
-	"\rlocal_session\x18\a \x01(\v2&.lindm.agent.v1.AssistanceLocalSessionR\flocalSession:\xb7\x02\xbaH\xb3\x02\x1a\xc1\x01\n" +
+	"\rlocal_session\x18\a \x01(\v2&.lindm.agent.v1.AssistanceLocalSessionR\flocalSession\x12Y\n" +
+	"\x14granted_capabilities\x18\b \x01(\v2&.lindm.agent.v1.AssistanceCapabilitiesR\x13grantedCapabilities\x12G\n" +
+	"\bdisplays\x18\t \x03(\v2!.lindm.agent.v1.AssistanceDisplayB\b\xbaH\x05\x92\x01\x02\x10\bR\bdisplays\x127\n" +
+	"\x13selected_display_id\x18\n" +
+	" \x01(\tB\a\xbaH\x04r\x02\x18@R\x11selectedDisplayId\x12N\n" +
+	"\x0ecommand_result\x18\v \x01(\v2'.lindm.agent.v1.AssistanceCommandResultR\rcommandResult\x12-\n" +
+	"\x12display_generation\x18\f \x01(\rR\x11displayGeneration\x12W\n" +
+	"\x16requested_capabilities\x18\r \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
+	"\x16effective_capabilities\x18\x0e \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\x12K\n" +
+	"\rdisplay_frame\x18\x0f \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame:\x80\a\xbaH\xfc\x06\x1a\xc1\x01\n" +
 	"\x17assistance_report.offer\x127offer_sdp is required from OFFERED and absent before it\x1am(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)\x1am\n" +
-	"\x15assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\"f\n" +
+	"\x15assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\x1a\xe0\x01\n" +
+	" assistance_report.command_result\x12Ecommand reports are terminal and ended sessions cannot retain content\x1au!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))\x1a\xe3\x02\n" +
+	"\x1fassistance_report.display_frame\x12@frame identity must name the currently shared display generation\x1a\xfd\x01!has(this.display_frame) || ((this.phase == 3 || this.phase == 4) && this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))\"\xf8\x01\n" +
 	"\x15SyncAssistanceRequest\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\bR\n" +
-	"directives\"\xa2\x01\n" +
+	"directives:\x8f\x01\xbaH\x8b\x01\x1a\x88\x01\n" +
+	"#sync_assistance_request.one_command\x12*only one device command may be outstanding\x1a5this.directives.filter(d, has(d.command)).size() <= 1\"\xe2\x02\n" +
 	"\x16SyncAssistanceResponse\x12D\n" +
-	"\areports\x18\x01 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12B\n" +
-	"\x06policy\x18\x02 \x01(\x0e2 .lindm.agent.v1.AssistancePolicyB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy\"|\n" +
+	"\areports\x18\x01 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12F\n" +
+	"\x06policy\x18\x02 \x01(\x0e2$.lindm.agent.v1.AssistanceEnablementB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy:\xb9\x01\xbaH\xb5\x01\x1a\xb2\x01\n" +
+	"$sync_assistance_response.one_content\x120only one device command result may carry content\x1aXthis.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1\"\xc5\x01\n" +
 	"\x16RemoteAssistanceConfig\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12H\n" +
-	"\x19session_runtime_directory\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\x17sessionRuntimeDirectory*h\n" +
+	"\x19session_runtime_directory\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\x17sessionRuntimeDirectory\x12G\n" +
+	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\"\xc2\x02\n" +
+	"\x10AssistancePolicy\x12L\n" +
+	"\tclipboard\x18\x01 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\tclipboard\x12J\n" +
+	"\bkeyboard\x18\x02 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bkeyboard\x12H\n" +
+	"\adisplay\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\adisplay\x12J\n" +
+	"\bmessages\x18\x04 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmessages\"\xd2\x02\n" +
+	"\x16AssistanceCapabilities\x128\n" +
+	"\x06policy\x18\x01 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x06policy\x12@\n" +
+	"\x10clipboard_reason\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0fclipboardReason\x12>\n" +
+	"\x0fkeyboard_reason\x18\x03 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0ekeyboardReason\x12<\n" +
+	"\x0edisplay_reason\x18\x04 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\rdisplayReason\x12>\n" +
+	"\x0fmessages_reason\x18\x05 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0emessagesReason\"\xab\x01\n" +
+	"\x11AssistanceDisplay\x12,\n" +
+	"\x02id\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01(@2\x11^[A-Za-z0-9_.-]+$R\x02id\x12 \n" +
+	"\x05label\x18\x02 \x01(\tB\n" +
+	"\xbaH\ar\x05\x10\x01(\x80\x01R\x05label\x12!\n" +
+	"\x05width\x18\x03 \x01(\rB\v\xbaH\b*\x06\x18\x80\x80\x01 \x00R\x05width\x12#\n" +
+	"\x06height\x18\x04 \x01(\rB\v\xbaH\b*\x06\x18\x80\x80\x01 \x00R\x06height\"\xa3\x01\n" +
+	"\x16AssistanceDisplayFrame\x12;\n" +
+	"\n" +
+	"display_id\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01(@2\x11^[A-Za-z0-9_.-]+$R\tdisplayId\x12'\n" +
+	"\n" +
+	"generation\x18\x02 \x01(\rB\a\xbaH\x04*\x02 \x00R\n" +
+	"generation\x12#\n" +
+	"\rrtp_timestamp\x18\x03 \x01(\rR\frtpTimestamp\"\xc9\x05\n" +
+	"\x11AssistanceCommand\x12M\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12E\n" +
+	"\x04kind\x18\x02 \x01(\x0e2%.lindm.agent.v1.AssistanceCommandKindB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x126\n" +
+	"\bdeadline\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\bdeadline\x12\x1d\n" +
+	"\x04text\x18\x04 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\x04text\x12O\n" +
+	"\vspecial_key\x18\x05 \x01(\x0e2$.lindm.agent.v1.AssistanceSpecialKeyB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
+	"specialKey\x129\n" +
+	"\n" +
+	"display_id\x18\x06 \x01(\tB\x1a\xbaH\x17r\x15\x18@2\x11^[A-Za-z0-9_.-]*$R\tdisplayId:\xba\x02\xbaH\xb6\x02\x1a\xb3\x02\n" +
+	"\x1aassistance_command.payload\x12#payload must match the command kind\x1a\xef\x01((this.kind == 1 || this.kind == 5) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048))\"\x97\a\n" +
+	"\x17AssistanceCommandResult\x12'\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12E\n" +
+	"\x04kind\x18\x02 \x01(\x0e2%.lindm.agent.v1.AssistanceCommandKindB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12K\n" +
+	"\x06status\x18\x03 \x01(\x0e2'.lindm.agent.v1.AssistanceCommandStatusB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\xe8\x02\n" +
+	"\x06reason\x18\x04 \x01(\tB\xcf\x02\xbaH\xcb\x02r\xc8\x02R\x00R\x19command_identity_conflictR\x16command_result_expiredR\x15session_command_limitR\x0fcontent_expiredR\rsession_endedR\x13command_not_grantedR\x18command_deadline_reachedR\x17clipboard_selection_setR\x13clipboard_text_readR\x11special_keys_sentR\x10display_selectedR\x0emessage_postedR\x13command_unsupportedR\x0ecommand_failedR\x12command_state_lostR\x0fcommand_expiredR\x06reason\x12\x1d\n" +
+	"\x04text\x18\x05 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\x04text\x12=\n" +
+	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt:\xf5\x01\xbaH\xf1\x01\x1a\xee\x01\n" +
+	"!assistance_command_result.content\x12\\only a successful clipboard read may carry content; terminal results require completion time\x1ak(this.text == '' || (this.kind == 2 && this.status == 2)) && ((this.status != 1) == has(this.completed_at))*h\n" +
 	"\x0eAssistanceMode\x12\x1f\n" +
 	"\x1bASSISTANCE_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ASSISTANCE_MODE_VIEW\x10\x01\x12\x1b\n" +
@@ -934,11 +1776,36 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x12$\n" +
 	" ASSISTANCE_END_CAUSE_UNAVAILABLE\x10\v\x12*\n" +
 	"&ASSISTANCE_END_CAUSE_CONNECTION_FAILED\x10\f\x12!\n" +
-	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\r*t\n" +
-	"\x10AssistancePolicy\x12!\n" +
-	"\x1dASSISTANCE_POLICY_UNSPECIFIED\x10\x00\x12\x1d\n" +
-	"\x19ASSISTANCE_POLICY_ENABLED\x10\x01\x12\x1e\n" +
-	"\x1aASSISTANCE_POLICY_DISABLED\x10\x02B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\r*\x84\x01\n" +
+	"\x14AssistanceEnablement\x12%\n" +
+	"!ASSISTANCE_ENABLEMENT_UNSPECIFIED\x10\x00\x12!\n" +
+	"\x1dASSISTANCE_ENABLEMENT_ENABLED\x10\x01\x12\"\n" +
+	"\x1eASSISTANCE_ENABLEMENT_DISABLED\x10\x02*\xa1\x01\n" +
+	"\x14AssistancePolicyMode\x12&\n" +
+	"\"ASSISTANCE_POLICY_MODE_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aASSISTANCE_POLICY_MODE_OFF\x10\x01\x12\"\n" +
+	"\x1eASSISTANCE_POLICY_MODE_LIMITED\x10\x02\x12\x1d\n" +
+	"\x19ASSISTANCE_POLICY_MODE_ON\x10\x03*\x94\x02\n" +
+	"\x15AssistanceCommandKind\x12'\n" +
+	"#ASSISTANCE_COMMAND_KIND_UNSPECIFIED\x10\x00\x12+\n" +
+	"'ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE\x10\x01\x12*\n" +
+	"&ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ\x10\x02\x12(\n" +
+	"$ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS\x10\x03\x12*\n" +
+	"&ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY\x10\x04\x12#\n" +
+	"\x1fASSISTANCE_COMMAND_KIND_MESSAGE\x10\x05*\xe9\x01\n" +
+	"\x14AssistanceSpecialKey\x12&\n" +
+	"\"ASSISTANCE_SPECIAL_KEY_UNSPECIFIED\x10\x00\x12(\n" +
+	"$ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW\x10\x01\x12,\n" +
+	"(ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS\x10\x02\x12(\n" +
+	"$ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL\x10\x03\x12'\n" +
+	"#ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW\x10\x04*\x8a\x02\n" +
+	"\x17AssistanceCommandStatus\x12)\n" +
+	"%ASSISTANCE_COMMAND_STATUS_UNSPECIFIED\x10\x00\x12%\n" +
+	"!ASSISTANCE_COMMAND_STATUS_PENDING\x10\x01\x12'\n" +
+	"#ASSISTANCE_COMMAND_STATUS_SUCCEEDED\x10\x02\x12$\n" +
+	" ASSISTANCE_COMMAND_STATUS_FAILED\x10\x03\x12'\n" +
+	"#ASSISTANCE_COMMAND_STATUS_CANCELLED\x10\x04\x12%\n" +
+	"!ASSISTANCE_COMMAND_STATUS_EXPIRED\x10\x05B\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_assistance_proto_rawDescOnce sync.Once
@@ -952,41 +1819,73 @@ func file_lindm_agent_v1_assistance_proto_rawDescGZIP() []byte {
 	return file_lindm_agent_v1_assistance_proto_rawDescData
 }
 
-var file_lindm_agent_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_lindm_agent_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_lindm_agent_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
+var file_lindm_agent_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_lindm_agent_v1_assistance_proto_goTypes = []any{
-	(AssistanceMode)(0),            // 0: lindm.agent.v1.AssistanceMode
-	(AssistancePhase)(0),           // 1: lindm.agent.v1.AssistancePhase
-	(AssistanceEndCause)(0),        // 2: lindm.agent.v1.AssistanceEndCause
-	(AssistancePolicy)(0),          // 3: lindm.agent.v1.AssistancePolicy
-	(*AssistanceIceServer)(nil),    // 4: lindm.agent.v1.AssistanceIceServer
-	(*AssistanceInvitation)(nil),   // 5: lindm.agent.v1.AssistanceInvitation
-	(*AssistanceDirective)(nil),    // 6: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil), // 7: lindm.agent.v1.AssistanceLocalSession
-	(*AssistanceReport)(nil),       // 8: lindm.agent.v1.AssistanceReport
-	(*SyncAssistanceRequest)(nil),  // 9: lindm.agent.v1.SyncAssistanceRequest
-	(*SyncAssistanceResponse)(nil), // 10: lindm.agent.v1.SyncAssistanceResponse
-	(*RemoteAssistanceConfig)(nil), // 11: lindm.agent.v1.RemoteAssistanceConfig
-	(*timestamppb.Timestamp)(nil),  // 12: google.protobuf.Timestamp
+	(AssistanceMode)(0),             // 0: lindm.agent.v1.AssistanceMode
+	(AssistancePhase)(0),            // 1: lindm.agent.v1.AssistancePhase
+	(AssistanceEndCause)(0),         // 2: lindm.agent.v1.AssistanceEndCause
+	(AssistanceEnablement)(0),       // 3: lindm.agent.v1.AssistanceEnablement
+	(AssistancePolicyMode)(0),       // 4: lindm.agent.v1.AssistancePolicyMode
+	(AssistanceCommandKind)(0),      // 5: lindm.agent.v1.AssistanceCommandKind
+	(AssistanceSpecialKey)(0),       // 6: lindm.agent.v1.AssistanceSpecialKey
+	(AssistanceCommandStatus)(0),    // 7: lindm.agent.v1.AssistanceCommandStatus
+	(*AssistanceIceServer)(nil),     // 8: lindm.agent.v1.AssistanceIceServer
+	(*AssistanceInvitation)(nil),    // 9: lindm.agent.v1.AssistanceInvitation
+	(*AssistanceDirective)(nil),     // 10: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil),  // 11: lindm.agent.v1.AssistanceLocalSession
+	(*AssistanceReport)(nil),        // 12: lindm.agent.v1.AssistanceReport
+	(*SyncAssistanceRequest)(nil),   // 13: lindm.agent.v1.SyncAssistanceRequest
+	(*SyncAssistanceResponse)(nil),  // 14: lindm.agent.v1.SyncAssistanceResponse
+	(*RemoteAssistanceConfig)(nil),  // 15: lindm.agent.v1.RemoteAssistanceConfig
+	(*AssistancePolicy)(nil),        // 16: lindm.agent.v1.AssistancePolicy
+	(*AssistanceCapabilities)(nil),  // 17: lindm.agent.v1.AssistanceCapabilities
+	(*AssistanceDisplay)(nil),       // 18: lindm.agent.v1.AssistanceDisplay
+	(*AssistanceDisplayFrame)(nil),  // 19: lindm.agent.v1.AssistanceDisplayFrame
+	(*AssistanceCommand)(nil),       // 20: lindm.agent.v1.AssistanceCommand
+	(*AssistanceCommandResult)(nil), // 21: lindm.agent.v1.AssistanceCommandResult
+	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
 }
 var file_lindm_agent_v1_assistance_proto_depIdxs = []int32{
 	0,  // 0: lindm.agent.v1.AssistanceInvitation.mode:type_name -> lindm.agent.v1.AssistanceMode
-	12, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
-	12, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
-	4,  // 3: lindm.agent.v1.AssistanceInvitation.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
-	5,  // 4: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
-	2,  // 5: lindm.agent.v1.AssistanceDirective.terminate_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	1,  // 6: lindm.agent.v1.AssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
-	2,  // 7: lindm.agent.v1.AssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	7,  // 8: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	6,  // 9: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	8,  // 10: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
-	3,  // 11: lindm.agent.v1.SyncAssistanceResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	22, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
+	22, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
+	8,  // 3: lindm.agent.v1.AssistanceInvitation.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
+	16, // 4: lindm.agent.v1.AssistanceInvitation.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	16, // 5: lindm.agent.v1.AssistanceInvitation.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	9,  // 6: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
+	2,  // 7: lindm.agent.v1.AssistanceDirective.terminate_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	20, // 8: lindm.agent.v1.AssistanceDirective.command:type_name -> lindm.agent.v1.AssistanceCommand
+	22, // 9: lindm.agent.v1.AssistanceDirective.authorized_until:type_name -> google.protobuf.Timestamp
+	1,  // 10: lindm.agent.v1.AssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
+	2,  // 11: lindm.agent.v1.AssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	11, // 12: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	17, // 13: lindm.agent.v1.AssistanceReport.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
+	18, // 14: lindm.agent.v1.AssistanceReport.displays:type_name -> lindm.agent.v1.AssistanceDisplay
+	21, // 15: lindm.agent.v1.AssistanceReport.command_result:type_name -> lindm.agent.v1.AssistanceCommandResult
+	16, // 16: lindm.agent.v1.AssistanceReport.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	16, // 17: lindm.agent.v1.AssistanceReport.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	19, // 18: lindm.agent.v1.AssistanceReport.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
+	10, // 19: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	12, // 20: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
+	3,  // 21: lindm.agent.v1.SyncAssistanceResponse.policy:type_name -> lindm.agent.v1.AssistanceEnablement
+	16, // 22: lindm.agent.v1.RemoteAssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	4,  // 23: lindm.agent.v1.AssistancePolicy.clipboard:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 24: lindm.agent.v1.AssistancePolicy.keyboard:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 25: lindm.agent.v1.AssistancePolicy.display:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 26: lindm.agent.v1.AssistancePolicy.messages:type_name -> lindm.agent.v1.AssistancePolicyMode
+	16, // 27: lindm.agent.v1.AssistanceCapabilities.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	5,  // 28: lindm.agent.v1.AssistanceCommand.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
+	22, // 29: lindm.agent.v1.AssistanceCommand.deadline:type_name -> google.protobuf.Timestamp
+	6,  // 30: lindm.agent.v1.AssistanceCommand.special_key:type_name -> lindm.agent.v1.AssistanceSpecialKey
+	5,  // 31: lindm.agent.v1.AssistanceCommandResult.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
+	7,  // 32: lindm.agent.v1.AssistanceCommandResult.status:type_name -> lindm.agent.v1.AssistanceCommandStatus
+	22, // 33: lindm.agent.v1.AssistanceCommandResult.completed_at:type_name -> google.protobuf.Timestamp
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_assistance_proto_init() }
@@ -999,8 +1898,8 @@ func file_lindm_agent_v1_assistance_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_assistance_proto_rawDesc), len(file_lindm_agent_v1_assistance_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   8,
+			NumEnums:      8,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

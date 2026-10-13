@@ -9,40 +9,69 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AssistanceCommand struct {
+	RequestID     uuid.UUID
+	SessionID     uuid.UUID
+	DeviceID      uuid.UUID
+	OperatorID    uuid.UUID
+	RequestDigest []byte
+	Kind          int16
+	Policy        []byte
+	ByteCount     int32
+	SpecialKey    int16
+	DisplayID     string
+	Deadline      pgtype.Timestamptz
+	Status        int16
+	Reason        string
+	CompletedAt   pgtype.Timestamptz
+}
+
+type AssistancePolicyRequest struct {
+	RequestID     uuid.UUID
+	DeviceID      uuid.UUID
+	OperatorID    uuid.UUID
+	RequestDigest []byte
+	Policy        []byte
+}
+
 type AssistanceSession struct {
-	ID                 uuid.UUID
-	DeviceID           uuid.UUID
-	GenerationID       uuid.UUID
-	RequestID          uuid.UUID
-	RequestDigest      []byte
-	OperatorID         uuid.UUID
-	OperatorDisplay    string
-	Mode               int16
-	Reason             string
-	TargetUsername     string
-	State              int16
-	CreatedAt          pgtype.Timestamptz
-	ConsentDeadline    pgtype.Timestamptz
-	EndsAt             pgtype.Timestamptz
-	PromptedAt         pgtype.Timestamptz
-	ConsentedAt        pgtype.Timestamptz
-	AnsweredAt         pgtype.Timestamptz
-	StartedAt          pgtype.Timestamptz
-	EndedAt            pgtype.Timestamptz
-	EndCause           int16
-	EndDetail          string
-	DeviceSyncedAt     pgtype.Timestamptz
-	DeviceEnded        bool
-	ControlGranted     bool
-	LocalUsername      string
-	LocalUid           int64
-	LocalLogindSession string
-	LocalSessionType   string
-	LocalDesktop       string
-	OfferSdp           string
-	OfferFingerprint   string
-	AnswerSdp          string
-	AnswerFingerprint  string
+	ID                    uuid.UUID
+	DeviceID              uuid.UUID
+	GenerationID          uuid.UUID
+	RequestID             uuid.UUID
+	RequestDigest         []byte
+	OperatorID            uuid.UUID
+	OperatorDisplay       string
+	Mode                  int16
+	Reason                string
+	TargetUsername        string
+	State                 int16
+	CreatedAt             pgtype.Timestamptz
+	ConsentDeadline       pgtype.Timestamptz
+	EndsAt                pgtype.Timestamptz
+	PromptedAt            pgtype.Timestamptz
+	ConsentedAt           pgtype.Timestamptz
+	AnsweredAt            pgtype.Timestamptz
+	StartedAt             pgtype.Timestamptz
+	EndedAt               pgtype.Timestamptz
+	EndCause              int16
+	EndDetail             string
+	DeviceSyncedAt        pgtype.Timestamptz
+	DeviceEnded           bool
+	ControlGranted        bool
+	LocalUsername         string
+	LocalUid              int64
+	LocalLogindSession    string
+	LocalSessionType      string
+	LocalDesktop          string
+	OfferSdp              string
+	OfferFingerprint      string
+	AnswerSdp             string
+	AnswerFingerprint     string
+	AuthorizedUntil       pgtype.Timestamptz
+	RequestedCapabilities []byte
+	EffectiveCapabilities []byte
+	CapabilityProjection  []byte
 }
 
 type DeviceAction struct {

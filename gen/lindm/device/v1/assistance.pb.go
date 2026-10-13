@@ -31,7 +31,7 @@ type SyncAssistanceRequest struct {
 	Reports      []*v1.AssistanceReport `protobuf:"bytes,2,rep,name=reports,proto3" json:"reports,omitempty"`
 	// The executor's applied remote-assistance setting; UNSPECIFIED from agents
 	// that predate it leaves the server's view unknown.
-	Policy        v1.AssistancePolicy `protobuf:"varint,3,opt,name=policy,proto3,enum=lindm.agent.v1.AssistancePolicy" json:"policy,omitempty"`
+	Policy        v1.AssistanceEnablement `protobuf:"varint,3,opt,name=policy,proto3,enum=lindm.agent.v1.AssistanceEnablement" json:"policy,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,11 +80,11 @@ func (x *SyncAssistanceRequest) GetReports() []*v1.AssistanceReport {
 	return nil
 }
 
-func (x *SyncAssistanceRequest) GetPolicy() v1.AssistancePolicy {
+func (x *SyncAssistanceRequest) GetPolicy() v1.AssistanceEnablement {
 	if x != nil {
 		return x.Policy
 	}
-	return v1.AssistancePolicy(0)
+	return v1.AssistanceEnablement(0)
 }
 
 // SyncAssistanceResponse carries the complete desired state for every open
@@ -138,15 +138,17 @@ var File_lindm_device_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_assistance_proto_rawDesc = "" +
 	"\n" +
-	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\xd9\x01\n" +
+	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\x97\x03\n" +
 	"\x15SyncAssistanceRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12D\n" +
-	"\areports\x18\x02 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12B\n" +
-	"\x06policy\x18\x03 \x01(\x0e2 .lindm.agent.v1.AssistancePolicyB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy\"g\n" +
+	"\areports\x18\x02 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12F\n" +
+	"\x06policy\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistanceEnablementB\b\xbaH\x05\x82\x01\x02\x10\x01R\x06policy:\xb7\x01\xbaH\xb3\x01\x1a\xb0\x01\n" +
+	"\"device_sync_assistance.one_content\x120only one device command result may carry content\x1aXthis.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1\"\xf8\x01\n" +
 	"\x16SyncAssistanceResponse\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\bR\n" +
-	"directivesB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
+	"directives:\x8e\x01\xbaH\x8a\x01\x1a\x87\x01\n" +
+	"\"device_sync_assistance.one_command\x12*only one device command may be outstanding\x1a5this.directives.filter(d, has(d.command)).size() <= 1B$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
 	file_lindm_device_v1_assistance_proto_rawDescOnce sync.Once
@@ -165,12 +167,12 @@ var file_lindm_device_v1_assistance_proto_goTypes = []any{
 	(*SyncAssistanceRequest)(nil),  // 0: lindm.device.v1.SyncAssistanceRequest
 	(*SyncAssistanceResponse)(nil), // 1: lindm.device.v1.SyncAssistanceResponse
 	(*v1.AssistanceReport)(nil),    // 2: lindm.agent.v1.AssistanceReport
-	(v1.AssistancePolicy)(0),       // 3: lindm.agent.v1.AssistancePolicy
+	(v1.AssistanceEnablement)(0),   // 3: lindm.agent.v1.AssistanceEnablement
 	(*v1.AssistanceDirective)(nil), // 4: lindm.agent.v1.AssistanceDirective
 }
 var file_lindm_device_v1_assistance_proto_depIdxs = []int32{
 	2, // 0: lindm.device.v1.SyncAssistanceRequest.reports:type_name -> lindm.agent.v1.AssistanceReport
-	3, // 1: lindm.device.v1.SyncAssistanceRequest.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	3, // 1: lindm.device.v1.SyncAssistanceRequest.policy:type_name -> lindm.agent.v1.AssistanceEnablement
 	4, // 2: lindm.device.v1.SyncAssistanceResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
 	3, // [3:3] is the sub-list for method output_type
 	3, // [3:3] is the sub-list for method input_type

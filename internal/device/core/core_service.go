@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	enrollmentv1 "lindm/gen/lindm/enrollment/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
@@ -98,7 +99,8 @@ type Config struct {
 	ServerProtocol              uint32
 	// Assistance is nil when remote assistance is not configured; Create, Join
 	// and Answer then fail with assistance_unconfigured.
-	Assistance *assistrelay.Relay
+	Assistance              *assistrelay.Relay
+	AssistancePolicyCeiling *agentv1.AssistancePolicy
 }
 
 // ProfileActivator copies a provisioning token's immutable profile revision to
@@ -139,6 +141,7 @@ type Service struct {
 	ServerProtocol         uint32
 	EnrollmentInstructions *adminv1.GetEnrollmentInstructionsResponse
 	Assistance             *assistrelay.Relay
+	AssistanceCeiling      *agentv1.AssistancePolicy
 }
 
 // NewCore validates cfg and builds the shared device dependencies.
@@ -228,6 +231,7 @@ func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, e
 		ServerProtocol:         cfg.ServerProtocol,
 		EnrollmentInstructions: instructions,
 		Assistance:             cfg.Assistance,
+		AssistanceCeiling:      proto.CloneOf(cfg.AssistancePolicyCeiling),
 	}, nil
 }
 
@@ -463,6 +467,9 @@ func validatedMessages() []proto.Message {
 		&adminv1.AnswerAssistanceSessionRequest{}, &adminv1.StopAssistanceSessionRequest{},
 		&adminv1.GetAssistanceReadinessRequest{},
 		&devicev1.SyncAssistanceRequest{}, &devicev1.SyncAssistanceResponse{},
+		&adminv1.GetAssistancePolicyRequest{}, &adminv1.UpdateAssistancePolicyRequest{},
+		&adminv1.RunAssistanceCommandRequest{}, &adminv1.GetAssistanceCommandRequest{},
+		&adminv1.RunAssistanceCommandResponse{}, &adminv1.GetAssistanceCommandResponse{},
 		&devicev1.GetDeviceActionWorkRequest{},
 		&devicev1.AuthorizeDeviceActionStartRequest{},
 		&devicev1.ReportDeviceActionResultRequest{},

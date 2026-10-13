@@ -25,15 +25,23 @@ const (
 // SessionAssistanceReport is a helper observation. Local identity fields are
 // absent by design; the executor adds them from kernel and logind facts.
 type SessionAssistanceReport struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	SessionId      string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Phase          AssistancePhase        `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
-	OfferSdp       string                 `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
-	ControlGranted bool                   `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
-	EndCause       AssistanceEndCause     `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
-	EndDetail      string                 `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state                 protoimpl.MessageState   `protogen:"open.v1"`
+	SessionId             string                   `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Phase                 AssistancePhase          `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
+	OfferSdp              string                   `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
+	ControlGranted        bool                     `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
+	EndCause              AssistanceEndCause       `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
+	EndDetail             string                   `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
+	GrantedCapabilities   *AssistanceCapabilities  `protobuf:"bytes,7,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
+	Displays              []*AssistanceDisplay     `protobuf:"bytes,8,rep,name=displays,proto3" json:"displays,omitempty"`
+	SelectedDisplayId     string                   `protobuf:"bytes,9,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
+	CommandResult         *AssistanceCommandResult `protobuf:"bytes,10,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
+	DisplayGeneration     uint32                   `protobuf:"varint,11,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
+	RequestedCapabilities *AssistancePolicy        `protobuf:"bytes,12,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
+	EffectiveCapabilities *AssistancePolicy        `protobuf:"bytes,13,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
+	DisplayFrame          *AssistanceDisplayFrame  `protobuf:"bytes,14,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *SessionAssistanceReport) Reset() {
@@ -106,6 +114,62 @@ func (x *SessionAssistanceReport) GetEndDetail() string {
 		return x.EndDetail
 	}
 	return ""
+}
+
+func (x *SessionAssistanceReport) GetGrantedCapabilities() *AssistanceCapabilities {
+	if x != nil {
+		return x.GrantedCapabilities
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetDisplays() []*AssistanceDisplay {
+	if x != nil {
+		return x.Displays
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetSelectedDisplayId() string {
+	if x != nil {
+		return x.SelectedDisplayId
+	}
+	return ""
+}
+
+func (x *SessionAssistanceReport) GetCommandResult() *AssistanceCommandResult {
+	if x != nil {
+		return x.CommandResult
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetDisplayGeneration() uint32 {
+	if x != nil {
+		return x.DisplayGeneration
+	}
+	return 0
+}
+
+func (x *SessionAssistanceReport) GetRequestedCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.RequestedCapabilities
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetEffectiveCapabilities() *AssistancePolicy {
+	if x != nil {
+		return x.EffectiveCapabilities
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetDisplayFrame() *AssistanceDisplayFrame {
+	if x != nil {
+		return x.DisplayFrame
+	}
+	return nil
 }
 
 type SyncSessionRequest struct {
@@ -227,22 +291,34 @@ var File_lindm_agent_v1_session_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a\x1elindm/agent/v1/os_update.proto\"\xa4\x05\n" +
+	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a\x1elindm/agent/v1/os_update.proto\"\xd8\x0e\n" +
 	"\x17SessionAssistanceReport\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12G\n" +
 	"\x05phase\x18\x02 \x01(\x0e2\x1f.lindm.agent.v1.AssistancePhaseB\x10\xbaH\r\x82\x01\n" +
 	"\x10\x01\x18\x02\x18\x03\x18\x04\x18\x05R\x05phase\x12&\n" +
-	"\toffer_sdp\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x18\x80\x80\x01R\bofferSdp\x12'\n" +
+	"\toffer_sdp\x18\x03 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\bofferSdp\x12'\n" +
 	"\x0fcontrol_granted\x18\x04 \x01(\bR\x0econtrolGranted\x12I\n" +
 	"\tend_cause\x18\x05 \x01(\x0e2\".lindm.agent.v1.AssistanceEndCauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\bendCause\x121\n" +
 	"\n" +
-	"end_detail\x18\x06 \x01(\tB\x12\xbaH\x0fr\r\x18\x80\x022\b^[ -~]*$R\tendDetail:\xc7\x02\xbaH\xc3\x02\x1a\xc9\x01\n" +
+	"end_detail\x18\x06 \x01(\tB\x12\xbaH\x0fr\r\x18\x80\x022\b^[ -~]*$R\tendDetail\x12Y\n" +
+	"\x14granted_capabilities\x18\a \x01(\v2&.lindm.agent.v1.AssistanceCapabilitiesR\x13grantedCapabilities\x12G\n" +
+	"\bdisplays\x18\b \x03(\v2!.lindm.agent.v1.AssistanceDisplayB\b\xbaH\x05\x92\x01\x02\x10\bR\bdisplays\x127\n" +
+	"\x13selected_display_id\x18\t \x01(\tB\a\xbaH\x04r\x02\x18@R\x11selectedDisplayId\x12N\n" +
+	"\x0ecommand_result\x18\n" +
+	" \x01(\v2'.lindm.agent.v1.AssistanceCommandResultR\rcommandResult\x12-\n" +
+	"\x12display_generation\x18\v \x01(\rR\x11displayGeneration\x12W\n" +
+	"\x16requested_capabilities\x18\f \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
+	"\x16effective_capabilities\x18\r \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\x12K\n" +
+	"\rdisplay_frame\x18\x0e \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame:\xa0\a\xbaH\x9c\a\x1a\xc9\x01\n" +
 	"\x1fsession_assistance_report.offer\x127offer_sdp is required from OFFERED and absent before it\x1am(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)\x1au\n" +
-	"\x1dsession_assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\"\xb9\x01\n" +
+	"\x1dsession_assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\x1a\xe8\x01\n" +
+	"(session_assistance_report.command_result\x12Ecommand reports are terminal and ended sessions cannot retain content\x1au!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))\x1a\xeb\x02\n" +
+	"'session_assistance_report.display_frame\x12@frame identity must name the currently shared display generation\x1a\xfd\x01!has(this.display_frame) || ((this.phase == 3 || this.phase == 4) && this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))\"\xe2\x02\n" +
 	"\x12SyncSessionRequest\x12K\n" +
 	"\areports\x18\x01 \x03(\v2'.lindm.agent.v1.SessionAssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\x04R\areports\x12V\n" +
-	"\x0freboot_deferral\x18\x02 \x01(\v2-.lindm.agent.v1.OSUpdateRebootDeferralRequestR\x0erebootDeferral\"\xf7\x01\n" +
+	"\x0freboot_deferral\x18\x02 \x01(\v2-.lindm.agent.v1.OSUpdateRebootDeferralRequestR\x0erebootDeferral:\xa6\x01\xbaH\xa2\x01\x1a\x9f\x01\n" +
+	"\x18sync_session.one_content\x12)only one command result may carry content\x1aXthis.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1\"\xf7\x01\n" +
 	"\x13SyncSessionResponse\x12M\n" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\x04R\n" +
@@ -271,26 +347,37 @@ var file_lindm_agent_v1_session_proto_goTypes = []any{
 	(*SyncSessionResponse)(nil),           // 2: lindm.agent.v1.SyncSessionResponse
 	(AssistancePhase)(0),                  // 3: lindm.agent.v1.AssistancePhase
 	(AssistanceEndCause)(0),               // 4: lindm.agent.v1.AssistanceEndCause
-	(*OSUpdateRebootDeferralRequest)(nil), // 5: lindm.agent.v1.OSUpdateRebootDeferralRequest
-	(*AssistanceDirective)(nil),           // 6: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil),        // 7: lindm.agent.v1.AssistanceLocalSession
-	(*OSUpdateRebootNotice)(nil),          // 8: lindm.agent.v1.OSUpdateRebootNotice
+	(*AssistanceCapabilities)(nil),        // 5: lindm.agent.v1.AssistanceCapabilities
+	(*AssistanceDisplay)(nil),             // 6: lindm.agent.v1.AssistanceDisplay
+	(*AssistanceCommandResult)(nil),       // 7: lindm.agent.v1.AssistanceCommandResult
+	(*AssistancePolicy)(nil),              // 8: lindm.agent.v1.AssistancePolicy
+	(*AssistanceDisplayFrame)(nil),        // 9: lindm.agent.v1.AssistanceDisplayFrame
+	(*OSUpdateRebootDeferralRequest)(nil), // 10: lindm.agent.v1.OSUpdateRebootDeferralRequest
+	(*AssistanceDirective)(nil),           // 11: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil),        // 12: lindm.agent.v1.AssistanceLocalSession
+	(*OSUpdateRebootNotice)(nil),          // 13: lindm.agent.v1.OSUpdateRebootNotice
 }
 var file_lindm_agent_v1_session_proto_depIdxs = []int32{
-	3, // 0: lindm.agent.v1.SessionAssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
-	4, // 1: lindm.agent.v1.SessionAssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	0, // 2: lindm.agent.v1.SyncSessionRequest.reports:type_name -> lindm.agent.v1.SessionAssistanceReport
-	5, // 3: lindm.agent.v1.SyncSessionRequest.reboot_deferral:type_name -> lindm.agent.v1.OSUpdateRebootDeferralRequest
-	6, // 4: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	7, // 5: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	8, // 6: lindm.agent.v1.SyncSessionResponse.reboot:type_name -> lindm.agent.v1.OSUpdateRebootNotice
-	1, // 7: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
-	2, // 8: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
-	8, // [8:9] is the sub-list for method output_type
-	7, // [7:8] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	3,  // 0: lindm.agent.v1.SessionAssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
+	4,  // 1: lindm.agent.v1.SessionAssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	5,  // 2: lindm.agent.v1.SessionAssistanceReport.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
+	6,  // 3: lindm.agent.v1.SessionAssistanceReport.displays:type_name -> lindm.agent.v1.AssistanceDisplay
+	7,  // 4: lindm.agent.v1.SessionAssistanceReport.command_result:type_name -> lindm.agent.v1.AssistanceCommandResult
+	8,  // 5: lindm.agent.v1.SessionAssistanceReport.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	8,  // 6: lindm.agent.v1.SessionAssistanceReport.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	9,  // 7: lindm.agent.v1.SessionAssistanceReport.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
+	0,  // 8: lindm.agent.v1.SyncSessionRequest.reports:type_name -> lindm.agent.v1.SessionAssistanceReport
+	10, // 9: lindm.agent.v1.SyncSessionRequest.reboot_deferral:type_name -> lindm.agent.v1.OSUpdateRebootDeferralRequest
+	11, // 10: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	12, // 11: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	13, // 12: lindm.agent.v1.SyncSessionResponse.reboot:type_name -> lindm.agent.v1.OSUpdateRebootNotice
+	1,  // 13: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
+	2,  // 14: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
+	14, // [14:15] is the sub-list for method output_type
+	13, // [13:14] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_session_proto_init() }

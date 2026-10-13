@@ -934,6 +934,21 @@ async function main() {
       const page = pages[index];
       if (page !== requester) await visit(page, viewerUrl);
       await settle(page);
+      if (await page.getByText("The user allowed viewing only.", { exact: true }).count())
+        report.failures.push(
+          `assistance: ${theme} ${viewport} claims a user viewing-only decision before consent`,
+        );
+      if ((await page.getByRole("region", { name: "Remote screen", exact: true }).count()) !== 1)
+        report.failures.push(
+          `assistance: ${theme} ${viewport} remote screen lacks its named accessible region`,
+        );
+      if (
+        (await page.getByRole("heading", { name: "Clipboard", level: 2, exact: true }).count()) !==
+        1
+      )
+        report.failures.push(
+          `assistance: ${theme} ${viewport} clipboard section skips the page heading hierarchy`,
+        );
       await review(
         page,
         viewerRoute,

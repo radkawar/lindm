@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,12 +33,14 @@ type SessionBus struct {
 }
 
 type busWatch struct {
-	bus     *SessionBus
-	sender  string
-	path    dbus.ObjectPath
-	name    string
-	options []dbus.MatchOption
-	signals chan *dbus.Signal
+	bus          *SessionBus
+	sender       string
+	path         dbus.ObjectPath
+	name         string
+	options      []dbus.MatchOption
+	signals      chan *dbus.Signal
+	overflow     chan struct{}
+	overflowOnce sync.Once
 }
 
 // ConnectSessionBus connects to DBUS_SESSION_BUS_ADDRESS (never an
@@ -100,12 +103,14 @@ func (b *SessionBus) dispatch() {
 	for signal := range b.signals {
 		b.mu.Lock()
 		for watch := range b.watches {
-			if signal.Sender != watch.sender || signal.Name != watch.name || (watch.path != "" && signal.Path != watch.path) {
+			matches := signal.Name == watch.name || (strings.HasSuffix(watch.name, ".") && strings.HasPrefix(signal.Name, watch.name))
+			if signal.Sender != watch.sender || !matches || (watch.path != "" && signal.Path != watch.path) {
 				continue
 			}
 			select {
 			case watch.signals <- signal:
 			default:
+				watch.overflowOnce.Do(func() { close(watch.overflow) })
 			}
 		}
 		b.mu.Unlock()
@@ -129,18 +134,21 @@ func (b *SessionBus) watch(ctx context.Context, sender string, path dbus.ObjectP
 	options := []dbus.MatchOption{
 		dbus.WithMatchSender(sender),
 		dbus.WithMatchInterface(iface),
-		dbus.WithMatchMember(member),
+	}
+	if member != "" {
+		options = append(options, dbus.WithMatchMember(member))
 	}
 	if path != "" {
 		options = append(options, dbus.WithMatchObjectPath(path))
 	}
 	watch := &busWatch{
-		bus:     b,
-		sender:  sender,
-		path:    path,
-		name:    iface + "." + member,
-		options: options,
-		signals: make(chan *dbus.Signal, watchBuffer),
+		bus:      b,
+		sender:   sender,
+		path:     path,
+		name:     iface + "." + member,
+		options:  options,
+		signals:  make(chan *dbus.Signal, watchBuffer),
+		overflow: make(chan struct{}),
 	}
 	b.mu.Lock()
 	b.watches[watch] = struct{}{}

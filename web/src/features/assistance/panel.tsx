@@ -10,7 +10,12 @@ import {
   type AssistanceReadiness,
   type CreateAssistanceSessionRequest,
 } from "../../../gen/lindm/admin/v1/assistance_pb";
-import { AssistanceMode, AssistancePolicy } from "../../../gen/lindm/agent/v1/assistance_pb";
+import {
+  AssistanceEnablement,
+  AssistanceMode,
+  AssistancePolicyMode,
+  AssistancePolicySchema,
+} from "../../../gen/lindm/agent/v1/assistance_pb";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -36,7 +41,8 @@ import { canPermission } from "@/lib/permissions";
 import { REASON_MAX_UNITS } from "@/lib/reason";
 import { adminClient } from "@/lib/rpc";
 import {
-  ASSISTANCE_PERMISSION,
+  ASSISTANCE_CONTROL_PERMISSION,
+  ASSISTANCE_VIEW_PERMISSION,
   AssistanceStateBadge,
   disabledRemedy,
   TimeCell,
@@ -46,7 +52,18 @@ import {
   localSessionText,
   modeLabels,
 } from "./display";
-import { assistanceReadinessQueryOptions, assistanceSessionsQueryOptions } from "./queries";
+import {
+  CapabilityFields,
+  capabilityFields,
+  capabilityPermissions,
+  policyMode,
+} from "./capabilities";
+import { AssistancePolicyDialog } from "./policy";
+import {
+  assistancePolicyQueryOptions,
+  assistanceReadinessQueryOptions,
+  assistanceSessionsQueryOptions,
+} from "./queries";
 import { validateRequest } from "@/lib/validation";
 
 const MAX_DURATION_MINUTES = 30;
@@ -57,7 +74,7 @@ const modeOptions = [
 ] as const;
 
 // Device-detail Remote assistance tab: request form for operators holding
-// remote_assistance.run and the device's assistance history for every reader.
+// remote_assistance.view and the device's assistance history for every reader.
 export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
   const principal = usePrincipal();
   return (
@@ -69,7 +86,10 @@ export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
-        {canPermission(principal, ASSISTANCE_PERMISSION) ? (
+        {canPermission(principal, "remote_assistance.policy.manage") ? (
+          <AssistancePolicyDialog deviceId={deviceId} />
+        ) : null}
+        {canPermission(principal, ASSISTANCE_VIEW_PERMISSION) ? (
           <AssistanceRequest deviceId={deviceId} />
         ) : null}
         <AssistanceHistory deviceId={deviceId} />
@@ -100,7 +120,7 @@ function AssistanceRequest({ deviceId }: { deviceId: string }) {
     return (
       <AssistanceRequestForm
         deviceId={deviceId}
-        policyUnknown={readiness.policy === AssistancePolicy.UNSPECIFIED}
+        policyUnknown={readiness.policy === AssistanceEnablement.UNSPECIFIED}
       />
     );
   return (
@@ -188,6 +208,9 @@ function AssistanceRequestForm({
   policyUnknown: boolean;
 }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
+  const policyQuery = useQuery(assistancePolicyQueryOptions(lifetime, deviceId));
+  const [capabilities, setCapabilities] = useState(() => create(AssistancePolicySchema));
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const id = useId();
@@ -197,11 +220,14 @@ function AssistanceRequestForm({
   const [minutes, setMinutes] = useState(String(MAX_DURATION_MINUTES));
   const locked = exact.busy || exact.ambiguous;
   const precondition = exact.failure ? assistanceFailureMessage(exact.failure) : null;
+  const controlAllowed = canPermission(principal, ASSISTANCE_CONTROL_PERMISSION);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void exact.submit({
       capture: () => {
+        if (mode === AssistanceMode.CONTROL && !controlAllowed)
+          throw new Error("Your role allows viewing only. Choose View screen.");
         const parsed = Number(minutes);
         if (
           minutes.trim() === "" ||
@@ -217,6 +243,22 @@ function AssistanceRequestForm({
           reason: reason.trim(),
           maxDurationSeconds: parsed * 60,
         });
+        request.requestedCapabilities = create(AssistancePolicySchema);
+        for (const field of capabilityFields) {
+          const requested = policyMode(capabilities, field);
+          if (requested !== AssistancePolicyMode.OFF) {
+            if (!policyQuery.data || policyQuery.error)
+              throw new Error("Refresh the assistance policy before requesting extra features.");
+            if (
+              !canPermission(principal, capabilityPermissions[field]) ||
+              requested > policyMode(policyQuery.data.policy, field)
+            )
+              throw new Error(
+                "A requested feature is no longer allowed. Review the assistance policy.",
+              );
+          }
+          request.requestedCapabilities[field] = requested;
+        }
         validateRequest(CreateAssistanceSessionRequestSchema, request);
         return request;
       },
@@ -270,7 +312,7 @@ function AssistanceRequestForm({
             id={`${id}-mode`}
             value={String(mode)}
             disabled={locked}
-            options={modeOptions}
+            options={controlAllowed ? modeOptions : [modeOptions[0]]}
             aria-describedby={`${id}-mode-help`}
             onValueChange={(value) => setMode(Number(value) as AssistanceMode)}
           />
@@ -298,6 +340,31 @@ function AssistanceRequestForm({
           ? "The user can allow keyboard and mouse control, or choose viewing only."
           : "View only: you can see the shared screen, but cannot type or click."}
       </p>
+      {!controlAllowed ? (
+        <p className="text-sm text-muted-foreground">Your role allows viewing only, not control.</p>
+      ) : null}
+      <CapabilityFields
+        value={capabilities}
+        ceiling={policyQuery.error ? undefined : policyQuery.data?.policy}
+        disabled={locked || policyQuery.isPending}
+        onChange={(field, value) =>
+          setCapabilities((current) =>
+            create(AssistancePolicySchema, { ...current, [field]: value }),
+          )
+        }
+      />
+      {policyQuery.error ? (
+        <RpcError failure={toRpcFailure(policyQuery.error)} title="Couldn't load assistance policy">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={policyQuery.isFetching}
+            onClick={() => void policyQuery.refetch()}
+          >
+            Refresh policy
+          </Button>
+        </RpcError>
+      ) : null}
       {exact.invalid ? (
         <p role="alert" className="text-sm text-destructive">
           {exact.invalid}

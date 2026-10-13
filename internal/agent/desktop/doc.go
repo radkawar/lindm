@@ -28,8 +28,26 @@
 //     embedded cursor mode, otherwise the hidden mode is requested. The
 //     metadata mode is never used because the encoder pipeline does not
 //     composite cursor metadata, so on such portals the operator sees no cursor.
-//   - No clipboard, file transfer, audio, recording or session extension.
-//   - Input is limited to absolute pointer motion, the three primary buttons,
-//     discrete wheel steps and keys from a fixed KeyboardEvent.code table; power
-//     and sleep keys are not mapped.
+//   - Tier1 optional capabilities default off and require named directional
+//     product consent, fresh authority, and native portal grants. Clipboard is
+//     explicit bounded UTF-8 text on the same RemoteDesktop session, never a
+//     root/X11/direct-compositor fallback. Setting a selection is not a paste.
+//     Only explicit unsupported/denied clipboard method replies are independent
+//     refusals; cancellation, transport failure and invalid session/state abort.
+//     Both a successful RequestClipboard and Start's exact true grant are needed.
+//   - Typed low-frequency commands have bounded identities/results and never
+//     replay side effects. Text exists only in ephemeral session memory.
+//   - Input distinguishes printable XKB symbols from physical evdev keys. The
+//     pinned public-domain libxkbcommon graphical table supplies canonical legacy
+//     symbols without CGo; action/dead/modifier/keypad aliases remain excluded.
+//     Symbols absent from the active keymap and arbitrary Unicode/IME insertion
+//     are not supported. Monitor switches pause input under a short lock, release
+//     held presses, fence coordinates AND keyboards, and retain one RTP timeline.
+//   - Display-frame witnesses name the first actually emitted post-mapping RTP
+//     timestamp for the exact source/generation. CONTROL also caches/sends this
+//     marker on its existing reliable ordered input channel; VIEW has no data
+//     channel and uses the typed report. A report only exposes a witness matching
+//     its atomically published selection, and end revokes cached publication.
+//   - Operator messages use the bound user's notifier, separate from Stop.
+//     No file transfer, audio, recording, unattended access or session extension.
 package desktop

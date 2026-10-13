@@ -4,6 +4,9 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"image/png"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -378,6 +381,74 @@ func TestGNOME41PortalRowsRejectNewerDialogs(t *testing.T) {
 		}
 		if !portalShareSensitive(img, dialog) {
 			t.Errorf("%s: Share reported insensitive", name)
+		}
+	}
+}
+
+func TestPortalMonitorTilesRequireTwoDistinctChoices(t *testing.T) {
+	dialog := image.Rect(300, 150, 980, 650)
+	img := image.NewRGBA(image.Rect(0, 0, 1280, 800))
+	fill(img, dialog, color.RGBA{250, 250, 250, 255})
+	left, right := image.Rect(360, 390, 620, 395), image.Rect(650, 390, 900, 395)
+	fill(img, left, color.RGBA{204, 204, 204, 255})
+	if _, found := portalMonitorTiles(img, dialog); found {
+		t.Fatal("one monitor was treated as two choices")
+	}
+	fill(img, right, color.RGBA{204, 204, 204, 255})
+	borders, found := portalMonitorTiles(img, dialog)
+	if !found {
+		t.Fatal("two native-style monitor borders not located")
+	}
+	if portalMonitorSelected(img, borders[0]) {
+		t.Fatal("neutral monitor border was treated as consent")
+	}
+	fill(img, left, color.RGBA{30, 90, 220, 255})
+	if !portalMonitorSelected(img, borders[0]) || portalMonitorSelected(img, borders[1]) {
+		t.Fatal("selected monitor state crossed to the other head")
+	}
+	fill(img, right, color.RGBA{30, 90, 220, 255})
+	if !portalMonitorSelected(img, borders[1]) {
+		t.Fatal("second selected border not detected")
+	}
+}
+
+// The real GNOME 50 (Fedora 44 aarch64, fedora44arm-tier1-23) and GNOME 46
+// (Ubuntu 24.04 amd64, ubuntu24-tier1-22) monitors dialogs, cropped to the
+// located dialog: the 15" primary-head tile is wider than the 13" one, carries
+// the top bar under its border, and both borders have rounded corners, so no
+// two rows share both extents.
+func TestPortalMonitorTilesLocateUnequalNativeChoices(t *testing.T) {
+	for _, test := range []struct {
+		file   string
+		dialog image.Rectangle
+		want   [2]image.Rectangle
+	}{
+		{"portal-monitors-fedora44-aarch64-310x166.png", image.Rect(310, 166, 970, 666), [2]image.Rectangle{image.Rect(373, 405, 660, 409), image.Rect(681, 405, 908, 410)}},
+		{"portal-monitors-ubuntu2404-amd64-343x166.png", image.Rect(343, 166, 1003, 666), [2]image.Rectangle{image.Rect(408, 406, 693, 410), image.Rect(714, 406, 939, 411)}},
+	} {
+		file, err := os.Open(filepath.Join("testdata", test.file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := png.Decode(file)
+		if closeErr := file.Close(); err == nil {
+			err = closeErr
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		img := image.NewRGBA(test.dialog)
+		draw.Draw(img, img.Bounds(), decoded, decoded.Bounds().Min, draw.Src)
+		borders, found := portalMonitorTiles(img, test.dialog)
+		if !found || borders != test.want {
+			t.Fatalf("%s: monitor choices = %v %t, want %v", test.file, borders, found, test.want)
+		}
+		if portalMonitorSelected(img, borders[0]) || portalMonitorSelected(img, borders[1]) {
+			t.Fatalf("%s: unselected neutral border treated as consent", test.file)
+		}
+		fill(img, borders[1], color.RGBA{53, 132, 228, 255})
+		if portalMonitorSelected(img, borders[0]) || !portalMonitorSelected(img, borders[1]) {
+			t.Fatalf("%s: selecting the second choice crossed heads", test.file)
 		}
 	}
 }

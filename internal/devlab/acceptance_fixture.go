@@ -21,7 +21,7 @@ import (
 
 // CreateAcceptanceEnrollment issues a distinct browser-owned account through the
 // real account API. Separate engines never borrow an authenticated cookie jar.
-func (f *AuthorityFixture) CreateAcceptanceEnrollment(ctx context.Context, username string) (_ *authv1.AccountEnrollment, resultErr error) {
+func (f *AuthorityFixture) CreateAcceptanceEnrollment(ctx context.Context, username, role string) (_ *authv1.AccountEnrollment, resultErr error) {
 	if f.local == nil || f.ConsoleOrigin == consoleOrigin {
 		return nil, errors.New("acceptance enrollment requires dynamic local console fixture")
 	}
@@ -35,7 +35,7 @@ func (f *AuthorityFixture) CreateAcceptanceEnrollment(ctx context.Context, usern
 		resultErr = errors.Join(resultErr, owner.Close(cleanup))
 	}()
 	enrollment := new(authv1.AccountEnrollment)
-	if err := owner.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: username, Role: "owner"}, enrollment, http.StatusOK); err != nil {
+	if err := owner.localRequest(ctx, "/auth/accounts/create", &authv1.CreateAccountRequest{Username: username, Role: role}, enrollment, http.StatusOK); err != nil {
 		return nil, err
 	}
 	return enrollment, nil

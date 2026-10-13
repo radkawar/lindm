@@ -34,8 +34,8 @@ func NewPionPeers() *PionPeers {
 
 // NewPeer builds a peer connection with ICETransportPolicy relay, mDNS
 // disabled, a send-only VP8 transceiver and, when config.Input is set, the
-// ordered "lindm-input" data channel. Data channels opened by the remote are
-// closed.
+// reliable ordered "lindm-input" data channel. VIEW has no data channel.
+// Channels opened by the remote are closed.
 func (f *PionPeers) NewPeer(config PeerConfig) (Peer, error) {
 	if len(config.ICEServers) == 0 {
 		return nil, errors.New("peer requires relay ICE servers")
@@ -96,6 +96,7 @@ type pionPeer struct {
 	gatherTimeout time.Duration
 	packet        rtp.Packet
 	input         chan []byte
+	frames        displayFrames
 
 	connected     chan struct{}
 	connectedOnce sync.Once
@@ -133,6 +134,7 @@ func (p *pionPeer) setup(codec webrtc.RTPCodecCapability, input bool) error {
 		case webrtc.PeerConnectionStateConnected:
 			p.connectedOnce.Do(func() { close(p.connected) })
 		case webrtc.PeerConnectionStateFailed, webrtc.PeerConnectionStateClosed:
+			p.frames.close()
 			p.failedOnce.Do(func() { close(p.failed) })
 		default:
 		}
@@ -148,6 +150,11 @@ func (p *pionPeer) setup(codec webrtc.RTPCodecCapability, input bool) error {
 	if err != nil {
 		return fmt.Errorf("create input channel: %w", err)
 	}
+	channel.OnOpen(func() {
+		if err := p.frames.open(channel.SendText); err != nil {
+			p.failedOnce.Do(func() { close(p.failed) })
+		}
+	})
 	p.input = make(chan []byte, inputQueueSize)
 	channel.OnMessage(func(message webrtc.DataChannelMessage) {
 		if len(message.Data) == 0 || len(message.Data) > maxInputMessageBytes {
@@ -156,6 +163,9 @@ func (p *pionPeer) setup(codec webrtc.RTPCodecCapability, input bool) error {
 		select {
 		case p.input <- append([]byte(nil), message.Data...):
 		default:
+			// Dropping a release can leave a held key indefinitely. Fail closed
+			// on queue overflow; session cleanup releases all attempted presses.
+			p.failedOnce.Do(func() { close(p.failed) })
 		}
 	})
 	return nil
@@ -194,18 +204,37 @@ func (p *pionPeer) Answer(sdp string) error {
 }
 
 // WriteRTP must be called from a single goroutine; it reuses one packet.
-func (p *pionPeer) WriteRTP(packet []byte) error {
-	if err := p.packet.Unmarshal(packet); err != nil {
-		return fmt.Errorf("parse rtp: %w", err)
+func (p *pionPeer) WriteRTP(packet []byte) (bool, error) {
+	select {
+	case <-p.connected:
+	default:
+		return false, nil
 	}
-	return p.track.WriteRTP(&p.packet)
+	if err := p.packet.Unmarshal(packet); err != nil {
+		return false, fmt.Errorf("parse rtp: %w", err)
+	}
+	if err := p.track.WriteRTP(&p.packet); err != nil {
+		return false, err
+	}
+	return true, nil
 }
+
+func (p *pionPeer) BeginDisplay(display string, generation uint32) error {
+	return p.frames.begin(display, generation)
+}
+
+func (p *pionPeer) PublishDisplayFrame(frame DisplayFrame) error {
+	return p.frames.publish(frame)
+}
+
+func (p *pionPeer) EndDisplayFrames() { p.frames.close() }
 
 func (p *pionPeer) Connected() <-chan struct{} { return p.connected }
 func (p *pionPeer) Failed() <-chan struct{}    { return p.failed }
 func (p *pionPeer) Input() <-chan []byte       { return p.input }
 
 func (p *pionPeer) Close() error {
+	p.frames.close()
 	err := p.pc.Close()
 	<-p.rtcpDone
 	if err != nil {

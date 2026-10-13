@@ -130,7 +130,7 @@ func TestConnectedAuthorityRefusesControllerOperations(t *testing.T) {
 		call func() error
 	}{
 		{"device actions", func() error { _, err := fixture.ConfigureDeviceActions(t.Context()); return err }},
-		{"assistance", func() error { return fixture.ConfigureAssistance(t.Context(), nil) }},
+		{"assistance", func() error { return fixture.ConfigureAssistance(t.Context(), nil, nil) }},
 		{"restart", func() error { return fixture.Restart(t.Context()) }},
 		{"reveal approval", func() error { return fixture.RequireConsoleRevealApproval(t.Context()) }},
 		{"wait", func() error { return fixture.Wait(t.Context()) }},

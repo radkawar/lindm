@@ -10,6 +10,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	"lindm/gen/lindm/admin/v1/adminv1connect"
+
 	"lindm/gen/lindm/device/v1/devicev1connect"
 	"lindm/gen/lindm/enrollment/v1/enrollmentv1connect"
 	"lindm/internal/device/assistance"
@@ -48,8 +49,9 @@ var (
 	_ devicev1connect.DeviceServiceHandler         = (*Service)(nil)
 )
 
-// New composes the device RPC surfaces over one shared core.
-func New(pool *pgxpool.Pool, cfg core.Config) (*Service, error) {
+// New composes the device RPC surfaces over a core owned by this service.
+// Admin and device instances keep separate pools but must share runtime.
+func New(pool *pgxpool.Pool, cfg core.Config, runtime *assistance.Runtime) (*Service, error) {
 	var work *dispatch.Service
 	c, err := core.New(pool, cfg, func(ctx context.Context, tx pgx.Tx, token devicedb.ProvisioningToken, receipt devicedb.ProvisioningEnrollment, assignment *adminv1.CreateProvisioningTokenRequest) error {
 		return work.ActivateProvisioningProfile(ctx, tx, token, receipt, assignment)
@@ -57,11 +59,15 @@ func New(pool *pgxpool.Pool, cfg core.Config) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	support, err := assistance.New(c, runtime)
+	if err != nil {
+		return nil, err
+	}
 	facts, custody := inventory.New(c), secrets.New(c)
 	work = dispatch.New(c, custody, facts)
 	return &Service{
 		Service:           c,
-		assistanceService: assistance.New(c),
+		assistanceService: support,
 		directoryService:  directory.New(c, facts),
 		dispatchService:   work,
 		inventoryService:  facts,

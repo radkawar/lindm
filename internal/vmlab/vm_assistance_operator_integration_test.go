@@ -133,7 +133,7 @@ func TestPersistentAssistanceOperatorAccountsAcrossResume(t *testing.T) {
 	}
 	var firstID, firstUsername string
 	for round := range 2 {
-		username, enrollment, err := createAssistanceOperator(ctx, lane, true)
+		username, enrollment, err := createAssistanceOperator(ctx, lane, true, assistanceOperator, "owner")
 		if err != nil {
 			t.Fatal(err)
 		}

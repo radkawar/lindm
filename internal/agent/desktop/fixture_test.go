@@ -46,12 +46,18 @@ type fakeNotice struct {
 	result       chan string
 	closed       chan struct{}
 	closeOnce    sync.Once
+	updates      chan Notification
 }
 
 func (n *fakeNotice) Result() <-chan string { return n.result }
 
 func (n *fakeNotice) Close(context.Context) error {
 	n.closeOnce.Do(func() { close(n.closed) })
+	return nil
+}
+
+func (n *fakeNotice) Update(_ context.Context, notification Notification) error {
+	n.updates <- notification
 	return nil
 }
 
@@ -84,7 +90,7 @@ func (n *fakeNotifier) ServerName(context.Context) (string, error) {
 }
 
 func (n *fakeNotifier) Notify(_ context.Context, notification Notification) (Notice, error) {
-	notice := &fakeNotice{notification: notification, result: make(chan string, 1), closed: make(chan struct{})}
+	notice := &fakeNotice{notification: notification, result: make(chan string, 1), closed: make(chan struct{}), updates: make(chan Notification, 8)}
 	n.posted <- notice
 	return notice, nil
 }
@@ -107,14 +113,44 @@ func (n *fakeNotifier) next(t *testing.T, summary string) *fakeNotice {
 }
 
 type fakeGrant struct {
-	control  bool
-	closed   chan struct{}
-	mu       sync.Mutex
-	injected []InputEvent
-	closes   int
+	control   bool
+	closed    chan struct{}
+	mu        sync.Mutex
+	injected  []InputEvent
+	closes    int
+	streams   []Stream
+	clipboard bool
+	text      string
+	writes    int
+	selected  string
 }
 
-func (g *fakeGrant) Stream() Stream          { return Stream{NodeID: 42, Width: 1920, Height: 1080} }
+func (g *fakeGrant) Streams() []Stream {
+	if g.streams != nil {
+		return g.streams
+	}
+	return []Stream{{NodeID: 42, ID: "monitor-1", Label: "Monitor 1", Width: 1920, Height: 1080}}
+}
+func (g *fakeGrant) SelectStream(id string) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.selected = id
+	return nil
+}
+func (g *fakeGrant) ClipboardGranted() bool  { return g.clipboard }
+func (g *fakeGrant) ClipboardReason() string { return "" }
+func (g *fakeGrant) KeyboardGranted() bool   { return g.control }
+func (g *fakeGrant) ClipboardWrite(_ context.Context, text string, _ time.Time) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.text, g.writes = text, g.writes+1
+	return nil
+}
+func (g *fakeGrant) ClipboardRead(context.Context) (string, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.text, nil
+}
 func (g *fakeGrant) ControlGranted() bool    { return g.control }
 func (g *fakeGrant) Closed() <-chan struct{} { return g.closed }
 
@@ -143,25 +179,27 @@ func (g *fakeGrant) snapshot() ([]InputEvent, int) {
 }
 
 type fakePortal struct {
-	grant  *fakeGrant
-	err    error
-	block  bool
-	mu     sync.Mutex
-	modes  []agentv1.AssistanceMode
-	opened chan struct{}
+	grant         *fakeGrant
+	grantOverride Grant
+	err           error
+	block         bool
+	mu            sync.Mutex
+	modes         []agentv1.AssistanceMode
+	opened        chan struct{}
 	// refuse maps a mode to the Check result a desktop's portal produces.
 	refuse  map[agentv1.AssistanceMode]error
-	checked []agentv1.AssistanceMode
+	checked []PortalRequest
 }
 
-func (p *fakePortal) Check(_ context.Context, mode agentv1.AssistanceMode) error {
+func (p *fakePortal) Check(_ context.Context, request PortalRequest) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.checked = append(p.checked, mode)
-	return p.refuse[mode]
+	p.checked = append(p.checked, request)
+	return p.refuse[request.Mode]
 }
 
-func (p *fakePortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (Grant, error) {
+func (p *fakePortal) Open(ctx context.Context, request PortalRequest) (Grant, error) {
+	mode := request.Mode
 	p.mu.Lock()
 	p.modes = append(p.modes, mode)
 	p.mu.Unlock()
@@ -174,6 +212,9 @@ func (p *fakePortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (Gra
 	}
 	if p.err != nil {
 		return nil, p.err
+	}
+	if p.grantOverride != nil {
+		return p.grantOverride, nil
 	}
 	return p.grant, nil
 }
@@ -208,8 +249,11 @@ func (c *fakeCapture) Close() error {
 }
 
 type fakeCapturer struct {
-	capture *fakeCapture
-	err     error
+	capture  *fakeCapture
+	err      error
+	captures []*fakeCapture
+	mu       sync.Mutex
+	requests []CaptureRequest
 }
 
 func newFakeCapturer() *fakeCapturer {
@@ -219,11 +263,19 @@ func newFakeCapturer() *fakeCapturer {
 }
 
 func (c *fakeCapturer) Start(_ context.Context, request CaptureRequest) (Capture, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.requests = append(c.requests, request)
 	if request.PipeWire == nil {
 		return nil, errors.New("missing pipewire")
 	}
 	if c.err != nil {
 		return nil, c.err
+	}
+	if len(c.captures) > 0 {
+		capture := c.captures[0]
+		c.captures = c.captures[1:]
+		return capture, nil
 	}
 	return c.capture, nil
 }
@@ -238,6 +290,7 @@ type fakePeer struct {
 	answers   []string
 	written   int
 	closes    int
+	frames    displayFrames
 }
 
 func (p *fakePeer) Offer(context.Context) (string, error) { return p.offer, nil }
@@ -249,12 +302,22 @@ func (p *fakePeer) Answer(sdp string) error {
 	return nil
 }
 
-func (p *fakePeer) WriteRTP([]byte) error {
+func (p *fakePeer) WriteRTP([]byte) (bool, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.written++
-	return nil
+	return true, nil
 }
+
+func (p *fakePeer) BeginDisplay(display string, generation uint32) error {
+	return p.frames.begin(display, generation)
+}
+
+func (p *fakePeer) PublishDisplayFrame(frame DisplayFrame) error {
+	return p.frames.publish(frame)
+}
+
+func (p *fakePeer) EndDisplayFrames() { p.frames.close() }
 
 func (p *fakePeer) Connected() <-chan struct{} { return p.connected }
 func (p *fakePeer) Failed() <-chan struct{}    { return p.failed }
@@ -429,20 +492,28 @@ func localSession() *agentv1.AssistanceLocalSession {
 
 func invitation(mode agentv1.AssistanceMode, consent, ends time.Duration) *agentv1.AssistanceInvitation {
 	now := time.Now()
+	policy := &agentv1.AssistancePolicy{Keyboard: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON}
 	return &agentv1.AssistanceInvitation{
-		SessionId:       testSessionID,
-		Mode:            mode,
-		Reason:          "printer <setup> & drivers",
-		OperatorDisplay: "Olga Operator",
-		ConsentDeadline: timestamppb.New(now.Add(consent)),
-		EndsAt:          timestamppb.New(now.Add(ends)),
-		IceServers:      []*agentv1.AssistanceIceServer{{Urls: []string{"turn:192.0.2.1:3478?transport=udp"}, Username: "u", Credential: "c"}},
+		SessionId:             testSessionID,
+		Mode:                  mode,
+		Reason:                "printer <setup> & drivers",
+		OperatorDisplay:       "Olga Operator",
+		ConsentDeadline:       timestamppb.New(now.Add(consent)),
+		EndsAt:                timestamppb.New(now.Add(ends)),
+		IceServers:            []*agentv1.AssistanceIceServer{{Urls: []string{"turn:192.0.2.1:3478?transport=udp"}, Username: "u", Credential: "c"}},
+		RequestedCapabilities: policy,
+		EffectiveCapabilities: policy,
 	}
 }
 
 // directives returns a responder handing out the given directives.
 func (h *harness) directives(directives ...*agentv1.AssistanceDirective) func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error) {
 	return func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error) {
+		for _, directive := range directives {
+			if directive.AuthorizedUntil == nil {
+				directive.AuthorizedUntil = timestamppb.New(h.clock.Now().Add(25 * time.Second))
+			}
+		}
 		return &agentv1.SyncSessionResponse{Directives: directives, LocalSession: localSession()}, nil
 	}
 }

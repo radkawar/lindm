@@ -14,7 +14,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/agent/v1/assistance.proto.
  */
 export const file_lindm_agent_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZ2VudC92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZ2VudC52MSKFAQoTQXNzaXN0YW5jZUljZVNlcnZlchIwCgR1cmxzGAEgAygJQiK6SB+SARwIARAEIhZyFBiAAjIPXnR1cm5zPzpbXlxzXSskEhwKCHVzZXJuYW1lGAIgASgJQgq6SAdyBRABGIACEh4KCmNyZWRlbnRpYWwYAyABKAlCCrpIB3IFEAEYgAIirAMKFEFzc2lzdGFuY2VJbnZpdGF0aW9uEhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEjgKBG1vZGUYAiABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYARIkChBvcGVyYXRvcl9kaXNwbGF5GAQgASgJQgq6SAdyBRABGIACEjwKEGNvbnNlbnRfZGVhZGxpbmUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESMwoHZW5kc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJCCg90YXJnZXRfdXNlcm5hbWUYByABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kEkQKC2ljZV9zZXJ2ZXJzGAggAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUljZVNlcnZlckIKukgHkgEECAEQBCLQAQoTQXNzaXN0YW5jZURpcmVjdGl2ZRJACgppbnZpdGF0aW9uGAEgASgLMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUludml0YXRpb25CBrpIA8gBARIdCgphbnN3ZXJfc2RwGAIgASgJQgm6SAZyBBiAgAESEQoJdGVybWluYXRlGAMgASgIEkUKD3Rlcm1pbmF0ZV9jYXVzZRgEIAEoDjIiLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmRDYXVzZUIIukgFggECEAEi5wEKFkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SOAoIdXNlcm5hbWUYASABKAlCJrpII3IhMh9eW2EtekEtWl9dW2EtekEtWjAtOV8uLV17MCwzMX0kEgsKA3VpZBgCIAEoDRI3ChFsb2dpbmRfc2Vzc2lvbl9pZBgDIAEoCUIcukgZchcQARhAMhFeW0EtWmEtejAtOV8uLV0rJBIpCgxzZXNzaW9uX3R5cGUYBCABKAlCE7pIEHIOUgd3YXlsYW5kUgN4MTESIgoHZGVza3RvcBgFIAEoCUIRukgOcgwYQDIIXlsgLX5dKiQihQUKEEFzc2lzdGFuY2VSZXBvcnQSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESOgoFcGhhc2UYAiABKA4yHy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUGhhc2VCCrpIB4IBBBABIAASHAoJb2ZmZXJfc2RwGAMgASgJQgm6SAZyBBiAgAESFwoPY29udHJvbF9ncmFudGVkGAQgASgIEj8KCWVuZF9jYXVzZRgFIAEoDjIiLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmRDYXVzZUIIukgFggECEAESJgoKZW5kX2RldGFpbBgGIAEoCUISukgPcg0YgAIyCF5bIC1+XSokEj0KDWxvY2FsX3Nlc3Npb24YByABKAsyJi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTG9jYWxTZXNzaW9uOrcCukizAhrBAQoXYXNzaXN0YW5jZV9yZXBvcnQub2ZmZXISN29mZmVyX3NkcCBpcyByZXF1aXJlZCBmcm9tIE9GRkVSRUQgYW5kIGFic2VudCBiZWZvcmUgaXQabSh0aGlzLnBoYXNlID09IDMgfHwgdGhpcy5waGFzZSA9PSA0KSA/IHRoaXMub2ZmZXJfc2RwICE9ICcnIDogKHRoaXMucGhhc2UgIT0gNSA/IHRoaXMub2ZmZXJfc2RwID09ICcnIDogdHJ1ZSkabQoVYXNzaXN0YW5jZV9yZXBvcnQuZW5kEihlbmRfY2F1c2UgaXMgcmVxdWlyZWQgZXhhY3RseSB3aGVuIEVOREVEGioodGhpcy5waGFzZSA9PSA1KSA9PSAodGhpcy5lbmRfY2F1c2UgIT0gMCkiWgoVU3luY0Fzc2lzdGFuY2VSZXF1ZXN0EkEKCmRpcmVjdGl2ZXMYASADKAsyIy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRGlyZWN0aXZlQgi6SAWSAQIQCCKRAQoWU3luY0Fzc2lzdGFuY2VSZXNwb25zZRI7CgdyZXBvcnRzGAEgAygLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVJlcG9ydEIIukgFkgECEAgSOgoGcG9saWN5GAIgASgOMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeUIIukgFggECEAEiWgoWUmVtb3RlQXNzaXN0YW5jZUNvbmZpZxIPCgdlbmFibGVkGAEgASgIEi8KGXNlc3Npb25fcnVudGltZV9kaXJlY3RvcnkYAiABKAlCDLpICdgBAXIEkLUYASpoCg5Bc3Npc3RhbmNlTW9kZRIfChtBU1NJU1RBTkNFX01PREVfVU5TUEVDSUZJRUQQABIYChRBU1NJU1RBTkNFX01PREVfVklFVxABEhsKF0FTU0lTVEFOQ0VfTU9ERV9DT05UUk9MEAIqxwEKD0Fzc2lzdGFuY2VQaGFzZRIgChxBU1NJU1RBTkNFX1BIQVNFX1VOU1BFQ0lGSUVEEAASHAoYQVNTSVNUQU5DRV9QSEFTRV9QRU5ESU5HEAESHQoZQVNTSVNUQU5DRV9QSEFTRV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfUEhBU0VfT0ZGRVJFRBADEhsKF0FTU0lTVEFOQ0VfUEhBU0VfQUNUSVZFEAQSGgoWQVNTSVNUQU5DRV9QSEFTRV9FTkRFRBAFKsQEChJBc3Npc3RhbmNlRW5kQ2F1c2USJAogQVNTSVNUQU5DRV9FTkRfQ0FVU0VfVU5TUEVDSUZJRUQQABIhCh1BU1NJU1RBTkNFX0VORF9DQVVTRV9ERUNMSU5FRBABEigKJEFTU0lTVEFOQ0VfRU5EX0NBVVNFX0NPTlNFTlRfVElNRU9VVBACEikKJUFTU0lTVEFOQ0VfRU5EX0NBVVNFX09QRVJBVE9SX1NUT1BQRUQQAxIlCiFBU1NJU1RBTkNFX0VORF9DQVVTRV9VU0VSX1NUT1BQRUQQBBImCiJBU1NJU1RBTkNFX0VORF9DQVVTRV9QT1JUQUxfQ0xPU0VEEAUSJwojQVNTSVNUQU5DRV9FTkRfQ0FVU0VfU0VTU0lPTl9MT0NLRUQQBhImCiJBU1NJU1RBTkNFX0VORF9DQVVTRV9TRVNTSU9OX0VOREVEEAcSIAocQVNTSVNUQU5DRV9FTkRfQ0FVU0VfRVhQSVJFRBAIEisKJ0FTU0lTVEFOQ0VfRU5EX0NBVVNFX0FVVEhPUklaQVRJT05fTE9TVBAJEiwKKEFTU0lTVEFOQ0VfRU5EX0NBVVNFX05PX0VMSUdJQkxFX1NFU1NJT04QChIkCiBBU1NJU1RBTkNFX0VORF9DQVVTRV9VTkFWQUlMQUJMRRALEioKJkFTU0lTVEFOQ0VfRU5EX0NBVVNFX0NPTk5FQ1RJT05fRkFJTEVEEAwSIQodQVNTSVNUQU5DRV9FTkRfQ0FVU0VfRElTQUJMRUQQDSp0ChBBc3Npc3RhbmNlUG9saWN5EiEKHUFTU0lTVEFOQ0VfUE9MSUNZX1VOU1BFQ0lGSUVEEAASHQoZQVNTSVNUQU5DRV9QT0xJQ1lfRU5BQkxFRBABEh4KGkFTU0lTVEFOQ0VfUE9MSUNZX0RJU0FCTEVEEAJCIlogbGluZG0vZ2VuL2xpbmRtL2FnZW50L3YxO2FnZW50djFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZ2VudC92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZ2VudC52MSKFAQoTQXNzaXN0YW5jZUljZVNlcnZlchIwCgR1cmxzGAEgAygJQiK6SB+SARwIARAEIhZyFBiAAjIPXnR1cm5zPzpbXlxzXSskEhwKCHVzZXJuYW1lGAIgASgJQgq6SAdyBRABGIACEh4KCmNyZWRlbnRpYWwYAyABKAlCCrpIB3IFEAEYgAIisAQKFEFzc2lzdGFuY2VJbnZpdGF0aW9uEhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEjgKBG1vZGUYAiABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YAyABKAlCCbpIBnIEmLUYARIkChBvcGVyYXRvcl9kaXNwbGF5GAQgASgJQgq6SAdyBRABGIACEjwKEGNvbnNlbnRfZGVhZGxpbmUYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wQga6SAPIAQESMwoHZW5kc19hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBCBrpIA8gBARJCCg90YXJnZXRfdXNlcm5hbWUYByABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kEkQKC2ljZV9zZXJ2ZXJzGAggAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUljZVNlcnZlckIKukgHkgEECAEQBBJAChZyZXF1ZXN0ZWRfY2FwYWJpbGl0aWVzGAkgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJAChZlZmZlY3RpdmVfY2FwYWJpbGl0aWVzGAogASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeSLhBAoTQXNzaXN0YW5jZURpcmVjdGl2ZRJACgppbnZpdGF0aW9uGAEgASgLMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUludml0YXRpb25CBrpIA8gBARIdCgphbnN3ZXJfc2RwGAIgASgJQgm6SAZyBCiAgAESEQoJdGVybWluYXRlGAMgASgIEkUKD3Rlcm1pbmF0ZV9jYXVzZRgEIAEoDjIiLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmRDYXVzZUIIukgFggECEAESMgoHY29tbWFuZBgFIAEoCzIhLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDb21tYW5kEjQKEGF1dGhvcml6ZWRfdW50aWwYBiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wOqQCukigAhqIAQomYXNzaXN0YW5jZV9kaXJlY3RpdmUub3BlcmF0b3JfZGVhZGxpbmUSMGxpdmUgZGlyZWN0aXZlcyByZXF1aXJlIGZyZXNoIG9wZXJhdG9yIGF1dGhvcml0eRosdGhpcy50ZXJtaW5hdGUgfHwgaGFzKHRoaXMuYXV0aG9yaXplZF91bnRpbCkakgEKJWFzc2lzdGFuY2VfZGlyZWN0aXZlLmNvbW1hbmRfZGVhZGxpbmUSN2EgZGVsaXZlcmVkIGNvbW1hbmQgcmVxdWlyZXMgaXRzIHNlcnZlci1pc3N1ZWQgZGVhZGxpbmUaMCFoYXModGhpcy5jb21tYW5kKSB8fCBoYXModGhpcy5jb21tYW5kLmRlYWRsaW5lKSLnAQoWQXNzaXN0YW5jZUxvY2FsU2Vzc2lvbhI4Cgh1c2VybmFtZRgBIAEoCUImukgjciEyH15bYS16QS1aX11bYS16QS1aMC05Xy4tXXswLDMxfSQSCwoDdWlkGAIgASgNEjcKEWxvZ2luZF9zZXNzaW9uX2lkGAMgASgJQhy6SBlyFxABGEAyEV5bQS1aYS16MC05Xy4tXSskEikKDHNlc3Npb25fdHlwZRgEIAEoCUITukgQcg5SB3dheWxhbmRSA3gxMRIiCgdkZXNrdG9wGAUgASgJQhG6SA5yDBhAMgheWyAtfl0qJCKZDQoQQXNzaXN0YW5jZVJlcG9ydBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABARI6CgVwaGFzZRgCIAEoDjIfLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQaGFzZUIKukgHggEEEAEgABIcCglvZmZlcl9zZHAYAyABKAlCCbpIBnIEKICAARIXCg9jb250cm9sX2dyYW50ZWQYBCABKAgSPwoJZW5kX2NhdXNlGAUgASgOMiIubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUVuZENhdXNlQgi6SAWCAQIQARImCgplbmRfZGV0YWlsGAYgASgJQhK6SA9yDRiAAjIIXlsgLX5dKiQSPQoNbG9jYWxfc2Vzc2lvbhgHIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SRAoUZ3JhbnRlZF9jYXBhYmlsaXRpZXMYCCABKAsyJi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ2FwYWJpbGl0aWVzEj0KCGRpc3BsYXlzGAkgAygLMiEubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpc3BsYXlCCLpIBZIBAhAIEiQKE3NlbGVjdGVkX2Rpc3BsYXlfaWQYCiABKAlCB7pIBHICGEASPwoOY29tbWFuZF9yZXN1bHQYCyABKAsyJy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ29tbWFuZFJlc3VsdBIaChJkaXNwbGF5X2dlbmVyYXRpb24YDCABKA0SQAoWcmVxdWVzdGVkX2NhcGFiaWxpdGllcxgNIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSQAoWZWZmZWN0aXZlX2NhcGFiaWxpdGllcxgOIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSPQoNZGlzcGxheV9mcmFtZRgPIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VEaXNwbGF5RnJhbWU6gAe6SPwGGsEBChdhc3Npc3RhbmNlX3JlcG9ydC5vZmZlchI3b2ZmZXJfc2RwIGlzIHJlcXVpcmVkIGZyb20gT0ZGRVJFRCBhbmQgYWJzZW50IGJlZm9yZSBpdBptKHRoaXMucGhhc2UgPT0gMyB8fCB0aGlzLnBoYXNlID09IDQpID8gdGhpcy5vZmZlcl9zZHAgIT0gJycgOiAodGhpcy5waGFzZSAhPSA1ID8gdGhpcy5vZmZlcl9zZHAgPT0gJycgOiB0cnVlKRptChVhc3Npc3RhbmNlX3JlcG9ydC5lbmQSKGVuZF9jYXVzZSBpcyByZXF1aXJlZCBleGFjdGx5IHdoZW4gRU5ERUQaKih0aGlzLnBoYXNlID09IDUpID09ICh0aGlzLmVuZF9jYXVzZSAhPSAwKRrgAQogYXNzaXN0YW5jZV9yZXBvcnQuY29tbWFuZF9yZXN1bHQSRWNvbW1hbmQgcmVwb3J0cyBhcmUgdGVybWluYWwgYW5kIGVuZGVkIHNlc3Npb25zIGNhbm5vdCByZXRhaW4gY29udGVudBp1IWhhcyh0aGlzLmNvbW1hbmRfcmVzdWx0KSB8fCAodGhpcy5jb21tYW5kX3Jlc3VsdC5zdGF0dXMgIT0gMSAmJiAodGhpcy5waGFzZSAhPSA1IHx8IHRoaXMuY29tbWFuZF9yZXN1bHQudGV4dCA9PSAnJykpGuMCCh9hc3Npc3RhbmNlX3JlcG9ydC5kaXNwbGF5X2ZyYW1lEkBmcmFtZSBpZGVudGl0eSBtdXN0IG5hbWUgdGhlIGN1cnJlbnRseSBzaGFyZWQgZGlzcGxheSBnZW5lcmF0aW9uGv0BIWhhcyh0aGlzLmRpc3BsYXlfZnJhbWUpIHx8ICgodGhpcy5waGFzZSA9PSAzIHx8IHRoaXMucGhhc2UgPT0gNCkgJiYgdGhpcy5kaXNwbGF5X2ZyYW1lLmRpc3BsYXlfaWQgPT0gdGhpcy5zZWxlY3RlZF9kaXNwbGF5X2lkICYmIHRoaXMuZGlzcGxheV9mcmFtZS5nZW5lcmF0aW9uID09IHRoaXMuZGlzcGxheV9nZW5lcmF0aW9uICYmIHRoaXMuZGlzcGxheXMuZXhpc3RzKGQsIGQuaWQgPT0gdGhpcy5kaXNwbGF5X2ZyYW1lLmRpc3BsYXlfaWQpKSLsAQoVU3luY0Fzc2lzdGFuY2VSZXF1ZXN0EkEKCmRpcmVjdGl2ZXMYASADKAsyIy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRGlyZWN0aXZlQgi6SAWSAQIQCDqPAbpIiwEaiAEKI3N5bmNfYXNzaXN0YW5jZV9yZXF1ZXN0Lm9uZV9jb21tYW5kEipvbmx5IG9uZSBkZXZpY2UgY29tbWFuZCBtYXkgYmUgb3V0c3RhbmRpbmcaNXRoaXMuZGlyZWN0aXZlcy5maWx0ZXIoZCwgaGFzKGQuY29tbWFuZCkpLnNpemUoKSA8PSAxItECChZTeW5jQXNzaXN0YW5jZVJlc3BvbnNlEjsKB3JlcG9ydHMYASADKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUmVwb3J0Qgi6SAWSAQIQCBI+CgZwb2xpY3kYAiABKA4yJC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5hYmxlbWVudEIIukgFggECEAE6uQG6SLUBGrIBCiRzeW5jX2Fzc2lzdGFuY2VfcmVzcG9uc2Uub25lX2NvbnRlbnQSMG9ubHkgb25lIGRldmljZSBjb21tYW5kIHJlc3VsdCBtYXkgY2FycnkgY29udGVudBpYdGhpcy5yZXBvcnRzLmZpbHRlcihyLCBoYXMoci5jb21tYW5kX3Jlc3VsdCkgJiYgci5jb21tYW5kX3Jlc3VsdC50ZXh0ICE9ICcnKS5zaXplKCkgPD0gMSKUAQoWUmVtb3RlQXNzaXN0YW5jZUNvbmZpZxIPCgdlbmFibGVkGAEgASgIEi8KGXNlc3Npb25fcnVudGltZV9kaXJlY3RvcnkYAiABKAlCDLpICdgBAXIEkLUYARI4Cg5wb2xpY3lfY2VpbGluZxgDIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kimgIKEEFzc2lzdGFuY2VQb2xpY3kSQQoJY2xpcGJvYXJkGAEgASgOMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeU1vZGVCCLpIBYIBAhABEkAKCGtleWJvYXJkGAIgASgOMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeU1vZGVCCLpIBYIBAhABEj8KB2Rpc3BsYXkYAyABKA4yJC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5TW9kZUIIukgFggECEAESQAoIbWVzc2FnZXMYBCABKA4yJC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5TW9kZUIIukgFggECEAEiigIKFkFzc2lzdGFuY2VDYXBhYmlsaXRpZXMSMAoGcG9saWN5GAEgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRIvChBjbGlwYm9hcmRfcmVhc29uGAIgASgJQhW6SBJyEBhAMgxeW2EtejAtOV9dKiQSLgoPa2V5Ym9hcmRfcmVhc29uGAMgASgJQhW6SBJyEBhAMgxeW2EtejAtOV9dKiQSLQoOZGlzcGxheV9yZWFzb24YBCABKAlCFbpIEnIQGEAyDF5bYS16MC05X10qJBIuCg9tZXNzYWdlc19yZWFzb24YBSABKAlCFbpIEnIQGEAyDF5bYS16MC05X10qJCKRAQoRQXNzaXN0YW5jZURpc3BsYXkSKAoCaWQYASABKAlCHLpIGXIXEAEoQDIRXltBLVphLXowLTlfLi1dKyQSGQoFbGFiZWwYAiABKAlCCrpIB3IFEAEogAESGgoFd2lkdGgYAyABKA1CC7pICCoGGICAASAAEhsKBmhlaWdodBgEIAEoDUILukgIKgYYgIABIAAifgoWQXNzaXN0YW5jZURpc3BsYXlGcmFtZRIwCgpkaXNwbGF5X2lkGAEgASgJQhy6SBlyFxABKEAyEV5bQS1aYS16MC05Xy4tXSskEhsKCmdlbmVyYXRpb24YAiABKA1CB7pIBCoCIAASFQoNcnRwX3RpbWVzdGFtcBgDIAEoDSKRBQoRQXNzaXN0YW5jZUNvbW1hbmQSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARI/CgRraW5kGAIgASgOMiUubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUNvbW1hbmRLaW5kQgq6SAeCAQQQASAAEiwKCGRlYWRsaW5lGAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCgR0ZXh0GAQgASgJQgm6SAZyBCiAgAESQwoLc3BlY2lhbF9rZXkYBSABKA4yJC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlU3BlY2lhbEtleUIIukgFggECEAESLgoKZGlzcGxheV9pZBgGIAEoCUIaukgXchUYQDIRXltBLVphLXowLTlfLi1dKiQ6ugK6SLYCGrMCChphc3Npc3RhbmNlX2NvbW1hbmQucGF5bG9hZBIjcGF5bG9hZCBtdXN0IG1hdGNoIHRoZSBjb21tYW5kIGtpbmQa7wEoKHRoaXMua2luZCA9PSAxIHx8IHRoaXMua2luZCA9PSA1KSB8fCB0aGlzLnRleHQgPT0gJycpICYmICgodGhpcy5raW5kID09IDMpID09ICh0aGlzLnNwZWNpYWxfa2V5ICE9IDApKSAmJiAoKHRoaXMua2luZCA9PSA0KSA9PSAodGhpcy5kaXNwbGF5X2lkICE9ICcnKSkgJiYgKHRoaXMua2luZCAhPSA1IHx8IChzaXplKGJ5dGVzKHRoaXMudGV4dCkpID4gMCAmJiBzaXplKGJ5dGVzKHRoaXMudGV4dCkpIDw9IDIwNDgpKSLjBgoXQXNzaXN0YW5jZUNvbW1hbmRSZXN1bHQSHAoKcmVxdWVzdF9pZBgBIAEoCUIIukgFcgOwAQESPwoEa2luZBgCIAEoDjIlLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDb21tYW5kS2luZEIKukgHggEEEAEgABJDCgZzdGF0dXMYAyABKA4yJy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ29tbWFuZFN0YXR1c0IKukgHggEEEAEgABLgAgoGcmVhc29uGAQgASgJQs8CukjLAnLIAlIAUhljb21tYW5kX2lkZW50aXR5X2NvbmZsaWN0UhZjb21tYW5kX3Jlc3VsdF9leHBpcmVkUhVzZXNzaW9uX2NvbW1hbmRfbGltaXRSD2NvbnRlbnRfZXhwaXJlZFINc2Vzc2lvbl9lbmRlZFITY29tbWFuZF9ub3RfZ3JhbnRlZFIYY29tbWFuZF9kZWFkbGluZV9yZWFjaGVkUhdjbGlwYm9hcmRfc2VsZWN0aW9uX3NldFITY2xpcGJvYXJkX3RleHRfcmVhZFIRc3BlY2lhbF9rZXlzX3NlbnRSEGRpc3BsYXlfc2VsZWN0ZWRSDm1lc3NhZ2VfcG9zdGVkUhNjb21tYW5kX3Vuc3VwcG9ydGVkUg5jb21tYW5kX2ZhaWxlZFISY29tbWFuZF9zdGF0ZV9sb3N0Ug9jb21tYW5kX2V4cGlyZWQSFwoEdGV4dBgFIAEoCUIJukgGcgQogIABEjAKDGNvbXBsZXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXA69QG6SPEBGu4BCiFhc3Npc3RhbmNlX2NvbW1hbmRfcmVzdWx0LmNvbnRlbnQSXG9ubHkgYSBzdWNjZXNzZnVsIGNsaXBib2FyZCByZWFkIG1heSBjYXJyeSBjb250ZW50OyB0ZXJtaW5hbCByZXN1bHRzIHJlcXVpcmUgY29tcGxldGlvbiB0aW1lGmsodGhpcy50ZXh0ID09ICcnIHx8ICh0aGlzLmtpbmQgPT0gMiAmJiB0aGlzLnN0YXR1cyA9PSAyKSkgJiYgKCh0aGlzLnN0YXR1cyAhPSAxKSA9PSBoYXModGhpcy5jb21wbGV0ZWRfYXQpKSpoCg5Bc3Npc3RhbmNlTW9kZRIfChtBU1NJU1RBTkNFX01PREVfVU5TUEVDSUZJRUQQABIYChRBU1NJU1RBTkNFX01PREVfVklFVxABEhsKF0FTU0lTVEFOQ0VfTU9ERV9DT05UUk9MEAIqxwEKD0Fzc2lzdGFuY2VQaGFzZRIgChxBU1NJU1RBTkNFX1BIQVNFX1VOU1BFQ0lGSUVEEAASHAoYQVNTSVNUQU5DRV9QSEFTRV9QRU5ESU5HEAESHQoZQVNTSVNUQU5DRV9QSEFTRV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfUEhBU0VfT0ZGRVJFRBADEhsKF0FTU0lTVEFOQ0VfUEhBU0VfQUNUSVZFEAQSGgoWQVNTSVNUQU5DRV9QSEFTRV9FTkRFRBAFKsQEChJBc3Npc3RhbmNlRW5kQ2F1c2USJAogQVNTSVNUQU5DRV9FTkRfQ0FVU0VfVU5TUEVDSUZJRUQQABIhCh1BU1NJU1RBTkNFX0VORF9DQVVTRV9ERUNMSU5FRBABEigKJEFTU0lTVEFOQ0VfRU5EX0NBVVNFX0NPTlNFTlRfVElNRU9VVBACEikKJUFTU0lTVEFOQ0VfRU5EX0NBVVNFX09QRVJBVE9SX1NUT1BQRUQQAxIlCiFBU1NJU1RBTkNFX0VORF9DQVVTRV9VU0VSX1NUT1BQRUQQBBImCiJBU1NJU1RBTkNFX0VORF9DQVVTRV9QT1JUQUxfQ0xPU0VEEAUSJwojQVNTSVNUQU5DRV9FTkRfQ0FVU0VfU0VTU0lPTl9MT0NLRUQQBhImCiJBU1NJU1RBTkNFX0VORF9DQVVTRV9TRVNTSU9OX0VOREVEEAcSIAocQVNTSVNUQU5DRV9FTkRfQ0FVU0VfRVhQSVJFRBAIEisKJ0FTU0lTVEFOQ0VfRU5EX0NBVVNFX0FVVEhPUklaQVRJT05fTE9TVBAJEiwKKEFTU0lTVEFOQ0VfRU5EX0NBVVNFX05PX0VMSUdJQkxFX1NFU1NJT04QChIkCiBBU1NJU1RBTkNFX0VORF9DQVVTRV9VTkFWQUlMQUJMRRALEioKJkFTU0lTVEFOQ0VfRU5EX0NBVVNFX0NPTk5FQ1RJT05fRkFJTEVEEAwSIQodQVNTSVNUQU5DRV9FTkRfQ0FVU0VfRElTQUJMRUQQDSqEAQoUQXNzaXN0YW5jZUVuYWJsZW1lbnQSJQohQVNTSVNUQU5DRV9FTkFCTEVNRU5UX1VOU1BFQ0lGSUVEEAASIQodQVNTSVNUQU5DRV9FTkFCTEVNRU5UX0VOQUJMRUQQARIiCh5BU1NJU1RBTkNFX0VOQUJMRU1FTlRfRElTQUJMRUQQAiqhAQoUQXNzaXN0YW5jZVBvbGljeU1vZGUSJgoiQVNTSVNUQU5DRV9QT0xJQ1lfTU9ERV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfUE9MSUNZX01PREVfT0ZGEAESIgoeQVNTSVNUQU5DRV9QT0xJQ1lfTU9ERV9MSU1JVEVEEAISHQoZQVNTSVNUQU5DRV9QT0xJQ1lfTU9ERV9PThADKpQCChVBc3Npc3RhbmNlQ29tbWFuZEtpbmQSJwojQVNTSVNUQU5DRV9DT01NQU5EX0tJTkRfVU5TUEVDSUZJRUQQABIrCidBU1NJU1RBTkNFX0NPTU1BTkRfS0lORF9DTElQQk9BUkRfV1JJVEUQARIqCiZBU1NJU1RBTkNFX0NPTU1BTkRfS0lORF9DTElQQk9BUkRfUkVBRBACEigKJEFTU0lTVEFOQ0VfQ09NTUFORF9LSU5EX1NQRUNJQUxfS0VZUxADEioKJkFTU0lTVEFOQ0VfQ09NTUFORF9LSU5EX1NFTEVDVF9ESVNQTEFZEAQSIwofQVNTSVNUQU5DRV9DT01NQU5EX0tJTkRfTUVTU0FHRRAFKukBChRBc3Npc3RhbmNlU3BlY2lhbEtleRImCiJBU1NJU1RBTkNFX1NQRUNJQUxfS0VZX1VOU1BFQ0lGSUVEEAASKAokQVNTSVNUQU5DRV9TUEVDSUFMX0tFWV9TV0lUQ0hfV0lORE9XEAESLAooQVNTSVNUQU5DRV9TUEVDSUFMX0tFWV9TSE9XX0FQUExJQ0FUSU9OUxACEigKJEFTU0lTVEFOQ0VfU1BFQ0lBTF9LRVlfT1BFTl9URVJNSU5BTBADEicKI0FTU0lTVEFOQ0VfU1BFQ0lBTF9LRVlfQ0xPU0VfV0lORE9XEAQqigIKF0Fzc2lzdGFuY2VDb21tYW5kU3RhdHVzEikKJUFTU0lTVEFOQ0VfQ09NTUFORF9TVEFUVVNfVU5TUEVDSUZJRUQQABIlCiFBU1NJU1RBTkNFX0NPTU1BTkRfU1RBVFVTX1BFTkRJTkcQARInCiNBU1NJU1RBTkNFX0NPTU1BTkRfU1RBVFVTX1NVQ0NFRURFRBACEiQKIEFTU0lTVEFOQ0VfQ09NTUFORF9TVEFUVVNfRkFJTEVEEAMSJwojQVNTSVNUQU5DRV9DT01NQU5EX1NUQVRVU19DQU5DRUxMRUQQBBIlCiFBU1NJU1RBTkNFX0NPTU1BTkRfU1RBVFVTX0VYUElSRUQQBUIiWiBsaW5kbS9nZW4vbGluZG0vYWdlbnQvdjE7YWdlbnR2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.agent.v1.AssistanceIceServer
@@ -96,6 +96,16 @@ export type AssistanceInvitation = Message<"lindm.agent.v1.AssistanceInvitation"
    * @generated from field: repeated lindm.agent.v1.AssistanceIceServer ice_servers = 8;
    */
   iceServers: AssistanceIceServer[];
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy requested_capabilities = 9;
+   */
+  requestedCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy effective_capabilities = 10;
+   */
+  effectiveCapabilities?: AssistancePolicy | undefined;
 };
 
 /**
@@ -131,6 +141,18 @@ export type AssistanceDirective = Message<"lindm.agent.v1.AssistanceDirective"> 
    * @generated from field: lindm.agent.v1.AssistanceEndCause terminate_cause = 4;
    */
   terminateCause: AssistanceEndCause;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommand command = 5;
+   */
+  command?: AssistanceCommand | undefined;
+
+  /**
+   * Absolute fresh operator authority bound; polling never extends it.
+   *
+   * @generated from field: google.protobuf.Timestamp authorized_until = 6;
+   */
+  authorizedUntil?: Timestamp | undefined;
 };
 
 /**
@@ -221,6 +243,46 @@ export type AssistanceReport = Message<"lindm.agent.v1.AssistanceReport"> & {
    * @generated from field: lindm.agent.v1.AssistanceLocalSession local_session = 7;
    */
   localSession?: AssistanceLocalSession | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCapabilities granted_capabilities = 8;
+   */
+  grantedCapabilities?: AssistanceCapabilities | undefined;
+
+  /**
+   * @generated from field: repeated lindm.agent.v1.AssistanceDisplay displays = 9;
+   */
+  displays: AssistanceDisplay[];
+
+  /**
+   * @generated from field: string selected_display_id = 10;
+   */
+  selectedDisplayId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommandResult command_result = 11;
+   */
+  commandResult?: AssistanceCommandResult | undefined;
+
+  /**
+   * @generated from field: uint32 display_generation = 12;
+   */
+  displayGeneration: number;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy requested_capabilities = 13;
+   */
+  requestedCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy effective_capabilities = 14;
+   */
+  effectiveCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceDisplayFrame display_frame = 15;
+   */
+  displayFrame?: AssistanceDisplayFrame | undefined;
 };
 
 /**
@@ -259,9 +321,9 @@ export type SyncAssistanceResponse = Message<"lindm.agent.v1.SyncAssistanceRespo
   /**
    * The executor's applied RemoteAssistanceConfig, reported on every sync.
    *
-   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 2;
+   * @generated from field: lindm.agent.v1.AssistanceEnablement policy = 2;
    */
-  policy: AssistancePolicy;
+  policy: AssistanceEnablement;
 };
 
 /**
@@ -289,6 +351,13 @@ export type RemoteAssistanceConfig = Message<"lindm.agent.v1.RemoteAssistanceCon
    * @generated from field: string session_runtime_directory = 2;
    */
   sessionRuntimeDirectory: string;
+
+  /**
+   * Absent or UNSPECIFIED fields deny optional capabilities.
+   *
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy_ceiling = 3;
+   */
+  policyCeiling?: AssistancePolicy | undefined;
 };
 
 /**
@@ -297,6 +366,227 @@ export type RemoteAssistanceConfig = Message<"lindm.agent.v1.RemoteAssistanceCon
  */
 export const RemoteAssistanceConfigSchema: GenMessage<RemoteAssistanceConfig> = /*@__PURE__*/
   messageDesc(file_lindm_agent_v1_assistance, 7);
+
+/**
+ * @generated from message lindm.agent.v1.AssistancePolicy
+ */
+export type AssistancePolicy = Message<"lindm.agent.v1.AssistancePolicy"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicyMode clipboard = 1;
+   */
+  clipboard: AssistancePolicyMode;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicyMode keyboard = 2;
+   */
+  keyboard: AssistancePolicyMode;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicyMode display = 3;
+   */
+  display: AssistancePolicyMode;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicyMode messages = 4;
+   */
+  messages: AssistancePolicyMode;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistancePolicy.
+ * Use `create(AssistancePolicySchema)` to create a new message.
+ */
+export const AssistancePolicySchema: GenMessage<AssistancePolicy> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 8);
+
+/**
+ * @generated from message lindm.agent.v1.AssistanceCapabilities
+ */
+export type AssistanceCapabilities = Message<"lindm.agent.v1.AssistanceCapabilities"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 1;
+   */
+  policy?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: string clipboard_reason = 2;
+   */
+  clipboardReason: string;
+
+  /**
+   * @generated from field: string keyboard_reason = 3;
+   */
+  keyboardReason: string;
+
+  /**
+   * @generated from field: string display_reason = 4;
+   */
+  displayReason: string;
+
+  /**
+   * @generated from field: string messages_reason = 5;
+   */
+  messagesReason: string;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistanceCapabilities.
+ * Use `create(AssistanceCapabilitiesSchema)` to create a new message.
+ */
+export const AssistanceCapabilitiesSchema: GenMessage<AssistanceCapabilities> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 9);
+
+/**
+ * Only locally consented portal streams may appear here.
+ *
+ * @generated from message lindm.agent.v1.AssistanceDisplay
+ */
+export type AssistanceDisplay = Message<"lindm.agent.v1.AssistanceDisplay"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string label = 2;
+   */
+  label: string;
+
+  /**
+   * @generated from field: uint32 width = 3;
+   */
+  width: number;
+
+  /**
+   * @generated from field: uint32 height = 4;
+   */
+  height: number;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistanceDisplay.
+ * Use `create(AssistanceDisplaySchema)` to create a new message.
+ */
+export const AssistanceDisplaySchema: GenMessage<AssistanceDisplay> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 10);
+
+/**
+ * The first RTP timestamp actually emitted for a selected capture generation.
+ * It is not a wall-clock readiness estimate or evidence of browser presentation.
+ *
+ * @generated from message lindm.agent.v1.AssistanceDisplayFrame
+ */
+export type AssistanceDisplayFrame = Message<"lindm.agent.v1.AssistanceDisplayFrame"> & {
+  /**
+   * @generated from field: string display_id = 1;
+   */
+  displayId: string;
+
+  /**
+   * @generated from field: uint32 generation = 2;
+   */
+  generation: number;
+
+  /**
+   * @generated from field: uint32 rtp_timestamp = 3;
+   */
+  rtpTimestamp: number;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistanceDisplayFrame.
+ * Use `create(AssistanceDisplayFrameSchema)` to create a new message.
+ */
+export const AssistanceDisplayFrameSchema: GenMessage<AssistanceDisplayFrame> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 11);
+
+/**
+ * Content is ephemeral. Neither this message nor its digest is audit detail.
+ *
+ * @generated from message lindm.agent.v1.AssistanceCommand
+ */
+export type AssistanceCommand = Message<"lindm.agent.v1.AssistanceCommand"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommandKind kind = 2;
+   */
+  kind: AssistanceCommandKind;
+
+  /**
+   * Omitted by admin callers; stamped by the server before delivery.
+   *
+   * @generated from field: google.protobuf.Timestamp deadline = 3;
+   */
+  deadline?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string text = 4;
+   */
+  text: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceSpecialKey special_key = 5;
+   */
+  specialKey: AssistanceSpecialKey;
+
+  /**
+   * @generated from field: string display_id = 6;
+   */
+  displayId: string;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistanceCommand.
+ * Use `create(AssistanceCommandSchema)` to create a new message.
+ */
+export const AssistanceCommandSchema: GenMessage<AssistanceCommand> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 12);
+
+/**
+ * @generated from message lindm.agent.v1.AssistanceCommandResult
+ */
+export type AssistanceCommandResult = Message<"lindm.agent.v1.AssistanceCommandResult"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommandKind kind = 2;
+   */
+  kind: AssistanceCommandKind;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommandStatus status = 3;
+   */
+  status: AssistanceCommandStatus;
+
+  /**
+   * @generated from field: string reason = 4;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: string text = 5;
+   */
+  text: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp completed_at = 6;
+   */
+  completedAt?: Timestamp | undefined;
+};
+
+/**
+ * Describes the message lindm.agent.v1.AssistanceCommandResult.
+ * Use `create(AssistanceCommandResultSchema)` to create a new message.
+ */
+export const AssistanceCommandResultSchema: GenMessage<AssistanceCommandResult> = /*@__PURE__*/
+  messageDesc(file_lindm_agent_v1_assistance, 13);
 
 /**
  * AssistanceMode is the capability requested by the operator. CONTROL also
@@ -481,35 +771,184 @@ export const AssistanceEndCauseSchema: GenEnum<AssistanceEndCause> = /*@__PURE__
   enumDesc(file_lindm_agent_v1_assistance, 2);
 
 /**
- * AssistancePolicy is the device's applied remote-assistance setting, so the
+ * AssistanceEnablement is the device's applied remote-assistance setting, so the
  * server can refuse a request before it reaches a device that would decline it.
  *
- * @generated from enum lindm.agent.v1.AssistancePolicy
+ * @generated from enum lindm.agent.v1.AssistanceEnablement
  */
-export enum AssistancePolicy {
+export enum AssistanceEnablement {
   /**
    * Not reported: an agent that predates this field.
    *
-   * @generated from enum value: ASSISTANCE_POLICY_UNSPECIFIED = 0;
+   * @generated from enum value: ASSISTANCE_ENABLEMENT_UNSPECIFIED = 0;
    */
   UNSPECIFIED = 0,
 
   /**
-   * @generated from enum value: ASSISTANCE_POLICY_ENABLED = 1;
+   * @generated from enum value: ASSISTANCE_ENABLEMENT_ENABLED = 1;
    */
   ENABLED = 1,
 
   /**
    * Absent or disabled RemoteAssistanceConfig: invitations end DISABLED.
    *
-   * @generated from enum value: ASSISTANCE_POLICY_DISABLED = 2;
+   * @generated from enum value: ASSISTANCE_ENABLEMENT_DISABLED = 2;
    */
   DISABLED = 2,
 }
 
 /**
- * Describes the enum lindm.agent.v1.AssistancePolicy.
+ * Describes the enum lindm.agent.v1.AssistanceEnablement.
  */
-export const AssistancePolicySchema: GenEnum<AssistancePolicy> = /*@__PURE__*/
+export const AssistanceEnablementSchema: GenEnum<AssistanceEnablement> = /*@__PURE__*/
   enumDesc(file_lindm_agent_v1_assistance, 3);
+
+/**
+ * @generated from enum lindm.agent.v1.AssistancePolicyMode
+ */
+export enum AssistancePolicyMode {
+  /**
+   * @generated from enum value: ASSISTANCE_POLICY_MODE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ASSISTANCE_POLICY_MODE_OFF = 1;
+   */
+  OFF = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_POLICY_MODE_LIMITED = 2;
+   */
+  LIMITED = 2,
+
+  /**
+   * @generated from enum value: ASSISTANCE_POLICY_MODE_ON = 3;
+   */
+  ON = 3,
+}
+
+/**
+ * Describes the enum lindm.agent.v1.AssistancePolicyMode.
+ */
+export const AssistancePolicyModeSchema: GenEnum<AssistancePolicyMode> = /*@__PURE__*/
+  enumDesc(file_lindm_agent_v1_assistance, 4);
+
+/**
+ * @generated from enum lindm.agent.v1.AssistanceCommandKind
+ */
+export enum AssistanceCommandKind {
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE = 1;
+   */
+  CLIPBOARD_WRITE = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ = 2;
+   */
+  CLIPBOARD_READ = 2,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS = 3;
+   */
+  SPECIAL_KEYS = 3,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY = 4;
+   */
+  SELECT_DISPLAY = 4,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_KIND_MESSAGE = 5;
+   */
+  MESSAGE = 5,
+}
+
+/**
+ * Describes the enum lindm.agent.v1.AssistanceCommandKind.
+ */
+export const AssistanceCommandKindSchema: GenEnum<AssistanceCommandKind> = /*@__PURE__*/
+  enumDesc(file_lindm_agent_v1_assistance, 5);
+
+/**
+ * @generated from enum lindm.agent.v1.AssistanceSpecialKey
+ */
+export enum AssistanceSpecialKey {
+  /**
+   * @generated from enum value: ASSISTANCE_SPECIAL_KEY_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW = 1;
+   */
+  SWITCH_WINDOW = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS = 2;
+   */
+  SHOW_APPLICATIONS = 2,
+
+  /**
+   * @generated from enum value: ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL = 3;
+   */
+  OPEN_TERMINAL = 3,
+
+  /**
+   * @generated from enum value: ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW = 4;
+   */
+  CLOSE_WINDOW = 4,
+}
+
+/**
+ * Describes the enum lindm.agent.v1.AssistanceSpecialKey.
+ */
+export const AssistanceSpecialKeySchema: GenEnum<AssistanceSpecialKey> = /*@__PURE__*/
+  enumDesc(file_lindm_agent_v1_assistance, 6);
+
+/**
+ * @generated from enum lindm.agent.v1.AssistanceCommandStatus
+ */
+export enum AssistanceCommandStatus {
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_SUCCEEDED = 2;
+   */
+  SUCCEEDED = 2,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_FAILED = 3;
+   */
+  FAILED = 3,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_CANCELLED = 4;
+   */
+  CANCELLED = 4,
+
+  /**
+   * @generated from enum value: ASSISTANCE_COMMAND_STATUS_EXPIRED = 5;
+   */
+  EXPIRED = 5,
+}
+
+/**
+ * Describes the enum lindm.agent.v1.AssistanceCommandStatus.
+ */
+export const AssistanceCommandStatusSchema: GenEnum<AssistanceCommandStatus> = /*@__PURE__*/
+  enumDesc(file_lindm_agent_v1_assistance, 7);
 

@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
@@ -43,11 +44,12 @@ func TestConsolePoolServesAdminReadsUnderDeviceSaturation(t *testing.T) {
 	now := time.Now().UTC()
 	ca, caKey := testCA(t, now.Add(90*24*time.Hour))
 	cfg := core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: localIdentity(t, consolePool)}
-	devices, err := New(devicePool, cfg)
+	runtime := assistance.NewRuntime()
+	devices, err := New(devicePool, cfg, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}
-	console, err := New(consolePool, cfg)
+	console, err := New(consolePool, cfg, runtime)
 	if err != nil {
 		t.Fatal(err)
 	}

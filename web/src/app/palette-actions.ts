@@ -13,7 +13,7 @@ import {
   UsersIcon,
 } from "lucide-react";
 import type { SessionPrincipal } from "../../gen/lindm/auth/v1/auth_pb";
-import { ASSISTANCE_PERMISSION } from "@/features/assistance/display";
+import { ASSISTANCE_VIEW_PERMISSION } from "@/features/assistance/display";
 import { actionPermissions } from "@/features/devices/action-display";
 import { canPermission } from "@/lib/permissions";
 
@@ -157,7 +157,7 @@ export const paletteDeviceActions: PaletteDeviceAction[] = [
     prompt: "Choose the device that needs assistance",
     keywords: ["remote support", "screen sharing", "help"],
     icon: HeadsetIcon,
-    allowed: (principal) => canChooseDevice(principal, ASSISTANCE_PERMISSION),
+    allowed: (principal) => canChooseDevice(principal, ASSISTANCE_VIEW_PERMISSION),
     open: (navigate, deviceId) =>
       navigate({
         to: "/devices/$deviceId",

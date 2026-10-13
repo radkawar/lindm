@@ -25,7 +25,7 @@ import (
 func (s *Service) GetAssistanceReadiness(ctx context.Context, req *connect.Request[adminv1.GetAssistanceReadinessRequest]) (*connect.Response[adminv1.GetAssistanceReadinessResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	actor, err := s.Require(ctx, identity.PermissionRunRemoteAssistance)
+	actor, err := s.Require(ctx, identity.PermissionViewRemoteAssistance)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (s *Service) GetAssistanceReadiness(ctx context.Context, req *connect.Reque
 	deviceID, _ := uuid.Parse(req.Msg.GetDeviceId())
 	var readiness *adminv1.AssistanceReadiness
 	err = s.assistanceTx(ctx, nil, "", func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionRunRemoteAssistance, deviceID); err != nil {
+		if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionViewRemoteAssistance, deviceID); err != nil {
 			return core.MapErr(err)
 		}
 		now := s.Now()
@@ -61,11 +61,11 @@ func (s *Service) GetAssistanceReadiness(ctx context.Context, req *connect.Reque
 // turned off is reported as such even while it is offline.
 func assistanceReadiness(row devicedb.GetAssistanceReadinessRow, configured bool, now time.Time) *adminv1.AssistanceReadiness {
 	readiness := &adminv1.AssistanceReadiness{
-		Policy:  agentv1.AssistancePolicy(row.ReportedPolicy.Int16),
+		Policy:  agentv1.AssistanceEnablement(row.ReportedPolicy.Int16),
 		Desktop: desktopEvidence(row.InventoryDetails),
 	}
 	if !row.ReportedPolicy.Valid {
-		readiness.Policy = agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED
+		readiness.Policy = agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED
 	}
 	if readiness.Desktop != adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_UNSPECIFIED && row.InventoryFinishedAt.Valid {
 		readiness.InventoryObservedAt = timestamppb.New(row.InventoryFinishedAt.Time)
@@ -78,7 +78,7 @@ func assistanceReadiness(row devicedb.GetAssistanceReadinessRow, configured bool
 		readiness.State = adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_UNCONFIGURED
 	case row.State != core.StateActive || row.CurrentGenerationID == nil:
 		readiness.State = adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_NOT_ENROLLED
-	case readiness.Policy == agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED:
+	case readiness.Policy == agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED:
 		readiness.State = adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_DISABLED
 	case readiness.Desktop == adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_ABSENT:
 		readiness.State = adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_NO_DESKTOP
@@ -100,7 +100,7 @@ func refuseUnreachable(ctx context.Context, q *devicedb.Queries, deviceID uuid.U
 	if err != nil {
 		return err
 	}
-	if row.ReportedPolicy.Valid && agentv1.AssistancePolicy(row.ReportedPolicy.Int16) == agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED {
+	if row.ReportedPolicy.Valid && agentv1.AssistanceEnablement(row.ReportedPolicy.Int16) == agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED {
 		return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_disabled")
 	}
 	if desktopEvidence(row.InventoryDetails) == adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_ABSENT {
@@ -140,10 +140,10 @@ func desktopEvidence(details []byte) adminv1.AssistanceDesktop {
 	return adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_ABSENT
 }
 
-// recordAssistancePolicy keeps the device's reported setting; an agent that
+// recordAssistanceEnablement keeps the device's reported setting; an agent that
 // does not report one leaves the server's view unknown rather than stale.
-func recordAssistancePolicy(ctx context.Context, q *devicedb.Queries, deviceID uuid.UUID, policy agentv1.AssistancePolicy, now time.Time) error {
-	if policy == agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED {
+func recordAssistanceEnablement(ctx context.Context, q *devicedb.Queries, deviceID uuid.UUID, policy agentv1.AssistanceEnablement, now time.Time) error {
+	if policy == agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED {
 		return q.ClearAssistanceDevicePolicy(ctx, deviceID)
 	}
 	return q.SetAssistanceDevicePolicy(ctx, devicedb.SetAssistanceDevicePolicyParams{DeviceID: deviceID, Policy: int16(policy), ChangedAt: core.Timestamptz(now)})

@@ -396,6 +396,9 @@ type LabSession struct {
 	FirstLoginMarkers []string
 	// Capture are the assistance capture-stack packages recorded as evidence.
 	Capture []string
+	// AssistanceFixtures are native packages installed only in the disposable
+	// assistance guest for independent clipboard/input/display witnesses.
+	AssistanceFixtures []string
 }
 
 // DesktopPackages returns the packages that install the lab desktop on the

@@ -28,8 +28,13 @@ type Notification struct {
 	Critical bool
 	// Persistent sets expire_timeout 0 (never expire).
 	Persistent bool
-	// Lifetime sets a bounded expire_timeout so a notice cannot stay resident.
+	// Lifetime sets a bounded expire_timeout so a notice (an operator message or
+	// the ended notice) cannot stay resident independently of the stop indicator.
 	Lifetime time.Duration
+	// Reshow keeps an actionable notification reachable while it awaits an
+	// action on a server that can leave it queued behind a banner that has
+	// gone (DesktopNotifier.strandsQueuedBanners).
+	Reshow bool
 }
 
 // NotificationAction is one action button.
@@ -45,19 +50,33 @@ type Notice interface {
 	Result() <-chan string
 	// Close withdraws the notification.
 	Close(ctx context.Context) error
+	// Update replaces the posted notification's content in place (same id),
+	// so a banner already on screen shows the new content and its action
+	// tracking is unchanged. notification must declare the same actions.
+	Update(ctx context.Context, notification Notification) error
 }
 
 // Portal is the xdg-desktop-portal boundary.
 type Portal interface {
 	// Check reports, without any dialog or user interaction, whether the
-	// desktop's portal can serve mode at all. It runs before the consent
-	// prompt so an impossible session ends UNAVAILABLE with an exact detail
-	// instead of asking for consent it cannot honour; a CONTROL request is
-	// never silently downgraded to VIEW.
-	Check(ctx context.Context, mode agentv1.AssistanceMode) error
-	// Open runs the portal dialog for mode and returns the grant. A user
-	// cancellation returns ErrPortalCancelled.
-	Open(ctx context.Context, mode agentv1.AssistanceMode) (Grant, error)
+	// desktop's portal can serve the requested mode and input policy at all.
+	// It runs before the consent prompt so an impossible session ends
+	// UNAVAILABLE with an exact detail instead of asking for consent it cannot
+	// honour; a CONTROL request is never silently downgraded to VIEW.
+	Check(ctx context.Context, request PortalRequest) error
+	// Open runs the portal dialog after product consent and returns the grant.
+	// A user cancellation returns ErrPortalCancelled.
+	Open(ctx context.Context, request PortalRequest) (Grant, error)
+}
+
+// PortalRequest contains the capabilities named in the product prompt.
+// Only Check may run before acceptance; Open requires explicit product consent.
+// VIEW never creates a RemoteDesktop session merely to obtain clipboard access.
+type PortalRequest struct {
+	Mode   agentv1.AssistanceMode
+	Policy *agentv1.AssistancePolicy
+	// Lifetime ends ongoing transfers independently of the consent dialog.
+	Lifetime context.Context
 }
 
 // ErrPortalCancelled reports a user-cancelled portal dialog.
@@ -65,10 +84,20 @@ var ErrPortalCancelled = errors.New("portal_cancelled")
 
 // Grant is a started portal session.
 type Grant interface {
-	// Stream is the granted monitor stream.
-	Stream() Stream
-	// ControlGranted reports whether keyboard and pointer were both granted.
+	// Streams contains only monitors returned by the local portal picker.
+	Streams() []Stream
+	// SelectStream changes pointer mapping to a granted monitor.
+	SelectStream(id string) error
+	// ClipboardGranted requires RequestClipboard and clipboard_enabled at Start.
+	ClipboardGranted() bool
+	ClipboardWrite(ctx context.Context, text string, deadline time.Time) error
+	// ClipboardReason identifies an explicit independent native refusal.
+	ClipboardReason() string
+	ClipboardRead(ctx context.Context) (string, error)
+	// ControlGranted reports whether pointer control was granted.
 	ControlGranted() bool
+	// KeyboardGranted is independent; OFF never requests a keyboard device.
+	KeyboardGranted() bool
 	// OpenPipeWire returns a PipeWire remote fd restricted to the grant. The
 	// caller owns the file.
 	OpenPipeWire(ctx context.Context) (*os.File, error)
@@ -83,6 +112,8 @@ type Grant interface {
 // Stream is a PipeWire node with its logical size (0 when unknown).
 type Stream struct {
 	NodeID        uint32
+	ID            string
+	Label         string
 	Width, Height int
 }
 
@@ -114,7 +145,7 @@ type PeerFactory interface {
 // PeerConfig configures one relay-only peer.
 type PeerConfig struct {
 	ICEServers []*agentv1.AssistanceIceServer
-	// Input adds the ordered "lindm-input" data channel.
+	// Input adds the reliable ordered "lindm-input" data channel. VIEW has none.
 	Input bool
 }
 
@@ -124,13 +155,21 @@ type Peer interface {
 	Offer(ctx context.Context) (string, error)
 	// Answer applies the remote answer SDP.
 	Answer(sdp string) error
-	// WriteRTP sends one RTP packet on the video track.
-	WriteRTP(packet []byte) error
+	// WriteRTP sends one RTP packet on the video track. Emitted is false before
+	// connection; such packets must never establish a display-frame marker.
+	WriteRTP(packet []byte) (emitted bool, err error)
+	// BeginDisplay invalidates the cached marker for a newer source generation.
+	BeginDisplay(display string, generation uint32) error
+	// PublishDisplayFrame caches/sends the first emitted post-mapping timestamp.
+	// An old capture's marker can never qualify for a newer source generation.
+	PublishDisplayFrame(frame DisplayFrame) error
+	// EndDisplayFrames prevents cached replay or publication after session end.
+	EndDisplayFrames()
 	// Connected is closed once DTLS-SRTP is established.
 	Connected() <-chan struct{}
 	// Failed is closed when the connection fails or closes.
 	Failed() <-chan struct{}
-	// Input delivers raw data-channel messages; nil without a data channel.
+	// Input delivers raw operator messages; nil for VIEW.
 	Input() <-chan []byte
 	Close() error
 }

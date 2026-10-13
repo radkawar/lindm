@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -57,7 +58,7 @@ func (s *Service) assistanceTx(ctx context.Context, authorization *identity.Auth
 // authorizeAssistance applies the CreateDeviceAction admission pattern: cached
 // grant at entry, configured service, bounded slots, then fresh authority.
 func (s *Service) authorizeAssistance(ctx context.Context) (identity.Principal, *identity.Authorization, func(), error) {
-	actor, err := s.Require(ctx, identity.PermissionRunRemoteAssistance)
+	actor, err := s.Require(ctx, identity.PermissionViewRemoteAssistance)
 	if err != nil {
 		return identity.Principal{}, nil, nil, err
 	}
@@ -70,7 +71,7 @@ func (s *Service) authorizeAssistance(ctx context.Context) (identity.Principal, 
 	if err := s.Acquire(ctx); err != nil {
 		return identity.Principal{}, nil, nil, core.MapErr(err)
 	}
-	authorization, err := s.Identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionRunRemoteAssistance)
+	authorization, err := s.Identity.AuthorizeFresh(ctx, actor.ID, identity.PermissionViewRemoteAssistance)
 	if err != nil {
 		s.Release()
 		return identity.Principal{}, nil, nil, core.ExecutionError(err)
@@ -81,11 +82,16 @@ func (s *Service) authorizeAssistance(ctx context.Context) (identity.Principal, 
 func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Request[adminv1.CreateAssistanceSessionRequest]) (*connect.Response[adminv1.CreateAssistanceSessionResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	if _, err := s.Require(ctx, identity.PermissionRunRemoteAssistance); err != nil {
+	if _, err := s.Require(ctx, identity.PermissionViewRemoteAssistance); err != nil {
 		return nil, err
 	}
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil || core.HasNUL(req.Msg.GetReason()) {
 		return nil, core.Invalid("invalid_assistance_session")
+	}
+	if req.Msg.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
+		if _, err := s.Require(ctx, identity.PermissionControlRemoteAssistance); err != nil {
+			return nil, err
+		}
 	}
 	actor, authorization, release, err := s.authorizeAssistance(ctx)
 	if err != nil {
@@ -102,21 +108,15 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 	if seconds := req.Msg.GetMaxDurationSeconds(); seconds != 0 {
 		duration = time.Duration(seconds) * time.Second
 	}
-	display := actor.DisplayName
-	if display == "" {
-		display = actor.Subject
-	}
-	if display == "" {
-		display = actor.ID.String()
-	}
-	if runes := []rune(display); len(runes) > 256 {
-		display = string(runes[:256])
-	}
+	display := assistanceOperatorLabel(actor)
 	var session *adminv1.AssistanceSession
-	err = s.assistanceTx(ctx, authorization, identity.PermissionRunRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		device, err := core.LockMutableDevice(ctx, q, authorization.Principal(), identity.PermissionRunRemoteAssistance, deviceID)
+	err = s.assistanceTx(ctx, authorization, identity.PermissionViewRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
+		device, err := core.LockMutableDevice(ctx, q, authorization.Principal(), identity.PermissionViewRemoteAssistance, deviceID)
 		if err != nil {
 			return core.MapErr(err)
+		}
+		if err := scopeAssistanceCapabilities(ctx, q, authorization.Principal(), deviceID, req.Msg.GetMode(), req.Msg.GetRequestedCapabilities()); err != nil {
+			return err
 		}
 		now := s.Now()
 		old, err := q.GetAssistanceSessionByRequest(ctx, requestID)
@@ -159,12 +159,30 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 			return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_capacity")
 		}
 		id := uuid.New()
+		policy, err := loadAssistancePolicy(ctx, q, deviceID)
+		if err != nil {
+			return err
+		}
+		requested, err := proto.Marshal(assistancePolicy(req.Msg.GetRequestedCapabilities()))
+		if err != nil {
+			return err
+		}
+		effective, err := proto.Marshal(intersectAssistancePolicy(req.Msg.GetRequestedCapabilities(), intersectAssistancePolicy(policy, s.AssistanceCeiling)))
+		if err != nil {
+			return err
+		}
 		if err := q.InsertAssistanceSession(ctx, devicedb.InsertAssistanceSessionParams{
 			ID: id, DeviceID: deviceID, GenerationID: *device.CurrentGenerationID, RequestID: requestID, RequestDigest: digest,
 			OperatorID: actor.ID, OperatorDisplay: display, Mode: int16(req.Msg.GetMode()), Reason: req.Msg.GetReason(),
 			TargetUsername: req.Msg.GetTargetUsername(), CreatedAt: core.Timestamptz(now),
 			ConsentDeadline: core.Timestamptz(now.Add(assistanceConsentWindow)), EndsAt: core.Timestamptz(now.Add(duration)),
 		}); err != nil {
+			return err
+		}
+		if err := q.SetAssistanceCapabilities(ctx, devicedb.SetAssistanceCapabilitiesParams{ID: id, RequestedCapabilities: requested, EffectiveCapabilities: effective}); err != nil {
+			return err
+		}
+		if err := q.AuthorizeAssistanceSession(ctx, devicedb.AuthorizeAssistanceSessionParams{ID: id, AuthorizedUntil: core.Timestamptz(authorization.ExpiresAt())}); err != nil {
 			return err
 		}
 		row, err := q.GetAssistanceSession(ctx, id)
@@ -181,6 +199,24 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 	return core.NoStore(&adminv1.CreateAssistanceSessionResponse{Session: session}), nil
+}
+
+func assistanceOperatorLabel(actor identity.Principal) string {
+	display := actor.DisplayName
+	if display == "" {
+		display = actor.Subject
+	}
+	if display == "" {
+		return actor.ID.String()
+	}
+	count := 0
+	for index := range display {
+		if count == 256 {
+			return display[:index]
+		}
+		count++
+	}
+	return display
 }
 
 func (s *Service) ListAssistanceSessions(ctx context.Context, req *connect.Request[adminv1.ListAssistanceSessionsRequest]) (*connect.Response[adminv1.ListAssistanceSessionsResponse], error) {
@@ -303,7 +339,7 @@ func creatorOffered(row devicedb.AssistanceSession, actor identity.Principal) er
 func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Request[adminv1.JoinAssistanceSessionRequest]) (*connect.Response[adminv1.JoinAssistanceSessionResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	if _, err := s.Require(ctx, identity.PermissionRunRemoteAssistance); err != nil {
+	if _, err := s.Require(ctx, identity.PermissionViewRemoteAssistance); err != nil {
 		return nil, err
 	}
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil {
@@ -316,8 +352,8 @@ func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Reques
 	defer release()
 	id, _ := uuid.Parse(req.Msg.GetSessionId())
 	response := &adminv1.JoinAssistanceSessionResponse{}
-	err = s.assistanceTx(ctx, authorization, identity.PermissionRunRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		row, err := s.lockAssistanceInScope(ctx, q, authorization.Principal(), identity.PermissionRunRemoteAssistance, id, true)
+	err = s.assistanceTx(ctx, authorization, identity.PermissionViewRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
+		row, err := s.lockAssistanceInScope(ctx, q, authorization.Principal(), identity.PermissionViewRemoteAssistance, id, true)
 		if err != nil {
 			return err
 		}
@@ -325,6 +361,12 @@ func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Reques
 			return err
 		}
 		if err := creatorOffered(row, actor); err != nil {
+			return err
+		}
+		if err := scopeAssistanceCapabilities(ctx, q, authorization.Principal(), row.DeviceID, agentv1.AssistanceMode(row.Mode), decodeAssistancePolicy(row.EffectiveCapabilities)); err != nil {
+			return err
+		}
+		if err := s.checkAssistancePolicy(ctx, q, row); err != nil {
 			return err
 		}
 		ice, err := s.Assistance.ICEServer(row.ID, assistrelay.RoleConsole, row.EndsAt.Time)
@@ -346,7 +388,7 @@ func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Reques
 func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Request[adminv1.AnswerAssistanceSessionRequest]) (*connect.Response[adminv1.AnswerAssistanceSessionResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	if _, err := s.Require(ctx, identity.PermissionRunRemoteAssistance); err != nil {
+	if _, err := s.Require(ctx, identity.PermissionViewRemoteAssistance); err != nil {
 		return nil, err
 	}
 	if req == nil || req.Msg == nil || s.Rules.Validate(req.Msg) != nil || core.HasNUL(req.Msg.GetAnswerSdp()) {
@@ -366,8 +408,8 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 	}
 	id, _ := uuid.Parse(req.Msg.GetSessionId())
 	var session *adminv1.AssistanceSession
-	err = s.assistanceTx(ctx, authorization, identity.PermissionRunRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		row, err := s.lockAssistanceInScope(ctx, q, authorization.Principal(), identity.PermissionRunRemoteAssistance, id, true)
+	err = s.assistanceTx(ctx, authorization, identity.PermissionViewRemoteAssistance, func(q *devicedb.Queries, revoked *assistanceRevocations) error {
+		row, err := s.lockAssistanceInScope(ctx, q, authorization.Principal(), identity.PermissionViewRemoteAssistance, id, true)
 		if err != nil {
 			return err
 		}
@@ -376,6 +418,12 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 			return err
 		}
 		if err := creatorOffered(row, actor); err != nil {
+			return err
+		}
+		if err := scopeAssistanceCapabilities(ctx, q, authorization.Principal(), row.DeviceID, agentv1.AssistanceMode(row.Mode), decodeAssistancePolicy(row.EffectiveCapabilities)); err != nil {
+			return err
+		}
+		if err := s.checkAssistancePolicy(ctx, q, row); err != nil {
 			return err
 		}
 		if fingerprint == row.OfferFingerprint {
@@ -400,12 +448,12 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 	return core.NoStore(&adminv1.AnswerAssistanceSessionResponse{Session: session}), nil
 }
 
-// StopAssistanceSession is de-escalation: any operator holding the grant in
-// scope may stop, without a fresh directory round trip that could block it.
+// StopAssistanceSession is de-escalation: any operator holding view in scope may
+// stop either mode, without a fresh directory round trip that could block it.
 func (s *Service) StopAssistanceSession(ctx context.Context, req *connect.Request[adminv1.StopAssistanceSessionRequest]) (*connect.Response[adminv1.StopAssistanceSessionResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()
-	actor, err := s.Require(ctx, identity.PermissionRunRemoteAssistance)
+	actor, err := s.Require(ctx, identity.PermissionViewRemoteAssistance)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +467,7 @@ func (s *Service) StopAssistanceSession(ctx context.Context, req *connect.Reques
 	id, _ := uuid.Parse(req.Msg.GetSessionId())
 	var session *adminv1.AssistanceSession
 	err = s.assistanceTx(ctx, nil, "", func(q *devicedb.Queries, revoked *assistanceRevocations) error {
-		row, err := s.lockAssistanceInScope(ctx, q, actor, identity.PermissionRunRemoteAssistance, id, true)
+		row, err := s.lockAssistanceInScope(ctx, q, actor, identity.PermissionViewRemoteAssistance, id, true)
 		if err != nil {
 			return err
 		}

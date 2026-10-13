@@ -2603,7 +2603,13 @@ Each side sends its complete current state, never a stream of events:
 
 1. The operator calls `AdminService.CreateAssistanceSession` with a mode
    (`VIEW` or `CONTROL`), reason and duration of at most 30 minutes. This needs
-   `remote_assistance.run`, fresh authorization and device scope. The device must
+   `remote_assistance.view`; `CONTROL` additionally requires
+   `remote_assistance.control` on the same device. Both grants and every requested
+   capability use their own device scope from one freshly observed, transaction-fenced
+   principal. Joining, answering, commands and every live authorization renewal
+   recheck the immutable session mode. Losing control ends a control session rather
+   than silently downgrading it or reusing its portal grant. View-only operators may
+   still stop either mode in their view scope. The device must
    be active and seen within two minutes. At most one non-ended session may exist
    per device, and a deployment-wide admission cap applies. A device that reports
    assistance disabled (`assistance_disabled`) or whose latest successful session
@@ -2648,7 +2654,12 @@ Each side sends its complete current state, never a stream of events:
    start the helper, and the executor still binds a helper only to its UID's
    single active local graphical logind session. It shows a
    critical, non-expiring desktop notification with explicit **Allow** and
-   **Decline** actions. Only the `allow` action consents.
+   **Decline** actions. Only the `allow` action consents. GNOME Shell without
+   animations can leave that prompt queued behind another banner after the
+   banner has gone, so there the helper posts and at once withdraws an
+   action-less notification every three seconds while the prompt is
+   unanswered, which makes the shell show its queue
+   ([Fedora](platforms/fedora.md#desktop-session-helper-and-remote-assistance)).
    - Before showing the prompt it requires notification actions, the portal
      frontend's `ScreenCast` interface with a monitor source and, for control,
      `RemoteDesktop` with keyboard and pointer devices. A missing interface ends
@@ -2676,20 +2687,28 @@ Each side sends its complete current state, never a stream of events:
      (`session_lock_state_unreported`) before consent, because a lock there
      would not end sharing.
    - After **Allow** it opens the XDG ScreenCast portal (view) or the
-     RemoteDesktop+ScreenCast portal (control). On GNOME, keyboard and pointer
-     access is a separate switch in that dialog, off by default. If the user
-     shares without enabling it, the session runs view-only.
+     RemoteDesktop+ScreenCast portal (control). On GNOME, requested input access
+     is a separate switch in that dialog, off by default. Sharing without it
+     grants viewing but no input. Keyboard-off policy requests no keyboard device;
+     pointer authority does not imply a keyboard capability.
    - The PipeWire remote is passed to `gst-launch-1.0` (`pipewiresrc` → VP8 →
-     RTP), and the RTP packets are forwarded into a pion WebRTC peer.
+     RTP), and the RTP packets are forwarded into a pion WebRTC peer. On a
+     session with clipboard access the remote is requested only after the
+     portal has forwarded the clipboard owner announcement that follows Start,
+     which portal 1.21.1 would otherwise deadlock on
+     ([Fedora](platforms/fedora.md#desktop-session-helper-and-remote-assistance)).
    - The helper offers, non-trickle and relay-only, and the browser answers. A
      data channel exists only for granted control. Its bounded JSON input events
      (at most 256 bytes and 240 per second) become portal
      `NotifyPointerMotionAbsolute`, `NotifyPointerButton`,
-     `NotifyPointerAxisDiscrete` and `NotifyKeyboardKeycode` calls. Pressed keys
-     and buttons are released at the end.
-5. Both SDPs travel only through authenticated RPCs. The server accepts exactly
-   one `a=fingerprint:sha-256` line and only `typ relay` candidates, and records
-   both fingerprints. Only the creating operator can join (offer plus console
+     `NotifyPointerAxisDiscrete`, `NotifyKeyboardKeycode` and
+     `NotifyKeyboardKeysym` calls, filtered by the effective keyboard policy.
+     Pressed keys/buttons are released on control loss, display changes and end;
+     selected-display generation fences reject stale coordinates.
+5. Both SDPs travel only through authenticated RPCs. The server accepts one
+   distinct `a=fingerprint:sha-256` value (which may repeat across media sections)
+   and only `typ relay` candidates, and records both fingerprints.
+   Only the creating operator can join (offer plus console
    TURN credentials) and answer, once.
 6. Media is DTLS-SRTP end to end through the relay embedded in `lindmd`
    (`internal/assistrelay`, pion/turn). Both ends use `iceTransportPolicy=relay`,
@@ -2870,6 +2889,12 @@ returned Unix FD, close it, then call `SelectionWriteDone`. `SelectionRead`
 returns a nonblocking FD. Bound bytes, lifetime and concurrent transfers; watch
 signals from the portal's unique owner before requests.
 
+Explicit optional-interface unsupported/denied replies disable only clipboard,
+with a visible capability reason. Invalid portal session/state, transport errors,
+timeouts and cancellation still fail closed; they are not relabeled unsupported.
+A continued session creates no clipboard processor without both successful
+`RequestClipboard` and the exact true `Start` grant.
+
 GNOME 46's
 [clipboard signal forwarding](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/72d01648ab872c8d849c298fdd9f4d33b5eb820d/src/clipboard.c#L41-79)
 passes Mutter's `(as)` MIME tuple through, despite the public `as` contract.
@@ -2899,3 +2924,104 @@ a host helper. Portal 1.18.4 may return non-file URIs; reject these at the helpe
 GNOME 46 uses its GTK chooser, while
 [GNOME 50 delegates to Nautilus](https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/blob/c9a231d3a0c77b6b14f998653b7323858d559dd7/src/filechooser.c#L305-397).
 Record and qualify that Nautilus version as part of Fedora's file-transfer lane.
+
+### Tier 1 policy and command exchange
+
+`AssistancePolicy` independently controls clipboard, keyboard, display and messages
+with unspecified/off/limited/on values; unspecified denies. The deployment's
+`ServerConfig.assistance.policy_ceiling` and executor's
+`AgentConfig.remote_assistance.policy_ceiling` bound the per-device policy.
+`GetAssistancePolicy` exposes the policy and ceiling; `UpdateAssistancePolicy`
+requires `remote_assistance.policy.manage`, fresh device scope and an exact
+request identity. Default optional capabilities are off. Session creation carries
+explicit requested capabilities; the invitation carries requested and effective
+policy, and the helper reports actual grants, native refusal reasons and a bounded
+list of portal-consented displays. A requested capability is not a native grant.
+
+The ordinary pointer/keyboard data channel remains low latency. Low-frequency
+clipboard transfers, named special-key commands, display selection and messages
+use `RunAssistanceCommand` plus `GetAssistanceCommand`, then the existing
+authenticated directive/report exchange to the bound helper. The server, not the
+browser, sets an execution deadline of at most 30 seconds and never beyond the
+session's end. Only the creating operator with the corresponding fresh scoped
+permission can submit or retrieve a command. One in-flight command per session
+bounds the complete-state exchange. Repeated request identities recover an
+existing operation, never repeat completed side effects.
+TLS/mTLS protects this command path hop by hop; the control-plane process sees
+clipboard/message bodies in ephemeral memory. The live media's end-to-end
+encryption claim does not apply to those RPC payloads.
+
+Durable rows retain identity, idempotency metadata and outcome, not clipboard or
+message bodies. Command/result content is held only in bounded expiring memory,
+is excluded from ordinary logs/audit and is discarded on session termination.
+Losing that memory cannot re-authorize execution or turn an unavailable clipboard
+result into a successful empty string. Clipboard-write completion means the
+selection was offered, not that another application pasted it. Command acceptance,
+native completion and independent lab observations remain distinct.
+
+The composition root creates one domain-owned `assistance.Runtime` and injects
+that same runtime into both admin and device service instances. Only the
+ephemeral command/result slots and their destruction timers are shared; each
+service keeps its own SQL core and pool for authorization and transactions.
+The runtime is process-owned, not service-owned or durable, and separate runtimes
+do not exchange payloads.
+
+Assistance audit uses typed `actor_id`, `resource_id`, `target_device_id` and
+`details`; top-level `reason` is operator-authored text only. Machine outcome,
+denial reason, request identity, direction, byte count and effective policy belong
+in `details`. Session events identify the session resource and device target;
+device-policy events identify the device in both fields without inventing a
+session, mode or duration. An unknown session cannot supply a fabricated target.
+Device-driven lifecycle events do not pretend that the creator acted locally.
+Command text and internal request digests are excluded from these fields.
+
+Authority refresh applies an observation only to the exact session read before
+the external directory call. A concurrently created replacement keeps its own
+bounded Create-time lease; stale or empty observations neither renew nor terminate
+it. Normal expiry enforcement and fresh same-session authority loss still end
+the session.
+
+The console's policy/request controls expose the effective restrictions and local
+refusals. **Send clipboard** uses an explicit browser gesture; **Read clipboard**
+retrieves a result into component memory, and **Copy clipboard** is a separate
+gesture that writes it to the browser clipboard. Clipboard/message content never
+enters query caches, URLs or browser storage and is cleared on blur, expiry,
+authorization loss and unmount. Result polling is a fresh bounded read, not an
+automatic mutation retry; ambiguous submissions retain their original identity.
+
+**Text** uses semantic keysyms and **Physical** uses the guest's physical key layout.
+Canonical printable conversion uses pinned libxkbcommon graphical symbol data,
+including legacy Euro/Cyrillic keysyms rather than assuming every layout contains
+their Unicode-form aliases. The vendored source, license and deterministic
+generator live in `internal/agent/desktop/keysymdata`; `make generate` produces
+the native validation and browser conversion tables. Dead/action/modifier aliases
+do not become printable input, and no arbitrary IME or layout support is implied.
+The special-key menu requires **Take control** and a confirmed presented display;
+none of its named actions unlocks a session or bypasses elevation.
+
+Monitor commands select only returned portal stream identities. Pointer, physical
+key and keysym frames include the selected display and generation. A switch pauses
+input, releases/discards held inputs, and restarts capture outside the input lock.
+`AssistanceDisplayFrame` binds the first actually emitted RTP timestamp to that
+source/generation. Its timestamp is immutable within a generation, including zero
+and wraparound; it is not a wall-clock readiness estimate. Typed session projection
+carries it without adding a data channel to view-only sessions. Control sessions
+also receive it over their existing reliable ordered `lindm-input` channel.
+
+The browser hides stale pixels and admits input only when session selection, frame
+identity and actual `requestVideoFrameCallback` RTP presentation metadata agree.
+Delayed RPC/media and marker ordering cannot turn an old visible frame into input
+for a new display. Missing browser presentation metadata is an explicit gate, not
+a timer fallback. Display-command success first reconciles the current session
+projection. Temporary connection or session-read failure clears sensitive text,
+but not the original pending command identity or confirmed stop-on-leave duty.
+**Fit**, **Actual size** and real browser **Full screen** do not change capture
+authority. Fullscreen keeps Stop, control and Exit actions outside the scrolling
+body, with selectors inside its subtree; global hidden command dialogs cannot
+capture focus there.
+
+The native `clipboard`, `clipboard-limited`, `clipboard-policy`,
+`clipboard-permission`, `keyboard`, `display`, `message` and `monitors` scenarios
+are separate from the historical baseline. Their result rows remain not run until
+the [capability ledger](verification.md#commercial-assistance-capability-qualification)
+contains the exact new run evidence.

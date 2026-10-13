@@ -3,7 +3,7 @@ import { ConnectError } from "@connectrpc/connect";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   AnswerAssistanceSessionRequestSchema,
@@ -12,7 +12,11 @@ import {
   type AssistanceSession,
   type StopAssistanceSessionRequest,
 } from "../../../gen/lindm/admin/v1/assistance_pb";
-import { AssistanceMode } from "../../../gen/lindm/agent/v1/assistance_pb";
+import {
+  AssistanceCommandKind,
+  AssistanceMode,
+  AssistancePolicyMode,
+} from "../../../gen/lindm/agent/v1/assistance_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +31,8 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import {
-  ASSISTANCE_PERMISSION,
+  ASSISTANCE_CONTROL_PERMISSION,
+  ASSISTANCE_VIEW_PERMISSION,
   AssistanceStateBadge,
   TimeCell,
   assistanceFailureMessage,
@@ -38,7 +43,11 @@ import {
   modeLabels,
   startFailureRemedy,
 } from "./display";
-import { InputCapture, videoFramePoint } from "./input";
+import { policyMode, type CapabilityField } from "./capabilities";
+import { AssistanceControls } from "./controls";
+import { useAssistanceCommand } from "./commands";
+import { InputCapture, videoFramePoint, type KeyboardMode } from "./input";
+import { DisplayPresentationFence, parseDisplayFrameMarker } from "./presentation";
 import { assistanceSessionQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
 
@@ -133,24 +142,53 @@ export function AssistanceViewerPage({
   sessionId: string;
 }) {
   const lifetime = useAuthLifetime();
+  return (
+    <AssistanceViewerSession
+      key={`${lifetime.generation}:${sessionId}`}
+      deviceId={deviceId}
+      deviceName={deviceName}
+      sessionId={sessionId}
+    />
+  );
+}
+
+function AssistanceViewerSession({
+  deviceId,
+  deviceName,
+  sessionId,
+}: {
+  deviceId: string;
+  deviceName: string;
+  sessionId: string;
+}) {
+  const lifetime = useAuthLifetime();
   const principal = usePrincipal();
   const query = useQuery(assistanceSessionQueryOptions(lifetime, deviceId, sessionId));
+  // A failed poll invalidates actions, not the mounted session/command identity.
   const session = query.data;
-  const allowed = canPermission(principal, ASSISTANCE_PERMISSION);
+  const canStop = canPermission(principal, ASSISTANCE_VIEW_PERMISSION);
+  const allowed =
+    canStop &&
+    session !== undefined &&
+    (session.mode === AssistanceMode.VIEW ||
+      (session.mode === AssistanceMode.CONTROL &&
+        canPermission(principal, ASSISTANCE_CONTROL_PERMISSION)));
   const creator = session !== undefined && session.operatorId === principal.id;
   const ended = session?.state === AssistanceState.ENDED;
 
   // Joining starts once, when the creator first observes OFFERED; the connection then
   // outlives the OFFERED → ANSWERED → ACTIVE transitions until the session ends.
   const [armed, setArmed] = useState(false);
-  if (!armed && allowed && creator && session.state === AssistanceState.OFFERED) setArmed(true);
+  if (!armed && allowed && creator && session?.state === AssistanceState.OFFERED) setArmed(true);
 
   // Leaving the page (route change, unmount, tab close) while the creator's session is
   // still open ends it. Media and input also stop when the peer connection closes.
   const stopOnLeaveRef = useRef(false);
-  useEffect(() => {
-    stopOnLeaveRef.current = allowed && creator && !ended;
-  }, [allowed, creator, ended]);
+  useLayoutEffect(() => {
+    if (query.error || !session) return;
+    if (ended) stopOnLeaveRef.current = false;
+    else if (creator) stopOnLeaveRef.current = true;
+  }, [query.error, session, creator, ended]);
   useEffect(() => {
     const leave = () => {
       if (!stopOnLeaveRef.current) return;
@@ -189,7 +227,7 @@ export function AssistanceViewerPage({
               : "Only the requesting admin can connect. The user can stop sharing at any time."
         }
         actions={
-          session && !ended && allowed ? (
+          session && !ended && canStop ? (
             <div data-review-next-action>
               <StopButton sessionId={sessionId} deviceId={deviceId} />
             </div>
@@ -223,28 +261,32 @@ export function AssistanceViewerPage({
       ) : null}
       {session ? (
         <>
-          <SessionStatus
-            session={session}
-            identifiers={[
-              { label: "Device ID", value: deviceId },
-              { label: "Session ID", value: sessionId },
-              { label: "Operator ID", value: session.operatorId },
-            ]}
-          />
+          {!query.error ? (
+            <SessionStatus
+              session={session}
+              identifiers={[
+                { label: "Device ID", value: deviceId },
+                { label: "Session ID", value: sessionId },
+                { label: "Operator ID", value: session.operatorId },
+              ]}
+            />
+          ) : null}
           {creator && allowed && !ended ? (
             <AssistanceConnection
               key={`${lifetime.generation}:${sessionId}`}
               session={session}
               deviceId={deviceId}
-              armed={armed}
+              armed={armed && !ended}
+              sessionAvailable={!query.error}
             />
           ) : !ended ? (
             <Alert>
-              <AlertTitle>View only</AlertTitle>
+              <AlertTitle>Session details only</AlertTitle>
               <AlertDescription>
-                {allowed
-                  ? "Only the admin who requested this session can connect. You can still stop it."
+                {creator && !allowed
+                  ? "Your role no longer allows this session's requested access."
                   : "Only the admin who requested this session can connect."}
+                {canStop ? " You can still stop it." : ""}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -480,15 +522,20 @@ function AssistanceConnection({
   session,
   deviceId,
   armed,
+  sessionAvailable,
 }: {
   session: AssistanceSession;
   deviceId: string;
   armed: boolean;
+  sessionAvailable: boolean;
 }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
+  const controlHelpId = useId();
   const queryClient = useQueryClient();
   const sessionId = session.id;
   const controlRequested = session.mode === AssistanceMode.CONTROL;
+  const ended = session.state === AssistanceState.ENDED;
   const waitingForUser =
     session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED;
   const [attempt, setAttempt] = useState(0);
@@ -498,9 +545,25 @@ function AssistanceConnection({
   const [channel, setChannel] = useState<RTCDataChannel | null>(null);
   const [channelOpen, setChannelOpen] = useState(false);
   const [controlOn, setControlOn] = useState(false);
+  const [message, setMessage] = useState("");
+  const [keyboardMode, setKeyboardMode] = useState<KeyboardMode>("text");
+  const [actualSize, setActualSize] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [displayError, setDisplayError] = useState("");
+  const [frameSize, setFrameSize] = useState({ width: 0, height: 0 });
+  const [presentation, setPresentation] = useState({
+    ready: false,
+    display: "",
+    generation: 0,
+    metadataAvailable: null as boolean | null,
+  });
+  const fenceRef = useRef(new DisplayPresentationFence());
+  const refreshPresentationRef = useRef(() => {});
+  const inputCaptureRef = useRef<InputCapture | null>(null);
+  const fullscreenRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
-  const controlReasonId = useId();
+  const frameCoverRef = useRef<HTMLParagraphElement | null>(null);
 
   useEffect(() => {
     if (!armed) return;
@@ -551,8 +614,15 @@ function AssistanceConnection({
       });
       peer.addEventListener("datachannel", (event) => {
         const incoming = event.channel;
-        // View sessions carry no input channel at all; refuse anything unexpected.
-        if (signal.aborted || !controlRequested || incoming.label !== INPUT_CHANNEL_LABEL) {
+        // View sessions have no data channel; their marker arrives in the session projection.
+        if (
+          signal.aborted ||
+          !controlRequested ||
+          incoming.label !== INPUT_CHANNEL_LABEL ||
+          !incoming.ordered ||
+          incoming.maxRetransmits !== null ||
+          incoming.maxPacketLifeTime !== null
+        ) {
           incoming.close();
           return;
         }
@@ -566,6 +636,13 @@ function AssistanceConnection({
           }
         });
         setChannel(incoming);
+        incoming.addEventListener("message", (event: MessageEvent<unknown>) => {
+          if (signal.aborted) return;
+          const marker = parseDisplayFrameMarker(event.data);
+          if (!marker) return;
+          fenceRef.current.receive(marker);
+          refreshPresentationRef.current();
+        });
         setChannelOpen(incoming.readyState === "open");
       });
       await peer.setRemoteDescription({ type: "offer", sdp: join.offerSdp });
@@ -630,16 +707,153 @@ function AssistanceConnection({
     };
   }, [stream]);
 
-  const controlAvailable = session.controlGranted && channel !== null && channelOpen;
+  const active =
+    sessionAvailable && session.state === AssistanceState.ACTIVE && connectionState === "connected";
+  const commands = useAssistanceCommand(session, active, () => setMessage(""));
+  const frameReady =
+    active &&
+    !commands.displayPending &&
+    presentation.ready &&
+    presentation.display === session.selectedDisplayId &&
+    presentation.generation === session.displayGeneration;
+  const controlAvailable = frameReady && session.controlGranted && channel !== null && channelOpen;
   const capturing = controlOn && controlAvailable;
 
+  // Reconcile all three independent clocks before paint. Marker receipt also
+  // calls this synchronously, hiding an obsolete frame and releasing held input
+  // without waiting for a React render or the next video callback.
+  useLayoutEffect(() => {
+    const fence = fenceRef.current;
+    inputCaptureRef.current?.releaseAll();
+    setControlOn(false);
+    fence.select(session.selectedDisplayId, session.displayGeneration);
+    if (!active) fence.clearPresentation();
+    const refresh = () => {
+      const ready = active && !commands.displayPending && fence.ready;
+      if (frameCoverRef.current) frameCoverRef.current.style.display = ready ? "none" : "grid";
+      if (!ready) {
+        inputCaptureRef.current?.releaseAll();
+        setControlOn(false);
+      }
+      setPresentation((current) =>
+        current.ready === ready &&
+        current.display === session.selectedDisplayId &&
+        current.generation === session.displayGeneration &&
+        current.metadataAvailable === fence.metadataAvailable
+          ? current
+          : {
+              ready,
+              display: session.selectedDisplayId,
+              generation: session.displayGeneration,
+              metadataAvailable: fence.metadataAvailable,
+            },
+      );
+    };
+    refreshPresentationRef.current = refresh;
+    refresh();
+  }, [active, commands.displayPending, session.selectedDisplayId, session.displayGeneration]);
+
+  // VIEW keeps its no-data-channel boundary. The session carries the same exact
+  // media marker; CONTROL can observe either transport first without rolling back.
+  useLayoutEffect(() => {
+    const marker = session.displayFrame;
+    if (!sessionAvailable || !marker) return;
+    fenceRef.current.receive({
+      t: "display-frame",
+      display: marker.displayId,
+      generation: marker.generation,
+      rtpTimestamp: marker.rtpTimestamp,
+    });
+    refreshPresentationRef.current();
+  }, [sessionAvailable, session.displayFrame]);
+
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !stream) return;
+    const fence = fenceRef.current;
+    fence.clearPresentation();
+    if (typeof video.requestVideoFrameCallback !== "function") {
+      fence.present(undefined);
+      refreshPresentationRef.current();
+      return;
+    }
+    let callback = 0;
+    const presented: VideoFrameRequestCallback = (_now, metadata) => {
+      fence.present(metadata.rtpTimestamp);
+      refreshPresentationRef.current();
+      callback = video.requestVideoFrameCallback(presented);
+    };
+    refreshPresentationRef.current();
+    callback = video.requestVideoFrameCallback(presented);
+    return () => {
+      video.cancelVideoFrameCallback(callback);
+      fence.clearPresentation();
+    };
+  }, [stream]);
+  const requiredKeyboardMode =
+    keyboardMode === "physical" ? AssistancePolicyMode.ON : AssistancePolicyMode.LIMITED;
+  const keyboardAllowed =
+    canPermission(principal, "remote_assistance.keyboard") &&
+    policyMode(session.effectiveCapabilities, "keyboard") >= requiredKeyboardMode &&
+    policyMode(session.grantedCapabilities?.policy, "keyboard") >= requiredKeyboardMode;
+  const displayAllowed =
+    active &&
+    canPermission(principal, "remote_assistance.display") &&
+    policyMode(session.effectiveCapabilities, "display") >= AssistancePolicyMode.LIMITED &&
+    policyMode(session.grantedCapabilities?.policy, "display") >= AssistancePolicyMode.LIMITED;
+  const controlReason = !controlRequested
+    ? ""
+    : session.state === AssistanceState.ENDED
+      ? "The session has ended, so control is no longer available."
+      : !session.controlGranted
+        ? session.state === AssistanceState.ACTIVE
+          ? "The user allowed viewing only, so you can't control this session."
+          : "Control is available after the user accepts and allows it."
+        : !active
+          ? "Control is available once the screen connects."
+          : presentation.metadataAvailable === false
+            ? "This browser cannot confirm the shared screen. Remote control is unavailable."
+            : !frameReady
+              ? "Wait for the selected screen to appear."
+              : !controlAvailable
+                ? "Wait for the screen and controls to connect."
+                : "";
+
+  useEffect(() => {
+    const container = fullscreenRef.current;
+    const changed = () => setFullscreen(document.fullscreenElement === container);
+    document.addEventListener("fullscreenchange", changed);
+    return () => {
+      document.removeEventListener("fullscreenchange", changed);
+      if (document.fullscreenElement === container)
+        void document.exitFullscreen().catch(() => {
+          toast.error("Couldn't exit full screen. Press Escape.");
+        });
+    };
+  }, []);
+
+  async function toggleFullscreen() {
+    setControlOn(false);
+    setDisplayError("");
+    try {
+      if (document.fullscreenElement === fullscreenRef.current) await document.exitFullscreen();
+      else await fullscreenRef.current?.requestFullscreen();
+    } catch {
+      setDisplayError("Couldn't change full screen. Check your browser's permissions.");
+    }
+  }
+
+  useLayoutEffect(() => {
     const surface = surfaceRef.current;
     const video = videoRef.current;
     if (!capturing || !surface || !video || !channel) return;
-    const capture = new InputCapture(channel);
+    const capture = new InputCapture(channel, session.selectedDisplayId, session.displayGeneration);
+    inputCaptureRef.current = capture;
+    const currentFrame = () => fenceRef.current.ready && channel.readyState === "open";
     const point = (event: PointerEvent) =>
-      videoFramePoint(video, event.clientX, event.clientY, capture.dragging);
+      currentFrame()
+        ? videoFramePoint(video, event.clientX, event.clientY, capture.dragging)
+        : null;
     const onPointerMove = (event: PointerEvent) => {
       const next = point(event);
       if (next) capture.move(next);
@@ -654,6 +868,7 @@ function AssistanceConnection({
       capture.button(event.button, true);
     };
     const onPointerUp = (event: PointerEvent) => {
+      if (!currentFrame()) return;
       const next = point(event);
       if (next) capture.move(next);
       if (capture.button(event.button, false)) event.preventDefault();
@@ -661,13 +876,14 @@ function AssistanceConnection({
         surface.releasePointerCapture(event.pointerId);
     };
     const onWheel = (event: WheelEvent) => {
+      if (!currentFrame()) return;
       if (!videoFramePoint(video, event.clientX, event.clientY, false)) return;
       event.preventDefault();
       capture.wheel(event);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.isComposing) return;
-      if (capture.key(event.code, event.type === "keydown")) event.preventDefault();
+      if (!keyboardAllowed || !currentFrame()) return;
+      if (capture.key(event, keyboardMode)) event.preventDefault();
     };
     const release = () => capture.releaseAll();
     const suppress = (event: Event) => event.preventDefault();
@@ -681,6 +897,10 @@ function AssistanceConnection({
     surface.addEventListener("blur", release);
     surface.addEventListener("contextmenu", suppress);
     window.addEventListener("blur", release);
+    const visibility = () => {
+      if (document.hidden) release();
+    };
+    document.addEventListener("visibilitychange", visibility);
     surface.focus();
     return () => {
       surface.removeEventListener("pointermove", onPointerMove);
@@ -693,147 +913,299 @@ function AssistanceConnection({
       surface.removeEventListener("blur", release);
       surface.removeEventListener("contextmenu", suppress);
       window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", visibility);
+      inputCaptureRef.current = null;
       capture.dispose();
     };
-  }, [capturing, channel]);
+  }, [
+    capturing,
+    channel,
+    keyboardAllowed,
+    keyboardMode,
+    session.selectedDisplayId,
+    session.displayGeneration,
+  ]);
 
   const precondition = link.failure ? assistanceFailureMessage(link.failure) : "";
   const attachedElsewhere =
     link.stage === "idle" &&
     (session.state === AssistanceState.ANSWERED || session.state === AssistanceState.ACTIVE);
-  // Why Take control is unavailable; shown next to the disabled button.
-  const controlBlocked = !controlRequested
-    ? ""
-    : !session.controlGranted
-      ? session.state === AssistanceState.ACTIVE
-        ? "The user allowed viewing only, so you can't control this session."
-        : "Control is available after the user accepts and allows it."
-      : !controlAvailable
-        ? "Control is available once the screen connects."
-        : "";
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center justify-between gap-3">
-          <span>Shared screen</span>
-          <span className="flex flex-wrap items-center gap-2 text-sm font-normal">
-            <span className="text-muted-foreground">
-              {link.stage === "answered"
-                ? (mediaLabels[connectionState] ?? "Connecting")
-                : stageLabels[link.stage]}
-            </span>
-            {controlRequested ? (
+    <div
+      ref={fullscreenRef}
+      data-assistance-fullscreen
+      className={
+        fullscreen ? "flex h-dvh min-h-0 flex-col overflow-hidden bg-background" : "bg-background"
+      }
+    >
+      <Card className={fullscreen ? "flex min-h-0 flex-1 flex-col overflow-hidden" : undefined}>
+        <CardHeader className="shrink-0">
+          <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+            <span>Screen</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm font-normal">
+              <span className="text-muted-foreground">
+                {link.stage === "answered"
+                  ? (mediaLabels[connectionState] ?? "Connecting")
+                  : stageLabels[link.stage]}
+              </span>
+              {controlRequested ? (
+                <Button
+                  variant={capturing ? "default" : "outline"}
+                  aria-describedby={controlReason ? controlHelpId : undefined}
+                  disabled={!controlOn && (!controlAvailable || ended)}
+                  onClick={() => {
+                    if (controlOn) {
+                      inputCaptureRef.current?.releaseAll();
+                      setControlOn(false);
+                    } else if (controlAvailable && fenceRef.current.ready) setControlOn(true);
+                  }}
+                >
+                  {controlOn ? "Release control" : "Take control"}
+                </Button>
+              ) : null}
               <Button
-                disabled={!controlAvailable}
-                aria-describedby={controlBlocked ? controlReasonId : undefined}
-                onClick={() => setControlOn((current) => !current)}
+                variant="outline"
+                disabled={!fullscreen && (!displayAllowed || !document.fullscreenEnabled)}
+                aria-describedby="assistance-display-help"
+                onClick={() => void toggleFullscreen()}
               >
-                {capturing ? "Release control" : "Take control"}
+                {fullscreen ? "Exit full screen" : "Full screen"}
               </Button>
-            ) : null}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-3">
-        {waitingForUser ? (
-          <p role="status">
-            Waiting for the user on the device to accept. Keep this page open; leaving cancels the
-            request.
-          </p>
-        ) : null}
-        {attachedElsewhere ? (
-          <Alert>
-            <AlertTitle>Open in another tab</AlertTitle>
-            <AlertDescription>
-              This session is already connected elsewhere. To reconnect here, stop it and request a
-              new session.
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {link.failure ? (
-          <RpcError failure={link.failure} title="Couldn't connect">
-            {precondition ? <p>{precondition}</p> : null}
-          </RpcError>
-        ) : null}
-        {link.error ? (
-          <Alert variant="destructive">
-            <AlertTitle>Couldn't connect</AlertTitle>
-            <AlertDescription>{link.error}</AlertDescription>
-          </Alert>
-        ) : null}
-        {link.stage === "failed" && link.retryable && session.state === AssistanceState.OFFERED ? (
-          <Button
-            variant="outline"
-            className="w-fit"
-            onClick={() => setAttempt((current) => current + 1)}
-          >
-            Try again
-          </Button>
-        ) : null}
-        {connectionState === "failed" ? (
-          <p role="alert" className="text-sm text-destructive">
-            The connection was lost. The session will end.
-          </p>
-        ) : null}
-        {controlBlocked ? (
-          <p id={controlReasonId} className="text-sm text-muted-foreground">
-            {controlBlocked}
-          </p>
-        ) : null}
-        {waitingForUser ? <UserSidePreview session={session} /> : null}
-        <div
-          ref={surfaceRef}
-          tabIndex={capturing ? 0 : -1}
-          hidden={waitingForUser}
-          aria-label={
-            capturing
-              ? "Remote screen. Keyboard and pointer input is sent to the device. Click outside to release the keyboard."
-              : "Remote screen"
-          }
-          className={
-            capturing
-              ? "relative aspect-video w-full touch-none overflow-hidden bg-black outline-none ring-2 ring-destructive"
-              : "relative aspect-video w-full overflow-hidden bg-black"
-          }
-        >
-          <video
-            ref={videoRef}
-            className="pointer-events-none size-full object-contain"
-            autoPlay
-            playsInline
-            muted
-            disablePictureInPicture
-          />
-          {!stream ? (
-            <p className="absolute inset-0 grid place-items-center text-sm text-white/70">
-              Waiting for the shared screen
-            </p>
-          ) : controlAvailable && !capturing ? (
-            <p className="pointer-events-none absolute inset-x-0 bottom-3 mx-auto w-fit bg-black/70 px-3 py-1.5 text-sm text-white">
-              Click Take control to use the mouse and keyboard
+              {fullscreen && !ended ? (
+                <StopButton sessionId={session.id} deviceId={deviceId} />
+              ) : null}
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={fullscreen ? "grid min-h-0 gap-3 overflow-y-auto" : "grid gap-3"}>
+          {controlReason ? (
+            <p id={controlHelpId} className="text-sm text-muted-foreground">
+              {controlReason}
             </p>
           ) : null}
-        </div>
-        {capturing ? (
-          <p className="text-sm text-muted-foreground">
-            Control is on. Keys and clicks go to the device. Click outside the screen to release the
-            keyboard.
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              aria-pressed={!actualSize}
+              disabled={!displayAllowed}
+              aria-describedby="assistance-display-help"
+              onClick={() => {
+                setControlOn(false);
+                setActualSize(false);
+              }}
+            >
+              Fit
+            </Button>
+            <Button
+              variant="outline"
+              aria-pressed={actualSize}
+              disabled={!displayAllowed}
+              aria-describedby="assistance-display-help"
+              onClick={() => {
+                setControlOn(false);
+                setActualSize(true);
+              }}
+            >
+              Actual size
+            </Button>
+          </div>
+          <p id="assistance-display-help" className="text-sm text-muted-foreground">
+            {!displayAllowed
+              ? "Display adjustments require an active session and permission from the policy and user."
+              : !document.fullscreenEnabled
+                ? "This browser does not allow full screen."
+                : "Choose how the shared display fits in this window."}
           </p>
-        ) : null}
-      </CardContent>
-    </Card>
+          {displayError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {displayError}
+            </p>
+          ) : null}
+          {waitingForUser ? (
+            <p role="status">
+              Waiting for the user on the device to accept. Keep this page open; leaving cancels the
+              request.
+            </p>
+          ) : null}
+          {attachedElsewhere ? (
+            <Alert>
+              <AlertTitle>Open in another tab</AlertTitle>
+              <AlertDescription>
+                This session is already connected elsewhere. To reconnect here, stop it and request
+                a new session.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {link.failure ? (
+            <RpcError failure={link.failure} title="Couldn't connect">
+              {precondition ? <p>{precondition}</p> : null}
+            </RpcError>
+          ) : null}
+          {link.error ? (
+            <Alert variant="destructive">
+              <AlertTitle>Couldn't connect</AlertTitle>
+              <AlertDescription>{link.error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {link.stage === "failed" &&
+          link.retryable &&
+          session.state === AssistanceState.OFFERED ? (
+            <Button
+              variant="outline"
+              className="w-fit"
+              onClick={() => setAttempt((current) => current + 1)}
+            >
+              Try again
+            </Button>
+          ) : null}
+          {connectionState === "failed" ? (
+            <p role="alert" className="text-sm text-destructive">
+              The connection was lost. The session will end.
+            </p>
+          ) : null}
+          {waitingForUser ? <UserSidePreview session={session} /> : null}
+          <div className="relative" hidden={waitingForUser}>
+            <div
+              ref={surfaceRef}
+              tabIndex={capturing ? 0 : -1}
+              role="region"
+              aria-label={
+                capturing
+                  ? "Remote screen. Keyboard and pointer input is sent to the device. Click outside to release the keyboard."
+                  : "Remote screen"
+              }
+              className={
+                capturing
+                  ? "relative aspect-video w-full touch-none overflow-auto bg-black outline-none ring-2 ring-destructive"
+                  : "relative aspect-video w-full overflow-auto bg-black"
+              }
+            >
+              <video
+                ref={videoRef}
+                className={
+                  actualSize && displayAllowed
+                    ? "pointer-events-none max-w-none object-contain"
+                    : "pointer-events-none size-full object-contain"
+                }
+                style={
+                  actualSize && displayAllowed && frameSize.width
+                    ? { width: frameSize.width, height: frameSize.height }
+                    : undefined
+                }
+                onLoadedMetadata={(event) =>
+                  setFrameSize({
+                    width: event.currentTarget.videoWidth,
+                    height: event.currentTarget.videoHeight,
+                  })
+                }
+                onResize={(event) =>
+                  setFrameSize({
+                    width: event.currentTarget.videoWidth,
+                    height: event.currentTarget.videoHeight,
+                  })
+                }
+                autoPlay
+                playsInline
+                muted
+                disablePictureInPicture
+              />
+              {stream && controlAvailable && !capturing ? (
+                <p className="pointer-events-none absolute bottom-2 left-2 bg-black/70 p-2 text-sm text-white">
+                  Click Take control to use the mouse and keyboard
+                </p>
+              ) : null}
+            </div>
+            {/* Keep the video rendering for presentation metadata; cover stale pixels
+              outside its scroll area so actual-size panning cannot expose them. */}
+            <p
+              ref={frameCoverRef}
+              role="status"
+              style={{ display: frameReady ? "none" : "grid" }}
+              className="absolute inset-0 place-items-center bg-black p-3 text-center text-sm text-white/70"
+            >
+              {ended
+                ? "Session ended"
+                : !sessionAvailable
+                  ? "Session details unavailable. Controls are paused."
+                  : !stream
+                    ? "No video yet"
+                    : !active
+                      ? "Connection interrupted. Controls are paused."
+                      : presentation.metadataAvailable === false
+                        ? "This browser cannot confirm the shared screen. Use a browser with RTP presentation metadata."
+                        : "Waiting for the selected screen…"}
+            </p>
+          </div>
+          {capturing ? (
+            <p className="text-sm text-muted-foreground">
+              Control is on. Keys and clicks go to the device. Click outside the screen to release
+              the keyboard.
+            </p>
+          ) : null}
+          <AssistanceControls
+            session={session}
+            active={active}
+            controlOn={capturing}
+            frameReady={frameReady}
+            commands={commands}
+            message={message}
+            onMessage={setMessage}
+            onSpecialKey={(specialKey) => {
+              if (!capturing || !fenceRef.current.ready || channel?.readyState !== "open") return;
+              inputCaptureRef.current?.releaseAll();
+              setControlOn(false);
+              void commands.run({ kind: AssistanceCommandKind.SPECIAL_KEYS, specialKey });
+            }}
+            keyboardMode={keyboardMode}
+            onKeyboardMode={setKeyboardMode}
+            releaseControl={() => {
+              inputCaptureRef.current?.releaseAll();
+              setControlOn(false);
+            }}
+            portalContainer={fullscreenRef}
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
 // What the person at the device sees while the request waits, mirroring the
 // desktop agent's consent notification (internal/agent/desktop/session.go
-// promptNotification): a persistent critical notification with Allow and Decline,
-// then the desktop's own screen-sharing dialog after Allow.
+// promptNotification and capabilities.go capabilityConsentText): a persistent
+// critical notification with Allow and Decline, then the desktop's own
+// screen-sharing dialog after Allow.
 function UserSidePreview({ session }: { session: AssistanceSession }) {
   const control = session.mode === AssistanceMode.CONTROL;
   const operator = session.operatorDisplay || "The requesting admin";
   const prompted = session.state === AssistanceState.PROMPTED;
+  // The agent asks only for features both requested and allowed by the policy.
+  const consented = (field: CapabilityField) =>
+    Math.min(
+      policyMode(session.requestedCapabilities, field),
+      policyMode(session.effectiveCapabilities, field),
+    );
+  const clipboard = consented("clipboard");
+  const keyboard = consented("keyboard");
+  const capabilityLines = [
+    clipboard === AssistancePolicyMode.LIMITED
+      ? "Clipboard: allow the operator to send plain text to your clipboard, but not read it."
+      : clipboard === AssistancePolicyMode.ON
+        ? "Clipboard: allow the operator to send plain text to your clipboard and explicitly read your clipboard text."
+        : "",
+    keyboard === AssistancePolicyMode.LIMITED
+      ? "Keyboard: allow printable text symbols only; shortcuts are not allowed."
+      : keyboard === AssistancePolicyMode.ON
+        ? "Keyboard: allow text symbols, physical keys and special-key shortcuts."
+        : "",
+    consented("display") === AssistancePolicyMode.ON
+      ? "Displays: allow switching among the monitors you select in the system dialog."
+      : "",
+    consented("messages") !== AssistancePolicyMode.OFF
+      ? "Messages: allow plain-text operator notifications during this session."
+      : "",
+  ].filter(Boolean);
   return (
     <section
       aria-label="What the user sees"
@@ -849,9 +1221,11 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
       <div className="grid max-w-md gap-2 rounded-md border bg-background p-3 shadow-sm">
         <p className="font-medium">Remote assistance request</p>
         <p>
-          {control
-            ? `${operator} asks to view your screen and control your keyboard and pointer.`
-            : `${operator} asks to view your screen.`}
+          {!control
+            ? `${operator} asks to view your screen.`
+            : keyboard !== AssistancePolicyMode.OFF
+              ? `${operator} asks to view your screen and control your keyboard and pointer.`
+              : `${operator} asks to view your screen and control your pointer. Keyboard control is not requested.`}
         </p>
         <p>Reason: {session.reason}</p>
         <p>
@@ -859,6 +1233,9 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
             ? "Control is requested. The system dialog that follows lets you allow viewing only."
             : "Control is not requested. The system dialog that follows selects what is shared."}
         </p>
+        {capabilityLines.map((line) => (
+          <p key={line}>{line}</p>
+        ))}
         <div className="flex gap-2" aria-hidden="true">
           <span className="rounded-md border px-3 py-1">Allow</span>
           <span className="rounded-md border px-3 py-1">Decline</span>

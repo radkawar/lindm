@@ -17,7 +17,12 @@ message SyncAssistanceRequest {
   repeated lindm.agent.v1.AssistanceReport reports = 2 [(buf.validate.field).repeated.max_items = 8];
   // The executor's applied remote-assistance setting; UNSPECIFIED from agents
   // that predate it leaves the server's view unknown.
-  lindm.agent.v1.AssistancePolicy policy = 3 [(buf.validate.field).enum.defined_only = true];
+  lindm.agent.v1.AssistanceEnablement policy = 3 [(buf.validate.field).enum.defined_only = true];
+  option (buf.validate.message).cel = {
+    id: "device_sync_assistance.one_content"
+    message: "only one device command result may carry content"
+    expression: "this.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1"
+  };
 }
 
 // SyncAssistanceResponse carries the complete desired state for every open
@@ -25,4 +30,9 @@ message SyncAssistanceRequest {
 // confirmed. A session absent from directives is not authorized.
 message SyncAssistanceResponse {
   repeated lindm.agent.v1.AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 8];
+  option (buf.validate.message).cel = {
+    id: "device_sync_assistance.one_command"
+    message: "only one device command may be outstanding"
+    expression: "this.directives.filter(d, has(d.command)).size() <= 1"
+  };
 }

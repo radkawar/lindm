@@ -49,6 +49,14 @@ var (
 type assistanceRevocations []devicedb.AssistanceSession
 
 func (s *Service) revokeAssistance(revoked assistanceRevocations) {
+	s.runtime.assistanceMu.Lock()
+	for _, row := range revoked {
+		if memory := s.runtime.assistanceCommands[row.ID]; memory != nil {
+			memory.timer.Stop()
+		}
+		delete(s.runtime.assistanceCommands, row.ID)
+	}
+	s.runtime.assistanceMu.Unlock()
 	if s.Assistance == nil {
 		return
 	}
@@ -63,13 +71,17 @@ func endAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.Assis
 	if row.State == assistanceEnded {
 		return nil
 	}
+	if err := cancelAssistanceCommand(ctx, q, row.ID, now, "session_ended"); err != nil {
+		return err
+	}
 	if err := q.EndAssistanceSession(ctx, devicedb.EndAssistanceSessionParams{ID: row.ID, EndedAt: core.Timestamptz(now), EndCause: int16(cause), EndDetail: detail, DeviceEnded: deviceEnded}); err != nil {
 		return err
 	}
 	row.State, row.EndedAt, row.EndCause, row.EndDetail, row.DeviceEnded = assistanceEnded, core.Timestamptz(now), int16(cause), detail, deviceEnded
 	row.OfferSdp, row.AnswerSdp = "", ""
 	*revoked = append(*revoked, *row)
-	return recordAssistanceAudit(ctx, q, actor, auditkind.AssistanceEnd, *row, "", "cause", assistanceCauseName(cause), "detail", detail)
+	details := append([]string{"operator", row.OperatorID.String(), "cause", assistanceCauseName(cause), "detail", detail}, assistancePolicyAudit(decodeAssistancePolicy(row.EffectiveCapabilities))...)
+	return recordAssistanceAudit(ctx, q, actor, auditkind.AssistanceEnd, *row, "", details...)
 }
 
 // enforceAssistance applies the server-side deadlines to an open session:
@@ -84,6 +96,8 @@ func enforceAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.A
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT, "", false, revoked)
 	case row.State >= assistancePrompted && (!row.DeviceSyncedAt.Valid || now.Sub(row.DeviceSyncedAt.Time) >= assistanceUnreachable):
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "device_unreachable", false, revoked)
+	case !now.Before(row.AuthorizedUntil.Time):
+		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "operator_authorization_expired", false, revoked)
 	}
 	return nil
 }
@@ -102,25 +116,27 @@ func enforceOpenAssistance(ctx context.Context, q *devicedb.Queries, deviceID uu
 
 func assistanceMessage(row devicedb.AssistanceSession) *adminv1.AssistanceSession {
 	session := &adminv1.AssistanceSession{
-		Id:                row.ID.String(),
-		DeviceId:          row.DeviceID.String(),
-		OperatorId:        row.OperatorID.String(),
-		OperatorDisplay:   row.OperatorDisplay,
-		Mode:              agentv1.AssistanceMode(row.Mode),
-		Reason:            row.Reason,
-		State:             adminv1.AssistanceState(row.State),
-		CreatedAt:         core.ProtoTime(row.CreatedAt),
-		ConsentDeadline:   core.ProtoTime(row.ConsentDeadline),
-		EndsAt:            core.ProtoTime(row.EndsAt),
-		ConsentedAt:       core.ProtoTime(row.ConsentedAt),
-		StartedAt:         core.ProtoTime(row.StartedAt),
-		EndedAt:           core.ProtoTime(row.EndedAt),
-		EndCause:          agentv1.AssistanceEndCause(row.EndCause),
-		EndDetail:         row.EndDetail,
-		ControlGranted:    row.ControlGranted,
-		OfferFingerprint:  row.OfferFingerprint,
-		AnswerFingerprint: row.AnswerFingerprint,
-		TargetUsername:    row.TargetUsername,
+		Id:                    row.ID.String(),
+		DeviceId:              row.DeviceID.String(),
+		OperatorId:            row.OperatorID.String(),
+		OperatorDisplay:       row.OperatorDisplay,
+		Mode:                  agentv1.AssistanceMode(row.Mode),
+		Reason:                row.Reason,
+		State:                 adminv1.AssistanceState(row.State),
+		CreatedAt:             core.ProtoTime(row.CreatedAt),
+		ConsentDeadline:       core.ProtoTime(row.ConsentDeadline),
+		EndsAt:                core.ProtoTime(row.EndsAt),
+		ConsentedAt:           core.ProtoTime(row.ConsentedAt),
+		StartedAt:             core.ProtoTime(row.StartedAt),
+		EndedAt:               core.ProtoTime(row.EndedAt),
+		EndCause:              agentv1.AssistanceEndCause(row.EndCause),
+		EndDetail:             row.EndDetail,
+		ControlGranted:        row.ControlGranted,
+		OfferFingerprint:      row.OfferFingerprint,
+		AnswerFingerprint:     row.AnswerFingerprint,
+		TargetUsername:        row.TargetUsername,
+		RequestedCapabilities: decodeAssistancePolicy(row.RequestedCapabilities),
+		EffectiveCapabilities: decodeAssistancePolicy(row.EffectiveCapabilities),
 	}
 	if row.LocalLogindSession != "" {
 		session.LocalSession = &agentv1.AssistanceLocalSession{
@@ -131,6 +147,14 @@ func assistanceMessage(row devicedb.AssistanceSession) *adminv1.AssistanceSessio
 			Desktop:         row.LocalDesktop,
 		}
 	}
+	projection := assistanceProjection(row)
+	session.GrantedCapabilities = projection.GetGrantedCapabilities()
+	session.Displays = projection.GetDisplays()
+	session.SelectedDisplayId = projection.GetSelectedDisplayId()
+	session.DisplayGeneration = projection.GetDisplayGeneration()
+	if row.State != int16(adminv1.AssistanceState_ASSISTANCE_STATE_ENDED) {
+		session.DisplayFrame = projection.GetDisplayFrame()
+	}
 	return session
 }
 
@@ -140,15 +164,18 @@ func (s *Service) assistanceDirective(row devicedb.AssistanceSession) (*agentv1.
 		return nil, err
 	}
 	directive := &agentv1.AssistanceDirective{Invitation: &agentv1.AssistanceInvitation{
-		SessionId:       row.ID.String(),
-		Mode:            agentv1.AssistanceMode(row.Mode),
-		Reason:          row.Reason,
-		OperatorDisplay: row.OperatorDisplay,
-		ConsentDeadline: timestamppb.New(row.ConsentDeadline.Time),
-		EndsAt:          timestamppb.New(row.EndsAt.Time),
-		TargetUsername:  row.TargetUsername,
-		IceServers:      []*agentv1.AssistanceIceServer{ice},
+		SessionId:             row.ID.String(),
+		Mode:                  agentv1.AssistanceMode(row.Mode),
+		Reason:                row.Reason,
+		OperatorDisplay:       row.OperatorDisplay,
+		ConsentDeadline:       timestamppb.New(row.ConsentDeadline.Time),
+		EndsAt:                timestamppb.New(row.EndsAt.Time),
+		TargetUsername:        row.TargetUsername,
+		IceServers:            []*agentv1.AssistanceIceServer{ice},
+		RequestedCapabilities: decodeAssistancePolicy(row.RequestedCapabilities),
+		EffectiveCapabilities: decodeAssistancePolicy(row.EffectiveCapabilities),
 	}}
+	directive.AuthorizedUntil = core.ProtoTime(row.AuthorizedUntil)
 	switch row.State {
 	case assistanceAnswered, assistanceActive:
 		directive.AnswerSdp = row.AnswerSdp

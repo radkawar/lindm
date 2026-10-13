@@ -185,7 +185,7 @@ func TestRecoveryReadinessIgnoresCallerImageSize(t *testing.T) {
 	observation.ConfiguredImageSha256 = digest
 	observation.ConfiguredImageSize = proto.Uint64(1)
 	host := devicedb.GetHostObservationRow{ReceivedAt: core.Timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
-	s := composed(&core.Service{RecoveryArtifacts: client})
+	s := composed(t, &core.Service{RecoveryArtifacts: client})
 	details := &inventoryv1.NativeDetails{RecoveryReadiness: observation}
 	got, err := s.RecoveryReadiness(t.Context(), host, details, digest, now)
 	if err != nil || got.GetReady() || got.GetImageSize() != 8193 || got.GetNeededBytes() != 12288 || got.GetReason() != "device_action_esp_insufficient" {
@@ -209,7 +209,7 @@ func TestMeasuredRecoveryReadinessBindsSignedKernel(t *testing.T) {
 	now := time.Now().UTC()
 	observation := measuredObservationFixture(now, kernelDigest)
 	host := devicedb.GetHostObservationRow{ReceivedAt: core.Timestamptz(now), BootIDStatus: int16(inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS), BootIDValue: observation.GetBootId()}
-	s := composed(&core.Service{RecoveryArtifacts: client})
+	s := composed(t, &core.Service{RecoveryArtifacts: client})
 	details := &inventoryv1.NativeDetails{RecoveryReadiness: observation}
 	got, err := s.RecoveryReadiness(t.Context(), host, details, digest, now)
 	if err != nil || !got.GetReady() || got.GetBootMode() != agentv1.RecoveryBootMode_RECOVERY_BOOT_MODE_MEASURED_GRUB || got.GetImageSize() != 4097 || got.GetNeededBytes() != 8192 {

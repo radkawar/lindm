@@ -72,6 +72,42 @@ func TestUnknownReleaseIsGated(t *testing.T) {
 	}
 }
 
+// Interactive capabilities must not follow ID_LIKE or a derivative's base:
+// doing so would admit unsupported portal/session boundaries to the native lane.
+func TestInteractiveAssistanceGates(t *testing.T) {
+	for _, test := range []struct {
+		os        OSRelease
+		supported bool
+	}{
+		{OSRelease{ID: "ubuntu", VersionID: "24.04"}, true},
+		{OSRelease{ID: "fedora", VersionID: "44", VariantID: "workstation"}, true},
+		{OSRelease{ID: "ubuntu", VersionID: "22.04"}, false},
+		{OSRelease{ID: "ubuntu", VersionID: "26.04"}, false},
+		{OSRelease{ID: "fedora", VersionID: "43"}, false},
+		{OSRelease{ID: "fedora", VersionID: "44", VariantID: "silverblue"}, false},
+		{OSRelease{ID: "linuxmint", VersionID: "22.3"}, false},
+		{OSRelease{ID: "zorin", VersionID: "17"}, false},
+	} {
+		release := Identify(test.os)
+		for _, capability := range []Capability{AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages} {
+			err := release.Gate(capability)
+			if test.supported {
+				if err != nil {
+					t.Errorf("%s %s unexpectedly gated: %v", release.Name, capability, err)
+				}
+				if base := release.Gate(Assistance); base != nil {
+					t.Errorf("%s admits %s without base assistance: %v", release.Name, capability, base)
+				}
+				continue
+			}
+			var gate *GateError
+			if !errors.As(err, &gate) || gate.Reason == "" {
+				t.Errorf("%s %s lacks an explicit refusal: %v", release.Name, capability, err)
+			}
+		}
+	}
+}
+
 func TestDerivativeUsesBaseTooling(t *testing.T) {
 	mint := Identify(OSRelease{ID: "linuxmint", VersionID: "22.3"})
 	if mint.Native().Key != "ubuntu-24.04" || mint.Native().Packages.Backend != BackendAPT {

@@ -123,6 +123,9 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 		}
 	}
 
+	if err := peer.BeginDisplay("monitor-1", 1); err != nil {
+		t.Fatal(err)
+	}
 	browser := browserPeer(t, url)
 	received := make(chan struct{})
 	browser.OnTrack(func(track *webrtc.TrackRemote, _ *webrtc.RTPReceiver) {
@@ -131,7 +134,11 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 		}
 	})
 	channels := make(chan *webrtc.DataChannel, 1)
-	browser.OnDataChannel(func(channel *webrtc.DataChannel) { channels <- channel })
+	markers := make(chan string, 1)
+	browser.OnDataChannel(func(channel *webrtc.DataChannel) {
+		channel.OnMessage(func(message webrtc.DataChannelMessage) { markers <- string(message.Data) })
+		channels <- channel
+	})
 	answerSDP := answer(t, browser, offer)
 	if err := relayOnly(answerSDP); err != nil {
 		t.Fatalf("answer candidates: %v", err)
@@ -160,7 +167,7 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 				return
 			case <-ticker.C:
 				packet[2], packet[3] = byte(seq>>8), byte(seq)
-				_ = peer.WriteRTP(packet)
+				_, _ = peer.WriteRTP(packet)
 			}
 		}
 	}()
@@ -188,16 +195,42 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("data channel did not open")
 	}
-	if err := channel.SendText(`{"t":"key","code":"KeyA","down":true}`); err != nil {
+	// The production transport sends the same exact timestamp as the packet
+	// already received above, over the existing reliable ordered channel.
+	frame := DisplayFrame{Display: "monitor-1", Generation: 1, RTPTimestamp: 1}
+	if err := peer.PublishDisplayFrame(frame); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case message := <-markers:
+		if decodeDisplayFrame(t, message) != frame {
+			t.Fatalf("transport marker = %s", message)
+		}
+	case <-ctx.Done():
+		t.Fatal("display marker not delivered")
+	}
+	if err := channel.SendText(`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}`); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case message := <-peer.Input():
-		if string(message) != `{"t":"key","code":"KeyA","down":true}` {
+		if string(message) != `{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}` {
 			t.Fatalf("input = %q", message)
 		}
 	case <-ctx.Done():
 		t.Fatal("input message not delivered")
+	}
+	// Switch draining is fixed without weakening overflow's stuck-key defense.
+	// With no consumer, overflowing even with a release must still fail closed.
+	for range inputQueueSize + 1 {
+		if err := channel.SendText(`{"t":"release"}`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	select {
+	case <-peer.Failed():
+	case <-ctx.Done():
+		t.Fatal("input queue overflow did not fail closed")
 	}
 }
 

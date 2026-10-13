@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"time"
+	"unicode"
 )
 
 // Input data-channel limits from the assistance contract.
@@ -36,40 +38,50 @@ const (
 	inputButton
 	inputWheel
 	inputKey
+	inputKeysym
+	inputRelease
 )
 
 // InputEvent is one validated operator input already mapped to portal
 // arguments. X and Y are normalized [0,1] coordinates; Button and Keycode are
 // evdev codes; DX and DY are discrete wheel steps (positive is right/down).
 type InputEvent struct {
-	kind    inputKind
-	X, Y    float64
-	Button  int32
-	Keycode int32
-	DX, DY  int32
-	Down    bool
+	kind       inputKind
+	X, Y       float64
+	Button     int32
+	Keycode    int32
+	Keysym     int32
+	Display    string
+	Generation uint32
+	DX, DY     int32
+	Down       bool
 }
 
 var errInvalidInput = errors.New("invalid_input")
 
 type inputWire struct {
-	T    string   `json:"t"`
-	X    *float64 `json:"x"`
-	Y    *float64 `json:"y"`
-	B    *string  `json:"b"`
-	Down *bool    `json:"down"`
-	DX   *float64 `json:"dx"`
-	DY   *float64 `json:"dy"`
-	Code *string  `json:"code"`
+	T          string   `json:"t"`
+	X          *float64 `json:"x"`
+	Y          *float64 `json:"y"`
+	B          *string  `json:"b"`
+	Down       *bool    `json:"down"`
+	DX         *float64 `json:"dx"`
+	DY         *float64 `json:"dy"`
+	Code       *string  `json:"code"`
+	Keysym     *int32   `json:"keysym"`
+	Display    *string  `json:"display"`
+	Generation *uint32  `json:"generation"`
 }
 
 // parseInput validates one data-channel message. Messages are single JSON
 // objects of at most 256 bytes with exactly the fields of their type:
 //
-//	{"t":"move","x":0..1,"y":0..1}
-//	{"t":"button","b":"left|middle|right","down":bool}
-//	{"t":"wheel","dx":-10..10,"dy":-10..10}   (integral steps, positive right/down)
-//	{"t":"key","code":"<KeyboardEvent.code>","down":bool}
+//	{"t":"move","x":0..1,"y":0..1,"display":"monitor-1","generation":1}
+//	{"t":"button","b":"left|middle|right","down":bool,"display":"monitor-1","generation":1}
+//	{"t":"wheel","dx":-10..10,"dy":-10..10,"display":"monitor-1","generation":1}
+//	{"t":"key","code":"<KeyboardEvent.code>","down":bool,"display":"monitor-1","generation":1}
+//	{"t":"keysym","keysym":<printable XKB keysym>,"down":bool,"display":"monitor-1","generation":1}
+//	{"t":"release"}
 func parseInput(message []byte) (InputEvent, error) {
 	if len(message) == 0 || len(message) > maxInputMessageBytes {
 		return InputEvent{}, fmt.Errorf("%w: size", errInvalidInput)
@@ -92,6 +104,16 @@ func parseInput(message []byte) (InputEvent, error) {
 		return true
 	}
 	x, y, b, down, dx, dy, code := wire.X != nil, wire.Y != nil, wire.B != nil, wire.Down != nil, wire.DX != nil, wire.DY != nil, wire.Code != nil
+	if wire.T == "move" || wire.T == "button" || wire.T == "wheel" || wire.T == "key" || wire.T == "keysym" {
+		if wire.Display == nil || *wire.Display == "" || len(*wire.Display) > 64 || wire.Generation == nil || *wire.Generation == 0 {
+			return InputEvent{}, fmt.Errorf("%w: display fence", errInvalidInput)
+		}
+	} else if wire.Display != nil || wire.Generation != nil {
+		return InputEvent{}, fmt.Errorf("%w: unexpected display fence", errInvalidInput)
+	}
+	if wire.T != "keysym" && wire.Keysym != nil {
+		return InputEvent{}, fmt.Errorf("%w: unexpected keysym", errInvalidInput)
+	}
 	switch wire.T {
 	case "move":
 		if !present(x, y) || b || down || dx || dy || code {
@@ -100,7 +122,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !unit(*wire.X) || !unit(*wire.Y) {
 			return InputEvent{}, fmt.Errorf("%w: move range", errInvalidInput)
 		}
-		return InputEvent{kind: inputMove, X: *wire.X, Y: *wire.Y}, nil
+		return InputEvent{kind: inputMove, X: *wire.X, Y: *wire.Y, Display: *wire.Display, Generation: *wire.Generation}, nil
 	case "button":
 		if !present(b, down) || x || y || dx || dy || code {
 			return InputEvent{}, fmt.Errorf("%w: button fields", errInvalidInput)
@@ -116,7 +138,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		default:
 			return InputEvent{}, fmt.Errorf("%w: button name", errInvalidInput)
 		}
-		return InputEvent{kind: inputButton, Button: button, Down: *wire.Down}, nil
+		return InputEvent{kind: inputButton, Button: button, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
 	case "wheel":
 		if !present(dx, dy) || x || y || b || down || code {
 			return InputEvent{}, fmt.Errorf("%w: wheel fields", errInvalidInput)
@@ -126,7 +148,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !okX || !okY {
 			return InputEvent{}, fmt.Errorf("%w: wheel range", errInvalidInput)
 		}
-		return InputEvent{kind: inputWheel, DX: stepsX, DY: stepsY}, nil
+		return InputEvent{kind: inputWheel, DX: stepsX, DY: stepsY, Display: *wire.Display, Generation: *wire.Generation}, nil
 	case "key":
 		if !present(code, down) || x || y || b || dx || dy {
 			return InputEvent{}, fmt.Errorf("%w: key fields", errInvalidInput)
@@ -135,10 +157,43 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !ok {
 			return InputEvent{}, fmt.Errorf("%w: unmapped key", errInvalidInput)
 		}
-		return InputEvent{kind: inputKey, Keycode: keycode, Down: *wire.Down}, nil
+		return InputEvent{kind: inputKey, Keycode: keycode, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
+	case "keysym":
+		if !present(wire.Keysym != nil, down) || x || y || b || dx || dy || code || !printableKeysym(*wire.Keysym) {
+			return InputEvent{}, fmt.Errorf("%w: keysym fields", errInvalidInput)
+		}
+		return InputEvent{kind: inputKeysym, Keysym: *wire.Keysym, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
+	case "release":
+		if x || y || b || down || dx || dy || code {
+			return InputEvent{}, fmt.Errorf("%w: release fields", errInvalidInput)
+		}
+		return InputEvent{kind: inputRelease}, nil
 	default:
 		return InputEvent{}, fmt.Errorf("%w: type", errInvalidInput)
 	}
+}
+
+// Printable symbols are semantic XKB input, not arbitrary Unicode text/IME
+// insertion. The compositor may have no mapping in its current keymap.
+// Only libxkbcommon's graphical table participates: action, dead, modifier and
+// keypad keysyms stay excluded even if a general XKB converter gives them text.
+func printableKeysym(keysym int32) bool {
+	value := keysym
+	if uint32(keysym)&0xff000000 == 0x01000000 {
+		value = keysym & 0x00ffffff
+		if value <= 0xff {
+			return false
+		}
+	} else if value > 0xff {
+		index := sort.Search(len(legacyKeysymUnicode), func(i int) bool {
+			return int32(legacyKeysymUnicode[i].keysym) >= keysym
+		})
+		if index == len(legacyKeysymUnicode) || int32(legacyKeysymUnicode[index].keysym) != keysym {
+			return false
+		}
+		value = int32(legacyKeysymUnicode[index].unicode)
+	}
+	return value >= 0x20 && value <= 0x10ffff && unicode.IsPrint(rune(value))
 }
 
 func unit(value float64) bool {
@@ -180,10 +235,11 @@ func (l *inputLimiter) allow(now time.Time) bool {
 type pressedInput struct {
 	buttons map[int32]struct{}
 	keys    map[int32]struct{}
+	symbols map[int32]struct{}
 }
 
 func newPressedInput() *pressedInput {
-	return &pressedInput{buttons: map[int32]struct{}{}, keys: map[int32]struct{}{}}
+	return &pressedInput{buttons: map[int32]struct{}{}, keys: map[int32]struct{}{}, symbols: map[int32]struct{}{}}
 }
 
 func (p *pressedInput) observe(event InputEvent) {
@@ -194,6 +250,8 @@ func (p *pressedInput) observe(event InputEvent) {
 		set, code = p.buttons, event.Button
 	case inputKey:
 		set, code = p.keys, event.Keycode
+	case inputKeysym:
+		set, code = p.symbols, event.Keysym
 	default:
 		return
 	}
@@ -206,14 +264,18 @@ func (p *pressedInput) observe(event InputEvent) {
 
 // releases returns release events for everything still held, keys first.
 func (p *pressedInput) releases() []InputEvent {
-	events := make([]InputEvent, 0, len(p.keys)+len(p.buttons))
+	events := make([]InputEvent, 0, len(p.keys)+len(p.symbols)+len(p.buttons))
 	for code := range p.keys {
 		events = append(events, InputEvent{kind: inputKey, Keycode: code})
+	}
+	for symbol := range p.symbols {
+		events = append(events, InputEvent{kind: inputKeysym, Keysym: symbol})
 	}
 	for code := range p.buttons {
 		events = append(events, InputEvent{kind: inputButton, Button: code})
 	}
 	clear(p.keys)
+	clear(p.symbols)
 	clear(p.buttons)
 	return events
 }

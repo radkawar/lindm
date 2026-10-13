@@ -21,6 +21,7 @@ import (
 	"lindm/internal/assistrelay"
 	"lindm/internal/config"
 	"lindm/internal/device"
+	"lindm/internal/device/assistance"
 	devicecore "lindm/internal/device/core"
 	"lindm/internal/device/dispatch"
 	"lindm/internal/executionauthority"
@@ -232,6 +233,7 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		}
 	}
 	native := loadNativeRepositories(ctx, resources)
+	assistanceRuntime := assistance.NewRuntime()
 	deviceConfig := devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
@@ -250,14 +252,15 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		RequireReleaseCompatibility:  true,
 		EnrollmentInstructions:       enrollmentInstructions(resources, native),
 		Assistance:                   relay,
+		AssistancePolicyCeiling:      resources.Proto.GetAssistance().GetPolicyCeiling(),
 	}
-	devices, err := device.New(pool, deviceConfig)
+	devices, err := device.New(pool, deviceConfig, assistanceRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("initialize device service: %w", err)
 	}
-	// The same domain service on the console pool serves only admin handlers
-	// and the console's fleet population.
-	consoleDevices, err := device.New(adminPool, deviceConfig)
+	// SQL cores retain separate pool admission; only the process-local assistance
+	// command broker is shared between administrative admission and device sync.
+	consoleDevices, err := device.New(adminPool, deviceConfig, assistanceRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("initialize console device service: %w", err)
 	}

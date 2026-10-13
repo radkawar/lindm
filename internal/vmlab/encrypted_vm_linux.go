@@ -350,7 +350,8 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		args = append(args, "-chardev", "socket,id=tpm,path=tpm.sock", "-tpmdev", "emulator,id=tpm0,chardev=tpm", "-device", device+",tpmdev=tpm0")
 	}
 	if hardware.Desktop {
-		args = append(args, encryptedDesktopDevices(hardware.Architecture)...)
+		args = append(args, vmDisplayArguments(hardware)...)
+		args = append(args, encryptedDesktopInputDevices(hardware.Architecture)...)
 	}
 	if installer != "" {
 		relative, relErr := filepath.Rel(v.dir, installer)
@@ -761,12 +762,12 @@ func (v *EncryptedVM) Close() error {
 	return nil
 }
 
-// encryptedDesktopDevices attaches the private display and its input. q35
+// encryptedDesktopInputDevices attaches the desktop's input devices. q35
 // always carries an i8042 PS/2 keyboard for QMP send-key; aarch64 virt has no
 // keyboard at all, so keys (e.g. Escape closing GNOME's login overview) need a
 // USB keyboard there.
-func encryptedDesktopDevices(architecture string) []string {
-	devices := []string{"-device", "virtio-gpu-pci", "-vnc", "unix:display.sock", "-device", "qemu-xhci,id=usb", "-device", "usb-tablet,bus=usb.0"}
+func encryptedDesktopInputDevices(architecture string) []string {
+	devices := []string{"-device", "qemu-xhci,id=usb", "-device", "usb-tablet,bus=usb.0"}
 	if architecture == "aarch64" {
 		devices = append(devices, "-device", "usb-kbd,bus=usb.0")
 	}

@@ -221,7 +221,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	var chromiumConfig acceptanceBrowserConfig
 	for _, engine := range selected {
 		username := "acceptance-" + engine
-		enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, username)
+		enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, username, "owner")
 		if err != nil {
 			resultErr = errors.Join(resultErr, fmt.Errorf("%s enrollment fixture: %w", engine, err))
 			continue

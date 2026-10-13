@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"net"
 	"slices"
 	"strings"
 	"time"
@@ -36,6 +37,9 @@ type assistanceRun struct {
 	// over TCP, as a remote browser behind an SSH forward must.
 	turnTCP          bool
 	forwardedTURNURL string
+	fixtureLive      bool
+	headConnection   net.Conn
+	headOneLabel     string
 }
 
 // browserMedia mirrors the runner's camelCase observation.
@@ -53,6 +57,8 @@ type browserMedia struct {
 	ControlButton       bool     `json:"controlButton"`
 	LocalRelayProtocol  string   `json:"localRelayProtocol"`
 	LocalCandidateURL   string   `json:"localCandidateURL"`
+	OpenInputChannels   int      `json:"openInputChannels"`
+	MarkerHead          int      `json:"markerHead"`
 }
 
 // assistanceNoncePath is written only by the guest terminal's own shell.
@@ -129,10 +135,36 @@ func ended(session *adminv1.AssistanceSession) bool {
 // scenario runs one complete session: console request, local consent through
 // the product prompt and the desktop portal, live media in the console, the
 // scenario's end path, and device-side capture shutdown.
-func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpec) error {
+func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpec) (err error) {
+	defer func() { err = errors.Join(err, r.stopFixture(context.WithoutCancel(ctx))) }()
+	if spec.capability != "" {
+		if err := r.release.Gate(spec.capability); err != nil {
+			return err
+		}
+	}
+	if spec.name == "monitors" {
+		if err := r.screen.waitNoBanner(ctx, 45*time.Second); err != nil {
+			return err
+		}
+		head, err := activateAssistanceHead(ctx, r.vm.guest)
+		if err != nil {
+			return err
+		}
+		r.headConnection = head
+		defer func() { err = errors.Join(err, head.Close()) }()
+		if err := r.observeMonitorLayout(ctx); err != nil {
+			return err
+		}
+		if _, err := r.screen.captureReference(ctx, "two-head-desktop-reference"); err != nil {
+			return err
+		}
+	}
 	control := spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
-	scenario := &assistanceScenarioEvidence{Name: spec.name, Mode: map[bool]string{true: "control", false: "view"}[control], ExpectedCause: assistanceCauseText(spec.cause), ExpectedDetail: spec.detail}
+	scenario := &assistanceScenarioEvidence{Name: spec.name, DeviceID: r.deviceID, Mode: map[bool]string{true: "control", false: "view"}[control], ExpectedCause: assistanceCauseText(spec.cause), ExpectedDetail: spec.detail}
 	r.result.Scenarios = append(r.result.Scenarios, scenario)
+	if err := r.prepareModeAuthority(ctx, scenario); err != nil {
+		return err
+	}
 	// rerequest asks again right after control ended, without waiting for
 	// its "ended" notice to go: the new request must be on screen at once.
 	if spec.name != "rerequest" {
@@ -143,7 +175,23 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	var created struct {
 		SessionID string `json:"sessionId"`
 	}
-	if err := r.browser.call(ctx, "request", map[string]any{"deviceId": r.deviceID, "mode": scenario.Mode, "reason": "lab assistance " + spec.name + " scenario", "minutes": 10}, &created, time.Minute); err != nil {
+	capabilities := map[string]string{}
+	if control {
+		capabilities["Keyboard"] = "Text and physical keys"
+	}
+	switch spec.name {
+	case "clipboard", "clipboard-policy":
+		capabilities["Clipboard"] = "Send and read text"
+	case "clipboard-limited":
+		capabilities["Clipboard"] = "Send text only"
+	case "display":
+		capabilities["Displays"] = "Current display only"
+	case "monitors":
+		capabilities["Displays"] = "Select shared displays"
+	case "message":
+		capabilities["Messages"] = "Sequential messages"
+	}
+	if err := r.browser.call(ctx, "request", map[string]any{"deviceId": r.deviceID, "mode": scenario.Mode, "reason": "lab assistance " + spec.name + " scenario", "minutes": 10, "capabilities": capabilities}, &created, time.Minute); err != nil {
 		return err
 	}
 	if !vmValidID(created.SessionID) {
@@ -158,7 +206,6 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	}
 	var prompt *image.RGBA
 	var banner image.Rectangle
-	var err error
 	if spec.name == "rerequest" {
 		// No waiting out other notices: a resident "ended" banner that hides
 		// the request is the failure (org demo finance-desktop, Fedora 44).
@@ -178,6 +225,10 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if err := r.browserScreenshot(ctx, scenario, "awaiting-consent"); err != nil {
 		return err
 	}
+	if err := r.browser.call(ctx, "boundary", nil, nil, 30*time.Second); err != nil {
+		return err
+	}
+	scenario.NegativeBoundaries = append(scenario.NegativeBoundaries, "preconsent-capability-actions-disabled")
 	// The prompt's actions are declared allow, decline.
 	if spec.cause == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED && !spec.portalCancel {
 		if err := r.screen.clickNotificationAction(ctx, banner, 2, 1, "consent-decline", scenario); err != nil {
@@ -207,6 +258,11 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	}
 	if err != nil {
 		return err
+	}
+	if spec.name == "monitors" {
+		if err := r.screen.selectMonitors(ctx, dialog, scenario); err != nil {
+			return err
+		}
 	}
 	if err := r.screen.click(ctx, portal.Bounds(), portalShareButton(dialog), "portal-share", scenario); err != nil {
 		return err
@@ -240,10 +296,44 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if err := r.guestScreenshot(scenario, "sharing", sharing); err != nil {
 		return err
 	}
+	if spec.name == "clipboard-policy" || spec.name == "clipboard-permission" {
+		if err := r.authorizationWitness(ctx, scenario, session); err != nil {
+			return err
+		}
+		if spec.name == "clipboard-policy" {
+			return r.finish(ctx, spec, scenario, true)
+		}
+	} else if spec.capability != "" {
+		if err := r.tierOne(ctx, scenario, session); err != nil {
+			return err
+		}
+	} else if !control {
+		if err := r.browser.call(ctx, "boundary", nil, nil, 30*time.Second); err != nil {
+			return err
+		}
+		scenario.NegativeBoundaries = append(scenario.NegativeBoundaries, "view-ungranted-capability-actions-disabled")
+	}
+	if spec.name == "authority-control" {
+		if err := r.revokeModeControl(ctx, scenario); err != nil {
+			return err
+		}
+		return r.finish(ctx, spec, scenario, true)
+	}
+	if spec.name == "monitors" {
+		terminal, err := r.unplugSelectedMonitor(ctx, scenario)
+		if err != nil {
+			return err
+		}
+		spec.cause = terminal.GetEndCause()
+		scenario.ExpectedCause = assistanceCauseText(spec.cause)
+		return r.finish(ctx, spec, scenario, true)
+	}
 	switch spec.cause {
 	case agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED:
-		if err := r.typeNonce(ctx, scenario); err != nil {
-			return err
+		if spec.capability == "" {
+			if err := r.typeNonce(ctx, scenario); err != nil {
+				return err
+			}
 		}
 		if err := r.browser.call(ctx, "stop", nil, nil, time.Minute); err != nil {
 			return err
@@ -321,6 +411,7 @@ func (r *assistanceRun) unavailable(ctx context.Context, spec assistanceScenario
 // verifyBinding checks the server bound the consenting local session the lab
 // logged in through GDM, and that control was granted exactly when requested.
 func (r *assistanceRun) verifyBinding(scenario *assistanceScenarioEvidence, session *adminv1.AssistanceSession, control bool) error {
+	scenario.OperatorID, scenario.OperatorDisplay = session.GetOperatorId(), session.GetOperatorDisplay()
 	local := session.GetLocalSession()
 	scenario.LocalSession = &assistanceLocalEvidence{Username: local.GetUsername(), UID: local.GetUid(), LogindSessionID: local.GetLogindSessionId()}
 	scenario.ControlGranted = session.GetControlGranted()
@@ -422,6 +513,10 @@ func (r *assistanceRun) finish(ctx context.Context, spec assistanceScenarioSpec,
 		return err
 	}
 	scenario.ConsoleEndCause = console.Cause
+	if err := r.browser.call(ctx, "boundary", nil, nil, 30*time.Second); err != nil {
+		return err
+	}
+	scenario.NegativeBoundaries = append(scenario.NegativeBoundaries, "ended-capability-actions-disabled")
 	if err := r.browserScreenshot(ctx, scenario, "ended"); err != nil {
 		return err
 	}
@@ -446,6 +541,11 @@ func (r *assistanceRun) finish(ctx context.Context, spec assistanceScenarioSpec,
 			return fmt.Errorf("unlock lab desktop after lock scenario: %w", err)
 		}
 	}
+	if spec.name == "clipboard" {
+		if err := r.clipboardRefusal(ctx, scenario, "ended"); err != nil {
+			return err
+		}
+	}
 	return r.browser.call(ctx, "leave", map[string]any{"deviceId": r.deviceID}, nil, time.Minute)
 }
 
@@ -464,10 +564,11 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 			return nil, vmControlPlaneError("list audit events", err)
 		}
 		for _, event := range response.Msg.GetEvents() {
-			if !strings.HasPrefix(event.GetAction(), "assistance.") || sessions[event.GetResourceId()] == nil {
+			scenario := sessions[event.GetResourceId()]
+			if !strings.HasPrefix(event.GetAction(), "assistance.") || scenario == nil || event.GetTargetDeviceId() != scenario.DeviceID {
 				continue
 			}
-			rows = append(rows, assistanceAuditEvidence{ID: event.GetId(), OccurredAt: event.GetOccurredAt().AsTime(), ActorID: event.GetActorId(), Action: event.GetAction(), SessionID: event.GetResourceId(), Reason: event.GetReason(), TargetDeviceID: event.GetTargetDeviceId(), Details: event.GetDetails()})
+			rows = append(rows, assistanceAuditEvidence{ID: event.GetId(), OccurredAt: event.GetOccurredAt().AsTime(), ActorID: event.GetActorId(), Action: event.GetAction(), ResourceID: event.GetResourceId(), Reason: event.GetReason(), TargetDeviceID: event.GetTargetDeviceId(), Details: event.GetDetails()})
 		}
 		token = response.Msg.GetNextPageToken()
 		if token == "" {
@@ -475,9 +576,35 @@ func collectAssistanceAudit(ctx context.Context, owner *devlab.OwnerSession, sce
 		}
 	}
 	for _, scenario := range scenarios {
+		if scenario.CapabilityWitness == "" {
+			continue
+		}
+		expected := []string{"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start"}
+		if scenario.Name != "monitors" {
+			expected = append(expected, "assistance.stop")
+		}
+		switch scenario.Name {
+		case "clipboard", "clipboard-limited":
+			expected = append(expected, "assistance.clipboard")
+		case "keyboard":
+			expected = append(expected, "assistance.special_keys")
+		case "message":
+			expected = append(expected, "assistance.message")
+		case "monitors":
+			expected = append(expected, "assistance.display")
+		}
+		for _, action := range expected {
+			if !slices.ContainsFunc(rows, func(row assistanceAuditEvidence) bool {
+				return row.ResourceID == scenario.SessionID && row.Action == action
+			}) {
+				return rows, fmt.Errorf("scenario %s lacks audit %s", scenario.Name, action)
+			}
+		}
+	}
+	for _, scenario := range scenarios {
 		actions := map[string]map[string]string{}
 		for _, row := range rows {
-			if row.SessionID == scenario.SessionID {
+			if row.ResourceID == scenario.SessionID {
 				actions[row.Action] = row.Details
 			}
 		}

@@ -1,6 +1,6 @@
 //go:build integration
 
-package device
+package assistance
 
 import (
 	"testing"
@@ -14,9 +14,31 @@ import (
 	authv1 "lindm/gen/lindm/auth/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
-	"lindm/internal/device/inventory"
 	"lindm/internal/identity"
 )
+
+// nativeDetailsFixture is complete native inventory with every collector
+// unavailable; observeSessions fills in the session inventory under test.
+func nativeDetailsFixture() *inventoryv1.NativeDetails {
+	unavailable := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE
+	text := func() *inventoryv1.ObservedString { return &inventoryv1.ObservedString{Status: unavailable} }
+	number := func() *inventoryv1.ObservedUint64 { return &inventoryv1.ObservedUint64{Status: unavailable} }
+	boolean := func() *inventoryv1.ObservedBool { return &inventoryv1.ObservedBool{Status: unavailable} }
+	return &inventoryv1.NativeDetails{
+		Cpu:               &inventoryv1.CpuDetails{Model: text(), LogicalCores: number(), PhysicalCores: number(), X86_64Level: text()},
+		Memory:            &inventoryv1.MemoryDetails{TotalBytes: number(), AvailableBytes: number(), SwapTotalBytes: number()},
+		Storage:           &inventoryv1.StorageDetails{Status: unavailable},
+		Network:           &inventoryv1.NetworkDetails{Status: unavailable},
+		Firmware:          &inventoryv1.FirmwareDetails{Mode: text(), SecureBoot: text()},
+		Tpm:               &inventoryv1.TpmDetails{Present: boolean(), Version: text()},
+		Power:             &inventoryv1.PowerDetails{Chassis: text(), Batteries: &inventoryv1.BatteryDetails{Status: unavailable}},
+		Sessions:          &inventoryv1.SessionCounts{Users: number(), Sessions: number()},
+		LocalUsers:        &inventoryv1.LocalUsers{Status: unavailable},
+		KernelModuleCount: number(), UptimeSeconds: number(), BootTimeUnixSeconds: number(),
+		Backends: &inventoryv1.BackendDetails{Dpkg: boolean(), Rpm: boolean(), Pacman: boolean(), Zypper: boolean(), RpmOstree: boolean(), Nix: boolean(), Flatpak: boolean(), Snap: boolean()},
+		Flatpak:  &inventoryv1.ApplicationDetails{Status: unavailable}, Snap: &inventoryv1.ApplicationDetails{Status: unavailable},
+	}
+}
 
 func (f *assistanceFixture) readiness(t *testing.T) *adminv1.AssistanceReadiness {
 	t.Helper()
@@ -27,7 +49,7 @@ func (f *assistanceFixture) readiness(t *testing.T) *adminv1.AssistanceReadiness
 	return response.Msg.GetReadiness()
 }
 
-func (f *assistanceFixture) syncPolicy(t *testing.T, policy agentv1.AssistancePolicy) {
+func (f *assistanceFixture) syncPolicy(t *testing.T, policy agentv1.AssistanceEnablement) {
 	t.Helper()
 	if _, err := f.svc.SyncAssistance(f.deviceCtx(), connect.NewRequest(&devicev1.SyncAssistanceRequest{SessionEpoch: f.epoch, Policy: policy})); err != nil {
 		t.Fatal(err)
@@ -35,28 +57,36 @@ func (f *assistanceFixture) syncPolicy(t *testing.T, policy agentv1.AssistancePo
 }
 
 // observeSessions publishes a host observation whose active-session inventory
-// holds exactly sessions.
+// holds exactly sessions. It clears the host-observation rate limit in the
+// database rather than advancing the fixture clock: operator authorization
+// expiry follows the database clock, so a fixture clock minutes ahead would
+// end every new session at once.
 func (f *assistanceFixture) observeSessions(t *testing.T, sequence uint64, sessions ...*inventoryv1.ActiveSession) {
 	t.Helper()
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	report := hostObservation(f.generation, sequence, "assist")
 	report.Observation.Details = nativeDetailsFixture()
 	report.Observation.Details.Sessions.ActiveSessions = &inventoryv1.ActiveSessions{Status: success, Sessions: sessions}
-	f.advance(inventory.SnapshotAttemptInterval)
+	if _, err := f.conn.Exec(f.ctx, "UPDATE enrollment_generations SET last_host_admission_at=NULL WHERE id=$1", f.principal.GenerationID); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); err != nil {
 		t.Fatal(err)
 	}
-	f.syncPolicy(t, agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED)
+	f.syncPolicy(t, agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED)
 }
 
 func activeSession(class, kind string, remote bool) *inventoryv1.ActiveSession {
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
-	seat := observed(success, "seat0")
+	observed := func(value string) *inventoryv1.ObservedString {
+		return &inventoryv1.ObservedString{Status: success, Value: value}
+	}
+	seat := observed("seat0")
 	if remote || kind == "tty" {
 		seat = &inventoryv1.ObservedString{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_NOT_APPLICABLE}
 	}
 	return &inventoryv1.ActiveSession{
-		UserName: observed(success, "alice"), SessionClass: observed(success, class), SessionType: observed(success, kind),
+		UserName: observed("alice"), SessionClass: observed(class), SessionType: observed(kind),
 		Seat: seat, Remote: &inventoryv1.ObservedBool{Status: success, Value: remote},
 	}
 }
@@ -74,7 +104,7 @@ func (f *assistanceFixture) wantRefused(t *testing.T, reason string) {
 	}
 }
 
-func wantReadiness(t *testing.T, got *adminv1.AssistanceReadiness, state adminv1.AssistanceReadinessState, policy agentv1.AssistancePolicy, desktop adminv1.AssistanceDesktop) {
+func wantReadiness(t *testing.T, got *adminv1.AssistanceReadiness, state adminv1.AssistanceReadinessState, policy agentv1.AssistanceEnablement, desktop adminv1.AssistanceDesktop) {
 	t.Helper()
 	if got.GetState() != state || got.GetPolicy() != policy || got.GetDesktop() != desktop {
 		t.Fatalf("readiness %v, want %v policy %v desktop %v", got, state, policy, desktop)
@@ -85,8 +115,8 @@ func wantReadiness(t *testing.T, got *adminv1.AssistanceReadiness, state adminv1
 // operator gets a reason, and no session is recorded to read as "Ended".
 func TestAssistanceReadinessRefusesBeforeSession(t *testing.T) {
 	f := newAssistanceFixture(t, 0)
-	unknownPolicy, unknownDesktop := agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED, adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_UNSPECIFIED
-	enabled, disabled := agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED, agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+	unknownPolicy, unknownDesktop := agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED, adminv1.AssistanceDesktop_ASSISTANCE_DESKTOP_UNSPECIFIED
+	enabled, disabled := agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED, agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED
 
 	// Evidence not reported by an older agent is left to the device.
 	wantReadiness(t, f.readiness(t), adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_READY, unknownPolicy, unknownDesktop)
@@ -95,7 +125,9 @@ func TestAssistanceReadinessRefusesBeforeSession(t *testing.T) {
 	wantReadiness(t, f.readiness(t), adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_DISABLED, disabled, unknownDesktop)
 	f.wantRefused(t, "assistance_disabled")
 	// Policy is a lasting blocker: it is reported even after the device goes quiet.
-	f.advance(3 * time.Minute)
+	if _, err := f.conn.Exec(f.ctx, "UPDATE devices SET last_seen_at=$2 WHERE id=$1", f.deviceID, f.now.Add(-3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
 	wantReadiness(t, f.readiness(t), adminv1.AssistanceReadinessState_ASSISTANCE_READINESS_STATE_DISABLED, disabled, unknownDesktop)
 	f.wantRefused(t, "assistance_disabled")
 
@@ -138,7 +170,7 @@ func TestAssistanceReadinessRefusesBeforeSession(t *testing.T) {
 func TestAssistanceReadinessScope(t *testing.T) {
 	f := newAssistanceFixture(t, 0)
 	principal := insertPrincipal(t, f.ctx, f.conn, identity.RoleAdmin)
-	principal.Bindings = []*authv1.RoleBinding{{Permissions: []string{string(identity.PermissionRunRemoteAssistance)}, Scopes: []*authv1.DeviceScope{{DeviceIds: []string{uuid.NewString()}}}}}
+	principal.Bindings = []*authv1.RoleBinding{{Permissions: []string{string(identity.PermissionViewRemoteAssistance)}, Scopes: []*authv1.DeviceScope{{DeviceIds: []string{uuid.NewString()}}}}}
 	request := connect.NewRequest(&adminv1.GetAssistanceReadinessRequest{DeviceId: f.deviceID})
 	if _, err := f.svc.GetAssistanceReadiness(identity.WithPrincipal(f.ctx, principal), request); connect.CodeOf(err) != connect.CodeNotFound {
 		t.Fatalf("out-of-scope readiness: %v", err)

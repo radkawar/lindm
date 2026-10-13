@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -85,7 +86,7 @@ func newOfflineFixture(t *testing.T) *offlineFixture {
 		t.Fatal(err)
 	}
 	old := f.service
-	f.service, err = New(old.Pool, core.Config{DeploymentID: old.DeploymentID.String(), CACertificate: old.CA, CAKey: old.CAKey, Identity: old.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}})
+	f.service, err = New(old.Pool, core.Config{DeploymentID: old.DeploymentID.String(), CACertificate: old.CA, CAKey: old.CAKey, Identity: old.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

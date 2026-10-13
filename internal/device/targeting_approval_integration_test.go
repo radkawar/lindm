@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -33,7 +34,7 @@ func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
 		}
 	})
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
-	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: key, Identity: authority}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

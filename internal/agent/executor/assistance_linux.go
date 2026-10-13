@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
@@ -17,7 +18,10 @@ import (
 // WithRemoteAssistance applies device remote-assistance policy. Absent or
 // disabled policy ends every invitation with DISABLED.
 func WithRemoteAssistance(config *agentv1.RemoteAssistanceConfig) Option {
-	return func(s *Service) { s.assistanceEnabled = config.GetEnabled() }
+	return func(s *Service) {
+		s.assistanceEnabled = config.GetEnabled()
+		s.assistanceCeiling = proto.CloneOf(config.GetPolicyCeiling())
+	}
 }
 
 // SyncAssistance is the network process's relay of the server's complete

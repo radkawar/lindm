@@ -76,7 +76,8 @@ func assistanceTestDirective(terminate bool) *agentv1.AssistanceDirective {
 			ConsentDeadline: timestamppb.New(now.Add(2 * time.Minute)), EndsAt: timestamppb.New(now.Add(30 * time.Minute)),
 			IceServers: []*agentv1.AssistanceIceServer{{Urls: []string{"turn:relay.example:3478"}, Username: "1:s:device", Credential: "c"}},
 		},
-		Terminate: terminate,
+		Terminate:       terminate,
+		AuthorizedUntil: timestamppb.New(now.Add(30 * time.Second)),
 	}
 }
 

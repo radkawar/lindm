@@ -35,7 +35,13 @@ var permissionTable = []struct {
 	{PermissionQuarantineDevice, []string{RoleOwner, RoleAdmin}},
 	{PermissionManageSecrets, []string{RoleOwner, RoleAdmin}},
 	{PermissionRevealSecrets, []string{RoleOwner, RoleAdmin}},
-	{PermissionRunRemoteAssistance, []string{RoleOwner, RoleAdmin}},
+	{PermissionViewRemoteAssistance, []string{RoleOwner, RoleAdmin}},
+	{PermissionControlRemoteAssistance, []string{RoleOwner, RoleAdmin}},
+	{PermissionManageAssistancePolicy, []string{RoleOwner, RoleAdmin}},
+	{PermissionAssistanceClipboard, []string{RoleOwner, RoleAdmin}},
+	{PermissionAssistanceKeyboard, []string{RoleOwner, RoleAdmin}},
+	{PermissionAssistanceDisplay, []string{RoleOwner, RoleAdmin}},
+	{PermissionAssistanceMessage, []string{RoleOwner, RoleAdmin}},
 }
 
 func knownPermission(permission Permission) bool {

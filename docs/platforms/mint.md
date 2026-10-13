@@ -12,27 +12,31 @@ LTS base, but **no Ubuntu evidence carries over** to it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability        | Linux Mint 22.3                                                                                                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| inventory         | implemented                                                                                                                                |
-| lifecycle         | implemented                                                                                                                                |
-| dispatch          | implemented                                                                                                                                |
-| packages          | implemented                                                                                                                                |
-| accounts          | implemented                                                                                                                                |
-| sysctl            | implemented                                                                                                                                |
-| definitions       | implemented                                                                                                                                |
-| password          | implemented                                                                                                                                |
-| firewall          | implemented                                                                                                                                |
-| encryption        | implemented                                                                                                                                |
-| wipe              | implemented                                                                                                                                |
-| report-loss       | implemented                                                                                                                                |
-| lock              | implemented                                                                                                                                |
-| recovery-sanitize | implemented                                                                                                                                |
-| self-update       | implemented                                                                                                                                |
-| assistance        | gated: portal_screencast_unavailable: xdg-desktop-portal-xapp/-gtk implement no ScreenCast or RemoteDesktop; lindm has no X11 capture path |
-| advisories        | partial: vendor feed unavailable for Linux Mint packages                                                                                   |
-| os-update         | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                    |
-| release-upgrade   | gated: release upgrade is not implemented                                                                                                  |
+| Capability           | Linux Mint 22.3                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| inventory            | implemented                                                                                                                                |
+| lifecycle            | implemented                                                                                                                                |
+| dispatch             | implemented                                                                                                                                |
+| packages             | implemented                                                                                                                                |
+| accounts             | implemented                                                                                                                                |
+| sysctl               | implemented                                                                                                                                |
+| definitions          | implemented                                                                                                                                |
+| password             | implemented                                                                                                                                |
+| firewall             | implemented                                                                                                                                |
+| encryption           | implemented                                                                                                                                |
+| wipe                 | implemented                                                                                                                                |
+| report-loss          | implemented                                                                                                                                |
+| lock                 | implemented                                                                                                                                |
+| recovery-sanitize    | implemented                                                                                                                                |
+| self-update          | implemented                                                                                                                                |
+| assistance           | gated: portal_screencast_unavailable: xdg-desktop-portal-xapp/-gtk implement no ScreenCast or RemoteDesktop; lindm has no X11 capture path |
+| assistance-clipboard | gated: not implemented for Linux Mint 22.3                                                                                                 |
+| assistance-keyboard  | gated: not implemented for Linux Mint 22.3                                                                                                 |
+| assistance-displays  | gated: not implemented for Linux Mint 22.3                                                                                                 |
+| assistance-messages  | gated: not implemented for Linux Mint 22.3                                                                                                 |
+| advisories           | partial: vendor feed unavailable for Linux Mint packages                                                                                   |
+| os-update            | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                    |
+| release-upgrade      | gated: release upgrade is not implemented                                                                                                  |
 
 <!-- END GENERATED platform-capabilities -->
 

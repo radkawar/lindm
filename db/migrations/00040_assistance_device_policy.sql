@@ -1,6 +1,6 @@
 -- +goose Up
 -- The remote-assistance setting each device's executor reports with every
--- assistance sync, using lindm.agent.v1.AssistancePolicy numbers. No row: the
+-- assistance sync, using lindm.agent.v1.AssistanceEnablement numbers. No row: the
 -- agent has not reported one. changed_at is when the reported value changed.
 CREATE TABLE assistance_device_policies (
     device_id uuid PRIMARY KEY REFERENCES devices(id),

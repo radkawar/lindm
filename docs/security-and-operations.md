@@ -880,7 +880,7 @@ on amd64, `ports.ubuntu.com` on arm64), suite/components and authenticated signi
 key/digest through the existing native-package provider configuration. These are
 explicit operator approvals, not repositories created or trusted by apply.
 
-Configure `demo-helpdesk` with `fleet.read`, `remote_assistance.run` and `actions.lock`;
+Configure `demo-helpdesk` with `fleet.read`, `remote_assistance.view` and `actions.lock`;
 configure `demo-security-analyst` with `fleet.read`, `advisory_exceptions.manage`,
 `approvals.manage` and `actions.lock`. Set `approval_required_permissions` to include
 `actions.lock` in the runtime authorization policy. Organization apply installs this
@@ -891,7 +891,8 @@ approval and lock authority. The requester cannot approve their own action.
 Owner and auditor use their built-in roles. Import the organization from Accounts
 in the console to create these accounts and save their shown-once enrollment secrets;
 the CLI bearer deliberately cannot do this.
-Remote assistance still requires device-user consent.
+The helpdesk example is view-only: it grants neither control nor clipboard, files
+or unattended access. Remote assistance still requires device-user consent.
 
 Advisory exception examples select `demo-engineering-01` and `demo-finance-01`.
 Their expiries are 45 and 60 days after 2026-10-11; review the dates and reasons
@@ -1097,7 +1098,13 @@ blindly replayed. See [native records](verification.md#ssh-login-banner).
 Every remaining item is either pending or an explicit gate with its closing
 condition.
 
-- Remote assistance has one permission for view and control, not separate grants.
+- **Gate: remaining assistance capability qualification.** Screen viewing requires
+  `remote_assistance.view`; control additionally requires `remote_assistance.control`
+  in the intersection of both grants' device scopes. Clipboard uses its own scoped
+  `remote_assistance.clipboard` grant. The helpdesk example is view-only. Files and
+  unattended capability APIs, independent grants and native qualification remain
+  owned by the assistance roadmap; the mode-permission cutover alone does not close
+  that remaining gate.
 - **Gate: password policy on stock devices.** The Company baseline password row
   is an approved adoption and rolls out under its rollout's one approval, but
   PASSWORD_POLICY is local-only: a signed capability policy never grants it, and
@@ -1286,6 +1293,19 @@ Graphical assistance is optional. It is enabled by `ServerConfig.assistance`, an
 without that section the server refuses requests with `assistance_unconfigured`.
 `lindmd` embeds the relay-only TURN service; it has no public STUN/TURN dependency.
 
+Live viewing requires `remote_assistance.view`. Requesting or continuing control
+requires both `.view` and `.control` on the same device; the scopes of separate
+grants are intersected, never combined into wider access. Configure helpdesk with
+`.view` alone when support must remain view-only. No clipboard, keyboard, file or
+unattended grant implies either base permission. Custom roles and emergency
+allowlists must explicitly select the new permissions; no legacy permission alias
+is accepted. Existing immutable audit rows are not rewritten.
+
+Creator checks, fresh authorization, per-session consent and native capability
+negotiation still apply. Losing a control grant ends its control session rather
+than silently reusing it as view-only. An operator with view authority in scope can
+always request Stop for either mode, without requiring an extra control grant.
+
 - `relay.listener`: the TURN UDP and TCP listener (for example port 3478). It
   must not overlap the admin, device or profiling listener.
 - `relay.relay_address`, `relay_port_min` and `relay_port_max`: the specific IPv4
@@ -1316,6 +1336,28 @@ assistance until a shared or external relay contract exists.
 Managed devices also need `AgentConfig.remote_assistance.enabled`. The packaged
 executor configuration leaves it disabled.
 
+Interactive capabilities additionally require explicit server/executor policy
+ceilings, per-device policy and requested/local grants. Unspecified and off deny.
+The owner/admin defaults for `remote_assistance.clipboard`, `.keyboard`, `.display`,
+`.message` and `.policy.manage` do not bypass the employee's consent or portal.
+Other roles need scoped grants; metadata access is not live-screen or clipboard
+authority. Policy and operator authority are rechecked during the session, with
+bounded directives that cannot extend an expired identity observation.
+
+Clipboard text and operator messages use bounded authenticated RPC state exchange,
+not the encrypted media track. TLS/mTLS protects each hop, but the control-plane
+process necessarily sees those command bodies in short-lived memory; do not
+describe this path as end-to-end encrypted against the server. SQL retains
+operation identity/outcome, not bodies, and ordinary audit/logs exclude bodies
+and low-entropy clipboard-content hashes. Ephemeral-state loss produces an
+explicit unavailable/unknown result, never a replay of the side effect.
+Ordinary live input remains on the authenticated peer data channel; named
+special-key actions have their own content-free audit. On the device, a
+message appears inside the in-progress notice, which keeps its Stop action.
+GNOME shows no other banner while that critical notice is on screen. The
+message carries the authenticated operator name and the "Message from your
+support operator" label. Only after the employee dismisses the notice (until
+it is reposted) is a message its own 30-second notification.
 GNOME shows one banner at a time. It kept an idle seat's "Remote assistance
 ended" banner on screen, and a new request, even a critical one, queued behind
 it unseen until the request expired. So every new request first withdraws the
@@ -1323,6 +1365,68 @@ previous "ended" notice, and a request's own banner is withdrawn when it is
 answered, expires or is cancelled. The `rerequest` lab scenario asks again
 right after a session ends and fails unless the new request is on screen
 within 15 s.
+
+The [capability contract](product-specification.md#remote-assistance-capabilities)
+defines the separate file, reconnect, recording and unattended boundaries. File
+approval/selection must pause all remote injection before a local user acts.
+Recording is off by default and discloses the organization's later archive access;
+its helper-side encryption is distinct from media relay encryption. A future
+unattended policy must not become an unlock, login-screen or consent bypass.
+
+#### Persisted assistance permission cutover
+
+An existing persisted runtime policy is authoritative over bootstrap configuration.
+An active policy containing the removed `remote_assistance.run` permission makes
+the new server fail closed; changing only the configuration file does not repair
+it. Do not rewrite SQL, historical request receipts or audit events, and do not
+reset a deployment's database to bypass this transition.
+
+Use a reviewed, explicit deny-window transition through the existing
+`GetAuthorization` / `UpdateAuthorization` API. It requires a retained
+unrestricted built-in local owner or the pinned deployment owner that does not
+depend on the custom assistance roles being changed.
+
+1. While the old server still runs, export the complete current policy and its
+   revision. Preserve every role, permission, binding, scope and approval gate.
+   Prepare the final policy by replacing each old assistance permission with
+   **both** `remote_assistance.view` and `remote_assistance.control` in that same
+   role. Do not add capability permissions or change any scopes. Retain previously
+   explicit clipboard, keyboard, display, message or files grants unchanged.
+   Selecting view-only is a separate, deliberate reduction, not an automatic
+   scope-preserving conversion.
+   The role and emergency-allowlist bounds increase from 24 to 25 entries solely
+   to accommodate this explicit two-name replacement of a full old list.
+2. Prepare an interim policy by removing only the old permission. If that leaves
+   a custom role empty, temporarily remove the role and its directory bindings,
+   retaining their exact definitions for the final policy. Accounts assigned to
+   that missing custom role remain recorded but fail closed; never reassign them
+   to a built-in role. Publish the interim policy on the old server with the
+   exported `expected_revision`, a new request ID and an explicit cutover reason.
+   Save the exact returned interim revision and request receipt. A conflict
+   requires fresh review, not an automatic retry with a newer revision.
+3. Assistance grants remain withdrawn during the interruption. Stop all old
+   replicas, update the validated bootstrap configuration and emergency allowlists
+   to the new names, and deploy the new server. No mixed old/new replicas may
+   restore competing permission vocabularies. The persisted interim policy must
+   remain active; bootstrap configuration must not fill in its removed grants.
+4. Authenticate the preserved owner afresh. Publish the reviewed final policy with
+   a new request ID, an explicit reason and `expected_revision` equal to the saved
+   **interim** revision. Never let an apply plan silently substitute the current
+   revision for this restore. If another policy write occurred during the window,
+   the restore must abort: review and merge that intervening change rather than
+   overwriting it from the old snapshot.
+5. Retain both audited revision receipts and verify the resulting grants and
+   scopes. Existing consent and session authority do not survive the deny window;
+   operators need fresh sign-in and new consented sessions. An interruption before
+   restoration leaves grants denied and the owner able to resume. If deployment
+   rolls back before restoration, keep the interim policy or deliberately restore
+   the old policy through the old server with the same revision protections.
+   After the new policy is published, an old binary cannot safely read it.
+
+This procedure is an explicit administrative transition, not a compatibility alias.
+Its exact old/new binary and interruption/CAS qualification must be recorded in
+the [verification ledger](verification.md#commercial-assistance-capability-qualification)
+before claiming a persisted deployment's cutover qualified.
 
 ### Native single-host installation
 

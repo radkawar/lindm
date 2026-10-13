@@ -44,7 +44,7 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland")
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack (must match the cached golden)")
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
-	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
+	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock,clipboard,clipboard-limited,clipboard-policy,clipboard-permission,keyboard,display,message,monitors; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
 	rebootPolicy := flags.Bool("reboot-policy", false, "qualify signed reboot windows and employee deferral on a disposable desktop; emits reboot-policy.json, not assistance qualification")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	name := flags.String("name", "", "persistent held demo name; Ctrl-C stops processes but keeps enrolled state")

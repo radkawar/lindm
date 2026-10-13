@@ -11,6 +11,7 @@ import {
   startupStage,
   visibleOutcome,
 } from "./assistance-startup.mjs";
+import { decodeNativeMarker, sampleNativeMarker } from "./assistance-marker.mjs";
 
 // Line-oriented private control protocol for `lab vm assistance`
 // (internal/vmlab/vm_assistance_browser_linux.go). Each stdin line is one JSON
@@ -28,6 +29,28 @@ let startStage = "configuration";
 function starting(stage) {
   startStage = stage;
   startupStage(stage);
+}
+
+let lastCommand;
+let commandURL;
+let commandCSRF;
+let fixtureNonce;
+
+async function completedCommand(action) {
+  const previous = lastCommand?.requestId;
+  await action();
+  return until(
+    () => {
+      if (!lastCommand || lastCommand.requestId === previous) return null;
+      if (lastCommand.status === "ASSISTANCE_COMMAND_STATUS_SUCCEEDED" || lastCommand.status === 2)
+        return lastCommand;
+      if (!["ASSISTANCE_COMMAND_STATUS_PENDING", 1].includes(lastCommand.status))
+        throw new Error("guest_command_failed");
+      return null;
+    },
+    45_000,
+    "guest_command_timeout",
+  );
 }
 
 // Observe the console's own peer. Split lanes additionally restrict TURN URLs
@@ -53,9 +76,13 @@ function observePeers(forwardedTURNURL) {
         pc: this,
         policy: configuration?.iceTransportPolicy ?? "all",
         channels: [],
+        inputs: [],
       };
       peers.push(record);
-      this.addEventListener("datachannel", (event) => record.channels.push(event.channel.label));
+      this.addEventListener("datachannel", (event) => {
+        record.channels.push(event.channel.label);
+        record.inputs.push(event.channel);
+      });
     }
   };
 }
@@ -76,6 +103,9 @@ async function observeMedia(surface) {
     localRelayProtocol: "",
     localCandidateURL: "",
     remoteCandidateType: "",
+    openInputChannels:
+      record?.inputs.filter((channel) => channel.readyState === "open").length ?? 0,
+    markerHead: -1,
     controlButton: [...document.querySelectorAll("button")].some((node) =>
       /^(Take control|Release control)$/.test(node.innerText.trim()),
     ),
@@ -95,6 +125,17 @@ async function observeMedia(surface) {
     result.localRelayProtocol = stats.get(pair.localCandidateId)?.relayProtocol ?? "";
     result.localCandidateURL = stats.get(pair.localCandidateId)?.url ?? "";
   }
+  return result;
+}
+
+async function nativeMarker() {
+  const samples = await driver.page.evaluate(sampleNativeMarker, SURFACE);
+  return decodeNativeMarker(samples, fixtureNonce);
+}
+
+async function mediaObservation() {
+  const result = await driver.page.evaluate(observeMedia, SURFACE);
+  result.markerHead = (await nativeMarker())?.head ?? -1;
   return result;
 }
 
@@ -122,6 +163,31 @@ const commands = {
     await driver.open(config);
     starting("browser_setup");
     await driver.context.addInitScript(observePeers, config.forwardedTurnUrl ?? "");
+    await driver.context.grantPermissions(["clipboard-read", "clipboard-write"], {
+      origin: config.origin,
+    });
+    driver.page.on("request", (request) => {
+      if (
+        !/\/(CreateAssistanceSession|RunAssistanceCommand)$/.test(new URL(request.url()).pathname)
+      )
+        return;
+      commandURL = request.url().replace(/\/CreateAssistanceSession$/, "/RunAssistanceCommand");
+      commandCSRF = request.headers()["x-csrf-token"];
+    });
+    driver.page.on("response", async (response) => {
+      if (!/\/(RunAssistanceCommand|GetAssistanceCommand)$/.test(new URL(response.url()).pathname))
+        return;
+      if (!response.ok()) return;
+      try {
+        const { result } = await response.json();
+        if (result) {
+          const { requestId, kind, status, reason } = result;
+          lastCommand = { requestId, kind, status, reason };
+        }
+      } catch {
+        // An aborted response cannot establish command completion.
+      }
+    });
     ui = new UI(driver, config.actionTimeoutMs);
     starting("navigation");
     await openSignIn(ui, config.origin);
@@ -133,8 +199,109 @@ const commands = {
     await signIn(ui, config);
     return { engine: "chromium", version: driver.metadata.browserVersion };
   },
+  async identity() {
+    return driver.page.evaluate(async () => {
+      const response = await fetch("/auth/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("authenticated_identity_unavailable");
+      const principal = await response.json();
+      if (!principal.id || !Array.isArray(principal.permissions))
+        throw new Error("authenticated_identity_incomplete");
+      // Whitelist public actor facts. Never return CSRF, cookies or credentials.
+      return {
+        id: principal.id,
+        display: principal.displayName || principal.subject || principal.id,
+        role: principal.role,
+        permissions: principal.permissions,
+        observed_at: new Date().toISOString(),
+      };
+    });
+  },
+  async refuseMode(args) {
+    if (!/^[0-9a-f-]{36}$/.test(args.deviceId ?? "") || !["view", "control"].includes(args.mode))
+      throw new Error("invalid_mode_boundary");
+    await driver.goto(`${config.origin}/devices/${args.deviceId}`);
+    await ui.click({ role: "tab", text: "Remote assistance" });
+    await ui.wait({ role: "heading", text: "Session history" });
+    // The request form appears only once readiness answers READY.
+    await driver.page
+      .getByText("Checking whether this device can be helped…", { exact: true })
+      .waitFor({ state: "hidden" });
+    const requestForm =
+      (await driver.page
+        .getByRole("button", { name: "Request remote assistance", exact: true })
+        .count()) > 0;
+    let controlOption = false;
+    if (requestForm) {
+      await driver.page.getByRole("combobox", { name: "Mode", exact: true }).click();
+      controlOption =
+        (await driver.page
+          .getByRole("option", { name: "View and request control", exact: true })
+          .count()) > 0;
+      await driver.page.keyboard.press("Escape");
+    }
+    const actor = await commands.identity();
+    const refusal = await driver.page.evaluate(async ({ deviceId, mode }) => {
+      const session = await fetch("/auth/session", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!session.ok) throw new Error("authenticated_identity_unavailable");
+      const { csrfToken } = await session.json();
+      if (!csrfToken) throw new Error("authenticated_csrf_unavailable");
+      const requestId = crypto.randomUUID();
+      const response = await fetch("/lindm.admin.v1.AdminService/CreateAssistanceSession", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "Connect-Protocol-Version": "1",
+          "X-CSRF-Token": csrfToken,
+        },
+        body: JSON.stringify({
+          requestId,
+          deviceId,
+          mode: mode === "control" ? "ASSISTANCE_MODE_CONTROL" : "ASSISTANCE_MODE_VIEW",
+          reason: "lab independent assistance mode permission denial",
+          maxDurationSeconds: 600,
+        }),
+      });
+      const body = await response.json();
+      return {
+        request_id: requestId,
+        device_id: deviceId,
+        mode,
+        code: body.code ?? "",
+        reason: response.headers.get("Lindm-Reason") ?? "",
+        http_status: response.status,
+        observed_at: new Date().toISOString(),
+      };
+    }, args);
+    if (
+      refusal.http_status !== 403 ||
+      refusal.code !== "permission_denied" ||
+      refusal.reason !== "permission_denied"
+    )
+      throw new Error("mode_permission_not_denied");
+    return { ...refusal, actor, request_form: requestForm, control_option: controlOption };
+  },
+  async reopen(args) {
+    if (
+      !/^[0-9a-f-]{36}$/.test(args.deviceId ?? "") ||
+      !/^[0-9a-f-]{36}$/.test(args.sessionId ?? "")
+    )
+      throw new Error("invalid_session");
+    await driver.goto(config.origin);
+    await signIn(ui, config);
+    const actor = await commands.identity();
+    await driver.goto(`${config.origin}/devices/${args.deviceId}/assistance/${args.sessionId}`);
+    return actor;
+  },
   async request(args) {
     if (!/^[0-9a-f-]{36}$/.test(args.deviceId ?? "")) throw new Error("invalid_device");
+    fixtureNonce = undefined;
     const label = { view: "View screen", control: "View and request control" }[args.mode];
     if (!label) throw new Error("invalid_mode");
     await driver.goto(`${config.origin}/devices/${args.deviceId}`);
@@ -142,6 +309,8 @@ const commands = {
     await ui.select("Mode", label);
     await ui.fill({ label: "Maximum duration (minutes, 1 to 30)" }, String(args.minutes));
     await ui.fill({ label: "Reason (shown to the local user and audited)" }, args.reason);
+    for (const [label, option] of Object.entries(args.capabilities ?? {}))
+      await ui.select(label, option);
     await ui.click({ role: "button", text: "Request remote assistance" });
     const match = await until(
       () => /\/assistance\/([0-9a-f-]{36})$/.exec(new URL(driver.page.url()).pathname),
@@ -156,7 +325,7 @@ const commands = {
     try {
       return await until(
         async () => {
-          last = await driver.page.evaluate(observeMedia, SURFACE);
+          last = await mediaObservation();
           return last.videoWidth > 0 && last.decodedFrames >= minFrames ? last : null;
         },
         timeout(args),
@@ -168,28 +337,47 @@ const commands = {
     }
   },
   async observe() {
-    return driver.page.evaluate(observeMedia, SURFACE);
+    return mediaObservation();
   },
   async control() {
-    await ui.click({ role: "button", text: "Take control" });
+    const take = driver.page.getByRole("button", { name: "Take control", exact: true });
+    if (await take.count()) await take.click();
     await ui.wait({ role: "button", text: "Release control" });
     return {};
   },
   async click(args) {
     const { x, y } = args;
     if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) throw new Error("invalid_point");
-    const box = await driver.page.evaluate((surface) => {
-      const video = document.querySelector(`${surface} video`);
-      const rect = video.getBoundingClientRect();
-      return {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        videoWidth: video.videoWidth,
-        videoHeight: video.videoHeight,
-      };
-    }, SURFACE);
+    await commands.control();
+    await driver.page.locator(SURFACE).scrollIntoViewIfNeeded();
+    const box = await driver.page.evaluate(
+      ({ surface, x, y }) => {
+        const container = document.querySelector(surface);
+        const video = container.querySelector("video");
+        let rect = video.getBoundingClientRect();
+        const clip = container.getBoundingClientRect();
+        const scale = Math.min(rect.width / video.videoWidth, rect.height / video.videoHeight);
+        const targetX =
+          rect.x + (rect.width - video.videoWidth * scale) / 2 + x * video.videoWidth * scale;
+        const targetY =
+          rect.y + (rect.height - video.videoHeight * scale) / 2 + y * video.videoHeight * scale;
+        // Actual size scrolls the native frame; do not click the clipped portion
+        // or normalize against the viewport rather than the received video.
+        container.scrollLeft +=
+          targetX - Math.max(clip.left + 8, Math.min(clip.right - 8, targetX));
+        container.scrollTop += targetY - Math.max(clip.top + 8, Math.min(clip.bottom - 8, targetY));
+        rect = video.getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          videoWidth: video.videoWidth,
+          videoHeight: video.videoHeight,
+        };
+      },
+      { surface: SURFACE, x, y },
+    );
     if (!box.videoWidth || !box.videoHeight) throw new Error("video_not_rendered");
     // object-contain letterboxes the frame inside the element.
     const scale = Math.min(box.width / box.videoWidth, box.height / box.videoHeight);
@@ -203,6 +391,9 @@ const commands = {
   },
   async type(args) {
     if (!/^[a-z0-9]{1,64}$/.test(args.text ?? "")) throw new Error("invalid_text");
+    await ui.select("Keyboard mode", "Physical keys");
+    await commands.control();
+    await driver.page.locator(SURFACE).focus();
     const focused = await driver.page.evaluate(
       (surface) => document.activeElement === document.querySelector(surface),
       SURFACE,
@@ -211,6 +402,215 @@ const commands = {
     await driver.page.keyboard.type(args.text, { delay: 40 });
     if (args.enter) await driver.page.keyboard.press("Enter");
     return {};
+  },
+  async keys(args) {
+    if (!["Control+c", "Control+v", "KeyY", "KeyZ"].includes(args.key))
+      throw new Error("invalid_fixture_key");
+    if (args.mode) await ui.select("Keyboard mode", args.mode);
+    await commands.control();
+    await driver.page.locator(SURFACE).focus();
+    await driver.page.keyboard.press(args.key);
+    return {};
+  },
+  async unicodeKey(args) {
+    const code = { "€": "KeyE", я: "KeyZ" }[args.key];
+    if (!code) throw new Error("invalid_fixture_unicode_key");
+    await ui.select("Keyboard mode", "Text");
+    await commands.control();
+    await driver.page.locator(SURFACE).focus();
+    // Playwright insertText does not emit keyboard events. CDP supplies a real
+    // Chromium keyboard event with a physical code through production InputCapture,
+    // not a DOM callback or a raw product data-channel frame.
+    await driver.cdp.send("Input.dispatchKeyEvent", {
+      type: "keyDown",
+      key: args.key,
+      code,
+      text: args.key,
+    });
+    await driver.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: args.key, code });
+    return {};
+  },
+  async holdShift() {
+    await ui.select("Keyboard mode", "Physical keys");
+    await commands.control();
+    await driver.page.locator(SURFACE).focus();
+    await driver.page.keyboard.down("Shift");
+    return {};
+  },
+  async releaseControl() {
+    await ui.click({ role: "button", text: "Release control" });
+    await ui.wait({ role: "button", text: "Take control" });
+    // This local browser keyup occurs after control authority was released.
+    await driver.page.keyboard.up("Shift");
+    return {};
+  },
+  async refuse(args) {
+    if (
+      !["oversized", "read-denied", "ended", "policy", "permission"].includes(args.boundary) ||
+      !commandURL ||
+      !commandCSRF
+    )
+      throw new Error("invalid_refusal_probe");
+    const sessionId = /\/assistance\/([0-9a-f-]{36})$/.exec(
+      new URL(driver.page.url()).pathname,
+    )?.[1];
+    if (!sessionId) throw new Error("invalid_refusal_session");
+    const actor = await commands.identity();
+    // Adversarial RPC uses the creator's real browser cookie and observed CSRF
+    // header, never an owner backdoor or a mocked result. Credentials stay local.
+    const refusal = await driver.page.evaluate(
+      async ({ url, csrf, sessionId, boundary }) => {
+        const requestId = crypto.randomUUID();
+        const command = {
+          requestId,
+          kind:
+            boundary === "read-denied"
+              ? "ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ"
+              : "ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE",
+        };
+        if (boundary !== "read-denied")
+          command.text =
+            boundary === "oversized" ? "a".repeat(16385) : "must-not-reach-ended-session";
+        const response = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: {
+            "Content-Type": "application/json",
+            "Connect-Protocol-Version": "1",
+            "X-CSRF-Token": csrf,
+          },
+          body: JSON.stringify({ sessionId, command }),
+        });
+        const body = await response.json();
+        const expectedCode =
+          boundary === "oversized"
+            ? "invalid_argument"
+            : boundary === "permission"
+              ? "not_found"
+              : "failed_precondition";
+        const expectedReason = {
+          oversized: "invalid_assistance_command",
+          "read-denied": "assistance_capability_not_granted",
+          ended: "assistance_ended",
+          policy: "assistance_ended",
+          permission: "not_found",
+        }[boundary];
+        const reason = response.headers.get("Lindm-Reason");
+        if (
+          response.ok ||
+          body.code !== expectedCode ||
+          (boundary !== "oversized" && reason !== expectedReason)
+        )
+          throw new Error("authoritative_refusal_not_observed");
+        return { boundary, requestId, code: body.code, reason, httpStatus: response.status };
+      },
+      { url: commandURL, csrf: commandCSRF, sessionId, boundary: args.boundary },
+    );
+    return { ...refusal, actor };
+  },
+  async clipboardSend(args) {
+    if (!/^[a-f0-9]{24}$/.test(args.text ?? "")) throw new Error("invalid_fixture_nonce");
+    await driver.page.evaluate((text) => navigator.clipboard.writeText(text), args.text);
+    return completedCommand(() => ui.click({ role: "button", text: "Send clipboard" }));
+  },
+  async clipboardRead() {
+    const result = await completedCommand(() =>
+      ui.click({ role: "button", text: "Read clipboard" }),
+    );
+    await ui.click({ role: "button", text: "Copy clipboard" });
+    return { ...result, text: await driver.page.evaluate(() => navigator.clipboard.readText()) };
+  },
+  async special() {
+    await ui.select("Special keys", "Close window");
+    return completedCommand(() => ui.click({ role: "button", text: "Send special keys" }));
+  },
+  async presentation(args) {
+    if (!["Fit", "Actual size", "Full screen", "Exit full screen"].includes(args.label))
+      throw new Error("invalid_presentation");
+    await ui.click({ role: "button", text: args.label });
+    if (args.label.includes("full screen") || args.label === "Full screen") {
+      const wanted = args.label === "Full screen";
+      await until(
+        () =>
+          driver.page.evaluate((value) => Boolean(document.fullscreenElement) === value, wanted),
+        10_000,
+        "fullscreen_state_timeout",
+      );
+    }
+    if (args.label === "Full screen") await ui.select("Keyboard mode", "Physical keys");
+    return { label: args.label };
+  },
+  // The Base UI select mounts its popup after the click resolves: reading the
+  // options at once returned none (ubuntu24-tier1-25), and the Escape meant
+  // to close it ran before it opened. Wait for the popup both ways.
+  async displays() {
+    await driver.page.getByRole("combobox", { name: "Select display", exact: true }).click();
+    const listbox = driver.page.getByRole("listbox");
+    await listbox.getByRole("option").first().waitFor({ state: "visible" });
+    const labels = (await listbox.getByRole("option").allTextContents()).map((label) =>
+      label.trim(),
+    );
+    await driver.page.keyboard.press("Escape");
+    await listbox.waitFor({ state: "hidden" });
+    return { labels };
+  },
+  async display(args) {
+    const selected = await driver.page
+      .getByRole("combobox", { name: "Select display", exact: true })
+      .innerText();
+    const before = await commands.marker({});
+    if (selected.trim() === args.label.trim()) return before;
+    const command = await completedCommand(() => ui.select("Select display", args.label));
+    return { ...(await commands.marker({ notHead: before.head })), command };
+  },
+  async fixture(args) {
+    if (!/^[a-f0-9]{24}$/.test(args.nonce ?? "")) throw new Error("invalid_fixture_nonce");
+    fixtureNonce = args.nonce;
+    return commands.marker();
+  },
+  async marker(args = {}) {
+    return until(
+      async () => {
+        const marker = await nativeMarker();
+        return marker && marker.head !== args.notHead ? marker : null;
+      },
+      30_000,
+      "native_head_marker_timeout",
+    );
+  },
+  async message(args) {
+    if (!/^[a-f0-9]{24}$/.test(args.text ?? "")) throw new Error("invalid_fixture_message");
+    await ui.fill({ label: "Message" }, args.text);
+    return completedCommand(() => ui.click({ role: "button", text: "Send message" }));
+  },
+  async boundary(args = {}) {
+    const labels = args.onlyDisplay
+      ? ["Select display"]
+      : ["Send clipboard", "Read clipboard", "Send special keys", "Select display", "Send message"];
+    for (const label of labels) {
+      const node = driver.page.getByRole(label === "Select display" ? "combobox" : "button", {
+        name: label,
+        exact: true,
+      });
+      if ((await node.count()) && (await node.isEnabled()))
+        throw new Error("ungranted_capability_enabled");
+    }
+    const control = driver.page.getByRole("button", { name: /^(Take control|Release control)$/ });
+    if (await control.count()) {
+      if ((await control.getAttribute("aria-pressed")) !== null)
+        throw new Error("control_action_exposed_as_toggle");
+      if (await control.isDisabled()) {
+        const explained = await control.evaluate((button) =>
+          (button.getAttribute("aria-describedby") ?? "").split(/\s+/).some((id) => {
+            const explanation = document.getElementById(id);
+            return explanation?.innerText.trim() && explanation.getClientRects().length > 0;
+          }),
+        );
+        if (!explained) throw new Error("disabled_control_reason_not_visible");
+      }
+    }
+    return { noEnabledCapabilityActions: true };
   },
   async stop() {
     await ui.click({ role: "button", text: "Stop session" });

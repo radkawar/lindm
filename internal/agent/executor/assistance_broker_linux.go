@@ -13,6 +13,7 @@ import (
 
 	"buf.build/go/protovalidate"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/agent/actionprovider"
@@ -52,6 +53,7 @@ type logindLookup func(ctx context.Context, match func(id string, uid uint32) bo
 type assistanceBroker struct {
 	mu         sync.Mutex
 	enabled    bool
+	ceiling    *agentv1.AssistancePolicy
 	clock      func() time.Time
 	lookup     logindLookup
 	validator  protovalidate.Validator
@@ -62,17 +64,29 @@ type assistanceBroker struct {
 }
 
 type assistanceSession struct {
-	invitation     *agentv1.AssistanceInvitation
-	answerSDP      string
-	created        time.Time
-	lastDirective  time.Time
-	lastHelper     time.Time
-	phase          agentv1.AssistancePhase
-	offerSDP       string
-	controlGranted bool
-	endCause       agentv1.AssistanceEndCause
-	endDetail      string
-	local          *agentv1.AssistanceLocalSession
+	invitation        *agentv1.AssistanceInvitation
+	answerSDP         string
+	created           time.Time
+	lastDirective     time.Time
+	lastHelper        time.Time
+	authorizedUntil   time.Time
+	command           *agentv1.AssistanceCommand
+	commandResult     *agentv1.AssistanceCommandResult
+	granted           *agentv1.AssistanceCapabilities
+	displays          []*agentv1.AssistanceDisplay
+	selectedDisplayID string
+	displayGeneration uint32
+	displayFrame      *agentv1.AssistanceDisplayFrame
+	capabilitiesSet   bool
+	commandDeadline   time.Time
+	commandTimer      *time.Timer
+	commandDigests    map[string][32]byte
+	phase             agentv1.AssistancePhase
+	offerSDP          string
+	controlGranted    bool
+	endCause          agentv1.AssistanceEndCause
+	endDetail         string
+	local             *agentv1.AssistanceLocalSession
 	// helperEnded records that the bound helper itself reported ENDED, so a
 	// terminate directive no longer needs to reach it.
 	helperEnded bool
@@ -96,10 +110,11 @@ type assistanceTombstone struct {
 var assistanceRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.SyncAssistanceRequest{}, &agentv1.SyncSessionRequest{}, &agentv1.AssistanceLocalSession{},
+		&agentv1.SyncAssistanceResponse{}, &agentv1.SyncSessionResponse{},
 	), protovalidate.WithDisableLazy())
 })
 
-func newAssistanceBroker(enabled bool, clock func() time.Time, lookup logindLookup) (*assistanceBroker, error) {
+func newAssistanceBroker(enabled bool, ceiling *agentv1.AssistancePolicy, clock func() time.Time, lookup logindLookup) (*assistanceBroker, error) {
 	if clock == nil || lookup == nil {
 		return nil, errors.New("executor: assistance broker requires a clock and logind lookup")
 	}
@@ -109,6 +124,7 @@ func newAssistanceBroker(enabled bool, clock func() time.Time, lookup logindLook
 	}
 	return &assistanceBroker{
 		enabled:    enabled,
+		ceiling:    proto.CloneOf(ceiling),
 		clock:      clock,
 		lookup:     lookup,
 		validator:  validator,
@@ -118,7 +134,7 @@ func newAssistanceBroker(enabled bool, clock func() time.Time, lookup logindLook
 }
 
 func (b *assistanceBroker) admit(msg proto.Message) error {
-	if msg == nil || !msg.ProtoReflect().IsValid() {
+	if msg == nil || !msg.ProtoReflect().IsValid() || proto.Size(msg) > 256<<10 {
 		return errInvalid
 	}
 	if err := protodata.ValidateClosed(msg.ProtoReflect()); err != nil || b.validator.Validate(msg) != nil {
@@ -146,6 +162,8 @@ func (b *assistanceBroker) syncNetwork(ctx context.Context, req *agentv1.SyncAss
 		b.rebootEpoch++
 	}
 	now := b.clock()
+	// A fresh snapshot cannot revive a portal grant across an authority gap.
+	b.expire(now)
 	b.applyDirectives(now, req.GetDirectives(), present)
 	b.expire(now)
 	bound := make(map[string]struct{})
@@ -174,11 +192,15 @@ func (b *assistanceBroker) syncNetwork(ctx context.Context, req *agentv1.SyncAss
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.expire(b.clock())
-	policy := agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+	policy := agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED
 	if b.enabled {
-		policy = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
+		policy = agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED
 	}
-	return &agentv1.SyncAssistanceResponse{Reports: b.reports(), Policy: policy}, nil
+	response := &agentv1.SyncAssistanceResponse{Reports: b.reports(), Policy: policy}
+	if err := b.admit(response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // syncSession binds the SO_PEERCRED uid to its single eligible logind session,
@@ -219,7 +241,11 @@ func (b *assistanceBroker) syncSession(ctx context.Context, uid uint32, req *age
 		b.applyReport(now, local, report)
 	}
 	b.expire(now)
-	return &agentv1.SyncSessionResponse{Directives: b.helperDirectives(local), LocalSession: proto.CloneOf(local)}, nil
+	response := &agentv1.SyncSessionResponse{Directives: b.helperDirectives(local), LocalSession: proto.CloneOf(local)}
+	if err := b.admit(response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 // eligible requires exactly one local, active, unlocked user graphical session.
@@ -296,6 +322,11 @@ func (b *assistanceBroker) applyDirectives(now time.Time, directives []*agentv1.
 			}
 		}
 		session.lastDirective = now
+		session.authorizedUntil = directive.GetAuthorizedUntil().AsTime()
+		if !directive.GetTerminate() && (!now.Before(session.authorizedUntil) || session.authorizedUntil.After(now.Add(assistanceReauthorization))) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "operator_authorization_expired")
+		}
+		b.applyCommand(now, session, directive.GetCommand())
 		// The invitation is immutable once seen; only the answer and
 		// termination may arrive later. The answer is single use.
 		if session.answerSDP == "" && directive.GetAnswerSdp() != "" {
@@ -371,6 +402,7 @@ func (b *assistanceBroker) forget(now time.Time, id string, session *assistanceS
 // expire applies every executor-owned deadline with the executor's clock.
 func (b *assistanceBroker) expire(now time.Time) {
 	for _, session := range b.sessions {
+		expireAssistanceCommand(session, now)
 		if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
 			continue
 		}
@@ -383,7 +415,7 @@ func (b *assistanceBroker) expire(now time.Time) {
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION, "")
 		case session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED && !now.Before(session.invitation.GetConsentDeadline().AsTime()):
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT, "")
-		case now.Sub(session.lastDirective) >= assistanceReauthorization:
+		case now.Sub(session.lastDirective) >= assistanceReauthorization || !now.Before(session.authorizedUntil):
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "")
 		case session.phase != agentv1.AssistancePhase_ASSISTANCE_PHASE_PENDING && now.Sub(session.lastHelper) >= assistanceHelperAbsence:
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "helper_absent")
@@ -397,6 +429,11 @@ func (b *assistanceBroker) end(session *assistanceSession, cause agentv1.Assista
 	}
 	session.phase = agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED
 	session.endCause, session.endDetail = cause, detail
+	session.command, session.commandResult = nil, nil
+	session.displayFrame = nil
+	if session.commandTimer != nil {
+		session.commandTimer.Stop()
+	}
 	slog.Info("remote assistance session ended", "session_id", session.invitation.GetSessionId(), "cause", cause.String(), "detail", detail)
 }
 
@@ -455,6 +492,16 @@ func (b *assistanceBroker) applyReport(now time.Time, local *agentv1.AssistanceL
 		// No connection can exist before the authorized answer was delivered.
 		phase = agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED
 	}
+	if phase >= agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED {
+		if !b.applyCapabilities(session, report) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "capability_report_invalid")
+			return
+		}
+		b.applyCommandResult(now, session, report.GetCommandResult())
+		if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+			return
+		}
+	}
 	if phase <= session.phase {
 		return
 	}
@@ -496,7 +543,7 @@ func (b *assistanceBroker) helperDirectives(local *agentv1.AssistanceLocalSessio
 		switch {
 		case session.local == nil:
 			if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_PENDING && targets(session.invitation, local) {
-				out = append(out, &agentv1.AssistanceDirective{Invitation: proto.CloneOf(session.invitation)})
+				out = append(out, b.helperDirective(session))
 			}
 		case !sameLocalSession(session.local, local):
 		case session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED:
@@ -504,7 +551,7 @@ func (b *assistanceBroker) helperDirectives(local *agentv1.AssistanceLocalSessio
 				out = append(out, &agentv1.AssistanceDirective{Invitation: proto.CloneOf(session.invitation), Terminate: true, TerminateCause: session.endCause})
 			}
 		default:
-			out = append(out, &agentv1.AssistanceDirective{Invitation: proto.CloneOf(session.invitation), AnswerSdp: session.answerSDP})
+			out = append(out, b.helperDirective(session))
 		}
 	}
 	return out
@@ -514,12 +561,20 @@ func (b *assistanceBroker) reports() []*agentv1.AssistanceReport {
 	var out []*agentv1.AssistanceReport
 	for _, session := range b.ordered() {
 		report := &agentv1.AssistanceReport{
-			SessionId:      session.invitation.GetSessionId(),
-			Phase:          session.phase,
-			ControlGranted: session.controlGranted,
-			EndCause:       session.endCause,
-			EndDetail:      session.endDetail,
-			LocalSession:   proto.CloneOf(session.local),
+			SessionId:             session.invitation.GetSessionId(),
+			Phase:                 session.phase,
+			ControlGranted:        session.controlGranted,
+			EndCause:              session.endCause,
+			EndDetail:             session.endDetail,
+			LocalSession:          proto.CloneOf(session.local),
+			GrantedCapabilities:   proto.CloneOf(session.granted),
+			Displays:              cloneAssistanceDisplays(session.displays),
+			SelectedDisplayId:     session.selectedDisplayID,
+			DisplayGeneration:     session.displayGeneration,
+			DisplayFrame:          proto.CloneOf(session.displayFrame),
+			CommandResult:         proto.CloneOf(session.commandResult),
+			RequestedCapabilities: proto.CloneOf(session.invitation.GetRequestedCapabilities()),
+			EffectiveCapabilities: assistancePolicyIntersection(session.invitation.GetEffectiveCapabilities(), b.ceiling),
 		}
 		if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE {
 			report.OfferSdp = session.offerSDP
@@ -527,4 +582,21 @@ func (b *assistanceBroker) reports() []*agentv1.AssistanceReport {
 		out = append(out, report)
 	}
 	return out
+}
+
+func expireAssistanceCommand(session *assistanceSession, now time.Time) {
+	if session.commandResult != nil && !now.Before(session.commandDeadline) {
+		session.commandResult.Text = ""
+		if session.commandResult.GetKind() == agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ && session.commandResult.GetStatus() == agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_SUCCEEDED {
+			session.commandResult.Status = agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_EXPIRED
+			session.commandResult.Reason = "content_expired"
+		}
+	}
+	if session.command != nil && !now.Before(session.command.GetDeadline().AsTime()) {
+		if session.commandResult == nil {
+			session.commandResult = &agentv1.AssistanceCommandResult{RequestId: session.command.GetRequestId(), Kind: session.command.GetKind(), Status: agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_EXPIRED, Reason: "command_expired", CompletedAt: timestamppb.New(now)}
+		}
+		session.command = nil
+		session.commandResult.Text = ""
+	}
 }

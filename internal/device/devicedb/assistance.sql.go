@@ -39,6 +39,21 @@ func (q *Queries) AnswerAssistanceSession(ctx context.Context, arg AnswerAssista
 	return err
 }
 
+const authorizeAssistanceSession = `-- name: AuthorizeAssistanceSession :exec
+UPDATE assistance_sessions SET authorized_until = $1
+WHERE id = $2 AND state <> 6
+`
+
+type AuthorizeAssistanceSessionParams struct {
+	AuthorizedUntil pgtype.Timestamptz
+	ID              uuid.UUID
+}
+
+func (q *Queries) AuthorizeAssistanceSession(ctx context.Context, arg AuthorizeAssistanceSessionParams) error {
+	_, err := q.db.Exec(ctx, authorizeAssistanceSession, arg.AuthorizedUntil, arg.ID)
+	return err
+}
+
 const bindAssistanceLocalSession = `-- name: BindAssistanceLocalSession :exec
 UPDATE assistance_sessions
 SET
@@ -96,6 +111,17 @@ func (q *Queries) ConfirmAssistanceDeviceEnded(ctx context.Context, id uuid.UUID
 	return err
 }
 
+const countAssistanceCommands = `-- name: CountAssistanceCommands :one
+SELECT count(*)::bigint FROM assistance_commands WHERE session_id = $1
+`
+
+func (q *Queries) CountAssistanceCommands(ctx context.Context, sessionID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAssistanceCommands, sessionID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countLiveAssistanceSessions = `-- name: CountLiveAssistanceSessions :one
 SELECT count(*)::bigint FROM assistance_sessions
 WHERE state <> 6
@@ -150,6 +176,85 @@ func (q *Queries) EndAssistanceSession(ctx context.Context, arg EndAssistanceSes
 	return err
 }
 
+const finishAssistanceCommand = `-- name: FinishAssistanceCommand :exec
+UPDATE assistance_commands
+SET status = $1, reason = $2, completed_at = $3, byte_count = $4
+WHERE request_id = $5 AND status = 1
+`
+
+type FinishAssistanceCommandParams struct {
+	Status      int16
+	Reason      string
+	CompletedAt pgtype.Timestamptz
+	ByteCount   int32
+	RequestID   uuid.UUID
+}
+
+func (q *Queries) FinishAssistanceCommand(ctx context.Context, arg FinishAssistanceCommandParams) error {
+	_, err := q.db.Exec(ctx, finishAssistanceCommand,
+		arg.Status,
+		arg.Reason,
+		arg.CompletedAt,
+		arg.ByteCount,
+		arg.RequestID,
+	)
+	return err
+}
+
+const getAssistanceCommand = `-- name: GetAssistanceCommand :one
+SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at FROM assistance_commands WHERE request_id = $1
+`
+
+func (q *Queries) GetAssistanceCommand(ctx context.Context, requestID uuid.UUID) (AssistanceCommand, error) {
+	row := q.db.QueryRow(ctx, getAssistanceCommand, requestID)
+	var i AssistanceCommand
+	err := row.Scan(
+		&i.RequestID,
+		&i.SessionID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.RequestDigest,
+		&i.Kind,
+		&i.Policy,
+		&i.ByteCount,
+		&i.SpecialKey,
+		&i.DisplayID,
+		&i.Deadline,
+		&i.Status,
+		&i.Reason,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const getAssistancePolicy = `-- name: GetAssistancePolicy :one
+SELECT policy FROM assistance_policies WHERE device_id = $1
+`
+
+func (q *Queries) GetAssistancePolicy(ctx context.Context, deviceID uuid.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, getAssistancePolicy, deviceID)
+	var policy []byte
+	err := row.Scan(&policy)
+	return policy, err
+}
+
+const getAssistancePolicyRequest = `-- name: GetAssistancePolicyRequest :one
+SELECT request_id, device_id, operator_id, request_digest, policy FROM assistance_policy_requests WHERE request_id = $1
+`
+
+func (q *Queries) GetAssistancePolicyRequest(ctx context.Context, requestID uuid.UUID) (AssistancePolicyRequest, error) {
+	row := q.db.QueryRow(ctx, getAssistancePolicyRequest, requestID)
+	var i AssistancePolicyRequest
+	err := row.Scan(
+		&i.RequestID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.RequestDigest,
+		&i.Policy,
+	)
+	return i, err
+}
+
 const getAssistanceReadiness = `-- name: GetAssistanceReadiness :one
 SELECT
     d.state,
@@ -193,7 +298,7 @@ func (q *Queries) GetAssistanceReadiness(ctx context.Context, deviceID uuid.UUID
 }
 
 const getAssistanceSession = `-- name: GetAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE id = $1
 `
 
@@ -234,12 +339,16 @@ func (q *Queries) GetAssistanceSession(ctx context.Context, id uuid.UUID) (Assis
 		&i.OfferFingerprint,
 		&i.AnswerSdp,
 		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
 	)
 	return i, err
 }
 
 const getAssistanceSessionByRequest = `-- name: GetAssistanceSessionByRequest :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE request_id = $1
 `
 
@@ -280,8 +389,147 @@ func (q *Queries) GetAssistanceSessionByRequest(ctx context.Context, requestID u
 		&i.OfferFingerprint,
 		&i.AnswerSdp,
 		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
 	)
 	return i, err
+}
+
+const getOpenAssistanceSession = `-- name: GetOpenAssistanceSession :one
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions WHERE device_id = $1 AND state <> 6
+`
+
+func (q *Queries) GetOpenAssistanceSession(ctx context.Context, deviceID uuid.UUID) (AssistanceSession, error) {
+	row := q.db.QueryRow(ctx, getOpenAssistanceSession, deviceID)
+	var i AssistanceSession
+	err := row.Scan(
+		&i.ID,
+		&i.DeviceID,
+		&i.GenerationID,
+		&i.RequestID,
+		&i.RequestDigest,
+		&i.OperatorID,
+		&i.OperatorDisplay,
+		&i.Mode,
+		&i.Reason,
+		&i.TargetUsername,
+		&i.State,
+		&i.CreatedAt,
+		&i.ConsentDeadline,
+		&i.EndsAt,
+		&i.PromptedAt,
+		&i.ConsentedAt,
+		&i.AnsweredAt,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.EndCause,
+		&i.EndDetail,
+		&i.DeviceSyncedAt,
+		&i.DeviceEnded,
+		&i.ControlGranted,
+		&i.LocalUsername,
+		&i.LocalUid,
+		&i.LocalLogindSession,
+		&i.LocalSessionType,
+		&i.LocalDesktop,
+		&i.OfferSdp,
+		&i.OfferFingerprint,
+		&i.AnswerSdp,
+		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
+	)
+	return i, err
+}
+
+const getPendingAssistanceCommand = `-- name: GetPendingAssistanceCommand :one
+SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at FROM assistance_commands WHERE session_id = $1 AND status = 1
+`
+
+func (q *Queries) GetPendingAssistanceCommand(ctx context.Context, sessionID uuid.UUID) (AssistanceCommand, error) {
+	row := q.db.QueryRow(ctx, getPendingAssistanceCommand, sessionID)
+	var i AssistanceCommand
+	err := row.Scan(
+		&i.RequestID,
+		&i.SessionID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.RequestDigest,
+		&i.Kind,
+		&i.Policy,
+		&i.ByteCount,
+		&i.SpecialKey,
+		&i.DisplayID,
+		&i.Deadline,
+		&i.Status,
+		&i.Reason,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
+const insertAssistanceCommand = `-- name: InsertAssistanceCommand :exec
+INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
+`
+
+type InsertAssistanceCommandParams struct {
+	RequestID     uuid.UUID
+	SessionID     uuid.UUID
+	DeviceID      uuid.UUID
+	OperatorID    uuid.UUID
+	RequestDigest []byte
+	Kind          int16
+	Policy        []byte
+	ByteCount     int32
+	SpecialKey    int16
+	DisplayID     string
+	Deadline      pgtype.Timestamptz
+}
+
+func (q *Queries) InsertAssistanceCommand(ctx context.Context, arg InsertAssistanceCommandParams) error {
+	_, err := q.db.Exec(ctx, insertAssistanceCommand,
+		arg.RequestID,
+		arg.SessionID,
+		arg.DeviceID,
+		arg.OperatorID,
+		arg.RequestDigest,
+		arg.Kind,
+		arg.Policy,
+		arg.ByteCount,
+		arg.SpecialKey,
+		arg.DisplayID,
+		arg.Deadline,
+	)
+	return err
+}
+
+const insertAssistancePolicyRequest = `-- name: InsertAssistancePolicyRequest :exec
+INSERT INTO assistance_policy_requests(request_id, device_id, operator_id, request_digest, policy)
+VALUES ($1, $2, $3, $4, $5)
+`
+
+type InsertAssistancePolicyRequestParams struct {
+	RequestID     uuid.UUID
+	DeviceID      uuid.UUID
+	OperatorID    uuid.UUID
+	RequestDigest []byte
+	Policy        []byte
+}
+
+func (q *Queries) InsertAssistancePolicyRequest(ctx context.Context, arg InsertAssistancePolicyRequestParams) error {
+	_, err := q.db.Exec(ctx, insertAssistancePolicyRequest,
+		arg.RequestID,
+		arg.DeviceID,
+		arg.OperatorID,
+		arg.RequestDigest,
+		arg.Policy,
+	)
+	return err
 }
 
 const insertAssistanceSession = `-- name: InsertAssistanceSession :exec
@@ -354,7 +602,7 @@ func (q *Queries) InsertAssistanceSession(ctx context.Context, arg InsertAssista
 }
 
 const listAssistanceDirectiveSessions = `-- name: ListAssistanceDirectiveSessions :many
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE device_id = $1
   AND (state <> 6 OR (NOT device_ended AND ended_at > $2::timestamptz))
 ORDER BY (state = 6), created_at DESC, id DESC
@@ -410,6 +658,10 @@ func (q *Queries) ListAssistanceDirectiveSessions(ctx context.Context, arg ListA
 			&i.OfferFingerprint,
 			&i.AnswerSdp,
 			&i.AnswerFingerprint,
+			&i.AuthorizedUntil,
+			&i.RequestedCapabilities,
+			&i.EffectiveCapabilities,
+			&i.CapabilityProjection,
 		); err != nil {
 			return nil, err
 		}
@@ -422,7 +674,7 @@ func (q *Queries) ListAssistanceDirectiveSessions(ctx context.Context, arg ListA
 }
 
 const listAssistanceSessions = `-- name: ListAssistanceSessions :many
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE device_id = $1
   AND (NOT $2::boolean OR (created_at, id) < ($3::timestamptz, $4::uuid))
 ORDER BY created_at DESC, id DESC
@@ -486,6 +738,10 @@ func (q *Queries) ListAssistanceSessions(ctx context.Context, arg ListAssistance
 			&i.OfferFingerprint,
 			&i.AnswerSdp,
 			&i.AnswerFingerprint,
+			&i.AuthorizedUntil,
+			&i.RequestedCapabilities,
+			&i.EffectiveCapabilities,
+			&i.CapabilityProjection,
 		); err != nil {
 			return nil, err
 		}
@@ -507,7 +763,7 @@ func (q *Queries) LockAssistanceAdmission(ctx context.Context) error {
 }
 
 const lockAssistanceSession = `-- name: LockAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE id = $1
 FOR UPDATE
 `
@@ -549,12 +805,16 @@ func (q *Queries) LockAssistanceSession(ctx context.Context, id uuid.UUID) (Assi
 		&i.OfferFingerprint,
 		&i.AnswerSdp,
 		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
 	)
 	return i, err
 }
 
 const lockAssistanceSessionForDevice = `-- name: LockAssistanceSessionForDevice :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE id = $1 AND device_id = $2
 FOR UPDATE
 `
@@ -601,12 +861,16 @@ func (q *Queries) LockAssistanceSessionForDevice(ctx context.Context, arg LockAs
 		&i.OfferFingerprint,
 		&i.AnswerSdp,
 		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
 	)
 	return i, err
 }
 
 const lockOpenAssistanceSession = `-- name: LockOpenAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
 WHERE device_id = $1 AND state <> 6
 FOR UPDATE
 `
@@ -648,6 +912,10 @@ func (q *Queries) LockOpenAssistanceSession(ctx context.Context, deviceID uuid.U
 		&i.OfferFingerprint,
 		&i.AnswerSdp,
 		&i.AnswerFingerprint,
+		&i.AuthorizedUntil,
+		&i.RequestedCapabilities,
+		&i.EffectiveCapabilities,
+		&i.CapabilityProjection,
 	)
 	return i, err
 }
@@ -682,6 +950,40 @@ func (q *Queries) OfferAssistanceSession(ctx context.Context, arg OfferAssistanc
 	return err
 }
 
+const putAssistancePolicy = `-- name: PutAssistancePolicy :exec
+INSERT INTO assistance_policies(device_id, policy)
+VALUES ($1, $2)
+ON CONFLICT (device_id) DO UPDATE SET policy = EXCLUDED.policy
+`
+
+type PutAssistancePolicyParams struct {
+	DeviceID uuid.UUID
+	Policy   []byte
+}
+
+func (q *Queries) PutAssistancePolicy(ctx context.Context, arg PutAssistancePolicyParams) error {
+	_, err := q.db.Exec(ctx, putAssistancePolicy, arg.DeviceID, arg.Policy)
+	return err
+}
+
+const setAssistanceCapabilities = `-- name: SetAssistanceCapabilities :exec
+UPDATE assistance_sessions
+SET requested_capabilities = $1,
+    effective_capabilities = $2
+WHERE id = $3
+`
+
+type SetAssistanceCapabilitiesParams struct {
+	RequestedCapabilities []byte
+	EffectiveCapabilities []byte
+	ID                    uuid.UUID
+}
+
+func (q *Queries) SetAssistanceCapabilities(ctx context.Context, arg SetAssistanceCapabilitiesParams) error {
+	_, err := q.db.Exec(ctx, setAssistanceCapabilities, arg.RequestedCapabilities, arg.EffectiveCapabilities, arg.ID)
+	return err
+}
+
 const setAssistanceDevicePolicy = `-- name: SetAssistanceDevicePolicy :exec
 INSERT INTO assistance_device_policies (device_id, policy, changed_at)
 VALUES ($1, $2, $3)
@@ -699,6 +1001,37 @@ type SetAssistanceDevicePolicyParams struct {
 // Writes only when the reported value changes, not on every idle sync.
 func (q *Queries) SetAssistanceDevicePolicy(ctx context.Context, arg SetAssistanceDevicePolicyParams) error {
 	_, err := q.db.Exec(ctx, setAssistanceDevicePolicy, arg.DeviceID, arg.Policy, arg.ChangedAt)
+	return err
+}
+
+const setAssistanceEffectiveCapabilities = `-- name: SetAssistanceEffectiveCapabilities :exec
+UPDATE assistance_sessions SET effective_capabilities = $1
+WHERE id = $2 AND state <> 6
+`
+
+type SetAssistanceEffectiveCapabilitiesParams struct {
+	EffectiveCapabilities []byte
+	ID                    uuid.UUID
+}
+
+func (q *Queries) SetAssistanceEffectiveCapabilities(ctx context.Context, arg SetAssistanceEffectiveCapabilitiesParams) error {
+	_, err := q.db.Exec(ctx, setAssistanceEffectiveCapabilities, arg.EffectiveCapabilities, arg.ID)
+	return err
+}
+
+const setAssistanceProjection = `-- name: SetAssistanceProjection :exec
+UPDATE assistance_sessions
+SET capability_projection = $1
+WHERE id = $2 AND state <> 6
+`
+
+type SetAssistanceProjectionParams struct {
+	CapabilityProjection []byte
+	ID                   uuid.UUID
+}
+
+func (q *Queries) SetAssistanceProjection(ctx context.Context, arg SetAssistanceProjectionParams) error {
+	_, err := q.db.Exec(ctx, setAssistanceProjection, arg.CapabilityProjection, arg.ID)
 	return err
 }
 

@@ -322,3 +322,82 @@ func centreChanged(reference, current *image.RGBA) bool {
 	_, count := screenDiffBounds(reference, current, image.Rect(centre.X-120, centre.Y-120, centre.X+120, centre.Y+120), screenDiffThreshold)
 	return count >= 240*240/2
 }
+
+// portalMonitorTiles locates the two unselected monitor illustration top
+// borders, not a fabricated second monitor. GNOME 46/50 screencastwidget.css
+// uses neutral shade(view_bg, .8) borders and accent borders when checked.
+// Each border is a band of at least two neutral rows ≥70 px wide; its rounded
+// corners widen it row by row, and the tiles are sized after each monitor's
+// resolution, so two choices need not share extents or a top row (the
+// primary head's tile also draws its top bar right below the border). A tile's
+// bottom border overlaps its top horizontally and is skipped, as is the
+// single-row frame around the choices. Both choices must lie side by side,
+// below the interaction controls; the final Start response remains the
+// authority for two consented streams.
+func portalMonitorTiles(img *image.RGBA, dialog image.Rectangle) ([2]image.Rectangle, bool) {
+	area := image.Rect(dialog.Min.X+40, dialog.Min.Y+160, dialog.Max.X-40, dialog.Max.Y-36).Intersect(img.Bounds())
+	// A choice leaves room for a second ≥70 px choice and the 8 px gap.
+	maxWidth := area.Dx() - 78
+	var tiles []image.Rectangle
+	accept := func(band image.Rectangle) {
+		if band.Dy() < 2 || band.Dx() > maxWidth {
+			return
+		}
+		for _, tile := range tiles {
+			if band.Min.X < tile.Max.X+8 && tile.Min.X < band.Max.X+8 {
+				return
+			}
+		}
+		tiles = append(tiles, band)
+	}
+	var open []image.Rectangle
+	for y := area.Min.Y; y <= area.Max.Y; y++ {
+		var bands []image.Rectangle
+		continued := make([]bool, len(open))
+		start := -1
+		for x := area.Min.X; y < area.Max.Y && x <= area.Max.X; x++ {
+			neutral := x < area.Max.X && pixelLuma(img, x, y) >= 140 && pixelLuma(img, x, y) < 225 && pixelSaturation(img, x, y) < 40
+			if neutral && start < 0 {
+				start = x
+			}
+			if !neutral && start >= 0 {
+				if x-start >= 70 {
+					band := image.Rect(start, y, x, y+1)
+					for i, previous := range open {
+						if previous.Min.X < band.Max.X && band.Min.X < previous.Max.X {
+							band, continued[i] = band.Union(previous), true
+						}
+					}
+					bands = append(bands, band)
+				}
+				start = -1
+			}
+		}
+		for i, band := range open {
+			if !continued[i] {
+				accept(band)
+			}
+		}
+		open = bands
+	}
+	if len(tiles) != 2 {
+		return [2]image.Rectangle{}, false
+	}
+	if tiles[1].Min.X < tiles[0].Min.X {
+		tiles[0], tiles[1] = tiles[1], tiles[0]
+	}
+	return [2]image.Rectangle{tiles[0], tiles[1]}, true
+}
+
+func portalMonitorSelected(img *image.RGBA, border image.Rectangle) bool {
+	area := border.Inset(-5).Intersect(img.Bounds())
+	accent := 0
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			if pixelSaturation(img, x, y) >= 90 {
+				accent++
+			}
+		}
+	}
+	return accent >= border.Dx()
+}

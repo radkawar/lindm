@@ -114,7 +114,7 @@ func TestSplitAuthorityExportConnect(t *testing.T) {
 	if _, err := connected.ReadAgentFixture(ctx); err != nil {
 		t.Fatalf("caller mutation changed connected trust: %v", err)
 	}
-	acceptance, err := connected.CreateAcceptanceEnrollment(ctx, "remote-browser-owner")
+	acceptance, err := connected.CreateAcceptanceEnrollment(ctx, "remote-browser-owner", "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -105,7 +105,7 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	if err != nil {
 		return nil, fmt.Errorf("read exported transport CA: %w", err)
 	}
-	enrollment, err := f.CreateAcceptanceEnrollment(ctx, username)
+	enrollment, err := f.CreateAcceptanceEnrollment(ctx, username, "owner")
 	if err != nil {
 		return nil, fmt.Errorf("create remote owner enrollment: %w", err)
 	}

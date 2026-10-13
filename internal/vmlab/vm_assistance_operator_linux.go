@@ -16,12 +16,11 @@ import (
 // createAssistanceOperator creates the browser's own account, never the retained
 // human owner or lane authority. Named runs retain disabled account audit history,
 // so each scenario invocation needs a distinct username as well as account ID.
-func createAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, persistent bool) (string, *authv1.AccountEnrollment, error) {
-	username := assistanceOperator
+func createAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixture, persistent bool, username, role string) (string, *authv1.AccountEnrollment, error) {
 	if persistent {
 		username += "-" + strings.ToLower(rand.Text()[:12])
 	}
-	enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, username)
+	enrollment, err := fixture.CreateAcceptanceEnrollment(ctx, username, role)
 	if err != nil {
 		return "", nil, fmt.Errorf("issue assistance operator enrollment: %w", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -66,6 +67,15 @@ func TestDemoOrganizationPlan(t *testing.T) {
 	spec, err := orgapply.Decode(data)
 	if err != nil {
 		t.Fatal(err)
+	}
+	var helpdesk []string
+	for _, role := range spec.GetAuthorization().GetRoles() {
+		if role.GetName() == "demo-helpdesk" {
+			helpdesk = role.GetPermissions()
+		}
+	}
+	if !slices.Equal(helpdesk, []string{"fleet.read", "remote_assistance.view", "actions.lock"}) {
+		t.Fatalf("helpdesk example must remain view-only without implicit capability grants: %v", helpdesk)
 	}
 	for _, profile := range spec.GetProfiles() {
 		if err := policy.Validate(t.Context(), profile.GetSpec()); err != nil {

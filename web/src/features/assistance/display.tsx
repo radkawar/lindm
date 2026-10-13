@@ -7,7 +7,8 @@ import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 import type { RpcFailure } from "@/lib/errors";
 import { formatTimestamp } from "@/lib/time";
 
-export const ASSISTANCE_PERMISSION = "remote_assistance.run";
+export const ASSISTANCE_VIEW_PERMISSION = "remote_assistance.view";
+export const ASSISTANCE_CONTROL_PERMISSION = "remote_assistance.control";
 
 const stateLabels: Record<AssistanceState, { label: string; tone: StatusTone }> = {
   [AssistanceState.UNSPECIFIED]: { label: "Unknown", tone: "neutral" },

@@ -5,6 +5,7 @@ package lindm.config.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
 import "lindm/advisory/v1/feed.proto";
+import "lindm/agent/v1/assistance.proto";
 import "lindm/agent/v1/connectivity_guard.proto";
 import "lindm/auth/v1/authorization.proto";
 import "lindm/validation/v1/string_rules.proto";
@@ -483,7 +484,7 @@ message BreakGlassPolicy {
   // This allowlist always applies, including when console_only is true.
   repeated string allowed_permissions = 1 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 24,
+    (buf.validate.field).repeated.max_items = 25,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -498,7 +499,13 @@ message BreakGlassPolicy {
         "inventory.manage",
         "recovery_keys.read",
         "remote_execution.run",
-        "remote_assistance.run",
+        "remote_assistance.view",
+        "remote_assistance.control",
+        "remote_assistance.policy.manage",
+        "remote_assistance.clipboard",
+        "remote_assistance.keyboard",
+        "remote_assistance.display",
+        "remote_assistance.message",
         "scripts.run",
         "destructive.execute",
         "approvals.manage",
@@ -533,6 +540,8 @@ message AssistanceConfig {
   AssistanceRelayConfig relay = 1 [(buf.validate.field).required = true];
   // Admission bound for non-ended sessions; zero selects 16.
   uint32 max_concurrent_sessions = 2 [(buf.validate.field).uint32.lte = 256];
+  // Deployment ceiling, not an implicit per-device grant.
+  lindm.agent.v1.AssistancePolicy policy_ceiling = 3;
 }
 
 message AssistanceRelayConfig {

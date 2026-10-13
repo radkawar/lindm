@@ -75,3 +75,16 @@ export function assistanceSessionQueryOptions(
     refetchIntervalInBackground: true,
   });
 }
+
+export function assistancePolicyQueryOptions(lifetime: AuthLifetime, deviceId: string) {
+  return queryOptions({
+    queryKey: ["assistance-policy", lifetime.generation, deviceId] as const,
+    meta: { authGeneration: lifetime.generation },
+    retry: false,
+    queryFn: ({ signal }) =>
+      adminClient.getAssistancePolicy(
+        { deviceId },
+        { signal: AbortSignal.any([signal, lifetime.signal]) },
+      ),
+  });
+}

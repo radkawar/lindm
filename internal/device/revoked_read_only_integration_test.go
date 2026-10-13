@@ -4,13 +4,18 @@ package device
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/assistrelay"
 )
 
 // A revoked device is read-only: every operator mutation targeting it is
@@ -18,7 +23,14 @@ import (
 func TestRevokedDeviceRefusesMutations(t *testing.T) {
 	f := newLAPSFixture(t, false)
 	// Configured relay only: the refusal precedes any relay use.
-	f.svc.Assistance = newAssistanceFixture(t, 1).relay
+	relay, err := assistrelay.New(&configv1.AssistanceConfig{MaxConcurrentSessions: 1, Relay: &configv1.AssistanceRelayConfig{
+		Listener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 3478}, RelayAddress: "127.0.0.1",
+		RelayPortMin: 40000, RelayPortMax: 40100, Urls: []string{"turn:relay.example:3478?transport=udp"}, Realm: "relay.example",
+	}}, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.svc.Assistance = relay
 	f.setPolicy(t, f.ownerCtx)
 	if _, err := f.svc.RevokeDevice(f.ownerCtx, approvedRevocation(t, f.svc, f.ownerCtx, &adminv1.RevokeDeviceRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, Reason: "retire stolen laptop"})); err != nil {
 		t.Fatal(err)
@@ -51,6 +63,10 @@ func TestRevokedDeviceRefusesMutations(t *testing.T) {
 		},
 		"CreateAssistanceSession": func(ctx context.Context) error {
 			_, err := f.svc.CreateAssistanceSession(ctx, connect.NewRequest(&adminv1.CreateAssistanceSessionRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, Mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, Reason: "help user"}))
+			return err
+		},
+		"UpdateAssistancePolicy": func(ctx context.Context) error {
+			_, err := f.svc.UpdateAssistancePolicy(ctx, connect.NewRequest(&adminv1.UpdateAssistancePolicyRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, Policy: &agentv1.AssistancePolicy{}}))
 			return err
 		},
 		"SetLocalAdminPasswordPolicy": func(ctx context.Context) error {

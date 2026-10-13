@@ -154,7 +154,7 @@ Only one checkout can run the dev lab at a time, because it uses fixed ports.
   - Each test gets a fresh schema via `pool, conn := testdb.Open(t)`.
   - Without `LINDM_TEST_DATABASE_URL_FILE` (an owner-only DSN file; never put the DSN in argv or the environment) they fail rather than skip. Run them with `make test-integration`.
 - Root, namespace or capability tests in `internal/agent` call `t.Skip` when not running as root or on EPERM. Some re-exec the test binary, gated by env vars (e.g. `LINDM_SNAPSHOT_REEXEC`).
-- The web code has no unit tests. It is gated by eslint (`--max-warnings=0`), `tsc` and prettier.
+- Pure assistance input/presentation regressions use Node's built-in test runner through `make test`; they exercise production logic, not source text or fake native results. Web changes also require eslint (`--max-warnings=0`), `tsc` and prettier.
 - There is no coverage percentage target. Rules:
   - Every bug fix needs a deterministic regression test when practical.
   - Tests check consumer-visible behavior, boundaries, authority and durability. Never test source text, mock echoes or tooling glue.

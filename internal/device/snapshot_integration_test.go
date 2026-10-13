@@ -13,6 +13,7 @@ import (
 
 	"lindm/internal/device/inventory"
 
+	"lindm/internal/device/assistance"
 	"lindm/internal/device/core"
 
 	"connectrpc.com/connect"
@@ -46,7 +47,7 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 	pool, conn := testdb.Open(t)
 	f.conn = conn
 	ca, caKey := testCA(t, f.now.Add(90*24*time.Hour))
-	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)})
+	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}

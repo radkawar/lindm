@@ -49,7 +49,7 @@ message RoleDefinition {
   }];
   repeated string permissions = 2 [
     (buf.validate.field).repeated.min_items = 1,
-    (buf.validate.field).repeated.max_items = 24,
+    (buf.validate.field).repeated.max_items = 25,
     (buf.validate.field).repeated.unique = true,
     (buf.validate.field).repeated.items.string = {
       in: [
@@ -64,7 +64,13 @@ message RoleDefinition {
         "inventory.manage",
         "recovery_keys.read",
         "remote_execution.run",
-        "remote_assistance.run",
+        "remote_assistance.view",
+        "remote_assistance.control",
+        "remote_assistance.policy.manage",
+        "remote_assistance.clipboard",
+        "remote_assistance.keyboard",
+        "remote_assistance.display",
+        "remote_assistance.message",
         "scripts.run",
         "destructive.execute",
         "approvals.manage",

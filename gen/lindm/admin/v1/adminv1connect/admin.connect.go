@@ -232,6 +232,18 @@ const (
 	// AdminServiceStopAssistanceSessionProcedure is the fully-qualified name of the AdminService's
 	// StopAssistanceSession RPC.
 	AdminServiceStopAssistanceSessionProcedure = "/lindm.admin.v1.AdminService/StopAssistanceSession"
+	// AdminServiceGetAssistancePolicyProcedure is the fully-qualified name of the AdminService's
+	// GetAssistancePolicy RPC.
+	AdminServiceGetAssistancePolicyProcedure = "/lindm.admin.v1.AdminService/GetAssistancePolicy"
+	// AdminServiceUpdateAssistancePolicyProcedure is the fully-qualified name of the AdminService's
+	// UpdateAssistancePolicy RPC.
+	AdminServiceUpdateAssistancePolicyProcedure = "/lindm.admin.v1.AdminService/UpdateAssistancePolicy"
+	// AdminServiceRunAssistanceCommandProcedure is the fully-qualified name of the AdminService's
+	// RunAssistanceCommand RPC.
+	AdminServiceRunAssistanceCommandProcedure = "/lindm.admin.v1.AdminService/RunAssistanceCommand"
+	// AdminServiceGetAssistanceCommandProcedure is the fully-qualified name of the AdminService's
+	// GetAssistanceCommand RPC.
+	AdminServiceGetAssistanceCommandProcedure = "/lindm.admin.v1.AdminService/GetAssistanceCommand"
 	// AdminServiceGetAssistanceReadinessProcedure is the fully-qualified name of the AdminService's
 	// GetAssistanceReadiness RPC.
 	AdminServiceGetAssistanceReadinessProcedure = "/lindm.admin.v1.AdminService/GetAssistanceReadiness"
@@ -382,6 +394,10 @@ type AdminServiceClient interface {
 	JoinAssistanceSession(context.Context, *connect.Request[v1.JoinAssistanceSessionRequest]) (*connect.Response[v1.JoinAssistanceSessionResponse], error)
 	AnswerAssistanceSession(context.Context, *connect.Request[v1.AnswerAssistanceSessionRequest]) (*connect.Response[v1.AnswerAssistanceSessionResponse], error)
 	StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error)
+	GetAssistancePolicy(context.Context, *connect.Request[v1.GetAssistancePolicyRequest]) (*connect.Response[v1.GetAssistancePolicyResponse], error)
+	UpdateAssistancePolicy(context.Context, *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error)
+	RunAssistanceCommand(context.Context, *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error)
+	GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error)
 	// Whether a new request can reach a person on the device, and the evidence.
 	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
@@ -828,6 +844,30 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("StopAssistanceSession")),
 			connect.WithClientOptions(opts...),
 		),
+		getAssistancePolicy: connect.NewClient[v1.GetAssistancePolicyRequest, v1.GetAssistancePolicyResponse](
+			httpClient,
+			baseURL+AdminServiceGetAssistancePolicyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetAssistancePolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		updateAssistancePolicy: connect.NewClient[v1.UpdateAssistancePolicyRequest, v1.UpdateAssistancePolicyResponse](
+			httpClient,
+			baseURL+AdminServiceUpdateAssistancePolicyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("UpdateAssistancePolicy")),
+			connect.WithClientOptions(opts...),
+		),
+		runAssistanceCommand: connect.NewClient[v1.RunAssistanceCommandRequest, v1.RunAssistanceCommandResponse](
+			httpClient,
+			baseURL+AdminServiceRunAssistanceCommandProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RunAssistanceCommand")),
+			connect.WithClientOptions(opts...),
+		),
+		getAssistanceCommand: connect.NewClient[v1.GetAssistanceCommandRequest, v1.GetAssistanceCommandResponse](
+			httpClient,
+			baseURL+AdminServiceGetAssistanceCommandProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetAssistanceCommand")),
+			connect.WithClientOptions(opts...),
+		),
 		getAssistanceReadiness: connect.NewClient[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse](
 			httpClient,
 			baseURL+AdminServiceGetAssistanceReadinessProcedure,
@@ -1056,6 +1096,10 @@ type adminServiceClient struct {
 	joinAssistanceSession                *connect.Client[v1.JoinAssistanceSessionRequest, v1.JoinAssistanceSessionResponse]
 	answerAssistanceSession              *connect.Client[v1.AnswerAssistanceSessionRequest, v1.AnswerAssistanceSessionResponse]
 	stopAssistanceSession                *connect.Client[v1.StopAssistanceSessionRequest, v1.StopAssistanceSessionResponse]
+	getAssistancePolicy                  *connect.Client[v1.GetAssistancePolicyRequest, v1.GetAssistancePolicyResponse]
+	updateAssistancePolicy               *connect.Client[v1.UpdateAssistancePolicyRequest, v1.UpdateAssistancePolicyResponse]
+	runAssistanceCommand                 *connect.Client[v1.RunAssistanceCommandRequest, v1.RunAssistanceCommandResponse]
+	getAssistanceCommand                 *connect.Client[v1.GetAssistanceCommandRequest, v1.GetAssistanceCommandResponse]
 	getAssistanceReadiness               *connect.Client[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse]
 	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
 	listDeviceStorageTargets             *connect.Client[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse]
@@ -1421,6 +1465,26 @@ func (c *adminServiceClient) StopAssistanceSession(ctx context.Context, req *con
 	return c.stopAssistanceSession.CallUnary(ctx, req)
 }
 
+// GetAssistancePolicy calls lindm.admin.v1.AdminService.GetAssistancePolicy.
+func (c *adminServiceClient) GetAssistancePolicy(ctx context.Context, req *connect.Request[v1.GetAssistancePolicyRequest]) (*connect.Response[v1.GetAssistancePolicyResponse], error) {
+	return c.getAssistancePolicy.CallUnary(ctx, req)
+}
+
+// UpdateAssistancePolicy calls lindm.admin.v1.AdminService.UpdateAssistancePolicy.
+func (c *adminServiceClient) UpdateAssistancePolicy(ctx context.Context, req *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error) {
+	return c.updateAssistancePolicy.CallUnary(ctx, req)
+}
+
+// RunAssistanceCommand calls lindm.admin.v1.AdminService.RunAssistanceCommand.
+func (c *adminServiceClient) RunAssistanceCommand(ctx context.Context, req *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error) {
+	return c.runAssistanceCommand.CallUnary(ctx, req)
+}
+
+// GetAssistanceCommand calls lindm.admin.v1.AdminService.GetAssistanceCommand.
+func (c *adminServiceClient) GetAssistanceCommand(ctx context.Context, req *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error) {
+	return c.getAssistanceCommand.CallUnary(ctx, req)
+}
+
 // GetAssistanceReadiness calls lindm.admin.v1.AdminService.GetAssistanceReadiness.
 func (c *adminServiceClient) GetAssistanceReadiness(ctx context.Context, req *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {
 	return c.getAssistanceReadiness.CallUnary(ctx, req)
@@ -1623,6 +1687,10 @@ type AdminServiceHandler interface {
 	JoinAssistanceSession(context.Context, *connect.Request[v1.JoinAssistanceSessionRequest]) (*connect.Response[v1.JoinAssistanceSessionResponse], error)
 	AnswerAssistanceSession(context.Context, *connect.Request[v1.AnswerAssistanceSessionRequest]) (*connect.Response[v1.AnswerAssistanceSessionResponse], error)
 	StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error)
+	GetAssistancePolicy(context.Context, *connect.Request[v1.GetAssistancePolicyRequest]) (*connect.Response[v1.GetAssistancePolicyResponse], error)
+	UpdateAssistancePolicy(context.Context, *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error)
+	RunAssistanceCommand(context.Context, *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error)
+	GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error)
 	// Whether a new request can reach a person on the device, and the evidence.
 	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
@@ -2065,6 +2133,30 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("StopAssistanceSession")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceGetAssistancePolicyHandler := connect.NewUnaryHandler(
+		AdminServiceGetAssistancePolicyProcedure,
+		svc.GetAssistancePolicy,
+		connect.WithSchema(adminServiceMethods.ByName("GetAssistancePolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceUpdateAssistancePolicyHandler := connect.NewUnaryHandler(
+		AdminServiceUpdateAssistancePolicyProcedure,
+		svc.UpdateAssistancePolicy,
+		connect.WithSchema(adminServiceMethods.ByName("UpdateAssistancePolicy")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRunAssistanceCommandHandler := connect.NewUnaryHandler(
+		AdminServiceRunAssistanceCommandProcedure,
+		svc.RunAssistanceCommand,
+		connect.WithSchema(adminServiceMethods.ByName("RunAssistanceCommand")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetAssistanceCommandHandler := connect.NewUnaryHandler(
+		AdminServiceGetAssistanceCommandProcedure,
+		svc.GetAssistanceCommand,
+		connect.WithSchema(adminServiceMethods.ByName("GetAssistanceCommand")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetAssistanceReadinessHandler := connect.NewUnaryHandler(
 		AdminServiceGetAssistanceReadinessProcedure,
 		svc.GetAssistanceReadiness,
@@ -2357,6 +2449,14 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceAnswerAssistanceSessionHandler.ServeHTTP(w, r)
 		case AdminServiceStopAssistanceSessionProcedure:
 			adminServiceStopAssistanceSessionHandler.ServeHTTP(w, r)
+		case AdminServiceGetAssistancePolicyProcedure:
+			adminServiceGetAssistancePolicyHandler.ServeHTTP(w, r)
+		case AdminServiceUpdateAssistancePolicyProcedure:
+			adminServiceUpdateAssistancePolicyHandler.ServeHTTP(w, r)
+		case AdminServiceRunAssistanceCommandProcedure:
+			adminServiceRunAssistanceCommandHandler.ServeHTTP(w, r)
+		case AdminServiceGetAssistanceCommandProcedure:
+			adminServiceGetAssistanceCommandHandler.ServeHTTP(w, r)
 		case AdminServiceGetAssistanceReadinessProcedure:
 			adminServiceGetAssistanceReadinessHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceEncryptionProcedure:
@@ -2684,6 +2784,22 @@ func (UnimplementedAdminServiceHandler) AnswerAssistanceSession(context.Context,
 
 func (UnimplementedAdminServiceHandler) StopAssistanceSession(context.Context, *connect.Request[v1.StopAssistanceSessionRequest]) (*connect.Response[v1.StopAssistanceSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.StopAssistanceSession is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetAssistancePolicy(context.Context, *connect.Request[v1.GetAssistancePolicyRequest]) (*connect.Response[v1.GetAssistancePolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAssistancePolicy is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) UpdateAssistancePolicy(context.Context, *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.UpdateAssistancePolicy is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RunAssistanceCommand(context.Context, *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RunAssistanceCommand is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAssistanceCommand is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {

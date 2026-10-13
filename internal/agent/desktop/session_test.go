@@ -28,8 +28,8 @@ func TestConsentAllowOffersAppliesAnswerOnceAndTerminates(t *testing.T) {
 
 	h.sync(directiveFor(inv))
 	prompt := h.notifier.next(t, "Remote assistance request")
-	if !prompt.notification.Critical || !prompt.notification.Persistent {
-		t.Fatalf("prompt must be critical and persistent: %+v", prompt.notification)
+	if !prompt.notification.Critical || !prompt.notification.Persistent || !prompt.notification.Reshow {
+		t.Fatalf("prompt must be critical, persistent and reshown: %+v", prompt.notification)
 	}
 	if body := prompt.notification.Body; !strings.Contains(body, "Olga Operator") || !strings.Contains(body, "printer <setup> & drivers") || !strings.Contains(body, "Control is not requested") {
 		t.Fatalf("prompt body lacks operator, reason or control statement: %q", body)
@@ -229,6 +229,8 @@ func TestPortalCapabilityGateRefusesBeforeConsent(t *testing.T) {
 	}{
 		{"no_screencast", modeView, "portal_screencast_unavailable"},
 		{"no_remote_desktop", modeControl, "portal_remote_desktop_unavailable"},
+		{"no_monitor_source", modeView, "portal_monitor_source_unavailable"},
+		{"no_input_devices", modeControl, "portal_input_devices_unavailable"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			h := newHarness(t)
@@ -254,6 +256,43 @@ func TestPortalCapabilityGateRefusesBeforeConsent(t *testing.T) {
 		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
 		h.notifier.next(t, "Remote assistance request")
 	})
+}
+
+func TestPortalPreflightUsesConsentedPolicyWithoutOpeningSession(t *testing.T) {
+	h := newHarness(t)
+	inv := tierOneInvitation(modeControl)
+	inv.EffectiveCapabilities.Keyboard = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	inv.RequestedCapabilities.Clipboard = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED
+	h.sync(directiveFor(inv))
+	prompt := h.notifier.next(t, "Remote assistance request")
+	h.portal.mu.Lock()
+	checked := append([]PortalRequest(nil), h.portal.checked...)
+	h.portal.mu.Unlock()
+	if len(checked) != 1 {
+		t.Fatalf("preflight count = %d", len(checked))
+	}
+	request := checked[0]
+	if request.Mode != modeControl || request.Policy.GetKeyboard() != agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF ||
+		request.Policy.GetClipboard() != agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED ||
+		request.Policy.GetDisplay() != agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON ||
+		request.Policy.GetMessages() != agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON {
+		t.Fatalf("preflight lost consented policy: %+v", request)
+	}
+	if h.portal.openCount() != 0 {
+		t.Fatal("preflight opened a native session before product consent")
+	}
+	if !strings.Contains(prompt.notification.Body, "Keyboard control is not requested") ||
+		!strings.Contains(prompt.notification.Body, "but not read it") {
+		t.Fatalf("product prompt differs from preflight: %q", prompt.notification.Body)
+	}
+	prompt.result <- actionDecline
+	h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED)
+	if h.portal.openCount() != 0 {
+		t.Fatal("declined product consent opened a native session")
+	}
+	if request.Lifetime == nil || request.Lifetime.Err() == nil {
+		t.Fatal("declined session retained its transfer lifetime")
+	}
 }
 
 func TestPortalClosedEndsSession(t *testing.T) {
@@ -432,10 +471,10 @@ func TestControlGrantedForwardsInputAndReleasesHeld(t *testing.T) {
 		t.Fatalf("indicator body = %q", indicator.notification.Body)
 	}
 	for _, message := range []string{
-		`{"t":"key","code":"KeyA","down":true}`,
-		`{"t":"button","b":"left","down":true}`,
-		`{"t":"move","x":0.5,"y":0.25}`,
-		`{"t":"key","code":"Power","down":true}`,
+		`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}`,
+		`{"t":"button","b":"left","down":true,"display":"monitor-1","generation":1}`,
+		`{"t":"move","x":0.5,"y":0.25,"display":"monitor-1","generation":1}`,
+		`{"t":"key","code":"Power","down":true,"display":"monitor-1","generation":1}`,
 		`not json`,
 	} {
 		h.peers.peer.input <- []byte(message)

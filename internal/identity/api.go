@@ -84,8 +84,14 @@ const (
 	PermissionQuarantineDevice         Permission = "actions.quarantine"
 	PermissionManageSecrets            Permission = "secrets.manage"
 	PermissionRevealSecrets            Permission = "secrets.reveal"
-	// Graphical remote assistance: create, join, answer and stop sessions.
-	PermissionRunRemoteAssistance Permission = "remote_assistance.run"
+	// Control supplements view; neither capability grants nor control imply view.
+	PermissionViewRemoteAssistance    Permission = "remote_assistance.view"
+	PermissionControlRemoteAssistance Permission = "remote_assistance.control"
+	PermissionManageAssistancePolicy  Permission = "remote_assistance.policy.manage"
+	PermissionAssistanceClipboard     Permission = "remote_assistance.clipboard"
+	PermissionAssistanceKeyboard      Permission = "remote_assistance.keyboard"
+	PermissionAssistanceDisplay       Permission = "remote_assistance.display"
+	PermissionAssistanceMessage       Permission = "remote_assistance.message"
 
 	RoleOwner    = "owner"
 	RoleAdmin    = "admin"

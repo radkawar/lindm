@@ -5,7 +5,7 @@
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
-import type { AssistanceDirective, AssistancePolicy, AssistanceReport } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceDirective, AssistanceEnablement, AssistanceReport } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -13,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/device/v1/assistance.proto.
  */
 export const file_lindm_device_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIroBChVTeW5jQXNzaXN0YW5jZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASOwoHcmVwb3J0cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZXBvcnRCCLpIBZIBAhAIEjoKBnBvbGljeRgDIAEoDjIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3lCCLpIBYIBAhABIlsKFlN5bmNBc3Npc3RhbmNlUmVzcG9uc2USQQoKZGlyZWN0aXZlcxgBIAMoCzIjLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VEaXJlY3RpdmVCCLpIBZIBAhAIQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_assistance]);
+  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIvgCChVTeW5jQXNzaXN0YW5jZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASOwoHcmVwb3J0cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZXBvcnRCCLpIBZIBAhAIEj4KBnBvbGljeRgDIAEoDjIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmFibGVtZW50Qgi6SAWCAQIQATq3AbpIswEasAEKImRldmljZV9zeW5jX2Fzc2lzdGFuY2Uub25lX2NvbnRlbnQSMG9ubHkgb25lIGRldmljZSBjb21tYW5kIHJlc3VsdCBtYXkgY2FycnkgY29udGVudBpYdGhpcy5yZXBvcnRzLmZpbHRlcihyLCBoYXMoci5jb21tYW5kX3Jlc3VsdCkgJiYgci5jb21tYW5kX3Jlc3VsdC50ZXh0ICE9ICcnKS5zaXplKCkgPD0gMSLsAQoWU3luY0Fzc2lzdGFuY2VSZXNwb25zZRJBCgpkaXJlY3RpdmVzGAEgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpcmVjdGl2ZUIIukgFkgECEAg6jgG6SIoBGocBCiJkZXZpY2Vfc3luY19hc3Npc3RhbmNlLm9uZV9jb21tYW5kEipvbmx5IG9uZSBkZXZpY2UgY29tbWFuZCBtYXkgYmUgb3V0c3RhbmRpbmcaNXRoaXMuZGlyZWN0aXZlcy5maWx0ZXIoZCwgaGFzKGQuY29tbWFuZCkpLnNpemUoKSA8PSAxQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_assistance]);
 
 /**
  * SyncAssistanceRequest reports the device's complete observed state for each
@@ -36,9 +36,9 @@ export type SyncAssistanceRequest = Message<"lindm.device.v1.SyncAssistanceReque
    * The executor's applied remote-assistance setting; UNSPECIFIED from agents
    * that predate it leaves the server's view unknown.
    *
-   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 3;
+   * @generated from field: lindm.agent.v1.AssistanceEnablement policy = 3;
    */
-  policy: AssistancePolicy;
+  policy: AssistanceEnablement;
 };
 
 /**

@@ -59,19 +59,20 @@ func NewDesktopPortal(bus *SessionBus, logger *slog.Logger) (*DesktopPortal, err
 	return &DesktopPortal{bus: bus, logger: logger}, nil
 }
 
-// Check probes the portal frontend's advertised interfaces for mode without
-// creating a session, so no dialog is shown.
-func (p *DesktopPortal) Check(ctx context.Context, mode agentv1.AssistanceMode) error {
-	_, err := p.capabilities(ctx, mode)
+// Check probes the portal frontend's advertised interfaces for the request
+// without creating a session, so no dialog is shown.
+func (p *DesktopPortal) Check(ctx context.Context, request PortalRequest) error {
+	_, err := p.capabilities(ctx, request)
 	return err
 }
 
-// capabilities returns the advertised cursor modes once mode is servable.
+// capabilities returns the advertised cursor modes once the request is servable.
 // The frontend exports an interface only when a backend selected for this
 // desktop implements it: xdg-desktop-portal-xapp (Cinnamon) has no
 // ScreenCast, and xdg-desktop-portal-hyprland has ScreenCast but no
 // RemoteDesktop, so CONTROL there is refused rather than reduced to VIEW.
-func (p *DesktopPortal) capabilities(ctx context.Context, mode agentv1.AssistanceMode) (uint32, error) {
+func (p *DesktopPortal) capabilities(ctx context.Context, request PortalRequest) (uint32, error) {
+	mode := request.Mode
 	// The first call to the well-known name D-Bus-activates the portal;
 	// GetNameOwner alone would not.
 	sourceTypes, err := p.uint32Property(ctx, screenCastIface, "AvailableSourceTypes")
@@ -88,7 +89,8 @@ func (p *DesktopPortal) capabilities(ctx context.Context, mode agentv1.Assistanc
 		if err != nil {
 			return 0, unavailable("portal_remote_desktop_unavailable", err)
 		}
-		if deviceTypes&(deviceKeyboard|devicePointer) != deviceKeyboard|devicePointer {
+		devicesRequested := request.deviceTypes()
+		if deviceTypes&devicesRequested != devicesRequested {
 			return 0, unavailable("portal_input_devices_unavailable", nil)
 		}
 		remoteDesktopVersion, _ = p.uint32Property(ctx, remoteDesktopIface, "version")
@@ -104,10 +106,14 @@ func (p *DesktopPortal) capabilities(ctx context.Context, mode agentv1.Assistanc
 }
 
 // Open creates, configures and starts a portal session. VIEW uses a
-// ScreenCast session; CONTROL uses a RemoteDesktop session with keyboard and
-// pointer plus ScreenCast sources on the same session.
-func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (_ Grant, err error) {
-	cursorModes, err := p.capabilities(ctx, mode)
+// ScreenCast session; CONTROL uses a RemoteDesktop session with the requested
+// input devices plus ScreenCast sources on the same session.
+func (p *DesktopPortal) Open(ctx context.Context, request PortalRequest) (_ Grant, err error) {
+	mode := request.Mode
+	if request.Lifetime == nil {
+		return nil, errors.New("portal session lifetime missing")
+	}
+	cursorModes, err := p.capabilities(ctx, request)
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +122,7 @@ func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (
 		return nil, unavailable("portal_unavailable", err)
 	}
 	control := mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+	devicesRequested := request.deviceTypes()
 	createIface := screenCastIface
 	if control {
 		createIface = remoteDesktopIface
@@ -136,6 +143,7 @@ func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (
 	}
 	grant := &portalGrant{
 		bus:     p.bus,
+		owner:   owner,
 		watch:   closedWatch,
 		closed:  make(chan struct{}),
 		stop:    make(chan struct{}),
@@ -168,18 +176,58 @@ func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (
 	if handle != predicted {
 		return nil, unavailable("portal_session_path_unexpected", nil)
 	}
+	if err := p.configureSession(ctx, request, grant, sender, devicesRequested, cursorModes); err != nil {
+		return nil, err
+	}
+	started, err := p.request(ctx, owner, sender, createIface+".Start", []any{handle, ""}, map[string]dbus.Variant{})
+	if err != nil {
+		return nil, err
+	}
+	streams, err := grantedStreams(started)
+	if err != nil {
+		return nil, unavailable("portal_stream_missing", err)
+	}
+	grant.streams, grant.stream = streams, streams[0]
+	grant.startClipboard(started)
 	if control {
-		if _, err := p.request(ctx, owner, sender, remoteDesktopIface+".SelectDevices", []any{handle},
+		if value, ok := started["devices"]; ok {
+			var devices uint32
+			if value.Store(&devices) == nil {
+				grant.control = devices&devicePointer != 0
+				grant.keyboard = devicesRequested&deviceKeyboard != 0 && devices&deviceKeyboard != 0
+			}
+		}
+	}
+	p.logger.Info("portal session started", "mode", mode.String(), "monitors", len(streams),
+		"control_granted", grant.control, "cursor_modes", cursorModes)
+	return grant, nil
+}
+
+func (r PortalRequest) deviceTypes() uint32 {
+	if r.Mode != agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
+		return 0
+	}
+	devices := devicePointer
+	if policyEnabled(r.Policy.GetKeyboard()) {
+		devices |= deviceKeyboard
+	}
+	return devices
+}
+
+func (p *DesktopPortal) configureSession(ctx context.Context, request PortalRequest, grant *portalGrant, sender string, devicesRequested, cursorModes uint32) error {
+	control := request.Mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+	if control {
+		if _, err := p.request(ctx, grant.owner, sender, remoteDesktopIface+".SelectDevices", []any{grant.handle},
 			map[string]dbus.Variant{
-				"types":        dbus.MakeVariant(deviceKeyboard | devicePointer),
+				"types":        dbus.MakeVariant(devicesRequested),
 				"persist_mode": dbus.MakeVariant(persistNone),
 			}); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	sources := map[string]dbus.Variant{
 		"types":        dbus.MakeVariant(sourceMonitor),
-		"multiple":     dbus.MakeVariant(false),
+		"multiple":     dbus.MakeVariant(request.Policy.GetDisplay() == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON),
 		"persist_mode": dbus.MakeVariant(persistNone),
 	}
 	switch {
@@ -188,29 +236,31 @@ func (p *DesktopPortal) Open(ctx context.Context, mode agentv1.AssistanceMode) (
 	case cursorModes&cursorHidden != 0:
 		sources["cursor_mode"] = dbus.MakeVariant(cursorHidden)
 	}
-	if _, err := p.request(ctx, owner, sender, screenCastIface+".SelectSources", []any{handle}, sources); err != nil {
-		return nil, err
+	if _, err := p.request(ctx, grant.owner, sender, screenCastIface+".SelectSources", []any{grant.handle}, sources); err != nil {
+		return err
 	}
-	started, err := p.request(ctx, owner, sender, createIface+".Start", []any{handle, ""}, map[string]dbus.Variant{})
-	if err != nil {
-		return nil, err
-	}
-	stream, err := firstStream(started)
-	if err != nil {
-		return nil, unavailable("portal_stream_missing", err)
-	}
-	grant.stream = stream
-	if control {
-		if value, ok := started["devices"]; ok {
-			var devices uint32
-			if value.Store(&devices) == nil {
-				grant.control = devices&(deviceKeyboard|devicePointer) == deviceKeyboard|devicePointer
+	if control && policyEnabled(request.Policy.GetClipboard()) {
+		version, versionErr := p.uint32Property(ctx, clipboardIface, "version")
+		switch {
+		case ctx.Err() != nil:
+			return ctx.Err()
+		case versionErr != nil:
+			grant.clipboardReason = clipboardRequestRefusal(versionErr)
+			if dbusErrorName(versionErr) == "org.freedesktop.DBus.Error.UnknownProperty" {
+				grant.clipboardReason = "portal_clipboard_unsupported"
+			}
+			if grant.clipboardReason == "" {
+				return unavailable("portal_clipboard_probe_failed", versionErr)
+			}
+		case version < 1:
+			grant.clipboardReason = "portal_clipboard_unsupported"
+		default:
+			if err := grant.requestClipboard(ctx, request.Lifetime); err != nil {
+				return unavailable("portal_clipboard_request_failed", err)
 			}
 		}
 	}
-	p.logger.Info("portal session started", "mode", mode.String(), "node", stream.NodeID,
-		"width", stream.Width, "height", stream.Height, "control_granted", grant.control, "cursor_modes", cursorModes)
-	return grant, nil
+	return nil
 }
 
 func (p *DesktopPortal) uint32Property(ctx context.Context, iface, name string) (uint32, error) {
@@ -228,7 +278,7 @@ func (p *DesktopPortal) uint32Property(ctx context.Context, iface, name string) 
 // request calls a portal method returning a Request handle and waits for
 // its Response. ctx bounds the user interaction; on expiry the request is
 // closed so the dialog disappears.
-func (p *DesktopPortal) request(ctx context.Context, owner, sender, method string, args []any, options map[string]dbus.Variant) (map[string]dbus.Variant, error) {
+func (p *DesktopPortal) request(ctx context.Context, owner, sender, method string, args []any, options map[string]dbus.Variant) (results map[string]dbus.Variant, err error) {
 	token, err := portalToken()
 	if err != nil {
 		return nil, err
@@ -239,15 +289,24 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 	if err != nil {
 		return nil, unavailable("portal_watch_failed", err)
 	}
+	pending := true
+	cleanupPath := predicted
 	defer func() {
 		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), busCallTimeout)
 		defer cancel()
-		if err := watch.stop(stop); err != nil {
-			p.logger.Debug("portal request watch removal failed", "err", err)
+		err = errors.Join(err, watch.stop(stop))
+		// The native Request can exist before the method acknowledgement.
+		// Cancellation must close that predicted handle, including a Response
+		// racing cancellation, and must never return its grant.
+		if pending || ctx.Err() != nil {
+			err = errors.Join(err, p.closeRequest(ctx, owner, cleanupPath))
+		}
+		if ctx.Err() != nil {
+			results, err = nil, errors.Join(ctx.Err(), err)
 		}
 	}()
 	var handle dbus.ObjectPath
-	if err := p.bus.call(ctx, portalName, portalPath, method, append(args, options)...).Store(&handle); err != nil {
+	if err := p.bus.call(ctx, owner, portalPath, method, append(args, options)...).Store(&handle); err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
@@ -256,16 +315,23 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 	if handle != predicted {
 		// Portals older than 0.9 return unpredictable handles; refusing them
 		// avoids missing a Response emitted before a late subscription.
-		p.closeRequest(ctx, handle)
+		cleanupPath = handle
 		return nil, unavailable("portal_request_path_unexpected", nil)
 	}
 	select {
 	case signal := <-watch.signals:
-		var response uint32
-		var results map[string]dbus.Variant
-		if err := dbus.Store(signal.Body, &response, &results); err != nil {
-			return nil, unavailable("portal_response_invalid", err)
+		if len(signal.Body) != 2 {
+			return nil, unavailable("portal_response_invalid", nil)
 		}
+		response, ok := signal.Body[0].(uint32)
+		if !ok {
+			return nil, unavailable("portal_response_invalid", nil)
+		}
+		results, ok = signal.Body[1].(map[string]dbus.Variant)
+		if !ok {
+			return nil, unavailable("portal_response_invalid", nil)
+		}
+		pending = false
 		switch response {
 		case responseSuccess:
 			return results, nil
@@ -275,19 +341,19 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 			return nil, unavailable("portal_request_failed", fmt.Errorf("%s: response %d", method, response))
 		}
 	case <-ctx.Done():
-		p.closeRequest(ctx, handle)
 		return nil, ctx.Err()
 	case <-p.bus.done:
 		return nil, unavailable("session_bus_closed", nil)
 	}
 }
 
-func (p *DesktopPortal) closeRequest(ctx context.Context, handle dbus.ObjectPath) {
+func (p *DesktopPortal) closeRequest(ctx context.Context, owner string, handle dbus.ObjectPath) error {
 	call, cancel := context.WithTimeout(context.WithoutCancel(ctx), busCallTimeout)
 	defer cancel()
-	if err := p.bus.call(call, portalName, handle, requestIface+".Close").Err; err != nil {
-		p.logger.Debug("portal request close failed", "err", err)
+	if err := p.bus.call(call, owner, handle, requestIface+".Close").Err; err != nil {
+		return fmt.Errorf("close portal request: %w", err)
 	}
+	return nil
 }
 
 func portalToken() (string, error) {
@@ -324,57 +390,88 @@ type portalStream struct {
 	Properties map[string]dbus.Variant
 }
 
-func firstStream(results map[string]dbus.Variant) (Stream, error) {
+func grantedStreams(results map[string]dbus.Variant) ([]Stream, error) {
 	value, ok := results["streams"]
 	if !ok {
-		return Stream{}, errors.New("missing streams")
+		return nil, errors.New("missing streams")
 	}
-	var streams []portalStream
-	if err := value.Store(&streams); err != nil {
-		return Stream{}, fmt.Errorf("decode streams: %w", err)
+	var granted []portalStream
+	if err := value.Store(&granted); err != nil {
+		return nil, fmt.Errorf("decode streams: %w", err)
 	}
-	if len(streams) == 0 {
-		return Stream{}, errors.New("no stream granted")
+	if len(granted) == 0 || len(granted) > 8 {
+		return nil, errors.New("invalid granted monitor count")
 	}
-	stream := Stream{NodeID: streams[0].Node}
-	if size, ok := streams[0].Properties["size"]; ok {
-		var dims struct{ Width, Height int32 }
-		if size.Store(&dims) == nil && dims.Width > 0 && dims.Height > 0 {
-			stream.Width, stream.Height = int(dims.Width), int(dims.Height)
+	streams := make([]Stream, 0, len(granted))
+	seen := make(map[uint32]bool, len(granted))
+	for i, native := range granted {
+		if native.Node == 0 || seen[native.Node] {
+			return nil, errors.New("invalid granted monitor identity")
 		}
+		seen[native.Node] = true
+		stream := Stream{NodeID: native.Node, ID: fmt.Sprintf("monitor-%d", i+1), Label: fmt.Sprintf("Monitor %d", i+1)}
+		if size, ok := native.Properties["size"]; ok {
+			var dims struct{ Width, Height int32 }
+			if size.Store(&dims) == nil && dims.Width > 0 && dims.Height > 0 && dims.Width <= 16384 && dims.Height <= 16384 {
+				stream.Width, stream.Height = int(dims.Width), int(dims.Height)
+			}
+		}
+		if stream.Width == 0 || stream.Height == 0 {
+			return nil, errors.New("monitor_geometry_unknown")
+		}
+		streams = append(streams, stream)
 	}
-	return stream, nil
+	return streams, nil
 }
 
 // portalGrant is a started portal session.
 type portalGrant struct {
-	bus      *SessionBus
-	handle   dbus.ObjectPath
-	stream   Stream
-	control  bool
-	watch    *busWatch
-	closed   chan struct{}
-	stop     chan struct{}
-	stopOnce sync.Once
-	done     chan struct{}
+	bus             *SessionBus
+	handle          dbus.ObjectPath
+	owner           string
+	streams         []Stream
+	clipboard       *portalClipboard
+	clipboardReason string
+	stream          Stream
+	control         bool
+	keyboard        bool
+	watch           *busWatch
+	closed          chan struct{}
+	closedOnce      sync.Once
+	stop            chan struct{}
+	stopOnce        sync.Once
+	done            chan struct{}
 }
 
 var _ Grant = (*portalGrant)(nil)
 
-func (g *portalGrant) Stream() Stream          { return g.stream }
+func (g *portalGrant) Streams() []Stream { return g.streams }
+
+func (g *portalGrant) SelectStream(id string) error {
+	for _, stream := range g.streams {
+		if stream.ID == id {
+			g.stream = stream
+			return nil
+		}
+	}
+	return errors.New("display_not_granted")
+}
 func (g *portalGrant) ControlGranted() bool    { return g.control }
+func (g *portalGrant) KeyboardGranted() bool   { return g.keyboard }
 func (g *portalGrant) Closed() <-chan struct{} { return g.closed }
 
 func (g *portalGrant) watchClosed() {
 	defer close(g.done)
 	select {
 	case <-g.watch.signals:
-		close(g.closed)
+		g.markClosed()
 	case <-g.bus.done:
-		close(g.closed)
+		g.markClosed()
 	case <-g.stop:
 	}
 }
+
+func (g *portalGrant) markClosed() { g.closedOnce.Do(func() { close(g.closed) }) }
 
 func (g *portalGrant) stopWatching() {
 	g.stopOnce.Do(func() { close(g.stop) })
@@ -384,25 +481,76 @@ func (g *portalGrant) stopWatching() {
 	_ = g.watch.stop(ctx)
 }
 
+// OpenPipeWire waits at most busCallTimeout for the remote. On a session with
+// clipboard access it is sent only after the clipboard owner announcement
+// that follows Start (see portalClipboard.awaitAnnouncement).
 func (g *portalGrant) OpenPipeWire(ctx context.Context) (*os.File, error) {
-	var fd dbus.UnixFD
-	if err := g.bus.call(ctx, portalName, portalPath, screenCastIface+".OpenPipeWireRemote", g.handle, map[string]dbus.Variant{}).Store(&fd); err != nil {
+	if g.clipboard != nil && g.clipboard.enabled {
+		if err := g.clipboard.awaitAnnouncement(ctx); err != nil {
+			return nil, fmt.Errorf("open pipewire remote: %w", err)
+		}
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("open pipewire remote: %w", err)
 	}
-	if fd < 0 {
+	call := g.bus.conn.Object(g.owner, portalPath).Go(screenCastIface+".OpenPipeWireRemote", 0, make(chan *dbus.Call, 1), g.handle, map[string]dbus.Variant{})
+	wait, cancel := context.WithTimeout(ctx, busCallTimeout)
+	defer cancel()
+	return awaitPipeWireRemote(wait, call.Done)
+}
+
+// awaitPipeWireRemote returns the remote of the one reply on replies, or an
+// error once wait ends. A reply that arrives after that is still collected
+// and its descriptor closed: godbus drops replies to abandoned calls without
+// closing the descriptors they carry, which would leak the PipeWire
+// connection. The collector ends with that reply; godbus delivers one for
+// every call, at the latest when the bus connection closes.
+func awaitPipeWireRemote(wait context.Context, replies <-chan *dbus.Call) (*os.File, error) {
+	select {
+	case reply := <-replies:
+		return pipeWireRemote(reply)
+	case <-wait.Done():
+		go func() {
+			if late, err := pipeWireRemote(<-replies); err == nil {
+				_ = late.Close()
+			}
+		}()
+		return nil, fmt.Errorf("open pipewire remote: %w", wait.Err())
+	}
+}
+
+// pipeWireRemote takes ownership of every descriptor in an OpenPipeWireRemote
+// reply and returns its single remote.
+func pipeWireRemote(reply *dbus.Call) (*os.File, error) {
+	if reply.Err != nil {
+		return nil, fmt.Errorf("open pipewire remote: %w", reply.Err)
+	}
+	var files []*os.File
+	for _, value := range reply.Body {
+		if fd, ok := value.(dbus.UnixFD); ok && fd >= 0 {
+			syscall.CloseOnExec(int(fd))
+			files = append(files, os.NewFile(uintptr(fd), "pipewire-remote"))
+		}
+	}
+	if len(reply.Body) != 1 || len(files) != 1 {
+		for _, file := range files {
+			_ = file.Close()
+		}
 		return nil, errors.New("open pipewire remote: invalid fd")
 	}
-	syscall.CloseOnExec(int(fd))
-	return os.NewFile(uintptr(fd), "pipewire-remote"), nil
+	return files[0], nil
 }
 
 func (g *portalGrant) Inject(ctx context.Context, event InputEvent) error {
 	if !g.control {
 		return errors.New("input not granted")
 	}
+	if (event.kind == inputKey || event.kind == inputKeysym) && !g.keyboard {
+		return errors.New("keyboard not granted")
+	}
 	options := map[string]dbus.Variant{}
 	method := func(name string, args ...any) error {
-		if err := g.bus.call(ctx, portalName, portalPath, remoteDesktopIface+"."+name, append([]any{g.handle, options}, args...)...).Err; err != nil {
+		if err := g.bus.call(ctx, g.owner, portalPath, remoteDesktopIface+"."+name, append([]any{g.handle, options}, args...)...).Err; err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
 		return nil
@@ -435,14 +583,26 @@ func (g *portalGrant) Inject(ctx context.Context, event InputEvent) error {
 		return nil
 	case inputKey:
 		return method("NotifyKeyboardKeycode", event.Keycode, state(event.Down))
+	case inputKeysym:
+		return method("NotifyKeyboardKeysym", event.Keysym, state(event.Down))
 	default:
 		return errors.New("unknown input event")
 	}
 }
 
 func (g *portalGrant) Close(ctx context.Context) error {
+	if g.clipboard != nil {
+		g.clipboard.cancel()
+	}
+	// Revoke the native authority before waiting for transfer acknowledgements
+	// or D-Bus match cleanup, which must not delay local Stop.
+	err := g.bus.call(ctx, g.owner, g.handle, portalSessionIface+".Close").Err
+	g.markClosed()
+	if g.clipboard != nil {
+		g.clipboard.close()
+	}
 	g.stopWatching()
-	if err := g.bus.call(ctx, portalName, g.handle, portalSessionIface+".Close").Err; err != nil {
+	if err != nil {
 		return fmt.Errorf("close portal session: %w", err)
 	}
 	return nil

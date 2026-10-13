@@ -47,6 +47,18 @@ message AssistanceSession {
   string offer_fingerprint = 18;
   string answer_fingerprint = 19;
   string target_username = 20;
+  lindm.agent.v1.AssistancePolicy requested_capabilities = 21;
+  lindm.agent.v1.AssistancePolicy effective_capabilities = 22;
+  lindm.agent.v1.AssistanceCapabilities granted_capabilities = 23;
+  repeated lindm.agent.v1.AssistanceDisplay displays = 24;
+  string selected_display_id = 25;
+  uint32 display_generation = 26;
+  lindm.agent.v1.AssistanceDisplayFrame display_frame = 27;
+  option (buf.validate.message).cel = {
+    id: "assistance_session.display_frame"
+    message: "frame identity must name the currently shared display generation"
+    expression: "!has(this.display_frame) || (this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))"
+  };
 }
 
 message CreateAssistanceSessionRequest {
@@ -73,6 +85,7 @@ message CreateAssistanceSessionRequest {
   ];
   // Empty targets the user of the device's active local graphical session.
   string target_username = 6 [(buf.validate.field).string.pattern = "^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$"];
+  lindm.agent.v1.AssistancePolicy requested_capabilities = 7;
 }
 message CreateAssistanceSessionResponse {
   AssistanceSession session = 1;
@@ -110,7 +123,7 @@ message AnswerAssistanceSessionRequest {
   string session_id = 1 [(buf.validate.field).string.uuid = true];
   string answer_sdp = 2 [(buf.validate.field).string = {
     min_len: 1
-    max_len: 16384
+    max_bytes: 16384
   }];
 }
 message AnswerAssistanceSessionResponse {
@@ -122,6 +135,52 @@ message StopAssistanceSessionRequest {
 }
 message StopAssistanceSessionResponse {
   AssistanceSession session = 1;
+}
+
+message GetAssistancePolicyRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message GetAssistancePolicyResponse {
+  lindm.agent.v1.AssistancePolicy policy = 1;
+  lindm.agent.v1.AssistancePolicy ceiling = 2;
+}
+message UpdateAssistancePolicyRequest {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  lindm.agent.v1.AssistancePolicy policy = 3 [(buf.validate.field).required = true];
+}
+message UpdateAssistancePolicyResponse {
+  lindm.agent.v1.AssistancePolicy policy = 1;
+  lindm.agent.v1.AssistancePolicy ceiling = 2;
+}
+message RunAssistanceCommandRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.agent.v1.AssistanceCommand command = 2 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "run_assistance_command.deadline"
+    message: "the server, not the caller, sets command deadlines"
+    expression: "!has(this.command) || !has(this.command.deadline)"
+  };
+}
+message RunAssistanceCommandResponse {
+  // Outcome metadata only, including exact replay. Clipboard text is returned
+  // exclusively by GetAssistanceCommand after fresh creator authorization.
+  lindm.agent.v1.AssistanceCommandResult result = 1;
+  option (buf.validate.message).cel = {
+    id: "run_assistance_command_response.metadata_only"
+    message: "clipboard text is disclosed only by GetAssistanceCommand"
+    expression: "!has(this.result) || this.result.text == ''"
+  };
+}
+message GetAssistanceCommandRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  string request_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message GetAssistanceCommandResponse {
+  lindm.agent.v1.AssistanceCommandResult result = 1;
 }
 
 // AssistanceReadinessState is the server's answer to "can a new request reach
@@ -157,7 +216,7 @@ enum AssistanceDesktop {
 message AssistanceReadiness {
   AssistanceReadinessState state = 1;
   // The device's reported setting; UNSPECIFIED when it has not reported one.
-  lindm.agent.v1.AssistancePolicy policy = 2;
+  lindm.agent.v1.AssistanceEnablement policy = 2;
   AssistanceDesktop desktop = 3;
   // When the session inventory behind desktop was collected.
   google.protobuf.Timestamp inventory_observed_at = 4;

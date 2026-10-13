@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { cn } from "cn";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 
@@ -13,6 +13,7 @@ export function SelectField({
   options,
   placeholder,
   onValueChange,
+  portalContainer,
   "aria-label": ariaLabel,
   "aria-describedby": ariaDescribedBy,
 }: {
@@ -26,6 +27,7 @@ export function SelectField({
   "aria-label"?: string;
   "aria-describedby"?: string;
   options: readonly { value: string | number; label: ReactNode; disabled?: boolean }[];
+  portalContainer?: ComponentProps<typeof SelectContent>["portalContainer"];
   // Shown while the controlled value is "", which then means nothing chosen yet.
   placeholder?: string;
   onValueChange?: (value: string) => void;
@@ -57,7 +59,7 @@ export function SelectField({
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
-      <SelectContent align="start" alignItemWithTrigger={false}>
+      <SelectContent align="start" alignItemWithTrigger={false} portalContainer={portalContainer}>
         {items.map((option) => (
           <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}

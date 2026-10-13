@@ -20,6 +20,13 @@ const qmpAbsoluteMax = 0x7fff
 // screendump captures QEMU's current display surface through QMP. It observes
 // pixels only; it never injects input and never reads guest memory.
 func (v *guestVM) screendump(ctx context.Context) (_ *image.RGBA, err error) {
+	return v.screendumpHead(ctx, 0)
+}
+
+func (v *guestVM) screendumpHead(ctx context.Context, head int) (_ *image.RGBA, err error) {
+	if head < 0 || head > 1 || head == 1 && v.hardware.DisplayHeads != 2 {
+		return nil, errors.New("unconfigured guest display head")
+	}
 	if !v.hardware.Desktop {
 		return nil, errors.New("screendump requires the lab desktop display")
 	}
@@ -32,7 +39,11 @@ func (v *guestVM) screendump(ctx context.Context) (_ *image.RGBA, err error) {
 	if err := file.Close(); err != nil {
 		return nil, err
 	}
-	if err := v.qmpCommand(ctx, map[string]any{"execute": "screendump", "arguments": map[string]any{"filename": path}, "id": "screendump"}); err != nil {
+	arguments := map[string]any{"filename": path}
+	if v.hardware.DisplayHeads == 2 {
+		arguments["device"], arguments["head"] = "lab-display", head
+	}
+	if err := v.qmpCommand(ctx, map[string]any{"execute": "screendump", "arguments": arguments, "id": "screendump"}); err != nil {
 		return nil, fmt.Errorf("capture guest display: %w", err)
 	}
 	file, err = os.Open(path)

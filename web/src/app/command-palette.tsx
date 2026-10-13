@@ -70,6 +70,11 @@ export function CommandPalette({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        document.fullscreenElement?.hasAttribute("data-assistance-fullscreen")
+      )
+        return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         // Typing in a form field keeps the shortcut out of the way; the palette's own
         // search box still closes it.
@@ -93,8 +98,17 @@ export function CommandPalette({
         setOpen((value) => !value);
       }
     }
+    // The palette portals outside assistance's fullscreen subtree. Close it on
+    // entry instead of leaving an invisible modal trapping the safety toolbar.
+    function onFullscreenChange() {
+      if (document.fullscreenElement?.hasAttribute("data-assistance-fullscreen")) setOpen(false);
+    }
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
   }, []);
 
   const searched = query.trim();

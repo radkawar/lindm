@@ -386,7 +386,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			return err
 		}
 		// The idle check-in every agent makes, reporting its assistance setting.
-		if d.demo.assistance != agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED {
+		if d.demo.assistance != agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED {
 			if _, err := d.syncAssistance(ctx); err != nil {
 				return fmt.Errorf("report %s assistance policy: %w", d.demo.hostname, err)
 			}
@@ -430,7 +430,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return err
 	}
 	for _, d := range s.devices {
-		if d.demo.assistance == agentv1.AssistancePolicy_ASSISTANCE_POLICY_UNSPECIFIED && !d.demo.historical && s.demo.Routes.RefusedAssistanceSessionID == "" {
+		if d.demo.assistance == agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_UNSPECIFIED && !d.demo.historical && s.demo.Routes.RefusedAssistanceSessionID == "" {
 			if s.demo.Routes.RefusedAssistanceSessionID, err = s.refusedAssistance(ctx, d); err != nil {
 				return fmt.Errorf("refused demo assistance: %w", err)
 			}

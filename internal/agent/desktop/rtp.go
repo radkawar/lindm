@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 )
 
 // maxRTPPacket bounds one RFC 4571 frame. The encoder pipeline uses
@@ -52,4 +53,37 @@ func (r *rtpStreamReader) ReadPacket(buf []byte) (int, error) {
 		return 0, fmt.Errorf("%w: rtp version", errRTPFraming)
 	}
 	return size, nil
+}
+
+// rtpTimeline belongs to the session, not to an encoder instance. A selected
+// monitor starts a new encoder with arbitrary RTP offsets; the single WebRTC
+// track must retain sequence, SSRC and a forward-moving 90 kHz clock.
+type rtpTimeline struct {
+	started                 bool
+	sequence                uint16
+	timestamp, offset, ssrc uint32
+	last                    time.Time
+}
+
+func (t *rtpTimeline) rewrite(packet []byte, newSource bool, now time.Time) error {
+	if len(packet) < minRTPPacket || packet[0]>>6 != 2 {
+		return errRTPFraming
+	}
+	input := binary.BigEndian.Uint32(packet[4:8])
+	if !t.started {
+		t.started = true
+		t.sequence = binary.BigEndian.Uint16(packet[2:4])
+		t.ssrc = binary.BigEndian.Uint32(packet[8:12])
+	} else {
+		t.sequence++
+		if newSource {
+			gap := max(int64(90000/captureFramerate), now.Sub(t.last).Nanoseconds()*90000/int64(time.Second))
+			t.offset = t.timestamp + uint32(gap) - input
+		}
+	}
+	t.timestamp, t.last = input+t.offset, now
+	binary.BigEndian.PutUint16(packet[2:4], t.sequence)
+	binary.BigEndian.PutUint32(packet[4:8], t.timestamp)
+	binary.BigEndian.PutUint32(packet[8:12], t.ssrc)
+	return nil
 }

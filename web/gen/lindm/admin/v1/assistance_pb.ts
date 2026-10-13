@@ -7,7 +7,7 @@ import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { AssistanceEndCause, AssistanceIceServer, AssistanceLocalSession, AssistanceMode, AssistancePolicy } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceCapabilities, AssistanceCommand, AssistanceCommandResult, AssistanceDisplay, AssistanceDisplayFrame, AssistanceEnablement, AssistanceEndCause, AssistanceIceServer, AssistanceLocalSession, AssistanceMode, AssistancePolicy } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/assistance.proto.
  */
 export const file_lindm_admin_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSLlBQoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCSLtAgoeQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESQQoJZGV2aWNlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEjgKBG1vZGUYAyABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIrChRtYXhfZHVyYXRpb25fc2Vjb25kcxgFIAEoDUINukgK2AEBKgUYiA4oPBJCCg90YXJnZXRfdXNlcm5hbWUYBiABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kIlUKH0NyZWF0ZUFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uInYKHUxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXF1ZXN0EhsKCWRldmljZV9pZBgBIAEoCUIIukgFcgOwAQESGgoJcGFnZV9zaXplGAIgASgNQge6SAQqAhhkEhwKCnBhZ2VfdG9rZW4YAyABKAlCCLpIBXIDGIAEIm4KHkxpc3RBc3Npc3RhbmNlU2Vzc2lvbnNSZXNwb25zZRIzCghzZXNzaW9ucxgBIAMoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSI7ChtHZXRBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUgocR2V0QXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iPAocSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASKgAQodSm9pbkFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uEhEKCW9mZmVyX3NkcBgCIAEoCRI4CgtpY2Vfc2VydmVycxgDIAMoCzIjLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VJY2VTZXJ2ZXIiXwoeQW5zd2VyQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEh8KCmFuc3dlcl9zZHAYAiABKAlCC7pICHIGEAEYgIABIlUKH0Fuc3dlckFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIjwKHFN0b3BBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEiUwodU3RvcEFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIroCChNBc3Npc3RhbmNlUmVhZGluZXNzEjcKBXN0YXRlGAEgASgOMigubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEjAKBnBvbGljeRgCIAEoDjIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSMgoHZGVza3RvcBgDIAEoDjIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VEZXNrdG9wEjkKFWludmVudG9yeV9vYnNlcnZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9vcGVuX3Nlc3Npb25faWQYBiABKAkiYgodR2V0QXNzaXN0YW5jZVJlYWRpbmVzc1JlcXVlc3QSQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBIlgKHkdldEFzc2lzdGFuY2VSZWFkaW5lc3NSZXNwb25zZRI2CglyZWFkaW5lc3MYASABKAsyIy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBirnAgoYQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEioKJkFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfUkVBRFkQARIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9VTkNPTkZJR1VSRUQQAhIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9OT1RfRU5ST0xMRUQQAxInCiNBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9ESVNBQkxFRBAEEikKJUFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX05PX0RFU0tUT1AQBRImCiJBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9PRkZMSU5FEAYSIwofQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfQlVTWRAHKnYKEUFzc2lzdGFuY2VEZXNrdG9wEiIKHkFTU0lTVEFOQ0VfREVTS1RPUF9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfREVTS1RPUF9QUkVTRU5UEAESHQoZQVNTSVNUQU5DRV9ERVNLVE9QX0FCU0VOVBACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_assistance, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSKiCwoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCRJAChZyZXF1ZXN0ZWRfY2FwYWJpbGl0aWVzGBUgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJAChZlZmZlY3RpdmVfY2FwYWJpbGl0aWVzGBYgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJEChRncmFudGVkX2NhcGFiaWxpdGllcxgXIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDYXBhYmlsaXRpZXMSMwoIZGlzcGxheXMYGCADKAsyIS5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRGlzcGxheRIbChNzZWxlY3RlZF9kaXNwbGF5X2lkGBkgASgJEhoKEmRpc3BsYXlfZ2VuZXJhdGlvbhgaIAEoDRI9Cg1kaXNwbGF5X2ZyYW1lGBsgASgLMiYubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpc3BsYXlGcmFtZTrDArpIvwIavAIKIGFzc2lzdGFuY2Vfc2Vzc2lvbi5kaXNwbGF5X2ZyYW1lEkBmcmFtZSBpZGVudGl0eSBtdXN0IG5hbWUgdGhlIGN1cnJlbnRseSBzaGFyZWQgZGlzcGxheSBnZW5lcmF0aW9uGtUBIWhhcyh0aGlzLmRpc3BsYXlfZnJhbWUpIHx8ICh0aGlzLmRpc3BsYXlfZnJhbWUuZGlzcGxheV9pZCA9PSB0aGlzLnNlbGVjdGVkX2Rpc3BsYXlfaWQgJiYgdGhpcy5kaXNwbGF5X2ZyYW1lLmdlbmVyYXRpb24gPT0gdGhpcy5kaXNwbGF5X2dlbmVyYXRpb24gJiYgdGhpcy5kaXNwbGF5cy5leGlzdHMoZCwgZC5pZCA9PSB0aGlzLmRpc3BsYXlfZnJhbWUuZGlzcGxheV9pZCkpIq8DCh5DcmVhdGVBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJBCglkZXZpY2VfaWQYAiABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESOAoEbW9kZRgDIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlQgq6SAeCAQQQASAAEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEisKFG1heF9kdXJhdGlvbl9zZWNvbmRzGAUgASgNQg26SArYAQEqBRiIDig8EkIKD3RhcmdldF91c2VybmFtZRgGIAEoCUIpukgmciQyIl4oW2EtekEtWl9dW2EtekEtWjAtOV8uLV17MCwzMX0pPyQSQAoWcmVxdWVzdGVkX2NhcGFiaWxpdGllcxgHIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kiVQofQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24idgodTGlzdEFzc2lzdGFuY2VTZXNzaW9uc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIaCglwYWdlX3NpemUYAiABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgDIAEoCUIIukgFcgMYgAQibgoeTGlzdEFzc2lzdGFuY2VTZXNzaW9uc1Jlc3BvbnNlEjMKCHNlc3Npb25zGAEgAygLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjsKG0dldEFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASJSChxHZXRBc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbiI8ChxKb2luQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBIqABCh1Kb2luQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24SEQoJb2ZmZXJfc2RwGAIgASgJEjgKC2ljZV9zZXJ2ZXJzGAMgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUljZVNlcnZlciJfCh5BbnN3ZXJBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESHwoKYW5zd2VyX3NkcBgCIAEoCUILukgIcgYQASiAgAEiVQofQW5zd2VyQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iPAocU3RvcEFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASJTCh1TdG9wQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iOQoaR2V0QXNzaXN0YW5jZVBvbGljeVJlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABASKCAQobR2V0QXNzaXN0YW5jZVBvbGljeVJlc3BvbnNlEjAKBnBvbGljeRgBIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSMQoHY2VpbGluZxgCIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kiugEKHVVwZGF0ZUFzc2lzdGFuY2VQb2xpY3lSZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARI4CgZwb2xpY3kYAyABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5Qga6SAPIAQEihQEKHlVwZGF0ZUFzc2lzdGFuY2VQb2xpY3lSZXNwb25zZRIwCgZwb2xpY3kYASABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5EjEKB2NlaWxpbmcYAiABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5IokCChtSdW5Bc3Npc3RhbmNlQ29tbWFuZFJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESOgoHY29tbWFuZBgCIAEoCzIhLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDb21tYW5kQga6SAPIAQE6jwG6SIsBGogBCh9ydW5fYXNzaXN0YW5jZV9jb21tYW5kLmRlYWRsaW5lEjJ0aGUgc2VydmVyLCBub3QgdGhlIGNhbGxlciwgc2V0cyBjb21tYW5kIGRlYWRsaW5lcxoxIWhhcyh0aGlzLmNvbW1hbmQpIHx8ICFoYXModGhpcy5jb21tYW5kLmRlYWRsaW5lKSL3AQocUnVuQXNzaXN0YW5jZUNvbW1hbmRSZXNwb25zZRI3CgZyZXN1bHQYASABKAsyJy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ29tbWFuZFJlc3VsdDqdAbpImQEalgEKLXJ1bl9hc3Npc3RhbmNlX2NvbW1hbmRfcmVzcG9uc2UubWV0YWRhdGFfb25seRI4Y2xpcGJvYXJkIHRleHQgaXMgZGlzY2xvc2VkIG9ubHkgYnkgR2V0QXNzaXN0YW5jZUNvbW1hbmQaKyFoYXModGhpcy5yZXN1bHQpIHx8IHRoaXMucmVzdWx0LnRleHQgPT0gJyciWQobR2V0QXNzaXN0YW5jZUNvbW1hbmRSZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEhwKCnJlcXVlc3RfaWQYAiABKAlCCLpIBXIDsAEBIlcKHEdldEFzc2lzdGFuY2VDb21tYW5kUmVzcG9uc2USNwoGcmVzdWx0GAEgASgLMicubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUNvbW1hbmRSZXN1bHQivgIKE0Fzc2lzdGFuY2VSZWFkaW5lc3MSNwoFc3RhdGUYASABKA4yKC5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzU3RhdGUSNAoGcG9saWN5GAIgASgOMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUVuYWJsZW1lbnQSMgoHZGVza3RvcBgDIAEoDjIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VEZXNrdG9wEjkKFWludmVudG9yeV9vYnNlcnZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9vcGVuX3Nlc3Npb25faWQYBiABKAkiYgodR2V0QXNzaXN0YW5jZVJlYWRpbmVzc1JlcXVlc3QSQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBIlgKHkdldEFzc2lzdGFuY2VSZWFkaW5lc3NSZXNwb25zZRI2CglyZWFkaW5lc3MYASABKAsyIy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBirnAgoYQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEioKJkFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfUkVBRFkQARIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9VTkNPTkZJR1VSRUQQAhIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9OT1RfRU5ST0xMRUQQAxInCiNBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9ESVNBQkxFRBAEEikKJUFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX05PX0RFU0tUT1AQBRImCiJBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9PRkZMSU5FEAYSIwofQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfQlVTWRAHKnYKEUFzc2lzdGFuY2VEZXNrdG9wEiIKHkFTU0lTVEFOQ0VfREVTS1RPUF9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfREVTS1RPUF9QUkVTRU5UEAESHQoZQVNTSVNUQU5DRV9ERVNLVE9QX0FCU0VOVBACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_assistance, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AssistanceSession
@@ -125,6 +125,41 @@ export type AssistanceSession = Message<"lindm.admin.v1.AssistanceSession"> & {
    * @generated from field: string target_username = 20;
    */
   targetUsername: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy requested_capabilities = 21;
+   */
+  requestedCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy effective_capabilities = 22;
+   */
+  effectiveCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCapabilities granted_capabilities = 23;
+   */
+  grantedCapabilities?: AssistanceCapabilities | undefined;
+
+  /**
+   * @generated from field: repeated lindm.agent.v1.AssistanceDisplay displays = 24;
+   */
+  displays: AssistanceDisplay[];
+
+  /**
+   * @generated from field: string selected_display_id = 25;
+   */
+  selectedDisplayId: string;
+
+  /**
+   * @generated from field: uint32 display_generation = 26;
+   */
+  displayGeneration: number;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceDisplayFrame display_frame = 27;
+   */
+  displayFrame?: AssistanceDisplayFrame | undefined;
 };
 
 /**
@@ -171,6 +206,11 @@ export type CreateAssistanceSessionRequest = Message<"lindm.admin.v1.CreateAssis
    * @generated from field: string target_username = 6;
    */
   targetUsername: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy requested_capabilities = 7;
+   */
+  requestedCapabilities?: AssistancePolicy | undefined;
 };
 
 /**
@@ -401,6 +441,175 @@ export const StopAssistanceSessionResponseSchema: GenMessage<StopAssistanceSessi
   messageDesc(file_lindm_admin_v1_assistance, 12);
 
 /**
+ * @generated from message lindm.admin.v1.GetAssistancePolicyRequest
+ */
+export type GetAssistancePolicyRequest = Message<"lindm.admin.v1.GetAssistancePolicyRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistancePolicyRequest.
+ * Use `create(GetAssistancePolicyRequestSchema)` to create a new message.
+ */
+export const GetAssistancePolicyRequestSchema: GenMessage<GetAssistancePolicyRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 13);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistancePolicyResponse
+ */
+export type GetAssistancePolicyResponse = Message<"lindm.admin.v1.GetAssistancePolicyResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 1;
+   */
+  policy?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy ceiling = 2;
+   */
+  ceiling?: AssistancePolicy | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistancePolicyResponse.
+ * Use `create(GetAssistancePolicyResponseSchema)` to create a new message.
+ */
+export const GetAssistancePolicyResponseSchema: GenMessage<GetAssistancePolicyResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 14);
+
+/**
+ * @generated from message lindm.admin.v1.UpdateAssistancePolicyRequest
+ */
+export type UpdateAssistancePolicyRequest = Message<"lindm.admin.v1.UpdateAssistancePolicyRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string device_id = 2;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 3;
+   */
+  policy?: AssistancePolicy | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.UpdateAssistancePolicyRequest.
+ * Use `create(UpdateAssistancePolicyRequestSchema)` to create a new message.
+ */
+export const UpdateAssistancePolicyRequestSchema: GenMessage<UpdateAssistancePolicyRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 15);
+
+/**
+ * @generated from message lindm.admin.v1.UpdateAssistancePolicyResponse
+ */
+export type UpdateAssistancePolicyResponse = Message<"lindm.admin.v1.UpdateAssistancePolicyResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 1;
+   */
+  policy?: AssistancePolicy | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistancePolicy ceiling = 2;
+   */
+  ceiling?: AssistancePolicy | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.UpdateAssistancePolicyResponse.
+ * Use `create(UpdateAssistancePolicyResponseSchema)` to create a new message.
+ */
+export const UpdateAssistancePolicyResponseSchema: GenMessage<UpdateAssistancePolicyResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 16);
+
+/**
+ * @generated from message lindm.admin.v1.RunAssistanceCommandRequest
+ */
+export type RunAssistanceCommandRequest = Message<"lindm.admin.v1.RunAssistanceCommandRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommand command = 2;
+   */
+  command?: AssistanceCommand | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.RunAssistanceCommandRequest.
+ * Use `create(RunAssistanceCommandRequestSchema)` to create a new message.
+ */
+export const RunAssistanceCommandRequestSchema: GenMessage<RunAssistanceCommandRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 17);
+
+/**
+ * @generated from message lindm.admin.v1.RunAssistanceCommandResponse
+ */
+export type RunAssistanceCommandResponse = Message<"lindm.admin.v1.RunAssistanceCommandResponse"> & {
+  /**
+   * Outcome metadata only, including exact replay. Clipboard text is returned
+   * exclusively by GetAssistanceCommand after fresh creator authorization.
+   *
+   * @generated from field: lindm.agent.v1.AssistanceCommandResult result = 1;
+   */
+  result?: AssistanceCommandResult | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.RunAssistanceCommandResponse.
+ * Use `create(RunAssistanceCommandResponseSchema)` to create a new message.
+ */
+export const RunAssistanceCommandResponseSchema: GenMessage<RunAssistanceCommandResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 18);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceCommandRequest
+ */
+export type GetAssistanceCommandRequest = Message<"lindm.admin.v1.GetAssistanceCommandRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceCommandRequest.
+ * Use `create(GetAssistanceCommandRequestSchema)` to create a new message.
+ */
+export const GetAssistanceCommandRequestSchema: GenMessage<GetAssistanceCommandRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 19);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceCommandResponse
+ */
+export type GetAssistanceCommandResponse = Message<"lindm.admin.v1.GetAssistanceCommandResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceCommandResult result = 1;
+   */
+  result?: AssistanceCommandResult | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceCommandResponse.
+ * Use `create(GetAssistanceCommandResponseSchema)` to create a new message.
+ */
+export const GetAssistanceCommandResponseSchema: GenMessage<GetAssistanceCommandResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 20);
+
+/**
  * @generated from message lindm.admin.v1.AssistanceReadiness
  */
 export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> & {
@@ -412,9 +621,9 @@ export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> 
   /**
    * The device's reported setting; UNSPECIFIED when it has not reported one.
    *
-   * @generated from field: lindm.agent.v1.AssistancePolicy policy = 2;
+   * @generated from field: lindm.agent.v1.AssistanceEnablement policy = 2;
    */
-  policy: AssistancePolicy;
+  policy: AssistanceEnablement;
 
   /**
    * @generated from field: lindm.admin.v1.AssistanceDesktop desktop = 3;
@@ -446,7 +655,7 @@ export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> 
  * Use `create(AssistanceReadinessSchema)` to create a new message.
  */
 export const AssistanceReadinessSchema: GenMessage<AssistanceReadiness> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 13);
+  messageDesc(file_lindm_admin_v1_assistance, 21);
 
 /**
  * @generated from message lindm.admin.v1.GetAssistanceReadinessRequest
@@ -463,7 +672,7 @@ export type GetAssistanceReadinessRequest = Message<"lindm.admin.v1.GetAssistanc
  * Use `create(GetAssistanceReadinessRequestSchema)` to create a new message.
  */
 export const GetAssistanceReadinessRequestSchema: GenMessage<GetAssistanceReadinessRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 14);
+  messageDesc(file_lindm_admin_v1_assistance, 22);
 
 /**
  * @generated from message lindm.admin.v1.GetAssistanceReadinessResponse
@@ -480,7 +689,7 @@ export type GetAssistanceReadinessResponse = Message<"lindm.admin.v1.GetAssistan
  * Use `create(GetAssistanceReadinessResponseSchema)` to create a new message.
  */
 export const GetAssistanceReadinessResponseSchema: GenMessage<GetAssistanceReadinessResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 15);
+  messageDesc(file_lindm_admin_v1_assistance, 23);
 
 /**
  * AssistanceState is the server lifecycle of one support invitation.

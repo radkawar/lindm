@@ -4,6 +4,9 @@ import (
 	"crypto/x509"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 )
 
@@ -22,6 +25,12 @@ func TestResolveAssistanceRelay(t *testing.T) {
 	}{
 		{name: "absent", accepted: true, change: func(c *configv1.ServerConfig) { c.Assistance = nil }},
 		{name: "configured", accepted: true},
+		{name: "independent capability ceiling", accepted: true, change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Clipboard: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, Keyboard: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, Display: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON}
+		}},
+		{name: "unknown capability mode", change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Messages: agentv1.AssistancePolicyMode(99)}
+		}},
 		{name: "wildcard relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "0.0.0.0" }},
 		{name: "IPv6 relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "2001:db8::1" }},
 		{name: "listener inside relay ports", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.Listener.Port = 49170 }},
@@ -54,6 +63,9 @@ func TestResolveAssistanceRelay(t *testing.T) {
 			resources, err := (&Document{base: dir, Proto: cfg}).Resolve()
 			if err == nil {
 				resources.HTTPClient.CloseIdleConnections()
+				if !proto.Equal(resources.Proto.GetAssistance().GetPolicyCeiling(), cfg.GetAssistance().GetPolicyCeiling()) {
+					t.Fatal("resource resolution changed the configured policy ceiling")
+				}
 			}
 			if (err == nil) != test.accepted {
 				t.Fatalf("resolve = %v, want accepted %t", err, test.accepted)

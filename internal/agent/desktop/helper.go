@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -82,6 +83,10 @@ func newHelper(config Config, uid uint32) (*Helper, error) {
 	if config.Client == nil || config.Notifier == nil || config.Portal == nil || config.Capturer == nil || config.Peers == nil || config.Locks == nil || config.Logger == nil {
 		return nil, errors.New("desktop: missing helper dependency")
 	}
+	validator, err := protovalidate.New(protovalidate.WithMessages(&agentv1.AssistanceCommand{}), protovalidate.WithDisableLazy())
+	if err != nil {
+		return nil, err
+	}
 	return &Helper{
 		client: config.Client,
 		deps: &sessionDeps{
@@ -92,6 +97,7 @@ func newHelper(config Config, uid uint32) (*Helper, error) {
 			logger:             config.Logger,
 			clock:              time.Now,
 			lockReporting:      lockReporting(config.CurrentDesktop),
+			validator:          validator,
 			firstPacketTimeout: 10 * time.Second,
 			captureGrace:       time.Second,
 			repostInterval:     2 * time.Second,
@@ -327,6 +333,10 @@ func (h *Helper) admit(parent context.Context, directive *agentv1.AssistanceDire
 		h.sessions[id] = endedSession(invitation, cause, "terminate_directive")
 		return
 	}
+	if directive.GetCommand() != nil {
+		h.sessions[id] = endedSession(invitation, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "unknown_command_session")
+		return
+	}
 	if !h.deps.clock().Before(invitation.GetEndsAt().AsTime()) {
 		h.sessions[id] = endedSession(invitation, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_EXPIRED, "ends_at_reached")
 		return
@@ -347,7 +357,7 @@ func (h *Helper) admit(parent context.Context, directive *agentv1.AssistanceDire
 		return
 	}
 	h.logger.Info("remote assistance invitation received", "session_id", id, "mode", invitation.GetMode().String())
-	h.sessions[id] = startSession(parent, h.deps, invitation, &h.group)
+	h.sessions[id] = startSession(parent, h.deps, directive, &h.group)
 }
 
 // bury remembers the final state of a forgotten session so a reappearing

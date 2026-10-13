@@ -57,7 +57,7 @@ type demoDevice struct {
 	headless bool
 	// assistance is the executor setting reported with every assistance sync;
 	// UNSPECIFIED models an agent that predates the report.
-	assistance        agentv1.AssistancePolicy
+	assistance        agentv1.AssistanceEnablement
 	encryption        encryptionState
 	service           serviceOutcome
 	department        string // provisioning token name in lab/demo/org.json
@@ -87,8 +87,8 @@ func rpm(name, version string) *inventoryv1.Package {
 }
 
 const (
-	assistanceOn  = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
-	assistanceOff = agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+	assistanceOn  = agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED
+	assistanceOff = agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED
 )
 
 // demoDevices returns the deterministic fleet in enrollment order. Index 0

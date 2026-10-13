@@ -35,11 +35,20 @@ func newAssistanceFixture(t *testing.T, enabled bool) *assistanceFixture {
 		{ID: "3", UID: 1001, User: "bob", Class: "user", Type: "x11", Active: true},
 		{ID: "c1", UID: 1001, User: "bob", Class: "greeter", Type: "wayland", Active: false},
 	}
-	broker, err := newAssistanceBroker(enabled, f.clock, f.lookup)
+	broker, err := newAssistanceBroker(enabled, nil, f.clock, f.lookup)
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.broker = broker
+	t.Cleanup(func() {
+		broker.mu.Lock()
+		defer broker.mu.Unlock()
+		for _, session := range broker.sessions {
+			if session.commandTimer != nil {
+				session.commandTimer.Stop()
+			}
+		}
+	})
 	return f
 }
 
@@ -93,6 +102,9 @@ func (f *assistanceFixture) invitation(mode agentv1.AssistanceMode, target strin
 
 func (f *assistanceFixture) network(directives ...*agentv1.AssistanceDirective) map[string]*agentv1.AssistanceReport {
 	f.t.Helper()
+	for _, directive := range directives {
+		directive.AuthorizedUntil = timestamppb.New(f.clock().Add(assistanceReauthorization))
+	}
 	response, err := f.broker.syncNetwork(f.t.Context(), &agentv1.SyncAssistanceRequest{Directives: directives})
 	if err != nil {
 		f.t.Fatalf("network sync: %v", err)
@@ -409,9 +421,9 @@ func TestAssistanceBrokerDisabledEndsInvitations(t *testing.T) {
 // sync, not just one carrying an invitation, reports the applied setting.
 func TestAssistanceBrokerReportsPolicy(t *testing.T) {
 	for _, enabled := range []bool{false, true} {
-		want := agentv1.AssistancePolicy_ASSISTANCE_POLICY_DISABLED
+		want := agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_DISABLED
 		if enabled {
-			want = agentv1.AssistancePolicy_ASSISTANCE_POLICY_ENABLED
+			want = agentv1.AssistanceEnablement_ASSISTANCE_ENABLEMENT_ENABLED
 		}
 		f := newAssistanceFixture(t, enabled)
 		response, err := f.broker.syncNetwork(t.Context(), &agentv1.SyncAssistanceRequest{})

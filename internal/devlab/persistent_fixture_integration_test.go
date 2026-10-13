@@ -135,7 +135,7 @@ func TestPersistentFixtureResumePreservesOwnerSession(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := fixture.ConfigureAssistance(ctx, relay); err != nil {
+			if err := fixture.ConfigureAssistance(ctx, relay, nil); err != nil {
 				t.Fatal(err)
 			}
 			delegation, err := fixture.ConfigureDeviceActions(ctx)

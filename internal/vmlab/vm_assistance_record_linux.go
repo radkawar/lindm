@@ -5,11 +5,13 @@ package vmlab
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -38,22 +40,32 @@ type VMAssistanceResult struct {
 	Browser           *assistanceBrowserEvidence `json:"browser"`
 	// Readiness is the server's assistance readiness the lane waited for
 	// after publishing its desktop session inventory.
-	Readiness   *assistanceReadinessEvidence  `json:"readiness,omitempty"`
-	Scenarios   []*assistanceScenarioEvidence `json:"scenarios"`
-	Audit       []assistanceAuditEvidence     `json:"audit"`
-	Journals    []assistanceEvidenceFile      `json:"journals"`
-	Screenshots []assistanceEvidenceFile      `json:"screenshots"`
-	StartedAt   time.Time                     `json:"started_at"`
-	FinishedAt  time.Time                     `json:"finished_at"`
-	Passed      bool                          `json:"passed"`
-	Failure     string                        `json:"failure,omitempty"`
-	Boundaries  []string                      `json:"boundaries"`
+	Readiness         *assistanceReadinessEvidence  `json:"readiness,omitempty"`
+	Scenarios         []*assistanceScenarioEvidence `json:"scenarios"`
+	Audit             []assistanceAuditEvidence     `json:"audit"`
+	Journals          []assistanceEvidenceFile      `json:"journals"`
+	Screenshots       []assistanceEvidenceFile      `json:"screenshots"`
+	Witnesses         []assistanceEvidenceFile      `json:"capability_witnesses"`
+	BoundaryWitnesses []assistanceEvidenceFile      `json:"native_boundary_witnesses"`
+	TierOnePassed     bool                          `json:"tier_one_passed"`
+	NotRun            []assistanceNotRunEvidence    `json:"capabilities_not_run"`
+	StartedAt         time.Time                     `json:"started_at"`
+	FinishedAt        time.Time                     `json:"finished_at"`
+	Passed            bool                          `json:"passed"`
+	Failure           string                        `json:"failure,omitempty"`
+	Boundaries        []string                      `json:"boundaries"`
 }
 
 // assistanceReadinessEvidence is GetAssistanceReadiness when the lane began.
 type assistanceReadinessEvidence struct {
 	State               string    `json:"state"`
 	InventoryObservedAt time.Time `json:"inventory_observed_at"`
+}
+
+type assistanceNotRunEvidence struct {
+	Scenario   string `json:"scenario"`
+	Capability string `json:"capability"`
+	Reason     string `json:"reason"`
 }
 
 // assistanceEvidenceFile binds one evidence artifact by its path relative to
@@ -149,27 +161,34 @@ type assistanceClickEvidence struct {
 }
 
 type assistanceScenarioEvidence struct {
-	Name           string `json:"name"`
-	Mode           string `json:"mode"`
-	SessionID      string `json:"session_id"`
-	ExpectedCause  string `json:"expected_end_cause"`
-	EndCause       string `json:"end_cause"`
-	EndDetail      string `json:"end_detail,omitempty"`
-	ExpectedDetail string `json:"expected_end_detail,omitempty"`
+	Name               string                           `json:"name"`
+	Mode               string                           `json:"mode"`
+	SessionID          string                           `json:"session_id"`
+	DeviceID           string                           `json:"device_id"`
+	OperatorID         string                           `json:"operator_id"`
+	OperatorDisplay    string                           `json:"operator_display"`
+	ExpectedCause      string                           `json:"expected_end_cause"`
+	EndCause           string                           `json:"end_cause"`
+	EndDetail          string                           `json:"end_detail,omitempty"`
+	ExpectedDetail     string                           `json:"expected_end_detail,omitempty"`
+	ConsoleEndCause    string                           `json:"console_end_cause_text,omitempty"`
+	ControlGranted     bool                             `json:"control_granted"`
+	LocalSession       *assistanceLocalEvidence         `json:"local_session,omitempty"`
+	OfferFingerprint   string                           `json:"offer_fingerprint,omitempty"`
+	AnswerFingerprint  string                           `json:"answer_fingerprint,omitempty"`
+	States             []assistanceStateObservation     `json:"states"`
+	Clicks             []assistanceClickEvidence        `json:"guest_local_clicks"`
+	Media              *assistanceMediaEvidence         `json:"media,omitempty"`
+	Nonce              string                           `json:"typed_nonce,omitempty"`
+	NonceReceived      bool                             `json:"nonce_received_by_guest"`
+	CaptureStopped     bool                             `json:"guest_capture_stopped"`
+	Screenshots        []string                         `json:"screenshots"`
+	CapabilityWitness  string                           `json:"capability_witness,omitempty"`
+	BoundaryWitnesses  []string                         `json:"native_boundary_witnesses"`
+	NegativeBoundaries []string                         `json:"negative_boundaries"`
+	ModeAuthority      *assistanceModeAuthorityEvidence `json:"mode_authority,omitempty"`
 	// LockPath is how the lock scenario locked the desktop.
-	LockPath          string                       `json:"lock_path,omitempty"`
-	ConsoleEndCause   string                       `json:"console_end_cause_text,omitempty"`
-	ControlGranted    bool                         `json:"control_granted"`
-	LocalSession      *assistanceLocalEvidence     `json:"local_session,omitempty"`
-	OfferFingerprint  string                       `json:"offer_fingerprint,omitempty"`
-	AnswerFingerprint string                       `json:"answer_fingerprint,omitempty"`
-	States            []assistanceStateObservation `json:"states"`
-	Clicks            []assistanceClickEvidence    `json:"guest_local_clicks"`
-	Media             *assistanceMediaEvidence     `json:"media,omitempty"`
-	Nonce             string                       `json:"typed_nonce,omitempty"`
-	NonceReceived     bool                         `json:"nonce_received_by_guest"`
-	CaptureStopped    bool                         `json:"guest_capture_stopped"`
-	Screenshots       []string                     `json:"screenshots"`
+	LockPath string `json:"lock_path,omitempty"`
 }
 
 type assistanceAuditEvidence struct {
@@ -177,7 +196,7 @@ type assistanceAuditEvidence struct {
 	OccurredAt     time.Time         `json:"occurred_at"`
 	ActorID        string            `json:"actor_id,omitempty"`
 	Action         string            `json:"action"`
-	SessionID      string            `json:"session_id"`
+	ResourceID     string            `json:"resource_id"`
 	Reason         string            `json:"reason"`
 	TargetDeviceID string            `json:"target_device_id"`
 	Details        map[string]string `json:"details"`
@@ -267,7 +286,7 @@ func (e *assistanceEvidence) bind(name, relative string) (assistanceEvidenceFile
 // resolve to bound screenshots.
 func verifyAssistanceEvidence(dir string, result *VMAssistanceResult) error {
 	screenshots := map[string]bool{}
-	for _, group := range [][]assistanceEvidenceFile{result.Screenshots, result.Journals} {
+	for _, group := range [][]assistanceEvidenceFile{result.Screenshots, result.Journals, result.Witnesses, result.BoundaryWitnesses} {
 		for _, bound := range group {
 			if bound.Path == "" || filepath.Base(bound.Path) != bound.Path {
 				return fmt.Errorf("evidence %q is not a plain file name", bound.Path)
@@ -286,6 +305,56 @@ func verifyAssistanceEvidence(dir string, result *VMAssistanceResult) error {
 		screenshots[bound.Path] = true
 	}
 	for _, scenario := range result.Scenarios {
+		if scenario.Name == "authority-view" || scenario.Name == "authority-control" {
+			if err := verifyAssistanceModeAuthority(scenario); err != nil {
+				return err
+			}
+		}
+		if slices.Contains([]string{"clipboard", "clipboard-limited", "keyboard", "display", "message", "monitors"}, scenario.Name) {
+			var binding *assistanceEvidenceFile
+			for i := range result.Witnesses {
+				if result.Witnesses[i].Path == scenario.CapabilityWitness {
+					binding = &result.Witnesses[i]
+				}
+			}
+			if binding == nil {
+				return fmt.Errorf("capability scenario %s lacks a bound native witness", scenario.Name)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, binding.Path))
+			if err != nil {
+				return err
+			}
+			var witness assistanceCapabilityWitness
+			if err := json.Unmarshal(data, &witness); err != nil {
+				return err
+			}
+			if err := verifyAssistanceCapabilityWitness(scenario, &witness); err != nil {
+				return err
+			}
+		}
+		for _, name := range requiredAssistanceBoundaries(scenario.Name) {
+			var binding *assistanceEvidenceFile
+			for i := range result.BoundaryWitnesses {
+				candidate := &result.BoundaryWitnesses[i]
+				if candidate.Name == name && slices.Contains(scenario.BoundaryWitnesses, candidate.Path) {
+					binding = candidate
+				}
+			}
+			if binding == nil {
+				return fmt.Errorf("scenario %s lacks native boundary %s", scenario.Name, name)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, binding.Path))
+			if err != nil {
+				return err
+			}
+			var boundary assistanceNativeBoundary
+			if err := json.Unmarshal(data, &boundary); err != nil {
+				return err
+			}
+			if err := verifyAssistanceNativeBoundary(scenario, &boundary); err != nil {
+				return err
+			}
+		}
 		for _, path := range scenario.Screenshots {
 			if !screenshots[path] {
 				return fmt.Errorf("scenario %s references unbound screenshot %s", scenario.Name, path)

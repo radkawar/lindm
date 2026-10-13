@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"html"
@@ -10,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/platform"
@@ -33,12 +37,13 @@ var (
 // sessionDeps are the per-session collaborators and timings shared by all
 // sessions of one helper.
 type sessionDeps struct {
-	notifier Notifier
-	portal   Portal
-	capturer Capturer
-	peers    PeerFactory
-	logger   *slog.Logger
-	clock    func() time.Time
+	notifier  Notifier
+	portal    Portal
+	capturer  Capturer
+	peers     PeerFactory
+	logger    *slog.Logger
+	clock     func() time.Time
+	validator protovalidate.Validator
 	// lockReporting is nil when every lock of this desktop is observable
 	// (logind LockedHint or the LockMonitor's logind signals).
 	lockReporting error
@@ -74,21 +79,34 @@ func (d *sessionDeps) replaceEndedNotice(ctx context.Context, next Notice) error
 // desktop resources; the helper loop only reads reports and forwards
 // directives.
 type session struct {
-	deps       *sessionDeps
-	invitation *agentv1.AssistanceInvitation
-	logger     *slog.Logger
-	cancel     context.CancelCauseFunc
-	done       chan struct{}
-	answers    chan string
+	deps            *sessionDeps
+	invitation      *agentv1.AssistanceInvitation
+	logger          *slog.Logger
+	cancel          context.CancelCauseFunc
+	done            chan struct{}
+	answers         chan string
+	commands        chan *agentv1.AssistanceCommand
+	authority       *time.Timer
+	authorizedUntil time.Time
 
-	mu       sync.Mutex
-	phase    agentv1.AssistancePhase
-	offer    string
-	control  bool
-	cause    agentv1.AssistanceEndCause
-	detail   string
-	answered bool
-	prompted bool
+	mu             sync.Mutex
+	phase          agentv1.AssistancePhase
+	offer          string
+	control        bool
+	cause          agentv1.AssistanceEndCause
+	detail         string
+	answered       bool
+	prompted       bool
+	granted        *agentv1.AssistanceCapabilities
+	displays       []*agentv1.AssistanceDisplay
+	selected       string
+	generation     uint32
+	frame          DisplayFrame
+	mediaPeer      Peer
+	command        *agentv1.AssistanceCommand
+	commandResult  *agentv1.AssistanceCommandResult
+	commandHistory map[string][32]byte
+	commandBusy    bool
 }
 
 // sessionResources are released by cleanup in a fixed order.
@@ -99,20 +117,34 @@ type sessionResources struct {
 	capture     Capture
 	forwardDone chan struct{}
 	inputDone   chan struct{}
-	indicator   Notice
-	markup      bool
+	// indicatorMu guards indicator between serve and operator messages.
+	indicatorMu   sync.Mutex
+	indicator     Notice
+	markup        bool
+	input         *inputControl
+	captureCancel context.CancelFunc
+	captureDone   chan error
+	timeline      rtpTimeline
+	commandDone   chan struct{}
+	message       Notice
+	messageUntil  time.Time
+	lastMessage   time.Time
 }
 
-func startSession(parent context.Context, deps *sessionDeps, invitation *agentv1.AssistanceInvitation, group *sync.WaitGroup) *session {
+func startSession(parent context.Context, deps *sessionDeps, directive *agentv1.AssistanceDirective, group *sync.WaitGroup) *session {
+	invitation := directive.GetInvitation()
 	ctx, cancel := context.WithCancelCause(parent)
 	s := &session{
-		deps:       deps,
-		invitation: invitation,
-		logger:     deps.logger.With("session_id", invitation.GetSessionId()),
-		cancel:     cancel,
-		done:       make(chan struct{}),
-		answers:    make(chan string, 1),
+		deps:           deps,
+		invitation:     invitation,
+		logger:         deps.logger.With("session_id", invitation.GetSessionId()),
+		cancel:         cancel,
+		done:           make(chan struct{}),
+		answers:        make(chan string, 1),
+		commands:       make(chan *agentv1.AssistanceCommand, 1),
+		commandHistory: make(map[string][32]byte),
 	}
+	s.renewAuthority(directive)
 	runCtx, release := context.WithDeadlineCause(ctx, invitation.GetEndsAt().AsTime(), errExpired)
 	group.Go(func() {
 		defer release()
@@ -148,6 +180,14 @@ func (s *session) end(cause agentv1.AssistanceEndCause, detail string) {
 		cause, detail = agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "helper_stopped"
 	}
 	s.phase, s.cause, s.detail = agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED, cause, sanitizeDetail(detail)
+	s.frame = DisplayFrame{}
+	if s.mediaPeer != nil {
+		s.mediaPeer.EndDisplayFrames()
+	}
+	if s.authority != nil {
+		s.authority.Stop()
+	}
+	expireClipboardResult(s.commandResult, agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_CANCELLED, "session_ended")
 	s.mu.Unlock()
 	if s.logger != nil {
 		s.logger.Info("remote assistance ended", "cause", cause.String(), "detail", detail)
@@ -170,9 +210,25 @@ func (s *session) report() (*agentv1.SessionAssistanceReport, bool) {
 		return nil, false
 	}
 	report := &agentv1.SessionAssistanceReport{
-		SessionId:      s.id(),
-		Phase:          s.phase,
-		ControlGranted: s.control,
+		SessionId:             s.id(),
+		Phase:                 s.phase,
+		ControlGranted:        s.control,
+		RequestedCapabilities: proto.CloneOf(s.invitation.GetRequestedCapabilities()),
+		EffectiveCapabilities: proto.CloneOf(s.invitation.GetEffectiveCapabilities()),
+		GrantedCapabilities:   proto.CloneOf(s.granted),
+		Displays:              cloneDisplays(s.displays),
+		SelectedDisplayId:     s.selected,
+		DisplayGeneration:     s.generation,
+	}
+	if (s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE) &&
+		s.frame.Generation != 0 && s.frame.Display == s.selected && s.frame.Generation == s.generation {
+		report.DisplayFrame = &agentv1.AssistanceDisplayFrame{DisplayId: s.frame.Display, Generation: s.frame.Generation, RtpTimestamp: s.frame.RTPTimestamp}
+	}
+	if s.commandResult != nil {
+		if s.command == nil || !s.deps.clock().Before(s.command.GetDeadline().AsTime()) {
+			expireClipboardResult(s.commandResult, agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_EXPIRED, "content_expired")
+		}
+		report.CommandResult = proto.CloneOf(s.commandResult)
 	}
 	switch s.phase {
 	case agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED, agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE:
@@ -195,6 +251,14 @@ func (s *session) apply(directive *agentv1.AssistanceDirective) {
 		}
 		s.end(cause, "terminate_directive")
 		return
+	}
+	if !proto.Equal(consentedPolicy(s.invitation), consentedPolicy(directive.GetInvitation())) {
+		s.end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "capability_authority_changed")
+		return
+	}
+	s.renewAuthority(directive)
+	if command := directive.GetCommand(); command != nil {
+		s.applyCommand(command)
 	}
 	answer := directive.GetAnswerSdp()
 	if answer == "" {
@@ -242,6 +306,9 @@ func (s *session) run(ctx context.Context) {
 // cancellation by end() returns UNSPECIFIED, which end ignores because the
 // first cause wins.
 func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.AssistanceEndCause, string) {
+	if ctx.Err() != nil {
+		return s.failure(ctx, ctx.Err())
+	}
 	deps := s.deps
 	consentCtx, cancelConsent := context.WithDeadlineCause(ctx, s.invitation.GetConsentDeadline().AsTime(), errConsentTimeout)
 	defer cancelConsent()
@@ -255,7 +322,9 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	}
 	// Never ask for consent the desktop cannot honour: a missing ScreenCast
 	// (or, for CONTROL, RemoteDesktop) portal ends the session before the prompt.
-	if err := deps.portal.Check(consentCtx, s.invitation.GetMode()); err != nil {
+	policy := consentedPolicy(s.invitation)
+	request := PortalRequest{Mode: s.invitation.GetMode(), Policy: policy, Lifetime: ctx}
+	if err := deps.portal.Check(consentCtx, request); err != nil {
 		return s.failure(consentCtx, unavailable("portal_unavailable", err))
 	}
 	// A server that advertises actions but never shows them would present a
@@ -296,47 +365,38 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 		return s.failure(consentCtx, consentCtx.Err())
 	}
 
-	grant, err := deps.portal.Open(consentCtx, s.invitation.GetMode())
+	grant, err := deps.portal.Open(consentCtx, request)
 	if err != nil {
 		return s.failure(consentCtx, err)
 	}
 	r.grant = grant
 	control := s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL && grant.ControlGranted()
-	pipeWire, err := grant.OpenPipeWire(consentCtx)
-	if err != nil {
-		return s.failure(consentCtx, unavailable("pipewire_unavailable", err))
+	streams := grant.Streams()
+	if len(streams) == 0 || len(streams) > 8 {
+		return s.failure(consentCtx, unavailable("portal_stream_missing", nil))
 	}
+	s.mu.Lock()
+	s.granted = grantedCapabilities(policy, grant)
+	s.selected, s.generation = streams[0].ID, 1
+	for _, stream := range streams {
+		s.displays = append(s.displays, &agentv1.AssistanceDisplay{Id: stream.ID, Label: stream.Label, Width: uint32(stream.Width), Height: uint32(stream.Height)})
+	}
+	s.mu.Unlock()
+	r.input = newInputControl(grant, s.granted.GetPolicy().GetKeyboard(), streams[0].ID)
 	peer, err := deps.peers.NewPeer(PeerConfig{ICEServers: s.invitation.GetIceServers(), Input: control})
 	if err != nil {
-		_ = pipeWire.Close()
 		return s.failure(consentCtx, unavailable("peer_setup_failed", err))
 	}
 	r.peer = peer
-	capture, err := deps.capturer.Start(ctx, CaptureRequest{PipeWire: pipeWire, Stream: grant.Stream()})
-	closeErr := pipeWire.Close()
-	if err != nil {
-		return s.failure(consentCtx, unavailable("capture_start_failed", err))
+	s.mu.Lock()
+	s.mediaPeer = peer
+	if s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+		peer.EndDisplayFrames()
 	}
-	r.capture = capture
-	if closeErr != nil {
-		return s.failure(consentCtx, unavailable("pipewire_close_failed", closeErr))
-	}
-	firstPacket := make(chan struct{})
-	captureDone := make(chan error, 1)
-	r.forwardDone = make(chan struct{})
-	go s.forwardMedia(capture, peer, firstPacket, captureDone, r.forwardDone)
-	firstTimer := time.NewTimer(deps.firstPacketTimeout)
-	select {
-	case <-firstPacket:
-		firstTimer.Stop()
-	case err := <-captureDone:
-		firstTimer.Stop()
-		return s.failure(consentCtx, unavailable("capture_exited", err))
-	case <-firstTimer.C:
-		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "capture_no_frames"
-	case <-consentCtx.Done():
-		firstTimer.Stop()
-		return s.failure(consentCtx, consentCtx.Err())
+	s.mu.Unlock()
+	r.captureDone = make(chan error, 1)
+	if err := s.startCapture(ctx, consentCtx, r, streams[0]); err != nil {
+		return s.failure(consentCtx, err)
 	}
 	offer, err := peer.Offer(consentCtx)
 	if err != nil {
@@ -350,9 +410,11 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	s.logger.Info("remote assistance offered", "control_granted", control)
 	if control {
 		r.inputDone = make(chan struct{})
-		go s.forwardInput(ctx, grant, peer.Input(), r.inputDone)
+		go s.forwardInput(ctx, r.input, peer.Input(), r.inputDone)
 	}
-	return s.serve(ctx, r, captureDone)
+	r.commandDone = make(chan struct{})
+	go s.commandLoop(ctx, r)
+	return s.serve(ctx, r, r.captureDone)
 }
 
 // serve runs the OFFERED/ACTIVE phase.
@@ -361,7 +423,7 @@ func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-
 	if err != nil {
 		return s.failure(ctx, unavailable("indicator_failed", err))
 	}
-	r.indicator = indicator
+	r.setIndicator(indicator)
 	lastPost := s.deps.clock()
 	indicatorResult := indicator.Result()
 	var repost *time.Timer
@@ -412,7 +474,7 @@ func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-
 			if action == actionStop {
 				return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED, "local_stop"
 			}
-			r.indicator = nil
+			r.setIndicator(nil)
 			repost = time.NewTimer(max(0, lastPost.Add(s.deps.repostInterval).Sub(s.deps.clock())))
 			repostC = repost.C
 		case <-repostC:
@@ -421,9 +483,16 @@ func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-
 			if err != nil {
 				return s.failure(ctx, unavailable("indicator_failed", err))
 			}
-			r.indicator, indicatorResult, lastPost = indicator, indicator.Result(), s.deps.clock()
+			r.setIndicator(indicator)
+			indicatorResult, lastPost = indicator.Result(), s.deps.clock()
 		}
 	}
+}
+
+func (r *sessionResources) setIndicator(indicator Notice) {
+	r.indicatorMu.Lock()
+	r.indicator = indicator
+	r.indicatorMu.Unlock()
 }
 
 // failure maps a step error to an end cause. Context causes win because
@@ -454,40 +523,93 @@ func (s *session) failure(ctx context.Context, err error) (agentv1.AssistanceEnd
 }
 
 // forwardMedia copies encoder packets to the peer until the capture ends.
-func (s *session) forwardMedia(capture Capture, peer Peer, firstPacket chan<- struct{}, captureDone chan<- error, done chan<- struct{}) {
+func (s *session) forwardMedia(ctx context.Context, r *sessionResources, capture Capture, display string, generation uint32, firstPacket chan<- struct{}, done chan<- struct{}) {
 	defer close(done)
 	buf := make([]byte, maxRTPPacket)
 	first := true
+	marked := false
 	for {
 		n, err := capture.ReadPacket(buf)
 		if err != nil {
-			captureDone <- err
+			if ctx.Err() == nil {
+				select {
+				case r.captureDone <- err:
+				case <-ctx.Done():
+				}
+			}
+			return
+		}
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		if err := r.timeline.rewrite(buf[:n], first, s.deps.clock()); err != nil {
+			select {
+			case r.captureDone <- err:
+			case <-ctx.Done():
+			}
 			return
 		}
 		if first {
 			first = false
 			close(firstPacket)
 		}
-		if err := peer.WriteRTP(buf[:n]); err != nil {
+		emitted, err := r.peer.WriteRTP(buf[:n])
+		if err != nil {
 			s.logger.Debug("remote assistance rtp write failed", "err", err)
+			continue
+		}
+		if emitted && !marked {
+			if err := ctx.Err(); err != nil {
+				return
+			}
+			frame := DisplayFrame{Display: display, Generation: generation, RTPTimestamp: binary.BigEndian.Uint32(buf[4:8])}
+			if err := s.publishDisplayFrame(r, frame); err != nil {
+				select {
+				case r.captureDone <- err:
+				case <-ctx.Done():
+				}
+				return
+			}
+			marked = true
 		}
 	}
 }
 
+// The same exact media witness feeds CONTROL's reliable channel and the typed
+// report (also used by VIEW, which has no data channel). A switch's candidate
+// remains private until selected/gen/result are atomically published.
+func (s *session) publishDisplayFrame(r *sessionResources, frame DisplayFrame) error {
+	r.input.mu.Lock()
+	defer r.input.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+		return errSessionEnded
+	}
+	if frame.Display != r.input.display || frame.Generation != r.input.generation {
+		return nil
+	}
+	if s.frame.Display == frame.Display && s.frame.Generation == frame.Generation {
+		return nil
+	}
+	if err := r.peer.PublishDisplayFrame(frame); err != nil {
+		return err
+	}
+	s.frame = frame
+	return nil
+}
+
 // forwardInput injects rate-limited, validated operator input and releases
 // every held key and button when the session ends.
-func (s *session) forwardInput(ctx context.Context, grant Grant, messages <-chan []byte, done chan<- struct{}) {
+func (s *session) forwardInput(ctx context.Context, input *inputControl, messages <-chan []byte, done chan<- struct{}) {
 	defer close(done)
 	limiter := newInputLimiter(s.deps.clock())
-	pressed := newPressedInput()
 	var dropped, rejected int
 	defer func() {
 		release, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.deps.callTimeout)
 		defer cancel()
-		for _, event := range pressed.releases() {
-			if err := grant.Inject(release, event); err != nil {
-				s.logger.Warn("remote assistance input release failed", "err", err)
-			}
+		if err := input.releaseAll(release); err != nil {
+			s.logger.Warn("remote assistance input release failed", "err", err)
 		}
 		if dropped > 0 || rejected > 0 {
 			s.logger.Info("remote assistance input dropped", "rate_limited", dropped, "invalid", rejected)
@@ -501,21 +623,27 @@ func (s *session) forwardInput(ctx context.Context, grant Grant, messages <-chan
 			if !ok {
 				return
 			}
-			if !limiter.allow(s.deps.clock()) {
-				dropped++
-				continue
-			}
 			event, err := parseInput(message)
 			if err != nil {
 				rejected++
 				continue
 			}
-			pressed.observe(event)
+			// Never rate-drop releases: a burst must not leave a key held.
+			releasing := event.kind == inputRelease || ((event.kind == inputKey || event.kind == inputKeysym || event.kind == inputButton) && !event.Down)
+			if !releasing && !limiter.allow(s.deps.clock()) {
+				dropped++
+				continue
+			}
 			call, cancel := context.WithTimeout(ctx, s.deps.callTimeout)
-			err = grant.Inject(call, event)
+			err = input.inject(call, event)
 			cancel()
+			if errors.Is(err, errInvalidInput) {
+				rejected++
+				continue
+			}
 			if err != nil && ctx.Err() == nil {
-				s.logger.Warn("remote assistance input injection failed", "err", err)
+				s.end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "input_injection_failed")
+				return
 			}
 		}
 	}
@@ -526,6 +654,20 @@ func (s *session) forwardInput(ctx context.Context, grant Grant, messages <-chan
 func (s *session) cleanup(r *sessionResources) {
 	ctx, cancel := context.WithTimeout(context.Background(), s.deps.cleanupTimeout)
 	defer cancel()
+	if r.commandDone != nil {
+		<-r.commandDone
+	}
+	s.mu.Lock()
+	if s.command != nil {
+		s.command.Text = ""
+	}
+	for len(s.commands) > 0 {
+		<-s.commands
+	}
+	s.mu.Unlock()
+	if r.captureCancel != nil {
+		r.captureCancel()
+	}
 	if r.prompt != nil {
 		s.logIfErr("close prompt", r.prompt.Close(ctx))
 	}
@@ -546,6 +688,9 @@ func (s *session) cleanup(r *sessionResources) {
 	}
 	if r.indicator != nil {
 		s.logIfErr("close indicator", r.indicator.Close(ctx))
+	}
+	if r.message != nil {
+		s.logIfErr("close operator message", r.message.Close(ctx))
 	}
 	s.mu.Lock()
 	prompted, cause := s.prompted, s.cause
@@ -576,7 +721,11 @@ func (s *session) promptNotification(markup bool) Notification {
 	}
 	var body strings.Builder
 	if s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
-		fmt.Fprintf(&body, "%s asks to view your screen and control your keyboard and pointer.\n", operator)
+		if policyEnabled(consentedPolicy(s.invitation).GetKeyboard()) {
+			fmt.Fprintf(&body, "%s asks to view your screen and control your keyboard and pointer.\n", operator)
+		} else {
+			fmt.Fprintf(&body, "%s asks to view your screen and control your pointer. Keyboard control is not requested.\n", operator)
+		}
 	} else {
 		fmt.Fprintf(&body, "%s asks to view your screen.\n", operator)
 	}
@@ -586,12 +735,14 @@ func (s *session) promptNotification(markup bool) Notification {
 	} else {
 		body.WriteString("Control is not requested. The system dialog that follows selects what is shared.")
 	}
+	body.WriteString(capabilityConsentText(consentedPolicy(s.invitation)))
 	return Notification{
 		Summary:    "Remote assistance request",
 		Body:       body.String(),
 		Actions:    []NotificationAction{{Key: actionAllow, Label: "Allow"}, {Key: actionDecline, Label: "Decline"}},
 		Critical:   true,
 		Persistent: true,
+		Reshow:     true,
 	}
 }
 

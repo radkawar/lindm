@@ -103,15 +103,30 @@ message AssistanceInvitation {
     min_items: 1
     max_items: 4
   }];
+  AssistancePolicy requested_capabilities = 9;
+  AssistancePolicy effective_capabilities = 10;
 }
 
 // AssistanceDirective is the authority's complete desired state for one
 // session. Receivers apply it idempotently.
 message AssistanceDirective {
   AssistanceInvitation invitation = 1 [(buf.validate.field).required = true];
-  string answer_sdp = 2 [(buf.validate.field).string.max_len = 16384];
+  string answer_sdp = 2 [(buf.validate.field).string.max_bytes = 16384];
   bool terminate = 3;
   AssistanceEndCause terminate_cause = 4 [(buf.validate.field).enum.defined_only = true];
+  AssistanceCommand command = 5;
+  // Absolute fresh operator authority bound; polling never extends it.
+  google.protobuf.Timestamp authorized_until = 6;
+  option (buf.validate.message).cel = {
+    id: "assistance_directive.operator_deadline"
+    message: "live directives require fresh operator authority"
+    expression: "this.terminate || has(this.authorized_until)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_directive.command_deadline"
+    message: "a delivered command requires its server-issued deadline"
+    expression: "!has(this.command) || has(this.command.deadline)"
+  };
 }
 
 // AssistanceLocalSession identifies the consenting local session. The
@@ -144,7 +159,7 @@ message AssistanceReport {
     defined_only: true
     not_in: [0]
   }];
-  string offer_sdp = 3 [(buf.validate.field).string.max_len = 16384];
+  string offer_sdp = 3 [(buf.validate.field).string.max_bytes = 16384];
   bool control_granted = 4;
   AssistanceEndCause end_cause = 5 [(buf.validate.field).enum.defined_only = true];
   string end_detail = 6 [(buf.validate.field).string = {
@@ -152,6 +167,14 @@ message AssistanceReport {
     pattern: "^[ -~]*$"
   }];
   AssistanceLocalSession local_session = 7;
+  AssistanceCapabilities granted_capabilities = 8;
+  repeated AssistanceDisplay displays = 9 [(buf.validate.field).repeated.max_items = 8];
+  string selected_display_id = 10 [(buf.validate.field).string.max_len = 64];
+  AssistanceCommandResult command_result = 11;
+  uint32 display_generation = 12;
+  AssistancePolicy requested_capabilities = 13;
+  AssistancePolicy effective_capabilities = 14;
+  AssistanceDisplayFrame display_frame = 15;
   option (buf.validate.message).cel = {
     id: "assistance_report.offer"
     message: "offer_sdp is required from OFFERED and absent before it"
@@ -162,25 +185,45 @@ message AssistanceReport {
     message: "end_cause is required exactly when ENDED"
     expression: "(this.phase == 5) == (this.end_cause != 0)"
   };
+  option (buf.validate.message).cel = {
+    id: "assistance_report.command_result"
+    message: "command reports are terminal and ended sessions cannot retain content"
+    expression: "!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_report.display_frame"
+    message: "frame identity must name the currently shared display generation"
+    expression: "!has(this.display_frame) || ((this.phase == 3 || this.phase == 4) && this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))"
+  };
 }
 
 message SyncAssistanceRequest {
   repeated AssistanceDirective directives = 1 [(buf.validate.field).repeated.max_items = 8];
+  option (buf.validate.message).cel = {
+    id: "sync_assistance_request.one_command"
+    message: "only one device command may be outstanding"
+    expression: "this.directives.filter(d, has(d.command)).size() <= 1"
+  };
 }
 message SyncAssistanceResponse {
   repeated AssistanceReport reports = 1 [(buf.validate.field).repeated.max_items = 8];
   // The executor's applied RemoteAssistanceConfig, reported on every sync.
-  AssistancePolicy policy = 2 [(buf.validate.field).enum.defined_only = true];
+  AssistanceEnablement policy = 2 [(buf.validate.field).enum.defined_only = true];
+  option (buf.validate.message).cel = {
+    id: "sync_assistance_response.one_content"
+    message: "only one device command result may carry content"
+    expression: "this.reports.filter(r, has(r.command_result) && r.command_result.text != '').size() <= 1"
+  };
 }
 
-// AssistancePolicy is the device's applied remote-assistance setting, so the
+// AssistanceEnablement is the device's applied remote-assistance setting, so the
 // server can refuse a request before it reaches a device that would decline it.
-enum AssistancePolicy {
+enum AssistanceEnablement {
   // Not reported: an agent that predates this field.
-  ASSISTANCE_POLICY_UNSPECIFIED = 0;
-  ASSISTANCE_POLICY_ENABLED = 1;
+  ASSISTANCE_ENABLEMENT_UNSPECIFIED = 0;
+  ASSISTANCE_ENABLEMENT_ENABLED = 1;
   // Absent or disabled RemoteAssistanceConfig: invitations end DISABLED.
-  ASSISTANCE_POLICY_DISABLED = 2;
+  ASSISTANCE_ENABLEMENT_DISABLED = 2;
 }
 
 // RemoteAssistanceConfig is device policy. Disabled devices end every
@@ -192,4 +235,164 @@ message RemoteAssistanceConfig {
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
     (buf.validate.field).string.(lindm.validation.v1.file_reference) = true
   ];
+  // Absent or UNSPECIFIED fields deny optional capabilities.
+  AssistancePolicy policy_ceiling = 3;
+}
+
+enum AssistancePolicyMode {
+  ASSISTANCE_POLICY_MODE_UNSPECIFIED = 0;
+  ASSISTANCE_POLICY_MODE_OFF = 1;
+  ASSISTANCE_POLICY_MODE_LIMITED = 2;
+  ASSISTANCE_POLICY_MODE_ON = 3;
+}
+
+message AssistancePolicy {
+  AssistancePolicyMode clipboard = 1 [(buf.validate.field).enum.defined_only = true];
+  AssistancePolicyMode keyboard = 2 [(buf.validate.field).enum.defined_only = true];
+  AssistancePolicyMode display = 3 [(buf.validate.field).enum.defined_only = true];
+  AssistancePolicyMode messages = 4 [(buf.validate.field).enum.defined_only = true];
+}
+
+message AssistanceCapabilities {
+  AssistancePolicy policy = 1;
+  string clipboard_reason = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string keyboard_reason = 3 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string display_reason = 4 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string messages_reason = 5 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+}
+
+// Only locally consented portal streams may appear here.
+message AssistanceDisplay {
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 64
+    pattern: "^[A-Za-z0-9_.-]+$"
+  }];
+  string label = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 128
+  }];
+  uint32 width = 3 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 16384
+  }];
+  uint32 height = 4 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 16384
+  }];
+}
+
+// The first RTP timestamp actually emitted for a selected capture generation.
+// It is not a wall-clock readiness estimate or evidence of browser presentation.
+message AssistanceDisplayFrame {
+  string display_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_bytes: 64
+    pattern: "^[A-Za-z0-9_.-]+$"
+  }];
+  uint32 generation = 2 [(buf.validate.field).uint32.gt = 0];
+  uint32 rtp_timestamp = 3;
+}
+
+enum AssistanceCommandKind {
+  ASSISTANCE_COMMAND_KIND_UNSPECIFIED = 0;
+  ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE = 1;
+  ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ = 2;
+  ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS = 3;
+  ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY = 4;
+  ASSISTANCE_COMMAND_KIND_MESSAGE = 5;
+}
+
+enum AssistanceSpecialKey {
+  ASSISTANCE_SPECIAL_KEY_UNSPECIFIED = 0;
+  ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW = 1;
+  ASSISTANCE_SPECIAL_KEY_SHOW_APPLICATIONS = 2;
+  ASSISTANCE_SPECIAL_KEY_OPEN_TERMINAL = 3;
+  ASSISTANCE_SPECIAL_KEY_CLOSE_WINDOW = 4;
+}
+
+// Content is ephemeral. Neither this message nor its digest is audit detail.
+message AssistanceCommand {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  AssistanceCommandKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Omitted by admin callers; stamped by the server before delivery.
+  google.protobuf.Timestamp deadline = 3;
+  string text = 4 [(buf.validate.field).string.max_bytes = 16384];
+  AssistanceSpecialKey special_key = 5 [(buf.validate.field).enum.defined_only = true];
+  string display_id = 6 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[A-Za-z0-9_.-]*$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_command.payload"
+    message: "payload must match the command kind"
+    expression: "((this.kind == 1 || this.kind == 5) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048))"
+  };
+}
+
+enum AssistanceCommandStatus {
+  ASSISTANCE_COMMAND_STATUS_UNSPECIFIED = 0;
+  ASSISTANCE_COMMAND_STATUS_PENDING = 1;
+  ASSISTANCE_COMMAND_STATUS_SUCCEEDED = 2;
+  ASSISTANCE_COMMAND_STATUS_FAILED = 3;
+  ASSISTANCE_COMMAND_STATUS_CANCELLED = 4;
+  ASSISTANCE_COMMAND_STATUS_EXPIRED = 5;
+}
+
+message AssistanceCommandResult {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceCommandKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  AssistanceCommandStatus status = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 4 [(buf.validate.field).string = {
+    in: [
+      "",
+      "command_identity_conflict",
+      "command_result_expired",
+      "session_command_limit",
+      "content_expired",
+      "session_ended",
+      "command_not_granted",
+      "command_deadline_reached",
+      "clipboard_selection_set",
+      "clipboard_text_read",
+      "special_keys_sent",
+      "display_selected",
+      "message_posted",
+      "command_unsupported",
+      "command_failed",
+      "command_state_lost",
+      "command_expired"
+    ]
+  }];
+  string text = 5 [(buf.validate.field).string.max_bytes = 16384];
+  google.protobuf.Timestamp completed_at = 6;
+  option (buf.validate.message).cel = {
+    id: "assistance_command_result.content"
+    message: "only a successful clipboard read may carry content; terminal results require completion time"
+    expression: "(this.text == '' || (this.kind == 2 && this.status == 2)) && ((this.status != 1) == has(this.completed_at))"
+  };
 }

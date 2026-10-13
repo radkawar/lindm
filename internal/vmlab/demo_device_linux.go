@@ -299,7 +299,7 @@ func DemoDeviceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		}
 		result := &VMAssistanceResult{DeviceID: saved.DeviceID, Relay: relay, Guest: guest}
 		screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
-		if _, err := screen.captureReference(ctx); err != nil {
+		if _, err := screen.captureReference(ctx, "desktop-reference"); err != nil {
 			return err
 		}
 		return holdAssistance(ctx, vm, fixture, screen, result, options.Hold, true, nil, true)

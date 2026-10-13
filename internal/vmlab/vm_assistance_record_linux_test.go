@@ -226,3 +226,41 @@ func TestAssistanceAdmissionMatchesRegistryGate(t *testing.T) {
 		}
 	}
 }
+
+func TestAssistanceAuditEvidenceKeepsStructuredFields(t *testing.T) {
+	audit := assistanceAuditEvidence{
+		ID: "event", ActorID: "actor", Action: "assistance.clipboard",
+		ResourceID: "session", TargetDeviceID: "device",
+		Reason:  "Operator explanation, not machine metadata",
+		Details: map[string]string{"request": "request", "result": "denied", "reason": "capability_scope_denied"},
+	}
+	encoded, err := json.Marshal(audit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var shape map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &shape); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range map[string]string{
+		"actor_id": "actor", "resource_id": "session", "target_device_id": "device",
+		"reason": audit.Reason,
+	} {
+		var got string
+		if err := json.Unmarshal(shape[key], &got); err != nil || got != want {
+			t.Fatalf("audit %s = %q, %v; want %q", key, got, err, want)
+		}
+	}
+	if _, exists := shape["session_id"]; exists {
+		t.Fatal("audit resource still uses the obsolete session-only alias")
+	}
+	var details map[string]string
+	if err := json.Unmarshal(shape["details"], &details); err != nil {
+		t.Fatal(err)
+	}
+	for key, want := range audit.Details {
+		if details[key] != want {
+			t.Fatalf("audit details[%q] = %q; want %q", key, details[key], want)
+		}
+	}
+}

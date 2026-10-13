@@ -53,6 +53,7 @@ generate-code: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect
 	@test -w go.mod || { echo "make generate: tracked files here are read-only (the protected shared checkout); generate in a private worktree and land the output" >&2; exit 1; }
 	$(BUF) generate
 	$(SQLC) generate
+	node internal/agent/desktop/keysymdata/generate.mjs
 
 web-assets:
 	npm run build:web
@@ -78,6 +79,7 @@ audit: web-assets $(GOVULNCHECK)
 # integrationLockCap), as in the land gate: loaded hosts push the
 # internal/agent/executor race suite past go test's 10m default.
 test: web-assets
+	node --test web/acceptance/assistance-input.test.mjs web/acceptance/assistance-presentation.test.mjs web/acceptance/assistance-marker.test.mjs
 	go test -race -timeout 45m $(GO_PACKAGES)
 	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/journey.test.mjs web/acceptance/review-edit-sheet.test.mjs web/eslint/freeform-input.test.mjs
 

@@ -1,6 +1,6 @@
 //go:build integration
 
-package device
+package assistance
 
 import (
 	"context"
@@ -137,7 +137,7 @@ func reasonOf(err error) string {
 func newEnrolledOn(t *testing.T, f *assistanceFixture) string {
 	t.Helper()
 	key := ed25519Key(t)
-	_, _, _, enrolled := enrollDevice(t, f.ctx, f.svc, f.ownerCtx, key)
+	enrolled := enrollAssistanceDevice(t, f.ctx, f.svc, f.ownerCtx, key)
 	principal, err := f.svc.authenticateDeviceRequest(httptest.NewRequest(http.MethodPost, "/", nil), parseCertPEM(t, enrolled.Msg.GetCertificatePem()))
 	if err != nil {
 		t.Fatal(err)
@@ -334,7 +334,9 @@ func TestAssistanceAdmission(t *testing.T) {
 	if _, err := f.svc.CreateAssistanceSession(helpdesk, connect.NewRequest(f.createRequest(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, ""))); connect.CodeOf(err) != connect.CodePermissionDenied {
 		t.Fatalf("helpdesk create: %v", err)
 	}
-	f.advance(3 * time.Minute)
+	if _, err := f.conn.Exec(f.ctx, "UPDATE devices SET last_seen_at=$2 WHERE id=$1", f.deviceID, f.now.Add(-3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
 	_, err = f.svc.CreateAssistanceSession(f.creatorCtx, connect.NewRequest(f.createRequest(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, "")))
 	wantReason(t, err, connect.CodeFailedPrecondition, "device_offline")
 	f.sync(t)
@@ -361,11 +363,13 @@ func TestAssistanceDeadlines(t *testing.T) {
 		f := newAssistanceFixture(t, 0)
 		session := f.create(t, agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, "")
 		f.sync(t, report(session.GetId(), agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED, localSession("3"), ""))
-		// The device keeps syncing within the 30 s window while the prompt is shown.
-		for range 7 {
-			f.advance(17 * time.Second)
-			f.sync(t, report(session.GetId(), agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED, localSession("3"), ""))
+		// Shorten this session's consent deadline, not the identity clock:
+		// fresh local authority is observed from real PostgreSQL time.
+		if _, err := f.conn.Exec(f.ctx, "UPDATE assistance_sessions SET consent_deadline=$2 WHERE id=$1", session.GetId(), f.now.Add(2*time.Second)); err != nil {
+			t.Fatal(err)
 		}
+		f.advance(time.Second)
+		f.sync(t, report(session.GetId(), agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED, localSession("3"), ""))
 		if got := f.get(t, session.GetId()); got.GetState() != adminv1.AssistanceState_ASSISTANCE_STATE_PROMPTED {
 			t.Fatalf("before deadline %v", got)
 		}

@@ -50,7 +50,7 @@ func measuredHandoffFixture(t *testing.T, initrd, kernel []byte) *agentv1.Device
 
 func TestMeasuredHandoffAdmissionBindsReleaseAndKey(t *testing.T) {
 	client, initrd, kernel := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), bytes.Repeat([]byte{0x4b}, 5000))
-	s := composed(&core.Service{RecoveryArtifacts: client})
+	s := composed(t, &core.Service{RecoveryArtifacts: client})
 	if err := s.AdmitMeasuredHandoff(t.Context(), measuredHandoffFixture(t, initrd, kernel)); err != nil {
 		t.Fatalf("exact measured handoff refused: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestMeasuredHandoffAdmissionBindsReleaseAndKey(t *testing.T) {
 
 func TestRecoveryStartAttestationGate(t *testing.T) {
 	client, initrd, kernel := recoveryArtifactRepository(t, bytes.Repeat([]byte{0x1d}, 4097), bytes.Repeat([]byte{0x4b}, 5000))
-	s := composed(&core.Service{RecoveryArtifacts: client})
+	s := composed(t, &core.Service{RecoveryArtifacts: client})
 	handoff := measuredHandoffFixture(t, initrd, kernel)
 	challenge := &agentv1.DeviceActionChallenge{ActionId: handoff.GetIntent().GetActionId(), Nonce: bytes.Repeat([]byte{3}, 32)}
 	receipt := []byte("server-signed BOOTED receipt")
