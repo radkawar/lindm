@@ -235,6 +235,24 @@ func TestCentreChanged(t *testing.T) {
 	}
 }
 
+// elcapture2-rocky9-x86 failed "guest window did not appear" with the terminal
+// open at the centre: Rocky 9's dark gnome-terminal over its navy wallpaper
+// differed by more than 48 only on the wallpaper's grey stripes.
+func TestCentreChangedDarkWindowOnDarkWallpaper(t *testing.T) {
+	reference := image.NewRGBA(image.Rect(0, 0, 1280, 800))
+	fill(reference, reference.Bounds(), color.RGBA{8, 19, 29, 0xff})
+	// A grey stripe across 36% of the central 240x240 square.
+	fill(reference, image.Rect(520, 280, 760, 366), color.RGBA{90, 90, 95, 0xff})
+	if centreChanged(reference, clone(reference)) {
+		t.Fatal("unchanged centre reported a window")
+	}
+	window := clone(reference)
+	fill(window, image.Rect(342, 136, 932, 591), color.RGBA{29, 29, 27, 0xff})
+	if !centreChanged(reference, window) {
+		t.Fatal("dark terminal window over the centre not observed")
+	}
+}
+
 // allow completes consent in one step, so it must tell a Control request's
 // RemoteDesktop dialog from a view-only ScreenCast dialog without the server.
 func TestPortalHasControlSwitchDistinguishesRequestMode(t *testing.T) {

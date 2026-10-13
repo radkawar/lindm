@@ -312,14 +312,20 @@ AlmaLinux 9.8/10.2 as well
 Five-scenario remote assistance passed on Rocky and AlmaLinux 10.2 (GNOME 49) on
 aarch64 and x86_64.
 
-On 9.8 (GNOME 40), assistance ends with `UNAVAILABLE capture_no_frames`. The
-vendor PipeWire 1.4.11 sends damage-frame and keepalive timestamps that stall
-GStreamer's `pipewiresrc`; upstream PipeWire fixed this in `efd1526` and
-`49300d8`, and no capture fallback is added. Rocky 9.8 x86_64 fails the same
-way (no decoded frames), so the defect is not architecture-specific; the
-capture workaround is remote-assistance product work. Records and the diagnosis
-are in
-[verification](../verification.md#device-actions-encryption-configuration-and-assistance-ubuntu-2204-debian-1213-rocky-and-almalinux-98102).
+On 9.8 (GNOME 40, PipeWire 1.4.11), Mutter attaches no `SPA_META_Header`, so
+`pipewiresrc` stamps every damage frame with the same stale graph-cycle time, and
+its keepalive resends carry the absolute PipeWire clock, on which `GstBaseSrc`
+waits far past running time (upstream PipeWire changed only the keepalive, in
+`efd1526` and `49300d8`). Assistance therefore ended `UNAVAILABLE
+capture_no_frames` on both architectures. The capture pipeline now reads no
+source timestamps and runs no keepalive on any release: a live `imagefreeze`
+keeps the newest frame and emits it at 15 fps in pipeline running time
+([architecture](../architecture.md)). With it, all six assistance scenarios pass
+on Rocky Linux 9.8 x86_64; AlmaLinux 9.8 and the aarch64 rows have not been
+re-run. Rocky's gnome-terminal is dark on a dark wallpaper, so the lab detects
+the nonce terminal by any pixel change at the screen centre. Records and the
+diagnosis are in
+[verification](../verification.md#el-9-assistance-capture-re-timestamping-2026-10-13).
 
 ## Advisory feeds
 

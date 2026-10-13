@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ func TestScaledSize(t *testing.T) {
 
 func TestGstArguments(t *testing.T) {
 	args := gstArguments(57, 3840, 2160)
-	want := "-q pipewiresrc fd=3 path=57 keepalive-time=500 ! videorate ! videoconvert ! videoscale ! " +
+	want := "-q pipewiresrc fd=3 path=57 ! imagefreeze is-live=true allow-replace=true ! videoconvert ! videoscale ! " +
 		"video/x-raw,framerate=15/1,width=1920,height=1080 ! vp8enc deadline=1 cpu-used=8 end-usage=cbr " +
 		"target-bitrate=2500000 keyframe-max-dist=30 error-resilient=default ! rtpvp8pay mtu=1200 pt=96 ! " +
 		"rtpstreampay ! fdsink fd=1"
@@ -54,6 +55,43 @@ func TestGstArguments(t *testing.T) {
 	for _, element := range gstElements {
 		if !slices.Contains(args, element) {
 			t.Errorf("element %s not in pipeline", element)
+		}
+	}
+}
+
+// Rocky/AlmaLinux 9.8 (Mutter 40.9, PipeWire 1.4.11) ended capture_no_frames:
+// damage frames shared one PTS, so videorate dropped them, and keepalive
+// resends carried the absolute clock, so GstBaseSrc waited far ahead. The
+// element after pipewiresrc must re-stamp in running time at the encoder
+// rate, and nothing may consume or synchronise on pipewiresrc timestamps.
+func TestGstArgumentsIgnoreSourceTimestamps(t *testing.T) {
+	args := gstArguments(57, 1280, 800)
+	var elements [][]string
+	start := 1 // after -q
+	for i := start; i <= len(args); i++ {
+		if i == len(args) || args[i] == "!" {
+			elements = append(elements, args[start:i])
+			start = i + 1
+		}
+	}
+	if len(elements) < 2 || elements[0][0] != "pipewiresrc" {
+		t.Fatalf("pipeline elements = %q", elements)
+	}
+	for _, property := range elements[0][1:] {
+		if name, _, _ := strings.Cut(property, "="); name != "fd" && name != "path" {
+			t.Errorf("pipewiresrc property %q; its timestamps or keepalive must not be relied on", property)
+		}
+	}
+	if !slices.Equal(elements[1], []string{"imagefreeze", "is-live=true", "allow-replace=true"}) {
+		t.Errorf("element after pipewiresrc = %q, want live replacing imagefreeze", elements[1])
+	}
+	rate := fmt.Sprintf("video/x-raw,framerate=%d/1,width=1280,height=800", captureFramerate)
+	if i := slices.IndexFunc(elements, func(e []string) bool { return slices.Equal(e, []string{rate}) }); i < 2 {
+		t.Errorf("encoder rate caps %s at element %d, want after imagefreeze", rate, i)
+	}
+	for _, element := range elements {
+		if element[0] == "videorate" {
+			t.Errorf("videorate retimes from source timestamps: %q", element)
 		}
 	}
 }

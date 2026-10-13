@@ -820,8 +820,8 @@ The RPM declares these as weak `Recommends`, not hard dependencies, so server
 installs stay lean:
 
 - `pipewire-gstreamer`, which provides `pipewiresrc`.
-- `gstreamer1-plugins-good`, which provides `vp8enc`, `rtpvp8pay` and
-  `rtpstreampay`.
+- `gstreamer1-plugins-good`, which provides `imagefreeze`, `vp8enc`,
+  `rtpvp8pay` and `rtpstreampay`.
 - `gstreamer1`, which provides `gst-launch-1.0` (installed under `/usr/sbin` on
   Fedora 44; the helper resolves it through `PATH`).
 

@@ -2691,8 +2691,11 @@ Each side sends its complete current state, never a stream of events:
      is a separate switch in that dialog, off by default. Sharing without it
      grants viewing but no input. Keyboard-off policy requests no keyboard device;
      pointer authority does not imply a keyboard capability.
-   - The PipeWire remote is passed to `gst-launch-1.0` (`pipewiresrc` → VP8 →
-     RTP), and the RTP packets are forwarded into a pion WebRTC peer. On a
+   - The PipeWire remote is passed to `gst-launch-1.0` (`pipewiresrc` → live
+     `imagefreeze` → VP8 → RTP), and the RTP packets are forwarded into a pion
+     WebRTC peer. `imagefreeze` keeps the newest frame and emits it at 15 fps in
+     pipeline running time, so neither PipeWire's source timestamps nor its
+     keepalive are used (both stall on Mutter 40 with PipeWire 1.4). On a
      session with clipboard access the remote is requested only after the
      portal has forwarded the clipboard owner announcement that follows Start,
      which portal 1.21.1 would otherwise deadlock on

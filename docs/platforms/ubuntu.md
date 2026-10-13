@@ -1013,8 +1013,8 @@ The DEB declares these as `Recommends`, not hard dependencies, so server install
 stay lean:
 
 - `gstreamer1.0-pipewire`, which provides `pipewiresrc`.
-- `gstreamer1.0-plugins-good`, which provides `vp8enc`, `rtpvp8pay` and
-  `rtpstreampay`.
+- `gstreamer1.0-plugins-good`, which provides `imagefreeze`, `vp8enc`,
+  `rtpvp8pay` and `rtpstreampay`.
 - `gstreamer1.0-tools`, which provides `gst-launch-1.0`.
 
 The helper checks all eight elements with `gst-inspect-1.0`. If any is missing it

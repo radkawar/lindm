@@ -15,7 +15,7 @@ const (
 
 // gstElements are the GStreamer elements the capture pipeline requires.
 var gstElements = []string{
-	"pipewiresrc", "videorate", "videoconvert", "videoscale",
+	"pipewiresrc", "imagefreeze", "videoconvert", "videoscale",
 	"vp8enc", "rtpvp8pay", "rtpstreampay", "fdsink",
 }
 
@@ -45,6 +45,14 @@ func scaledSize(width, height int) (int, int, bool) {
 // PipeWire node nodeID through the portal remote inherited as fd 3 and
 // writes RFC 4571 framed VP8 RTP to stdout. When the portal did not report
 // the stream size the frame is not rescaled.
+//
+// pipewiresrc timestamps are not used. A compositor that attaches no
+// SPA_META_Header (Mutter 40) gets the same stale graph-cycle time on every
+// damage frame, and before PipeWire 1.6 a keepalive resend carries the
+// absolute clock, on which GstBaseSrc then waits far past running time. So
+// keepalive stays off and imagefreeze, live, re-stamps instead: it keeps the
+// newest frame and emits it at captureFramerate in clock running time, also
+// while an idle damage-driven desktop sends nothing.
 func gstArguments(nodeID uint32, width, height int) []string {
 	caps := fmt.Sprintf("video/x-raw,framerate=%d/1", captureFramerate)
 	if w, h, ok := scaledSize(width, height); ok {
@@ -52,8 +60,8 @@ func gstArguments(nodeID uint32, width, height int) []string {
 	}
 	return []string{
 		"-q",
-		"pipewiresrc", "fd=3", "path=" + strconv.FormatUint(uint64(nodeID), 10), "keepalive-time=500",
-		"!", "videorate",
+		"pipewiresrc", "fd=3", "path=" + strconv.FormatUint(uint64(nodeID), 10),
+		"!", "imagefreeze", "is-live=true", "allow-replace=true",
 		"!", "videoconvert",
 		"!", "videoscale",
 		"!", caps,

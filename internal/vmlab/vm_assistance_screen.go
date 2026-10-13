@@ -314,12 +314,19 @@ func portalShareSensitive(img *image.RGBA, dialog image.Rectangle) bool {
 	return shareAccent*10 >= 52*20 || shareDarkest <= cancelDarkest+40
 }
 
+// centreWindowThreshold is any change in a lossless screendump of a static
+// wallpaper. A window replaces the pixels outright, but it can match the
+// wallpaper closely: Rocky 9's dark gnome-terminal (29,29,27) over its navy
+// wallpaper (8,19,29) moved only the wallpaper's grey stripes, 36% of the
+// square, by more than screenDiffThreshold.
+const centreWindowThreshold = 8
+
 // centreChanged reports whether a window now covers the display centre, by
 // comparing a central square with the clean reference.
 func centreChanged(reference, current *image.RGBA) bool {
 	display := current.Bounds()
 	centre := image.Pt(display.Min.X+display.Dx()/2, display.Min.Y+display.Dy()/2)
-	_, count := screenDiffBounds(reference, current, image.Rect(centre.X-120, centre.Y-120, centre.X+120, centre.Y+120), screenDiffThreshold)
+	_, count := screenDiffBounds(reference, current, image.Rect(centre.X-120, centre.Y-120, centre.X+120, centre.Y+120), centreWindowThreshold)
 	return count >= 240*240/2
 }
 

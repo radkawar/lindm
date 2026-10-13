@@ -11674,6 +11674,51 @@
       "recoveryManifest": "rhel-9.8-kvm-x86-64",
       "recoveryManifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "rocky-9",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "rocky-9.8-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/elcapture2-rocky9-x86-20261013T011312Z/rocky-9/assistance-x86_64/assistance.json",
+      "sha256": "5a148e54db979498c12ea631cefa98e303a877552157b52acb1fa5ad71021758",
+      "recorded": "2026-10-13T05:41:49.943784720Z",
+      "revision": "de1e5167440b9618f4d690b2d2df9b0e7243e7a6",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "7a6591c243bc0630a31dffb4f392663f9c29f9ff374713258d3821bf45437392",
+      "mainlineRevision": "d1f3a848dd2d569dbfc5708adacdee3908f3f5ae"
+    },
+    {
+      "platform": "rocky-9",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "rocky-9.8-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/elcapture3-rocky9-x86-20261013T131612Z/rocky-9/assistance-x86_64/assistance.json",
+      "sha256": "bd3ee89418ff41c3a168fff89801cc1ba071b3c5cc908ee18c3c6b41e0f34bfc",
+      "recorded": "2026-10-13T14:58:28.082994017Z",
+      "revision": "2a3e3034c040a1930e53cd57e3b470f6dfdc5585",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "7a6591c243bc0630a31dffb4f392663f9c29f9ff374713258d3821bf45437392",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/elcapture2-ubuntu2404-x86-20261013T011424Z/assistance.json",
+      "sha256": "f0b80ee69d193858e0bc118799b414152a6729372ff285be28681d04f07cc4ca",
+      "recorded": "2026-10-13T05:45:41.996113845Z",
+      "revision": "5f20afb2c70f2167539fd5dc3a210309c8253788",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#el-9-assistance-capture-re-timestamping-2026-10-13",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
     }
   ]
 }
