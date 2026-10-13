@@ -566,7 +566,9 @@ helpers name `/lib64/ld-linux-x86-64.so.2`, but its `libc.so.6` names
 descriptor, so native NVMe admin commands use `NVME_IOCTL_ADMIN_CMD` directly
 (see [architecture](../architecture.md)).
 
-Native qualification (2026-10-12): the x86_64 `recovery-sanitize` cell passed.
+Native qualification (2026-10-12): the x86_64 `recovery-sanitize` cell passed;
+it was rerun above the matrix's 9b4e6f5f requalification floor on 2026-10-13
+(main `35d88958`) and passed again (second row).
 The run used the original enrolled device and generation on the revision-3
 ordinary systemd-boot golden. The lab enrolled a short-lived owner signer into
 a private copy of the Microsoft-enrolled OVMF variables and cold-booted. It then
@@ -577,6 +579,7 @@ native NVMe user-data format of the original namespace.
 | Record                                                                                           | SHA-256                                                            |
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
 | `~/.cache/lindm-tier2-matrix/arch-recovery-final-r9-0c1dae2f/arch/recovery-sanitize-x86_64.json` | `9dceb84e427c18cd38f2bbbc004ac73d027771c1a768bc6e312b167b2c64c942` |
+| `~/.cache/lindm-arch-qualify/r27/arch/recovery-sanitize-x86_64.json`                             | `d73d354a74f3c550d1e5627e7dd04834d2cdd8ff3a09f03326a84ad88a11e487` |
 
 This is an emulated QEMU NVMe, swtpm and package-pinned OVMF result with a lab
 signer. It is not a fleet signing key, a physical firmware enrollment or flash

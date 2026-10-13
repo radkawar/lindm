@@ -12204,6 +12204,25 @@
       "verified": true,
       "manifestSha256": "d550e448f0140b1752ed0e01b07b3abc15eab2dd94149613ebad37c66adaf4f5",
       "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "arch",
+      "cell": "recovery-sanitize",
+      "architecture": "x86_64",
+      "manifest": "arch-20261001-encrypted-systemd-boot-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-arch-qualify/r27/arch/recovery-sanitize-x86_64.json",
+      "sha256": "d73d354a74f3c550d1e5627e7dd04834d2cdd8ff3a09f03326a84ad88a11e487",
+      "recorded": "2026-10-13T19:48:24.692888278Z",
+      "revision": "35d8895887138fb37c1415bc19ce8d7889cb8532",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "886d69487ebcb99f03847d708c847de56af46b90147bb13b69c335c135c0950e",
+      "repositorySnapshotDate": "2026-10-02",
+      "recoveryManifest": "arch-20261001-systemd-boot-x86-64",
+      "recoveryManifestSha256": "b2525fc660b5969bb351151c7de410e29f914a789be19e61639aebc0c3ee5430",
+      "recoveryRepositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "35d8895887138fb37c1415bc19ce8d7889cb8532"
     }
   ]
 }
