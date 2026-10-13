@@ -31,9 +31,11 @@ const (
 // returned as the canonical table name ("" when none is listed).
 //   - GNOME: gnome-shell's shield sets LockedHint on every lock (Ubuntu 24.04
 //     GNOME 46, Fedora 44 GNOME 50).
-//   - COSMIC: cosmic-greeter (epoch 1.x) locks only on logind Session.Lock and
-//     PrepareForSleep; Super+Escape and idle run `loginctl lock-session`, the
-//     panel applet calls Session.Lock; it never sets LockedHint.
+//   - COSMIC: cosmic-greeter (Pop!_OS 24.04: 0.1.0 ae627ab, 1.10.0 98df07d)
+//     locks only on logind Session.Lock and PrepareForSleep; Super+Escape and
+//     idle run `loginctl lock-session`, the panel applet calls Session.Lock;
+//     it never sets LockedHint. logind LockSessions engaged it natively
+//     (pop2404-lock-quarantine-11).
 //   - X-Cinnamon: cinnamon-screensaver 6.6 engages on logind Lock but never
 //     sets LockedHint and also locks directly (Mint 22.3,
 //     mint223-lock-quarantine-01).

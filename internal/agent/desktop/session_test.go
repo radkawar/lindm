@@ -186,7 +186,7 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 		default:
 		}
 	})
-	// cosmic-notifications 1.10 advertises actions but shows no buttons, and
+	// cosmic-notifications advertises actions but shows no buttons, and
 	// activating its card invokes the first action (allow): pop2404-assistance-04.
 	t.Run("hidden actions", func(t *testing.T) {
 		h := newHarness(t)

@@ -2700,7 +2700,7 @@ Each side sends its complete current state, never a stream of events:
      reduced to view.
    - It refuses a notification server that advertises actions but shows no
      action buttons, by its `GetServerInformation` name from an explicit table
-     in `internal/platform`. cosmic-notifications 1.10 (Pop!\_OS 24.04) renders
+     in `internal/platform`. cosmic-notifications (Pop!\_OS 24.04) renders
      only the summary, body and a close button, and activating the card invokes
      the first action. The session ends `UNAVAILABLE`
      (`notification_actions_hidden`) after the portal check and before any

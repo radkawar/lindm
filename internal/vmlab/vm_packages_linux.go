@@ -247,6 +247,21 @@ func (p *nativeGuestPackages) command(ctx context.Context, step, command string,
 	return nil
 }
 
+// aptMetadataCommand runs apt-get update against the lab's public fixture
+// repository. Its output names only that repository and APT's own errors, so
+// a failure carries it: on Pop!_OS 24.04 the step failed with exit 100 and no
+// other evidence (pop2404-assistance-06..08).
+func (p *nativeGuestPackages) aptMetadataCommand(ctx context.Context) error {
+	result, err := p.result(ctx, p.aptCommand("update"), nil)
+	if err != nil {
+		return fmt.Errorf("authenticate APT metadata: %w", err)
+	}
+	if result.ExitCode != 0 {
+		return fmt.Errorf("authenticate APT metadata: native guest exit %d (stdout %q, stderr %q)", result.ExitCode, bytes.TrimSpace(result.Stdout), bytes.TrimSpace(result.Stderr))
+	}
+	return nil
+}
+
 func (p *nativeGuestPackages) uploadBytes(ctx context.Context, destination string, data []byte) error {
 	hash := sha256.Sum256(data)
 	return p.command(ctx, "upload native public input", "umask 022; cat > "+nativeQuote(destination)+"; printf '%s  %s\\n' "+nativeQuote(hex.EncodeToString(hash[:]))+" "+nativeQuote(destination)+" | sha256sum --check --status", bytes.NewReader(data))
@@ -336,11 +351,22 @@ func (p *nativeGuestPackages) startAPT(ctx context.Context, repo *packaging.APTR
 	if err := p.uploadBytes(ctx, nativeGuestDir+"/source.sources", []byte(source)); err != nil {
 		return err
 	}
+	if err := p.uploadBytes(ctx, nativeGuestDir+"/apt.conf", []byte(aptIsolationConfig)); err != nil {
+		return err
+	}
 	return p.command(ctx, "reset isolated APT cache", "rm -rf "+nativeGuestDir+"/lists "+nativeGuestDir+"/archives; install -d -m 0755 "+nativeGuestDir+"/lists "+nativeGuestDir+"/archives", nil)
 }
 
+// aptIsolationConfig clears the system's APT::Update hooks for the fixture
+// update. They refresh system state, not the isolated lists: Pop!_OS 24.04's
+// command-not-found Post-Invoke-Success hook raced the vendor updater's own
+// cnf-update-db ("attempt to write a readonly database") and failed the step
+// under Error-Mode=any (pop2404-assistance-09). apt-get reads -c files after
+// apt.conf.d, so #clear removes the hooks configured there.
+const aptIsolationConfig = "#clear APT::Update::Pre-Invoke;\n#clear APT::Update::Post-Invoke;\n#clear APT::Update::Post-Invoke-Success;\n"
+
 func (p *nativeGuestPackages) aptCommand(action string) string {
-	return "apt-get -q -y -o Dir::Etc::sourcelist=" + nativeGuestDir + "/source.sources -o Dir::Etc::sourceparts=" + nativeGuestDir + "/empty -o Dir::Etc::trusted=" + nativeGuestDir + "/empty/trusted.gpg -o Dir::Etc::trustedparts=" + nativeGuestDir + "/empty -o Dir::State::lists=" + nativeGuestDir + "/lists -o Dir::Cache::archives=" + nativeGuestDir + "/archives -o Acquire::Retries=0 -o Acquire::http::Proxy=false -o Acquire::http::Timeout=20 -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false -o APT::Update::Error-Mode=any " + action
+	return "apt-get -q -y -c " + nativeGuestDir + "/apt.conf -o Dir::Etc::sourcelist=" + nativeGuestDir + "/source.sources -o Dir::Etc::sourceparts=" + nativeGuestDir + "/empty -o Dir::Etc::trusted=" + nativeGuestDir + "/empty/trusted.gpg -o Dir::Etc::trustedparts=" + nativeGuestDir + "/empty -o Dir::State::lists=" + nativeGuestDir + "/lists -o Dir::Cache::archives=" + nativeGuestDir + "/archives -o Acquire::Retries=0 -o Acquire::http::Proxy=false -o Acquire::http::Timeout=20 -o Acquire::AllowInsecureRepositories=false -o Acquire::AllowDowngradeToInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false -o APT::Update::Error-Mode=any " + action
 }
 
 func (p *nativeGuestPackages) dnfCommand(action string) string {
@@ -370,7 +396,7 @@ func (p *nativeGuestPackages) rpmInstallCommand(destination string, upgrade bool
 func (p *nativeGuestPackages) install(ctx context.Context, artifact packaging.Artifact, upgrade bool) error {
 	switch artifact.Format {
 	case packaging.FormatDEB:
-		if err := p.command(ctx, "authenticate APT metadata", p.aptCommand("update"), nil); err != nil {
+		if err := p.aptMetadataCommand(ctx); err != nil {
 			return err
 		}
 		action := "install --no-install-recommends "

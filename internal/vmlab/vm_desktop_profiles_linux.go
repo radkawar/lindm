@@ -221,7 +221,7 @@ case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) ech
 		locker:     "cosmic-greeter locker journal (session locked/unlocked)",
 		lockedHint: false,
 		logindLock: true,
-		// cosmic-notifications 1.10 shows the consent prompt without its
+		// cosmic-notifications (0.1.0 and 1.10.0) shows the consent prompt without its
 		// Allow/Decline buttons (pop2404-assistance-04), so VIEW is refused
 		// before consent. xdg-desktop-portal-cosmic 0.1.0pop1 has no
 		// RemoteDesktop, which refuses CONTROL first.

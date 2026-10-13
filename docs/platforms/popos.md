@@ -12,31 +12,31 @@ Ubuntu, but **no Ubuntu evidence carries over** to it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability           | Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                       |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| inventory            | implemented                                                                                                                                                                                                                                              |
-| lifecycle            | implemented                                                                                                                                                                                                                                              |
-| dispatch             | implemented                                                                                                                                                                                                                                              |
-| packages             | implemented                                                                                                                                                                                                                                              |
-| accounts             | implemented                                                                                                                                                                                                                                              |
-| sysctl               | implemented                                                                                                                                                                                                                                              |
-| definitions          | implemented                                                                                                                                                                                                                                              |
-| password             | implemented                                                                                                                                                                                                                                              |
-| firewall             | implemented                                                                                                                                                                                                                                              |
-| encryption           | implemented                                                                                                                                                                                                                                              |
-| wipe                 | implemented                                                                                                                                                                                                                                              |
-| report-loss          | implemented                                                                                                                                                                                                                                              |
-| lock                 | implemented                                                                                                                                                                                                                                              |
-| recovery-sanitize    | gated: original-device recovery requires Secure Boot; Pop!\_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot     |
-| self-update          | implemented                                                                                                                                                                                                                                              |
-| assistance           | gated: notification_actions_hidden: cosmic-notifications 1.10 advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1 |
-| assistance-clipboard | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                            |
-| assistance-keyboard  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                            |
-| assistance-displays  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                            |
-| assistance-messages  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                            |
-| advisories           | partial: vendor feed unavailable for Pop!\_OS packages                                                                                                                                                                                                   |
-| os-update            | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                                  |
-| release-upgrade      | gated: release upgrade is not implemented                                                                                                                                                                                                                |
+| Capability           | Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory            | implemented                                                                                                                                                                                                                                                                                     |
+| lifecycle            | implemented                                                                                                                                                                                                                                                                                     |
+| dispatch             | implemented                                                                                                                                                                                                                                                                                     |
+| packages             | implemented                                                                                                                                                                                                                                                                                     |
+| accounts             | implemented                                                                                                                                                                                                                                                                                     |
+| sysctl               | implemented                                                                                                                                                                                                                                                                                     |
+| definitions          | implemented                                                                                                                                                                                                                                                                                     |
+| password             | implemented                                                                                                                                                                                                                                                                                     |
+| firewall             | implemented                                                                                                                                                                                                                                                                                     |
+| encryption           | implemented                                                                                                                                                                                                                                                                                     |
+| wipe                 | implemented                                                                                                                                                                                                                                                                                     |
+| report-loss          | implemented                                                                                                                                                                                                                                                                                     |
+| lock                 | implemented                                                                                                                                                                                                                                                                                     |
+| recovery-sanitize    | gated: original-device recovery requires Secure Boot; Pop!\_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot                                            |
+| self-update          | implemented                                                                                                                                                                                                                                                                                     |
+| assistance           | gated: notification_actions_hidden: cosmic-notifications (0.1.0 on the ISO, 1.10.0 from the archive) advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1 |
+| assistance-clipboard | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
+| assistance-keyboard  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
+| assistance-displays  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
+| assistance-messages  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
+| advisories           | partial: vendor feed unavailable for Pop!\_OS packages                                                                                                                                                                                                                                          |
+| os-update            | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                                                                         |
+| release-upgrade      | gated: release upgrade is not implemented                                                                                                                                                                                                                                                       |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -135,20 +135,23 @@ installation time.
   image also lacks `gstreamer1.0-pipewire`, which the agent package recommends.
   Assistance CONTROL therefore ends `UNAVAILABLE`
   `portal_remote_desktop_unavailable` before consent.
-- **Notifications.** cosmic-notifications 1.10 (`1.10.0~1791314632~24.04~1e4c1f1`)
-  advertises the `actions` capability but renders only the summary, body and a
-  close button. Activating the card invokes the `default` action, else the first
-  action (`src/app.rs` `activate_notification`). Natively observed in
+- **Notifications.** cosmic-notifications, both the ISO's
+  `0.1.0~1785437935~24.04~7837e49` and the archive's
+  `1.10.0~1791314632~24.04~1e4c1f1`, advertises the `actions` capability but
+  renders only the summary, body and a close button. Activating the card invokes
+  the `default` action, else the first action (`src/app.rs`
+  `activate_notification`). Natively observed on 1.10.0 in
   `pop2404-assistance-04`: the lindm consent prompt showed no Allow or Decline.
   The session helper therefore refuses VIEW before any prompt with `UNAVAILABLE`
-  `notification_actions_hidden`, and the registry gates assistance with that
-  reason.
-- **Lock.** cosmic-greeter 1.10 (`98df07d`) locks only on logind `Session.Lock`
-  and `PrepareForSleep` (`src/logind.rs`). The lock-screen shortcut and idle
-  action run `loginctl lock-session` (cosmic-settings-daemon
-  `data/system_actions.ron`, cosmic-idle), and the panel power applet calls
-  logind `Session.Lock`. These are source facts; natively, logind `LockSessions`
-  engaged the locker (`pop2404-lock-quarantine-10`). cosmic-greeter never sets
+  `notification_actions_hidden` (`pop2404-assistance-10` on 0.1.0), and the
+  registry gates assistance with that reason.
+- **Lock.** cosmic-greeter, both the ISO's `0.1.0` (`ae627ab`) and the archive's
+  `1.10.0` (`98df07d`), locks only on logind `Session.Lock` and `PrepareForSleep`
+  (`src/logind.rs`). The lock-screen shortcut and idle action run
+  `loginctl lock-session` (cosmic-settings-daemon `data/system_actions.ron`,
+  cosmic-idle), and the panel power applet calls logind `Session.Lock`. These are
+  source facts; natively, logind `LockSessions` engaged the locker
+  (`pop2404-lock-quarantine-11`). cosmic-greeter never sets
   `LockedHint`, so a lock action ends `OUTCOME_UNKNOWN`/`OBSERVATION` with
   `session_lock_state_unreported`; release does not unlock the desktop. Its
   "session locked"/"session unlocked" journal lines are logged at info under a

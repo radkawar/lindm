@@ -782,7 +782,7 @@ var registry = []*Release{
 		Advisory: Advisory{VendorOrigins: []string{"pop-os-release", "system76"}, Partial: "vendor feed unavailable for Pop!_OS packages"},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock}),
 		Gates: gates(string(RecoverySanitize), "original-device recovery requires Secure Boot; "+popUnsignedBoot,
-			string(Assistance), "notification_actions_hidden: cosmic-notifications 1.10 advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1"),
+			string(Assistance), "notification_actions_hidden: cosmic-notifications (0.1.0 on the ISO, 1.10.0 from the archive) advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1"),
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),
