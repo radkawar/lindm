@@ -3190,6 +3190,16 @@ Publication records include cache-hit state and artifact preparation seconds;
 tool failures include elapsed time. Cache reuse never substitutes for the two
 independent unsigned package builds or native enrollment proof.
 
+Before replacing HOME, release builds resolve the caller's real Go executable
+from `go env GOROOT` and the real Node runtime from `process.execPath`.
+They require the exact `go.mod` Go version and `.node-version` Node version;
+errors name the expected pin and selected executable. Both independent builders
+invoke these absolute paths, including Go module inspection and npm's resolved
+CLI through that Node runtime. Child tool lookup also puts their real binary
+directories first. Each builder still owns separate HOME, Go and npm caches;
+mise shims do not run inside those isolated homes, and no ambient Go/npm or
+signing credentials enter the build.
+
 The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
 Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
 x86_64/aarch64, including native aarch64 on a

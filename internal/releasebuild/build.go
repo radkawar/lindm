@@ -45,6 +45,7 @@ import (
 type Request struct {
 	Repository, Output, Version, Revision string
 	SourceDateEpoch                       int64
+	tools                                 buildToolchain
 	PackageSigner                         packaging.SigningKey
 	AttestationSigner                     AttestationKey
 	OCICABundle, OCICASHA256              string
@@ -139,6 +140,10 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 		}
 	}()
 	source, sourceDigest, err := captureBuildSource(ctx, work, request.Repository, caBundle)
+	if err != nil {
+		return nil, err
+	}
+	request.tools, err = resolveBuildToolchain(ctx, request.Repository, source)
 	if err != nil {
 		return nil, err
 	}
@@ -307,9 +312,9 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 			return nil, err
 		}
 	}
-	environment := builderEnvironment(root, request.SourceDateEpoch)
+	environment := builderEnvironment(root, request.SourceDateEpoch, request.tools)
 	observation := &releasev1.BuildObservation{SourceSha256: captured, StartedAt: time.Now().UTC().Format(time.RFC3339Nano), ToolVersions: map[string]string{}, UnsignedSha256: map[string]string{}, BinarySha256: map[string]string{}}
-	if err := observeToolchain(ctx, checkout, environment, observation); err != nil {
+	if err := observeToolchain(ctx, checkout, environment, request.tools, observation); err != nil {
 		return nil, err
 	}
 	result := &buildOutput{observation: observation}
@@ -321,14 +326,14 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 
 func buildProducts(ctx context.Context, root string, request Request, result *buildOutput, products []string, bundle string) error {
 	checkout := filepath.Join(root, "source")
-	environment := builderEnvironment(root, request.SourceDateEpoch)
+	environment := builderEnvironment(root, request.SourceDateEpoch, request.tools)
 	observation := result.observation
 	var npmBOM []byte
 	if bundle != "" {
-		if _, err := command(ctx, checkout, environment, "npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
+		if _, err := command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
 			return err
 		}
-		if _, err := command(ctx, checkout, environment, "npm", "run", "build:web"); err != nil {
+		if _, err := command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "run", "build:web"); err != nil {
 			return err
 		}
 		var err error
@@ -340,7 +345,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 		if err != nil {
 			return err
 		}
-		npmBOM, err = command(ctx, checkout, environment, "npm", "sbom", "--sbom-format=cyclonedx")
+		npmBOM, err = command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "sbom", "--sbom-format=cyclonedx")
 		if err != nil {
 			return err
 		}
@@ -350,7 +355,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 	helper := filepath.Join(root, "bin", "lab")
 	hostEnvironment := append(append([]string{}, environment...), "GOARCH="+runtime.GOARCH)
 	if bundle == "" {
-		if _, err := command(ctx, checkout, hostEnvironment, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-o", helper, "./cmd/lab"); err != nil {
+		if _, err := command(ctx, checkout, hostEnvironment, request.tools.goBinary, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-o", helper, "./cmd/lab"); err != nil {
 			return err
 		}
 	}
@@ -359,7 +364,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 		for _, product := range products {
 			binary := filepath.Join(root, "bin", product+"-"+arch)
 			flags := "-buildid= -X lindm/internal/agent/buildinfo.Version=" + request.Version + " -X lindm/internal/agent/buildinfo.Revision=" + request.Revision
-			if _, err := command(ctx, checkout, env, "go", "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", binary, "./cmd/"+product); err != nil {
+			if _, err := command(ctx, checkout, env, request.tools.goBinary, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", binary, "./cmd/"+product); err != nil {
 				return err
 			}
 			binaryDigest, _, err := digestFile(binary)
@@ -367,7 +372,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 				return err
 			}
 			observation.BinarySha256[product+"/"+arch] = binaryDigest
-			bom, err := sbom(ctx, checkout, env, product, request.Version, arch, npmBOM)
+			bom, err := sbom(ctx, checkout, env, product, request.Version, arch, npmBOM, request.tools.goBinary)
 			if err != nil {
 				return err
 			}
@@ -423,8 +428,10 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 
 // builderEnvironment isolates one builder's HOME, Go and npm caches and pins
 // the toolchain, target OS and source epoch.
-func builderEnvironment(root string, sourceDateEpoch int64) []string {
+func builderEnvironment(root string, sourceDateEpoch int64, tools buildToolchain) []string {
 	return []string{
+		"PATH=" + filepath.Dir(tools.goBinary) + string(os.PathListSeparator) + filepath.Dir(tools.nodeBinary) + string(os.PathListSeparator) + os.Getenv("PATH"),
+		"GOROOT=" + tools.goRoot,
 		"HOME=" + filepath.Join(root, "home"),
 		"GOCACHE=" + filepath.Join(root, "go-cache"),
 		"GOMODCACHE=" + filepath.Join(root, "go-mod"),
@@ -440,34 +447,24 @@ func builderEnvironment(root string, sourceDateEpoch int64) []string {
 
 // observeToolchain records the builder's tool versions and requires the Node and
 // Go versions pinned by the captured source.
-func observeToolchain(ctx context.Context, checkout string, environment []string, observation *releasev1.BuildObservation) error {
-	for _, tool := range []string{"go", "node", "npm", "dpkg-deb", "rpmbuild"} {
-		arg := "--version"
-		if tool == "go" {
-			arg = "version"
-		}
-		version, err := command(ctx, checkout, environment, tool, arg)
+func observeToolchain(ctx context.Context, checkout string, environment []string, tools buildToolchain, observation *releasev1.BuildObservation) error {
+	for _, tool := range []struct {
+		name, path string
+		args       []string
+	}{
+		{"go", tools.goBinary, []string{"version"}},
+		{"node", tools.nodeBinary, []string{"--version"}},
+		{"npm", tools.nodeBinary, []string{tools.npmCLI, "--version"}},
+		{"dpkg-deb", "dpkg-deb", []string{"--version"}},
+		{"rpmbuild", "rpmbuild", []string{"--version"}},
+	} {
+		version, err := command(ctx, checkout, environment, tool.path, tool.args...)
 		if err != nil {
 			return err
 		}
-		observation.ToolVersions[tool] = strings.TrimSpace(string(version))
+		observation.ToolVersions[tool.name] = strings.TrimSpace(string(version))
 	}
-	nodePin, err := readBounded(filepath.Join(checkout, ".node-version"), 128)
-	if err != nil {
-		return err
-	}
-	if strings.TrimPrefix(observation.ToolVersions["node"], "v") != strings.TrimSpace(string(nodePin)) {
-		return errors.New("releasebuild: Node version differs from pinned source")
-	}
-	goMod, err := readBounded(filepath.Join(checkout, "go.mod"), maxDocument)
-	if err != nil {
-		return err
-	}
-	goPin := regexp.MustCompile(`(?m)^go ([0-9.]+)$`).FindSubmatch(goMod)
-	if len(goPin) != 2 || !strings.Contains(observation.ToolVersions["go"], "go"+string(goPin[1])+" ") {
-		return errors.New("releasebuild: Go version differs from pinned source")
-	}
-	return nil
+	return checkBuildToolVersions(tools, observation.ToolVersions["go"], observation.ToolVersions["node"])
 }
 
 // packageArgs is the captured packaging helper's command line for one product

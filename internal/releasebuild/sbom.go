@@ -25,8 +25,8 @@ type goPackage struct {
 	Standard   bool
 }
 
-func sbom(ctx context.Context, source string, environment []string, product, version, arch string, npmDocument []byte) ([]byte, error) {
-	data, err := command(ctx, source, environment, "go", "list", "-mod=readonly", "-deps", "-json", "./cmd/"+product)
+func sbom(ctx context.Context, source string, environment []string, product, version, arch string, npmDocument []byte, goBinary string) ([]byte, error) {
+	data, err := command(ctx, source, environment, goBinary, "list", "-mod=readonly", "-deps", "-json", "./cmd/"+product)
 	if err != nil {
 		return nil, err
 	}

@@ -26,7 +26,7 @@ func command(ctx context.Context, dir string, environment []string, name string,
 	stdout, stderr := nativeexec.NewBuffer(maxDocument), nativeexec.NewBuffer(maxDocument)
 	env := append([]string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C", "TZ=UTC"}, environment...)
 	bound := 15 * time.Minute
-	if name == "go" && len(args) > 0 && args[0] == "build" {
+	if filepath.Base(name) == "go" && len(args) > 0 && args[0] == "build" {
 		// Isolated cold compiler caches compete with the native lab on one host.
 		bound = 45 * time.Minute
 	}
