@@ -133,6 +133,7 @@
   ],
   "vendorAdvisoryHosts": [
     "access.redhat.com",
+    "security.access.redhat.com",
     "www.redhat.com",
     "ubuntu.com",
     "www.ubuntu.com",
@@ -142,6 +143,7 @@
     "bodhi.fedoraproject.org",
     "fedoraproject.org",
     "www.suse.com",
+    "ftp.suse.com",
     "www.opensuse.org",
     "lists.opensuse.org",
     "security.archlinux.org",

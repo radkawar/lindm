@@ -1038,6 +1038,29 @@ async function main() {
       summarize(entry);
       report.results.push(entry);
     }
+    // Bundled reference documents are not primary console copy. Capture their
+    // real server rendering separately so the design review covers local help.
+    report.helpScreenshots = [];
+    for (const { theme, viewport } of combos) {
+      const page = pages[0];
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      for (const path of ["/help", "/help/security-and-operations.md"]) {
+        const response = await page.goto(`${config.origin}${path}`, {
+          waitUntil: "domcontentloaded",
+        });
+        if (!response?.ok()) throw new Error(`local_help_unavailable: ${path}`);
+        await page.evaluate(() => document.fonts.ready);
+        const prefix = `${slug(path)}-${theme}-${viewport.name}`;
+        report.helpScreenshots.push({
+          path,
+          theme,
+          viewport: viewport.name,
+          viewportScreenshot: await screenshot(page, `${prefix}.png`, false),
+          fullScreenshot: await screenshot(page, `${prefix}-full.png`, true),
+        });
+      }
+    }
   } finally {
     await driver.close();
   }
