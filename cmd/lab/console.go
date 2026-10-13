@@ -46,6 +46,8 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	if *advisoryCache == "" {
 		*advisoryCache = filepath.Join(*repo, ".cache", "lab", "advisories")
 	}
+	started := time.Now()
+	_, _ = fmt.Fprintln(stderr, "lab console: preparing signed stock console artifact")
 	preparation, stopPreparation := context.WithTimeout(ctx, *artifactTimeout)
 	err := devlab.PrepareNativeEnrollmentRepository(preparation, *source)
 	stopPreparation()
@@ -58,6 +60,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	}
 	setup, cancel := context.WithTimeout(ctx, setupTimeout)
 	defer cancel()
+	_, _ = fmt.Fprintf(stderr, "lab console +%s: opening console fixture\n", time.Since(started).Round(time.Second))
 	fixture, err := devlab.OpenStockConsoleAuthorityFixture(setup, *repo, *source, *binary)
 	if err != nil {
 		return err
@@ -71,8 +74,13 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	var summary string
 	reporting := "devices stop reporting after population."
 	if *demo {
-		// The outer context: the route device keeps checking in until the console stops.
-		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache, FixtureFeeds: *feeds == "fixtures"})
+		// The outer context: the route device keeps checking in until the console
+		// stops. SeedDemo bounds and names each of its steps itself and reports
+		// progress on stderr, so an overrun fails with the step that overran. The
+		// refused package scan state, gated by the server's five-minute package
+		// admission interval, finishes in the background after the console is ready.
+		_, _ = fmt.Fprintf(stderr, "lab console +%s: seeding demo\n", time.Since(started).Round(time.Second))
+		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache, FixtureFeeds: *feeds == "fixtures", Progress: stderr, BackgroundPackageFailure: true})
 		if err != nil {
 			return err
 		}
@@ -89,9 +97,13 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 			summary += fmt.Sprintf("Historical host replay device: %s\nOriginal observation fields and collection times are preserved. Labels identify historical replay; package inventory and action results remain synthetic.\n", population.HistoricalDeviceID)
 		}
 	}
-	enrollment, err := fixture.CreateConsoleEnrollment(setup)
+	// Its own bound: the setup deadline covers opening the fixture and the
+	// capacity population, not a demo seed that bounds its own steps.
+	issue, cancelIssue := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancelIssue()
+	enrollment, err := fixture.CreateConsoleEnrollment(issue)
 	if err != nil {
-		return err
+		return fmt.Errorf("issue console owner enrollment: %w", err)
 	}
 	defer func() { enrollment.Secret = "" }()
 	_, err = fmt.Fprintf(stdout, "Protected disposable console lab — output contains a one-time enrollment secret.\nConsole origin: %s\nEnrollment URL: %s/enroll\nUsername: console-owner\nEnrollment secret (shown once): %s\nExpires at: %s\nOwned database: %s\n%sChoose a password and register a browser authenticator, then sign in.\nSynthetic inventory/results are not native device evidence; %s\nPress Ctrl-C to stop the server and remove only this fixture's database/resources.\n", fixture.ConsoleOrigin, fixture.ConsoleOrigin, enrollment.GetSecret(), enrollment.GetExpiresAt().AsTime().UTC().Format(time.RFC3339), fixture.DatabaseName, summary, reporting)

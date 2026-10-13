@@ -19,6 +19,39 @@ import (
 // the device's last package publication.
 const demoPackageAdmissionWait = 6 * time.Minute
 
+// packageFailureInBackground seeds the refused package scan state on devices
+// after an interactive seed returned, then releases them and the owner session
+// it inherited. Stopping the console first cancels it without error; any
+// other failure is reported at once and returned from DemoPresence.Stop.
+func (s *demoSeed) packageFailureInBackground(presence context.Context, devices []*simulatedDevice) (resultErr error) {
+	defer func() {
+		for _, d := range devices {
+			d.close()
+		}
+		cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		resultErr = errors.Join(resultErr, s.owner.Close(cleanup))
+	}()
+	ctx, cancel := context.WithTimeout(presence, demoEvaluationWait+demoPackageAdmissionWait+2*time.Minute)
+	defer cancel()
+	for _, d := range devices {
+		if err := s.denyPackageScan(ctx, d); err != nil {
+			if presence.Err() != nil {
+				return nil
+			}
+			err = fmt.Errorf("background demo refused package scan on %s: %w", d.demo.hostname, err)
+			if s.progress.out != nil {
+				_, _ = fmt.Fprintf(s.progress.out, "demo seed: %v\n", err)
+			}
+			return err
+		}
+	}
+	if s.progress.out != nil {
+		_, _ = fmt.Fprintf(s.progress.out, "demo seed +%s: background refused package scan state ready\n", time.Since(s.progress.start).Round(time.Second))
+	}
+	return nil
+}
+
 // denyPackageScan leaves d's real-feed findings standing on a device that is
 // no longer fully checked. After the server's own evaluation reports an
 // AFFECTED finding, the host reports a later package collection its collector

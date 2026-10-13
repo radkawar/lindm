@@ -10,10 +10,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -52,6 +54,40 @@ type DemoOptions struct {
 	// then unused. Only the Fedora controlled repository is complete, so
 	// accepted and proposed findings come from Fedora devices.
 	FixtureFeeds bool
+	// Progress, when set, receives one line per seed step with elapsed time,
+	// so a slow host shows where the time goes. It never receives secrets.
+	Progress io.Writer
+	// BackgroundPackageFailure returns once the console is usable and finishes
+	// the refused package scan state after return, under the presence: the
+	// server admits that report only five minutes after the device's enrollment
+	// inventory, which would otherwise dominate an interactive seed. Failures
+	// go to Progress and to DemoPresence.Stop. Review seeds leave it false so
+	// the state exists before any check runs.
+	BackgroundPackageFailure bool
+}
+
+// demoProgress names the current seed step for progress lines and errors.
+type demoProgress struct {
+	out   io.Writer
+	start time.Time
+	mu    sync.Mutex
+	step  string
+}
+
+func (p *demoProgress) begin(step string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.step = step
+	if p.out != nil {
+		// Progress is advisory; a closed terminal must not fail the seed.
+		_, _ = fmt.Fprintf(p.out, "demo seed +%s: %s\n", time.Since(p.start).Round(time.Second), step)
+	}
+}
+
+func (p *demoProgress) wrap(err error) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return fmt.Errorf("demo seed step %q failed after %s: %w", p.step, time.Since(p.start).Round(time.Second), err)
 }
 
 // Demo holds no credentials; safe to print/store as evidence.
@@ -98,14 +134,18 @@ type demoSeed struct {
 	demo         Demo
 	organization *orgv1.Organization
 	fixtureFeeds bool
+	progress     *demoProgress
+	// backgroundPackageFailure: see DemoOptions.BackgroundPackageFailure.
+	backgroundPackageFailure bool
 }
 
 // DemoPresence keeps the route device checking in after seeding, so the console
-// can request remote assistance and inventory refreshes from it. Stop ends it
-// and releases the device.
+// can request remote assistance and inventory refreshes from it, and finishes
+// any background seed step. Stop ends both and releases their devices.
 type DemoPresence struct {
-	cancel context.CancelFunc
-	done   chan error
+	cancel  context.CancelFunc
+	done    chan error
+	workers int
 }
 
 // demoPresenceInterval keeps the device inside the server's two-minute
@@ -115,7 +155,11 @@ const demoPresenceInterval = 30 * time.Second
 // Stop ends the presence loop and returns its check-in failure, if any.
 func (p *DemoPresence) Stop() error {
 	p.cancel()
-	return <-p.done
+	var err error
+	for range p.workers {
+		err = errors.Join(err, <-p.done)
+	}
+	return err
 }
 
 // SeedDemo applies the maintained organization and adds synthetic review history
@@ -135,6 +179,13 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		if resultErr != nil && presence != nil {
 			resultErr = errors.Join(resultErr, presence.Stop())
 			presence = nil
+		}
+	}()
+	progress := &demoProgress{out: options.Progress, start: time.Now()}
+	// Every failure, including a step's deadline, names the step that overran.
+	defer func() {
+		if resultErr != nil {
+			resultErr = progress.wrap(resultErr)
 		}
 	}()
 	if options.SourceDirectory == "" {
@@ -181,29 +232,45 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 			seen[device.release.Key] = true
 		}
 	}
-	// Initial vendor downloads/revalidation have their own bounded deadline,
-	// before the twenty-minute synthetic device seed (enrollment, scale writes
-	// and evaluation waits). Nil feeds select the checked-in fixtures.
-	origin, err := fixture.ConfigureConsoleDemo(ctx, feeds, options.AdvisoryCache)
+	// Feed configuration has its own bound: real exports may need the first
+	// vendor download, fixtures are local. The device seed after it has its own
+	// twenty minutes (enrollment, scale writes and evaluation waits). Nil feeds
+	// select the checked-in fixtures.
+	configureWait := 15 * time.Minute
+	if !options.FixtureFeeds {
+		configureWait = 2*time.Hour + 30*time.Minute
+	}
+	configureCtx, cancelConfigure := context.WithTimeout(ctx, configureWait)
+	defer cancelConfigure()
+	progress.begin("configure advisory feeds, relay and webhook")
+	origin, err := fixture.ConfigureConsoleDemo(configureCtx, feeds, options.AdvisoryCache)
 	if err != nil {
 		return Demo{}, nil, fmt.Errorf("configure console demo: %w", err)
 	}
-	if err := fixture.ConfigureAuthorization(ctx, organization.GetAuthorization()); err != nil {
+	progress.begin("configure organization authorization")
+	if err := fixture.ConfigureAuthorization(configureCtx, organization.GetAuthorization()); err != nil {
 		return Demo{}, nil, err
 	}
 	seedCtx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
+	progress.begin("open owner session")
 	r := &runner{fixture: fixture, metrics: &measurements{}, historicalHost: historical, demo: devices, options: Options{Packages: 1, EnrollmentWorkers: 4}}
 	if err := r.prepare(seedCtx); err != nil {
 		return Demo{}, nil, err
 	}
+	// An interactive seed hands the owner session to its background step.
+	ownerHandedOff := false
 	defer func() {
+		if ownerHandedOff {
+			return
+		}
 		cleanup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		resultErr = errors.Join(resultErr, r.owner.Close(cleanup))
 	}()
 	defer r.enrollmentTransport.CloseIdleConnections()
-	s := &demoSeed{runner: r, origin: origin, organization: organization, fixtureFeeds: options.FixtureFeeds}
+	s := &demoSeed{runner: r, origin: origin, organization: organization, fixtureFeeds: options.FixtureFeeds, backgroundPackageFailure: options.BackgroundPackageFailure, progress: progress}
+	progress.begin("apply enrollment organization")
 	// Provision enrollment prerequisites through the same organization engine.
 	// Rollouts freeze a real cohort at creation and cannot precede enrollment;
 	// their assignments are applied with the full spec after inventory arrives.
@@ -231,11 +298,13 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 			device.provisioningToken = ""
 		}
 	}()
+	progress.begin("enroll demo devices")
 	enrolled, err := r.enrollBatch(seedCtx, 0, len(devices))
 	var present *simulatedDevice
+	var background []*simulatedDevice
 	defer func() {
 		for _, device := range enrolled {
-			if device != present {
+			if device != present && !slices.Contains(background, device) {
 				device.close()
 			}
 		}
@@ -245,6 +314,7 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	}
 	// The demo approver reads as what it is: an admin, the least built-in role
 	// that can decide every approval kind, not a second owner.
+	progress.begin("open approver session")
 	if err := fixture.UseAdminApprover(seedCtx); err != nil {
 		return Demo{}, nil, fmt.Errorf("make demo approver an admin: %w", err)
 	}
@@ -261,14 +331,21 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	if err := s.seed(seedCtx, historical); err != nil {
 		return Demo{}, nil, err
 	}
+	progress.begin("ready")
 	present = enrolled[0]
 	presenceCtx, stop := context.WithCancel(ctx)
-	done := make(chan error, 1)
-	presence = &DemoPresence{cancel: stop, done: done}
+	done := make(chan error, 2)
+	presence = &DemoPresence{cancel: stop, done: done, workers: 1}
 	go func() {
 		defer present.close()
 		done <- s.checkIns(presenceCtx, present)
 	}()
+	if s.backgroundPackageFailure {
+		background = slices.DeleteFunc(slices.Clone(enrolled), func(d *simulatedDevice) bool { return !d.demo.packageScanDenied })
+		ownerHandedOff = true
+		presence.workers++
+		go func() { done <- s.packageFailureInBackground(presenceCtx, background) }()
+	}
 	return s.demo, presence, nil
 }
 
@@ -390,6 +467,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			s.demo.Routes.FactsPendingDeviceID = d.id
 		}
 	}
+	s.progress.begin("label devices and report assistance")
 	for _, d := range s.devices {
 		if err := s.describe(ctx, d, historical); err != nil {
 			return err
@@ -407,10 +485,12 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	// Re-plan after enrollment/metadata so targeting activates actual members
 	// and exceptions resolve actual inventory. This is not an idempotency probe;
 	// the integration test reapplies the finished organization independently.
+	s.progress.begin("roll out organization")
 	if err := s.rollOutOrganization(ctx); err != nil {
 		return err
 	}
 	// Organization assignments roll out asynchronously through the promoter.
+	s.progress.begin("await organization rollouts")
 	if err := s.awaitRollouts(ctx); err != nil {
 		return err
 	}
@@ -419,6 +499,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	if s.demo.Routes.FirewallProfileID, err = s.publishFirewallReviewProfile(ctx); err != nil {
 		return err
 	}
+	s.progress.begin("converge profiles")
 	for _, d := range s.devices {
 		switch {
 		case d.demo.state == "stale":
@@ -435,6 +516,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			}
 		}
 	}
+	s.progress.begin("route device actions and assistance")
 	if err := s.richDevice(ctx, rich); err != nil {
 		return err
 	}
@@ -453,6 +535,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			}
 		}
 	}
+	s.progress.begin("enrollments, catalog and adoption rollout")
 	if err := s.enrollments(ctx); err != nil {
 		return err
 	}
@@ -462,6 +545,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 	if err := s.adoptionRollout(ctx); err != nil {
 		return err
 	}
+	s.progress.begin("scale fixtures")
 	if err := s.scale(ctx); err != nil {
 		return err
 	}
@@ -484,6 +568,7 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			return errors.New("fixture feeds require the Fedora demo devices")
 		}
 	}
+	s.progress.begin("accept and propose advisory findings")
 	if err := s.acceptFinding(ctx, accepted); err != nil {
 		return err
 	}
@@ -492,16 +577,21 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			return err
 		}
 	}
+	s.progress.begin("await scale findings")
 	if err := s.awaitScaleFindings(ctx); err != nil {
 		return err
 	}
-	for _, d := range s.devices {
-		if d.demo.packageScanDenied {
-			if err := s.denyPackageScan(ctx, d); err != nil {
-				return err
+	if !s.backgroundPackageFailure {
+		s.progress.begin("refused package scan")
+		for _, d := range s.devices {
+			if d.demo.packageScanDenied {
+				if err := s.denyPackageScan(ctx, d); err != nil {
+					return err
+				}
 			}
 		}
 	}
+	s.progress.begin("await stale kiosk")
 	for _, d := range s.devices {
 		if d.demo.state == "stale" {
 			if err := s.awaitStale(ctx, d); err != nil {

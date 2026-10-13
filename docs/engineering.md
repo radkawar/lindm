@@ -1119,7 +1119,16 @@ always does. The demo owner's admin client waits 20 s for response headers
 (above the server's 15 s RPC bound) and retries reads and `request_id`
 mutations, which the server replays exactly, up to four attempts on
 `deadline_exceeded` or `unavailable`, so one slow call on a loaded host does not
-fail a long seed.
+fail a long seed. The command prints each setup and seed step with its elapsed
+time on stderr; feed configuration (15 minutes for fixtures, 2.5 hours for real
+feeds) and the device seed (20 minutes) have their own deadlines, and an overrun
+fails with the step's name. The owner enrollment is issued under its own short
+deadline after seeding. Interactively, the refused package scan state on
+`fedora-ws-03` finishes in the background about five minutes after enrollment
+(the server admits one package report per device per five minutes); its
+failure is printed and returned when the console stops. Review seeds it before
+returning. The signed stock artifact cache is keyed by the source digest, so
+the first run after a source change rebuilds it (about eight minutes here).
 For a private worktree, use `make ui-review UI_REVIEW_REPO=/path/to/shared-checkout`
 to read the shared fixture's protected trust without copying credentials. The
 embedded UI and browser runner still come from the current worktree; the default
