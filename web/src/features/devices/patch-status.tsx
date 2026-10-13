@@ -71,7 +71,11 @@ const phaseLabels: Record<PatchRunPhase, string> = {
 
 function LastRun({ run }: { run: PatchRunSummary | undefined }) {
   if (!run) {
-    return <p className="text-sm text-muted-foreground">No lindm-driven run is recorded.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        The device has not reported a lindm patch run.
+      </p>
+    );
   }
   const [result, tone] = resultLabels[run.result] ?? [`Unknown result ${run.result}`, "warning"];
   const diagnostic = run.diagnostic;
@@ -139,9 +143,7 @@ function LastRun({ run }: { run: PatchRunSummary | undefined }) {
             <p className="text-sm text-muted-foreground">No native error lines reported.</p>
           )}
           {diagnostic.truncated ? (
-            <p className="text-xs text-muted-foreground">
-              Native output was truncated on the device.
-            </p>
+            <p className="text-xs text-muted-foreground">The device truncated native output.</p>
           ) : null}
         </section>
       ) : null}

@@ -303,10 +303,9 @@ export function DashboardView() {
                       nothing.
                     </p>
                     <Help label="About approval counts">
-                      Requests waiting in your approval inbox. Another admin must approve each one
-                      before it runs. Pending, unexpired records are counted separately from the
-                      fleet snapshot. A pending request is not a guarantee you can approve it;
-                      authority is checked again at approval.
+                      Another administrator must approve each request before it runs. The inbox
+                      counts pending, unexpired requests separately from the fleet snapshot. The
+                      server checks your authority again when you approve.
                     </Help>
                   </div>
                 </WorkItem>
@@ -337,7 +336,7 @@ export function DashboardView() {
                   <p className="text-xs text-muted-foreground">
                     {uncovered > 0n
                       ? `No advisory source has checked these devices' packages. Their exposure is unknown. ${canFixCoverage ? "Open Advisories to check the cause and add coverage." : "Open Advisories to check the cause. Ask an administrator with fleet-wide access to add coverage."}`
-                      : `${plural(findings.partialDevices, "device is", "devices are")} only partly checked.`}
+                      : `Coverage checks only some packages on ${plural(findings.partialDevices, "device", "devices")}.`}
                   </p>
                 ) : (
                   <Unavailable section="Advisory coverage" />
@@ -380,8 +379,8 @@ export function DashboardView() {
                     {contact.unknownDevices > 0n ? (
                       <p className="text-xs text-muted-foreground">
                         {plural(contact.unknownDevices, "device has", "devices have")} never checked
-                        in and {contact.unknownDevices === 1n ? "is" : "are"} not counted here.
-                        Review contact evidence before sending work.
+                        in. This count excludes those devices. Review contact evidence before
+                        sending work.
                       </p>
                     ) : null}
                   </>
@@ -455,8 +454,8 @@ export function DashboardView() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Counts findings on{" "}
-                      {plural(findings.evaluatedDevices, "checked device", "checked devices")}.
-                      Accepted findings are excluded; zero findings does not mean no exposure.
+                      {plural(findings.evaluatedDevices, "checked device", "checked devices")}. This
+                      count excludes accepted findings. Zero findings does not mean no exposure.
                     </p>
                   </>
                 ) : (
@@ -526,8 +525,8 @@ export function DashboardView() {
               </h2>
               <p className="text-xs text-muted-foreground">
                 The {plural(data.recentActions.length, "newest action", "newest actions")} in your
-                device scopes, grouped by kind. Outcomes are what devices reported; open a device
-                for details.
+                device scopes, grouped by kind. Devices report the outcomes. Open a device for
+                details.
               </p>
             </div>
             {activity.length ? (
@@ -655,7 +654,7 @@ function Help({ label, children }: { label: string; children: ReactNode }) {
 function Unavailable({ section }: { section: string }) {
   return (
     <p data-review-state="blocked" className="text-sm text-muted-foreground">
-      {section} unavailable. Review the linked evidence; no zero is assumed.
+      {section} unavailable. Review the linked evidence. The console does not assume zero.
     </p>
   );
 }

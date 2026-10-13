@@ -151,7 +151,7 @@ function MetadataForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Couldn't confirm changes were saved" : "Couldn't save changes");
+        ](failure.ambiguous ? "Server did not confirm the save" : "Could not save changes");
       }
     },
     onSettled: () => {
@@ -330,7 +330,7 @@ function MetadataForm({
             ))}
           </ul>
           <p className="text-muted-foreground">
-            Everything else stays as it is. Labels can change who is allowed to see this device.
+            Other settings stay unchanged. Labels can change who has access to this device.
           </p>
           <TechnicalDetails items={[{ label: "Request ID", value: captured.requestId }]} />
         </section>

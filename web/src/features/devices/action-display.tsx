@@ -231,7 +231,7 @@ export function DeviceActionSpecView({
           <Fact label="Confirmed when">
             {action.case === "restart"
               ? "The device reports a new boot."
-              : "Can't be confirmed. The device stops reporting."}
+              : "The device stops reporting. The server cannot confirm power-off."}
           </Fact>
         </dl>
       ) : null}

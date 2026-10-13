@@ -31,14 +31,14 @@ export function NativeToolCustodyAlert({ custody }: { custody: NativeToolCustody
       <AlertTitle>The agent refuses to run native tools on this device</AlertTitle>
       <AlertDescription>
         <p>
-          <code>{path}</code> is mode <code>{unsafe.mode.toString(8).padStart(4, "0")}</code>, owner
-          UID {unsafe.ownerUid}: it is writable by a group or other users, so anyone in that group
-          could replace the system tools. Until it is fixed, inventory, settings, updates and
-          actions that use system tools fail.
+          <code>{path}</code> has mode <code>{unsafe.mode.toString(8).padStart(4, "0")}</code> and
+          owner UID {unsafe.ownerUid}. A group or other users can write to this path and replace
+          system tools. The agent refuses inventory, settings, updates and actions that use these
+          tools.
         </p>
         <p>
-          As root on the device, run <code>chmod go-w {path}</code>. On Fedora and other RPM systems{" "}
-          <code>rpm --restore filesystem</code> restores the packaged mode. The next inventory
+          Run <code>chmod go-w {path}</code> as root on the device. On RPM systems, run{" "}
+          <code>rpm --restore filesystem</code> to restore the packaged mode. The next inventory
           clears this message.
         </p>
       </AlertDescription>

@@ -232,7 +232,7 @@ function OfflineAuthorization() {
           /run/lindm/lindm-offline-request.json
         </pre>
         <p className="text-sm text-muted-foreground">
-          If it was interrupted, run{" "}
+          If the export stopped before completion, run{" "}
           <code className="break-all font-mono text-xs">
             /usr/libexec/lindm/lindm-agent offline-export -resume -out
             /run/lindm/lindm-offline-request.json
@@ -385,7 +385,7 @@ function OfflineExchange() {
           <div className="grid gap-1">
             <p role="status" className="text-sm">
               {importedStateLabels[status.state] ??
-                "Request imported. Its enrollment state isn't recognized; check the device page."}
+                "Request imported. The console does not recognize its enrollment state. Check the device page."}
             </p>
             <TechnicalDetails
               items={[

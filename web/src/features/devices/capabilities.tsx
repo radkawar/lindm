@@ -62,9 +62,8 @@ function AppliedPolicy({ state }: { state: DeviceCapabilityState }) {
     case CapabilityPolicyState.INERT:
       return (
         <p className="text-warning">
-          The policy the device holds (version {applied.toString()}) was signed by a key the current
-          execution delegation no longer trusts, so it allows nothing until a newly signed version
-          arrives.
+          The current delegation no longer trusts the signer of policy version {applied.toString()}.
+          The policy permits no changes. Wait for a policy with a trusted signature.
         </p>
       );
     case CapabilityPolicyState.ACTIVE:

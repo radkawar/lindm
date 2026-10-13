@@ -199,14 +199,18 @@ export function LocalAdminPasswordReveal({
         response.password.fill(0);
         setFailure(
           toRpcFailure(
-            new Error("The password can't be displayed. It contains unsupported characters."),
+            new Error(
+              "The console cannot display the password. It contains unsupported characters.",
+            ),
           ),
         );
         return;
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         response.password.fill(0);
-        setNotice("The page was hidden when the password arrived, so it wasn't shown. Try again.");
+        setNotice(
+          "The page was not visible when the password arrived. The console did not show it. Try again.",
+        );
         return;
       }
       held.current = response.password;

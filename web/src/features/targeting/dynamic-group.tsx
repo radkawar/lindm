@@ -502,8 +502,8 @@ export function MembershipPreview({
         </p>
         {data.unknownCount > 0 ? (
           <p className="text-muted-foreground">
-            {deviceCount(data.unknownCount)} can&apos;t be checked: inventory older than {maxAge} or
-            never reported. They are not included.
+            The group excludes {deviceCount(data.unknownCount)}. Their inventory is older than{" "}
+            {maxAge}, or they have never reported inventory.
           </p>
         ) : null}
         {!data.complete ? (
@@ -1047,7 +1047,7 @@ function AttributeCondition({
           </p>
         ) : !definitions.isPending && list.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            No custom attributes are defined yet.{" "}
+            No custom attributes exist yet.{" "}
             <Link to="/settings" className="underline underline-offset-4">
               Define them in Settings
             </Link>

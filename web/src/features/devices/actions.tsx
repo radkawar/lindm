@@ -145,12 +145,12 @@ const restrictionNames = {
   lock: {
     confirmed: "Accounts locked",
     sent: "Account lock sent",
-    still: "the accounts are still locked",
+    still: "the account lock remains active",
   },
   quarantine: {
     confirmed: "Network quarantined",
     sent: "Network quarantine sent",
-    still: "the network is still quarantined",
+    still: "the network quarantine remains active",
   },
 } as const;
 const releaseKinds: Record<Restriction["kind"], DeviceActionKind> = {

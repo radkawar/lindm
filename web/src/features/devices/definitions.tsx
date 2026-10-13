@@ -173,7 +173,7 @@ function DefinitionForm({
             : classifyRpcFailure(failure).tone === "warning"
               ? "warning"
               : "message"
-        ](failure.ambiguous ? "Couldn't confirm attribute was saved" : "Couldn't save attribute");
+        ](failure.ambiguous ? "Server did not confirm the save" : "Could not save attribute");
       }
     },
     onSettled: () => {
@@ -227,9 +227,7 @@ function DefinitionForm({
           inFlight.current = true;
           save.mutate(request);
         } catch {
-          setInputError(
-            "This attribute can't be saved as entered. Check each field and try again.",
-          );
+          setInputError("The server cannot save these entries. Check each field. Try again.");
         }
       }}
     >
@@ -277,7 +275,7 @@ function DefinitionForm({
           ) : (
             <p id="definition-key-hint" className="text-xs text-muted-foreground">
               {existing
-                ? "The key can't change after the attribute is created."
+                ? "You cannot change the key after creating the attribute."
                 : "The name supplies the key. Use lowercase letters, digits, hyphens, underscores or dots. The key cannot change later."}
             </p>
           )}

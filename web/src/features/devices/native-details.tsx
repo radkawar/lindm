@@ -306,7 +306,9 @@ export function DeviceNativeDetails({
               >
                 Show unavailable fields
               </Button>
-              <p className="text-sm text-muted-foreground">Empty optional fields are hidden.</p>
+              <p className="text-sm text-muted-foreground">
+                This view hides empty optional fields.
+              </p>
             </div>
             <NativeFacts
               showUnavailable={showUnavailable}
@@ -343,7 +345,8 @@ export function DeviceNativeDetails({
               <section className="grid gap-4">
                 <h3 className="font-semibold">Platform and repositories</h3>
                 <p className="text-sm text-muted-foreground">
-                  Repositories as configured on the device. Credentials in URLs are hidden.
+                  The device reports these repository settings. The console hides credentials in
+                  URLs.
                 </p>
                 <NativeFacts
                   showUnavailable={showUnavailable}

@@ -31,7 +31,7 @@ const unavailableMessages: Record<string, string> = {
   device_action_inventory_stale: "Storage info is too old. Refresh inventory first.",
   device_action_storage_unavailable: "No storage reported yet. Refresh inventory.",
   device_action_storage_identity_unavailable:
-    "No disk can be used for this action yet. Refresh inventory.",
+    "This action has no eligible disk yet. Refresh inventory.",
   device_action_tpm2_unavailable: "No TPM 2.0 reported. Refresh inventory.",
   device_action_tpm2_binding_unsupported:
     "This OS release cannot bind the disk to the TPM. TPM binding needs systemd 252 or newer.",
@@ -110,7 +110,7 @@ export function ObservedStorageTargetPicker({
   }, [stale]);
   const unavailable = targets?.unavailableReason
     ? (unavailableMessages[targets.unavailableReason] ??
-      "Storage can't be selected right now. Refresh inventory.")
+      "The console cannot select storage now. Refresh inventory.")
     : targets && !targets.fresh
       ? unavailableMessages.device_action_inventory_stale
       : targets?.targets.length
@@ -140,11 +140,11 @@ export function ObservedStorageTargetPicker({
             }}
           />
           <p id={`${id}-help`} className="text-sm text-muted-foreground">
-            Only disks this action can use are listed.
+            This list shows only eligible disks for this action.
           </p>
           {selectedKey && !selected ? (
             <p role="status" className="text-sm text-muted-foreground">
-              This disk is no longer reported. Pick another.
+              The device no longer reports this disk. Select another disk.
             </p>
           ) : null}
           {selected ? <ObservedStorageIdentity selection={selected.selection} /> : null}

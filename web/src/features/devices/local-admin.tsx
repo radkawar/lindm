@@ -122,7 +122,7 @@ export function DeviceLocalAdminPanel({ deviceId }: { deviceId: string }) {
               </Fact>
               {!status.escrowKeyId ? (
                 <Fact label="Server key">
-                  <StatusBadge status="warning">Not set up, changes are paused</StatusBadge>
+                  <StatusBadge status="warning">Missing key prevents changes</StatusBadge>
                 </Fact>
               ) : null}
             </dl>
@@ -301,8 +301,8 @@ function LocalAdminPolicyForm({
     <form className="grid gap-3 border p-3" onSubmit={submit} autoComplete="off">
       <h3 className="font-semibold">{policy ? "Change policy" : "Set up policy"}</h3>
       <p className="text-sm text-muted-foreground">
-        Choose an existing local account other than root. The device changes its password only if
-        the account is also listed in the device&apos;s agent settings.
+        Choose an existing local account other than root. The device changes the password only for
+        accounts in its agent settings.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         <LocalUserPicker
@@ -313,7 +313,7 @@ function LocalAdminPolicyForm({
           disabled={locked}
           onChange={setAccount}
           ineligible={(user) =>
-            user.uid === 0n ? "Can't be managed: root's password is never changed" : undefined
+            user.uid === 0n ? "lindm never changes root's password" : undefined
           }
         />
         <div className="grid gap-2">
@@ -466,7 +466,8 @@ function LocalAdminPolicyRemoval({ deviceId }: { deviceId: string }) {
     <form className="grid gap-3 border p-3" onSubmit={submit} autoComplete="off">
       <h3 className="font-semibold">Remove policy</h3>
       <p className="text-sm text-muted-foreground">
-        Stops automatic changes. The current password stays on the device and can still be revealed.
+        Stops automatic changes. The device keeps the current password. You can still reveal the
+        password.
       </p>
       <Label htmlFor={`${id}-reason`}>Reason</Label>
       <Textarea

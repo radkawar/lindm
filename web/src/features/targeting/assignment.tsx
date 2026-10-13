@@ -139,7 +139,7 @@ const startRefusals: Record<string, string> = {
   targeting_impact_stale:
     "Devices or settings changed after your review. Review impact again. Start the rollout.",
   targeting_not_ready:
-    "No active device would change, so nothing was saved. Check the target and version.",
+    "No active device would change. The server saved nothing. Check the target and version.",
   invalid_targeting_request:
     "The server refused this rollout plan. Check the stages and target. Review impact again.",
 };
@@ -502,7 +502,7 @@ export function RolloutFlow({
       ) : null}
       {readFailure ? (
         <RpcError failure={readFailure}>
-          <p>Impact could not be reviewed. Nothing has changed; review again.</p>
+          <p>The console could not review impact. Nothing has changed. Review impact again.</p>
         </RpcError>
       ) : null}
       {evidence ? (

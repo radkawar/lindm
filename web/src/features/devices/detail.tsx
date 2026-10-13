@@ -735,7 +735,7 @@ function AccessAndReporting({
     <Card>
       <CardHeader>
         <CardTitle>Access and reporting</CardTitle>
-        <CardDescription>Who is signed in, the agent version and how it connects.</CardDescription>
+        <CardDescription>Active sessions, agent version and connection details.</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid gap-6 sm:grid-cols-2">
@@ -821,7 +821,7 @@ function AccessAndReporting({
                   ))}
                   {summaryInterfaces.length < interfaces.length || summaryInterfaces.length > 4 ? (
                     <li className="text-muted-foreground">
-                      All {interfaces.length} interfaces are listed under Hardware and software.
+                      Hardware and software lists all {interfaces.length} interfaces.
                     </li>
                   ) : null}
                 </ul>

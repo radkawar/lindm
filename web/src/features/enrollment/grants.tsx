@@ -258,7 +258,7 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
           <DialogHeader>
             <DialogTitle>Revoke this one-time code?</DialogTitle>
             <DialogDescription>
-              The code can no longer enroll a device. Devices already enrolled are not affected.
+              The code can no longer enroll a device. Revocation does not affect enrolled devices.
             </DialogDescription>
           </DialogHeader>
           <form

@@ -55,11 +55,11 @@ function recoverability(
   if (!escrow) {
     if (!volume) return "Unknown: no encryption status or recovery key reported yet";
     if (!volume.encrypted)
-      return "Not recoverable: the latest report shows this volume isn't encrypted and no recovery key is stored";
+      return "Not recoverable: the volume lacks encryption. The server has no recovery key.";
     return `Not recoverable: no recovery key escrowed, ${tpm}`;
   }
   if (volume && !volume.encrypted)
-    return "Not recoverable: the latest report shows this volume is no longer encrypted";
+    return "Not recoverable: the latest report shows no encryption on this volume.";
   if (volume?.occupiedKeyslots.length && !volume.occupiedKeyslots.includes(escrow.keyslot))
     return `Not recoverable: the escrowed key's slot ${escrow.keyslot} is no longer on this volume`;
   return (
@@ -189,7 +189,7 @@ export function DeviceEncryptionPanel({
       <CardHeader>
         <CardTitle>
           {failure
-            ? "Unknown: encryption status couldn't be loaded"
+            ? "Unknown: the console could not load encryption status"
             : data
               ? recoverability(verdictVolume, escrow, escrowVolume)
               : "Encryption and recovery key"}
@@ -251,7 +251,7 @@ export function DeviceEncryptionPanel({
         ) : null}
         {historyFailure ? (
           <RpcError failure={historyFailure} title="Couldn't load volume history">
-            <p>Only the most recently reported volumes are listed.</p>
+            <p>This list shows only the latest reported volumes.</p>
           </RpcError>
         ) : null}
         {morePages ? (
@@ -319,8 +319,8 @@ export function DeviceEncryptionPanel({
                     "Off"
                   ) : data && data.tpm2TokenReferences < data.tpm2TokenReferencesRequired ? (
                     <>
-                      <StatusBadge status="warning">May ask for the passphrase at boot</StatusBadge>{" "}
-                      {`${data.tpm2TokenReferences} of the ${data.tpm2TokenReferencesRequired} TPM unlock tokens this release needs. Bind TPM 2.0 again to add the rest; no passphrase is needed.`}
+                      <StatusBadge status="warning">Boot can require the passphrase</StatusBadge>{" "}
+                      {`${data.tpm2TokenReferences} of ${data.tpm2TokenReferencesRequired} required TPM unlock tokens. Bind TPM 2.0 again to add the rest. This action does not need a passphrase.`}
                     </>
                   ) : (
                     "On"

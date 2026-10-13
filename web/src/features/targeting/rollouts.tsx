@@ -66,15 +66,14 @@ const PAUSE_REASONS: Record<string, string> = {
 };
 
 const NEEDS_REVIEW: Record<string, string> = {
-  preview_changed:
-    "Its settings changed after the review (another assignment, profile or group changed), so it wasn't changed.",
-  device_reenrolled: "It re-enrolled after the review, so it wasn't changed.",
+  preview_changed: "Its settings changed after review. The rollout skipped this device.",
+  device_reenrolled: "It enrolled again after review. The rollout skipped this device.",
   assigned_directly:
-    "A profile was assigned directly on the device after the review, so it wasn't changed.",
-  device_not_active: "It's no longer enrolled for active management, so it wasn't changed.",
-  resolution_not_ready: "Its settings conflict or are blocked, so it wasn't changed.",
+    "An administrator assigned a profile directly after review. The rollout skipped this device.",
+  device_not_active: "Active management enrollment ended. The rollout skipped this device.",
+  resolution_not_ready: "Settings conflict or cannot apply. The rollout skipped this device.",
   adoption_not_approved:
-    "Its change would adopt settings the approval didn't cover, so it wasn't changed.",
+    "Approval did not cover the existing settings. The rollout skipped this device.",
   membership_unknown: "Its inventory is too old to confirm it's still in the target.",
 };
 
@@ -316,7 +315,7 @@ function statusView(state: RolloutState, inProgress: number, final: boolean) {
         tone: "info" as StatusTone,
         note: state.approvalId
           ? "Nothing changes on any device until another administrator approves."
-          : "Approval hasn't been requested. Nothing changes, and the rollout ends an hour after it was created.",
+          : "No administrator has requested approval. Nothing changes. The rollout ends one hour after creation.",
       };
     case RolloutStatus.ACTIVE:
       if (state.paused)
@@ -332,7 +331,7 @@ function statusView(state: RolloutState, inProgress: number, final: boolean) {
           ? {
               label: "Finished with failures",
               tone: "destructive" as StatusTone,
-              note: "Every planned device was tried; some reported a failure.",
+              note: "The rollout attempted every planned device. Some devices reported failure.",
             }
           : { label: "Finished", tone: "success" as StatusTone, note: "" };
       return { label: "Rolling out", tone: "info" as StatusTone, note: "" };
@@ -352,7 +351,7 @@ function statusView(state: RolloutState, inProgress: number, final: boolean) {
       return {
         label: "Stopped",
         tone: "warning" as StatusTone,
-        note: "The assignment changed after this review, so nothing was applied. Roll out a change to review it again.",
+        note: "The assignment changed after review. The rollout applied nothing. Start a rollout to review the change again.",
       };
     case RolloutStatus.SUPERSEDED:
       return {
@@ -738,7 +737,7 @@ function ControlButton({
       ? "No more devices start this change until you resume. Devices that already changed keep it."
       : operation === ControlRolloutRequest_Operation.RESUME
         ? "Devices in the current stage continue to get this change while health checks pass."
-        : `If the current stage's health checks pass, ${nextName} starts and up to ${(next?.cumulativeBasisPoints ?? 0) / 100}% of targeted devices get this change.`;
+        : `If health checks pass, ${nextName} starts. Up to ${(next?.cumulativeBasisPoints ?? 0) / 100}% of targeted devices get this change.`;
   async function send() {
     if (busy) return;
     const request =

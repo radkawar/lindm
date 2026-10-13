@@ -225,7 +225,7 @@ function QuarantineActionPicker({ deviceId, ...props }: PickerProps & { deviceId
         onRetry: () => void query.refetch(),
         empty:
           query.isSuccess && options.length === 0
-            ? "No network quarantine was requested on this device."
+            ? "No administrator has requested network quarantine on this device."
             : undefined,
         fetching: query.isFetching,
         onFirst: pageToken ? () => setPageToken("") : undefined,
@@ -550,7 +550,7 @@ export function DeviceActionForm({
         new Set(liveTargets.map((entry) => entry.selection.target.luksUuid)).size !==
           liveTargets.length
       )
-        throw new Error("Each volume can only be listed once.");
+        throw new Error("Select each volume only once.");
       const target = storage && !liveErase ? currentSelection!.target : undefined;
       const spec = create(DeviceActionSpecSchema);
       switch (kind) {
@@ -1038,7 +1038,7 @@ export function DeviceActionForm({
   // inventory report, so a device can be online with inventory too old to use.
   const blockerEvidence =
     refusalReason === "device_action_inventory_stale" && inventoryAge && inventoryWindow
-      ? `${deviceName} ${lastContact ? `last checked in ${lastContact}, but its` : "'s"} latest inventory arrived ${inventoryAge}. This action needs inventory from the last ${inventoryWindow}, and check-ins don't include inventory.`
+      ? `${deviceName} ${lastContact ? `last checked in ${lastContact}. Its` : "'s"} latest inventory arrived ${inventoryAge}. This action needs inventory from the last ${inventoryWindow}. Check-ins do not include inventory.`
       : refusalReason === "device_action_offline" && lastContact
         ? `${deviceName} last checked in ${lastContact}.`
         : "";
@@ -1088,7 +1088,7 @@ export function DeviceActionForm({
     ? ""
     : attempt.status === "rejected"
       ? blocker
-        ? `${blockedControls} off until this is resolved: ${blocker.title.toLowerCase()}.`
+        ? `${blockedControls} unavailable. Resolve this problem: ${blocker.title.toLowerCase()}.`
         : `Send is off after this refusal. ${attempt.failure ? classifyRpcFailure(attempt.failure).action : "Edit the action to start a new request."}`
       : attempt.status !== "frozen"
         ? ""
@@ -1097,7 +1097,7 @@ export function DeviceActionForm({
           : preflight?.state === "failed"
             ? "Send is available once the server's checks run. Check again."
             : blocker
-              ? `${blockedControls} off until this is resolved: ${blocker.title.toLowerCase()}.`
+              ? `${blockedControls} unavailable. Resolve this problem: ${blocker.title.toLowerCase()}.`
               : "";
   // A refusal at Send stays on screen while its evidence is re-checked; only a
   // first review check shows the bare progress line.
@@ -1229,7 +1229,7 @@ export function DeviceActionForm({
           ) : null}
           {storage && storageTargets.isSuccess && !eligibleTargets && !detail.error ? (
             <p role="status" className="text-sm text-warning">
-              This device was re-enrolled. Refresh the page before choosing storage.
+              This device enrolled again. Refresh the page before choosing storage.
             </p>
           ) : null}
           {storage && eligibleTargets ? (
@@ -1434,8 +1434,8 @@ export function DeviceActionForm({
                       <StorageTargetView target={entry.selection.target} />
                       {!isStillObserved(entry) ? (
                         <p className="text-sm text-warning">
-                          This volume is no longer reported by the device. Remove it and pick
-                          another.
+                          The device no longer reports this volume. Remove the volume. Select
+                          another volume.
                         </p>
                       ) : null}
                       <Button

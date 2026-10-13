@@ -192,14 +192,16 @@ export function RecoveryKeyReveal({
         response.recoveryKey.fill(0);
         setFailure(
           toRpcFailure(
-            new Error("The recovery key can't be displayed. It has an unexpected format."),
+            new Error("The console cannot display the recovery key. It has an unexpected format."),
           ),
         );
         return;
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         response.recoveryKey.fill(0);
-        setNotice("The page was hidden when the key arrived, so it wasn't shown. Try again.");
+        setNotice(
+          "The page was not visible when the key arrived. The console did not show it. Try again.",
+        );
         return;
       }
       held.current = response.recoveryKey;

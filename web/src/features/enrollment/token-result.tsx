@@ -214,10 +214,10 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {unavailable
-              ? "This was created, but the secret can't be shown."
+              ? "The server created the credential. The console cannot show its secret."
               : provisioning
-                ? "Reusable token for automatic enrollment. Copy it now; it won't be shown again."
-                : "Single-use code to enroll one device. Copy it now; it won't be shown again."}
+                ? "Reusable token for automatic enrollment. Copy it now. The console shows it only once."
+                : "Single-use code to enroll one device. Copy it now. The console shows it only once."}
           </DialogDescription>
         </DialogHeader>
         {unavailable ? (

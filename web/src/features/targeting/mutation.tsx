@@ -160,7 +160,7 @@ export function TargetMutation<S extends DescMessage>({
           <p>
             {attempt.status === "ambiguous"
               ? "The server did not confirm the save. Retry the same request. The fields remain unchanged until confirmation."
-              : "Nothing was saved. Start over to change the entries. Send the request again."}
+              : "The server saved nothing. Start over to change the entries. Send the request again."}
           </p>
         </RpcError>
       ) : null}

@@ -96,7 +96,7 @@ function EncryptionState({
           Root disk encrypted, recovery key escrowed <Age value={escrow.storedAt} />.
         </span>
       ) : (
-        "Root disk encrypted, but no recovery key is escrowed on the server."
+        "Root disk encryption is active. The server has no recovery key."
       )}
     </span>
   );

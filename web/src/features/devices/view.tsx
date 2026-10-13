@@ -252,10 +252,12 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
       return (
         <PostureBadge tone={tone} label={findings.partial ? `${label} · partial` : label}>
           <p>
-            Open findings: {counts}, {rest}. Accepted risks are excluded.
+            Open findings: {counts}, {rest}. This count excludes accepted risks.
           </p>
           {findings.partial ? (
-            <p>Partial check: only packages from the distribution archive were matched.</p>
+            <p>
+              Partial check: advisory sources matched only packages from the distribution archive.
+            </p>
           ) : null}
         </PostureBadge>
       );
@@ -688,8 +690,8 @@ export function DeviceRevocationImpact({ device }: { device: Device }) {
       <div data-review-impact="reversibility">
         <dt className="font-medium">Recovery</dt>
         <dd>
-          Existing device credentials are revoked; restoring management requires recovery
-          enrollment.
+          Revocation stops existing device credentials. Use recovery enrollment to restore
+          management.
         </dd>
       </div>
       <div data-review-impact="approval">

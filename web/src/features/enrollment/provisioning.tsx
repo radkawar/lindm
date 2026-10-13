@@ -269,7 +269,8 @@ export function IssueProvisioningToken({
             </summary>
             <div className="mt-3 grid gap-3">
               <p className="text-sm text-muted-foreground">
-                Applied to every device enrolled with this token. These can't be changed later.
+                The token applies these settings to every device it enrolls. You cannot change the
+                token settings later.
               </p>
               <MultiPicker
                 label="Labels"
@@ -336,7 +337,8 @@ export function IssueProvisioningToken({
         {failure ? <RpcError failure={failure} /> : null}
         {failure?.ambiguous ? (
           <p className="text-sm text-muted-foreground">
-            The token may have been created. Try again to check. The secret can't be shown twice.
+            The server did not confirm token creation. Retry the same request. The console shows the
+            secret only once.
           </p>
         ) : null}
       </div>
@@ -484,7 +486,8 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
           <DialogHeader>
             <DialogTitle>Revoke provisioning token?</DialogTitle>
             <DialogDescription>
-              New devices can no longer enroll with it. Devices already enrolled are not affected.
+              New devices can no longer enroll with this token. Revocation does not affect enrolled
+              devices.
             </DialogDescription>
           </DialogHeader>
           <p className="break-words text-sm font-medium">{token.reason || "Provisioning token"}</p>
@@ -512,7 +515,7 @@ function TokenRow({ token }: { token: ProvisioningToken }) {
             {failure ? <RpcError failure={failure} /> : null}
             {failure?.ambiguous ? (
               <p className="text-sm text-muted-foreground">
-                The token may already be revoked. Try again to check.
+                The server did not confirm revocation. Retry the same request.
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">

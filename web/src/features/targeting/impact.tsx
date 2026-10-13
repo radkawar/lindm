@@ -266,9 +266,9 @@ function ChangeList({ device }: { device: TargetAssignmentDeviceImpact }) {
           {resource.disposition === ResourceResolutionDisposition.CONFLICT
             ? "conflicts with another assignment of equal priority"
             : resource.disposition === ResourceResolutionDisposition.BLOCKED
-              ? `is blocked${resource.reason ? ` (${resource.reason.replaceAll("_", " ")})` : ""}`
-              : "can't be resolved"}
-          ; this device won't change until that's fixed.
+              ? `cannot apply${resource.reason ? ` (${resource.reason.replaceAll("_", " ")})` : ""}`
+              : "has no resolved value"}
+          . Resolve the problem before this device changes.
         </>
       ),
     });
@@ -350,10 +350,9 @@ export function AssignmentImpact({
         ) : null}
         {review.unknownCount > 0 ? (
           <p className="text-sm text-muted-foreground">
-            {plural(review.unknownCount, "device")} can't be matched to{" "}
-            <TargetName target={review.assignment?.target} />: inventory is missing or too old to
-            tell. {review.unknownCount === 1 ? "It" : "They"} won't change in this rollout; refresh
-            inventory and review again to include {review.unknownCount === 1 ? "it" : "them"}.
+            The review cannot confirm membership for {plural(review.unknownCount, "device")} in{" "}
+            <TargetName target={review.assignment?.target} />. Inventory is missing or too old. This
+            rollout skips those devices. Refresh inventory. Review impact again to include them.
           </p>
         ) : null}
         {!review.complete ? (
@@ -410,7 +409,7 @@ export function AssignmentImpact({
           </Table>
         ) : review.devices.length === 0 ? (
           <p className="text-sm">
-            No device is targeted. Check the target and its exclusions before rolling out.
+            The target includes no devices. Check the target and its exclusions before rollout.
           </p>
         ) : null}
         {untargeted.length ? (
