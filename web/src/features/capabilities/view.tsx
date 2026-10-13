@@ -359,7 +359,9 @@ function PolicyCapabilities({
                 {capabilityCopy(capability).description}
               </span>
               {capability === ManagementCapability.KERNEL_SETTINGS && on ? (
-                <span className="break-words">
+                // Parameter names are long unbroken tokens; anywhere-wrapping
+                // keeps their min-content inside a 375px viewport.
+                <span className="[overflow-wrap:anywhere]">
                   Parameters:{" "}
                   {policy.sysctlKeys.map((key, index) => (
                     <span key={key}>
