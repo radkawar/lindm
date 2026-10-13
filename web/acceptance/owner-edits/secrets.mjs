@@ -52,7 +52,7 @@ export async function check({ page, demo, visit, require, capture, step }) {
   require((await actions.count()) === 1, "The secret row has no actions menu");
   await actions.click();
   await page.getByRole("menu").waitFor({ timeout });
-  for (const name of ["Where it's used", "Rotate…", "Delete…"])
+  for (const name of ["Where it's used", "Rotate…", "Remove…"])
     require((await page.getByRole("menuitem", { name }).count()) ===
       1, `Row actions lack '${name}'`);
   await capture("secrets-row-actions");
@@ -66,17 +66,17 @@ export async function check({ page, demo, visit, require, capture, step }) {
   await page.keyboard.press("Escape");
   await uses.waitFor({ state: "hidden", timeout });
 
-  step("delete names the uses and refuses while in use");
+  step("removal names the uses and refuses while in use");
   await actions.click();
-  await page.getByRole("menuitem", { name: "Delete…" }).click();
-  const remove = page.getByRole("dialog", { name: `Delete ${SECRET}` });
+  await page.getByRole("menuitem", { name: "Remove…" }).click();
+  const remove = page.getByRole("dialog", { name: `Remove ${SECRET}` });
   await remove.waitFor({ timeout });
   await remove.getByRole("link", { name: PROFILE }).waitFor({ timeout });
-  require((await remove.getByText("In use, so it can't be deleted").count()) ===
-    1, "Delete does not explain that the secret is in use");
+  require((await remove.getByText("Profiles or devices still use this secret").count()) ===
+    1, "Removal does not explain that the secret is in use");
   require(await remove
-    .getByRole("button", { name: "Delete secret", exact: true })
-    .isDisabled(), "Delete is enabled while the secret is in use");
+    .getByRole("button", { name: "Remove secret", exact: true })
+    .isDisabled(), "Removal is enabled while the secret is in use");
   await capture("secrets-delete-in-use");
   await page.keyboard.press("Escape");
   await remove.waitFor({ state: "hidden", timeout });

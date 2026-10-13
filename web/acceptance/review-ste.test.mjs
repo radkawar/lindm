@@ -28,6 +28,14 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
     };
     assert.ok((await inspect("<p>The request is accepted.</p>")).includes("STE passive voice"));
     assert.ok((await inspect("<button>Delete machine</button>")).includes('STE use "device"'));
+    assert.deepEqual(await inspect("<p>Service drop-in</p>"), []);
+    assert.ok((await inspect("<button>Drop device</button>")).includes('STE use "remove"'));
+    assert.deepEqual(
+      await inspect(
+        "<p>Review <span><code>Delete machine nativePackage</code></span> the device.</p>",
+      ),
+      [],
+    );
     assert.ok((await inspect("<p>Device group profile policy</p>")).includes("STE noun cluster"));
     const sentence = `Select ${Array.from({ length: 20 }, () => "the").join(" ")} <strong>device</strong>.`;
     assert.ok((await inspect(`<p>${sentence}</p>`)).includes("STE sentence length"));
@@ -45,6 +53,11 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
     );
     assert.ok(
       (await inspect('<a href="https://github.com/example/project">Help</a>')).includes(
+        "external console link",
+      ),
+    );
+    assert.ok(
+      (await inspect('<a hidden href="https://github.com/example/project">Help</a>')).includes(
         "external console link",
       ),
     );

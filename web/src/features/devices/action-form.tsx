@@ -1917,8 +1917,8 @@ export function DeviceActionForm({
                     : "This permanently wipes the volume. Another admin must approve."
                   : attempt.payload.spec?.action.case === "sanitize"
                     ? attempt.payload.spec.action.value.nvmeScope?.controllerWide
-                      ? "This permanently erases every namespace on the controller. Another admin must approve."
-                      : "This permanently erases the disk. Another admin must approve."
+                      ? "This permanently wipes every namespace on the controller. Another admin must approve."
+                      : "This permanently wipes the disk. Another admin must approve."
                     : attempt.payload.spec?.action.case === "lockSessions" &&
                         attempt.payload.spec.action.value.terminateSessions
                       ? "Signing out sessions can lose unsaved work."

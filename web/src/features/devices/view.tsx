@@ -69,7 +69,7 @@ const columns = [
   { id: "findings", label: "Findings", sortable: false },
   { id: "contact", label: "Last contact", sortable: true },
   { id: "os", label: "Operating system", sortable: true },
-  { id: "host", label: "Host received", sortable: false },
+  { id: "host", label: "Device facts received", sortable: false },
   { id: "inventory", label: "Last inventory", sortable: false },
   { id: "metadata", label: "Owner / labels / attributes", sortable: false },
   { id: "id", label: "Device ID", sortable: false },

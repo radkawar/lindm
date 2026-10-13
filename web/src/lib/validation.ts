@@ -124,7 +124,7 @@ export function violationText(label: string, ruleId: string, ruleMessage: string
     case "hostname":
     case "host_and_port":
     case "address":
-      return `${label}: enter a host name, such as host.example.com.`;
+      return `${label}: enter a network address, such as receiver.example.com.`;
     case "uri":
     case "uri_ref":
       return `${label}: enter a full address, such as https://example.com/path.`;

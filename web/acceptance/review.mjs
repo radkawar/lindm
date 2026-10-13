@@ -969,7 +969,9 @@ async function main() {
       // While the request waits for consent nothing is shared and the screen
       // surface is hidden; the named region is required only once it shows.
       const waiting =
-        (await page.getByText("No screen or input is shared yet", { exact: false }).count()) > 0;
+        (await page
+          .getByText("The device shares no screen or input yet", { exact: false })
+          .count()) > 0;
       const regions = await page
         .getByRole("region", { name: "Remote screen", exact: true })
         .count();

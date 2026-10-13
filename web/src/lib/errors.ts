@@ -823,7 +823,7 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           tone: "warning",
           title: "Address not accepted",
           message:
-            "Webhooks need an https:// address and syslog needs tls://host:port, without a user name.",
+            "Webhooks require HTTPS. Syslog requires an address such as tls://receiver.example:6514. Do not include a user name.",
           action: "Correct the address. Retry the request.",
         };
       case "invalid_ca":

@@ -435,7 +435,7 @@ function DestinationForm({
     endpoint: syslog
       ? SYSLOG_ENDPOINT.test(endpoint.trim())
         ? ""
-        : "Use tls://host:port, for example tls://siem.example:6514."
+        : "Use a TLS address, such as tls://siem.example:6514."
       : WEBHOOK_ENDPOINT.test(endpoint.trim())
         ? ""
         : "Use an https:// address, for example https://receiver.example/events. Plain http:// isn't allowed.",

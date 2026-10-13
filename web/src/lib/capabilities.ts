@@ -40,11 +40,11 @@ const copy: Record<ManagementCapability, CapabilityCopy> = {
   [ManagementCapability.PACKAGES]: {
     name: "Software packages",
     description:
-      "Install and remove packages from the OS vendor's repositories. On Ubuntu, metadata and packages are verified with the archive signing key on the device; on Fedora, metadata is verified via Fedora's HTTPS metalink and packages with Fedora's signing key.",
+      "Install packages from the OS vendor's repositories. Remove packages from these repositories. Devices verify vendor sources before installation.",
   },
   [ManagementCapability.FILES]: {
     name: "Files in standard locations",
-    description: "Login messages and banners in /etc/motd.d and /etc/issue.d.",
+    description: "Sign-in messages and banners in /etc/motd.d and /etc/issue.d.",
   },
   [ManagementCapability.KERNEL_MODULE_BLOCKLIST]: {
     name: "USB and kernel module blocklist",
@@ -57,7 +57,7 @@ const copy: Record<ManagementCapability, CapabilityCopy> = {
   [ManagementCapability.FIREWALL]: {
     name: "Firewall",
     description:
-      "Firewall zones. A connectivity check rolls a change back if the device loses contact with lindm.",
+      "Firewall zones. A connectivity check reverses a change if the device loses contact with lindm.",
   },
   [ManagementCapability.OS_UPDATES]: {
     name: "OS updates",

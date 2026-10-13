@@ -384,7 +384,7 @@ export function DeleteSecretDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Delete {secretName(secret)}</DialogTitle>
+          <DialogTitle>Remove {secretName(secret)}</DialogTitle>
           <DialogDescription>
             {purposeLabels[secret.purpose] ?? "Unrecognized purpose"}, version{" "}
             {secret.currentVersion.toString()}
@@ -395,10 +395,10 @@ export function DeleteSecretDialog({
             usesTotal(uses) > 0 ? (
               <div className="grid gap-4">
                 <Alert>
-                  <AlertTitle>In use, so it can&apos;t be deleted</AlertTitle>
+                  <AlertTitle>Profiles or devices still use this secret</AlertTitle>
                   <AlertDescription>
-                    Choose another secret in these profiles and publish them. Devices stop using it
-                    once they apply the new version.
+                    Select another secret in each profile. Publish the profiles. Wait for devices to
+                    apply them.
                   </AlertDescription>
                 </Alert>
                 <SecretUsesList uses={uses} currentVersion={secret.currentVersion} />
@@ -409,7 +409,7 @@ export function DeleteSecretDialog({
                     disabled
                     aria-describedby={`delete-blocked-${secret.secretId}`}
                   >
-                    Delete secret
+                    Remove secret
                   </Button>
                   <p
                     id={`delete-blocked-${secret.secretId}`}
@@ -460,9 +460,9 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
         return request;
       },
       send: (request, options) => adminClient.deleteSecret(request, options),
-      failureTitle: "Secret deletion",
+      failureTitle: "Secret removal",
       onSuccess: async () => {
-        toast.success("Secret deleted");
+        toast.success("Secret removed");
         onDeleted();
         await queryClient.invalidateQueries({ queryKey: ["secrets", lifetime.generation] });
         queryClient.removeQueries({ queryKey: ["secret", lifetime.generation, secret.secretId] });
@@ -490,8 +490,8 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
           <dt className="font-medium">Effect</dt>
           <dd>
             {secret.currentVersion === 1n
-              ? "Erases the stored value from the server."
-              : `Erases all ${secret.currentVersion.toString()} versions of the value from the server.`}{" "}
+              ? "Removes the stored value from the server."
+              : `Removes all ${secret.currentVersion.toString()} versions of the value from the server.`}{" "}
             Who created and changed it stays in the audit log.
           </dd>
         </div>
@@ -538,9 +538,12 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
         </p>
       ) : null}
       {exact.failure ? (
-        <RpcError failure={exact.failure} title="Secret not deleted">
+        <RpcError failure={exact.failure} title="Secret removal failed">
           {exact.ambiguous ? (
-            <p>Refresh to see whether it was deleted. Try again, or discard to start over.</p>
+            <p>
+              Refresh to check whether the secret remains. Retry the same request. Discard it only
+              to start a new request.
+            </p>
           ) : null}
         </RpcError>
       ) : null}
@@ -552,7 +555,7 @@ function DeleteSecretForm({ secret, onDeleted }: { secret: SecretSummary; onDele
           disabled={exact.busy || !confirmed || reason.trim() === ""}
           aria-describedby={confirmed && reason.trim() !== "" ? undefined : `${id}-prerequisite`}
         >
-          {exact.busy ? "Deleting…" : exact.ambiguous ? "Try again" : "Delete secret"}
+          {exact.busy ? "Removing…" : exact.ambiguous ? "Retry same request" : "Remove secret"}
         </Button>
         {exact.ambiguous ? (
           <Button type="button" variant="outline" disabled={exact.busy} onClick={exact.reset}>
@@ -613,7 +616,7 @@ export function SecretRowActions({
                 aria-haspopup="dialog"
                 onClick={() => setOpen("delete")}
               >
-                Delete…
+                Remove…
               </DropdownMenuItem>
             </>
           ) : null}

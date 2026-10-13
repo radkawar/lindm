@@ -526,7 +526,10 @@ export function installProbes(rules) {
             for (const term of vocabulary.approvedTerms) {
               for (const synonym of term.forbiddenSynonyms) {
                 const escaped = synonym.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-                const match = new RegExp(`\\b${escaped}\\b`, "i").exec(value);
+                const match = new RegExp(
+                  `(?<![\\p{L}\\p{N}-])${escaped}(?![\\p{L}\\p{N}-])`,
+                  "iu",
+                ).exec(value);
                 if (match)
                   report(
                     `STE use "${term.term}"`,
@@ -566,6 +569,9 @@ export function installProbes(rules) {
             }
           }
         }
+        // Existing identifier rules inspect individual non-technical text nodes.
+        // Sentence aggregation must not reclassify a block's technical values.
+        if (source === "primary text") return;
         for (const { rule, regex } of compiled) {
           const match = regex.exec(value);
           if (match) report(rule, value, match.index, match[0].length, node, source);
@@ -590,14 +596,20 @@ export function installProbes(rules) {
           ) ?? parent;
         if (!steBlocks.has(block)) {
           steBlocks.add(block);
-          const primaryText = [...block.childNodes]
-            .map((child) => {
-              if (child.nodeType === Node.TEXT_NODE) return child.nodeValue;
-              if (child.nodeType !== Node.ELEMENT_NODE || excluded(child) || !rendered(child))
-                return "";
-              return child.innerText ?? "";
-            })
-            .join(" ");
+          const parts = [];
+          const blockWalker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+          for (let child = blockWalker.nextNode(); child; child = blockWalker.nextNode()) {
+            const element = child.parentElement;
+            if (
+              element &&
+              rendered(element) &&
+              !srOnly(element) &&
+              !excluded(element) &&
+              !element.closest("script,style,template,textarea")
+            )
+              parts.push(child.nodeValue);
+          }
+          const primaryText = parts.join(" ");
           inspect(normalize(primaryText), block, "primary text", false);
         }
         const phrase = normalize(text.nodeValue).includes(" ");
@@ -628,7 +640,6 @@ export function installProbes(rules) {
         }
       }
       for (const node of document.querySelectorAll("a[href]")) {
-        if (!rendered(node)) continue;
         let url;
         try {
           url = new URL(node.getAttribute("href"), location.href);

@@ -14,10 +14,14 @@
         "deletes",
         "deleted",
         "deleting",
+        "deletion",
+        "deletions",
         "erase",
         "erases",
         "erased",
         "erasing",
+        "erasure",
+        "erasures",
         "drop",
         "drops",
         "dropped",
@@ -25,6 +29,11 @@
       ]
     },
     { "term": "wipe", "meaning": "Destructively remove device data", "forbiddenSynonyms": [] },
+    {
+      "term": "drop-in",
+      "meaning": "A systemd configuration fragment, not the remove action",
+      "forbiddenSynonyms": []
+    },
     {
       "term": "hostname",
       "meaning": "The reported name of a device; host remains a distinct network term",

@@ -444,7 +444,7 @@ function GroupEditor({
         ) : null}
         {group && reason.trim() === "" ? (
           <p id={`${groupId}-delete-help`} className="text-xs text-muted-foreground">
-            Enter a reason to delete this group.
+            Enter a reason to remove this group.
           </p>
         ) : null}
       </div>
