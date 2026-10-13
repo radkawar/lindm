@@ -107,13 +107,29 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     const isDeviceAction = (caption) =>
       DEVICE_ACTION_NAMES.some((name) => caption.startsWith(name));
     const all = await captions(main);
-    // The seed's bulk device-details edits fill this page; each is about one
-    // device, so its Device cell (When, Action, Who, Device, Reason) names it.
+    // The seed's bulk device-details edits are each about one device, so their
+    // Device cell (When, Action, Who, Device, Reason) names it. Events recorded
+    // after the seed (inbox reads, sign-ins, earlier review checks) can push
+    // them past the first page, so page back as an operator would.
     const details = main
       .getByRole("table")
       .first()
       .locator("tbody tr")
       .filter({ hasText: "Changed device details" });
+    for (let turned = 0; (await details.count()) === 0 && turned < 40; turned += 1) {
+      const next = main
+        .getByRole("navigation", { name: "Audit log pages", exact: true })
+        .getByRole("button", { name: "Next page", exact: true });
+      if (!(await next.isVisible()) || (await next.isDisabled())) break;
+      await Promise.all([
+        page.waitForResponse((response) =>
+          response.url().endsWith("/lindm.admin.v1.AdminService/ListAuditEvents"),
+        ),
+        next.click(),
+      ]);
+      await idle(main);
+      all.push(...(await captions(main)));
+    }
     const detailCount = await details.count();
     require(detailCount > 0, "All actions shows no 'Changed device details' rows to assess");
     const unnamedDevices = [];

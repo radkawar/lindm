@@ -52,7 +52,10 @@ export async function check({ page, visit, require, capture, step }) {
     require(await box.isChecked(), `Built-in approval '${label}' is unticked`);
     require(await box.isDisabled(), `Built-in approval '${label}' can be unticked`);
   }
+  // Custom roles grant the same operation by the same name, so read the
+  // approval requirement in its own group.
   require((await main
+    .getByRole("group", { name: "Require independent approval", exact: true })
     .getByRole("checkbox", {
       name: "Change which signing keys devices trust for commands",
       exact: true,
