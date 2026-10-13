@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"time"
@@ -40,4 +42,35 @@ func DecodeCursor(token string) (time.Time, uuid.UUID, error) {
 		return time.Time{}, uuid.Nil, Invalid("page_token")
 	}
 	return when, id, nil
+}
+
+// EncodeFilteredCursor is EncodeCursor bound to a list's filter: an empty filter
+// keeps the plain token; otherwise the token carries the first 16 bytes of the
+// filter's SHA-256, so it continues only that filter.
+func EncodeFilteredCursor(t time.Time, id uuid.UUID, filter []byte) (string, error) {
+	token, err := EncodeCursor(t, id)
+	if err != nil || len(filter) == 0 {
+		return token, err
+	}
+	raw, _ := base64.RawURLEncoding.DecodeString(token)
+	raw[0] = 2
+	digest := sha256.Sum256(filter)
+	return base64.RawURLEncoding.EncodeToString(append(raw, digest[:16]...)), nil
+}
+
+// DecodeFilteredCursor accepts only a token encoded for the same filter.
+func DecodeFilteredCursor(token string, filter []byte) (time.Time, uuid.UUID, error) {
+	if len(filter) == 0 {
+		return DecodeCursor(token)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil || len(token) > 512 || len(raw) != 1+8+16+16 || raw[0] != 2 {
+		return time.Time{}, uuid.Nil, Invalid("page_token")
+	}
+	digest := sha256.Sum256(filter)
+	if !bytes.Equal(raw[25:], digest[:16]) {
+		return time.Time{}, uuid.Nil, Invalid("page_token")
+	}
+	raw[0] = 1
+	return DecodeCursor(base64.RawURLEncoding.EncodeToString(raw[:25]))
 }

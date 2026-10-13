@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"lindm/internal/auditkind"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -314,9 +316,13 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 	if err := core.RequireDeviceScope(ctx, q, actor, identity.PermissionReadFleet, id); err != nil {
 		return nil, core.MapErr(err)
 	}
-	params := devicedb.ListDeviceActionsParams{DeviceID: id, PageLimit: core.PageLimit(req.Msg.GetPageSize()) + 1, CursorTime: core.Timestamptz(time.Unix(0, 0))}
+	capabilities, filter, err := actionKindCapabilities(req.Msg.GetKinds())
+	if err != nil {
+		return nil, err
+	}
+	params := devicedb.ListDeviceActionsParams{DeviceID: id, PageLimit: core.PageLimit(req.Msg.GetPageSize()) + 1, CursorTime: core.Timestamptz(time.Unix(0, 0)), Capabilities: capabilities}
 	if req.Msg.GetPageToken() != "" {
-		stamp, cursor, err := core.DecodeCursor(req.Msg.GetPageToken())
+		stamp, cursor, err := core.DecodeFilteredCursor(req.Msg.GetPageToken(), filter)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +380,7 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 			return nil, rpcreason.Error(connect.CodeResourceExhausted, "device_action_page_capacity")
 		}
 		last := rows[len(response.Actions)-1]
-		response.NextPageToken, err = core.EncodeCursor(last.IssuedAt.Time, last.ID)
+		response.NextPageToken, err = core.EncodeFilteredCursor(last.IssuedAt.Time, last.ID, filter)
 		if err != nil {
 			return nil, err
 		}
@@ -384,6 +390,33 @@ func (s *Service) GetDeviceActions(ctx context.Context, req *connect.Request[adm
 	}
 	return core.NoStore(response), nil
 }
+
+// actionKindCapabilities maps requested action kinds to the capability names
+// stored with each action (trust.DeviceActionCapability, the one mapping), and
+// returns the sorted kinds as the filter a page token binds.
+func actionKindCapabilities(kinds []adminv1.DeviceActionKind) ([]string, []byte, error) {
+	sorted := slices.Sorted(slices.Values(kinds))
+	action := (&agentv1.DeviceActionSpec{}).ProtoReflect().Descriptor().Oneofs().ByName("action")
+	capabilities := make([]string, 0, len(sorted))
+	filter := make([]byte, 0, len(sorted))
+	for _, kind := range sorted {
+		field := action.Fields().ByNumber(protoreflect.FieldNumber(kind))
+		if field == nil {
+			return nil, nil, core.Invalid("invalid_device_actions")
+		}
+		spec := new(agentv1.DeviceActionSpec)
+		message := spec.ProtoReflect()
+		message.Set(field, message.NewField(field))
+		capability, err := trust.DeviceActionCapability(spec)
+		if err != nil {
+			return nil, nil, core.Invalid("invalid_device_actions")
+		}
+		capabilities = append(capabilities, capability)
+		filter = append(filter, byte(kind))
+	}
+	return capabilities, filter, nil
+}
+
 func (s *Service) GetDeviceAction(ctx context.Context, req *connect.Request[adminv1.GetDeviceActionRequest]) (*connect.Response[adminv1.GetDeviceActionResponse], error) {
 	ctx, cancel := core.Bound(ctx)
 	defer cancel()

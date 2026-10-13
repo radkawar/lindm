@@ -25,6 +25,90 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Which device action a DeviceActionSpec carries. Each value is the number of
+// its lindm.agent.v1.DeviceActionSpec.action field.
+type DeviceActionKind int32
+
+const (
+	DeviceActionKind_DEVICE_ACTION_KIND_UNSPECIFIED                 DeviceActionKind = 0
+	DeviceActionKind_DEVICE_ACTION_KIND_ESCROW_ROTATE               DeviceActionKind = 1
+	DeviceActionKind_DEVICE_ACTION_KIND_TPM2_BIND                   DeviceActionKind = 2
+	DeviceActionKind_DEVICE_ACTION_KIND_LOCK_SESSIONS               DeviceActionKind = 3
+	DeviceActionKind_DEVICE_ACTION_KIND_QUARANTINE                  DeviceActionKind = 4
+	DeviceActionKind_DEVICE_ACTION_KIND_RELEASE_QUARANTINE          DeviceActionKind = 5
+	DeviceActionKind_DEVICE_ACTION_KIND_CRYPTO_ERASE                DeviceActionKind = 6
+	DeviceActionKind_DEVICE_ACTION_KIND_SANITIZE                    DeviceActionKind = 7
+	DeviceActionKind_DEVICE_ACTION_KIND_RELEASE_LOCK                DeviceActionKind = 8
+	DeviceActionKind_DEVICE_ACTION_KIND_RESTART                     DeviceActionKind = 9
+	DeviceActionKind_DEVICE_ACTION_KIND_SHUTDOWN                    DeviceActionKind = 10
+	DeviceActionKind_DEVICE_ACTION_KIND_REFRESH_INVENTORY           DeviceActionKind = 11
+	DeviceActionKind_DEVICE_ACTION_KIND_LOCAL_ADMIN_PASSWORD_ROTATE DeviceActionKind = 12
+	DeviceActionKind_DEVICE_ACTION_KIND_PATCH_NOW                   DeviceActionKind = 13
+)
+
+// Enum value maps for DeviceActionKind.
+var (
+	DeviceActionKind_name = map[int32]string{
+		0:  "DEVICE_ACTION_KIND_UNSPECIFIED",
+		1:  "DEVICE_ACTION_KIND_ESCROW_ROTATE",
+		2:  "DEVICE_ACTION_KIND_TPM2_BIND",
+		3:  "DEVICE_ACTION_KIND_LOCK_SESSIONS",
+		4:  "DEVICE_ACTION_KIND_QUARANTINE",
+		5:  "DEVICE_ACTION_KIND_RELEASE_QUARANTINE",
+		6:  "DEVICE_ACTION_KIND_CRYPTO_ERASE",
+		7:  "DEVICE_ACTION_KIND_SANITIZE",
+		8:  "DEVICE_ACTION_KIND_RELEASE_LOCK",
+		9:  "DEVICE_ACTION_KIND_RESTART",
+		10: "DEVICE_ACTION_KIND_SHUTDOWN",
+		11: "DEVICE_ACTION_KIND_REFRESH_INVENTORY",
+		12: "DEVICE_ACTION_KIND_LOCAL_ADMIN_PASSWORD_ROTATE",
+		13: "DEVICE_ACTION_KIND_PATCH_NOW",
+	}
+	DeviceActionKind_value = map[string]int32{
+		"DEVICE_ACTION_KIND_UNSPECIFIED":                 0,
+		"DEVICE_ACTION_KIND_ESCROW_ROTATE":               1,
+		"DEVICE_ACTION_KIND_TPM2_BIND":                   2,
+		"DEVICE_ACTION_KIND_LOCK_SESSIONS":               3,
+		"DEVICE_ACTION_KIND_QUARANTINE":                  4,
+		"DEVICE_ACTION_KIND_RELEASE_QUARANTINE":          5,
+		"DEVICE_ACTION_KIND_CRYPTO_ERASE":                6,
+		"DEVICE_ACTION_KIND_SANITIZE":                    7,
+		"DEVICE_ACTION_KIND_RELEASE_LOCK":                8,
+		"DEVICE_ACTION_KIND_RESTART":                     9,
+		"DEVICE_ACTION_KIND_SHUTDOWN":                    10,
+		"DEVICE_ACTION_KIND_REFRESH_INVENTORY":           11,
+		"DEVICE_ACTION_KIND_LOCAL_ADMIN_PASSWORD_ROTATE": 12,
+		"DEVICE_ACTION_KIND_PATCH_NOW":                   13,
+	}
+)
+
+func (x DeviceActionKind) Enum() *DeviceActionKind {
+	p := new(DeviceActionKind)
+	*p = x
+	return p
+}
+
+func (x DeviceActionKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DeviceActionKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_device_actions_proto_enumTypes[0].Descriptor()
+}
+
+func (DeviceActionKind) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_device_actions_proto_enumTypes[0]
+}
+
+func (x DeviceActionKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DeviceActionKind.Descriptor instead.
+func (DeviceActionKind) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_device_actions_proto_rawDescGZIP(), []int{0}
+}
+
 // Immutable imperative action, never a desired-state assignment or retry policy.
 type DeviceAction struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
@@ -442,10 +526,13 @@ func (x *PreflightDeviceActionResponse) GetBlockingAction() *DeviceAction {
 }
 
 type GetDeviceActionsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
-	PageSize      uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId  string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	PageSize  uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Only actions of these kinds; empty lists every kind. The page token binds
+	// the set: restart paging when it changes.
+	Kinds         []DeviceActionKind `protobuf:"varint,4,rep,packed,name=kinds,proto3,enum=lindm.admin.v1.DeviceActionKind" json:"kinds,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -499,6 +586,13 @@ func (x *GetDeviceActionsRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *GetDeviceActionsRequest) GetKinds() []DeviceActionKind {
+	if x != nil {
+		return x.Kinds
+	}
+	return nil
 }
 
 type GetDeviceActionsResponse struct {
@@ -1449,12 +1543,13 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"lastSeenAt\x12N\n" +
 	"\x15inventory_received_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x13inventoryReceivedAt\x129\n" +
 	"\x19inventory_max_age_seconds\x18\x05 \x01(\rR\x16inventoryMaxAgeSeconds\x12E\n" +
-	"\x0fblocking_action\x18\x06 \x01(\v2\x1c.lindm.admin.v1.DeviceActionR\x0eblockingAction\"\x90\x01\n" +
+	"\x0fblocking_action\x18\x06 \x01(\v2\x1c.lindm.admin.v1.DeviceActionR\x0eblockingAction\"\xdd\x01\n" +
 	"\x17GetDeviceActionsRequest\x12%\n" +
 	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12%\n" +
 	"\tpage_size\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\xb2\x02\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x12K\n" +
+	"\x05kinds\x18\x04 \x03(\x0e2 .lindm.admin.v1.DeviceActionKindB\x13\xbaH\x10\x92\x01\r\x10\r\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x05kinds\"\xb2\x02\n" +
 	"\x18GetDeviceActionsResponse\x126\n" +
 	"\aactions\x18\x01 \x03(\v2\x1c.lindm.admin.v1.DeviceActionR\aactions\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12'\n" +
@@ -1535,7 +1630,23 @@ const file_lindm_admin_v1_device_actions_proto_rawDesc = "" +
 	"image_size\x18\x05 \x01(\x04R\timageSize\x12!\n" +
 	"\fneeded_bytes\x18\x06 \x01(\x04R\vneededBytes\x12'\n" +
 	"\x0favailable_bytes\x18\a \x01(\x04R\x0eavailableBytes\x12=\n" +
-	"\tboot_mode\x18\b \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeR\bbootModeB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
+	"\tboot_mode\x18\b \x01(\x0e2 .lindm.agent.v1.RecoveryBootModeR\bbootMode*\x9e\x04\n" +
+	"\x10DeviceActionKind\x12\"\n" +
+	"\x1eDEVICE_ACTION_KIND_UNSPECIFIED\x10\x00\x12$\n" +
+	" DEVICE_ACTION_KIND_ESCROW_ROTATE\x10\x01\x12 \n" +
+	"\x1cDEVICE_ACTION_KIND_TPM2_BIND\x10\x02\x12$\n" +
+	" DEVICE_ACTION_KIND_LOCK_SESSIONS\x10\x03\x12!\n" +
+	"\x1dDEVICE_ACTION_KIND_QUARANTINE\x10\x04\x12)\n" +
+	"%DEVICE_ACTION_KIND_RELEASE_QUARANTINE\x10\x05\x12#\n" +
+	"\x1fDEVICE_ACTION_KIND_CRYPTO_ERASE\x10\x06\x12\x1f\n" +
+	"\x1bDEVICE_ACTION_KIND_SANITIZE\x10\a\x12#\n" +
+	"\x1fDEVICE_ACTION_KIND_RELEASE_LOCK\x10\b\x12\x1e\n" +
+	"\x1aDEVICE_ACTION_KIND_RESTART\x10\t\x12\x1f\n" +
+	"\x1bDEVICE_ACTION_KIND_SHUTDOWN\x10\n" +
+	"\x12(\n" +
+	"$DEVICE_ACTION_KIND_REFRESH_INVENTORY\x10\v\x122\n" +
+	".DEVICE_ACTION_KIND_LOCAL_ADMIN_PASSWORD_ROTATE\x10\f\x12 \n" +
+	"\x1cDEVICE_ACTION_KIND_PATCH_NOW\x10\rB\"Z lindm/gen/lindm/admin/v1;adminv1b\x06proto3"
 
 var (
 	file_lindm_admin_v1_device_actions_proto_rawDescOnce sync.Once
@@ -1549,69 +1660,72 @@ func file_lindm_admin_v1_device_actions_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_device_actions_proto_rawDescData
 }
 
+var file_lindm_admin_v1_device_actions_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_lindm_admin_v1_device_actions_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_lindm_admin_v1_device_actions_proto_goTypes = []any{
-	(*DeviceAction)(nil),                     // 0: lindm.admin.v1.DeviceAction
-	(*CreateDeviceActionRequest)(nil),        // 1: lindm.admin.v1.CreateDeviceActionRequest
-	(*CreateDeviceActionResponse)(nil),       // 2: lindm.admin.v1.CreateDeviceActionResponse
-	(*PreflightDeviceActionRequest)(nil),     // 3: lindm.admin.v1.PreflightDeviceActionRequest
-	(*PreflightDeviceActionResponse)(nil),    // 4: lindm.admin.v1.PreflightDeviceActionResponse
-	(*GetDeviceActionsRequest)(nil),          // 5: lindm.admin.v1.GetDeviceActionsRequest
-	(*GetDeviceActionsResponse)(nil),         // 6: lindm.admin.v1.GetDeviceActionsResponse
-	(*GetDeviceActionRequest)(nil),           // 7: lindm.admin.v1.GetDeviceActionRequest
-	(*GetDeviceActionResponse)(nil),          // 8: lindm.admin.v1.GetDeviceActionResponse
-	(*GetDeviceEncryptionRequest)(nil),       // 9: lindm.admin.v1.GetDeviceEncryptionRequest
-	(*DeviceRecoveryEscrow)(nil),             // 10: lindm.admin.v1.DeviceRecoveryEscrow
-	(*GetDeviceEncryptionResponse)(nil),      // 11: lindm.admin.v1.GetDeviceEncryptionResponse
-	(*RevealRecoveryKeyRequest)(nil),         // 12: lindm.admin.v1.RevealRecoveryKeyRequest
-	(*RevealRecoveryKeyResponse)(nil),        // 13: lindm.admin.v1.RevealRecoveryKeyResponse
-	(*DeviceStorageTarget)(nil),              // 14: lindm.admin.v1.DeviceStorageTarget
-	(*ListDeviceStorageTargetsRequest)(nil),  // 15: lindm.admin.v1.ListDeviceStorageTargetsRequest
-	(*ListDeviceStorageTargetsResponse)(nil), // 16: lindm.admin.v1.ListDeviceStorageTargetsResponse
-	(*RecoveryReadiness)(nil),                // 17: lindm.admin.v1.RecoveryReadiness
-	(*v1.DeviceActionSpec)(nil),              // 18: lindm.agent.v1.DeviceActionSpec
-	(*timestamppb.Timestamp)(nil),            // 19: google.protobuf.Timestamp
-	(*v1.DeviceActionStatus)(nil),            // 20: lindm.agent.v1.DeviceActionStatus
-	(*v1.DeviceActionObservation)(nil),       // 21: lindm.agent.v1.DeviceActionObservation
-	(*RevealApproval)(nil),                   // 22: lindm.admin.v1.RevealApproval
-	(*v1.StorageTarget)(nil),                 // 23: lindm.agent.v1.StorageTarget
-	(*v1.NVMeSanitizeScope)(nil),             // 24: lindm.agent.v1.NVMeSanitizeScope
-	(*v1.RecoveryReadinessObservation)(nil),  // 25: lindm.agent.v1.RecoveryReadinessObservation
-	(v1.RecoveryBootMode)(0),                 // 26: lindm.agent.v1.RecoveryBootMode
+	(DeviceActionKind)(0),                    // 0: lindm.admin.v1.DeviceActionKind
+	(*DeviceAction)(nil),                     // 1: lindm.admin.v1.DeviceAction
+	(*CreateDeviceActionRequest)(nil),        // 2: lindm.admin.v1.CreateDeviceActionRequest
+	(*CreateDeviceActionResponse)(nil),       // 3: lindm.admin.v1.CreateDeviceActionResponse
+	(*PreflightDeviceActionRequest)(nil),     // 4: lindm.admin.v1.PreflightDeviceActionRequest
+	(*PreflightDeviceActionResponse)(nil),    // 5: lindm.admin.v1.PreflightDeviceActionResponse
+	(*GetDeviceActionsRequest)(nil),          // 6: lindm.admin.v1.GetDeviceActionsRequest
+	(*GetDeviceActionsResponse)(nil),         // 7: lindm.admin.v1.GetDeviceActionsResponse
+	(*GetDeviceActionRequest)(nil),           // 8: lindm.admin.v1.GetDeviceActionRequest
+	(*GetDeviceActionResponse)(nil),          // 9: lindm.admin.v1.GetDeviceActionResponse
+	(*GetDeviceEncryptionRequest)(nil),       // 10: lindm.admin.v1.GetDeviceEncryptionRequest
+	(*DeviceRecoveryEscrow)(nil),             // 11: lindm.admin.v1.DeviceRecoveryEscrow
+	(*GetDeviceEncryptionResponse)(nil),      // 12: lindm.admin.v1.GetDeviceEncryptionResponse
+	(*RevealRecoveryKeyRequest)(nil),         // 13: lindm.admin.v1.RevealRecoveryKeyRequest
+	(*RevealRecoveryKeyResponse)(nil),        // 14: lindm.admin.v1.RevealRecoveryKeyResponse
+	(*DeviceStorageTarget)(nil),              // 15: lindm.admin.v1.DeviceStorageTarget
+	(*ListDeviceStorageTargetsRequest)(nil),  // 16: lindm.admin.v1.ListDeviceStorageTargetsRequest
+	(*ListDeviceStorageTargetsResponse)(nil), // 17: lindm.admin.v1.ListDeviceStorageTargetsResponse
+	(*RecoveryReadiness)(nil),                // 18: lindm.admin.v1.RecoveryReadiness
+	(*v1.DeviceActionSpec)(nil),              // 19: lindm.agent.v1.DeviceActionSpec
+	(*timestamppb.Timestamp)(nil),            // 20: google.protobuf.Timestamp
+	(*v1.DeviceActionStatus)(nil),            // 21: lindm.agent.v1.DeviceActionStatus
+	(*v1.DeviceActionObservation)(nil),       // 22: lindm.agent.v1.DeviceActionObservation
+	(*RevealApproval)(nil),                   // 23: lindm.admin.v1.RevealApproval
+	(*v1.StorageTarget)(nil),                 // 24: lindm.agent.v1.StorageTarget
+	(*v1.NVMeSanitizeScope)(nil),             // 25: lindm.agent.v1.NVMeSanitizeScope
+	(*v1.RecoveryReadinessObservation)(nil),  // 26: lindm.agent.v1.RecoveryReadinessObservation
+	(v1.RecoveryBootMode)(0),                 // 27: lindm.agent.v1.RecoveryBootMode
 }
 var file_lindm_admin_v1_device_actions_proto_depIdxs = []int32{
-	18, // 0: lindm.admin.v1.DeviceAction.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	19, // 1: lindm.admin.v1.DeviceAction.created_at:type_name -> google.protobuf.Timestamp
-	19, // 2: lindm.admin.v1.DeviceAction.expires_at:type_name -> google.protobuf.Timestamp
-	20, // 3: lindm.admin.v1.DeviceAction.status:type_name -> lindm.agent.v1.DeviceActionStatus
-	18, // 4: lindm.admin.v1.CreateDeviceActionRequest.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	19, // 5: lindm.admin.v1.CreateDeviceActionRequest.expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 6: lindm.admin.v1.CreateDeviceActionResponse.action:type_name -> lindm.admin.v1.DeviceAction
-	18, // 7: lindm.admin.v1.PreflightDeviceActionRequest.spec:type_name -> lindm.agent.v1.DeviceActionSpec
-	19, // 8: lindm.admin.v1.PreflightDeviceActionResponse.checked_at:type_name -> google.protobuf.Timestamp
-	19, // 9: lindm.admin.v1.PreflightDeviceActionResponse.last_seen_at:type_name -> google.protobuf.Timestamp
-	19, // 10: lindm.admin.v1.PreflightDeviceActionResponse.inventory_received_at:type_name -> google.protobuf.Timestamp
-	0,  // 11: lindm.admin.v1.PreflightDeviceActionResponse.blocking_action:type_name -> lindm.admin.v1.DeviceAction
-	0,  // 12: lindm.admin.v1.GetDeviceActionsResponse.actions:type_name -> lindm.admin.v1.DeviceAction
-	19, // 13: lindm.admin.v1.GetDeviceActionsResponse.quarantine_until:type_name -> google.protobuf.Timestamp
-	0,  // 14: lindm.admin.v1.GetDeviceActionResponse.action:type_name -> lindm.admin.v1.DeviceAction
-	19, // 15: lindm.admin.v1.DeviceRecoveryEscrow.stored_at:type_name -> google.protobuf.Timestamp
-	21, // 16: lindm.admin.v1.GetDeviceEncryptionResponse.observation:type_name -> lindm.agent.v1.DeviceActionObservation
-	10, // 17: lindm.admin.v1.GetDeviceEncryptionResponse.escrow:type_name -> lindm.admin.v1.DeviceRecoveryEscrow
-	22, // 18: lindm.admin.v1.GetDeviceEncryptionResponse.recovery_key_reveal_approval:type_name -> lindm.admin.v1.RevealApproval
-	23, // 19: lindm.admin.v1.DeviceStorageTarget.target:type_name -> lindm.agent.v1.StorageTarget
-	24, // 20: lindm.admin.v1.DeviceStorageTarget.nvme:type_name -> lindm.agent.v1.NVMeSanitizeScope
-	14, // 21: lindm.admin.v1.ListDeviceStorageTargetsResponse.targets:type_name -> lindm.admin.v1.DeviceStorageTarget
-	19, // 22: lindm.admin.v1.ListDeviceStorageTargetsResponse.received_at:type_name -> google.protobuf.Timestamp
-	19, // 23: lindm.admin.v1.ListDeviceStorageTargetsResponse.observed_at:type_name -> google.protobuf.Timestamp
-	17, // 24: lindm.admin.v1.ListDeviceStorageTargetsResponse.recovery_readiness:type_name -> lindm.admin.v1.RecoveryReadiness
-	25, // 25: lindm.admin.v1.RecoveryReadiness.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
-	26, // 26: lindm.admin.v1.RecoveryReadiness.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	19, // 0: lindm.admin.v1.DeviceAction.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	20, // 1: lindm.admin.v1.DeviceAction.created_at:type_name -> google.protobuf.Timestamp
+	20, // 2: lindm.admin.v1.DeviceAction.expires_at:type_name -> google.protobuf.Timestamp
+	21, // 3: lindm.admin.v1.DeviceAction.status:type_name -> lindm.agent.v1.DeviceActionStatus
+	19, // 4: lindm.admin.v1.CreateDeviceActionRequest.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	20, // 5: lindm.admin.v1.CreateDeviceActionRequest.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: lindm.admin.v1.CreateDeviceActionResponse.action:type_name -> lindm.admin.v1.DeviceAction
+	19, // 7: lindm.admin.v1.PreflightDeviceActionRequest.spec:type_name -> lindm.agent.v1.DeviceActionSpec
+	20, // 8: lindm.admin.v1.PreflightDeviceActionResponse.checked_at:type_name -> google.protobuf.Timestamp
+	20, // 9: lindm.admin.v1.PreflightDeviceActionResponse.last_seen_at:type_name -> google.protobuf.Timestamp
+	20, // 10: lindm.admin.v1.PreflightDeviceActionResponse.inventory_received_at:type_name -> google.protobuf.Timestamp
+	1,  // 11: lindm.admin.v1.PreflightDeviceActionResponse.blocking_action:type_name -> lindm.admin.v1.DeviceAction
+	0,  // 12: lindm.admin.v1.GetDeviceActionsRequest.kinds:type_name -> lindm.admin.v1.DeviceActionKind
+	1,  // 13: lindm.admin.v1.GetDeviceActionsResponse.actions:type_name -> lindm.admin.v1.DeviceAction
+	20, // 14: lindm.admin.v1.GetDeviceActionsResponse.quarantine_until:type_name -> google.protobuf.Timestamp
+	1,  // 15: lindm.admin.v1.GetDeviceActionResponse.action:type_name -> lindm.admin.v1.DeviceAction
+	20, // 16: lindm.admin.v1.DeviceRecoveryEscrow.stored_at:type_name -> google.protobuf.Timestamp
+	22, // 17: lindm.admin.v1.GetDeviceEncryptionResponse.observation:type_name -> lindm.agent.v1.DeviceActionObservation
+	11, // 18: lindm.admin.v1.GetDeviceEncryptionResponse.escrow:type_name -> lindm.admin.v1.DeviceRecoveryEscrow
+	23, // 19: lindm.admin.v1.GetDeviceEncryptionResponse.recovery_key_reveal_approval:type_name -> lindm.admin.v1.RevealApproval
+	24, // 20: lindm.admin.v1.DeviceStorageTarget.target:type_name -> lindm.agent.v1.StorageTarget
+	25, // 21: lindm.admin.v1.DeviceStorageTarget.nvme:type_name -> lindm.agent.v1.NVMeSanitizeScope
+	15, // 22: lindm.admin.v1.ListDeviceStorageTargetsResponse.targets:type_name -> lindm.admin.v1.DeviceStorageTarget
+	20, // 23: lindm.admin.v1.ListDeviceStorageTargetsResponse.received_at:type_name -> google.protobuf.Timestamp
+	20, // 24: lindm.admin.v1.ListDeviceStorageTargetsResponse.observed_at:type_name -> google.protobuf.Timestamp
+	18, // 25: lindm.admin.v1.ListDeviceStorageTargetsResponse.recovery_readiness:type_name -> lindm.admin.v1.RecoveryReadiness
+	26, // 26: lindm.admin.v1.RecoveryReadiness.observation:type_name -> lindm.agent.v1.RecoveryReadinessObservation
+	27, // 27: lindm.admin.v1.RecoveryReadiness.boot_mode:type_name -> lindm.agent.v1.RecoveryBootMode
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_device_actions_proto_init() }
@@ -1626,13 +1740,14 @@ func file_lindm_admin_v1_device_actions_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_device_actions_proto_rawDesc), len(file_lindm_admin_v1_device_actions_proto_rawDesc)),
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_lindm_admin_v1_device_actions_proto_goTypes,
 		DependencyIndexes: file_lindm_admin_v1_device_actions_proto_depIdxs,
+		EnumInfos:         file_lindm_admin_v1_device_actions_proto_enumTypes,
 		MessageInfos:      file_lindm_admin_v1_device_actions_proto_msgTypes,
 	}.Build()
 	File_lindm_admin_v1_device_actions_proto = out.File

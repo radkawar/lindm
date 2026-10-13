@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { DeviceActionKind } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import type { AuthLifetime } from "@/lib/auth-lifetime";
 import { adminClient } from "@/lib/rpc";
 
@@ -65,19 +66,22 @@ export function deviceStorageTargetsQueryOptions(
   });
 }
 
+// A page of the device's actions, newest first; only the given kinds when any
+// are named (a page token continues only the same kinds).
 export function deviceActionsQueryOptions(
   lifetime: AuthLifetime,
   deviceId: string,
   pageToken: string,
+  kinds: DeviceActionKind[] = [],
 ) {
   return queryOptions({
-    queryKey: ["device-actions", lifetime.generation, deviceId, pageToken] as const,
+    queryKey: ["device-actions", lifetime.generation, deviceId, pageToken, kinds] as const,
     meta: { authGeneration: lifetime.generation },
     retry: false,
     refetchInterval: 10_000,
     queryFn: async ({ signal }) => {
       const result = await adminClient.getDeviceActions(
-        { deviceId, pageSize: 25, pageToken },
+        { deviceId, pageSize: 25, pageToken, kinds },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );
       lifetime.signal.throwIfAborted();

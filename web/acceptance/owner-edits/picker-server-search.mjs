@@ -3,14 +3,17 @@
 // read "No matching options". Device group and dynamic group pickers now ask the
 // server for any part of the name, page inside the open picker with More
 // choices, and name an empty search result.
-// Read-only: searches in the New rollout dialog and closes it without saving.
+// The release-quarantine picker asks the server for quarantines only and names
+// each by what stayed reachable, not only by its request time.
+// Read-only: searches in the New rollout dialog and closes it without saving, and
+// opens Release quarantine on the route device without sending anything.
 export const task = {
   name: "Pickers search every group, not one page",
   screenId: "owner-picker-server-search",
   route: "/rollouts",
   priority: "normal",
   acceptance:
-    "In the New rollout dialog, a device group that is only on the Target picker's second page (More choices) is found by typing part of its name in another case and can be chosen; a search with no match says no group names contain it; the dynamic group Target picker finds 'Finance devices' by 'NANCE' and lists nothing else.",
+    "In the New rollout dialog, a device group that is only on the Target picker's second page (More choices) is found by typing part of its name in another case and can be chosen; a search with no match says no group names contain it; the dynamic group Target picker finds 'Finance devices' by 'NANCE' and lists nothing else. On a device, Release quarantine's picker lists only quarantines, each named 'Network cut off except <addresses>', or says no quarantine was requested; never 'on this page'.",
 };
 
 const timeout = 30_000;
@@ -40,7 +43,7 @@ function openChoices(page) {
   return page.locator('[data-slot="command-list"]');
 }
 
-export async function check({ page, visit, settle, require, capture, step }) {
+export async function check({ page, demo, visit, settle, require, capture, step }) {
   const main = page.getByRole("main");
   step("open New rollout");
   await visit("/rollouts");
@@ -113,4 +116,34 @@ export async function check({ page, visit, settle, require, capture, step }) {
 
   await form.getByRole("button", { name: "Close", exact: true }).click();
   await form.waitFor({ state: "detached", timeout });
+
+  step("release quarantine lists quarantines only");
+  const deviceId = demo?.Routes?.DeviceID;
+  require(deviceId, "demo route device is missing");
+  if (!deviceId) return;
+  await visit(`/devices/${encodeURIComponent(deviceId)}`);
+  await main.getByRole("button", { name: "Actions", exact: true }).first().click();
+  await page.getByRole("menuitem", { name: "Release quarantine", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Release quarantine", exact: true });
+  await dialog.waitFor({ timeout });
+  await dialog.getByRole("button", { name: /^Quarantine to undo/ }).click();
+  const quarantines = openChoices(page);
+  const empty = page.getByText("No network quarantine was requested on this device.", {
+    exact: true,
+  });
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline && !(await empty.isVisible()) && !(await labels(quarantines)).length)
+    await page.waitForTimeout(100);
+  const listed = await labels(quarantines);
+  require(listed.length > 0 ||
+    (await empty.isVisible()), "Release quarantine's picker neither lists quarantines nor says none was requested");
+  for (const name of listed)
+    require(/^Network cut off except \S/.test(name), `Release quarantine lists "${name}"`);
+  require(!(await page
+    .getByText(/on this page/i)
+    .count()), "Release quarantine still says it searched one page");
+  await capture("release-quarantine-picker");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached", timeout });
 }

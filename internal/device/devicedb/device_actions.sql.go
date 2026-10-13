@@ -530,15 +530,17 @@ const listDeviceActions = `-- name: ListDeviceActions :many
 SELECT id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at, challenge_proof, challenge_document, start_grant_envelope, start_authorized_at, outcome_unknown, closed_at, closed_reason, result_nonce, nonce_expires_at, action_revision, attestation_envelope, attestation_certificate, status_document, received_at, escrow_receipt_envelope, inventory_receipt_envelope, inventory_receipt_document, inventory_host_sequence, inventory_host_received_at, inventory_package_sequence FROM device_actions
 WHERE device_id = $1
 AND (NOT $2::boolean OR (issued_at, id) < ($3::timestamptz, $4::uuid))
-ORDER BY issued_at DESC, id DESC LIMIT $5
+AND (cardinality($5::text[]) = 0 OR capability = ANY($5::text[]))
+ORDER BY issued_at DESC, id DESC LIMIT $6
 `
 
 type ListDeviceActionsParams struct {
-	DeviceID   uuid.UUID
-	HasCursor  bool
-	CursorTime pgtype.Timestamptz
-	CursorID   uuid.UUID
-	PageLimit  int32
+	DeviceID     uuid.UUID
+	HasCursor    bool
+	CursorTime   pgtype.Timestamptz
+	CursorID     uuid.UUID
+	Capabilities []string
+	PageLimit    int32
 }
 
 func (q *Queries) ListDeviceActions(ctx context.Context, arg ListDeviceActionsParams) ([]DeviceAction, error) {
@@ -547,6 +549,7 @@ func (q *Queries) ListDeviceActions(ctx context.Context, arg ListDeviceActionsPa
 		arg.HasCursor,
 		arg.CursorTime,
 		arg.CursorID,
+		arg.Capabilities,
 		arg.PageLimit,
 	)
 	if err != nil {

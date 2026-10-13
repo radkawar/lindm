@@ -204,6 +204,12 @@ popover (`pickerFooter`). A device-group page token binds its search; the `after
 keyset of dynamic groups and rollouts is valid under any search, and the pickers
 restart it whenever the search changes. Dynamic group and rollout names are stored
 beside their protobuf definitions (migration `targeting_names` backfilled them).
+A picker over a filtered list asks the server for the filter: the release-quarantine
+picker sends `GetDeviceActionsRequest.kinds` (`DeviceActionKind`, numbered like the
+`DeviceActionSpec` action fields; the page token binds the sorted set) and names
+each quarantine by the management addresses it kept. A saved selection outside the
+loaded page is read by ID (`ListDeviceGroupsRequest.group_ids`, `GetDynamicGroup`),
+never shown as unavailable.
 
 **Free-text inputs.** A value that refers to something that already exists (devices
 and hostnames, packages and package managers, operating systems, architectures,

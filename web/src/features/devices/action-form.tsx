@@ -8,6 +8,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   CreateDeviceActionRequestSchema,
+  DeviceActionKind as ListedActionKind,
   type DeviceAction,
 } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { ApprovalState } from "../../../gen/lindm/admin/v1/approvals_pb";
@@ -51,7 +52,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
-import { SearchPicker, type PickerOption, type PickerProps } from "@/components/ui/search-picker";
+import {
+  SearchPicker,
+  pickerFooter,
+  type PickerOption,
+  type PickerProps,
+} from "@/components/ui/search-picker";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
@@ -179,70 +185,53 @@ function refreshOutcome(action: DeviceAction | undefined, polledAt: number) {
   return "waiting";
 }
 
+const QUARANTINES = [ListedActionKind.QUARANTINE];
+
+// The server lists only this device's quarantines, newest first, so an older one
+// is a More choices away rather than hidden behind other actions. Each choice
+// names what stayed reachable and who asked when.
 function QuarantineActionPicker({ deviceId, ...props }: PickerProps & { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const [pageToken, setPageToken] = useState("");
-  const [selected, setSelected] = useState<PickerOption>();
-  const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, pageToken));
+  const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, pageToken, QUARANTINES));
   const options: PickerOption[] = query.error
     ? []
-    : (query.data?.actions
-        .filter((action) => action.spec?.action.case === "quarantine")
-        .map((action) => ({
-          value: action.actionId,
-          label: `Quarantine requested ${formatTimestamp(action.createdAt).local}`,
-          description: `Expires ${formatTimestamp(action.expiresAt).local}`,
-        })) ?? []);
-  if (selected?.value === props.value && !options.some((option) => option.value === props.value)) {
-    options.unshift(selected);
-  }
+    : (query.data?.actions.flatMap((action) =>
+        action.spec?.action.case === "quarantine"
+          ? [
+              {
+                value: action.actionId,
+                label: `Network cut off except ${action.spec.action.value.managementEndpoints.join(", ")}`,
+                description: [
+                  `Requested ${formatTimestamp(action.createdAt).local}`,
+                  action.actorDisplayName ? `by ${action.actorDisplayName}` : "",
+                  `expires ${formatTimestamp(action.expiresAt).local}`,
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+              },
+            ]
+          : [],
+      ) ?? []);
+  const nextPageToken = query.data?.nextPageToken ?? "";
   return (
     <SearchPicker
       {...props}
-      disabled={props.disabled || query.isPending || !!query.error}
       options={options}
-      onChange={(value) => {
-        setSelected(options.find((option) => option.value === value));
-        props.onChange(value);
-      }}
-      note="Searches this page of actions. Use Next page for older actions."
-    >
-      {query.isPending ? <p role="status">Loading quarantine actions…</p> : null}
-      {query.error ? (
-        <RpcError failure={toRpcFailure(query.error)} title="Couldn't load quarantine actions" />
-      ) : null}
-      {!query.isPending && !query.error && !options.length ? (
-        <p className="text-sm text-muted-foreground">No quarantine actions on this page.</p>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching || !pageToken}
-          onClick={() => setPageToken("")}
-        >
-          First page
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={
-            props.disabled || query.isFetching || !!query.error || !query.data?.nextPageToken
-          }
-          onClick={() => setPageToken(query.data!.nextPageToken)}
-        >
-          Next page
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={props.disabled || query.isFetching}
-          onClick={() => void query.refetch()}
-        >
-          Refresh actions
-        </Button>
-      </div>
-    </SearchPicker>
+      note="Quarantines on this device, newest first, 25 at a time."
+      footer={pickerFooter({
+        loading: query.isPending,
+        error: query.error,
+        onRetry: () => void query.refetch(),
+        empty:
+          query.isSuccess && options.length === 0
+            ? "No network quarantine was requested on this device."
+            : undefined,
+        fetching: query.isFetching,
+        onFirst: pageToken ? () => setPageToken("") : undefined,
+        onMore: nextPageToken ? () => setPageToken(nextPageToken) : undefined,
+      })}
+    />
   );
 }
 

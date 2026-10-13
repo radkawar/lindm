@@ -18,6 +18,7 @@ SELECT * FROM device_actions WHERE device_id = $1 AND closed_at IS NULL FOR UPDA
 SELECT * FROM device_actions
 WHERE device_id = sqlc.arg('device_id')
 AND (NOT sqlc.arg('has_cursor')::boolean OR (issued_at, id) < (sqlc.arg('cursor_time')::timestamptz, sqlc.arg('cursor_id')::uuid))
+AND (cardinality(sqlc.arg('capabilities')::text[]) = 0 OR capability = ANY(sqlc.arg('capabilities')::text[]))
 ORDER BY issued_at DESC, id DESC LIMIT sqlc.arg('page_limit');
 
 -- name: ListDeviceActionActorNames :many
