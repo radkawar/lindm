@@ -63,7 +63,7 @@ export function parseFirewall(draft: FirewallDraft): FirewallResult {
     } catch (error) {
       return {
         missing,
-        problem: `The connectivity check isn't valid: ${error instanceof Error ? error.message : "it couldn't be read"}.`,
+        problem: `Invalid connectivity check: ${error instanceof Error ? error.message : "lindm could not read it"}.`,
       };
     }
   }
@@ -88,7 +88,7 @@ export function parseFirewall(draft: FirewallDraft): FirewallResult {
 export function guardSummary(guard: ConnectivityGuardConfig): string {
   const allow = guard.probes.filter((probe) => probe.expected === ConnectivityProbeVerdict.ALLOW);
   const families = new Set(guard.probes.map((probe) => (probe.address.includes(":") ? 6 : 4)));
-  return `${guard.probes.length} probe targets: ${allow.length} must get through and ${guard.probes.length - allow.length} must be blocked, over ${families.size === 2 ? "IPv4 and IPv6" : families.has(6) ? "IPv6 only" : "IPv4 only"}. A firewall change rolls back after ${guard.timeoutSeconds ?? 120} seconds without confirmation.`;
+  return `The check uses ${guard.probes.length} probe targets over ${families.size === 2 ? "IPv4 and IPv6" : families.has(6) ? "IPv6 only" : "IPv4 only"}. It requires access to ${allow.length} targets and blocked access to ${guard.probes.length - allow.length} targets. The device reverses firewall changes after ${guard.timeoutSeconds ?? 120} seconds without confirmation.`;
 }
 
 export function FirewallSettingsFields({

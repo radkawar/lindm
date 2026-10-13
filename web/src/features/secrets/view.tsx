@@ -302,7 +302,7 @@ function CreateSecretForm({ onCreated }: { onCreated: (secretId: string) => void
         <RpcError failure={exact.failure} title="Secret not created">
           {exact.ambiguous ? (
             <p>
-              Check the list to see whether it was created. Try again, or discard to start over.
+              Check the list for the new secret. Retry this request or discard it to start again.
             </p>
           ) : null}
         </RpcError>

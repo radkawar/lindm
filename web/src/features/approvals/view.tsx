@@ -86,7 +86,7 @@ function destructiveConsequence(approval: Approval, hostname: string): string {
         : targets.length === 1
           ? ` · ${total} volume`
           : ` · ${targets.length} volumes, ${total} in total`;
-    return `Erases all data on ${hostname}${scope}${live ? " · powers it off" : ""} · cannot be undone`;
+    return `Wipes all data on ${hostname}${scope}${live ? " · powers it off" : ""} · irreversible`;
   }
   if (action?.case === "sanitize") {
     const size =
@@ -96,7 +96,7 @@ function destructiveConsequence(approval: Approval, hostname: string): string {
       : size === undefined
         ? "the selected disk"
         : `${formatBytes(size)} disk`;
-    return `Erases all data on ${hostname} · ${scope} · cannot be undone`;
+    return `Wipes all data on ${hostname} · ${scope} · irreversible`;
   }
   return "";
 }
@@ -230,7 +230,9 @@ export function ApprovalsView({ rolloutNames }: { rolloutNames: RolloutApprovalN
             <p>Copy it now. It disappears after 30 seconds or when you leave this page.</p>
             {revealed.note ? <p>{revealed.note}</p> : null}
             {shown?.hex ? (
-              <p className="text-sm">Shown as hexadecimal because it isn't plain text.</p>
+              <p className="text-sm">
+                The value contains binary data. lindm shows it as hexadecimal.
+              </p>
             ) : null}
             <pre className="whitespace-pre-wrap break-all select-all">{shown?.text}</pre>
             <Button className="w-fit" variant="outline" onClick={() => setRevealed(null)}>
@@ -573,8 +575,8 @@ function ApprovalCard({
               secret: response.password,
               note: `Account ${response.escrow?.accountName || "unknown"}. ${
                 response.rotationDueAt
-                  ? `The password will be changed ${formatTimestamp(response.rotationDueAt).local}.`
-                  : "The password won't be changed automatically."
+                  ? `lindm changes the password ${formatTimestamp(response.rotationDueAt).local}.`
+                  : "lindm does not change the password automatically."
               }`,
             });
             break;
@@ -685,9 +687,8 @@ function ApprovalCard({
       ) : null}
       {evidenceGone ? (
         <p id={evidenceGoneId} role="alert" className="text-sm">
-          Finding evidence is no longer available: the device no longer reports this finding, so
-          this request can't be approved. Reject it, and propose a new acceptance from the device if
-          the risk remains.
+          The device no longer reports this finding. You cannot approve this request. Reject it.
+          Propose a new acceptance from the device if the risk remains.
         </p>
       ) : null}
       <dl
@@ -817,8 +818,8 @@ function ApprovalCard({
           {reason.trim() === "" ? (
             <p id={decisionHintId} className="text-sm text-muted-foreground">
               {evidenceGone
-                ? "Enter a decision reason to reject. It is recorded in the audit log."
-                : "Enter a decision reason to approve or reject. It is recorded in the audit log."}
+                ? "Enter a reason to reject this request. lindm records the reason in the audit log."
+                : "Enter a reason for your decision. lindm records the reason in the audit log."}
             </p>
           ) : null}
         </div>
@@ -859,7 +860,7 @@ function ApprovalCard({
           </Button>
           {reason.trim() === "" ? (
             <p id={decisionHintId} className="text-sm text-muted-foreground">
-              Enter a reason to withdraw. It is recorded in the audit log.
+              Enter a reason to withdraw. lindm records the reason in the audit log.
             </p>
           ) : null}
         </div>

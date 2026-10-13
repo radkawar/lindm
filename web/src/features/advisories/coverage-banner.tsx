@@ -75,14 +75,15 @@ function describe(
       return {
         title: `Source incomplete for ${os}`,
         detail: feed
-          ? "None of these devices can be shown as unaffected until the source is complete."
+          ? "Device exposure remains unknown until the source lists every advisory."
           : `The ${os} source doesn't list every ${os} advisory, so these devices stay unchecked.`,
         fix: "source",
       };
     case AdvisoryUncheckedReason.SOURCE_PACKAGE_IDENTITY_MISSING:
       return {
         title: "Package source names missing",
-        detail: "Some installed packages were reported without the source name advisories use.",
+        detail:
+          "Devices reported some installed packages without the source names that advisories use.",
         fix: "devices",
       };
     case AdvisoryUncheckedReason.PACKAGE_ARCHITECTURE_UNCOVERED:
@@ -94,13 +95,13 @@ function describe(
     case AdvisoryUncheckedReason.PACKAGE_ORIGIN_UNAVAILABLE:
       return {
         title: "Package origins unknown",
-        detail: `No installed package could be traced to a repository the ${os} source covers.`,
+        detail: `lindm could not trace any installed package to a repository that the ${os} source covers.`,
         fix: "devices",
       };
     case AdvisoryUncheckedReason.PACKAGE_VERSION_UNRECOGNIZED:
       return {
         title: "Package version not understood",
-        detail: "An installed package version couldn't be compared with an advisory's fix.",
+        detail: "lindm could not compare an installed package version with an advisory's fix.",
         fix: "devices",
       };
     case AdvisoryUncheckedReason.NATIVE_MODULE_IDENTITY_UNAVAILABLE:
@@ -112,19 +113,20 @@ function describe(
     case AdvisoryUncheckedReason.NATIVE_PACKAGE_INSTANCES_UNAVAILABLE:
       return {
         title: "Installed package details missing",
-        detail: "An advisory needs every installed copy of a package, and they weren't reported.",
+        detail: "Devices did not report every installed copy of a package that an advisory needs.",
         fix: "devices",
       };
     case AdvisoryUncheckedReason.NATIVE_PRODUCT_PREDICATE_UNSATISFIED:
       return {
         title: "Release package not confirmed",
-        detail: "An advisory applies only with a specific release package, which wasn't confirmed.",
+        detail:
+          "An advisory requires a specific release package. Device evidence does not confirm this package.",
         fix: "devices",
       };
     case AdvisoryUncheckedReason.ADVISORY_RECORD_INVALID:
       return {
         title: "Unreadable advisory entry",
-        detail: `An entry in the ${os} source couldn't be read.`,
+        detail: `lindm could not read an entry in the ${os} source.`,
         fix: "source",
       };
     case AdvisoryUncheckedReason.SOURCE_RECORD_REJECTED:
@@ -224,11 +226,11 @@ export function CoverageBanner({
         <div className="grid gap-1">
           <h2 id="advisory-coverage-title" className="text-base font-semibold">
             {total === 1n
-              ? "1 device isn't checked for advisories"
-              : `${total.toString()} devices aren't checked for advisories`}
+              ? "lindm has not checked 1 device for advisories"
+              : `lindm has not checked ${total.toString()} devices for advisories`}
           </h2>
           <p className="text-muted-foreground">
-            Their exposure is unknown, not clear, until the causes below are fixed.
+            Exposure remains unknown until you resolve the causes below.
           </p>
         </div>
       </div>

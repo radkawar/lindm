@@ -49,7 +49,7 @@ function sysctlProblem(keys: string[]): string {
   if (invalid)
     return `"${invalid}" isn't a kernel parameter name. Use the dotted name, for example vm.swappiness.`;
   const repeated = keys.find((key, index) => keys.indexOf(key) !== index);
-  if (repeated) return `"${repeated}" is listed twice.`;
+  if (repeated) return `Remove the duplicate parameter "${repeated}".`;
   return "";
 }
 
@@ -155,7 +155,7 @@ export function CapabilityPolicyEditor({
       </h3>
       <fieldset disabled={disabled} className="grid min-w-0 gap-5">
         <fieldset className="grid min-w-0 gap-3">
-          <legend className="mb-2 text-sm font-medium">The lindm agent may manage</legend>
+          <legend className="mb-2 text-sm font-medium">Allow the agent to manage</legend>
           {remoteCapabilities.map((capability) => {
             const copy = capabilityCopy(capability);
             const firewallBlocked =
@@ -187,7 +187,7 @@ export function CapabilityPolicyEditor({
         </fieldset>
         {selected.includes(ManagementCapability.KERNEL_SETTINGS) ? (
           <label className="grid gap-2 text-sm font-medium">
-            Kernel parameters lindm may set (one per line, for example vm.swappiness)
+            Allowed kernel parameters (one per line, for example vm.swappiness)
             <Textarea
               data-freeform="kernel parameter names"
               className="font-mono text-xs"

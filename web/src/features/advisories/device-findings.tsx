@@ -229,7 +229,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
         {findings.data?.findings.length === 0 ? (
           <EmptyState
             title="No findings on this page"
-            description="Outdated inventory or advisory sources do not confirm that this device is unaffected."
+            description="Outdated inventory or advisory sources leave this device's exposure unknown."
           />
         ) : null}
         {findings.data?.findings.length ? (

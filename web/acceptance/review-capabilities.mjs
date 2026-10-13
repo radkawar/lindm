@@ -111,7 +111,7 @@ export async function reviewCapabilities({
         await form.waitFor();
         await form.getByRole("checkbox", { name: "Kernel settings" }).check();
         await form
-          .getByRole("textbox", { name: /^Kernel parameters lindm may set/ })
+          .getByRole("textbox", { name: /^Allowed kernel parameters/ })
           .fill("vm.swappiness");
         await countsDevices(form, fail);
         const text = await form.innerText();

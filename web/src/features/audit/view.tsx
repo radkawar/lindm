@@ -63,7 +63,7 @@ export function AuditView({
     <section className="flex min-w-0 flex-col gap-6" aria-busy={list.isFetching}>
       <PageHeader
         title="Audit log"
-        description="Who changed what, and why. Secret values are never recorded."
+        description="Review who changed what and why. lindm never records secret values."
         onRefresh={() => void list.refetch()}
         refreshing={list.isFetching}
         actions={

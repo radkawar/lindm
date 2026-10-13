@@ -135,7 +135,8 @@ export function SecretReveal({
         { signal: AbortSignal.any([controller.signal, lifetime.signal]), timeoutMs: 30_000 },
       );
       if (controller.signal.aborted || lifetime.signal.aborted) return;
-      if (!response.approval?.id) throw new Error("The approval request wasn't saved. Try again.");
+      if (!response.approval?.id)
+        throw new Error("The server did not save the approval request. Try again.");
       setApprovalId(response.approval.id);
       setApprovalState(response.approval.state);
       request.current = create(RevealSecretRequestSchema, {
@@ -201,7 +202,9 @@ export function SecretReveal({
       }
       if (document.visibilityState !== "visible" || !document.hasFocus()) {
         material.fill(0);
-        setNotice("The page was hidden when the value arrived. lindm did not show it. Try again.");
+        setNotice(
+          "The page lost visibility when the value arrived. lindm did not show it. Try again.",
+        );
         return;
       }
       held.current = material;
@@ -245,7 +248,9 @@ export function SecretReveal({
           hidesAt={hidesAt}
           reason={reason.trim()}
           note={
-            shown.hex ? "Shown and copied as hexadecimal because it isn't plain text." : undefined
+            shown.hex
+              ? "The value contains binary data. lindm shows and copies it as hexadecimal."
+              : undefined
           }
           copiedMessage="Secret copied"
           onHide={hide}

@@ -103,10 +103,10 @@ const vendorFeedText: Record<string, string> = {
 
 // Server evaluation reasons (internal/advisory/match.go), in operator words.
 const evaluationReasonText: Record<string, string> = {
-  device_not_active: "the device is not enrolled",
-  inventory_unavailable: "no package inventory received yet",
+  device_not_active: "the device has not enrolled",
+  inventory_unavailable: "the device has not sent package inventory",
   inventory_stale: "the package inventory is out of date",
-  host_inventory_stale_or_failed: "the latest host inventory is out of date or failed",
+  host_inventory_stale_or_failed: "the latest device inventory is out of date or failed",
   package_collection_failed: "the last package scan failed",
   rhel_platform_stream_unavailable: "the device did not report its RHEL platform stream",
   feed_unavailable: "no advisory source covers this operating system",
@@ -117,10 +117,10 @@ const evaluationReasonText: Record<string, string> = {
 
 const uncoveredReasonText: Record<string, string> = {
   origin_unavailable: "APT origin evidence unavailable",
-  origin_unlisted: "installed version not listed by any APT source",
-  origin_ambiguous: "version also listed by a non-Ubuntu source",
-  origin_unverified: "listed only by unsigned or unverified APT sources",
-  origin_not_covered: "listed only by sources no advisory feed covers",
+  origin_unlisted: "no APT source lists the installed version",
+  origin_ambiguous: "a non-Ubuntu source also lists this version",
+  origin_unverified: "only unsigned or unverified APT sources list this version",
+  origin_not_covered: "no advisory feed covers the sources that list this version",
   base_pocket_uncovered: "Ubuntu pocket without security support (backports or proposed)",
 };
 

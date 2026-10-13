@@ -13,6 +13,6 @@ export function capabilityProblem<T extends DescMessage>(
   const result = validator.validate(schema, message);
   if (result.kind === "invalid")
     return result.violations.map((violation) => violation.toString()).join("; ");
-  if (result.kind === "error") return `The request couldn't be checked: ${result.error.message}`;
+  if (result.kind === "error") return `lindm could not check the request: ${result.error.message}`;
   return "";
 }

@@ -171,7 +171,7 @@ export function AdvisoryFleet() {
               {!summary.data.advisories.length ? (
                 <EmptyState
                   title="No advisories on this page"
-                  description="Outdated advisory sources do not confirm that devices are unaffected."
+                  description="Outdated advisory sources leave device exposure unknown."
                 />
               ) : null}
             </>
@@ -347,7 +347,7 @@ function sourceStatus(
     return {
       tone: "warning",
       label: `Up to date, ${skipped} entries skipped`,
-      sentence: "Some entries couldn't be read. Counts may be incomplete.",
+      sentence: "lindm could not read some entries. Counts exclude these entries.",
     };
   }
   if (feed.fresh && unexpired(feed.expiresAt, now)) {
@@ -361,7 +361,7 @@ function sourceStatus(
     return {
       tone: "neutral",
       label: "Not refreshed yet",
-      sentence: "This source hasn't been refreshed yet.",
+      sentence: "lindm has not refreshed this source yet.",
     };
   }
   if (!unexpired(feed.expiresAt, now)) {

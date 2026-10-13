@@ -72,7 +72,7 @@ export function SecretDetailView({ secretId }: { secretId: string }) {
                 aria-haspopup="dialog"
                 onClick={() => setDeleting(true)}
               >
-                Delete secret
+                Remove secret
               </Button>
             </>
           ) : null
