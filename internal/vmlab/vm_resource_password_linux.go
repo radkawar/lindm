@@ -12,6 +12,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -56,15 +57,31 @@ func openRootRecoverySession(ctx context.Context, vm *guestVM) (_ *rootRecoveryS
 	}
 	config := *vm.config
 	config.User = "root"
-	dial, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	conn, err := (&net.Dialer{}).DialContext(dial, "tcp4", vm.address)
-	if err != nil {
-		return nil, err
-	}
-	sshConn, channels, requests, err := ssh.NewClientConn(conn, vm.address, &config)
-	if err != nil {
-		return nil, errors.Join(err, conn.Close())
+	// The script reloads sshd. A connection that arrives while the listener
+	// re-executes is reset (Tumbleweed x86_64: "ssh: handshake failed … connection
+	// reset by peer"), so retry only reset, refused or truncated handshakes for a
+	// bounded time; any authentication failure still ends the attempt at once.
+	var sshConn ssh.Conn
+	var channels <-chan ssh.NewChannel
+	var requests <-chan *ssh.Request
+	for attempt := 0; ; attempt++ {
+		dial, cancel := context.WithTimeout(ctx, 15*time.Second)
+		conn, err := (&net.Dialer{}).DialContext(dial, "tcp4", vm.address)
+		cancel()
+		if err == nil {
+			sshConn, channels, requests, err = ssh.NewClientConn(conn, vm.address, &config)
+			if err == nil {
+				break
+			}
+			err = errors.Join(err, conn.Close())
+		}
+		transient := errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, io.EOF)
+		if attempt == 9 || !transient {
+			return nil, err
+		}
+		if err := lifecycleDelay(ctx, time.Second); err != nil {
+			return nil, err
+		}
 	}
 	client := ssh.NewClient(sshConn, channels, requests)
 	defer func() {

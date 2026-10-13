@@ -108,10 +108,10 @@ for scripts); zypper then refreshes and installs from a `--reposd-dir` holding o
 Chroot-script failures are not fatal to YaST; read
 `/var/adm/autoinstall/logs/lindm-enroll.sh.log` when a device does not appear, and
 delete the retained profile under `/var/adm/autoinstall/` after enrollment.
-Tumbleweed 20261007 aarch64 passed `provision-autoyast` end to end, through
-independent approval to **Enrolled**
+Tumbleweed 20261007 aarch64 and 20261009 x86_64 passed `provision-autoyast` end
+to end, through independent approval to **Enrolled**
 ([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
-x86_64 and SLES/SLED have no provisioning record.
+SLES/SLED have no provisioning record.
 
 The maintained `enroll-from-console` lane serves the manifest's verified vendor
 closure for prerequisite packages and checks the native RPM database both before
@@ -1281,21 +1281,24 @@ on the DGX Spark hosts, x86_64 on local KVM, each record in the
 | Device actions       | `tw2-arm-da-r2-724cf2ed/…/device-actions-aarch64.json` / `4b30b9f39632082cd3b286b89f3f022330f4c40e78ffaf15b85a3e687344c1c6`        |
 | TPM unattended boots | `tw2-arm-tpm-r2-c43c16df/…/tpm-unattended-boots-aarch64.json` / `4174e9b0fa3f1d15710d82224571f823d6b057448d4626695b26396482bb9075` |
 
-| Cell                 | x86_64 record / SHA-256                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Inventory            | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`              |
-| Dispatch             | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported)    |
-| Enroll from console  | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`    |
-| Air gap              | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)      |
-| Self-update          | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported) |
-| Lifecycle            | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)   |
-| Services             | `tw2-x86-r11-7fd59b73/…/services-x86_64.json` / `db5246f3ebe20bfba871e2ad50287644cb0131e664e568e618589c56c816f7c4`              |
-| Assistance           | `tw2-x86-r11-7fd59b73/…/assistance-x86_64/assistance.json` / `8594528e8a44c5b3945fa8dc40b13a33356357c0298f0d877771f99663b3ad26` |
-| Advisories           | `tw2-x86-r12-84dccfe4/…/advisories-x86_64.json` / `b42aeceb752970b0b47f44173b4a94afc2910f296191d8edf53670e1dc50e973`            |
-| OS update            | `tw2-x86-r12-84dccfe4/…/os-update-x86_64.json` / `327225c98f8631d48e6fe9407d77d2da531134cf256f5937a87b082a03c7fef0`             |
-| Encrypted            | `tw2-x86-r12-84dccfe4/…/encrypted-x86_64.json` / `32be0ac41c5c38bb71215e2ba4819fcc3a661408613eb6c3707950ec80490f6e`             |
-| TPM unattended boots | `tw2-x86-r12-84dccfe4/…/tpm-unattended-boots-x86_64.json` / `82690a8b71f569776a79300eda591549a5eeb2bcadad19d8d119995f0f5cb7a7`  |
-| Device actions       | `tw2-x86-r12-84dccfe4/…/device-actions-x86_64.json` / `f5d7a03be8cdf18ac2fb428ac9b9b8248fc8f9a5b02227ea53ef9819bb6312a3`        |
+| Cell                 | x86_64 record / SHA-256                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory            | `tw2-x86-r5-0d902fe8/…/inventory-x86_64.json` / `0232b5fc4a9c01ffd40cc211c6780ec6afe95529ad8d7adbff8bb234d27e4b7f`               |
+| Dispatch             | `tw2-x86-r5-0d902fe8/…/dispatch-x86_64.json` / `1b0c6634e665c28ab0a989175ebb1f23a6c5b85536481189bdc5d9e705fbddbf` (imported)     |
+| Enroll from console  | `tw2-x86-r5-0d902fe8/…/enroll-from-console-x86_64.json` / `8e7dfb19cafbbc3abb7e4524fbd76c278e7ad37772d1b025dae9b949283ed656`     |
+| Air gap              | `tw2-x86-r6-c43c16df/…/airgap-x86_64.json` / `58344d30237e27519fb4f93a6c3b45b8e14914574bb4fcd53b448209c98f20a5` (imported)       |
+| Self-update          | `tw2-x86-r6-c43c16df/…/self-update-x86_64.json` / `c14db08bfd0fa16c1292328a6945908735a40a85175e1a1efe094208d8b7127a` (imported)  |
+| Lifecycle            | `tw2-x86-r6-c43c16df/…/lifecycle-x86_64.json` / `0b9447ef647e46cc5c26ec85ed3b5b922d613d49fd30faf68ea30fcf70118bea` (imported)    |
+| Services             | `tw2-x86-r11-7fd59b73/…/services-x86_64.json` / `db5246f3ebe20bfba871e2ad50287644cb0131e664e568e618589c56c816f7c4`               |
+| Assistance           | `tw2-x86-r11-7fd59b73/…/assistance-x86_64/assistance.json` / `8594528e8a44c5b3945fa8dc40b13a33356357c0298f0d877771f99663b3ad26`  |
+| Advisories           | `tw2-x86-r12-84dccfe4/…/advisories-x86_64.json` / `b42aeceb752970b0b47f44173b4a94afc2910f296191d8edf53670e1dc50e973`             |
+| OS update            | `tw2-x86-r12-84dccfe4/…/os-update-x86_64.json` / `327225c98f8631d48e6fe9407d77d2da531134cf256f5937a87b082a03c7fef0`              |
+| Encrypted            | `tw2-x86-r12-84dccfe4/…/encrypted-x86_64.json` / `32be0ac41c5c38bb71215e2ba4819fcc3a661408613eb6c3707950ec80490f6e`              |
+| TPM unattended boots | `tw2-x86-r12-84dccfe4/…/tpm-unattended-boots-x86_64.json` / `82690a8b71f569776a79300eda591549a5eeb2bcadad19d8d119995f0f5cb7a7`   |
+| Device actions       | `tw2-x86-r12-84dccfe4/…/device-actions-x86_64.json` / `f5d7a03be8cdf18ac2fb428ac9b9b8248fc8f9a5b02227ea53ef9819bb6312a3`         |
+| Resources            | `tw2-x86-r15-57ebb1f5/…/resources-x86_64.json` / `9a0a85108c00c1b8bce80012ee5a7f18c635fecba53a15635106bc314c4f6cdc`              |
+| Recovery sanitize    | `tw2-x86-r15-57ebb1f5/…/recovery-sanitize-x86_64.json` / `0389e6e81caeaa6277817242bb5cedc28041f3eb5b1735c172bafd08a3524309`      |
+| Provision (AutoYaST) | `tw2-x86-prov-r1-ccb28567/…/provision-autoyast-x86_64.json` / `4387d53ecee066239d9febc26549f62902036460c69ad65f25fb9aefd96a0604` |
 
 "Imported" records come from lanes that finished after their matrix parent was
 stopped (so it would not start superseded cells) and were added with
@@ -1327,29 +1330,19 @@ waiting for fresh device presence and inventory; that wait now reports the last
 observations. Encrypted, TPM and device-action lanes on this host need
 `SUPERMIN_KERNEL`/`SUPERMIN_MODULES` (root-only `/boot`).
 
-Two x86_64 cells remain open. Resources (`tw2-x86-r12`) passed packages, files,
-groups, users and five sysctl scenarios, then `net.ipv4.ip_forward` was refused
-with "later effective sysctl.d assignment": YaST's installer writes
+Resources then needed two more fixes. `net.ipv4.ip_forward` was refused with
+"later effective sysctl.d assignment" (`tw2-x86-r12`): YaST's installer writes
 `/etc/sysctl.d/70-yast.conf` (`CFA::Sysctl`, including `net.ipv4.ip_forward`),
-which sorts after lindm's `60-lindm-*` stanza, so the refusal is correct. The
-lane now uses `net.ipv4.conf.all.log_martians` on Tumbleweed
-(`Lab.SysctlNetKey`), and the refusal names the overriding file. tpm-reference-repair
-(`tw2-x86-r12`) failed when the lane's own agent restart after the 0.1.0→0.1.1
-RPM upgrade was refused as "attempted too often"; the lane now clears the start
-rate counter first and keeps the agent journal on failure.
-
-The rerun at 284200c0 (`tw2-x86-r14`) moved resources further: packages, files,
-groups, users, all eight sysctl scenarios (including
-`net.ipv4.conf.all.log_martians`) and the timer and drop-in kind passed. The
-next kind then failed to open its root recovery session ("ssh: handshake
-failed … connection reset by peer"). This run did not establish whether that is
-a Tumbleweed or a host transport cause. tpm-reference-repair did not reach the
-upgrade. Its legacy 0.1.0 agent's TPM2 bind ended `OUTCOME_UNKNOWN`. That agent
-predates the bind's `--tpm2-pcrlock=` fix, and the same Tumbleweed pcrlock policy
-broke the current agent's bind before that fix. This is likely the cause, but
-the run did not confirm it. x86_64 `provision-autoyast` has no record: its lane
-needs the per-lane console browser configurations
-(`PLATFORM-ARCH.<lane>.json`), and the console fixture used here predates them.
+which sorts after lindm's `60-lindm-*` stanza, so the refusal is correct; the
+lane uses `net.ipv4.conf.all.log_martians` on Tumbleweed (`Lab.SysctlNetKey`)
+and the refusal names the overriding file. The password kind's first root SSH
+connection after the lane's sshd reload was reset (`tw2-x86-r14`); the root
+recovery session now retries a reset, refused or truncated handshake for up to
+10 s, and the `tw2-x86-r15` run passed every kind. tpm-reference-repair is gated
+"not applicable" on Tumbleweed (903113f5): the pinned legacy agent predates the
+multi-token change it repairs, and the bind fixes Tumbleweed needs (btrfs root
+mapping, `--tpm2-pcrlock=`) came after it, so no Tumbleweed device carries that
+legacy binding (its `tw2-x86-r14` bind ended `OUTCOME_UNKNOWN`).
 
 ## Known gaps
 
