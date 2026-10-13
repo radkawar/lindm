@@ -7632,6 +7632,94 @@ passed 13 touched/dependent race packages. Unit executable-shim fixtures exercis
 resolution before HOME isolation, direct invocation after isolation and clear
 expected-version refusal; they are not release compilation or native VM proof.
 
+#### Bare Ubuntu 24.04, console clipboard command
+
+The required `enroll-from-console` lane passed on a fresh Ubuntu 24.04 x86_64
+cloud VM, using only the local FIFO lab. Image `ubuntu-noble-20260926-amd64`
+has SHA-256
+`6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2`.
+The recorded environment is QEMU 8.2.2 with KVM, SeaBIOS, virtio-blk, no desktop
+and no TPM; it is VM evidence, not physical-machine qualification.
+
+The actual server configuration had neither `releaseRepository` nor
+`nativeRepositories`. Stock executable-adjacent discovery verified the signed
+bundle and returned **Ready**. Configuration SHA-256 is
+`b49d2baee265e6a626a8a55a4b77c672854b8ef7d798f396960f8cb6092eeac6`;
+server SHA-256 is
+`f39069e21f7cc0b52b3c74efa548e10382ae24a2e66245ebe2fccdc2426d6899`.
+The development release's captured source digest is
+`4ead7e298864aa7809b9bd742a72cdd6bb46a519de0387075c86c1c2d66300e0`,
+and its native signer fingerprint is
+`2269143E720EA255748F72CB0D8B2925B78FD747`. Both independent build observations
+record Go 1.26.9, Node 24.21.0 and matching unsigned packages for the complete
+stock matrix. This is a development-signed disposable fixture, not a production
+release-custody claim.
+
+The browser chose Ubuntu 24.04 and pressed **Copy install command**. The exact
+clipboard bytes ran over private SSH stdin; capture and execution both recorded
+SHA-256
+`ad9f24140f9954cdbcc939c14b3c411c680c1323d66e314a19867ffb505f7ce1`.
+The lane refused any preinstalled agent or identity. It installed
+`lindm-agent 0.1.0 amd64`, observed `LIFECYCLE_ENROLLED`, then independently signed
+in through the browser and confirmed that exact device as **Enrolled**.
+Installed agent SHA-256
+`8ab45f5abf583f3c64dc791ca4173e53cf42b874f3859852d76696909de61289`
+matches the binary digest in both signed build observations. There was no
+reconstructed command, external agent repository, skipped signature check,
+pre-provisioned lindm trust or Spark substitution.
+
+Retained records are under `~/.cache/lindm-repo-zero-config-Y5NS4nh3/`:
+
+| Record                                  | SHA-256                                                            | Observed scope                                                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| `ubuntu-24.04-enroll-from-console.json` | `a7d6ab2165aa0599e474a3a19dd6ed48dab9ad96c7839453b98199762ea4a6bd` | Pristine guest, exact clipboard/execution match, local identity, browser Enrolled state and owned guest cleanup |
+| `publication.json`                      | `e87edecabe6cd62565eb953ed10b411d3fe2b70af7e73cb508e6d56862abb678` | Actual Ready response, both configuration booleans false, signed manifest, server/configuration hashes          |
+| `startup.json`                          | `9bb89e9f0289b50a04d9677d9b1bbbd191ff63ead060ecc9fd08aa9a3b7b9d9d` | Actual configuration shape, stock discovery and private signer custody removed before startup                   |
+| `cleanup.json`                          | `4068ec2bfebd238e73a83611fcfd375d2e6bf05d925e23658b243c7aa0220b4c` | Supervised daemon stopped, exact owned database dropped without FORCE, private fixture and owner inputs removed |
+
+An initial waiting consumer timed out before FIFO admission, guest creation or
+clipboard capture. The successful run restored the same immutable payload and
+configuration under a supervised daemon and used a deadline-free standard FIFO
+job. The records preserve that recovery; they do not claim that the interrupted
+wait enrolled a device.
+
+`ce445650` corrects npm resolution for the observed mise shell wrapper:
+prefer the verified Node install's `lib/node_modules/npm/bin/npm-cli.js`;
+otherwise execute the resolved npm command directly. Its mandatory gate passed
+13 touched/dependent race packages, including a real executable wrapper fixture
+and absent-upstream-CLI fallback. These unit fixtures are not native qualification.
+
+#### Required design review: stock Agent repository
+
+| Criterion     | Status               | Evidence and boundary                                                                                                                                                                                                      |
+| ------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision      | Pass                 | Stock startup shows Ready and per-OS package versions; no repository configuration task. The primary install action still installs and enrolls the chosen machine.                                                         |
+| Evidence      | Pass                 | Availability comes from verified startup snapshots, not device health or blanket OS qualification. Missing or damaged artifacts keep precise per-OS failure reasons. Actual no-config Ubuntu enrollment is recorded above. |
+| Restraint     | Pass                 | One short working-state sentence; compact OS/version rows; signer fingerprints and repository URLs stay in Details; the installation guide is local.                                                                       |
+| Safety        | Pass                 | Clipboard equality, native package/release verification, TLS/bootstrap pins and enrollment authorization remain intact. Old devices retain their existing repository key until explicit trust replacement.                 |
+| Craft         | Needs owner decision | Retained light/dark desktop/mobile Ready screens preserve semantic state and narrow layout. Three real browser acceptance journeys passed; final combined visual/keyboard review and owner approval are not claimed.       |
+| Human editing | Needs owner decision | Before/after links below are retained. The exercised baseline `make ui-review` report was not green; Main owns the final combined review. No owner visual approval or unresolved accepted annotation was observed.         |
+
+Before is the actual missing-publication baseline under
+`~/.cache/lindm-ste-20261013/before/screenshots/`. After is the actual signed Ready
+fixture under `~/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/`:
+
+| Variant       | Before                                                                                                                                      | After                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Light desktop | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-desktop.png) | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-desktop.png) |
+| Dark desktop  | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-desktop.png)  | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-desktop.png)  |
+| Light mobile  | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-mobile.png)  | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-mobile.png)  |
+| Dark mobile   | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-mobile.png)   | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-mobile.png)   |
+
+The exercised baseline `before/report.json` has SHA-256
+`d9199bfb80541ce6f4596199221c5f494eca1329029994f76f59e2372f3315c0`:
+264 captures, `passed:false`, one advisory-seed owner-edit failure and four
+assistance accessible-region failures. It is baseline evidence, not a current
+Ready-state pass. The specific owner decision is to review these four Ready
+variants and accept the no-configuration wording and package-version hierarchy,
+or provide replacement wording/layout criteria. Automated green is not owner
+design approval.
+
 ### Installer provisioning from the console (2026-10-12)
 
 The `provision-*` matrix cells ([runbook](engineering.md#installer-provisioning-from-the-console))

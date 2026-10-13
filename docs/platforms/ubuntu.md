@@ -224,6 +224,11 @@ not weaker APT signature checks. See the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server)
 and the [zero-configuration evidence](../verification.md#zero-configuration-agent-repository-2026-10-13).
 This delivery path does not transfer qualification between Ubuntu releases.
+The no-configuration path passed a fresh Ubuntu 24.04 x86_64 cloud VM through the
+local `enroll-from-console` lane: actual clipboard command, installed signed
+package, local enrolled identity and independently observed console **Enrolled**
+state. The linked record is development-signed KVM/SeaBIOS evidence, not physical
+firmware, TPM, another Ubuntu release or production signing-custody qualification.
 
 For unattended installs, a provisioning token offers **cloud-init** (cloud images)
 and **Ubuntu autoinstall** (subiquity on 22.04, 24.04 and 26.04). Autoinstall puts
