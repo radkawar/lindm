@@ -99,8 +99,10 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   `/var/lib/pacman/sync/*.db`, so any `pacman` query prints "database file for
   'core' does not exist" (also extra, multilib, omarchy) on stderr until the owner
   runs `omarchy-update`. The agent reads `/var/lib/pacman/local` directly and its
-  updater accepts warnings with exit 0; the lab's package oracle and probes use a
-  repository-free `--config /dev/null` query.
+  updater accepts warnings with exit 0; the accounts provider's `pacman -Qo`
+  shadow version lookup drops exactly these notices and fails on any other
+  stderr. The lab's package oracle and probes use a repository-free
+  `--config /dev/null` query.
 - **Session file location.** `omarchy.desktop` (uwsm-managed Hyprland) is in
   `/usr/local/share/wayland-sessions/`, not `/usr/share/wayland-sessions/`.
 - **Firewall.** `ufw` is active by default (deny incoming except LocalSend

@@ -285,3 +285,23 @@ func TestNSSAbsenceThroughNativeexec(t *testing.T) {
 		t.Fatalf("absent group: %q, %v", out, err)
 	}
 }
+
+// Omarchy 4.0.4 installs offline without sync databases, so `pacman -Qo` warns
+// once per configured repository and the shadow backend version lookup failed
+// every accounts resource. Only those exact notices are dropped.
+func TestPacmanMissingSyncDatabaseNoticesOnly(t *testing.T) {
+	notices := "warning: database file for 'core' does not exist (use '-Sy' to download)\nwarning: database file for 'omarchy' does not exist (use '-Sy' to download)\n"
+	if got := withoutMissingSyncDatabaseNotices([]byte(notices)); len(got) != 0 {
+		t.Fatalf("benign notices kept: %q", got)
+	}
+	for _, stderr := range []string{
+		notices + "error: No package owns /usr/bin/useradd\n",
+		"warning: database file for 'core' does not exist (use '-Sy' to download) extra\n",
+		"warning: database file for '' does not exist (use '-Sy' to download)\n",
+		"warning: database file for 'core' is corrupted\n",
+	} {
+		if got := withoutMissingSyncDatabaseNotices([]byte(stderr)); len(got) == 0 {
+			t.Fatalf("diagnostic dropped from %q", stderr)
+		}
+	}
+}

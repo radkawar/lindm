@@ -40,16 +40,43 @@ type nativeRun func(ctx context.Context, stdin []byte, path string, args ...stri
 
 // runNative keeps the historical policy that any shadow-utils stderr fails the
 // command: diagnostics name users and line numbers, never the stdin token, so
-// the sanitized first line is surfaced for the administrator.
+// the sanitized first line is surfaced for the administrator. The only stderr
+// tolerated is pacman's notice that a configured sync database was never
+// downloaded: the local -Qo query does not read it.
 func runNative(ctx context.Context, stdin []byte, path string, args ...string) ([]byte, error) {
 	result, err := nativeexec.Run(ctx, nativeexec.Command{Path: path, Args: args, Stdin: stdin, Timeout: 20 * time.Second, StdoutLimit: 1 << 20, StderrLimit: 1 << 20})
-	if len(result.Stderr) != 0 {
+	stderr := result.Stderr
+	if path == pacmanPath {
+		stderr = withoutMissingSyncDatabaseNotices(stderr)
+	}
+	if len(stderr) != 0 {
 		return nil, fmt.Errorf("accountprovider: native diagnostic from %s: %s", filepath.Base(path), result.Diagnostic())
 	}
 	if err != nil {
 		return nil, err
 	}
 	return result.Stdout, nil
+}
+
+const pacmanPath = "/usr/bin/pacman"
+
+// withoutMissingSyncDatabaseNotices drops pacman's exact per-repository
+// "database file for '<repo>' does not exist" warnings. An offline install
+// (Omarchy 4.0.4) ships no /var/lib/pacman/sync/*.db, so every query printed
+// them and the shadow backend version lookup failed. Any other line remains.
+func withoutMissingSyncDatabaseNotices(stderr []byte) []byte {
+	var kept []byte
+	for line := range bytes.Lines(stderr) {
+		repo, ok := bytes.CutPrefix(bytes.TrimSuffix(line, []byte("\n")), []byte("warning: database file for '"))
+		if ok {
+			name, rest, found := bytes.Cut(repo, []byte("'"))
+			if found && len(name) != 0 && !bytes.ContainsAny(name, "' \t") && string(rest) == " does not exist (use '-Sy' to download)" {
+				continue
+			}
+		}
+		kept = append(kept, line...)
+	}
+	return kept
 }
 
 // rootRead reads a root-protected, singly linked account file of at most 4 MiB.

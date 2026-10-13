@@ -40,7 +40,7 @@ func nativeProvider(ctx context.Context, c nativeConfig) (*Provider, error) {
 	case platform.PackageDBRPM:
 		version, err = p.run(ctx, nil, "/usr/bin/rpm", "-qf", "--qf", "%{VERSION}-%{RELEASE}", "/usr/sbin/useradd")
 	case platform.PackageDBPacman:
-		version, err = p.run(ctx, nil, "/usr/bin/pacman", "-Qo", "--", "/usr/bin/useradd")
+		version, err = p.run(ctx, nil, pacmanPath, "-Qo", "--", "/usr/bin/useradd")
 		if err == nil {
 			fields := strings.Fields(string(version))
 			if len(fields) == 0 {
