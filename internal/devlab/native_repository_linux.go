@@ -179,7 +179,7 @@ func (f *AuthorityFixture) recordNativeEnrollmentReadiness(ctx context.Context) 
 		return err
 	}
 	if !instructions.Msg.GetReadiness().GetReady() {
-		return fmt.Errorf("stock enrollment fixture is not ready: %s", instructions.Msg.GetReadiness().GetReason())
+		return nativeEnrollmentReadinessError(instructions.Msg)
 	}
 	if instructions.Msg.GetAptRepository().GetSigningKeyFingerprint() != publication.SignerFingerprint ||
 		instructions.Msg.GetDnfRepository().GetSigningKeyFingerprint() != publication.SignerFingerprint ||
@@ -188,6 +188,22 @@ func (f *AuthorityFixture) recordNativeEnrollmentReadiness(ctx context.Context) 
 	}
 	publication.Ready = true
 	return nil
+}
+
+func nativeEnrollmentReadinessError(instructions *adminv1.GetEnrollmentInstructionsResponse) error {
+	readiness := instructions.GetReadiness()
+	details := []string{readiness.GetReason() + ": " + readiness.GetRemedy()}
+	remedies := []string{readiness.GetRemedy()}
+	for _, target := range instructions.GetPlatforms() {
+		platformReadiness := target.GetReadiness()
+		if platformReadiness.GetReady() || platformReadiness.GetReason() != "native_repository_unavailable" ||
+			slices.Contains(remedies, platformReadiness.GetRemedy()) {
+			continue
+		}
+		remedies = append(remedies, platformReadiness.GetRemedy())
+		details = append(details, fmt.Sprintf("%s (%s): %s", target.GetId(), target.GetPackageFamily(), platformReadiness.GetRemedy()))
+	}
+	return fmt.Errorf("stock enrollment fixture is not ready: %s", strings.Join(details, "; "))
 }
 
 // Publish pacman only for architectures admitted by registry lifecycle rows.

@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	releasev1 "lindm/gen/lindm/release/v1"
 	"lindm/internal/packaging"
 )
@@ -107,5 +109,27 @@ func TestNativeEnrollmentServerCopyIsPrivateAndDigestBound(t *testing.T) {
 	}
 	if _, err := copyNativeEnrollmentServer(source, filepath.Join(root, "invalid")); err == nil {
 		t.Fatal("non-executable source was accepted")
+	}
+}
+
+func TestNativeEnrollmentReadinessErrorKeepsDistinctLoaderRemedies(t *testing.T) {
+	apt := &adminv1.EnrollmentReadiness{Reason: "native_repository_unavailable", Remedy: "APT index has a digest mismatch"}
+	rpm := &adminv1.EnrollmentReadiness{Reason: "native_repository_unavailable", Remedy: "RPM metadata permits group writes"}
+	instructions := &adminv1.GetEnrollmentInstructionsResponse{
+		Readiness: &adminv1.EnrollmentReadiness{Reason: "native_repository_unavailable", Remedy: "Install a signed agent artifact"},
+		Platforms: []*adminv1.EnrollmentPlatform{
+			{Id: "ubuntu-24.04", PackageFamily: "apt", Readiness: apt},
+			{Id: "debian-13", PackageFamily: "apt", Readiness: apt},
+			{Id: "fedora-44", PackageFamily: "dnf", Readiness: rpm},
+		},
+	}
+	message := nativeEnrollmentReadinessError(instructions).Error()
+	for _, expected := range []string{"native_repository_unavailable", "Install a signed agent artifact", "ubuntu-24.04 (apt)", apt.GetRemedy(), "fedora-44 (dnf)", rpm.GetRemedy()} {
+		if !strings.Contains(message, expected) {
+			t.Fatalf("startup failure omitted actionable loader detail %q: %s", expected, message)
+		}
+	}
+	if strings.Count(message, apt.GetRemedy()) != 1 {
+		t.Fatal("startup failure repeats identical loader errors for each distribution")
 	}
 }
