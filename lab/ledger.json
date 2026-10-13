@@ -10664,6 +10664,40 @@
       "repositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
       "repositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
       "mainlineRevision": "9fb2b9dc624b70576e938406b978ebf4e99d2d4f"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "recovery-sanitize",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-encrypted-24.04.5-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/recovery-requal2-x86e-20261013T003601Z/ubuntu-24.04/recovery-sanitize-x86_64.json",
+      "sha256": "9f60dfb6c2bc13883be5973229a21f116d7fa39e8b2866694ccf0b0e13ebf6ab",
+      "recorded": "2026-10-13T04:03:08.706447878Z",
+      "revision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bb853abdc412b1c8e415de31fcf4f13eb6489ae4e1558b1e34d779d3587f5927",
+      "recoveryManifest": "ubuntu-noble-20260926-amd64",
+      "recoveryManifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "recovery-sanitize",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/recovery-requal2-x86e-20261013T003601Z/ubuntu-26.04/recovery-sanitize-x86_64.json",
+      "sha256": "f06164b089bbd26a828e7de91a265f2e149794fd92226ad59b6214776b817286",
+      "recorded": "2026-10-13T04:03:09.679083653Z",
+      "revision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5d12fac9dbb966d60678dbe11a4d58865497ae0bdacd6c594e5ae50e06e489d7",
+      "recoveryManifest": "ubuntu-resolute-20260927-amd64",
+      "recoveryManifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
+      "mainlineRevision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340"
     }
   ]
 }
