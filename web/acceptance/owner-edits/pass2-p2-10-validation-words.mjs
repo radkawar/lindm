@@ -48,9 +48,8 @@ export async function check({ page, demo, visit, require, capture, step }) {
   await page.getByRole("option", { name: /Use “bad label!”/ }).click();
   const labelError = main.locator("#metadata-label-error");
   await labelError.waitFor({ timeout });
-  require(/can't be a label\. Labels use letters, digits/.test(
-    await labelError.innerText(),
-  ), "the refused label isn't explained in words");
+  require((await labelError.innerText()).trim() ===
+    "“bad label!” can't be a label. Use letters, digits and . _ : / -. Start with a letter or digit. Use at most 64 characters.", "the refused label and its permitted characters, start and length are not explained in words");
   require((await main.getByRole("button", { name: "Remove label bad label!" }).count()) ===
     0, "the invalid label was added anyway");
   require(!RAW.test(await primaryText(main)), "raw validation text on the device page");

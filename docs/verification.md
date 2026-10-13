@@ -7428,6 +7428,25 @@ are machine-readable JSON/JUnit plus a concise human report. Preserve reproducib
 seeds. Automatic reruns retain the first failure and cannot turn an unexplained
 flaky security/destructive scenario into a passing release gate.
 
+### STE safety assertions (2026-10-13)
+
+The synthetic console review at
+`~/.cache/lindm-polish-20261012/uireview-final-10/report.json` failed stale safety
+copy assertions after the STE wording changes. Fleet and assistance checks now
+use the current active wording and form labels. They still require account
+restoration without screen unlock, an active lock after expired undo, explicit
+assistance refusal and consent waiting, worded field validation, and a timestamped
+fleet snapshot.
+
+Action checks retain separate check-in and inventory ages, named reasons for
+disabled Send and approval controls, and server checks before sending the exact
+reviewed request. Wipe checks retain irreversibility, independent approval,
+escrowed-key and header-backup consequences, recent contact, expiry without a
+wipe, and the in-use volume restriction. Typed confirmation, target identity,
+permission and exact-request recovery checks remain unchanged. This assertion
+migration does not claim a fresh console review or native-device qualification;
+the consolidated review remains required.
+
 ### Bare-machine console enrollment (2026-10-11)
 
 The initial `lab vm enroll-from-console` observer installed the agent and local

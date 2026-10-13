@@ -227,7 +227,16 @@ async function lostLaptop(ctx) {
     // (an online preflight, not an offline queue), and the review checks it
     // before an approval is requested. Demo workstations stop reporting.
     requireState(await requestApproval.isDisabled(), "lost_laptop_unready_approval_offered");
-    await visible(dialog.getByText(/off until this is resolved: /));
+    const blocker = dialog.locator('[data-slot="action-blocker"]');
+    await visible(blocker);
+    const blockerTitle = (await blocker.locator('[data-slot="alert-title"]').innerText()).trim();
+    requireState(blockerTitle.length > 0, "lost_laptop_refusal_reason_missing");
+    await visible(
+      dialog.getByText(
+        `Send and approval requests are unavailable. Resolve this problem: ${blockerTitle.toLowerCase()}.`,
+        { exact: true },
+      ),
+    );
     await shot(
       ctx,
       "lost-laptop-refused",
@@ -476,7 +485,10 @@ async function remoteHelp(ctx) {
   const reason =
     "Help the user diagnose a frozen application; please share your screen only if you consent.";
   await main
-    .getByRole("textbox", { name: "Reason (shown to the local user and audited)", exact: true })
+    .getByRole("textbox", {
+      name: "Reason (the user sees this; the audit log records it)",
+      exact: true,
+    })
     .fill(reason);
   await select(
     page,
@@ -503,7 +515,7 @@ async function remoteHelp(ctx) {
     await visible(main.getByRole("button", { name: "Stop session", exact: true }));
     await visible(
       main.getByText(
-        "No screen or input is shared yet. Wait for the user to accept, or stop the request.",
+        "The device shares no screen or input yet. Wait for user consent, or stop the request.",
         { exact: true },
       ),
     );

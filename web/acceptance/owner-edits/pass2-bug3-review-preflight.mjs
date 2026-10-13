@@ -20,9 +20,9 @@ export const task = {
 
 const STATUS = /^(Ready to send|Not ready to send)$/;
 const EVIDENCE =
-  /last checked in .+, but its latest inventory arrived .+ ago\. This action needs inventory from the last 5 minutes, and check-ins don't include inventory\./;
+  /last checked in .+\. Its latest inventory arrived .+ ago\. This action needs inventory from the last 5 minutes\. Check-ins do not include inventory\./;
 const SEND_OFF =
-  "Send and approval requests are off until this is resolved: inventory needs refreshing.";
+  "Send and approval requests are unavailable. Resolve this problem: inventory needs refreshing.";
 // A restart needs no approval, so the fix sends the same request once inventory is fresh.
 const REFRESH = { name: "Refresh inventory and send when ready", exact: true };
 

@@ -9,7 +9,7 @@ export const task = {
   route: "/devices/$deviceId",
   priority: "high",
   acceptance:
-    "Actions tab: 'Accounts locked since <time> by <person>. The undo request expired before the device received it, so the accounts are still locked.' with 'Undo again'; the Undo account lock row reads 'Expired before the device received it'; each action is listed once and no separate History tab repeats them.",
+    "Actions tab: 'Accounts locked since <time> by <person>. The undo request expired before the device received it, so the account lock remains active.' with 'Undo again'; the Undo account lock row reads 'Expired before the device received it'; each action is listed once and no separate History tab repeats them.",
 };
 
 export async function check({ page, demo, visit, settle, require, capture, step }) {
@@ -31,7 +31,7 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   const text = (await restriction.innerText()).replace(/\s+/g, " ");
   require(/Accounts locked since \S.* by \S.*\./.test(text) &&
     text.includes(
-      "The undo request expired before the device received it, so the accounts are still locked.",
+      "The undo request expired before the device received it, so the account lock remains active.",
     ), `Lock restriction reads ${JSON.stringify(text)}`);
   require((
     await restriction.getByRole("button", { name: "Undo account lock" }).innerText()

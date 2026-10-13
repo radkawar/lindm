@@ -38,7 +38,9 @@ export async function check({ page, demo, visit, require, capture, step }) {
   await mode.waitFor({ timeout: 30_000 });
   const modeText = (await mode.innerText()).trim();
   const inUse = await main
-    .getByText("This volume is in use, so it can only be wiped while the device is running.")
+    .getByText("This volume is in use. The device must remain running for this wipe.", {
+      exact: true,
+    })
     .isVisible();
   // The demo device reports only its root volume, which is in use.
   require(inUse, "the in-use root volume is not marked as in use");

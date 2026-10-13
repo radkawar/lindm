@@ -25,8 +25,10 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await main
     .getByRole("heading", { name: "Needs review", exact: true })
     .waitFor({ timeout: 30_000 });
-  require((await main.getByText(/^Fleet snapshot .*\. Work in your authorized scopes/).count()) ===
-    1, "Fleet snapshot time is not in the page header description");
+  require((await main
+    .locator("header")
+    .getByText(/^Fleet snapshot .+\. Review work within your authorized scopes\.$/)
+    .count()) === 1, "Fleet snapshot time is not in the page header description");
   require((await main.getByRole("link", { name: "Enroll a device" }).count()) ===
     1, "Dashboard has no Enroll a device entry");
   await capture("dashboard");

@@ -27,7 +27,9 @@ export async function check({ page, demo, visit, require, capture, step }) {
   step("request view-only assistance");
   await visit(`/devices/${DeviceID}`);
   await main.getByRole("tab", { name: "Remote assistance", exact: true }).click();
-  await main.getByLabel("Reason (shown to the local user and audited)").fill(reasonText);
+  await main
+    .getByLabel("Reason (the user sees this; the audit log records it)", { exact: true })
+    .fill(reasonText);
   await main.getByRole("button", { name: "Request remote assistance" }).click();
   await page.waitForURL(/\/assistance\/[0-9a-f-]{36}$/, { timeout: 30_000 });
 

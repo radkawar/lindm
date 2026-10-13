@@ -79,18 +79,29 @@ export async function check({ page, demo, visit, require, capture, step }) {
   require(order ===
     "before", `consequences box does not precede the first form control (${order})`);
   const box = (await consequences.innerText()).replace(/\s+/g, " ");
-  require(/can't be undone/i.test(box), "consequences box does not say the wipe is irreversible");
+  require(box.includes(
+    "Wiping cannot be undone",
+  ), "consequences box does not say the wipe is irreversible");
   require(box.includes(hostname), `consequences box does not name ${hostname}`);
   require(/powers off/i.test(box), "consequences box does not say the device powers off");
-  require(/another admin must approve/i.test(
-    box,
+  require(box.includes(
+    "Another administrator must approve this wipe before you send it.",
   ), "consequences box does not say a second admin must approve");
-  require(/not destroyed: recovery keys escrowed/i.test(box) &&
-    /header backups/i.test(
-      box,
-    ), "consequences box does not say escrowed keys and header backups are not destroyed");
-  require(/must be online/i.test(box) &&
-    /expires/i.test(box), "consequences box does not say what happens when the device is offline");
+  require(box.includes(
+    "The wipe keeps recovery keys on this server and external header backups.",
+  ) &&
+    box.includes(
+      "A header backup and recovery key still permit data access.",
+    ), "consequences box does not preserve escrowed keys, header backups and their data-access consequence");
+  require(box.includes(
+    "The device must have checked in during the last minute before you send the request.",
+  ) &&
+    box.includes(
+      "The request expires if the device does not start within 10 minutes of your review.",
+    ) &&
+    box.includes(
+      "An expired request does not wipe data.",
+    ), "consequences box does not state the contact requirement, expiry and offline effect");
   require(!(await main
     .getByText("Check the device and fill in the details.", { exact: true })
     .count()), "the generic subtitle is still shown");

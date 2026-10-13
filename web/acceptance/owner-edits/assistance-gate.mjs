@@ -47,9 +47,8 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await gate.first().waitFor({ timeout: 30_000 });
   require((await gate.count()) === 1, `Expected one reason line, found ${await gate.count()}`);
   const reason = (await gate.first().innerText()).trim();
-  require(/turned off/i.test(
-    reason,
-  ), `Reason line does not say assistance is turned off: ${reason}`);
+  require(reason ===
+    "This device has no desktop session to share. Its configuration also disables remote assistance.", `Reason line does not name the missing desktop and disabled assistance: ${reason}`);
   for (const role of ["button", "menuitem", "link"])
     require((await main.getByRole(role, { name: requestControl }).count()) ===
       0, `A ${role} still offers to request remote assistance on the assistance-off device`);

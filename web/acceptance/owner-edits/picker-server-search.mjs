@@ -128,9 +128,12 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await dialog.waitFor({ timeout });
   await dialog.getByRole("button", { name: /^Quarantine to undo/ }).click();
   const quarantines = openChoices(page);
-  const empty = page.getByText("No network quarantine was requested on this device.", {
-    exact: true,
-  });
+  const empty = page.getByText(
+    "No administrator has requested network quarantine on this device.",
+    {
+      exact: true,
+    },
+  );
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline && !(await empty.isVisible()) && !(await labels(quarantines)).length)
     await page.waitForTimeout(100);

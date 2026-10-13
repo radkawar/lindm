@@ -13,9 +13,9 @@ export const task = {
 };
 
 const REASON =
-  "Send and approval requests are off until this is resolved: inventory needs refreshing.";
+  "Send and approval requests are unavailable. Resolve this problem: inventory needs refreshing.";
 const PROMISE =
-  "Uses the reason above. This exact request is sent once fresh inventory passes the server's checks; nothing is sent if they still fail.";
+  "Uses the reason above. The console sends this exact request after fresh inventory passes server checks. Failed checks prevent sending.";
 
 export async function check({ page, demo, visit, require, capture, step }) {
   const deviceId = demo.Routes.DeviceID;
