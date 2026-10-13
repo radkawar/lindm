@@ -17,8 +17,8 @@ import (
 )
 
 type buildToolchain struct {
-	goBinary, goRoot, nodeBinary, npmCLI string
-	goVersion, nodeVersion               string
+	goBinary, goRoot, nodeBinary, npmCLI, npmBinary string
+	goVersion, nodeVersion                          string
 }
 
 // Resolve shims while the caller's HOME still exists. A shim's own realpath can
@@ -56,9 +56,7 @@ func resolveBuildToolchain(ctx context.Context, repository, capturedSource strin
 	}
 	tools.nodeBinary, err = realToolFile(strings.TrimSpace(string(node)), true)
 	if err == nil {
-		// Standard Node installations ship npm beside their runtime. Invoke its
-		// resolved CLI with that Node, never an npm shim under an isolated HOME.
-		tools.npmCLI, err = realToolFile(filepath.Join(filepath.Dir(tools.nodeBinary), "npm"), false)
+		err = resolveNPM(&tools)
 	}
 	if err != nil {
 		return tools, fmt.Errorf("releasebuild: resolve expected Node %s and its npm CLI: %w", tools.nodeVersion, err)
@@ -130,6 +128,30 @@ func realToolFile(path string, executable bool) (string, error) {
 		return "", fmt.Errorf("tool path %q is not a regular executable/CLI file", real)
 	}
 	return real, nil
+}
+
+func resolveNPM(tools *buildToolchain) error {
+	prefix := filepath.Dir(filepath.Dir(tools.nodeBinary))
+	cli := filepath.Join(prefix, "lib", "node_modules", "npm", "bin", "npm-cli.js")
+	var err error
+	tools.npmCLI, err = realToolFile(cli, false)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	// Distro layouts need not have the upstream lib/node_modules location.
+	// Execute their npm command directly; never interpret a shell wrapper as JS.
+	tools.npmBinary, err = realToolFile(filepath.Join(filepath.Dir(tools.nodeBinary), "npm"), true)
+	return err
+}
+
+func runNPM(ctx context.Context, directory string, environment []string, tools buildToolchain, args ...string) ([]byte, error) {
+	if tools.npmCLI != "" {
+		return command(ctx, directory, environment, tools.nodeBinary, append([]string{tools.npmCLI}, args...)...)
+	}
+	return command(ctx, directory, environment, tools.npmBinary, args...)
 }
 
 func toolchainProbe(ctx context.Context, directory string, environment []string, name string, args ...string) ([]byte, error) {

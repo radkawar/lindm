@@ -14,11 +14,11 @@ import (
 func toolchainShimFixture(t *testing.T, goVersion, nodeVersion string) (string, buildToolchain) {
 	t.Helper()
 	root := t.TempDir()
-	tools := buildToolchain{goRoot: filepath.Join(root, "real-go"), nodeBinary: filepath.Join(root, "real-node", "node")}
+	tools := buildToolchain{goRoot: filepath.Join(root, "real-go"), nodeBinary: filepath.Join(root, "real-node", "bin", "node")}
 	tools.goBinary = filepath.Join(tools.goRoot, "bin", "go")
-	tools.npmCLI = filepath.Join(filepath.Dir(tools.nodeBinary), "npm-cli.js")
+	tools.npmCLI = filepath.Join(root, "real-node", "lib", "node_modules", "npm", "bin", "npm-cli.js")
 	shim := filepath.Join(root, "shims")
-	for _, path := range []string{filepath.Dir(tools.goBinary), filepath.Dir(tools.nodeBinary), shim} {
+	for _, path := range []string{filepath.Dir(tools.goBinary), filepath.Dir(tools.nodeBinary), filepath.Dir(tools.npmCLI), shim} {
 		if err := os.MkdirAll(path, 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -33,11 +33,9 @@ func toolchainShimFixture(t *testing.T, goVersion, nodeVersion string) (string, 
 	write(filepath.Join(root, "go.mod"), "module toolchain.test\n\ngo 1.26.9\n", 0600)
 	write(filepath.Join(root, ".node-version"), "24.21.0\n", 0600)
 	write(tools.goBinary, "#!/bin/sh\nprintf '%s\\n' "+quote("go version "+goVersion+" linux/amd64")+"\n", 0700)
-	write(tools.nodeBinary, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' "+quote(nodeVersion)+"; else printf '%s\\n' '11.19.0'; fi\n", 0700)
+	write(tools.nodeBinary, "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' "+quote(nodeVersion)+"; elif [ \"$1\" = "+quote(tools.npmCLI)+" ]; then printf '%s\\n' '11.19.0'; else printf '%s\\n' 'SyntaxError: shell wrapper is not JavaScript' >&2; exit 2; fi\n", 0700)
 	write(tools.npmCLI, "// npm CLI admission fixture\n", 0600)
-	if err := os.Symlink(tools.npmCLI, filepath.Join(filepath.Dir(tools.nodeBinary), "npm")); err != nil {
-		t.Fatal(err)
-	}
+	write(filepath.Join(filepath.Dir(tools.nodeBinary), "npm"), "#!/bin/bash\nset -euo pipefail\nprintf '%s\\n' 'direct-wrapper-npm'\n", 0700)
 	homeGuard := "#!/bin/sh\nif [ \"$HOME\" != " + quote(root) + " ]; then printf '%s\\n' 'shim cannot run in isolated HOME' >&2; exit 9; fi\n"
 	write(filepath.Join(shim, "go"), homeGuard+"printf '%s\\n' "+quote(tools.goRoot)+"\n", 0700)
 	write(filepath.Join(shim, "node"), homeGuard+"printf '%s\\n' "+quote(tools.nodeBinary)+"\n", 0700)
@@ -68,7 +66,7 @@ func TestResolvePinnedToolsBeforeIsolatedHomeAndInvokeRealBinaries(t *testing.T)
 	if err := checkBuildToolVersions(tools, string(goVersion), string(nodeVersion)); err != nil {
 		t.Fatal(err)
 	}
-	npmVersion, err := command(t.Context(), source, environment, tools.nodeBinary, tools.npmCLI, "--version")
+	npmVersion, err := runNPM(t.Context(), source, environment, tools, "--version")
 	if err != nil || strings.TrimSpace(string(npmVersion)) != "11.19.0" {
 		t.Fatalf("npm shim used in isolated HOME: %v", err)
 	}
@@ -88,5 +86,25 @@ func TestResolvedToolchainReportsExpectedPinOnMismatch(t *testing.T) {
 				t.Fatalf("missing explicit expected pin %q: %v", test.expected, err)
 			}
 		})
+	}
+}
+
+func TestNpmWrapperFallsBackToDirectExecutionWithoutUpstreamCLI(t *testing.T) {
+	source, expected := toolchainShimFixture(t, "go1.26.9", "v24.21.0")
+	if err := os.Remove(expected.npmCLI); err != nil {
+		t.Fatal(err)
+	}
+	tools, err := resolveBuildToolchain(t.Context(), source, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wrapper := filepath.Join(filepath.Dir(expected.nodeBinary), "npm")
+	if tools.npmCLI != "" || tools.npmBinary != wrapper {
+		t.Fatalf("missing upstream CLI did not select direct wrapper execution: %+v", tools)
+	}
+	environment := builderEnvironment(filepath.Join(t.TempDir(), "builder"), 1760000000, tools)
+	version, err := runNPM(t.Context(), source, environment, tools, "--version")
+	if err != nil || strings.TrimSpace(string(version)) != "direct-wrapper-npm" {
+		t.Fatalf("shell npm wrapper became Node input instead of executing directly: %v", err)
 	}
 }

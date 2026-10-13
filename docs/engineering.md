@@ -3215,8 +3215,10 @@ Before replacing HOME, release builds resolve the caller's real Go executable
 from `go env GOROOT` and the real Node runtime from `process.execPath`.
 They require the exact `go.mod` Go version and `.node-version` Node version;
 errors name the expected pin and selected executable. Both independent builders
-invoke these absolute paths, including Go module inspection and npm's resolved
-CLI through that Node runtime. Child tool lookup also puts their real binary
+invoke these absolute paths, including Go module inspection. When the Node install
+contains `<prefix>/lib/node_modules/npm/bin/npm-cli.js`, npm runs through that
+Node runtime. Other layouts execute their resolved npm command directly; a shell
+wrapper must never become Node's JavaScript input. Child tool lookup puts the real binary
 directories first. Each builder still owns separate HOME, Go and npm caches;
 mise shims do not run inside those isolated homes, and no ambient Go/npm or
 signing credentials enter the build.

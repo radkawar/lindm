@@ -330,10 +330,10 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 	observation := result.observation
 	var npmBOM []byte
 	if bundle != "" {
-		if _, err := command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
+		if _, err := runNPM(ctx, checkout, environment, request.tools, "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
 			return err
 		}
-		if _, err := command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "run", "build:web"); err != nil {
+		if _, err := runNPM(ctx, checkout, environment, request.tools, "run", "build:web"); err != nil {
 			return err
 		}
 		var err error
@@ -345,7 +345,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 		if err != nil {
 			return err
 		}
-		npmBOM, err = command(ctx, checkout, environment, request.tools.nodeBinary, request.tools.npmCLI, "sbom", "--sbom-format=cyclonedx")
+		npmBOM, err = runNPM(ctx, checkout, environment, request.tools, "sbom", "--sbom-format=cyclonedx")
 		if err != nil {
 			return err
 		}
@@ -454,7 +454,6 @@ func observeToolchain(ctx context.Context, checkout string, environment []string
 	}{
 		{"go", tools.goBinary, []string{"version"}},
 		{"node", tools.nodeBinary, []string{"--version"}},
-		{"npm", tools.nodeBinary, []string{tools.npmCLI, "--version"}},
 		{"dpkg-deb", "dpkg-deb", []string{"--version"}},
 		{"rpmbuild", "rpmbuild", []string{"--version"}},
 	} {
@@ -464,6 +463,11 @@ func observeToolchain(ctx context.Context, checkout string, environment []string
 		}
 		observation.ToolVersions[tool.name] = strings.TrimSpace(string(version))
 	}
+	version, err := runNPM(ctx, checkout, environment, tools, "--version")
+	if err != nil {
+		return err
+	}
+	observation.ToolVersions["npm"] = strings.TrimSpace(string(version))
 	return checkBuildToolVersions(tools, observation.ToolVersions["go"], observation.ToolVersions["node"])
 }
 
