@@ -30,7 +30,7 @@ import { AttributeFields, readAttributeInputs } from "./attributes";
 import { checkRequest, validateRequest } from "@/lib/validation";
 
 const LABEL_HINT =
-  "Labels use letters, digits and . _ : / -, start with a letter or digit, and have at most 64 characters.";
+  "Use letters, digits and . _ : / -. Start with a letter or digit. Use at most 64 characters.";
 
 export function DeviceMetadataCard({
   deviceId,
@@ -191,7 +191,7 @@ function MetadataForm({
               "metadata.labels": LABEL_HINT,
             });
             if (metadataChanges(metadata, value).length === 0) {
-              setInputError("Nothing changed. Edit a field, or cancel.");
+              setInputError("Nothing changed. Edit a field. To leave without changes, cancel.");
               return;
             }
             setInputError("");
@@ -337,7 +337,9 @@ function MetadataForm({
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
-          {failure.ambiguous ? <p>We couldn&apos;t confirm the save. Retry to make sure.</p> : null}
+          {failure.ambiguous ? (
+            <p>The server did not confirm the save. Retry the same request.</p>
+          ) : null}
         </RpcError>
       ) : null}
       {inputError ? (

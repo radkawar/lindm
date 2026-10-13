@@ -71,7 +71,7 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
       lifetime.signal.throwIfAborted();
       if (!result.approval?.id)
         throw new Error(
-          "The approval request may not have been created. Check the approval inbox before trying again.",
+          "The server did not confirm the approval request. Check the approval inbox before you retry.",
         );
       setApprovalId(result.approval.id);
       void client.invalidateQueries({ queryKey: ["approvals", lifetime.generation] });
@@ -98,8 +98,9 @@ export function RecoveryEnrollment({ device }: { device: Device }) {
             {held ? "This device is on hold. Don't merge clones." : "Reinstall this exact device"}
           </AlertTitle>
           <AlertDescription>
-            Check the physical machine yourself first; hostname, serial or MAC alone are not enough.
-            Once used, the device's old credentials stop working. Clones must enroll as new devices.
+            Check the physical device first. A hostname, serial number or MAC address does not prove
+            identity. The recovery code stops the device&apos;s old credentials. Enroll clones as
+            new devices.
           </AlertDescription>
         </Alert>
         <TechnicalDetails items={[{ label: "Device ID", value: device.id }]} />

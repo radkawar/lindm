@@ -223,7 +223,7 @@ export function DeviceDetailView({
         <Alert>
           <AlertTitle>Waiting for enrollment approval</AlertTitle>
           <AlertDescription>
-            This machine asked to enroll and has not reported inventory yet.{" "}
+            This device requested enrollment. It has not reported inventory.{" "}
             {canPermission(principal, "enrollment.manage", true) ? (
               <>
                 Approve or reject it in{" "}
@@ -250,8 +250,8 @@ export function DeviceDetailView({
           </AlertTitle>
           <AlertDescription>
             {canPermission(principal, "fleet.read", true)
-              ? "It may have been removed, or the link is wrong. Open it again from the device list."
-              : "It's outside the devices your role covers, or it no longer exists. Ask an organization owner if you need access."}
+              ? "The device is unavailable. Open the device from the device list."
+              : "Your role cannot access this device, or the device no longer exists. Ask an organization owner for access."}
           </AlertDescription>
         </Alert>
       ) : failure ? (

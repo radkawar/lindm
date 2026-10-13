@@ -159,8 +159,8 @@ export function TargetMutation<S extends DescMessage>({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.status === "ambiguous"
-              ? "We couldn't confirm this was saved. Retry sends the same request, so it can't apply twice; the fields stay as sent until it's confirmed."
-              : "Nothing was saved. Start over to change the entries and send again."}
+              ? "The server did not confirm the save. Retry the same request. The fields remain unchanged until confirmation."
+              : "Nothing was saved. Start over to change the entries. Send the request again."}
           </p>
         </RpcError>
       ) : null}

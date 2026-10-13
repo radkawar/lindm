@@ -45,8 +45,7 @@ function VersionName({ value }: { value: string }) {
 }
 
 export const reasonLabels: Record<string, string> = {
-  native_capabilities_unknown:
-    "Whether the device can run this setting is unknown; only server support was checked.",
+  native_capabilities_unknown: "The review checked server support only. Device support is unknown.",
   host_inventory_unknown: "Its inventory is missing. Request fresh inventory on this device.",
   host_inventory_stale:
     "Its inventory is older than 24 hours. Request fresh inventory on this device.",
@@ -56,7 +55,7 @@ export const reasonLabels: Record<string, string> = {
   membership_unknown:
     "Its inventory is missing or too old to tell whether it's in the target. Request fresh inventory.",
   resolution_has_unknown_membership:
-    "Another assignment can't tell whether this device is its target, so its settings may still change.",
+    "Another assignment cannot confirm this device's membership. That assignment can still change its settings.",
   candidate_limit: "The target has more devices than one review covers. Narrow the target.",
   report_byte_limit: "The review is too large to keep. Narrow the target.",
   device_visibility_incomplete:
@@ -198,7 +197,9 @@ function ChangeList({ device }: { device: TargetAssignmentDeviceImpact }) {
       </p>
     );
   if (!device.proposedResolution)
-    return <p>Its settings couldn't be worked out. It won't change until it's reviewed again.</p>;
+    return (
+      <p>The server could not determine settings. Review this device again before activation.</p>
+    );
   if (!device.changed)
     return <p className="text-muted-foreground">Already has these settings; nothing changes.</p>;
   const change = deviceChange(device);
@@ -271,8 +272,7 @@ function ChangeList({ device }: { device: TargetAssignmentDeviceImpact }) {
         </>
       ),
     });
-  if (!lines.length)
-    lines.push({ key: "order", text: "Its settings are reordered or re-sourced." });
+  if (!lines.length) lines.push({ key: "order", text: "The settings change order or source." });
   return (
     <ul className="grid gap-1">
       {lines.map((line) => (

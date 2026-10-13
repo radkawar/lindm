@@ -198,8 +198,8 @@ export function DashboardView() {
         title="Dashboard"
         description={
           observed.date
-            ? `Fleet snapshot ${freshnessLabel(observed.date, new Date())}. Work in your authorized scopes, in the order to review it.`
-            : "Work in your authorized scopes, in the order to review it."
+            ? `Fleet snapshot ${freshnessLabel(observed.date, new Date())}. Review work within your authorized scopes.`
+            : "Review work within your authorized scopes."
         }
         actions={
           <>
@@ -336,7 +336,7 @@ export function DashboardView() {
                 {findings ? (
                   <p className="text-xs text-muted-foreground">
                     {uncovered > 0n
-                      ? `No advisory source has checked these devices' packages, so their exposure is unknown, not zero. ${canFixCoverage ? "Advisories explains the cause and how to add coverage." : "Advisories explains the cause; an owner or admin with fleet-wide access fixes coverage."}`
+                      ? `No advisory source has checked these devices' packages. Their exposure is unknown. ${canFixCoverage ? "Open Advisories to check the cause and add coverage." : "Open Advisories to check the cause. Ask an administrator with fleet-wide access to add coverage."}`
                       : `${plural(findings.partialDevices, "device is", "devices are")} only partly checked.`}
                   </p>
                 ) : (

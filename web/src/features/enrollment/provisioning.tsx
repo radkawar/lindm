@@ -184,7 +184,9 @@ export function IssueProvisioningToken({
       });
       lifetime.signal.throwIfAborted();
       if (!result.tokenId)
-        throw new Error("The token may not have been created. Check the list, then try again.");
+        throw new Error(
+          "The server did not confirm token creation. Check the list before you retry.",
+        );
       onIssued(result);
       setCompleted(true);
       void client.invalidateQueries({ queryKey: ["provisioning-tokens", lifetime.generation] });
@@ -212,8 +214,8 @@ export function IssueProvisioningToken({
       <DialogHeader className="p-4 pr-12">
         <DialogTitle>Create a provisioning token</DialogTitle>
         <DialogDescription>
-          A reusable token that enrolls devices during installation, until it expires or runs out of
-          uses.
+          This reusable token enrolls devices during installation. It stops working when it expires
+          or reaches its use limit.
         </DialogDescription>
       </DialogHeader>
       <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-4 pb-4">

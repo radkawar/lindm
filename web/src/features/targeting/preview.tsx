@@ -161,10 +161,7 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
     <Card>
       <CardHeader>
         <CardTitle>Inspect one device</CardTitle>
-        <CardDescription>
-          For a device a rollout couldn't change: preview its settings now, then activate that exact
-          preview or request approval for it.
-        </CardDescription>
+        <CardDescription>Preview this device&apos;s settings before activation.</CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4">
         <form
@@ -401,8 +398,8 @@ export function TargetPreviewView({ initialDevice = "" }: { initialDevice?: stri
                 <RpcError failure={current.activationFailure}>
                   <p>
                     {current.status === "ambiguous"
-                      ? "We couldn't confirm activation. Retry: it won't apply twice."
-                      : "Preview again, then activate."}
+                      ? "The server did not confirm activation. Retry the same request. It cannot apply twice."
+                      : "Preview again. Activate the reviewed settings."}
                   </p>
                 </RpcError>
               ) : null}

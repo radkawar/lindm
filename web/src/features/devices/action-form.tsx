@@ -156,14 +156,14 @@ const inventoryBlockers: Record<string, true> = {
 };
 
 const actionSummaries: Record<DeviceActionKind, string> = {
-  escrowRotate: "Create a new recovery key for this encrypted volume and store it on the server.",
+  escrowRotate: "Create a new recovery key for this encrypted volume. Store the key on the server.",
   tpm2Bind: "Unlock this encrypted volume automatically with the device's TPM.",
-  lockSessions: "Lock user sessions and optionally block local logins.",
+  lockSessions: "Lock user sessions. Select whether to block local sign-in.",
   releaseLock: "Restore accounts locked by lindm. Screen locks stay in place.",
   quarantine: "Cut network access except for the management IPs you allow.",
   releaseQuarantine: "Remove the network restrictions added by quarantine.",
-  cryptoErase: "Destroy the encryption keys on this volume. Recovery keys on the server are kept.",
-  sanitize: "Permanently erase this unencrypted disk.",
+  cryptoErase: "Destroy the encryption keys on this volume. The server keeps recovery keys.",
+  sanitize: "Permanently wipe this unencrypted disk.",
   restart: "Restart the device.",
   shutdown: "Shut down the device.",
   refreshInventory: "Collect a fresh inventory from this device.",
@@ -544,7 +544,7 @@ export function DeviceActionForm({
         liveErase &&
         (!liveTargets.length || !liveTargets.every((entry) => isStillObserved(entry)))
       )
-        throw new Error("A volume in the list is no longer available. Refresh and try again.");
+        throw new Error("A listed volume is no longer available. Refresh inventory. Try again.");
       if (
         liveErase &&
         new Set(liveTargets.map((entry) => entry.selection.target.luksUuid)).size !==
@@ -654,7 +654,7 @@ export function DeviceActionForm({
           if (method >= SanitizeMethod.NVME_FORMAT_USER_DATA) {
             if (!nvmeScope)
               throw new Error(
-                "This disk's NVMe details are incomplete. Refresh inventory, then try again.",
+                "This disk's NVMe details are incomplete. Refresh inventory. Try again.",
               );
             validateRequest(NVMeSanitizeScopeSchema, nvmeScope);
           }
@@ -993,8 +993,8 @@ export function DeviceActionForm({
       </p>
     ) : refreshResult === "expired" ? (
       <p className="text-sm text-warning">
-        {deviceName} didn&apos;t start the last refresh before it expired. Check that it&apos;s
-        online, then request it again. {refreshLink}
+        {deviceName} did not start the refresh before expiry. Check that the device is online.
+        Request inventory again. {refreshLink}
       </p>
     ) : refreshResult === "unknown" ? (
       <p className="text-sm text-warning">
@@ -1164,8 +1164,8 @@ export function DeviceActionForm({
                   </Button>
                   <span className="text-muted-foreground">
                     {sendableAfterRefresh
-                      ? "Uses the reason above. This exact request is sent once fresh inventory passes the server's checks; nothing is sent if they still fail."
-                      : "Uses the reason above. This action is checked again when inventory arrives."}
+                      ? "Uses the reason above. The console sends this exact request after fresh inventory passes server checks. Failed checks prevent sending."
+                      : "Uses the reason above. The server checks this action again when inventory arrives."}
                   </span>
                 </div>
               )}
@@ -1261,8 +1261,8 @@ export function DeviceActionForm({
           eligibleTargets &&
           eligibleTargets.ephemeralMappings.length > 0 ? (
             <p className="text-sm text-muted-foreground">
-              Not erased: {eligibleTargets.ephemeralMappings.join(", ")} (ephemeral random-key swap;
-              destroyed at power-off).
+              The wipe excludes {eligibleTargets.ephemeralMappings.join(", ")}. Power-off destroys
+              these temporary swap keys.
             </p>
           ) : null}
           {kind === "sanitize" && eligibleTargets && !currentSelection ? (
@@ -1345,11 +1345,11 @@ export function DeviceActionForm({
                     options={[
                       {
                         value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_NEVER,
-                        label: "Never: only report that a reboot is required",
+                        label: "Never: report when the device needs a restart",
                       },
                       {
                         value: OSUpdateRebootMode.OS_UPDATE_REBOOT_MODE_SCHEDULED,
-                        label: "Schedule a reboot when one is required",
+                        label: "Schedule a restart when the device needs one",
                       },
                     ]}
                   />
@@ -1415,7 +1415,7 @@ export function DeviceActionForm({
                   />
                   {currentSelection?.inUse ? (
                     <p id={`${prefix}-erase-mode-help`} className="text-sm text-muted-foreground">
-                      This volume is in use, so it can only be wiped while the device is running.
+                      This volume is in use. The device must remain running for this wipe.
                     </p>
                   ) : null}
                 </>
@@ -1527,7 +1527,7 @@ export function DeviceActionForm({
                       },
                     ]}
                   />
-                  <Label htmlFor={`${prefix}-accounts`}>Block local logins</Label>
+                  <Label htmlFor={`${prefix}-accounts`}>Block local sign-in</Label>
                   <SelectField
                     id={`${prefix}-accounts`}
                     value={accountSelection}
@@ -1547,9 +1547,7 @@ export function DeviceActionForm({
                         value=""
                         disabled={busy}
                         ineligible={(user) =>
-                          user.uid === 0n
-                            ? "Can't be blocked: root logins stay available"
-                            : undefined
+                          user.uid === 0n ? "Cannot block root sign-in" : undefined
                         }
                         onChange={(name) => {
                           if (name && !usernames.includes(name)) setUsernames([...usernames, name]);
@@ -1645,7 +1643,7 @@ export function DeviceActionForm({
               {kind === "sanitize" && method >= SanitizeMethod.NVME_FORMAT_USER_DATA ? (
                 currentSelection?.nvmeScope ? (
                   <div className="grid gap-2">
-                    <Label htmlFor={`${prefix}-nvme-scope`}>What to erase</Label>
+                    <Label htmlFor={`${prefix}-nvme-scope`}>What to wipe</Label>
                     <SelectField
                       id={`${prefix}-nvme-scope`}
                       value={nvmeControllerWide ? "controller" : "namespace"}
@@ -1661,13 +1659,13 @@ export function DeviceActionForm({
                     />
                     {nvmeControllerWide ? (
                       <p className="text-sm text-warning">
-                        Every namespace on this controller will be erased.
+                        The wipe removes data from every namespace on this controller.
                       </p>
                     ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    NVMe details aren&apos;t available for this disk. Refresh inventory, then try
+                    The device has not reported NVMe details for this disk. Refresh inventory. Try
                     again.
                   </p>
                 )
@@ -1726,8 +1724,8 @@ export function DeviceActionForm({
               <p className="text-sm">{actionSummaries[kind]}</p>
               {liveErase ? (
                 <p className="text-sm text-warning">
-                  Every selected volume is wiped and the device powers off within 2 minutes. Include
-                  all encrypted volumes.
+                  The action wipes every selected volume. The device powers off within 2 minutes.
+                  Include all encrypted volumes.
                 </p>
               ) : null}
               <p className="text-sm text-muted-foreground">

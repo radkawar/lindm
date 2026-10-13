@@ -190,7 +190,7 @@ async function lostLaptop(ctx) {
   }
   await select(
     page,
-    dialog.getByRole("combobox", { name: "Block local logins" }),
+    dialog.getByRole("combobox", { name: "Block local sign-in" }),
     "All local user accounts",
   );
   const reason =

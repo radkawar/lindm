@@ -138,36 +138,36 @@ function DestructiveConsequences({
       className="grid gap-2 rounded-lg border border-destructive/50 p-4 text-sm"
     >
       <h2 id={id} className="text-base font-semibold text-destructive">
-        {wipe ? "Wiping can't be undone" : "Erasing can't be undone"}
+        Wiping cannot be undone
       </h2>
       <ul className="grid list-disc gap-1 pl-5">
         {wipe ? (
           <>
             <li>
-              Destroys the encryption header and key slots of the volumes you select on {target}.
-              Their data becomes unreadable.
+              The wipe destroys the encryption header and key slots of the volumes you select on{" "}
+              {target}. The data becomes unreadable.
             </li>
             <li>{subject} powers off when the wipe finishes.</li>
           </>
         ) : (
           <>
-            <li>Erases everything on the unencrypted disk you select on {target}.</li>
+            <li>The wipe removes all data from the unencrypted disk you select on {target}.</li>
             <li>
-              If you choose to boot into lindm recovery first, {target} restarts into recovery and
-              powers off when the erase finishes.
+              If you select lindm recovery, {target} restarts into recovery. The device powers off
+              when the wipe finishes.
             </li>
           </>
         )}
-        <li>Another admin must approve this {wipe ? "wipe" : "erase"} before you can send it.</li>
+        <li>Another administrator must approve this wipe before you send it.</li>
         <li>
           {wipe
-            ? "Not destroyed: recovery keys escrowed on this server and any header backups. Anyone with a header backup and a recovery key can still read the data."
-            : "Not erased: backups and snapshots stored elsewhere."}
+            ? "The wipe keeps recovery keys on this server and external header backups. A header backup and recovery key still permit data access."
+            : "The wipe does not remove external backups or snapshots."}
         </li>
         <li>
-          The device must be online: sending is refused unless it checked in during the last minute.
-          If it hasn&apos;t started within 10 minutes of your review, the request expires and
-          nothing is {wipe ? "wiped" : "erased"}.
+          The device must have checked in during the last minute before you send the request. The
+          request expires if the device does not start within 10 minutes of your review. An expired
+          request does not wipe data.
         </li>
       </ul>
     </section>

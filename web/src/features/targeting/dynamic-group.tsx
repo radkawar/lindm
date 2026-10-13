@@ -596,8 +596,8 @@ export function DynamicGroupFields({
       ) : (
         <div className="grid gap-2 border bg-muted/30 p-3 text-sm">
           <p>
-            These conditions are nested more deeply than this editor shows. They are kept as they
-            are unless you replace them.
+            This editor cannot show the full depth of these conditions. It preserves the conditions
+            unless you replace them.
           </p>
           <Button
             type="button"
@@ -629,7 +629,8 @@ export function DynamicGroupFields({
           onValueChange={(next) => update({ seconds: Number(next) })}
         />
         <p id={`${id}-freshness-help`} className="text-xs text-muted-foreground">
-          Devices whose inventory is older can&apos;t be checked and are not included.
+          The group excludes devices with older inventory because it cannot confirm their
+          membership.
         </p>
       </div>
       <div className="grid gap-1.5">

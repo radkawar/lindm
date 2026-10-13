@@ -168,7 +168,7 @@ export function DeviceCapabilities({
           <h2>Management capabilities</h2>
         </CardTitle>
         <CardDescription>
-          What the lindm agent may change on this device, and what the device last reported.
+          The policy limits agent changes. The device reports which policy it applied.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid min-w-0 gap-4 text-sm">

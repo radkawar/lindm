@@ -34,7 +34,7 @@ import { ListStatus, TargetPagination } from "./list";
 // assignments evaluate the conditions at their next preview and rollouts keep
 // the cohort they froze when they started. Nothing is locked after saving.
 const SAVE_EFFECT =
-  "Saving changes no device by itself. Assignments use these conditions at their next preview; running rollouts keep the devices they started with. You can edit the group later.";
+  "Saving does not change devices. Assignments use these conditions at their next preview. Running rollouts keep their original devices.";
 const MEMBERS_LISTED = 10;
 
 export function DynamicGroupsView({ groupName }: { groupName: NameSlot }) {

@@ -137,11 +137,11 @@ async function startRollout(key: string, lifetime: AuthLifetime, client: QueryCl
 
 const startRefusals: Record<string, string> = {
   targeting_impact_stale:
-    "Devices or settings changed after your review. Review impact again, then roll out.",
+    "Devices or settings changed after your review. Review impact again. Start the rollout.",
   targeting_not_ready:
     "No active device would change, so nothing was saved. Check the target and version.",
   invalid_targeting_request:
-    "The server refused this rollout plan. Check the stages and target, then review again.",
+    "The server refused this rollout plan. Check the stages and target. Review impact again.",
 };
 
 function freshAssignment(candidate?: TargetCandidate) {
@@ -592,11 +592,11 @@ export function RolloutFlow({
         <RpcError failure={attempt.failure}>
           <p>
             {attempt.phase === "start-ambiguous"
-              ? "We couldn't confirm the rollout started. Retry the same rollout; it can't start twice."
+              ? "The server did not confirm the rollout started. Retry the same rollout. The same request cannot start it twice."
               : attempt.phase === "request-failed"
-                ? "The rollout is waiting for approval, but the approval request wasn't confirmed. Request it again; it is the same request."
+                ? "The rollout needs approval. The server did not confirm the approval request. Retry the same request."
                 : (startRefusals[attempt.failure.reason] ??
-                  "The rollout didn't start and nothing changed. Review impact again.")}
+                  "The rollout did not start. Nothing changed. Review impact again.")}
           </p>
         </RpcError>
       ) : null}

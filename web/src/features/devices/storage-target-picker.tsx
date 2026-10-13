@@ -34,7 +34,7 @@ const unavailableMessages: Record<string, string> = {
     "No disk can be used for this action yet. Refresh inventory.",
   device_action_tpm2_unavailable: "No TPM 2.0 reported. Refresh inventory.",
   device_action_tpm2_binding_unsupported:
-    "This OS release cannot bind the disk to the TPM (systemd 252 or newer is required).",
+    "This OS release cannot bind the disk to the TPM. TPM binding needs systemd 252 or newer.",
 };
 
 // Completes "Storage info from 12 min ago is too old …" per action.

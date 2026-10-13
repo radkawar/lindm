@@ -95,13 +95,10 @@ export function EnrollmentView({
           <CardHeader>
             <Laptop className="mb-2 size-6 text-primary" aria-hidden="true" />
             <CardTitle>Enroll one device now</CardTitle>
-            <CardDescription>For setting up one machine from its terminal.</CardDescription>
+            <CardDescription>Enroll a device from its terminal.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <p className="text-sm">A single-use code that expires after 5 minutes by default.</p>
-            <p className="text-sm text-muted-foreground">
-              You'll get the install and enroll commands for the device's distribution.
-            </p>
             <Button className="w-fit" aria-haspopup="dialog" onClick={() => setMethod("grant")}>
               Create one-time code
             </Button>
@@ -118,7 +115,7 @@ export function EnrollmentView({
           <CardContent className="grid gap-4">
             <p className="text-sm">A reusable token. Defaults to 24 hours and 100 uses.</p>
             <p className="text-sm text-muted-foreground">
-              You'll get an installer snippet. Add the token at install time, not to a saved image.
+              Add the token during installation. Do not store it in an image.
             </p>
             <Button
               className="w-fit"
@@ -237,8 +234,8 @@ export function EnrollmentView({
           <DialogHeader>
             <DialogTitle>Enroll devices at offline sites</DialogTitle>
             <DialogDescription>
-              For devices without network access. Move files by removable media, keep them readable
-              by root only (mode 0600), and do not edit them.
+              Move files by removable media. Keep files readable by root only (mode 0600). Do not
+              edit the files.
             </DialogDescription>
           </DialogHeader>
           <OfflineEnrollment />
@@ -275,7 +272,7 @@ function IssueGrant({
       });
       authLifetime.signal.throwIfAborted();
       if (!response.grantId.trim())
-        throw new Error("The code may not have been created. Try again.");
+        throw new Error("The server did not confirm code creation. Retry the same request.");
       const deliveryUnknown = response.secretDeliveryUnknown || !response.secret;
       onIssued({
         kind: "grant",
@@ -318,7 +315,7 @@ function IssueGrant({
     <>
       <DialogHeader>
         <DialogTitle>Enroll one device now</DialogTitle>
-        <DialogDescription>Create a single-use code for one machine.</DialogDescription>
+        <DialogDescription>Create a single-use code for one device.</DialogDescription>
       </DialogHeader>
       <form
         className="grid gap-4"
@@ -357,9 +354,6 @@ function IssueGrant({
             { value: "900", label: "15 minutes" },
           ]}
         />
-        <p className="text-sm text-muted-foreground">
-          You'll get the install commands after you create the code.
-        </p>
         <Label htmlFor="grant-reason">Reason</Label>
         <Textarea
           id="grant-reason"

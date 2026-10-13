@@ -358,12 +358,12 @@ export function DevicesView({
     }
   }, [failure, freshResponse, search, pageToken, lifetime, onSearch]);
 
-  if (!canRead) return <p role="alert">Fleet read permission is required to view inventory.</p>;
+  if (!canRead) return <p role="alert">Ask an owner for fleet read access to view inventory.</p>;
   return (
     <section className="flex min-w-0 flex-col gap-5" aria-busy={list.isFetching}>
       <PageHeader
         title="Devices"
-        description="Find a device by hostname, operating system or label, then open it to act."
+        description="Find a device by hostname, operating system or label. Open the device to act."
         actions={
           <Button variant="outline" onClick={() => void list.refetch()} disabled={list.isFetching}>
             <RefreshCw aria-hidden="true" /> Refresh
@@ -695,8 +695,8 @@ export function DeviceRevocationImpact({ device }: { device: Device }) {
       <div data-review-impact="approval">
         <dt className="font-medium">Approval required</dt>
         <dd>
-          This requests approval, not immediate revocation. Another admin must approve within one
-          hour; then finish the revocation in Approvals.
+          This requests approval, not immediate revocation. Another administrator must approve
+          within one hour. Finish the revocation in Approvals after approval.
         </dd>
       </div>
     </dl>

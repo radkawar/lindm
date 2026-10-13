@@ -278,7 +278,7 @@ function DefinitionForm({
             <p id="definition-key-hint" className="text-xs text-muted-foreground">
               {existing
                 ? "The key can't change after the attribute is created."
-                : "Filled in from the name. Lowercase letters, digits, hyphens, underscores or dots; it can't change later."}
+                : "The name supplies the key. Use lowercase letters, digits, hyphens, underscores or dots. The key cannot change later."}
             </p>
           )}
         </div>
@@ -338,7 +338,9 @@ function DefinitionForm({
       ) : null}
       {failure ? (
         <RpcError failure={failure}>
-          {failure.ambiguous ? <p>We couldn&apos;t confirm the save. Retry to make sure.</p> : null}
+          {failure.ambiguous ? (
+            <p>The server did not confirm the save. Retry the same request.</p>
+          ) : null}
         </RpcError>
       ) : null}
       {inputError ? (

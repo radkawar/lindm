@@ -54,8 +54,8 @@ export function StaleDevices({
     >
       <h4 className="text-sm font-semibold">Stale contact preview</h4>
       <p className="text-xs text-muted-foreground">
-        Up to five devices in enrollment order, not oldest first. This live list can differ from the
-        dashboard snapshot. Devices that never checked in are excluded.
+        This live list shows up to five devices in enrollment order. It excludes devices that never
+        checked in. The list can differ from the dashboard snapshot.
       </p>
       <div className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">

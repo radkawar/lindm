@@ -63,10 +63,10 @@ export const sanitizeMethodLabels: Record<SanitizeMethod, string> = {
   [SanitizeMethod.UNSPECIFIED]: "Not supported",
   [SanitizeMethod.OVERWRITE]: "Overwrite (hard drives)",
   [SanitizeMethod.DISCARD]: "Discard and verify zeros (SSDs)",
-  [SanitizeMethod.NVME_FORMAT_USER_DATA]: "NVMe format: user-data erase",
-  [SanitizeMethod.NVME_FORMAT_CRYPTO_ERASE]: "NVMe format: cryptographic erase",
-  [SanitizeMethod.NVME_SANITIZE_BLOCK_ERASE]: "NVMe sanitize: block erase",
-  [SanitizeMethod.NVME_SANITIZE_CRYPTO_ERASE]: "NVMe sanitize: cryptographic erase",
+  [SanitizeMethod.NVME_FORMAT_USER_DATA]: "NVMe format: wipe user data",
+  [SanitizeMethod.NVME_FORMAT_CRYPTO_ERASE]: "NVMe format: wipe encryption keys",
+  [SanitizeMethod.NVME_SANITIZE_BLOCK_ERASE]: "NVMe sanitize: wipe blocks",
+  [SanitizeMethod.NVME_SANITIZE_CRYPTO_ERASE]: "NVMe sanitize: wipe encryption keys",
 };
 export const sanitizeMethods = [
   SanitizeMethod.OVERWRITE,
@@ -278,9 +278,9 @@ export function DeviceActionSpecView({
       {action.case === "lockSessions" ? (
         <dl className="grid gap-2 text-sm">
           <Fact label="Terminate interactive sessions">
-            {action.value.terminateSessions ? "Yes: unsaved work may be lost" : "No: lock only"}
+            {action.value.terminateSessions ? "Yes: users can lose unsaved work" : "No: lock only"}
           </Fact>
-          <Fact label="Disable local login">
+          <Fact label="Block local sign-in">
             {action.value.allHumanAccounts
               ? "All eligible local human accounts"
               : action.value.usernames.join(", ") || "None: session lock only"}
@@ -354,7 +354,7 @@ export function DeviceActionSpecView({
           <Fact label="NVMe namespace ID">{action.value.nvmeScope.namespaceId}</Fact>
           <Fact label="Scope">
             {action.value.nvmeScope.controllerWide
-              ? "Entire controller: all namespaces are erased"
+              ? "Entire controller: wipes all namespaces"
               : "Selected namespace only"}
           </Fact>
         </dl>
@@ -413,7 +413,7 @@ export function CryptoEraseVerificationView({
           <StorageTargetView target={result.target} />
           <dl className="grid gap-2 text-sm sm:grid-cols-2">
             <Fact label="Header extent">{formatBytes(result.headerBytes)}</Fact>
-            <Fact label="LUKS erase">
+            <Fact label="LUKS wipe">
               <StatusBadge status={result.nativeLuksErase ? "success" : "warning"}>
                 {result.nativeLuksErase ? "Confirmed" : "Not confirmed"}
               </StatusBadge>
@@ -433,7 +433,7 @@ export function CryptoEraseVerificationView({
         </div>
       ))}
       <p className="text-sm text-muted-foreground">
-        Server recovery keys and backups are kept. Keys in memory are cleared at power-off.
+        The wipe keeps server recovery keys and backups. Power-off clears keys from memory.
       </p>
     </div>
   );

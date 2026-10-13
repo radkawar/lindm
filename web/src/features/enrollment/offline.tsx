@@ -43,7 +43,7 @@ export function OfflineEnrollment() {
 // Imported offline requests either wait for an independent approval or are ready to export.
 const importedStateLabels: Record<string, string> = {
   pending_approval:
-    "Request imported. It waits for another admin's approval in the approval inbox; export the response after that.",
+    "Request imported. Another administrator must approve it in the approval inbox. Export the response after approval.",
   ready: "Request imported and ready. Export the response now.",
 };
 
@@ -404,7 +404,9 @@ function OfflineExchange() {
             onDismiss={() => setDocument("")}
           />
         ) : null}
-        <p className="text-sm">Copy the response file to the same device, then run as root:</p>
+        <p className="text-sm">
+          Copy the response file to the same device. Run this command as root:
+        </p>
         <pre className="overflow-auto whitespace-pre-wrap break-all text-xs">
           /usr/libexec/lindm/lindm-agent offline-import -file /run/lindm/lindm-offline-response.json
         </pre>

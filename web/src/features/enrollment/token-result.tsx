@@ -111,9 +111,9 @@ function UnavailableInstall({ platform }: { platform: EnrollmentPlatform }) {
   return (
     <p className="text-sm">
       {reason.startsWith("native_")
-        ? `The agent repository for ${platform.label} isn't set up yet; see `
-        : "Agent installation isn't set up on this server yet; see "}
-      {settings} to set it up.
+        ? `The agent repository for ${platform.label} is not ready. Open `
+        : "Agent installation is not ready on this server. Open "}
+      {settings}.
     </p>
   );
 }
@@ -226,7 +226,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
               {credential.deliveryUnknown ? "Secret not shown" : "Secret unavailable"}
             </StatusBadge>
             <p className="text-sm">
-              Revoke this {provisioning ? "token" : "code"} in the list, then create a new one.
+              Revoke this {provisioning ? "token" : "code"} in the list. Create a new one.
             </p>
           </div>
         ) : (
@@ -295,8 +295,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
               <>
                 <p className="text-sm text-muted-foreground">
                   {provisioning
-                    ? "Installs the signed agent from this server and enrolls this device on its first boot."
-                    : "Installs the signed agent from this server, then enrolls this device."}
+                    ? "The installer installs the signed agent from this server. The device enrolls on its first boot."
+                    : "The command installs the signed agent from this server. It enrolls this device."}
                 </p>
                 <p className="text-sm">
                   {provisioning
@@ -345,7 +345,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
         )}
         {snippet && !(provisioning && format === "nixos") ? (
           <details className="text-sm">
-            <summary className="cursor-pointer">What this does</summary>
+            <summary className="cursor-pointer">Details</summary>
             <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
               <li>Checks the selected operating system and available package architecture.</li>
               <li>
@@ -353,20 +353,21 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                   ? "Inside the installer, before the first boot: installs package tools from the device's distribution sources."
                   : "Installs package tools from the device's existing distribution sources."}
                 {instructions.data?.tlsCaPem
-                  ? " Verifies the supplied private HTTPS CA fingerprint, then adds it to system trust."
+                  ? " The command verifies the private HTTPS CA fingerprint. It adds the CA to system trust."
                   : " Uses the device's system HTTPS trust."}
               </li>
               <li>
-                Authenticates the package signing key, adds only this server's signed agent
-                repository, and installs lindm-agent.
+                The command authenticates the package signing key. It adds only this server&apos;s
+                signed agent repository. It installs lindm-agent.
               </li>
               <li>
-                Verifies the execution root fingerprint and downloads the signed bootstrap bundle.
+                The command verifies the execution root fingerprint. It downloads the signed
+                bootstrap bundle.
               </li>
               <li>
-                Starts the agent and enrolls with this{" "}
-                {provisioning ? "token on first boot" : "code"}. Approval may be required; waiting
-                stops after one hour without claiming enrollment.
+                The agent enrolls with this {provisioning ? "token on first boot" : "code"}. The
+                enrollment policy determines whether enrollment needs approval. The command stops
+                waiting after one hour. This timeout does not confirm enrollment.
               </li>
             </ol>
           </details>
@@ -387,7 +388,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             {!unavailable ? (
               <>
                 <p>
-                  Keep the secret out of command lines, logs, URLs and images. Delete copies after
+                  Keep the secret out of command lines, logs, URLs and images. Remove copies after
                   use.
                 </p>
                 {!(provisioning && format === "nixos") ? (
@@ -427,11 +428,13 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 </p>
                 {provisioning ? (
                   <p>
-                    Merge the snippet into your complete installer configuration; it doesn't replace
-                    it. Delete installer and seed copies after enrollment.
+                    Merge the snippet into your complete installer configuration. It does not
+                    replace that configuration. Remove installer and seed copies after enrollment.
                   </p>
                 ) : (
-                  <p>When enrollment finishes, delete /run/lindm-enrollment/grant on the device.</p>
+                  <p>
+                    When enrollment finishes, remove /run/lindm-enrollment/grant from the device.
+                  </p>
                 )}
               </>
             ) : null}
