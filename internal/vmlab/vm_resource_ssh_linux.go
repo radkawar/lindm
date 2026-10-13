@@ -69,10 +69,11 @@ func sshBannerFilesOracle(vm *guestVM, content string, managed bool) func(contex
 		} else {
 			command += "test ! -e /etc/issue.net; printf 'issue.net absent\\n'; "
 		}
+		// OpenSSH 10.5 prints canonical keyword case ("Banner none").
 		if managed {
-			command += "/usr/sbin/sshd -T | grep -x 'banner /etc/issue.net'; stat -c '%n %a %u %g' " + resource.SSHBannerDirectivePath + "; sha256sum " + resource.SSHBannerDirectivePath + "; "
+			command += "/usr/sbin/sshd -T | grep -Ex '(banner|Banner) /etc/issue.net'; stat -c '%n %a %u %g' " + resource.SSHBannerDirectivePath + "; sha256sum " + resource.SSHBannerDirectivePath + "; "
 		} else {
-			command += "test ! -e " + resource.SSHBannerDirectivePath + "; /usr/sbin/sshd -T | grep -x 'banner none'; "
+			command += "test ! -e " + resource.SSHBannerDirectivePath + "; /usr/sbin/sshd -T | grep -Ex '(banner|Banner) none'; "
 		}
 		command += "if test -e /sys/fs/selinux/enforce; then test \"$(getenforce)\" = Enforcing; getenforce; if test -f /etc/issue.net; then matchpathcon -V /etc/issue.net; ls -Z /etc/issue.net; fi; if test -f " + resource.SSHBannerDirectivePath + "; then matchpathcon -V " + resource.SSHBannerDirectivePath + "; ls -Z " + resource.SSHBannerDirectivePath + "; fi; fi"
 		return resourceOracle(ctx, vm, "native-sshd-banner-files-syntax-labels", command)

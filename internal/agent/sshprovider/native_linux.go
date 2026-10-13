@@ -195,6 +195,10 @@ func (p *Provider) snapshot(ctx context.Context) (*agentv1.ResourceOwnershipSnap
 
 func sum(data []byte) []byte { digest := sha256.Sum256(data); return digest[:] }
 
+// parseEffective reads `sshd -T`. Keywords are case-insensitive: OpenSSH up to
+// 9.x prints them lowercase, while 10.5 (Arch, Omarchy 4.0.4) prints canonical
+// mixed case ("Port 22", "Banner none"), which once left every observation
+// without a port and refused as unsupported.
 func parseEffective(data []byte) (uint32, string, error) {
 	var port uint64
 	var banner string
@@ -203,7 +207,7 @@ func parseEffective(data []byte) (uint32, string, error) {
 		if len(fields) < 2 {
 			continue
 		}
-		switch fields[0] {
+		switch strings.ToLower(fields[0]) {
 		case "port":
 			if port != 0 {
 				return 0, "", fmt.Errorf("%w: multiple SSH listeners", ErrUnsupported)

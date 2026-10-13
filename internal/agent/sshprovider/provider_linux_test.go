@@ -190,11 +190,17 @@ func TestUnknownEffectsAndForeignOwnersStayBlocked(t *testing.T) {
 	}
 }
 func TestEffectiveBannerParsing(t *testing.T) {
-	port, path, err := parseEffective([]byte("port 22\nbanner /etc/issue.net\n"))
-	if err != nil || port != 22 || path != resource.SSHBannerPath {
+	// OpenSSH 10.5 prints canonical mixed-case keywords (Omarchy 4.0.4, Arch).
+	for _, data := range []string{"port 22\nbanner /etc/issue.net\n", "Port 22\nBanner /etc/issue.net\n"} {
+		port, path, err := parseEffective([]byte(data))
+		if err != nil || port != 22 || path != resource.SSHBannerPath {
+			t.Fatal(data, port, path, err)
+		}
+	}
+	if port, path, err := parseEffective([]byte("Port 22\nBanner none\n")); err != nil || port != 22 || path != "none" {
 		t.Fatal(port, path, err)
 	}
-	for _, data := range []string{"port 22\nbanner /foreign\n", "port 22\nport 2222\nbanner none\n", "port 0\nbanner none\n"} {
+	for _, data := range []string{"port 22\nbanner /foreign\n", "Port 22\nBanner /foreign\n", "port 22\nport 2222\nbanner none\n", "Port 22\nPort 2222\nBanner none\n", "port 0\nbanner none\n"} {
 		if _, _, err := parseEffective([]byte(data)); err == nil {
 			t.Fatalf("unsafe effective config accepted: %q", data)
 		}

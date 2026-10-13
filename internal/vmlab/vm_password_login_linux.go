@@ -38,7 +38,8 @@ func installPasswordLoginDropIn(ctx context.Context, vm *guestVM, user string) (
 	}
 	// sshd evaluates Match blocks against the connection; -T -C prints the
 	// effective per-user result, and the global default stays disabled.
-	oracle := "effective=$(/usr/sbin/sshd -T -C user=" + user + ",host=localhost,addr=127.0.0.1); printf '%s\\n' \"$effective\" | grep -Ex 'passwordauthentication yes'; printf '%s\\n' \"$effective\" | grep -E '^(kbdinteractiveauthentication|usepam|permitrootlogin) '; other=$(/usr/sbin/sshd -T -C user=lindm-lab-other,host=localhost,addr=127.0.0.1); printf '%s\\n' \"$other\" | grep -Eqx 'passwordauthentication no'; printf 'other-users: passwordauthentication no\\n'; cat " + path
+	// Keywords are case-insensitive: OpenSSH 10.5 prints canonical case.
+	oracle := "effective=$(/usr/sbin/sshd -T -C user=" + user + ",host=localhost,addr=127.0.0.1); printf '%s\\n' \"$effective\" | grep -Eix 'passwordauthentication yes'; printf '%s\\n' \"$effective\" | grep -Ei '^(kbdinteractiveauthentication|usepam|permitrootlogin) '; other=$(/usr/sbin/sshd -T -C user=lindm-lab-other,host=localhost,addr=127.0.0.1); printf '%s\\n' \"$other\" | grep -Eiqx 'passwordauthentication no'; printf 'other-users: passwordauthentication no\\n'; cat " + path
 	return resourceOracle(ctx, vm, "native-sshd-effective-password-authentication", oracle)
 }
 

@@ -112,6 +112,9 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   `fs.inotify.max_user_watches`). It sorts after lindm's stanza, so the sysctl
   provider refuses those keys (`later effective sysctl.d assignment`). The lab's
   resources lane manages `vm.overcommit_ratio` instead.
+- **OpenSSH 10.5.** `sshd -T` prints keywords in canonical case (`Port 22`,
+  `Banner none`), not the lowercase of OpenSSH 9.x. The SSH banner provider and
+  lab oracles compare keywords case-insensitively; values stay exact.
 - **Lock.** Omarchy 4 locks through its Quickshell shell (`WlSessionLock`,
   `shell/plugins/lock`), not hyprlock/hypridle. No logind `Lock` listener and no
   `SetLockedHint` caller exist in the v4.0.4 tree. Natively observed
