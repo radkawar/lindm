@@ -329,9 +329,14 @@ type MatrixCell struct {
 	// The lane needs a TPM the guest kernel binds (e.g. unattended TPM2
 	// unlock). The cell is gated on an architecture whose installed kernel
 	// cannot bind the TPM the lab attaches there (registry Lab.TPM.Unobservable).
-	Tpm           bool `protobuf:"varint,11,opt,name=tpm,proto3" json:"tpm,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Tpm bool `protobuf:"varint,11,opt,name=tpm,proto3" json:"tpm,omitempty"`
+	// The lane repairs a TPM2 bind an older agent left with a single systemd-tpm2
+	// token reference. Applicable only where the registry needs more than one
+	// (platform TPM2TokenReferences, the TPM2UnsealRetryNextToken quirk); every
+	// other release is gated as not applicable: no legacy defect exists there.
+	Tpm2ReferenceRepair bool `protobuf:"varint,12,opt,name=tpm2_reference_repair,json=tpm2ReferenceRepair,proto3" json:"tpm2_reference_repair,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *MatrixCell) Reset() {
@@ -437,6 +442,13 @@ func (x *MatrixCell) GetMinimumRevision() string {
 func (x *MatrixCell) GetTpm() bool {
 	if x != nil {
 		return x.Tpm
+	}
+	return false
+}
+
+func (x *MatrixCell) GetTpm2ReferenceRepair() bool {
+	if x != nil {
+		return x.Tpm2ReferenceRepair
 	}
 	return false
 }
@@ -746,7 +758,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x1blab.matrix_secure_boot_args\x12@a Secure Boot cell needs secure_boot_args for every architecture\x1aa!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)\"7\n" +
 	"\n" +
 	"MatrixArgs\x12)\n" +
-	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\x84\x06\n" +
+	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xb8\x06\n" +
 	"\n" +
 	"MatrixCell\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x04name\x12\x1f\n" +
@@ -762,7 +774,8 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"secureBoot\x12C\n" +
 	"\x10minimum_revision\x18\n" +
 	" \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x0fminimumRevision\x12\x10\n" +
-	"\x03tpm\x18\v \x01(\bR\x03tpm:\x87\x02\xbaH\x83\x02\x1a\x80\x02\n" +
+	"\x03tpm\x18\v \x01(\bR\x03tpm\x122\n" +
+	"\x15tpm2_reference_repair\x18\f \x01(\bR\x13tpm2ReferenceRepair:\x87\x02\xbaH\x83\x02\x1a\x80\x02\n" +
 	"\x14lab.matrix_cell_lane\x12pa cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane\x1avthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +

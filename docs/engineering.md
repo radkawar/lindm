@@ -3307,6 +3307,10 @@ A cell marked `tpm` (TPM unattended boots) is `gated` as lab-only on an
 architecture the row's `Lab.TPM.Unobservable` lists: the installed kernel there
 cannot bind the TPM the lab attaches (Debian arm64 builds neither `tpm_tis` nor
 `tpm_tis_i2c`, QEMU 8.2's arm `virt` TPMs).
+A cell marked `tpm2ReferenceRepair` (TPM reference repair) is `gated` as not
+applicable on a release whose registry `TPM2TokenReferences` is one: its systemd
+retries a PCR change itself, so no agent ever left it a single-reference bind
+to repair.
 A cell without a maintained lane, or whose lane has no recipe in
 the row's `Lab.Lanes`, is `no lane`; a release without a pinned image for that
 architecture is `no image`; and a runnable cell without a ledger entry is

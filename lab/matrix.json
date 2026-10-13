@@ -112,7 +112,8 @@
         "-tpm-boots=30"
       ],
       "secureBoot": true,
-      "tpm": true
+      "tpm": true,
+      "tpm2ReferenceRepair": true
     },
     {
       "name": "device-actions",

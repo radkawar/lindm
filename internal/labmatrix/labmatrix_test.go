@@ -179,6 +179,35 @@ func TestPlanGatesTPMCellsWhereTPMIsUnobservable(t *testing.T) {
 	}
 }
 
+// The reference-repair cell applies only to releases whose systemd needs
+// several token references (Ubuntu 24.04, EL 9 and their derivatives); a
+// release needing one has no legacy defect and is gated as not applicable.
+func TestPlanGatesTPMReferenceRepairToQuirkedReleases(t *testing.T) {
+	encrypted := labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	repair := &labv1.MatrixCell{Name: "tpm-reference-repair", Title: "TPM reference repair", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions", Tpm: true, Tpm2ReferenceRepair: true}
+	for key, applicable := range map[string]bool{"ubuntu-24.04": true, "rhel-9": true, "opensuse-tumbleweed": false, "debian-13": false, "rhel-10": false} {
+		r := release(t, key)
+		in := &Inputs{
+			Manifests: []*Manifest{{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "encrypted-lab"}, Release: r, Architecture: "x86_64"}},
+			Ledger:    &labv1.MatrixLedger{},
+		}
+		cells := in.Plan([]*platform.Release{r}, []*labv1.MatrixCell{repair})
+		var x86 *Cell
+		for _, c := range cells {
+			if c.Architecture == "x86_64" {
+				x86 = c
+			}
+		}
+		if x86 == nil {
+			t.Fatalf("%s: no x86_64 cell", key)
+		}
+		gated := x86.State == Gated && strings.Contains(x86.Reason, "TPM2TokenReferences")
+		if gated == applicable {
+			t.Errorf("%s: state %v %q, applicable %t", key, x86.State, x86.Reason, applicable)
+		}
+	}
+}
+
 // Pop!_OS installs an unsigned systemd-boot, so a cell that requires Secure
 // Boot is gated with the registry's measured reason instead of failing; the
 // same lane without Secure Boot stays schedulable.

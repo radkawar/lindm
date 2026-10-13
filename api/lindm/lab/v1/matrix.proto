@@ -140,6 +140,11 @@ message MatrixCell {
   // unlock). The cell is gated on an architecture whose installed kernel
   // cannot bind the TPM the lab attaches there (registry Lab.TPM.Unobservable).
   bool tpm = 11;
+  // The lane repairs a TPM2 bind an older agent left with a single systemd-tpm2
+  // token reference. Applicable only where the registry needs more than one
+  // (platform TPM2TokenReferences, the TPM2UnsealRetryNextToken quirk); every
+  // other release is gated as not applicable: no legacy defect exists there.
+  bool tpm2_reference_repair = 12;
 }
 
 // MatrixImage is the kind of pinned manifest a cell boots.

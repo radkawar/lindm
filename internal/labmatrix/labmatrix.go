@@ -390,6 +390,10 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		reasons = appendUnique(reasons, "lab-only: the installed "+arch+" kernel cannot bind the TPM the lab attaches (Lab.TPM.Unobservable)")
 		gated = true
 	}
+	if spec.GetTpm2ReferenceRepair() && r.TPM2TokenReferences() == 1 {
+		reasons = appendUnique(reasons, "not applicable: "+r.Name+" needs one systemd-tpm2 token reference (its systemd retries a PCR change itself), so no legacy single-reference bind exists to repair (TPM2TokenReferences)")
+		gated = true
+	}
 	if reason := r.Lab.SecureBootUnavailableFor(arch); spec.GetSecureBoot() && reason != "" {
 		reasons = appendUnique(reasons, "Secure Boot unavailable: "+reason+" (Lab.SecureBootUnavailable)")
 		gated = true
