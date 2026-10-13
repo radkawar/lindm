@@ -118,6 +118,12 @@ func TestOrganizationApplyRealServer(t *testing.T) {
 			if o.Status != "pending" {
 				t.Fatalf("exception without findings: %+v", o)
 			}
+		case "assignment":
+			// Adoption rows hold the rollout for its one requested approval;
+			// an unchanged declaration reports it pending, never a new rollout.
+			if o.Status != "unchanged" && (o.Status != "pending" || !strings.HasPrefix(o.Detail, "requires independent approval ")) {
+				t.Fatalf("second apply drift: %+v", o)
+			}
 		default:
 			if o.Status != "unchanged" {
 				t.Fatalf("second apply drift: %+v", o)

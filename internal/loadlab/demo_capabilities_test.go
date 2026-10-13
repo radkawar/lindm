@@ -10,6 +10,7 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	policyv1 "lindm/gen/lindm/policy/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/orgapply"
 )
@@ -32,24 +33,27 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The install default plus each department's group grant: provisioning
-	// tokens place a department's devices in their static groups.
-	deployment := []agentv1.ManagementCapability{agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_FILES, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_LOCAL_ACCOUNTS, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_OS_UPDATES}
+	// The organization's deployment policy plus each department's group grant:
+	// provisioning tokens place a department's devices in their static groups.
+	var deployment *adminv1.SetCapabilityPolicyRequest
 	group := map[string]*adminv1.SetCapabilityPolicyRequest{}
-	for _, token := range organization.GetProvisioningTokens() {
-		for _, entry := range organization.GetCapabilityPolicies() {
+	for _, entry := range organization.GetCapabilityPolicies() {
+		if entry.GetRequest().GetScope().GetDeployment() {
+			deployment = entry.GetRequest()
+		}
+		for _, token := range organization.GetProvisioningTokens() {
 			if slices.Contains(token.GetRequest().GetGroupIds(), entry.GetRequest().GetScope().GetStaticGroupId()) {
 				group[token.GetName()] = entry.GetRequest()
 			}
 		}
 	}
-	if group["engineering"] == nil || group["finance"] == nil {
-		t.Fatalf("lab/demo/org.json lacks the Engineering or Finance capability policy: %v", group)
+	if deployment == nil || group["engineering"] == nil || group["finance"] == nil {
+		t.Fatalf("lab/demo/org.json lacks the deployment, Engineering or Finance capability policy: %v %v", deployment, group)
 	}
-	resources := map[string]*resourcev1.ResourceDesiredState{}
+	resources := map[string]*policyv1.ProfileResource{}
 	for _, profile := range organization.GetProfiles() {
 		for _, item := range profile.GetSpec().GetResources() {
-			resources[profile.GetSpec().GetName()+" "+item.GetDesired().GetRef().GetCanonicalKey()] = item.GetDesired()
+			resources[profile.GetSpec().GetName()+" "+item.GetDesired().GetRef().GetCanonicalKey()] = item
 		}
 	}
 	type refusal struct {
@@ -70,24 +74,35 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 		unavailable = agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE
 	)
 	firewall := "Company baseline db7f6c12-b34a-59d7-aae7-b5474fdc3f92"
+	redirects := "Company baseline net.ipv4.conf.all.accept_redirects"
+	password := "Company baseline system/local-auth"
+	// Password policy is local-only: no signed policy grants it, so every stock
+	// host blocks the row with the executor.json field root must set.
+	passwordRefusal := capabilityRefusal(agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PASSWORD_POLICY)
 	for _, tc := range []struct {
 		hostname string
 		// Catalogue order 1-9.
 		statuses []agentv1.CapabilityStatus
 		detail   map[agentv1.ManagementCapability]string
 		refusals map[string]refusal
+		// Refusals of the same rows declared create-only rather than adopted.
+		createOnly map[string]refusal
 	}{
 		{
 			hostname: "ubuntu-ws-01", statuses: []agentv1.CapabilityStatus{enabled, enabled, off, enabled, off, enabled, enabled, off, off},
 			refusals: map[string]refusal{
 				firewall: capabilityRefusal(agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_FIREWALL),
 				// From the vendor archive the device derives itself.
-				"Engineering tools deb/git":                                {},
-				"Engineering tools system":                                 adoption("existing_banner_file"),
-				"Engineering tools developer":                              {},
-				"Company baseline /etc/motd.d/50-company":                  {},
+				"Engineering tools deb/git": {},
+				// Ubuntu's base-files issue.net is adopted, not a collision.
+				"Engineering tools system":                {},
+				"Engineering tools developer":             {},
+				"Company baseline /etc/motd.d/50-company": {},
+				redirects: {},
+				password:  passwordRefusal,
 				"Finance hardened /etc/modprobe.d/99-lindm-blocklist.conf": capabilityRefusal(agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_KERNEL_MODULE_BLOCKLIST),
 			},
+			createOnly: map[string]refusal{"Engineering tools system": adoption("existing_banner_file")},
 		},
 		{
 			hostname: "ubuntu-ws-02", statuses: []agentv1.CapabilityStatus{unavailable, enabled, off, enabled, off, enabled, enabled, off, off},
@@ -96,18 +111,21 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 				"Engineering tools deb/git":    capabilityRefusal(agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES),
 				"Engineering tools developers": adoption("existing_account"),
 				"Engineering tools developer":  {},
+				password:                       passwordRefusal,
 			},
 		},
 		{
-			hostname: "fedora-ws-03", statuses: []agentv1.CapabilityStatus{enabled, enabled, enabled, enabled, off, enabled, off, off, off},
+			hostname: "fedora-ws-03", statuses: []agentv1.CapabilityStatus{enabled, enabled, enabled, enabled, off, enabled, enabled, off, off},
 			refusals: map[string]refusal{
 				firewall: capabilityRefusal(agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_FIREWALL),
 				"Finance hardened /etc/modprobe.d/99-lindm-blocklist.conf": {},
+				redirects: {},
+				password:  passwordRefusal,
 			},
 		},
 		{
-			hostname: "ubuntu-srv-04", statuses: []agentv1.CapabilityStatus{enabled, local, off, enabled, off, enabled, off, off, local},
-			refusals: map[string]refusal{"Company baseline /etc/motd.d/50-company": {}},
+			hostname: "ubuntu-srv-04", statuses: []agentv1.CapabilityStatus{enabled, local, off, enabled, off, enabled, enabled, off, local},
+			refusals: map[string]refusal{"Company baseline /etc/motd.d/50-company": {}, redirects: {}, password: passwordRefusal},
 		},
 	} {
 		t.Run(tc.hostname, func(t *testing.T) {
@@ -120,10 +138,19 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 			if device == nil || device.agent == nil {
 				t.Fatalf("%s has no capability-aware agent", tc.hostname)
 			}
-			policy := &agentv1.AgentCapabilityPolicy{FormatVersion: 1, DeploymentId: "11111111-1111-4111-8111-111111111111", DeviceId: "22222222-2222-4222-8222-222222222222", EnrollmentGeneration: "33333333-3333-4333-8333-333333333333", Version: 1, IssuedAt: timestamppb.Now(), Capabilities: deployment}
+			policy := &agentv1.AgentCapabilityPolicy{FormatVersion: 1, DeploymentId: "11111111-1111-4111-8111-111111111111", DeviceId: "22222222-2222-4222-8222-222222222222", EnrollmentGeneration: "33333333-3333-4333-8333-333333333333", Version: 1, IssuedAt: timestamppb.Now(), Capabilities: slices.Clone(deployment.GetCapabilities()), SysctlKeys: slices.Clone(deployment.GetSysctlKeys())}
+			// The server signs the union of every applicable scope.
 			if extra := group[device.department]; extra != nil {
-				policy.Capabilities = append(policy.Capabilities, extra.GetCapabilities()...)
-				policy.SysctlKeys = extra.GetSysctlKeys()
+				for _, c := range extra.GetCapabilities() {
+					if !slices.Contains(policy.Capabilities, c) {
+						policy.Capabilities = append(policy.Capabilities, c)
+					}
+				}
+				for _, key := range extra.GetSysctlKeys() {
+					if !slices.Contains(policy.SysctlKeys, key) {
+						policy.SysctlKeys = append(policy.SysctlKeys, key)
+					}
+				}
 			}
 			if err := device.agent.accept(device.release, &agentv1.CapabilityPolicyRecord{FormatVersion: 1, PolicyEnvelope: []byte("synthetic envelope"), Policy: policy, AcceptedAt: timestamppb.Now(), Active: true}); err != nil {
 				t.Fatal(err)
@@ -138,13 +165,19 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 				}
 			}
 			for key, want := range tc.refusals {
-				desired := resources[key]
-				if desired == nil {
+				item := resources[key]
+				if item == nil {
 					t.Fatalf("lab/demo/org.json has no %s", key)
 				}
-				reason, capability, detail := device.agent.admission(desired)
+				reason, capability, detail := device.agent.admission(item.GetDesired(), item.GetOwnership().GetMode())
 				if got := (refusal{reason, capability, detail}); got != want {
 					t.Errorf("%s: %v, want %v", key, got, want)
+				}
+			}
+			for key, want := range tc.createOnly {
+				reason, capability, detail := device.agent.admission(resources[key].GetDesired(), resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY)
+				if got := (refusal{reason, capability, detail}); got != want {
+					t.Errorf("%s create-only: %v, want %v", key, got, want)
 				}
 			}
 		})

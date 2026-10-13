@@ -149,7 +149,9 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	}
 	// Capability-aware hosts report the status they derived from their signed
 	// policy; rhel-srv-05 runs an agent that never reports. Blocked rows carry
-	// the executor's capability, adoption and missing-unit refusals.
+	// the executor's capability, adoption and missing-unit refusals; the
+	// approved password-policy adoption stays blocked on the local-only
+	// password_provider every stock host lacks.
 	statuses, reasons := map[agentv1.CapabilityStatus]bool{}, map[string]bool{}
 	for _, device := range demo.Devices {
 		if device.State != "enrolled" {
@@ -187,7 +189,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			t.Fatalf("no demo host reports %v: %v", status, statuses)
 		}
 	}
-	for _, reason := range []string{"capability_firewall_not_enabled", "capability_packages_not_enabled", "existing_banner_file", "existing_account", "dependency_attention", "unit_not_installed"} {
+	for _, reason := range []string{"capability_firewall_not_enabled", "capability_packages_not_enabled", "capability_password_policy_not_enabled", "existing_account", "dependency_attention", "unit_not_installed"} {
 		if !reasons[reason] {
 			t.Fatalf("no demo resource is blocked with %s: %v", reason, reasons)
 		}
@@ -462,6 +464,8 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	// each item gets a terminal result and each release completes. Returning to
 	// the first organization profile re-adds items the device already ran once.
 	// This runs after the idempotency apply above because it changes assignment.
+	// Company baseline and Engineering tools adopt native state, so a direct
+	// assignment of them needs an approval; these two profiles create only.
 	byName := map[string]*adminv1.ProfileSummary{}
 	for token := ""; ; {
 		profiles, err := admin.ListProfiles(ctx, connect.NewRequest(&adminv1.ListProfilesRequest{PageSize: 100, PageToken: token}))
@@ -475,8 +479,8 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			break
 		}
 	}
-	if byName["Company baseline"] == nil || byName["Contractors"] == nil {
-		t.Fatalf("demo profiles: %d listed without the organization's Company baseline and Contractors", len(byName))
+	if byName["Finance hardened"] == nil || byName["Contractors"] == nil {
+		t.Fatalf("demo profiles: %d listed without the organization's Finance hardened and Contractors", len(byName))
 	}
 	assign := func(profile *adminv1.ProfileSummary) {
 		t.Helper()
@@ -521,9 +525,9 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			}
 		}
 	}
-	assign(byName["Company baseline"])
+	assign(byName["Finance hardened"])
 	assign(byName["Contractors"])
-	assign(byName["Company baseline"])
+	assign(byName["Finance hardened"])
 }
 
 // Exercise organization targeting/dispatch independently of the expensive vendor
@@ -598,6 +602,30 @@ func TestDemoOrganizationResourceConvergence(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clear(applied.Secrets)
+	// Adoption rows wait for one approval per rollout; a second admin decides it.
+	if err := fixture.UseAdminApprover(ctx); err != nil {
+		t.Fatal(err)
+	}
+	approver, err := devlab.OpenApprovalSession(ctx, "", fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := approver.Close(context.WithoutCancel(ctx)); err != nil {
+			t.Error(err)
+		}
+	})
+	s.approver = approver
+	approved, err := s.approveOrganizationRollouts(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(approved) == 0 {
+		t.Fatal("no organization rollout awaited its adoption approval")
+	}
+	if err := s.awaitRollouts(ctx, approved); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.converge(ctx, d); err != nil {
 		state, readErr := s.owner.Admin.GetDeviceResourceState(ctx, connect.NewRequest(&adminv1.GetDeviceResourceStateRequest{DeviceId: d.id}))
 		if readErr == nil {

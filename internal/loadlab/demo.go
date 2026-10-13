@@ -407,8 +407,12 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 		return errors.New("post-enrollment organization apply unexpectedly reissued credentials")
 	}
 	s.demo.Organization = applied.Outcomes
+	approved, err := s.approveOrganizationRollouts(ctx)
+	if err != nil {
+		return err
+	}
 	// Organization assignments roll out asynchronously through the promoter.
-	if err := s.awaitRollouts(ctx); err != nil {
+	if err := s.awaitRollouts(ctx, approved); err != nil {
 		return err
 	}
 	s.demo.Routes.ProfileID = s.organization.GetProfiles()[0].GetId()
@@ -517,6 +521,8 @@ func (s *demoSeed) describe(ctx context.Context, d *simulatedDevice, historical 
 // organization profile with platform-limited rows. Organization targeting
 // activates only active devices, so this one synthetic assignment is direct;
 // those rows then wait for the device's facts while unrestricted rows apply.
+// The profile adopts native state, so the independent approver approves the
+// exact assignment first, as for any direct adoption.
 func (s *demoSeed) assignFactsPending(ctx context.Context, d *simulatedDevice) error {
 	index := slices.IndexFunc(s.organization.GetProfiles(), func(profile *orgv1.Profile) bool {
 		return slices.ContainsFunc(profile.GetSpec().GetResources(), func(item *policyv1.ProfileResource) bool { return item.GetApplicability() != nil })
@@ -529,7 +535,17 @@ func (s *demoSeed) assignFactsPending(ctx context.Context, d *simulatedDevice) e
 		return fmt.Errorf("read platform-limited organization profile: %w", err)
 	}
 	profile := head.Msg.GetRevision()
-	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(&adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(86400), Reason: "Seed a device awaiting its first inventory"})); err != nil {
+	request := &adminv1.SetResourceAssignmentRequest{RequestId: uuid.NewString(), DeviceId: d.id, Target: &adminv1.ResourceAssignmentTarget{ProfileId: profile.GetProfileId(), RevisionId: profile.GetRevisionId()}, ReconcileIntervalSeconds: proto.Uint32(86400), Reason: "Seed a device awaiting its first inventory"}
+	if slices.ContainsFunc(profile.GetSpec().GetResources(), func(item *policyv1.ProfileResource) bool {
+		return item.GetOwnership().GetMode() == resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION
+	}) {
+		approval, err := s.approver.Approve(ctx, s.owner, &adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_SetResourceAssignment{SetResourceAssignment: request}})
+		if err != nil {
+			return fmt.Errorf("independently approve %s adoption assignment: %w", d.demo.hostname, err)
+		}
+		request.ApprovalId = approval.GetId()
+	}
+	if _, err := s.owner.Admin.SetResourceAssignment(ctx, connect.NewRequest(request)); err != nil {
 		return fmt.Errorf("assign %s: %w", d.demo.hostname, err)
 	}
 	return s.converge(ctx, d)
@@ -972,9 +988,26 @@ func (s *demoSeed) catalog(ctx context.Context) error {
 	return nil
 }
 
-// awaitRollouts waits for the promoter to activate every admitted device of
-// the organization's rollouts, so later convergence observes their heads.
-func (s *demoSeed) awaitRollouts(ctx context.Context) error {
+// approveOrganizationRollouts decides, as the independent approver, the one
+// approval each organization rollout with adoption rows awaits. Apply already
+// requested it as the owner; a second admin approves in the product API, as in
+// the console. It returns the approved rollout IDs.
+func (s *demoSeed) approveOrganizationRollouts(ctx context.Context) ([]string, error) {
+	assignments := make([]string, 0, len(s.organization.GetAssignments()))
+	for _, a := range s.organization.GetAssignments() {
+		assignments = append(assignments, a.GetAssignment().GetAssignmentId())
+	}
+	approved, err := s.approver.ApproveRollouts(ctx, s.owner, assignments, "Second admin approves the organization's reviewed adoption rollout")
+	if err != nil {
+		return nil, fmt.Errorf("approve organization rollouts: %w", err)
+	}
+	return approved, nil
+}
+
+// awaitRollouts waits for the promoter to start every approved rollout and
+// activate every admitted device of the organization's rollouts, so later
+// convergence observes their heads.
+func (s *demoSeed) awaitRollouts(ctx context.Context, approved []string) error {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
@@ -986,6 +1019,10 @@ func (s *demoSeed) awaitRollouts(ctx context.Context) error {
 		}
 		starting := false
 		for _, r := range listed.Msg.GetRollouts() {
+			if r.GetStatus() == adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL && slices.Contains(approved, r.GetRollout().GetRolloutId()) {
+				starting = true
+				continue
+			}
 			if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE {
 				continue
 			}

@@ -84,6 +84,25 @@
     {
       "request": {
         "scope": {
+          "deployment": true
+        },
+        "capabilities": [
+          "MANAGEMENT_CAPABILITY_PACKAGES",
+          "MANAGEMENT_CAPABILITY_FILES",
+          "MANAGEMENT_CAPABILITY_LOCAL_ACCOUNTS",
+          "MANAGEMENT_CAPABILITY_OS_UPDATES",
+          "MANAGEMENT_CAPABILITY_KERNEL_SETTINGS"
+        ],
+        "sysctlKeys": [
+          "net.ipv4.conf.all.accept_redirects",
+          "net.ipv4.conf.default.accept_redirects",
+          "net.ipv6.conf.all.accept_redirects"
+        ]
+      }
+    },
+    {
+      "request": {
+        "scope": {
           "staticGroupId": "9b1eb9f4-dee7-54b3-839d-4e0938f5a579"
         },
         "capabilities": ["MANAGEMENT_CAPABILITY_KERNEL_MODULE_BLOCKLIST"]
@@ -158,7 +177,7 @@
       "id": "e54a8af0-53a9-5d50-bd8c-3b05c607554c",
       "spec": {
         "name": "Company baseline",
-        "description": "Shared security baseline: a company login message, printing turned off, nightly security updates with a scheduled restart, and a firewall that lets only SSH in. Devices can apply the firewall once firewall settings are set for all devices.",
+        "description": "Shared security baseline: a company login message, printing turned off, nightly security updates with a scheduled restart, a firewall that lets only SSH in, ICMP redirects ignored and local password rules. Devices can apply the firewall once firewall settings are set for all devices. The redirect settings and password rules take over settings every device already has, so rolling this profile out needs one approval. Password rules apply only on devices where root turns on password_provider in /etc/lindm/executor.json; other devices show them as blocked.",
         "resources": [
           {
             "resourceId": "5a8a187a-d28c-506e-ae52-0b65fbda3535",
@@ -204,6 +223,34 @@
             },
             "ownership": {
               "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "be829bf4-93b4-514f-b6ef-6edf2f1dbeba",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_PASSWORD_POLICY",
+                "canonicalKey": "system/local-auth"
+              },
+              "passwordPolicy": {
+                "minLength": 14,
+                "minClasses": 3,
+                "historyCount": 10,
+                "maxAgeDays": 90,
+                "minAgeDays": 1,
+                "warnDays": 14,
+                "failureLimit": 5,
+                "unlockAfterSeconds": 900,
+                "enforceForRoot": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
               "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
             },
             "verification": {
@@ -314,6 +361,72 @@
               "maxAgeSeconds": 3600,
               "checks": ["HEALTH_CHECK_NATIVE_STATE"]
             }
+          },
+          {
+            "resourceId": "f3beca00-8a31-5d41-aaad-96ffed27adf3",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "net.ipv4.conf.all.accept_redirects"
+              },
+              "sysctl": {
+                "key": "net.ipv4.conf.all.accept_redirects",
+                "value": "0",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "e3ea60f1-83fe-5408-a0d7-a6b9ea428b3e",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "net.ipv4.conf.default.accept_redirects"
+              },
+              "sysctl": {
+                "key": "net.ipv4.conf.default.accept_redirects",
+                "value": "0",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
+          },
+          {
+            "resourceId": "56cbbd04-8fb1-5e1b-af41-de005e298bcf",
+            "desired": {
+              "ref": {
+                "kind": "RESOURCE_KIND_SYSCTL",
+                "canonicalKey": "net.ipv6.conf.all.accept_redirects"
+              },
+              "sysctl": {
+                "key": "net.ipv6.conf.all.accept_redirects",
+                "value": "0",
+                "persistent": true
+              }
+            },
+            "ownership": {
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
+              "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
+            },
+            "verification": {
+              "maxAgeSeconds": 3600,
+              "checks": ["HEALTH_CHECK_NATIVE_STATE"]
+            }
           }
         ]
       }
@@ -322,7 +435,7 @@
       "id": "cab4ef19-709a-5471-87d3-520361903656",
       "spec": {
         "name": "Engineering tools",
-        "description": "Git, htop and Podman from each device's own OS vendor repository on Ubuntu 24.04, Fedora 44 and RHEL 9 and 10 (htop on Fedora only, because RHEL ships it in EPEL), and a developer account that starts with a locked password.",
+        "description": "Git, htop and Podman from each device's own OS vendor repository on Ubuntu 24.04, Fedora 44 and RHEL 9 and 10 (htop on Fedora only, because RHEL ships it in EPEL), a company notice before SSH sign-in, and a developer account that starts with a locked password. Ubuntu ships its own SSH notice file, so the notice takes it over and rolling this profile out needs one approval.",
         "resources": [
           {
             "resourceId": "16eb0787-548e-57f4-977a-a1be276ecbef",
@@ -660,7 +773,7 @@
               }
             },
             "ownership": {
-              "mode": "OWNERSHIP_MODE_CREATE_ONLY",
+              "mode": "OWNERSHIP_MODE_APPROVED_ADOPTION",
               "release": "RELEASE_BEHAVIOR_RESTORE_OWNED"
             },
             "verification": {

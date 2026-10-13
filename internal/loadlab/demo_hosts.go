@@ -262,7 +262,7 @@ func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, in
 		return status, nil
 	}
 	unsupported := agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_UNSUPPORTED_NATIVE
-	switch reason, capability, detail := s.agent.admission(desired); {
+	switch reason, capability, detail := s.agent.admission(desired, intent.GetOwnership().GetPolicy().GetMode()); {
 	case reason == agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
 		return refuse(reason, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, capability, "")
 	case reason != 0 && intent.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE:

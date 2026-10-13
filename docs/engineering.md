@@ -986,6 +986,20 @@ and inventory exist: rollout creation freezes its first ring, so an empty cohort
 must not be admitted by lowering the declared canary gates. Both passes use the
 same organization engine; the final pass consumes the full original declaration.
 
+Company baseline (the ICMP-redirect kernel settings and the password policy) and
+Engineering tools (the SSH notice over Ubuntu's base-files `/etc/issue.net`)
+adopt existing native state, so the final pass leaves each affected assignment's
+rollout awaiting its one `resources.rollout` approval, which apply requests as the
+fixture owner; nothing is saved or sent before it. The runner then has the
+controller's independently enrolled approver account decide those requests
+through the ordinary `ApproveApproval` RPC
+(`devlab.ApprovalSession.ApproveRollouts`). It never requests on another human's
+behalf or bypasses the approval. It records the approved rollout IDs as
+`organization-approved-rollouts.json` and prints their count. The unchanged apply
+that follows reports a rollout the promoter has not started yet as `pending`.
+Both humans stay visible in the console's approval history. A resume approves any
+rollout a new apply started, for example after an approval expired.
+
 The controller retains `demos/NAME/demo-state.json` with each original host
 snapshot, image digest and device binding, and `control-plane/` with the same
 trust, accounts, database and listener ports. Each device's host retains
@@ -997,8 +1011,12 @@ changes apply at runtime without restart; advisory configuration changes
 restart only `lindmd`. Demo devices carry no executor opt-ins: the installer's
 stock `/etc/lindm/executor.json` is left unchanged (apart from the TPM bind's
 device-action target), and provider authority comes only from the organization's
-signed device capability policies (`capabilityPolicies` in `org.json` plus the
-deployment default), exactly as for a customer device. The retired
+signed device capability policies (`capabilityPolicies` in `org.json`), exactly
+as for a customer device. Its deployment entry replaces the whole install default,
+so it repeats PACKAGES, FILES, LOCAL_ACCOUNTS and OS_UPDATES and adds
+KERNEL_SETTINGS for exactly the three redirect keys. No demo device sets the
+local-only `password_provider`, so the password row is blocked
+`capability_password_policy_not_enabled` on every demo device. The retired
 `DemoDevice.file_provider`/`package_provider` fields (11 and 12) are reserved;
 older `demo-state.json` files that still carry them are read with those fields
 discarded.
@@ -1103,9 +1121,13 @@ organization's department provisioning tokens, retaining their static membership
 The enrollment prerequisite pass omits rollouts and assignments: a rollout freezes
 its cohort and correctly rejects an empty canary population. After device
 enrollment and inventory, the full unchanged source document is applied; each
-assignment rolls out to its reviewed devices, and the seed waits until the
-promoter has started every device. The seed then starts one adoption rollout
-(Kernel hardening) that waits for its approval. A separate post-seed apply verifies
+assignment rolls out to its reviewed devices. Company baseline and Engineering
+tools adopt existing native state, so their rollouts wait for the one approval
+apply requests. The seed's independent approver decides each one through
+`ApproveApproval` (`devlab.ApprovalSession.ApproveRollouts`), as a second admin
+would in the console. The seed then waits until the promoter has started every
+approved rollout and device. The seed then starts one adoption rollout (Kernel
+hardening) that waits for its approval. A separate post-seed apply verifies
 idempotence.
 Normal devices retain their department targeting labels. Outcomes are retained in
 the sanitized demo report, including pending advisory selectors and unsupported
@@ -1114,6 +1136,7 @@ rollout has a 25% Pilot and 100% Fleet ring with manual Fleet promotion. It is
 prepared but not linked to an assignment: the synthetic executor cannot establish
 native health for the organization's full resource set, and linking that failed
 head would correctly pause its rollout before dispatch. No health gate is relaxed.
+Each assignment's own single-stage rollout carries the adoption approval instead.
 The seed's independent `approver` account is an admin
 (`AuthorityFixture.UseAdminApprover`), the least built-in role that can decide every
 approval kind, not a second owner.
@@ -1128,7 +1151,8 @@ Headless servers report assistance off (`Routes.AssistanceOffDeviceID`). The old
 start (`Routes.RefusedAssistance*`). The Engineering laptop `ubuntu-ws-09` never
 reports inventory (`Routes.FactsPendingDeviceID`). It is still pending, and
 organization targeting activates only active devices. The seed therefore assigns
-Engineering tools to it directly, and that profile's platform-limited package
+Engineering tools to it directly, after the independent approver approves that
+exact adopting assignment, and that profile's platform-limited package
 rows wait for its device facts. On the Ubuntu route device, the Fedora/RHEL rows
 are not applicable.
 Organization resource kinds that the simulator cannot execute remain unsupported,
@@ -1155,7 +1179,8 @@ risk-acceptance proposal awaiting independent approval, beside one whose finding
 evidence is unavailable; the seed fails when no Affected finding appears instead of
 omitting them.
 
-The organization's `capabilityPolicies` (Kernel settings for
+The organization's `capabilityPolicies` (the deployment policy with Kernel settings
+for the three ICMP-redirect keys; Kernel settings for
 `fs.inotify.max_user_watches` on Engineering; the USB and kernel module blocklist on
 Finance) apply in the enrollment pass, before devices enroll through the
 department provisioning tokens that place them in those static groups. Right after
@@ -1170,10 +1195,14 @@ through `capabilitypolicy.RequiredCapability`. The hosts cover Enabled, Set loca
 reports. A stand-in vendor key is "recognized" only through a copied registry row;
 the registry is unchanged. Blocked rows show capability refusals (Firewall without
 deployment settings; Engineering packages on `ubuntu-ws-02`, whose Software
-packages are unavailable), create-only collisions (`existing_banner_file` on
-Ubuntu; `existing_account` for `ubuntu-ws-02`'s `developers` group, which leaves
-its dependent `developer` account at `dependency_attention`) and
-`unit_not_installed` (no CUPS on the CI runner).
+packages are unavailable; the local-only password policy on every host,
+`capability_password_policy_not_enabled`), a create-only collision
+(`existing_account` for `ubuntu-ws-02`'s `developers` group, which leaves its
+dependent `developer` account at `dependency_attention`) and
+`unit_not_installed` (no CUPS on the CI runner). Ubuntu hosts keep base-files'
+`/etc/issue.net`: the organization's approved adoption of it is admitted, and only
+a create-only SSH notice meets `existing_banner_file`. The simulator has no SSH or
+kernel-setting executor, so admitted adoption rows end unsupported, never compliant.
 
 Advisories come from registry-derived real Ubuntu OSV, Fedora updateinfo and RHEL
 CSAF exports, not single-record fixtures or a loopback feed server. First refresh

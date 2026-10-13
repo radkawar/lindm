@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -103,14 +104,65 @@ func OpenApprovalSession(ctx context.Context, repository string, isolated *Autho
 // the independent human's normal API session. Callers retain their request UUID
 // and returned approval ID for exact mutation retries after response loss.
 func (a *ApprovalSession) Approve(ctx context.Context, requester *OwnerSession, request *adminv1.CreateApprovalRequest) (*adminv1.Approval, error) {
-	if a == nil || a.closed || a.session == nil || requester == nil || requester.AccountID == a.session.AccountID {
-		return nil, errors.New("laboratory approval requires two distinct authenticated humans")
+	if err := a.distinct(requester); err != nil {
+		return nil, err
 	}
 	created, err := requester.Admin.CreateApproval(ctx, connect.NewRequest(request))
 	if err != nil {
 		return nil, err
 	}
-	approved, err := a.session.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: created.Msg.GetApproval().GetId(), Reason: "independent approval for owned laboratory resource cleanup"}))
+	return a.decide(ctx, requester, created.Msg.GetApproval().GetId(), "independent approval for owned laboratory resource cleanup")
+}
+
+// ApproveRollouts decides, as the independent human, the approval each rollout
+// of the given assignments awaits; requester started them and requested the
+// approvals (as `lindmctl apply` does). It returns the approved rollout IDs.
+// A rollout awaiting approval without a request fails: the session never
+// requests on another human's behalf.
+func (a *ApprovalSession) ApproveRollouts(ctx context.Context, requester *OwnerSession, assignmentIDs []string, reason string) ([]string, error) {
+	if err := a.distinct(requester); err != nil {
+		return nil, err
+	}
+	var approved []string
+	for after := ""; ; {
+		request := &adminv1.ListRolloutsRequest{PageSize: 100}
+		if after != "" {
+			request.AfterId = &after
+		}
+		listed, err := requester.Admin.ListRollouts(ctx, connect.NewRequest(request))
+		if err != nil {
+			return approved, fmt.Errorf("list rollouts: %w", err)
+		}
+		rollouts := listed.Msg.GetRollouts()
+		for _, r := range rollouts {
+			if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL || !slices.Contains(assignmentIDs, r.GetAssignment().GetAssignmentId()) {
+				continue
+			}
+			if r.GetApprovalId() == "" {
+				return approved, fmt.Errorf("rollout %s awaits an approval request", r.GetRollout().GetRolloutId())
+			}
+			if _, err := a.decide(ctx, requester, r.GetApprovalId(), reason); err != nil {
+				return approved, fmt.Errorf("approve rollout %s: %w", r.GetRollout().GetRolloutId(), err)
+			}
+			approved = append(approved, r.GetRollout().GetRolloutId())
+		}
+		if len(rollouts) < 100 {
+			return approved, nil
+		}
+		after = rollouts[len(rollouts)-1].GetRollout().GetRolloutId()
+	}
+}
+
+func (a *ApprovalSession) distinct(requester *OwnerSession) error {
+	if a == nil || a.closed || a.session == nil || requester == nil || requester.AccountID == a.session.AccountID {
+		return errors.New("laboratory approval requires two distinct authenticated humans")
+	}
+	return nil
+}
+
+// decide approves one requested approval and checks it binds both humans.
+func (a *ApprovalSession) decide(ctx context.Context, requester *OwnerSession, approvalID, reason string) (*adminv1.Approval, error) {
+	approved, err := a.session.ApproveApproval(ctx, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: approvalID, Reason: reason}))
 	if err != nil {
 		return nil, err
 	}

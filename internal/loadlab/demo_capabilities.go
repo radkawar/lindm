@@ -34,7 +34,8 @@ type demoAgent struct {
 	// local is the root-owned executor.json; nil is the stock empty file.
 	local *agentv1.AgentConfig
 	// collisions is the closed adoption detail a create-only item of this kind
-	// meets on the host: an unowned native object lindm did not create.
+	// meets on the host: an unowned native object lindm did not create. An
+	// approved adoption takes the object over instead.
 	collisions map[resourcev1.ResourceKind]string
 
 	// Set once the host has accepted its signed policy.
@@ -137,14 +138,14 @@ func demoCapabilityHost(row *platform.Release, vendorKey bool) capabilitypolicy.
 // admission is the executor's refusal before any native observation: a
 // capability the effective configuration does not provide, then a create-only
 // collision with an unowned native object. Zero reason admits the intent.
-func (a *demoAgent) admission(desired *resourcev1.ResourceDesiredState) (agentv1.ResourceAdmissionRefusalReason, agentv1.ManagementCapability, string) {
+func (a *demoAgent) admission(desired *resourcev1.ResourceDesiredState, mode resourcev1.OwnershipMode) (agentv1.ResourceAdmissionRefusalReason, agentv1.ManagementCapability, string) {
 	if a == nil || a.effective == nil {
 		return 0, 0, ""
 	}
 	if capability := capabilitypolicy.RequiredCapability(desired, a.effective.Config, a.host); capability != agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_UNSPECIFIED {
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, capability, ""
 	}
-	if detail := a.collisions[desired.GetRef().GetKind()]; detail != "" {
+	if detail := a.collisions[desired.GetRef().GetKind()]; detail != "" && mode != resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION {
 		return agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED, 0, detail
 	}
 	return 0, 0, ""

@@ -2,7 +2,9 @@
 // "Pending / No changes sent yet" because the demo device never asked for
 // resource work. State-changing: assigns the organization's "Contractors" profile
 // to the route device, waits until every item has a result and every removed
-// item completed, then assigns "Company baseline" (lab/demo/org.json) the same way.
+// item completed, then assigns "Finance hardened" (lab/demo/org.json) the same
+// way. Company baseline and Engineering tools adopt native state, so their
+// direct assignment needs an independent approval and is not used here.
 // The picker searches every profile by name on the server: with more than 100
 // profiles a name beyond the first page is found by typing, without paging.
 export const task = {
@@ -122,6 +124,6 @@ export async function check({ page, demo, visit, settle, require, capture, step 
 
   await assign("Contractors", { searchBeyondFirstPage: true });
   await awaitProgress("Contractors", true);
-  await assign("Company baseline");
-  await awaitProgress("Company baseline", false);
+  await assign("Finance hardened");
+  await awaitProgress("Finance hardened", false);
 }

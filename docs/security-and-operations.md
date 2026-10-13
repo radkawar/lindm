@@ -790,9 +790,21 @@ row is one the server dispatches under its qualified ownership operations (check
 by a unit test); the rows removed for that reason are listed under
 [gaps](#declarative-organization-gaps).
 
+Company baseline and Engineering tools contain `OWNERSHIP_MODE_APPROVED_ADOPTION`
+rows, so `apply` reviews each of their assignments and leaves the rollout
+`pending` with the one `resources.rollout` approval it requested. Nothing is saved
+or sent to a device until a second human with `approvals.manage` and unrestricted
+`resources.assign` approves it in the console (Approvals). A group with no enrolled
+device has nothing to approve; its assignment is saved and rolls out after review
+on a later apply. An unapproved request expires after an hour, and the next apply
+requests a new one. The persistent lab demo and the console review seed have their
+independent approver account approve these requests through the same API.
+
 Declared rollouts are stage plans, not stored objects: an assignment that names
 one rolls out through its stages on each `apply`, and an unreferenced one creates
-nothing. The declared Engineering stage plan is not yet referenced by an assignment:
+nothing. An assignment that names none rolls out in one stage to every reviewed
+device, never pausing on failures. Its approval covers the adoption rows too. The
+declared Engineering stage plan is not yet referenced by an assignment:
 Pilot admits 25% (at least one canary), then Fleet admits 100% after explicit
 promotion. Both rings require at least one observation, a 24-hour soak and health
 evidence no older than one hour. Failure, unknown and unavailable thresholds remain
@@ -807,7 +819,19 @@ disabled/stopped `cups.service`, and daily security-update starts between 02:00 
 04:00 Europe/London. Reboots use `SCHEDULED` within an independent daily
 05:00–07:00 Europe/London reboot window, at most 360 minutes after the update, with
 up to two 30-minute employee deferrals. An already-running update is not killed at
-window end. `/etc/motd.d` is a registry standard root on Ubuntu 22.04/24.04,
+window end. It adopts `net.ipv4.conf.all.accept_redirects`,
+`net.ipv4.conf.default.accept_redirects` and `net.ipv6.conf.all.accept_redirects`
+(persistent `0`; none is a key the kernel-settings provider protects). The
+organization's deployment capability policy grants KERNEL_SETTINGS for exactly
+those keys. A deployment request replaces the whole deployment policy, so it also
+repeats the default PACKAGES, FILES, LOCAL_ACCOUNTS and OS_UPDATES. Release
+restores each captured value. Company baseline also adopts the local password
+policy (`system/local-auth`: 14 characters, 3 classes, history 10, 90-day maximum
+age, lockout after 5 failures for 15 minutes, root included). PASSWORD_POLICY is
+local-only, so a device applies it only where root sets `password_provider` in
+`/etc/lindm/executor.json`. Elsewhere the row is blocked
+`capability_password_policy_not_enabled`, and the console names that field.
+`/etc/motd.d` is a registry standard root on Ubuntu 22.04/24.04,
 Debian 12/13, Fedora 44, Rocky Linux 9/10 and AlmaLinux 9/10, so the default
 FILES capability covers it there; approving `/etc` is not a substitute.
 When `/etc/motd.d` is absent (stock Ubuntu 24.04) the file provider creates it
@@ -821,13 +845,16 @@ directory.
 Engineering adds git, htop and podman (DEB `arm64` for the demo's Ubuntu 24.04
 aarch64 laptop), the typed SSH login banner, plus the local
 `developers` group and a `developer` user with a locked password, not an embedded
-login secret. Finance blocks USB storage
+login secret. The banner row is an approved adoption: Ubuntu's base-files ships
+`/etc/issue.net`, which create-only would refuse as `existing_banner_file`, so the
+approved rollout captures it as the release baseline. On Fedora, the stock
+symlink remains `existing_banner_symlink`. Finance blocks USB storage
 (`usb_storage`, `uas`) through the typed kernel-module template and removes the SSH
 firewall exception. Contractors deny ingress and default egress, permitting only outbound
 TCP 80/443/53 and UDP 53 for both IP families, with a nightly 02:00–02:30 update
 start window. This restriction requires a compatible firewall backend and may block
 nonstandard control-plane ports. Preserve the executor's connectivity guard; do not
-bypass a refused network change. Profiles use create-only ownership, so existing
+bypass a refused network change. Other rows use create-only ownership, so existing
 unowned native state may require the normal explicit adoption workflow rather than
 being silently taken over; service rows retain native state on release.
 
@@ -1062,15 +1089,17 @@ Every remaining item is either pending or an explicit gate with its closing
 condition.
 
 - Remote assistance has one permission for view and control, not separate grants.
-- **Pending: sysctl hardening and password controls in the example.** Native
-  `SYSCTL` and `PASSWORD_POLICY` rows are qualified only for
-  `OWNERSHIP_MODE_APPROVED_ADOPTION` (every kernel setting and authentication stack
-  already exists natively), so create-only rows are refused as
-  `resource_ownership_operation_unavailable`. Adoption rows currently put each
-  device activation behind its own independent approval, and `lindmctl apply`
-  stops at `ActivateTargetPreview` with `permission_denied`. `lab/demo/org.json`
-  therefore omits them until one rollout approval covers the adoption; then they
-  return as adoption rows.
+- **Gate: password policy on stock devices.** The Company baseline password row
+  is an approved adoption and rolls out under its rollout's one approval, but
+  PASSWORD_POLICY is local-only: a signed capability policy never grants it, and
+  `capabilityPolicies` rejects it. Every stock device therefore reports the row
+  blocked `capability_password_policy_not_enabled`; the console names
+  `password_provider` in `/etc/lindm/executor.json`. The gate closes per device
+  when its root sets that field. A remotely grantable password capability would
+  need its own design and qualification first. The example keeps the row as this
+  explicit gate rather than omitting it. Its sysctl rows use only keys the
+  kernel-settings provider does not protect (`kernel.kptr_restrict` and
+  `kernel.dmesg_restrict` are protected and stay out).
 - **Pending: platform-scoped resource rows.** Dispatch refuses any row carrying
   `applicability` products or features (`resource_capability_evidence_unavailable`)
   until capability evidence is qualified, so the example declares only the arm64

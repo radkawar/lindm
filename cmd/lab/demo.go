@@ -417,6 +417,9 @@ func (r *demoRun) holdDevices(ctx context.Context) (err error) {
 	if err := r.apply(ctx, "organization-ready.json", true, false); err != nil {
 		return err
 	}
+	if err := r.approveRollouts(ctx); err != nil {
+		return err
+	}
 	if err := r.apply(ctx, "organization-unchanged.json", true, true); err != nil {
 		return err
 	}
@@ -433,6 +436,37 @@ func (r *demoRun) holdDevices(ctx context.Context) (err error) {
 	})
 	<-ctx.Done()
 	return demoContextError(ctx)
+}
+
+// approveRollouts has the controller's independent approver decide the one
+// approval each organization rollout with adoption rows awaits. Apply
+// requested it as the fixture owner; the approver is a second enrolled human
+// deciding through the product API, never a bypass. Approved rollouts start
+// through the promoter. The decision stays in the console's approval history.
+func (r *demoRun) approveRollouts(ctx context.Context) (err error) {
+	owner, err := r.controller.Fixture.OpenOwnerSession(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, closeDemoSession(owner)) }()
+	approver, err := devlab.OpenApprovalSession(ctx, r.options.repository, r.controller.Fixture)
+	if err != nil {
+		return fmt.Errorf("open demo rollout approver: %w", err)
+	}
+	defer func() { err = errors.Join(err, approver.Close(context.WithoutCancel(ctx))) }()
+	assignments := make([]string, 0, len(r.spec.Organization.GetAssignments()))
+	for _, a := range r.spec.Organization.GetAssignments() {
+		assignments = append(assignments, a.GetAssignment().GetAssignmentId())
+	}
+	approved, err := approver.ApproveRollouts(ctx, owner, assignments, "Lab demo second admin approves the organization's reviewed adoption rollout")
+	if err != nil {
+		return fmt.Errorf("approve organization rollouts: %w", err)
+	}
+	if err := publishDemoJSON(filepath.Join(r.options.evidence, "organization-approved-rollouts.json"), approved, 0400); err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(r.stdout, "Organization rollouts approved by the independent approver: %d\n", len(approved))
+	return err
 }
 
 // demoTerminalUnknown lists product evaluation reasons that persist until the

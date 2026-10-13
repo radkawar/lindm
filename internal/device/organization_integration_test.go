@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
@@ -79,17 +80,38 @@ func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rolledOut := false
+	// The organization's baseline and Engineering tools adopt existing native
+	// state, so each rollout for the enrolled device waits for one approval
+	// that apply requested; nothing is saved or activated before it.
+	awaiting := 0
 	for _, o := range result.Outcomes {
-		if o.Kind == "assignment" && (o.Status == "created" || o.Status == "updated") {
-			rolledOut = true
+		if o.Kind == "assignment" && o.Status == "pending" && strings.HasPrefix(o.Detail, "requires independent approval ") {
+			awaiting++
 		}
 	}
-	if !rolledOut {
-		t.Fatalf("matching enrolled device did not start a rollout: %+v", result.Outcomes)
+	if awaiting == 0 {
+		t.Fatalf("matching enrolled device did not start an adoption rollout: %+v", result.Outcomes)
 	}
-	// Activation is the promoter's: each assignment's rollout applies its exact
-	// reviewed change, the later review covering the earlier assignment.
+	pending, err := f.svc.ListRollouts(f.stepUp, connect.NewRequest(&adminv1.ListRolloutsRequest{PageSize: 100}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewer := approvalReviewer(t, f.svc, t.Context())
+	approved := 0
+	for _, r := range pending.Msg.GetRollouts() {
+		if r.GetStatus() != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL {
+			continue
+		}
+		if _, err := f.svc.ApproveApproval(reviewer, connect.NewRequest(&adminv1.ApproveApprovalRequest{ApprovalId: r.GetApprovalId(), Reason: "Reviewed the organization's adoption rollout"})); err != nil {
+			t.Fatal(err)
+		}
+		approved++
+	}
+	if approved != awaiting {
+		t.Fatalf("approved %d rollouts, apply reported %d awaiting approval", approved, awaiting)
+	}
+	// Activation is the promoter's: each approved rollout starts and applies its
+	// exact reviewed change, the later review covering the earlier assignment.
 	promoter, err := targeting.NewPromoter(f.svc.Pool, f.svc.Identity, f.svc.Targeting, f.svc.RolloutHooks())
 	if err != nil {
 		t.Fatal(err)
