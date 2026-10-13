@@ -7492,6 +7492,71 @@ captures in the two `*-qualified-screenshots/` directories and the final contact
 sheet. There are no recorded unresolved owner annotations for this slice;
 automated green does not constitute owner design approval.
 
+### Zero-configuration agent repository (2026-10-13)
+
+The stock-style acceptance fixture passed with no `releaseRepository` and no
+`nativeRepositories` configuration. Its private server executable carried the
+same executable-adjacent signed bundle that source-built console fixtures use;
+installed native/OCI releases carry it at
+`/usr/share/lindmd/agent-repository`. Actual `GetEnrollmentInstructions` reported
+**Ready**, with APT/RPM/pacman repositories and the authenticated native signer.
+The fixture built the complete agent matrix twice before publication:
+amd64/arm64 DEB and RPM, plus x86_64 pacman. Every unsigned package digest matched
+between the independent source/cache builds. Development keys remained outside
+the payload and the fixture removed their private custody before server startup.
+
+`artifacts/repo-zero-config-check-web-EYjk1p/acceptance.json` has SHA-256
+`6965845166bc05bd7d7e7290bf759b60061d170ef12ce20d9bb5f0f4e8e974d6`.
+It records all three real browser journeys passing (Chromium, WebKit and Firefox),
+`repository.ready: true`, both configuration booleans `false`, and complete owned
+cleanup. Duration was 293.879 seconds, including the two source package builds.
+Server SHA-256 is
+`f39069e21f7cc0b52b3c74efa548e10382ae24a2e66245ebe2fccdc2426d6899`;
+lab SHA-256 is
+`a3b13fc5ddc979b360003b97933766a865451a3dbd16f9672ff760370e28c53c`;
+configuration SHA-256 is
+`cf6923151499368bdf46969562309f79da1ed1372a9bf0f323922f12fb0de301`.
+The authenticated subset's captured source digest is
+`adc089df0cb76cee634243bd3130bbecfcdd84bd9d7d6bcaca6396aa1a476595`.
+The private fixture paths in that record no longer exist after cleanup; the
+redacted record retains their digest and readiness bindings.
+
+Code landed through the mandatory gate in `a24a6f8b` (runtime/UI),
+`b07ef731` (canonical release bundle), `fae0579c` (stock console fixtures),
+`1f3fd5bc` (protected bundle modes) and `aa38fc61` (exact failed-read diagnostics).
+Native DEB/RPM/Arch server serialization and OCI regressions exercise bundle byte
+preservation, read-only modes, reproducibility and substitution rejection.
+Runtime regressions reject a valid native signature whose package is outside the
+authenticated release, tampered DSSE/manifest bytes and unsafe file modes/links.
+The native signer remains a release-pipeline key, not a daemon key; release
+attestation, TUF and execution authority remain separate.
+
+`0cbcd287` adds a complete signed stock-artifact cache keyed by the captured
+source digest, development release identity and epoch. Its mandatory landing gate
+passed race tests for 13 touched/dependent packages. Regression coverage exercises
+authenticated reuse, source-change invalidation, concurrent single-flight builds,
+tampered-entry refusal, canceled preparation and failed-build cleanup. The
+streamed source digest matches the actual captured tree, including executable
+modes and component-wise directory ordering. Independent fixture inodes preserve
+the runtime ctime tamper fence when another fixture starts or the cache is pruned.
+Console preparation has a separate bounded deadline; no release, package,
+repository or TLS signature gate was relaxed.
+
+The initial checkout-local cache exposed a custody defect in real review startup:
+private signing keys were beneath group-writable workspace ancestors.
+`cd2ee3bb` moves the cache to the caller's OS cache directory and applies the
+existing full-ancestor `statefs` fence. Its mandatory gate passed 14
+touched/dependent race packages, including an explicit replaceable-ancestor
+regression. Packaging refusals now name the selected path. Neither the private
+worktree workflow nor its security gates require weakening filesystem protection.
+
+`e399809a` resolves and checks the exact captured Go/Node pins before isolating
+builder HOME. Both builders invoke real absolute runtimes, including Go module
+inspection and npm's resolved CLI through the pinned Node. The mandatory gate
+passed 13 touched/dependent race packages. Unit executable-shim fixtures exercise
+resolution before HOME isolation, direct invocation after isolation and clear
+expected-version refusal; they are not release compilation or native VM proof.
+
 ### Installer provisioning from the console (2026-10-12)
 
 The `provision-*` matrix cells ([runbook](engineering.md#installer-provisioning-from-the-console))

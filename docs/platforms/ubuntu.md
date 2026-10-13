@@ -221,7 +221,8 @@ startup without repository configuration. **Settings › Agent repository** show
 the verified Ubuntu package versions or the exact release-verification failure.
 Missing or damaged artifacts require a correct authenticated server release,
 not weaker APT signature checks. See the
-[install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
+[install runbook](../security-and-operations.md#enrollment-installation-from-your-server)
+and the [zero-configuration evidence](../verification.md#zero-configuration-agent-repository-2026-10-13).
 This delivery path does not transfer qualification between Ubuntu releases.
 
 For unattended installs, a provisioning token offers **cloud-init** (cloud images)

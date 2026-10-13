@@ -3138,15 +3138,36 @@ authorize every later issuance. Absent configuration provides no signing fallbac
 
 ### Bare-machine enrollment from the console
 
-`lab console-enrollment` holds an initially empty local-auth console with the
-current source checkout's real signed native packages. Keep the development trust
-fixture and the source being qualified explicit:
+`lab console-enrollment` holds an initially empty local-auth console with a
+source-built signed stock artifact: a private `lindmd` executable and adjacent
+`agent-repository/` bundle. It does not configure `releaseRepository` or native
+signer pins. The server discovers and verifies the same bundle layout as the
+installed package, and the fixture refuses startup unless real enrollment
+readiness reports **Ready**. `lab console` and `lab console review` use that
+stock path too; the internal synthetic authentication fixture stays separate.
+
+The development bundle helper builds the complete registry-native agent matrix
+twice and checks unsigned archive equality before signing its release subset.
+Use the repository's pinned Node/Go toolchain and native package build tools,
+not an ambient newer Node version. Development signer custody stays outside the
+payload and the fixture removes it before server startup. The requested
+`-architectures` are required outputs, not a way to omit stock matrix packages.
+Keep development trust and the source being qualified explicit:
 
 ```sh
 artifacts/bin/lab console-enrollment \
   -repo "$FIXTURE" -code "$SOURCE" -lindmd "$SOURCE/artifacts/bin/lindmd" \
   -architectures arm64 -publication-record "$PRIVATE/publication.json"
 ```
+
+`lab console -repo "$FIXTURE" -code "$SOURCE" -lindmd "$SOURCE/artifacts/bin/lindmd"`
+uses the same preparation. Source-built fixture startup includes package builds;
+an installed authenticated release already carries these bytes and needs none.
+The publication record binds server/configuration hashes, the verified release
+manifest, the bundle path and the actual readiness result. It records
+`release_repository_configured: false` and
+`native_repositories_configured: false` for this fresh constructor. Device-action
+fixtures can retain separate TUF update configuration, never native pin setup.
 
 The printed one-time owner enrollment and all copied device commands are secrets.
 Use the production console to issue a fresh device code and select the exact
