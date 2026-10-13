@@ -152,6 +152,14 @@ async function scrolledModal({ page, origin, item, require, capture }) {
   await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
   const popup = item.popup(page);
   await popup.waitFor({ timeout });
+  // Base UI mounts a popup with data-starting-style (the sheet at its 2.5rem
+  // starting offset, transparent but already visible to Playwright) and removes
+  // it on a later frame; only then does the entry transition start. On a loaded
+  // browser that frame came after the wait below, which then measured the sheet
+  // at its starting offset, outside the viewport.
+  await page.waitForFunction(() => !document.querySelector("[data-starting-style]"), null, {
+    timeout,
+  });
   await page.evaluate(() =>
     Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {}))),
   );

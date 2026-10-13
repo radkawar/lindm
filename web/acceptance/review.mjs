@@ -154,9 +154,9 @@ async function settle(page) {
   return probe(page, "settled");
 }
 
-async function axe(page, selector) {
+async function axePass(page, selector) {
   await page.evaluate(config.axeSource);
-  const result = await page.evaluate(
+  return page.evaluate(
     async ({ selector }) => {
       const context = selector ? document.querySelector(selector) : document;
       const run = await window.axe.run(context, {
@@ -170,17 +170,41 @@ async function axe(page, selector) {
         id: violation.id,
         impact: violation.impact,
         help: violation.help,
-        nodes: violation.nodes.slice(0, 8).map((node) => ({
+        nodes: violation.nodes.map((node) => ({
           target: node.target.join(" "),
           summary: (node.failureSummary ?? "").replace(/\s+/g, " ").slice(0, 300),
         })),
-        count: violation.nodes.length,
       }));
     },
     { selector },
   );
-  return result.map((violation) => ({
+}
+
+// A background read can re-enable a control while axe runs; axe then measures
+// it at the start of its opacity transition (ui-review: a just-enabled outline
+// button at 3.69:1, the blend of its disabled 50% opacity, that settles at full
+// contrast). A blocking violation therefore counts only when a second pass, after
+// running animations and transitions finish, finds it on the same element.
+async function axe(page, selector) {
+  let violations = await axePass(page, selector);
+  if (violations.some((violation) => blockingImpacts.has(violation.impact))) {
+    const first = new Set(
+      violations.flatMap((violation) =>
+        violation.nodes.map((node) => `${violation.id} ${node.target}`),
+      ),
+    );
+    await settleAnimations(page);
+    violations = (await axePass(page, selector))
+      .map((violation) => ({
+        ...violation,
+        nodes: violation.nodes.filter((node) => first.has(`${violation.id} ${node.target}`)),
+      }))
+      .filter((violation) => violation.nodes.length > 0);
+  }
+  return violations.map((violation) => ({
     ...violation,
+    nodes: violation.nodes.slice(0, 8),
+    count: violation.nodes.length,
     blocking: blockingImpacts.has(violation.impact),
   }));
 }

@@ -62,6 +62,7 @@ import * as groups from "./groups.mjs";
 import * as groupsDynamicCreate from "./groups-dynamic-create.mjs";
 import * as pass2ActionsHistory from "./pass2-p2-actions-history.mjs";
 import * as pass2ActionPending from "./pass2-p2-6-action-pending.mjs";
+import * as actionDialogSessionRecheck from "./action-dialog-session-recheck.mjs";
 import * as pass2P2SignInError from "./pass2-p2-11-sign-in-error.mjs";
 import * as pass2P2NotFound from "./pass2-p2-12-not-found.mjs";
 import * as pass2P2DeepLink from "./pass2-p2-13-deep-link.mjs";
@@ -86,6 +87,8 @@ export const ownerEdits = [
   deviceActions,
   pass2ActionsHistory,
   pass2ActionPending,
+  // Separate context: a held session recheck and a jumped page clock.
+  actionDialogSessionRecheck,
   assistanceRecord,
   revealApproval,
   assistanceGate,

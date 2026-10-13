@@ -1328,7 +1328,10 @@ each starting from scroll position zero:
   description clamps and the header breadcrumb, which repeats the wrapping page
   heading, are not judged), and on desktop the sidebar column spans the document;
 - axe-core (exact-pinned dev dependency, WCAG 2.2 AA and best-practice rules): no
-  serious or critical violations, including inside each opened dialog;
+  serious or critical violations, including inside each opened dialog. A blocking
+  violation is confirmed by a second pass after running animations and transitions
+  finish and counts only on an element both passes flag, so a control a background
+  read re-enables mid-pass (measured at the start of its opacity fade) is not one;
 - keyboard: the skip link is the first stop and lands in main content, Tab reaches
   every focusable control with a visible focus change that nothing covers, and every
   control or menu item declaring `aria-haspopup="dialog"` opens a named dialog that
@@ -1565,6 +1568,12 @@ Issued enrollment secrets remain component-memory-only and disappear on navigati
 Account mutations send the session CSRF header and are never automatically retried.
 Every authenticated route displays a persistent emergency banner for break-glass
 sessions, including the incident reason; navigation is not an authorization boundary.
+The signed-in layout awaits `GET /auth/session` only when no session is known
+(first load, after sign-out). A known session older than 30 seconds is rechecked in
+the background, so no navigation waits on that read, including in-page URL state
+such as a device tab or open action dialog (`?action=`); the server authorizes every
+request regardless. A recheck that finds the session ended clears principal-scoped
+state and returns to sign-in with the current page as `next`.
 
 ### Planned code layout
 

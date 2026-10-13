@@ -15,7 +15,15 @@ import { toRpcFailure, type RpcFailure } from "@/lib/errors";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ context, location }) => {
-    const principal = await context.queryClient.fetchQuery(sessionQueryOptions());
+    // Every navigation passes through here, in-page ones too: a tab or an action
+    // dialog lives in the URL. A known session is therefore rechecked in the
+    // background once stale, never awaited; under load that round trip held
+    // Escape and Close for seconds. The server still authorizes every request,
+    // and a session found ended returns to sign-in (AuthenticatedLayout, app/query.ts).
+    const principal = await context.queryClient.ensureQueryData({
+      ...sessionQueryOptions(),
+      revalidateIfStale: true,
+    });
     // Signed out: sign in, then return to the page that was asked for.
     if (!principal) throw redirect({ to: "/", search: { next: location.href } });
     return { principal };
@@ -33,8 +41,9 @@ function AuthenticatedLayout() {
   const [logoutError, setLogoutError] = useState<RpcFailure | null>(null);
 
   useEffect(() => {
+    // The background recheck found the session ended: sign in, then return here.
     if (session.isSuccess && session.data === null) {
-      void router.navigate({ to: "/" });
+      void router.navigate({ to: "/", search: { next: router.state.location.href } });
     }
   }, [router, session.data, session.isSuccess]);
 
