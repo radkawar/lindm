@@ -10448,22 +10448,6 @@
     },
     {
       "platform": "linuxmint-22.3",
-      "cell": "lifecycle",
-      "architecture": "x86_64",
-      "manifest": "linuxmint-22.3-cinnamon-amd64",
-      "verdict": "MATRIX_VERDICT_PASS",
-      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
-      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
-      "recorded": "2026-10-11T21:34:01.765236456Z",
-      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
-      "source": "MATRIX_SOURCE_IMPORT",
-      "verified": true,
-      "scope": "signed DEB 0.7.0→0.7.1; control-plane trust; local authority",
-      "reference": "#tier-1-parity-records-2026-10-11",
-      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
-    },
-    {
-      "platform": "linuxmint-22.3",
       "cell": "tpm-unattended-boots",
       "architecture": "x86_64",
       "manifest": "linuxmint-22.3-cinnamon-encrypted-amd64",
@@ -10804,6 +10788,39 @@
       "repositoryClosureSha256": "ce7c2ff34cce5eb603eb4f40126d29b8fe4b66a278e84ff70cac1848323b6ace",
       "repositoryMetadataSha256": "54fa6d215972d7efb8a0835acac401327aca17b0b1eaf5c50eeb661635095aae",
       "mainlineRevision": "7fd59b73c7c49d2ace0e82df314f69b4f12de340"
+    },
+    {
+      "platform": "linuxmint-22.3",
+      "cell": "lifecycle",
+      "architecture": "x86_64",
+      "manifest": "linuxmint-22.3-cinnamon-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/linuxmint/lifecycle-05.json",
+      "sha256": "c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2",
+      "recorded": "2026-10-11T21:34:01.765236456Z",
+      "revision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed DEB 0.7.0\u21920.7.1; control-plane trust; local authority",
+      "reference": "#tier-1-parity-records-2026-10-11",
+      "mainlineRevision": "a35d0bb8399a50356ebbddfa5673af33b462f4f7"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-desktop-encrypted-26.04.1-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/ults-tpm3-x86-20261012T221813Z/ubuntu-26.04/tpm-unattended-boots-x86_64.json",
+      "sha256": "eabcc47f7c8e7c34acafd6b339ab078a5149e58626d00641b2a48ed9d9fb6fc6",
+      "recorded": "2026-10-13T03:16:05.431602804Z",
+      "revision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "5d12fac9dbb966d60678dbe11a4d58865497ae0bdacd6c594e5ae50e06e489d7",
+      "recoveryManifest": "ubuntu-resolute-20260927-amd64",
+      "recoveryManifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
+      "mainlineRevision": "8c6af7ff958babe2300eb52fb03a2bfd3bafc481"
     }
   ]
 }
