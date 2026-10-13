@@ -17,6 +17,7 @@ const timeout = 30_000;
 
 export async function check({ page, demo, visit, require, capture, step, settle }) {
   const main = page.getByRole("main");
+  const openTypes = page.locator("[data-slot=select-content][data-open]");
 
   step("profile page order");
   await visit(`/profiles/${encodeURIComponent(demo.Routes.ProfileID)}`);
@@ -83,14 +84,14 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   step("setting type availability");
   await type.click();
   for (const name of ["Sign-in and session policy", "Package repository"]) {
-    const option = page.getByRole("option", { name: new RegExp(`^${name}`) });
+    const option = openTypes.getByRole("option", { name: new RegExp(`^${name}`) });
     await option.first().waitFor({ timeout });
     require((await option.first().getAttribute("aria-disabled")) === "true" &&
       /not available yet/i.test(
         await option.first().innerText(),
       ), `${name} is offered although the server doesn't apply it`);
   }
-  const encryption = page.getByRole("option", { name: "Encryption compliance", exact: true });
+  const encryption = openTypes.getByRole("option", { name: "Encryption compliance", exact: true });
   require((await encryption.getAttribute("aria-disabled")) !==
     "true", "Encryption compliance, a qualified type, is disabled");
   await capture("setting types");
@@ -118,7 +119,7 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   // SYSCTL dispatches only as an approved takeover: no other choice is offered.
   const second = settings.nth(before + 1);
   await second.getByRole("combobox", { name: "Setting type", exact: true }).click();
-  await page.getByRole("option", { name: "Kernel setting", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Kernel setting", exact: true }).click();
   const mode = second.getByRole("combobox", {
     name: "If the item already exists on the device",
     exact: true,
@@ -135,7 +136,7 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   step("local user without numeric ID");
   await advanced.uncheck();
   await second.getByRole("combobox", { name: "Setting type", exact: true }).click();
-  await page.getByRole("option", { name: "Local user", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Local user", exact: true }).click();
   await second.getByText("Name", { exact: true }).first().waitFor({ timeout });
   require((await second.getByText(/^UID$/).count()) ===
     0, "a new local user asks for a numeric UID outside Advanced options");
@@ -143,7 +144,7 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   step("setting forms in admin terms");
   await advanced.check();
   await second.getByRole("combobox", { name: "Setting type", exact: true }).click();
-  await page.getByRole("option", { name: "Package", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Package", exact: true }).click();
   await second.getByText("Package name", { exact: true }).first().waitFor({ timeout });
   const wording = await second.innerText();
   for (const phrase of [/selection catalog/i, /\bSha256\b/, /Size bytes/, /full apt\//])
@@ -155,7 +156,6 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   // profile's many expanded advanced controls and the preceding type changes.
   await visit("/profiles/new");
   await editor.waitFor({ timeout });
-  const openTypes = page.locator("[data-slot=select-content][data-open]");
   await settings.nth(0).getByRole("combobox", { name: "Setting type", exact: true }).click();
   await settle();
   await openTypes.getByRole("option", { name: "SSH sign-in banner", exact: true }).click();
@@ -186,13 +186,13 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   require((await incoming.innerText()).trim() === "Discard", "incoming DROP caption changed");
   require((await outgoing.innerText()).trim() === "Accept", "outgoing ACCEPT changed");
   await incoming.click();
-  const dropOption = page.getByRole("option", { name: "Drop", exact: true });
+  const dropOption = openTypes.getByRole("option", { name: "Drop", exact: true });
   require((await dropOption.count()) === 0, "the firewall verdict still offers Drop");
-  await page.getByRole("option", { name: "Accept", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Accept", exact: true }).click();
   await incoming.click();
-  await page.getByRole("option", { name: "Discard", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Discard", exact: true }).click();
   await outgoing.click();
-  await page.getByRole("option", { name: "Discard", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Discard", exact: true }).click();
   await editor.locator("summary", { hasText: /^View JSON$/ }).click();
   const packetDraft = JSON.parse(await editor.getByLabel("Profile draft JSON").innerText());
   const zone = packetDraft.resources[0].desired.firewallZone;
@@ -200,7 +200,7 @@ export async function check({ page, demo, visit, require, capture, step, settle 
   const bothDiscard = zone.defaultIngress === drop && zone.defaultEgress === drop;
   require(bothDiscard, "Discard changed the protocol verdict instead of its caption");
   await outgoing.click();
-  await page.getByRole("option", { name: "Accept", exact: true }).click();
+  await openTypes.getByRole("option", { name: "Accept", exact: true }).click();
   const restoredDraft = JSON.parse(await editor.getByLabel("Profile draft JSON").innerText());
   const restored = restoredDraft.resources[0].desired.firewallZone.defaultEgress;
   require(restored === "FIREWALL_VERDICT_ACCEPT", "Accept changed the protocol verdict");
