@@ -22,6 +22,7 @@ import (
 )
 
 func TestTargetPreviewActivationRequiresBoundApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	authority, err := identity.New(ctx, pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(identity.PermissionAssignResources)}}})

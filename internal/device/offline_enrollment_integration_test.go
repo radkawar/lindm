@@ -140,6 +140,7 @@ func (f *offlineFixture) pendingExecutor(t *testing.T, authorization *agentv1.Of
 }
 
 func TestOfflineFilePairRealPostgresAndExecutor(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, approval := range []bool{false, true} {
 		t.Run(map[bool]string{false: "ready", true: "approval"}[approval], func(t *testing.T) {
 			f := newOfflineFixture(t)
@@ -239,6 +240,7 @@ func TestOfflineFilePairRealPostgresAndExecutor(t *testing.T) {
 }
 
 func TestOfflineAuthorizationTokenRevocation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newOfflineFixture(t)
 	token := f.mint(t, 1, false)
 	authorization := f.authorization(t, token)
@@ -259,6 +261,7 @@ func TestOfflineAuthorizationTokenRevocation(t *testing.T) {
 }
 
 func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, scenario := range []string{"authorization_expired", "delegation_revoked", "substituted_transaction"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newOfflineFixture(t)
@@ -334,6 +337,7 @@ func TestOfflineReservationRechecksAuthorityInsideTransaction(t *testing.T) {
 }
 
 func TestOfflineEnrollmentMissingSignerCapabilityIsActionable(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newOfflineFixture(t)
 	token := f.mint(t, 1, false)
 	authorization := f.authorization(t, token)

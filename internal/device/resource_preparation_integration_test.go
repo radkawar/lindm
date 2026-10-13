@@ -71,6 +71,7 @@ func preparationResult(t *testing.T, f *dispatchFixture, work *devicev1.Resource
 }
 
 func TestResourcePreparationRetainsLeaseWithoutCompliance(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, _ := newPreparationDispatchFixture(t)
 	first := f.work(t)
 	intent := f.intent(t, first)
@@ -113,6 +114,7 @@ func TestResourcePreparationRetainsLeaseWithoutCompliance(t *testing.T) {
 }
 
 func TestResourcePreparationResultBindsExactIntentAndLimits(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, _ := newPreparationDispatchFixture(t)
 	work := f.work(t)
 	valid := preparationResult(t, f, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED)
@@ -143,6 +145,7 @@ func TestResourcePreparationResultBindsExactIntentAndLimits(t *testing.T) {
 }
 
 func TestResourcePreparationRejectsMissingSystemdEvidence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	work := f.work(t)
@@ -151,6 +154,7 @@ func TestResourcePreparationRejectsMissingSystemdEvidence(t *testing.T) {
 }
 
 func TestResourcePreparationCancellationRetainsFenceUntilTerminal(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, mode := range []string{"expired", "superseded", "cleared", "authority"} {
 		t.Run(mode, func(t *testing.T) {
 			f, head := newPreparationDispatchFixture(t)
@@ -212,6 +216,7 @@ func TestResourcePreparationCancellationRetainsFenceUntilTerminal(t *testing.T) 
 }
 
 func TestResourcePreparationReadyGrantBindsExactDigest(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, _ := newPreparationDispatchFixture(t)
 	work := f.work(t)
 	if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(preparationResult(t, f, work, 1, agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_PREPARING))); err != nil {
@@ -251,6 +256,7 @@ func TestResourcePreparationReadyGrantBindsExactDigest(t *testing.T) {
 }
 
 func TestResourcePreparationNeverPreparedAckIsBoundAndNotProof(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, head := newPreparationDispatchFixture(t)
 	work := f.work(t)
 	digest := sha256.Sum256(work.GetIntentEnvelope())
@@ -310,6 +316,7 @@ func TestResourcePreparationNeverPreparedAckIsBoundAndNotProof(t *testing.T) {
 }
 
 func TestResourcePreparationNeverPreparedCannotReplaceProtectedHistory(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, granted := range []bool{false, true} {
 		name := "preparing"
 		if granted {

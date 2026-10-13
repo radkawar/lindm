@@ -55,6 +55,7 @@ func fleetReader(t *testing.T, f *enrolledFixture, perm identity.Permission, dev
 }
 
 func TestSuggestValuesPackagesReadCurrentSnapshotsWithinScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	pkg := adminv1.SuggestionField_SUGGESTION_FIELD_PACKAGE_NAME
 	f.publishPackages(t, 1, "retiredpkg")
@@ -95,6 +96,7 @@ func TestSuggestValuesPackagesReadCurrentSnapshotsWithinScope(t *testing.T) {
 }
 
 func TestSuggestValuesDeviceFieldsAreLiteralOrderedAndScoped(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	ids := []string{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()}
 	for i, row := range [][3]string{{"Fedora", "44", "x86_64"}, {"fedora", "43", "aarch64"}, {"a%_b", "1", "x86_64"}, {"aXYb", "2", "riscv64"}} {
@@ -108,7 +110,7 @@ func TestSuggestValuesDeviceFieldsAreLiteralOrderedAndScoped(t *testing.T) {
 		}
 	}
 	if _, err := f.conn.Exec(f.ctx, `INSERT INTO device_release_reports(generation_id,session_epoch,agent_release,protocol_version,reported_at) VALUES($1,1,'1.4.0',2,now())
-		ON CONFLICT (generation_id) DO UPDATE SET agent_release=excluded.agent_release`, f.generation); err != nil {
+ 		ON CONFLICT (generation_id) DO UPDATE SET agent_release=excluded.agent_release`, f.generation); err != nil {
 		t.Fatal(err)
 	}
 	os := adminv1.SuggestionField_SUGGESTION_FIELD_OS_ID
@@ -164,6 +166,7 @@ func TestSuggestValuesDeviceFieldsAreLiteralOrderedAndScoped(t *testing.T) {
 }
 
 func TestSuggestValuesDirectoryGroupsNeedUnrestrictedAccountAuthority(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	for _, path := range []string{"/eng/linux", "/Eng/desktop", "/sales"} {
@@ -189,18 +192,19 @@ func TestSuggestValuesDirectoryGroupsNeedUnrestrictedAccountAuthority(t *testing
 }
 
 func TestSuggestValuesAdvisoriesReadLatestFindingSetsWithinScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	set := uuid.New()
 	digest := make([]byte, 32)
 	if _, err := f.conn.Exec(f.ctx, `INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,finding_count,critical_count,high_count,medium_count,low_count,other_count)
-		VALUES($1,'ubuntu-24.04',gen_random_uuid(),$2,'evaluated','',$2,3,0,2,1,0,0)`, set, digest); err != nil {
+ 		VALUES($1,'ubuntu-24.04',gen_random_uuid(),$2,'evaluated','',$2,3,0,2,1,0,0)`, set, digest); err != nil {
 		t.Fatal(err)
 	}
 	for _, statement := range []string{
 		`INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,source_url) VALUES
-		 ($1,gen_random_uuid(),'USN-7001-1','openssl','3.0','3.1','amd64','high','{CVE-2026-0002,CVE-2026-0001}',''),
-		 ($1,gen_random_uuid(),'USN-7001-1','libssl3','3.0','3.1','amd64','medium','{CVE-2026-0001}',''),
-		 ($1,gen_random_uuid(),'usn-6999-2','bash','5','6','amd64','high','{}','')`,
+ 		 ($1,gen_random_uuid(),'USN-7001-1','openssl','3.0','3.1','amd64','high','{CVE-2026-0002,CVE-2026-0001}',''),
+ 		 ($1,gen_random_uuid(),'USN-7001-1','libssl3','3.0','3.1','amd64','medium','{CVE-2026-0001}',''),
+ 		 ($1,gen_random_uuid(),'usn-6999-2','bash','5','6','amd64','high','{}','')`,
 		`INSERT INTO advisory_set_advisories(set_id,advisory_id,severity,findings) VALUES ($1,'USN-7001-1','high',1),($1,'USN-7001-1','medium',1),($1,'usn-6999-2','high',1)`,
 	} {
 		if _, err := f.conn.Exec(f.ctx, statement, set); err != nil {
@@ -225,6 +229,7 @@ func TestSuggestValuesAdvisoriesReadLatestFindingSetsWithinScope(t *testing.T) {
 }
 
 func TestSuggestValuesHostEvidenceFollowsLatestObservation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	success := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	report := hostObservation(f.generation, 1, "host-values")

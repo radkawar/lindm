@@ -30,6 +30,7 @@ func deviceProjectionPage(t *testing.T, svc *Service, ctx context.Context, reque
 }
 
 func TestListDevicesCurrentHeadComplianceProjection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	assignment := f.assign(t, nil)
 	exec := func(query string, args ...any) {
@@ -47,7 +48,7 @@ func TestListDevicesCurrentHeadComplianceProjection(t *testing.T) {
 	exec("UPDATE devices SET hostname='projection-visible',enrolled_at=$2 WHERE id=$1", deviceID, now.Add(-time.Minute))
 	unassigned, hidden := uuid.NewString(), uuid.NewString()
 	exec(`INSERT INTO devices(id,state,enrolled_at,hostname) VALUES
-($1,'active',$3,'projection-unassigned'),($2,'active',$4,'projection-hidden')`, unassigned, hidden, now.Add(-2*time.Minute), now.Add(-time.Second))
+ ($1,'active',$3,'projection-unassigned'),($2,'active',$4,'projection-hidden')`, unassigned, hidden, now.Add(-2*time.Minute), now.Add(-time.Second))
 
 	// Retained assignments, including heads in an earlier enrollment generation,
 	// must not contaminate either the worst compliance or its verification time.
@@ -55,10 +56,10 @@ func TestListDevicesCurrentHeadComplianceProjection(t *testing.T) {
 		t.Helper()
 		id := uuid.NewString()
 		exec(`INSERT INTO resource_assignments(id,device_id,generation_id,request_id,request_digest,actor_id,authorization_version,revision_id,document,assigned_at)
-SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
-FROM resource_assignments WHERE id=$5`, id, device, generation, uuid.NewString(), assignment.GetAssignmentId())
+ SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
+ FROM resource_assignments WHERE id=$5`, id, device, generation, uuid.NewString(), assignment.GetAssignmentId())
 		exec(`INSERT INTO resource_assignment_resources(assignment_id,resource_id,resource_kind,canonical_key,position,document,disposition,last_verified_at)
-SELECT $1,resource_id,resource_kind,canonical_key,position,document,4,$3 FROM resource_assignment_resources WHERE assignment_id=$2`, id, assignment.GetAssignmentId(), stale.Add(-time.Hour))
+ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4,$3 FROM resource_assignment_resources WHERE assignment_id=$2`, id, assignment.GetAssignmentId(), stale.Add(-time.Hour))
 		if head {
 			exec("INSERT INTO resource_assignment_heads(generation_id,assignment_id) VALUES($1,$2)", generation, id)
 		}
@@ -66,7 +67,7 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4,$3 FROM re
 	copyAssignment(deviceID, f.principal.GenerationID.String(), false)
 	oldGeneration, hiddenGeneration := uuid.NewString(), uuid.NewString()
 	exec(`INSERT INTO enrollment_generations(id,device_id,state,created_at) VALUES
-($1,$2,'revoked',$5),($3,$4,'active',$5)`, oldGeneration, deviceID, hiddenGeneration, hidden, now)
+ ($1,$2,'revoked',$5),($3,$4,'active',$5)`, oldGeneration, deviceID, hiddenGeneration, hidden, now)
 	copyAssignment(deviceID, oldGeneration, true)
 	exec("UPDATE devices SET current_generation_id=$2 WHERE id=$1", hidden, hiddenGeneration)
 	copyAssignment(hidden, hiddenGeneration, true)
@@ -148,6 +149,7 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4,$3 FROM re
 }
 
 func TestListDevicesNamePrefixIsLiteralAndCaseSensitive(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	var visible []string
@@ -202,6 +204,7 @@ func TestListDevicesNamePrefixIsLiteralAndCaseSensitive(t *testing.T) {
 }
 
 func TestListDevicesPrefixCursorCutoffAndPreviousReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	prefix := `page%_\`
@@ -299,6 +302,7 @@ func TestListDevicesPrefixCursorCutoffAndPreviousReplay(t *testing.T) {
 }
 
 func TestListDevicesHostnameSearchIsCaseInsensitiveLiteralSubstring(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	for _, hostname := range []string{"ubuntu-ws-01", "UBUNTU-SRV", "fedora-ws-03", "node%x", "nodeyx"} {
 		fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,hostname,os_id) VALUES($1,'active',$2,$3,'search-fixture')`, uuid.NewString(), f.now.Add(-time.Minute), hostname)
@@ -329,6 +333,7 @@ func TestListDevicesHostnameSearchIsCaseInsensitiveLiteralSubstring(t *testing.T
 }
 
 func TestListDevicesSortsAcrossPagesWithMissingValuesLast(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	type fixture struct {
 		hostname, osID, osVersion string

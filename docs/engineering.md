@@ -4688,6 +4688,42 @@ full-ISO, graphical, cross-distro, soak and physical runs are separate lanes, bu
 remain mandatory before release. Changed-provider selection cannot omit its real
 native-interface smoke test.
 
+Device integration keeps a fresh disposable PostgreSQL schema for every case,
+but `devenv test-integration` enables one migrated golden schema per test binary.
+The binary applies its own embedded migrations and snapshots the result with the
+verified fixture container's matching `pg_dump`; each case restores the complete
+schema, migration history and seed rows in one transaction, then runs `db.Check`.
+Tables, foreign keys, functions, views, triggers and identity sequences are private;
+volatile deployment and audit-chain identities are regenerated. The golden schema
+is removed after its immutable snapshot is captured. Migration-runner tests and
+the `testdb.New` API still use the uncached application migration path.
+
+This is a logical schema template, not a per-case database clone: on the loaded
+shared cluster, `DROP DATABASE` forces cluster-wide checkpoints even for tiny
+fixtures. Existing authority-fixture observations recorded consecutive 533-second
+and 574-second checkpoints, so database-template cloning would move the bottleneck
+into cleanup rather than shorten the integration lock hold. No additional database
+privilege is granted to the migrator or runtime role.
+
+Independent device integration cases use `t.Parallel` with a four-case bound that
+includes cleanup, rather than the host CPU-derived concurrency default. Nested
+subtests retain their original order. The console-pool latency regression and
+10,000-device impact/report regression stay serial within their binary. Only the
+read-only RSA-3072 escrow transport key is shared; each custody object, wrapping
+key, enrollment, device, authority and database state remains independent.
+
+For per-test profiling without bypassing the host-wide integration lock, run
+`go run ./cmd/devenv test-integration -root <fixture-checkout> -code <code-checkout>
+-packages ./internal/device -json-output <new-owner-only-file>`.
+The optional package pattern defaults to every internal package; signoff always
+uses that complete default. The JSON output records every original Go test event,
+while normal progress still reports package verdicts. Fixture logs separately
+record schema creation, migration/template restoration, compatibility checks,
+connections, identity/service/authority setup, cleanup and active-versus-queued
+test time. `BenchmarkMigrationFixtures` compares uncached migration and template
+restoration including connection and cleanup work. The 30-minute per-binary
+deadline and integration-lock cap are unchanged.
+
 Avoid flaky fixed sleeps. Poll an observable state with a deadline and structured
 failure evidence. Tests use controlled time where appropriate; full lifecycle still
 exercises real reboot/renewal boundaries. Do not mock away OS package transactions or

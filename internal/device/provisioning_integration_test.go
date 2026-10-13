@@ -75,6 +75,7 @@ func provisioningProof(t *testing.T, svc *Service, request *enrollmentv1.Provisi
 }
 
 func TestProvisioningTokenHashOnlyAndMintIdempotency(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	request := &adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), LifetimeSeconds: 600, MaxUses: 2, Reason: "bounded token issuance"}
 	first, err := f.service.CreateProvisioningToken(f.ownerCtx, connect.NewRequest(request))
@@ -114,6 +115,7 @@ func TestProvisioningTokenHashOnlyAndMintIdempotency(t *testing.T) {
 }
 
 func TestProvisioningConcurrentSameCSRAndMaximumUses(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, same := range []bool{true, false} {
 		t.Run(map[bool]string{true: "same_transaction", false: "different_transactions"}[same], func(t *testing.T) {
 			f := newProvisioningFixture(t)
@@ -175,6 +177,7 @@ func TestProvisioningConcurrentSameCSRAndMaximumUses(t *testing.T) {
 }
 
 func TestProvisioningInterruptedResumeAndWrongKey(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	token := f.mint(t, 1, false)
 	request, key := provisionIntent(t, token.Secret)
@@ -213,6 +216,7 @@ func TestProvisioningInterruptedResumeAndWrongKey(t *testing.T) {
 }
 
 func TestProvisioningExpiryRevocationAndCreatorFences(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, scenario := range []string{"expired", "revoked", "disabled", "version"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newProvisioningFixture(t)
@@ -247,6 +251,7 @@ func TestProvisioningExpiryRevocationAndCreatorFences(t *testing.T) {
 }
 
 func TestProvisioningPendingApprovalAndAssignments(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	group := uuid.New()
 	if _, err := f.conn.Exec(t.Context(), "INSERT INTO device_groups(id,name) VALUES ($1,'provisioning')", group); err != nil {
@@ -343,6 +348,7 @@ func TestProvisioningPendingApprovalAndAssignments(t *testing.T) {
 }
 
 func TestProvisioningPendingRejectionRevocationAndApprovalFences(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, scenario := range []string{"rejected", "revoked", "expired", "requester_version", "approver_version"} {
 		t.Run(scenario, func(t *testing.T) {
 			f := newProvisioningFixture(t)
@@ -401,6 +407,7 @@ func TestProvisioningPendingRejectionRevocationAndApprovalFences(t *testing.T) {
 // An approved reservation is not enrolled until the requester runs it; the
 // pending list must say so instead of still asking for approval.
 func TestPendingEnrollmentsReportApprovalProgress(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	token := f.mint(t, 1, true)
 	request, _ := provisionIntent(t, token.Secret)
@@ -444,6 +451,7 @@ func TestPendingEnrollmentsReportApprovalProgress(t *testing.T) {
 }
 
 func TestProvisioningDoesNotBorrowScopeOrLabelPrivileges(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	helpdesk := insertPrincipal(t, t.Context(), f.conn, identity.RoleHelpdesk)
 	request := &adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), LifetimeSeconds: 600, MaxUses: 1, Reason: "fixed scope test", Metadata: &adminv1.DeviceMetadata{Labels: []string{"privileged"}}}
@@ -461,6 +469,7 @@ func TestProvisioningDoesNotBorrowScopeOrLabelPrivileges(t *testing.T) {
 }
 
 func TestProvisioningApprovalRejectsScopedReviewer(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	token := f.mint(t, 1, true)
 	request, _ := provisionIntent(t, token.Secret)
@@ -484,6 +493,7 @@ func TestProvisioningApprovalRejectsScopedReviewer(t *testing.T) {
 }
 
 func TestProvisioningRetryNeverReassignsOwnership(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	token, err := f.service.CreateProvisioningToken(f.ownerCtx, connect.NewRequest(&adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), LifetimeSeconds: 600, MaxUses: 1, Reason: "initial owner", Metadata: &adminv1.DeviceMetadata{Owner: &adminv1.DeviceMetadata_OwnerPrincipalId{OwnerPrincipalId: f.owner.ID.String()}}}))
 	if err != nil {
@@ -511,6 +521,7 @@ func TestProvisioningRetryNeverReassignsOwnership(t *testing.T) {
 }
 
 func TestProvisioningInstallationCannotConsumeAnotherToken(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	first := f.mint(t, 1, false)
 	second := f.mint(t, 1, false)

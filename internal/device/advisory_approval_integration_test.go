@@ -18,6 +18,7 @@ import (
 )
 
 func TestAdvisoryExceptionRequiresExactIndependentApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	authority, err := identity.New(f.ctx, f.svc.Pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(identity.PermissionManageAdvisoryExceptions)}}})
 	if err != nil {
@@ -97,6 +98,7 @@ func TestAdvisoryExceptionRequiresExactIndependentApproval(t *testing.T) {
 // A pending risk acceptance whose finding newer inventory no longer reports is
 // shown as unavailable and cannot be approved; it can still be rejected.
 func TestAdvisoryApprovalRefusedOnceFindingEvidenceIsGone(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	created, err := f.svc.CreateApproval(f.ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}}))
 	if err != nil {
@@ -165,6 +167,7 @@ func TestAdvisoryApprovalRefusedOnceFindingEvidenceIsGone(t *testing.T) {
 // A risk acceptance that has already ended is refused before it can be
 // proposed for approval or accepted directly.
 func TestAdvisoryAcceptanceRefusesPastExpiry(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	request.ExpiresAt = timestamppb.New(time.Now().Add(-time.Hour))
 	if _, err := f.svc.CreateApproval(f.ownerCtx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
@@ -180,6 +183,7 @@ func TestAdvisoryAcceptanceRefusesPastExpiry(t *testing.T) {
 }
 
 func TestAdvisoryApprovalConsumptionRollsBackWithInvalidExpiry(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	// Beyond the 366-day acceptance bound, which only the acceptance itself
 	// enforces after the approval is consumed in the same transaction.

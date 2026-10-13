@@ -16,6 +16,7 @@ import (
 // across pages however many other actions came after it, and a page token
 // continues only the kind set it was issued for.
 func TestGetDeviceActionsFiltersByKindAcrossPages(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	quarantine := func() *agentv1.DeviceActionSpec {
 		return &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}}

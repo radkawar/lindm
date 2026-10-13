@@ -52,6 +52,7 @@ func recoveryAdmissionReason(t *testing.T, err error, reason string) {
 }
 
 func TestRecoveryReadinessBlocksApprovalAndRechecksCreation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	client, digest := recoveryArtifactFixture(t, bytes.Repeat([]byte{0x5a}, 8193))
 	f.svc.RecoveryArtifacts = client

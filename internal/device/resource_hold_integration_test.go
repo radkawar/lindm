@@ -23,6 +23,7 @@ import (
 // mints no replacement work inside the reconcile interval and is re-dispatched
 // once the interval has passed.
 func TestNativeBusyPreparationIsAnExplicitRetriedHold(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, head := newPreparationDispatchFixture(t)
 	work := f.work(t)
 	intent := f.intent(t, work)

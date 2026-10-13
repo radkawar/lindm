@@ -30,6 +30,7 @@ func patchStatusReport(t *testing.T, f *enrolledFixture, sequence uint64, status
 }
 
 func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	observed := f.now.Add(-time.Minute)
 	boot := uuid.NewString()
@@ -115,6 +116,7 @@ func TestPatchStatusProjectionAndFleetCompliance(t *testing.T) {
 // Arch (pacman) and Tumbleweed (zypper) agents report the rolling backends;
 // the projection's backend bound once refused their whole host observation.
 func TestPatchStatusProjectsRollingBackends(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, backend := range []resourcev1.OSUpdateBackend{resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_PACMAN, resourcev1.OSUpdateBackend_OS_UPDATE_BACKEND_ZYPPER} {
 		t.Run(backend.String(), func(t *testing.T) {
 			f := newEnrolled(t, 0)

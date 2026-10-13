@@ -62,6 +62,7 @@ func (f *rolloutFixture) head(t *testing.T) (string, *string) {
 }
 
 func TestRolloutActivatesReviewedDeviceWithoutPerDeviceSteps(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRolloutFixture(t, resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY)
 	review := f.review(t)
 	if review.ApprovalRequired || review.AdoptingCount != 0 || review.IncludedCount != 1 {
@@ -109,6 +110,7 @@ func TestRolloutActivatesReviewedDeviceWithoutPerDeviceSteps(t *testing.T) {
 // A direct assignment made on the device after the review is the newer
 // decision: the promoter marks the device for review instead of replacing it.
 func TestRolloutNeverReplacesDirectAssignmentMadeAfterReview(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRolloutFixture(t, resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY)
 	review := f.review(t)
 	if review.ReplacingDirectCount != 0 {
@@ -135,6 +137,7 @@ func TestRolloutNeverReplacesDirectAssignmentMadeAfterReview(t *testing.T) {
 }
 
 func TestRolloutAdoptionNeedsOneIndependentApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, decision := range []string{"approve", "reject"} {
 		t.Run(decision, func(t *testing.T) {
 			f := newRolloutFixture(t, resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION)

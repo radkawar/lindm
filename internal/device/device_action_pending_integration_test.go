@@ -16,6 +16,7 @@ import (
 // device never started reads as expired once its expiry passes, without
 // waiting for another create or start attempt to record the closure.
 func TestDeviceActionPendingDetailAndUnstartedExpiry(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	open := f.create(t, f.request(lockActionSpec()))
 

@@ -4,6 +4,78 @@ Status: qualification plan. **No matrix cell is certified.** Installation, unit 
 containers, simulations and a source-code review cannot substitute for the required
 machine evidence. All supported claims are capability-specific.
 
+## Device integration performance
+
+The race-enabled `internal/device` package passed twice on the loaded development
+host on 2026-10-13 after migration-template, immutable-transport-key and bounded
+parallel-fixture changes. Both runs were below the 12-minute package target:
+
+| Run | Before (seconds) | After (seconds) |
+| --- | ---------------: | --------------: |
+| 1   |         1884.047 |         480.126 |
+| 2   |         1449.555 |         642.484 |
+
+The before values are IntegRed's completed, host-lock-protected `-race -count=1`
+device runs, not recreated estimates. An additional pre-change `go test -json`
+profile passed in 1369.917 seconds and exactly matched the newer before run's
+321 top-level tests and 1,573 test/subtest names. Both optimized runs retained
+every one of those names and passed 322 top-level tests / 1,576 names: the only
+addition was the escrow-fixture isolation regression and its two subtests.
+There were zero failed or skipped test events. One rolling-release regression
+landed between the original before builds; the union of both before manifests
+is preserved.
+
+Both after runs used the maintained host-locking command against the shared real
+PostgreSQL/Keycloak fixture:
+
+```sh
+go run ./cmd/devenv test-integration \
+  -root /home/r/dev/minor/lindm \
+  -code /home/r/dev/minor/lindm.worktrees/device-suite-speed \
+  -packages ./internal/device \
+  -json-output /home/r/.cache/lindm-device-suite-speed-20261013/after-N.jsonl
+```
+
+The package completed in 8m0.126s and 10m42.484s; command wall times including
+fresh-authorization preflight and server build were 492.37s and 667.78s.
+Observed five-minute host load averages around the runs were 14.20 and 19.74
+on the i7-13700K host. No deadline was lengthened: the runner still gives each
+binary 30 minutes, with the existing integration-lock cap.
+
+Profiling found 387 independent database fixtures per optimized run. Median
+schema creation was 26–31ms, template restoration 442–566ms, compatibility checking
+about 2ms and independent connection setup about 13ms; median schema cleanup was
+173–193ms. Local identity initialization remained 387–403ms; enrolled-service
+setup, including identity construction, remained about 955ms. Action-authority
+setup was 26–32ms, with delegation/custody/service setup around 637–654ms.
+These are per-fixture wall times and can overlap, not additive package durations.
+The one-time golden migration/snapshot took 1.689s/52.175s and 6.385s/73.142s.
+The independent two-sample migration benchmark measured uncached initialization
+at 818ms and 735ms versus template restoration at 226ms and 241ms; including
+connections and cleanup, complete fixtures took 977ms/873ms versus 375ms/392ms.
+The migration-fixture isolation regression also passed twice under `-race`.
+
+No wall-time sleeps were available to remove. Existing PostgreSQL race helpers
+already poll specific blocker PIDs with deadlines; the console-pool regression's
+300ms deadline proves saturation rather than delaying fixture setup. All original
+assertions, password costs, key sizes, nested subtest ordering, genuine directory
+operations and 10,000-device / 500-page coverage remain unchanged.
+
+Owner-only evidence is retained under
+`$HOME/.cache/lindm-device-suite-speed-20261013/`: complete `before-1.log` and
+`before-2.log`, `before-json.jsonl`, both after JSON event streams, per-test/fixture
+profiles, `fixture-benchmark.json` and `timings.json`. The timing/coverage summary's
+SHA-256 is
+`2e0c2ce63a14d337a1b4c243be32b6e449eac94e01462995f0e58b69920244ba`.
+The after-stream SHA-256 values are
+`262cb5d4e68a60b46afc0ebfeb4cd9565f3eb0857a75efb39bee10c870279c55`
+and `072a9bd1778425b7e97c8e148765d0b13419bf534d6b223b971386829bd2e09d`.
+Focused default race suites for `cmd/devenv`, `internal/devlab` and
+`internal/device` passed; `internal/testdb` had no default-tag test files.
+Independent static reviews found no remaining blocking migration-isolation or
+fixture-concurrency issue. This is integration test evidence, not native
+distribution or physical-device qualification.
+
 ## Restart, shutdown and inventory-refresh actions
 
 | Gate                             | Required evidence                                                                                                                                                                                                      | Current status                                                                               |

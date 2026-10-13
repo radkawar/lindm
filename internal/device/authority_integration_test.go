@@ -68,6 +68,7 @@ func signedRenewalRequest(t *testing.T, svc *Service, principal core.DevicePrinc
 }
 
 func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -138,6 +139,7 @@ func TestSessionAuthorityReplayFenceAndHold(t *testing.T) {
 }
 
 func TestSessionEnvelopeReencodingCannotCreateCloneHold(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))

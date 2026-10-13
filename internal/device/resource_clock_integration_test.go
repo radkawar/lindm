@@ -15,6 +15,7 @@ import (
 )
 
 func TestServiceDispatchDeviceClockSkew(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, skew := range []time.Duration{-90 * time.Second, 90 * time.Second, 3 * time.Minute} {
 		t.Run(skew.String(), func(t *testing.T) {
 			f := newDispatchFixture(t)

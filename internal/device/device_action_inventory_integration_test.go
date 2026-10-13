@@ -24,6 +24,7 @@ import (
 )
 
 func TestRefreshAdmissionSurvivesPostgrantRoutineBacklog(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, staging := range []bool{false, true} {
 		name := "failed-attempt"
 		if staging {
@@ -142,6 +143,7 @@ func TestRefreshAdmissionSurvivesPostgrantRoutineBacklog(t *testing.T) {
 }
 
 func TestRefreshRoutineAllowedFreshAdmissionStillBindsSlots(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(refreshActionSpec()))
 	start, _ := f.startRequest(t, f.work(t))
@@ -190,6 +192,7 @@ func TestRefreshRoutineAllowedFreshAdmissionStillBindsSlots(t *testing.T) {
 }
 
 func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, mode := range []string{"ungranted", "closed", "fenced", "stale", "generation", "quota"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -271,6 +274,7 @@ func TestRefreshRejectedAdmissionCannotSupersedeStaging(t *testing.T) {
 }
 
 func TestRefreshStagingSupersessionReusesDeviceAndGlobalQuota(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.svc.InventoryBudget = inventory.MaxDeviceInventoryBytes
 	oldAt := time.Now().UTC().Add(-10 * time.Second)
@@ -306,6 +310,7 @@ func TestRefreshStagingSupersessionReusesDeviceAndGlobalQuota(t *testing.T) {
 }
 
 func TestRefreshSupersedesPregrantStagingAcrossCollectorClockWindow(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(refreshActionSpec()))
 	start, challenge := f.startRequest(t, f.work(t))
@@ -331,6 +336,7 @@ func TestRefreshSupersedesPregrantStagingAcrossCollectorClockWindow(t *testing.T
 }
 
 func TestRefreshPublicationRecoversBoundInventoryAfterRoutineOverwrite(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(refreshActionSpec()))
 	start, _ := f.startRequest(t, f.work(t))

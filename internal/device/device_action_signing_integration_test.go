@@ -14,6 +14,7 @@ import (
 // The console fixture previously delegated only systemd.service.v1. A fresh
 // otherwise valid refresh reached the signer and returned an opaque HTTP 500.
 func TestDeviceActionServiceOnlyDelegationIsTypedPrerequisite(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, kind := range []string{"refresh", "restart", "shutdown", "lock"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newDeviceActionFixtureCapabilities(t, []string{"systemd.service.v1"})
@@ -42,6 +43,7 @@ func TestDeviceActionServiceOnlyDelegationIsTypedPrerequisite(t *testing.T) {
 }
 
 func TestDeviceActionConfiguredStartKeyMustBeDelegatedBeforeCreate(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.svc.Signing.StartKey = ed25519Key(t)
 	_, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}})))
@@ -54,6 +56,7 @@ func TestDeviceActionConfiguredStartKeyMustBeDelegatedBeforeCreate(t *testing.T)
 }
 
 func TestDeviceActionStartSignerChangeIsTypedPrerequisite(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(refreshActionSpec()))
 	request, _ := f.startRequest(t, f.work(t))

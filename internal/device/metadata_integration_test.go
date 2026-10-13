@@ -40,6 +40,7 @@ func setInventoryMetadata(t *testing.T, f *enrolledFixture, id string, metadata 
 }
 
 func TestInventoryMetadataTypingOwnershipAuditAndReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	defineInventoryAttribute(t, f, "desk", adminv1.AttributeType_ATTRIBUTE_TYPE_STRING)
 	defineInventoryAttribute(t, f, "floor", adminv1.AttributeType_ATTRIBUTE_TYPE_INT)
@@ -113,6 +114,7 @@ func TestInventoryMetadataTypingOwnershipAuditAndReplay(t *testing.T) {
 
 // The console shows the display name an administrator typed, not the key.
 func TestAttributeDefinitionKeepsDisplayName(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	definition := &adminv1.AttributeDefinition{Key: "cost-center", DisplayName: "Cost center", Type: adminv1.AttributeType_ATTRIBUTE_TYPE_ENUM, EnumValues: []string{"R&D", "Sales"}}
 	if _, err := f.svc.SetAttributeDefinition(f.ownerCtx, connect.NewRequest(&adminv1.SetAttributeDefinitionRequest{RequestId: uuid.NewString(), Definition: definition, Reason: "define cost center"})); err != nil {
@@ -128,9 +130,10 @@ func TestAttributeDefinitionKeepsDisplayName(t *testing.T) {
 }
 
 func TestInventoryMetadataAuditFailureRollsBack(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	if _, err := f.conn.Exec(f.ctx, `CREATE FUNCTION reject_inventory_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='inventory.SetDeviceMetadata' THEN RAISE EXCEPTION 'test audit unavailable'; END IF; RETURN NEW; END $$;
-CREATE TRIGGER reject_inventory_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_inventory_audit()`); err != nil {
+ CREATE TRIGGER reject_inventory_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_inventory_audit()`); err != nil {
 		t.Fatal(err)
 	}
 	request := &adminv1.SetDeviceMetadataRequest{RequestId: uuid.NewString(), DeviceId: f.deviceID, Metadata: &adminv1.DeviceMetadata{Labels: []string{"must-rollback"}}, Reason: "audit must be atomic"}
@@ -153,6 +156,7 @@ CREATE TRIGGER reject_inventory_audit BEFORE INSERT ON audit_events FOR EACH ROW
 }
 
 func TestInventorySearchLastSeenWithinIsAnchoredToTheSearch(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	ages := []time.Duration{time.Hour, 2 * time.Hour, 7*24*time.Hour - 5*time.Minute, 10 * 24 * time.Hour}
 	ids := make([]string, len(ages))
@@ -196,6 +200,7 @@ func TestInventorySearchLastSeenWithinIsAnchoredToTheSearch(t *testing.T) {
 }
 
 func TestInventorySearchCursorBindingAndScopedExports(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	defineInventoryAttribute(t, f, "floor", adminv1.AttributeType_ATTRIBUTE_TYPE_INT)
 	matching := map[string]bool{}
@@ -260,7 +265,7 @@ func TestInventorySearchCursorBindingAndScopedExports(t *testing.T) {
 	// continuation. Revisit the first page using its own returned token.
 	laterID := uuid.New()
 	if _, err := f.conn.Exec(f.ctx, `INSERT INTO devices(id,state,enrolled_at,last_seen_at,hostname,os_id,os_version,metadata)
-		SELECT $1,state,$2,last_seen_at,hostname,os_id,os_version,metadata FROM devices WHERE id=$3`, laterID, f.now.Add(time.Second), first.Msg.Devices[0].GetId()); err != nil {
+ 		SELECT $1,state,$2,last_seen_at,hostname,os_id,os_version,metadata FROM devices WHERE id=$3`, laterID, f.now.Add(time.Second), first.Msg.Devices[0].GetId()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.conn.Exec(f.ctx, `INSERT INTO device_labels(device_id,label) VALUES($1,'allowed')`, laterID); err != nil {
@@ -324,6 +329,7 @@ func TestInventorySearchCursorBindingAndScopedExports(t *testing.T) {
 }
 
 func TestInventoryValidationAndAuthorization(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	for _, filter := range []*adminv1.DeviceFilter{
 		{LastSeenFrom: timestamppb.New(f.now), LastSeenUntil: timestamppb.New(f.now.Add(-time.Second))},
@@ -349,6 +355,7 @@ func TestInventoryValidationAndAuthorization(t *testing.T) {
 }
 
 func TestInventoryExportByteBudgetAndDefinitionReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	definition := &adminv1.SetAttributeDefinitionRequest{RequestId: uuid.NewString(), Definition: &adminv1.AttributeDefinition{Key: "asset", Type: adminv1.AttributeType_ATTRIBUTE_TYPE_STRING}, Reason: "test definition receipt"}
 	for range 2 {
@@ -410,6 +417,7 @@ func TestInventoryExportByteBudgetAndDefinitionReplay(t *testing.T) {
 }
 
 func TestInventoryNestedMetadataPageBudget(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	metadata := &adminv1.DeviceMetadata{Attributes: make(map[string]*adminv1.AttributeValue)}
 	for i := range 32 {
@@ -421,7 +429,7 @@ func TestInventoryNestedMetadataPageBudget(t *testing.T) {
 	setInventoryMetadata(t, f, f.deviceID, metadata)
 	for range 15 {
 		if _, err := f.conn.Exec(f.ctx, `INSERT INTO devices(id,state,enrolled_at,metadata)
-			SELECT $1,'pending',enrolled_at,metadata FROM devices WHERE id=$2`, uuid.New(), f.principal.DeviceID); err != nil {
+ 			SELECT $1,'pending',enrolled_at,metadata FROM devices WHERE id=$2`, uuid.New(), f.principal.DeviceID); err != nil {
 			t.Fatal(err)
 		}
 	}

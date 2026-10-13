@@ -5,8 +5,6 @@ package device
 import (
 	"context"
 	"crypto/ed25519"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/pem"
 	"testing"
@@ -28,7 +26,6 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/config"
-	"lindm/internal/escrow"
 	"lindm/internal/executionauthority"
 	"lindm/internal/identity"
 	"lindm/internal/trust"
@@ -50,6 +47,7 @@ func newDeviceActionFixture(t *testing.T) *deviceActionFixture {
 func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *deviceActionFixture {
 	t.Helper()
 	f := &deviceActionFixture{enrolledFixture: newEnrolled(t, 0)}
+	started := time.Now()
 	s := f.svc
 	now := time.Now().UTC()
 	public := func(key ed25519.PrivateKey) *agentv1.ExecutionKey {
@@ -81,6 +79,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	if err != nil {
 		t.Fatal(err)
 	}
+	authorityReady := time.Now()
 	plan, start := ed25519Key(t), ed25519Key(t)
 	delegation := &agentv1.ExecutionDelegation{DeploymentId: s.DeploymentID.String(), RootVersion: 1, Version: 1, NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(6 * time.Hour)), Delegates: []*agentv1.ExecutionDelegate{{Key: public(plan), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: capabilities}, {Key: public(start), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: capabilities}}}
 	actor, _ := identity.PrincipalFromContext(f.ownerCtx)
@@ -95,19 +94,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	if err := tx.Commit(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kek := make([]byte, 32)
-	if _, err := rand.Read(kek); err != nil {
-		t.Fatal(err)
-	}
-	custody, err := escrow.New(rsaKey, kek)
-	clear(kek)
-	if err != nil {
-		t.Fatal(err)
-	}
+	custody := newFixtureCustody(t)
 	f.svc, err = New(s.Pool, core.Config{DeploymentID: s.DeploymentID.String(), CACertificate: s.CA, CAKey: s.CAKey, Identity: s.Identity, ExecutionAuthority: store, ExecutionSigning: &config.ExecutionSigning{PlanKey: plan, StartKey: start}, Escrow: custody}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
@@ -124,6 +111,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(report)); err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("action fixture: authority=%s delegation_custody_service=%s", authorityReady.Sub(started), time.Since(authorityReady))
 	return f
 }
 func (f *deviceActionFixture) request(spec *agentv1.DeviceActionSpec) *adminv1.CreateDeviceActionRequest {

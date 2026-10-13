@@ -79,6 +79,7 @@ func currentKey(t *testing.T, ctx context.Context, conn *pgx.Conn, generation uu
 }
 
 func TestRegisterEncryptionKeyBindsPresentedIdentity(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))

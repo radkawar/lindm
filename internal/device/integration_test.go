@@ -38,6 +38,7 @@ import (
 )
 
 func TestDurableEnrollmentBoundaries(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -218,10 +219,12 @@ func insertPrincipal(t *testing.T, ctx context.Context, conn *pgx.Conn, role str
 
 func localIdentity(t *testing.T, pool *pgxpool.Pool) *identity.Service {
 	t.Helper()
+	started := time.Now()
 	service, err := identity.New(t.Context(), pool, identity.Config{Local: true, PublicURL: "https://admin.example"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("identity fixture: initialize=%s", time.Since(started))
 	t.Cleanup(func() {
 		if err := service.Close(); err != nil {
 			t.Error(err)
@@ -363,6 +366,7 @@ func assertConcurrentRenewal(t *testing.T, ctx context.Context, conn *pgx.Conn, 
 }
 
 func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, status := range []string{"active", "overlapping"} {
 		for _, boundary := range []struct {
 			name   string
@@ -428,11 +432,11 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 					t.Helper()
 					var certificates, audits string
 					if err := conn.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id)::text
-						FROM device_certificates c WHERE device_id = $1`, deviceID).Scan(&certificates); err != nil {
+ 						FROM device_certificates c WHERE device_id = $1`, deviceID).Scan(&certificates); err != nil {
 						t.Fatal(err)
 					}
 					if err := conn.QueryRow(ctx, `SELECT jsonb_agg(to_jsonb(a) ORDER BY a.id)::text
-						FROM audit_events a WHERE resource_id = $1`, deviceID.String()).Scan(&audits); err != nil {
+ 						FROM audit_events a WHERE resource_id = $1`, deviceID.String()).Scan(&audits); err != nil {
 						t.Fatal(err)
 					}
 					return certificates, audits
@@ -475,9 +479,9 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				for {
 					var waiting bool
 					err := pool.QueryRow(ctx, `SELECT EXISTS (
-						SELECT 1 FROM pg_stat_activity
-						WHERE $1::integer = ANY(pg_blocking_pids(pid))
-					)`, int32(conn.PgConn().PID())).Scan(&waiting)
+ 						SELECT 1 FROM pg_stat_activity
+ 						WHERE $1::integer = ANY(pg_blocking_pids(pid))
+ 					)`, int32(conn.PgConn().PID())).Scan(&waiting)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -534,14 +538,14 @@ func TestRenewIdentityRechecksExpiryAfterDeviceLock(t *testing.T) {
 				}
 				var total, active, overlapping, revoked, audits int
 				if err := conn.QueryRow(ctx, `SELECT count(*),
-					count(*) FILTER (WHERE status = 'active'),
-					count(*) FILTER (WHERE status = 'overlapping'),
-					count(*) FILTER (WHERE status = 'revoked')
-					FROM device_certificates WHERE device_id = $1`, deviceID).Scan(&total, &active, &overlapping, &revoked); err != nil {
+ 					count(*) FILTER (WHERE status = 'active'),
+ 					count(*) FILTER (WHERE status = 'overlapping'),
+ 					count(*) FILTER (WHERE status = 'revoked')
+ 					FROM device_certificates WHERE device_id = $1`, deviceID).Scan(&total, &active, &overlapping, &revoked); err != nil {
 					t.Fatal(err)
 				}
 				if err := conn.QueryRow(ctx, `SELECT count(*) FROM audit_events
-					WHERE resource_id = $1 AND action = $2`, deviceID.String(), auditkind.DeviceRenew.String()).Scan(&audits); err != nil {
+ 					WHERE resource_id = $1 AND action = $2`, deviceID.String(), auditkind.DeviceRenew.String()).Scan(&audits); err != nil {
 					t.Fatal(err)
 				}
 				if total != 3 || active != 1 || overlapping != 1 || revoked != 1 || audits != 2 {
@@ -562,6 +566,7 @@ func activeCertificatePEM(t *testing.T, ctx context.Context, conn *pgx.Conn, dev
 }
 
 func TestEnrollmentReplayAfterRenewal(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, signer := testCA(t, time.Now().Add(90*24*time.Hour))

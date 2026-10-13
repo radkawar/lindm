@@ -5,7 +5,6 @@ package device
 import (
 	"bytes"
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
 	"os"
 	"path/filepath"
@@ -23,7 +22,6 @@ import (
 	devicev1 "lindm/gen/lindm/device/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
-	"lindm/internal/escrow"
 	"lindm/internal/identity"
 	"lindm/internal/secretseal"
 )
@@ -43,19 +41,8 @@ type deliveryFixture struct {
 func newDeliveryFixture(t *testing.T) *deliveryFixture {
 	t.Helper()
 	f := &deliveryFixture{dispatchFixture: newDispatchFixtureWithDelegationAge(t, time.Hour, "systemd.service.v1", "local.user.v1")}
-	key, err := rsa.GenerateKey(rand.Reader, 3072)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kek := make([]byte, 32)
-	if _, err := rand.Read(kek); err != nil {
-		t.Fatal(err)
-	}
-	f.service.Escrow, err = escrow.New(key, kek)
-	clear(kek)
-	if err != nil {
-		t.Fatal(err)
-	}
+	f.service.Escrow = newFixtureCustody(t)
+	var err error
 	f.private, err = secretseal.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +141,7 @@ func hexEncode(value string) string {
 }
 
 func TestServiceSecretDeliverySealsBoundMaterial(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeliveryFixture(t)
 	f.registerRecipient(t)
 	ref := f.storeSecret(t, resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, passwordHashMaterial(deliveredSHA512))
@@ -198,6 +186,7 @@ func TestServiceSecretDeliverySealsBoundMaterial(t *testing.T) {
 // A missing device key is transient: the resource waits visibly without a head
 // block, and the next poll after registration mints with its delivery.
 func TestServiceSecretDeliveryWaitsForDeviceKey(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeliveryFixture(t)
 	ref := f.storeSecret(t, resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, passwordHashMaterial(deliveredSHA512))
 	f.assignHashedUser(t, ref, resourcev1.PasswordHashAlgorithm_PASSWORD_HASH_ALGORITHM_SHA512_CRYPT)
@@ -230,6 +219,7 @@ func TestServiceSecretDeliveryWaitsForDeviceKey(t *testing.T) {
 }
 
 func TestServiceSecretDeliveryBlocksWithoutPrerequisites(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, test := range []struct {
 		name   string
 		reason string

@@ -29,6 +29,7 @@ import (
 )
 
 func TestGetDeviceUsesOneDatabaseSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, change := range []string{"publication", "host"} {
 		t.Run(change, func(t *testing.T) {
 			f := newEnrolled(t, 0)
@@ -85,10 +86,10 @@ func TestGetDeviceUsesOneDatabaseSnapshot(t *testing.T) {
 			for {
 				var waiting bool
 				if err := f.svc.Pool.QueryRow(ctx, `SELECT EXISTS (
-					SELECT 1 FROM pg_stat_activity
-					WHERE $1::integer = ANY(pg_blocking_pids(pid))
-					AND query LIKE '-- name: GetHostObservation %'
-				)`, int32(f.conn.PgConn().PID())).Scan(&waiting); err != nil {
+ 					SELECT 1 FROM pg_stat_activity
+ 					WHERE $1::integer = ANY(pg_blocking_pids(pid))
+ 					AND query LIKE '-- name: GetHostObservation %'
+ 				)`, int32(f.conn.PgConn().PID())).Scan(&waiting); err != nil {
 					t.Fatal(err)
 				}
 				if waiting {
@@ -145,6 +146,7 @@ func TestGetDeviceUsesOneDatabaseSnapshot(t *testing.T) {
 }
 
 func TestPutPackageBatchJSONAcceptsMaximumDecodedPayload(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	packages := make([]*inventoryv1.Package, 384)
 	for i := range packages {

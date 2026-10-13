@@ -18,6 +18,7 @@ import (
 // references against the observed release's requirement: a legacy one-token
 // bind on Ubuntu 24.04 reads 1 of 4 until a TPM2 bind completes it.
 func TestDeviceEncryptionReportsTPM2TokenReferences(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	target, virtio := fixtureVirtioStorage()
 	details := nativeDetailsFixture()

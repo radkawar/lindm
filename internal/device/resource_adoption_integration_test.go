@@ -14,6 +14,7 @@ import (
 )
 
 func TestResourceAdoptionConsumesIndependentExactAssignmentApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	item := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	item.DependsOn = nil
@@ -67,6 +68,7 @@ func TestResourceAdoptionConsumesIndependentExactAssignmentApproval(t *testing.T
 }
 
 func TestProfileCannotSupplyAdoptionApprovalMarker(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	spec := proto.CloneOf(f.revision.GetSpec())
 	spec.Resources[0].Ownership.Mode = resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION

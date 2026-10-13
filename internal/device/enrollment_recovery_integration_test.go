@@ -43,6 +43,7 @@ func approvedRecovery(t *testing.T, svc *Service, ctx context.Context, request *
 }
 
 func TestRecoveryEnrollmentReplacesOnlyApprovedGeneration(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -116,6 +117,7 @@ func TestRecoveryEnrollmentReplacesOnlyApprovedGeneration(t *testing.T) {
 }
 
 func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -155,6 +157,7 @@ func TestSignedInstallationConflictDurablyHoldsCurrentEpoch(t *testing.T) {
 }
 
 func TestRecoveryEnrollmentDoesNotOverrideLaterRevocation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))

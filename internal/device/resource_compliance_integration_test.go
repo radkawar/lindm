@@ -16,6 +16,7 @@ import (
 )
 
 func TestResourceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	request := f.assignmentRequest(nil)
 	request.ReconcileIntervalSeconds = proto.Uint32(300)
@@ -87,6 +88,7 @@ func TestResourceComplianceRechecksFreshnessAndDependencies(t *testing.T) {
 }
 
 func TestResourceComplianceRecheckAuthorizationFence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	for range 2 {
@@ -110,6 +112,7 @@ func TestResourceComplianceRecheckAuthorizationFence(t *testing.T) {
 }
 
 func TestResourceComplianceReadOnlyHistoryBound(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	// Retain a genuine granted success and a non-success without a grant.
@@ -155,6 +158,7 @@ func TestResourceComplianceReadOnlyHistoryBound(t *testing.T) {
 }
 
 func TestResourceComplianceIntervalValidation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	for _, seconds := range []uint32{0, 299, 86401} {
 		request := f.assignmentRequest(nil)

@@ -149,6 +149,7 @@ func deviceActionServerHarness(t *testing.T) *signedServerHarness {
 // TestSignedActionServerCharacterization pins the server authority semantics
 // the generic signed-action core gives every kind identically.
 func TestSignedActionServerCharacterization(t *testing.T) {
+	parallelDeviceIntegration(t)
 	kinds := map[string]func(*testing.T) *signedServerHarness{"resource": resourceServerHarness, "device-action": deviceActionServerHarness}
 	cases := map[string]func(t *testing.T, h *signedServerHarness){
 		"start-replay-is-exact": func(t *testing.T, h *signedServerHarness) {

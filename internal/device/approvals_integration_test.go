@@ -49,6 +49,7 @@ func approvedRevocation(t *testing.T, svc *Service, ctx context.Context, request
 }
 
 func TestApprovalRevokeLifecycle(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -126,6 +127,7 @@ func TestApprovalRevokeLifecycle(t *testing.T) {
 }
 
 func TestApprovalRejectExpiryAndVersions(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, scenario := range []string{"rejected", "expired", "requester_version", "approver_version", "disabled"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx := t.Context()
@@ -184,6 +186,7 @@ func TestApprovalRejectExpiryAndVersions(t *testing.T) {
 // Only the requester can withdraw, only while pending; a withdrawn request can
 // never be approved or used, and an exact retry is idempotent.
 func TestApprovalRequesterWithdraws(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -245,6 +248,7 @@ func TestApprovalRequesterWithdraws(t *testing.T) {
 // The device page reads its open requests through the same inbox, filtered to
 // that device only.
 func TestApprovalListFiltersByDevice(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -278,6 +282,7 @@ func TestApprovalListFiltersByDevice(t *testing.T) {
 }
 
 func TestApprovalScopeInboxAndCreation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -339,6 +344,7 @@ func TestApprovalScopeInboxAndCreation(t *testing.T) {
 // The inbox lists open requests first, nearest expiry first, then closed ones,
 // newest first; every page size walks the same order once.
 func TestApprovalInboxOrderAndPaging(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(90*24*time.Hour))
@@ -411,6 +417,7 @@ func TestApprovalInboxOrderAndPaging(t *testing.T) {
 }
 
 func TestConfiguredAssignmentApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	authority, err := identity.New(ctx, pool, identity.Config{Local: true, PublicURL: "https://admin.example", Policy: &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(identity.PermissionAssignResources)}}})

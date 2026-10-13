@@ -31,6 +31,7 @@ func wipeActionSpec() *agentv1.DeviceActionSpec {
 }
 
 func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	request := f.request(lockActionSpec())
 	action := f.create(t, request)
@@ -96,6 +97,7 @@ func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
 }
 
 func TestDeviceActionDestructiveApprovalConsumedAtStart(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	request := f.request(wipeActionSpec())
 	f.observeStorageTargets(t, request.GetSpec().GetCryptoErase().GetTarget())
@@ -126,6 +128,7 @@ func TestDeviceActionDestructiveApprovalConsumedAtStart(t *testing.T) {
 }
 
 func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, variant := range []string{"revoked", "expired", "digest"} {
 		t.Run(variant, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -163,6 +166,7 @@ func TestDeviceActionApprovalRevocationExpiryAndDigest(t *testing.T) {
 }
 
 func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	rotate := &agentv1.EscrowRotateAction{Target: fixtureStorageTarget(uuid.NewString()), EscrowKeyId: f.svc.Escrow.KeyID(), EscrowPublicKey: f.svc.Escrow.PublicKey()}
 	f.observeStorageTargets(t, rotate.GetTarget())
@@ -299,6 +303,7 @@ func TestDeviceActionEscrowDurableReceiptSecretExclusion(t *testing.T) {
 }
 
 func TestDeviceActionScopeOfflineAndQuarantineRestrictions(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	request := f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}})
 	if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE devices SET last_seen_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", f.principal.DeviceID); err != nil {
@@ -354,6 +359,7 @@ func TestDeviceActionScopeOfflineAndQuarantineRestrictions(t *testing.T) {
 }
 
 func TestDeviceActionFreshMutationScopeAndDeviceRevocation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	actor := insertPrincipal(t, t.Context(), f.conn, identity.RoleAdmin)
 	outside := []byte(`{"scopes":[{"deviceIds":["` + uuid.NewString() + `"]}]}`)
@@ -387,6 +393,7 @@ func TestDeviceActionFreshMutationScopeAndDeviceRevocation(t *testing.T) {
 }
 
 func TestDeviceActionResultNonceAndIntentFences(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.create(t, f.request(lockActionSpec()))
 	work := f.work(t)
@@ -415,6 +422,7 @@ func TestDeviceActionResultNonceAndIntentFences(t *testing.T) {
 }
 
 func TestDeviceActionEncryptionExactVolumeSelection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	volumes := []string{uuid.NewString(), uuid.NewString()}
 	actions := make([]string, len(volumes))

@@ -24,6 +24,7 @@ import (
 )
 
 func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	project := func() *adminv1.GetDeviceResponse {
 		t.Helper()
@@ -146,6 +147,7 @@ func TestAgentUpdatePersistenceOrderingAndProjection(t *testing.T) {
 }
 
 func TestAgentUpdateMalformedAndAtomicAudit(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	base := &agentv1.AgentUpdateStatus{Enabled: true, Phase: "recovery_required", ObservedAt: timestamppb.New(f.now), NativeDiagnostic: &agentv1.NativeUpdateDiagnostic{Manager: "apt-get", Phase: "apply", ExitCode: 100, ErrorLines: []string{"E: failed"}}}
 	for name, mutate := range map[string]func(*agentv1.AgentUpdateStatus){

@@ -20,8 +20,9 @@ import (
 // Database owns one disposable schema, its pool and an independent test
 // connection. All application connections have a schema-only search_path.
 type Database struct {
-	Pool *pgxpool.Pool
-	Conn *pgx.Conn
+	Pool    *pgxpool.Pool
+	Conn    *pgx.Conn
+	timings fixtureTimings
 
 	schema  string
 	config  *pgx.ConnConfig
@@ -30,14 +31,25 @@ type Database struct {
 	err     error
 }
 
+type fixtureTimings struct {
+	create, initialize, check, connect time.Duration
+}
+
 // New creates a private schema and applies the application's real migrations.
 // The supplied role needs CREATE SCHEMA, not superuser or CREATE DATABASE.
 // Close must be called even when the caller's context has been cancelled.
-func New(ctx context.Context, dsn string) (_ *Database, resultErr error) {
+func New(ctx context.Context, dsn string) (*Database, error) {
+	return newDatabase(ctx, dsn, func(pool *pgxpool.Pool, _ string) error {
+		return db.Migrate(ctx, pool)
+	})
+}
+
+func newDatabase(ctx context.Context, dsn string, initialize func(*pgxpool.Pool, string) error) (_ *Database, resultErr error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, errors.New("invalid integration database connection configuration")
 	}
+	started := time.Now()
 	database := &Database{
 		schema: "lindm_test_" + strings.ReplaceAll(uuid.NewString(), "-", ""),
 		config: cfg.ConnConfig.Copy(),
@@ -66,16 +78,23 @@ func New(ctx context.Context, dsn string) (_ *Database, resultErr error) {
 	if err != nil {
 		return nil, errors.New("create isolated schema pool failed")
 	}
-	if err := db.Migrate(ctx, database.Pool); err != nil {
+	database.timings.create = time.Since(started)
+	started = time.Now()
+	if err := initialize(database.Pool, database.schema); err != nil {
 		return nil, err
 	}
+	database.timings.initialize = time.Since(started)
+	started = time.Now()
 	if err := db.Check(ctx, database.Pool); err != nil {
 		return nil, err
 	}
+	database.timings.check = time.Since(started)
+	started = time.Now()
 	database.Conn, err = pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
 	if err != nil {
 		return nil, errors.New("connect isolated test connection failed")
 	}
+	database.timings.connect = time.Since(started)
 	return database, nil
 }
 

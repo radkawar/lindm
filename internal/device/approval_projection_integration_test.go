@@ -27,6 +27,7 @@ func assertApprovalProjection(t *testing.T, approval *adminv1.Approval, requeste
 // These tests exercise real PostgreSQL authorization and response projections.
 // They never dispatch an action or claim a native device effect.
 func TestApprovalProjectionLifecycle(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, test := range []struct {
 		name           string
 		requesterLabel string
@@ -160,6 +161,7 @@ func TestApprovalProjectionLifecycle(t *testing.T) {
 }
 
 func TestApprovalProjectionScopedVisibility(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	reviewerCtx := approvalReviewer(t, f.svc, t.Context())

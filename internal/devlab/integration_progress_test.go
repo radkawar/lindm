@@ -1,6 +1,7 @@
 package devlab
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,7 +27,7 @@ func TestTestWithProgressReportsEachPackage(t *testing.T) {
 		}
 	}
 	var lines []string
-	err := testWithProgress(t.Context(), root, os.Environ(), func(line string) { lines = append(lines, line) }, "-count=1", "./...")
+	err := testWithProgress(t.Context(), root, os.Environ(), func(line string) { lines = append(lines, line) }, io.Discard, "-count=1", "./...")
 	if err == nil || !strings.Contains(err.Error(), "1 of 2 packages failed") {
 		t.Fatalf("failing package not reported: %v", err)
 	}

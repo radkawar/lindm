@@ -29,6 +29,7 @@ func (f *deviceActionFixture) preflight(t *testing.T, ctx context.Context, spec 
 // The review-time preflight must refuse exactly what create would refuse, name
 // the inventory and check-in times separately, and never leave a trace.
 func TestPreflightDeviceActionMatchesCreateRefusalWithoutSideEffects(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	restart := restartActionSpec()
 	ready := f.preflight(t, f.ownerCtx, restart)
@@ -90,6 +91,7 @@ func TestPreflightDeviceActionMatchesCreateRefusalWithoutSideEffects(t *testing.
 // approved request without spending its approval: after fresh inventory
 // arrives, the same approved request is created once, carrying the approval.
 func TestApprovedActionSurvivesStaleInventoryRefusal(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	imperativePolicy(t, f, &authv1.AuthorizationPolicy{ApprovalRequiredPermissions: []string{string(identity.PermissionRunRemoteExecution)}})
 	request := f.request(restartActionSpec())
@@ -126,6 +128,7 @@ func TestApprovedActionSurvivesStaleInventoryRefusal(t *testing.T) {
 // Preflight is authorized exactly like create: a fleet reader cannot probe
 // remote-execution prerequisites, and out-of-scope devices stay invisible.
 func TestPreflightDeviceActionAuthorization(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	request := &adminv1.PreflightDeviceActionRequest{DeviceId: f.deviceID, EnrollmentGeneration: f.generation, Spec: restartActionSpec()}
 	helper := insertPrincipal(t, t.Context(), f.conn, identity.RoleHelpdesk)
@@ -142,6 +145,7 @@ func TestPreflightDeviceActionAuthorization(t *testing.T) {
 // The restart delay is bounded by the proto (0 to 3600 seconds, the logind
 // schedule the agent accepts); out-of-range values never reach a check.
 func TestPreflightDeviceActionRejectsOutOfRangeRestartDelay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	for _, delay := range []uint32{0, 3600} {
 		spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Restart{Restart: &agentv1.RestartAction{DelaySeconds: proto.Uint32(delay)}}}

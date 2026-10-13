@@ -197,6 +197,7 @@ func (f *actionRecoveryFixture) resultRequest(t *testing.T, state agentv1.Device
 	return request
 }
 func TestDeviceActionRecoveryWorkCarriesUnchangedCurrentTrust(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newActionRecoveryFixture(t)
 	work := f.acquire(t)
 	update := work.GetTrustUpdate()
@@ -206,6 +207,7 @@ func TestDeviceActionRecoveryWorkCarriesUnchangedCurrentTrust(t *testing.T) {
 }
 
 func TestDeviceActionRecoveryDurableCheckpointReplayAndTerminal(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newActionRecoveryFixture(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)
 	start := f.start(t)
@@ -250,6 +252,7 @@ func TestDeviceActionRecoveryDurableCheckpointReplayAndTerminal(t *testing.T) {
 	}
 }
 func TestDeviceActionRecoveryExpiryUnknownAndSessionFence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newActionRecoveryFixture(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)
 	f.start(t)
@@ -281,6 +284,7 @@ func TestDeviceActionRecoveryExpiryUnknownAndSessionFence(t *testing.T) {
 	}
 }
 func TestDeviceActionRecoveryScopeProofRevocationAndMissingResult(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newActionRecoveryFixture(t)
 	f.checkpoint(t, agentv1.RecoveryPhase_RECOVERY_PHASE_BOOTED)
 	acquire := &recoveryv1.AcquireRecoveryWorkRequest{CredentialEnvelope: f.envelope}

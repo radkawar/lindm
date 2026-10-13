@@ -22,6 +22,7 @@ import (
 // A saved selection (an account's scope group, a rollout target) must be
 // nameable even when the group is not on the first page of the ID-ordered list.
 func TestDeviceGroupLookupNamesGroupsBeyondTheFirstPage(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	ids := []string{uuid.NewString(), uuid.NewString(), uuid.NewString()}
 	slices.Sort(ids)
@@ -69,6 +70,7 @@ func TestDeviceGroupLookupNamesGroupsBeyondTheFirstPage(t *testing.T) {
 // A picker finds a group by any part of its name in any case, past the first
 // page; a % or _ is literal, and a page token continues only its own search.
 func TestDeviceGroupNameSearchPagesAcrossTheList(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	ids := []string{uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()}
 	slices.Sort(ids)
@@ -134,6 +136,7 @@ func TestDeviceGroupNameSearchPagesAcrossTheList(t *testing.T) {
 // competing transaction creates the group and adds enrollment membership.
 // Wait for the write to block on the uncommitted group, then let enrollment win.
 func TestDeviceGroupCreateOnlyRacingEnrollmentPreservesMembership(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	groupID := uuid.New()
 	tx, err := f.svc.Pool.Begin(f.ctx)

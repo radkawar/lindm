@@ -23,6 +23,7 @@ import (
 )
 
 func TestOrganizationTargetsEnrolledDeviceIdempotently(t *testing.T) {
+	parallelDeviceIntegration(t)
 	// Runtime organization policy requires an actual browser session, not the
 	// database-inserted principal used by isolated device-service fixtures.
 	f := newSecretFixture(t)

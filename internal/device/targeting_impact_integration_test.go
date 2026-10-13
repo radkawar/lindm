@@ -19,6 +19,7 @@ import (
 )
 
 func TestProposedImpactUsesCanonicalConflictResolverAndActualHead(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "finance-laptop"))); err != nil {
 		t.Fatal(err)
@@ -89,6 +90,7 @@ func TestProposedImpactUsesCanonicalConflictResolverAndActualHead(t *testing.T) 
 }
 
 func TestProposedImpactCanonicalAssignmentReplacement(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "finance-replacement"))); err != nil {
 		t.Fatal(err)

@@ -6,12 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"lindm/internal/devlab/project"
 )
 
 // integrationServerRelease stamps the lindmd binary that native-server
@@ -34,7 +37,7 @@ const integrationServerRelease = "0.1.0"
 //
 // Each package result is printed as it completes ("[n/total] ok pkg 12.3s"),
 // with the output of failing packages, and passed to progress when non-nil.
-func TestIntegration(ctx context.Context, fixtureRoot, codeRoot string, progress func(line string)) (resultErr error) {
+func TestIntegration(ctx context.Context, fixtureRoot, codeRoot, packages, jsonOutput string, progress func(line string)) (resultErr error) {
 	var root string
 	if err := locked(ctx, fixtureRoot, func(lockedRoot string) error {
 		root = lockedRoot
@@ -44,6 +47,9 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot string, progress
 		}
 		if err := databaseReady(ctx, dir); err != nil {
 			return fmt.Errorf("integration database is not ready; run make dev-up: %w", err)
+		}
+		if err := verifyRunningPostgres(ctx, root); err != nil {
+			return err
 		}
 		local, err := localFixture(dir)
 		if err != nil {
@@ -69,15 +75,23 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot string, progress
 	}
 	env := make([]string, 0, len(os.Environ())+3)
 	for _, value := range os.Environ() {
-		if !strings.HasPrefix(value, "LINDM_TEST_DATABASE_URL") && !strings.HasPrefix(value, "LINDM_NATIVE_SERVER_BINARY=") && !strings.HasPrefix(value, "LINDM_NATIVE_REPOSITORY=") {
+		if !strings.HasPrefix(value, "LINDM_TEST_DATABASE_") && !strings.HasPrefix(value, "LINDM_NATIVE_SERVER_BINARY=") && !strings.HasPrefix(value, "LINDM_NATIVE_REPOSITORY=") {
 			env = append(env, value)
 		}
 	}
-	env = append(env, "LINDM_TEST_DATABASE_URL_FILE="+filepath.Join(FixturePath(root), "migration-database-url"), "LINDM_NATIVE_SERVER_BINARY="+server, "LINDM_NATIVE_REPOSITORY="+root)
-	// The device suite runs six to fifteen minutes under -race against real
-	// PostgreSQL, depending on concurrent package and host load; a per-binary
-	// deadline near that reports false timeouts.
-	return testWithProgress(ctx, codeRoot, env, progress, "-race", "-tags=integration", "-count=1", "-timeout=30m", "./internal/...")
+	env = append(env, "LINDM_TEST_DATABASE_URL_FILE="+filepath.Join(FixturePath(root), "migration-database-url"), "LINDM_TEST_DATABASE_TEMPLATE_CONTAINER="+project.ComposeName(root)+"-postgres-1", "LINDM_NATIVE_SERVER_BINARY="+server, "LINDM_NATIVE_REPOSITORY="+root)
+	events := io.Discard
+	if jsonOutput != "" {
+		file, err := os.OpenFile(jsonOutput, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if err != nil {
+			return err
+		}
+		defer func() { resultErr = errors.Join(resultErr, file.Close()) }()
+		events = file
+	}
+	// Preserve the per-binary deadline: slower suites need optimization or
+	// sharding, not a longer hold of the shared integration fixture.
+	return testWithProgress(ctx, codeRoot, env, progress, events, "-race", "-tags=integration", "-count=1", "-timeout=30m", packages)
 }
 
 // testEvent is the subset of go test -json (test2json) events used here.
@@ -92,7 +106,7 @@ const maxFailureOutput = 256 << 10
 // testWithProgress runs go test -json and reports package results as they
 // complete, printing a failing package's retained output. Cancellation kills
 // the whole process group, like command.
-func testWithProgress(ctx context.Context, root string, env []string, progress func(string), args ...string) (resultErr error) {
+func testWithProgress(ctx context.Context, root string, env []string, progress func(string), events io.Writer, args ...string) (resultErr error) {
 	total := 0
 	list := exec.CommandContext(ctx, "go", "list", "-tags=integration", args[len(args)-1])
 	list.Dir, list.Env = root, env
@@ -122,6 +136,10 @@ func testWithProgress(ctx context.Context, root string, env []string, progress f
 	scanner := bufio.NewScanner(stdout)
 	scanner.Buffer(make([]byte, 64<<10), 4<<20)
 	for scanner.Scan() {
+		if _, err := fmt.Fprintln(events, scanner.Text()); err != nil {
+			// Stop and join the entire process group on recording failure.
+			return errors.Join(err, cmd.Cancel(), cmd.Wait())
+		}
 		var event testEvent
 		if json.Unmarshal(scanner.Bytes(), &event) != nil {
 			fmt.Println(scanner.Text())

@@ -60,6 +60,7 @@ func (f *deviceActionFixture) storageTargets(t *testing.T, kind string) *adminv1
 }
 
 func TestListDeviceStorageTargetsPublishedFreshnessAndHistoricalIdentity(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	target := fixtureStorageTarget(uuid.NewString())
 	f.observeStorageTargets(t, target)
@@ -92,6 +93,7 @@ func TestListDeviceStorageTargetsPublishedFreshnessAndHistoricalIdentity(t *test
 }
 
 func TestListDeviceStorageTargetsVirtioFallbackAndDuplicateSerial(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	target, virtio := fixtureVirtioStorage()
 	details := nativeDetailsFixture()
@@ -118,6 +120,7 @@ func TestListDeviceStorageTargetsVirtioFallbackAndDuplicateSerial(t *testing.T) 
 }
 
 func TestStorageActionFallbackBasisChangesRejectedAtCreateAndStart(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, downgrade := range []bool{false, true} {
 		t.Run(fmt.Sprintf("downgrade=%t", downgrade), func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -177,6 +180,7 @@ func storageActionSpecs(f *deviceActionFixture, target *agentv1.StorageTarget) m
 }
 
 func TestStorageActionCreateRejectsUnobservedTupleEveryKind(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	target := fixtureStorageTarget(uuid.NewString())
 	for kind, spec := range storageActionSpecs(f, target) {
@@ -212,6 +216,7 @@ func TestStorageActionCreateRejectsUnobservedTupleEveryKind(t *testing.T) {
 }
 
 func TestStorageActionStartRechecksLatestInventoryAndCreateReplayIsDurable(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, variant := range []string{"mismatch", "stale"} {
 		t.Run(variant, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -250,6 +255,7 @@ func TestStorageActionStartRechecksLatestInventoryAndCreateReplayIsDurable(t *te
 }
 
 func TestStorageActionNativeScopeMismatchAndCompleteLiveSet(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	target := fixtureStorageTarget("")
 	details := nativeDetailsFixture()

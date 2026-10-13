@@ -60,6 +60,7 @@ func startCompletedLock(t *testing.T, f *deviceActionFixture) string {
 }
 
 func TestDeviceActionLockReleaseVerifiedOwnershipAndAudit(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	original := startCompletedLock(t, f)
 	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(lockActionSpec()))); connect.CodeOf(err) != connect.CodeFailedPrecondition {
@@ -140,6 +141,7 @@ func TestDeviceActionLockReleaseVerifiedOwnershipAndAudit(t *testing.T) {
 }
 
 func TestDeviceActionLockRestrictionIndependentOfQuarantine(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	original := startCompletedLock(t, f)
 	quarantine := f.create(t, f.request(&agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_Quarantine{Quarantine: &agentv1.QuarantineAction{ManagementEndpoints: []string{"192.0.2.1"}}}}))
@@ -166,6 +168,7 @@ func TestDeviceActionLockRestrictionIndependentOfQuarantine(t *testing.T) {
 }
 
 func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, permission := range []identity.Permission{identity.PermissionLockDevice, identity.PermissionReleaseLockDevice} {
 		t.Run(string(permission), func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -226,6 +229,7 @@ func TestDeviceActionLockConfiguredApprovalConsumedAtStart(t *testing.T) {
 }
 
 func TestDeviceActionUnknownLockExplicitRelease(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	lock := f.create(t, f.request(lockActionSpec()))
 	original := lock.GetActionId()
@@ -270,6 +274,7 @@ func TestDeviceActionUnknownLockExplicitRelease(t *testing.T) {
 }
 
 func TestDeviceActionReleaseLockFreshOwnershipFence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	original := startCompletedLock(t, f)
 	action := f.create(t, f.request(releaseLockSpec(original)))
@@ -292,6 +297,7 @@ func TestDeviceActionReleaseLockFreshOwnershipFence(t *testing.T) {
 }
 
 func TestDeviceActionLockApprovalRejectsChangedSelectionAndRevocation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, change := range []string{"termination", "usernames", "all_humans", "approver_revoked"} {
 		t.Run(change, func(t *testing.T) {
 			f := newDeviceActionFixture(t)

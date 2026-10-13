@@ -15,6 +15,7 @@ import (
 // and nothing is queued; adding an account selection makes the action
 // effective and it is created.
 func TestDeviceActionSessionOnlyLockRefusedOnOmarchy(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	// The fixture's single allowed host report observed Debian 12; the stored
 	// observation is what admission reads.

@@ -26,6 +26,7 @@ import (
 )
 
 func TestServiceFreshDelegationIntentWindow(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixtureWithDelegationAge(t, time.Second)
 	f.assign(t, nil)
 	intent := f.intent(t, f.work(t))
@@ -41,6 +42,7 @@ func TestServiceFreshDelegationIntentWindow(t *testing.T) {
 }
 
 func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	request := f.assignmentRequest(nil)
 	first, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(request))
@@ -138,6 +140,7 @@ func TestServiceAssignmentCASAndLeaseReplay(t *testing.T) {
 }
 
 func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	head := f.assign(t, nil)
 	work := f.work(t)
@@ -223,6 +226,7 @@ func TestServiceStartResultNonceAndDependencyGates(t *testing.T) {
 }
 
 func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	head := f.assign(t, nil)
 	f.directory.membership(t, false)
@@ -260,6 +264,7 @@ func TestServiceAssignmentActorAuthorityChanges(t *testing.T) {
 }
 
 func TestServiceResultRegisteredCertificateAndNoEffect(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	work := f.work(t)
@@ -343,6 +348,7 @@ func assertDispatchClosure(t *testing.T, f *dispatchFixture, id, expected string
 }
 
 func TestResourceResultBindsExactDesiredEvidence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	work := f.work(t)

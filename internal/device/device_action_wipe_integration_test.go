@@ -19,6 +19,7 @@ import (
 )
 
 func TestDeviceActionLiveRootAggregateRequiresVolatileExactProof(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	targets := []*agentv1.StorageTarget{fixtureStorageTarget(uuid.NewString()), fixtureStorageTarget(uuid.NewString())}
 	targets[1].SizeBytes = 2 << 30

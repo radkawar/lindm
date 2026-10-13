@@ -17,6 +17,7 @@ import (
 )
 
 func TestHeterogeneousResourceAssignmentDispatchAndRelease(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	service := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	service.DependsOn = nil
@@ -88,6 +89,7 @@ func TestHeterogeneousResourceAssignmentDispatchAndRelease(t *testing.T) {
 }
 
 func TestCrossKindResourceClaimConflictNeverDispatches(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	service := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	service.DependsOn = nil
@@ -149,6 +151,7 @@ func assertNoResourceWork(t *testing.T, f *dispatchFixture) {
 }
 
 func TestTargetedResourceIntentRetainsEveryOwnershipContributor(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "ownership-preview"))); err != nil {
 		t.Fatal(err)

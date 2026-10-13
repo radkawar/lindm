@@ -21,6 +21,7 @@ import (
 )
 
 func TestListProfileRevisions(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))

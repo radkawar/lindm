@@ -100,7 +100,7 @@ func runSignoff(args []string) (resultErr error) {
 		if err := makeCheck(ctx, clean); err != nil {
 			return err
 		}
-		return testIntegration(ctx, checkout, clean, integrationLockCap)
+		return testIntegration(ctx, checkout, clean, integrationLockCap, "./internal/...", "")
 	}); err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ const integrationQueueLimit = 3 * time.Hour
 // the lock while waiting on the host; the run under the lock is bounded by
 // limit (at most integrationLockCap), and its per-package progress replaces
 // the lock's holder record so waiters and dev status see how far it is.
-func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit time.Duration) (resultErr error) {
+func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit time.Duration, packages, jsonOutput string) (resultErr error) {
 	if err := admitHeavyJob(ctx, "test-integration", os.Stderr); err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit ti
 	defer cancel()
 	started := time.Now()
 	holder := fmt.Sprintf("pid %d test-integration of %s since %s", os.Getpid(), codeRoot, started.UTC().Format(time.RFC3339))
-	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot, func(line string) {
+	return devlab.TestIntegration(ctx, fixtureRoot, codeRoot, packages, jsonOutput, func(line string) {
 		// Diagnostic only: the flock, not this record, is the lock.
 		_ = os.WriteFile(lock, []byte(holder+": "+line+"\n"), 0o600)
 	})

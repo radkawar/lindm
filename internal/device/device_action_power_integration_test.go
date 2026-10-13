@@ -50,6 +50,7 @@ func setImperativeScope(t *testing.T, f *deviceActionFixture, actor identity.Pri
 }
 
 func TestImperativeActionsFreshScopeOfflineAndReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for name, spec := range map[string]*agentv1.DeviceActionSpec{"restart": restartActionSpec(), "shutdown": shutdownActionSpec(), "refresh": refreshActionSpec()} {
 		t.Run(name, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -100,6 +101,7 @@ func TestImperativeActionsFreshScopeOfflineAndReplay(t *testing.T) {
 }
 
 func TestRefreshRequiresFreshReadAndInventoryManagement(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, permissions := range [][]string{{string(identity.PermissionReadFleet)}, {string(identity.PermissionManageInventory)}, {string(identity.PermissionRunRemoteExecution)}, {string(identity.PermissionReadFleet), string(identity.PermissionManageInventory)}} {
 		t.Run(permissions[0]+"-"+permissions[len(permissions)-1], func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -134,6 +136,7 @@ func TestRefreshRequiresFreshReadAndInventoryManagement(t *testing.T) {
 }
 
 func TestImperativeActionsConfiguredApprovalAndReviewerScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for name, spec := range map[string]*agentv1.DeviceActionSpec{"restart": restartActionSpec(), "shutdown": shutdownActionSpec(), "refresh": refreshActionSpec()} {
 		t.Run(name, func(t *testing.T) {
 			f := newDeviceActionFixture(t)
@@ -188,6 +191,7 @@ func TestImperativeActionsConfiguredApprovalAndReviewerScope(t *testing.T) {
 }
 
 func TestRestartSignedResultBootTransitionAndReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	action := f.create(t, f.request(restartActionSpec()))
 	work := f.work(t)
@@ -226,6 +230,7 @@ func TestRestartSignedResultBootTransitionAndReplay(t *testing.T) {
 }
 
 func TestShutdownSignedResultRemainsUnknown(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	action := f.create(t, f.request(shutdownActionSpec()))
 	work := f.work(t)
@@ -249,6 +254,7 @@ func TestShutdownSignedResultRemainsUnknown(t *testing.T) {
 }
 
 func TestRefreshSignedResultRequiresPublishedFullInventory(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	f.publishPackages(t, 1, "old-package")
 	f.create(t, f.request(refreshActionSpec()))
@@ -369,6 +375,7 @@ func TestRefreshSignedResultRequiresPublishedFullInventory(t *testing.T) {
 }
 
 func TestRefreshApprovalRequiresReviewerReadPermission(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	imperativePolicy(t, f, &authv1.AuthorizationPolicy{Roles: []*authv1.RoleDefinition{{Name: "inventory-reviewer", Permissions: []string{string(identity.PermissionManageInventory), string(identity.PermissionManageApprovals)}}}})
 	request := f.request(refreshActionSpec())
@@ -384,6 +391,7 @@ func TestRefreshApprovalRequiresReviewerReadPermission(t *testing.T) {
 }
 
 func TestImperativeApprovalReviewerRevocationBeforeStart(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for name, spec := range map[string]*agentv1.DeviceActionSpec{"restart": restartActionSpec(), "shutdown": shutdownActionSpec(), "refresh": refreshActionSpec()} {
 		t.Run(name, func(t *testing.T) {
 			f := newDeviceActionFixture(t)

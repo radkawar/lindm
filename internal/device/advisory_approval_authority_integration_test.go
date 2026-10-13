@@ -12,6 +12,7 @@ import (
 )
 
 func TestAdvisoryApprovalRejectsChangedHumanAuthority(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, changed := range []string{"requester", "reviewer"} {
 		t.Run(changed, func(t *testing.T) {
 			f, request := advisoryAcceptanceFixture(t)

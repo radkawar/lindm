@@ -21,6 +21,7 @@ import (
 )
 
 func TestAuditFiltersComposeHalfOpenEdgesEqualTimestampsAndSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	actor, _ := identity.PrincipalFromContext(f.ownerCtx)
 	other := insertPrincipal(t, f.ctx, f.conn, identity.RoleAuditor)
@@ -107,6 +108,7 @@ func TestAuditFiltersComposeHalfOpenEdgesEqualTimestampsAndSnapshot(t *testing.T
 }
 
 func TestAuditFiltersRejectScopedAndMalformedRequests(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	actor, _ := identity.PrincipalFromContext(f.ownerCtx)
 	actor.Role = identity.RoleAuditor
@@ -133,6 +135,7 @@ func TestAuditFiltersRejectScopedAndMalformedRequests(t *testing.T) {
 }
 
 func TestAuditCategoriesUseActualActionsAndDestructiveCapabilities(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	request := f.request(wipeActionSpec())
 	f.observeStorageTargets(t, request.GetSpec().GetCryptoErase().GetTarget())
@@ -197,6 +200,7 @@ func TestAuditCategoriesUseActualActionsAndDestructiveCapabilities(t *testing.T)
 // Signing in and out are things a person did, but not decisions: the default
 // "Human actions" view must not list them, while "All actions" keeps them.
 func TestHumanActionsOmitSessionAndReadBookkeeping(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	person := insertPrincipal(t, f.ctx, f.conn, identity.RoleAdmin)
 	for _, kind := range []auditkind.Kind{auditkind.IdentityLogin, auditkind.IdentityCLILogin, auditkind.IdentityLogout, auditkind.ApprovalListed, auditkind.DeviceGroupSet} {
@@ -227,6 +231,7 @@ func TestHumanActionsOmitSessionAndReadBookkeeping(t *testing.T) {
 
 // A device action row names what was requested, not only "device action".
 func TestAuditEventsNameTheDeviceActionCapability(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	action := f.create(t, f.request(refreshActionSpec()))
 	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{TargetDeviceId: &f.deviceID}}))
@@ -250,6 +255,7 @@ func TestAuditEventsNameTheDeviceActionCapability(t *testing.T) {
 // A device-details change is about one device, so its row names that device
 // and the device filter finds it; resource_id alone names nothing.
 func TestDeviceMetadataAuditNamesTheDevice(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	setInventoryMetadata(t, f, f.deviceID, &adminv1.DeviceMetadata{Labels: []string{"audit-target"}})
 	var target *uuid.UUID
@@ -275,6 +281,7 @@ func TestDeviceMetadataAuditNamesTheDevice(t *testing.T) {
 }
 
 func TestAuditTargetListAndPickerIncludeActualEnrollment(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{Filter: &auditv1.AuditFilter{TargetDeviceId: &f.deviceID}}))
 	if err != nil {

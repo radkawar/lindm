@@ -20,6 +20,7 @@ import (
 // Owner pass 2 bug 1: the console must locate the refused setting, so the
 // refusal carries its request field path in the schema-violation shape.
 func TestPublishRefusesEmptySettingAtItsFieldPath(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	spec := proto.CloneOf(f.revision.GetSpec())
 	zone := proto.CloneOf(spec.Resources[0])

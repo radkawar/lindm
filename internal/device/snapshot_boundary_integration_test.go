@@ -25,6 +25,7 @@ import (
 )
 
 func TestPackageCursorBindsActorDeviceAndLiteralFilter(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	prefix := `a%_\`
 	f.publishPackages(t, 1, "axy-decoy", prefix+"one", prefix+"two", "other")
@@ -60,6 +61,7 @@ func TestPackageCursorBindsActorDeviceAndLiteralFilter(t *testing.T) {
 }
 
 func TestPackageCursorExpiryWhileWaitingForCursorLock(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	f.publishPackages(t, 1, "one", "two")
 	client := inventoryAdminClient(t, f, f.ownerCtx, false)
@@ -129,6 +131,7 @@ func TestPackageCursorExpiryWhileWaitingForCursorLock(t *testing.T) {
 }
 
 func TestConcurrentSnapshotAdmissionPreservesBudgetAndLoserSequence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, core.MinInventoryBudget)
 	otherKey := ed25519Key(t)
 	_, _, _, enrolled := enrollDevice(t, f.ctx, f.svc, f.ownerCtx, otherKey)
@@ -177,7 +180,7 @@ func TestConcurrentSnapshotAdmissionPreservesBudgetAndLoserSequence(t *testing.T
 	var sequence, reserved int64
 	var open bool
 	if err := f.conn.QueryRow(f.ctx, `SELECT g.package_sequence, d.reserved_inventory_bytes, d.open_snapshot_id IS NOT NULL
-		FROM enrollment_generations g JOIN devices d ON d.id = g.device_id WHERE g.id = $1`, generations[loser]).Scan(&sequence, &reserved, &open); err != nil {
+ 		FROM enrollment_generations g JOIN devices d ON d.id = g.device_id WHERE g.id = $1`, generations[loser]).Scan(&sequence, &reserved, &open); err != nil {
 		t.Fatal(err)
 	}
 	if sequence != 0 || reserved != 0 || open {

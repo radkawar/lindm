@@ -27,6 +27,7 @@ func (f *deliveryFixture) secretUses(t *testing.T, ref *resourcev1.SecretRef) *a
 // server enforces: a referenced secret cannot be deleted, and deletion of an
 // unreferenced one erases its material while history stays auditable.
 func TestSecretUsesAndDeletion(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeliveryFixture(t)
 	ref := f.storeSecret(t, resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, passwordHashMaterial(deliveredSHA512))
 	unused := f.storeSecret(t, resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, passwordHashMaterial(deliveredYes))

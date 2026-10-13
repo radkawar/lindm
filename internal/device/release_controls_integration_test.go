@@ -54,6 +54,7 @@ func registerTestRelease(t *testing.T, f *enrolledFixture, minor uint32) *releas
 }
 
 func TestReleasePolicyPersistsAndFencesUnknownSession(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	f.svc.RequireCompatibility = true
 	f.svc.ServerRelease = "1.3.0"
@@ -118,6 +119,7 @@ func TestReleasePolicyPersistsAndFencesUnknownSession(t *testing.T) {
 }
 
 func TestReleasePromotionAnnouncesRetirementForNinetyDays(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	q := devicedb.New(f.svc.Pool)
@@ -140,6 +142,7 @@ func TestReleasePromotionAnnouncesRetirementForNinetyDays(t *testing.T) {
 }
 
 func TestRolloutPendingPublicationResumesAndAudits(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	directory, custody := t.TempDir(), t.TempDir()
 	for _, path := range []string{directory, custody} {
@@ -225,6 +228,7 @@ func TestRolloutPendingPublicationResumesAndAudits(t *testing.T) {
 }
 
 func TestUnsupportedReleasePreservesIssuedServiceRecovery(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	work := f.work(t)

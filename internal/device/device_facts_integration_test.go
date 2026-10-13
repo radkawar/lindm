@@ -25,6 +25,7 @@ import (
 )
 
 func TestDeviceAgentVersionSignedProjectionAndScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	reader := scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
@@ -112,6 +113,7 @@ func TestDeviceAgentVersionSignedProjectionAndScope(t *testing.T) {
 }
 
 func TestDeviceSessionAndRouteFactsInventoryScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	ok := inventoryv1.CollectionStatus_COLLECTION_STATUS_SUCCESS
 	missing := inventoryv1.CollectionStatus_COLLECTION_STATUS_UNAVAILABLE

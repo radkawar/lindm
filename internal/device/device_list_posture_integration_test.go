@@ -74,6 +74,7 @@ func postureReport(t *testing.T, f *enrolledFixture, sequence uint64, storage *i
 }
 
 func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	if device := listedPosture(t, f); device.GetRootEncryption() != adminv1.DeviceRootEncryption_DEVICE_ROOT_ENCRYPTION_UNKNOWN || device.GetUpdates() != nil || device.GetFindings() != nil {
 		t.Fatalf("never-reported device acquired posture: %v", device)
@@ -135,24 +136,25 @@ func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
 }
 
 func TestListDevicesFindingsMatchFreshEvaluationMinusExceptions(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	feedRevision, setID := uuid.NewString(), uuid.NewString()
 	fleetSummaryExec(t, f, `INSERT INTO advisory_feeds(id,distro,release,source_url,config_bytes,revision,expires_at,checked_at)
-VALUES('posture-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT_TIMESTAMP+interval '1 day',CURRENT_TIMESTAMP)`, feedRevision)
+ VALUES('posture-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT_TIMESTAMP+interval '1 day',CURRENT_TIMESTAMP)`, feedRevision)
 	snapshot := f.publishPackages(t, 1, "posture-package")
 	fleetSummaryExec(t, f, "UPDATE devices SET state='active',host_received_at=CURRENT_TIMESTAMP WHERE id=$1", f.deviceID)
 	fleetSummaryExec(t, f, `INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,host_received_at,expires_at,state,reason,finding_digest)
-SELECT id,$2,$3,'posture-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_received_at,CURRENT_TIMESTAMP+interval '1 day','evaluated','',decode(repeat('00',32),'hex') FROM devices WHERE id=$1`,
+ SELECT id,$2,$3,'posture-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_received_at,CURRENT_TIMESTAMP+interval '1 day','evaluated','',decode(repeat('00',32),'hex') FROM devices WHERE id=$1`,
 		f.deviceID, uuid.NewString(), snapshot, feedRevision)
 	severities := []string{"critical", "high", "high", "medium", "unrated"}
 	packageDigest := sha256.Sum256([]byte(setID))
 	fleetSummaryExec(t, f, `INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,finding_count,critical_count,high_count,medium_count,low_count,other_count)
-VALUES($1,'posture-feed',$2,$3,'evaluated','',decode(repeat('11',32),'hex'),5,1,2,1,0,1)`, setID, feedRevision, packageDigest[:])
+ VALUES($1,'posture-feed',$2,$3,'evaluated','',decode(repeat('11',32),'hex'),5,1,2,1,0,1)`, setID, feedRevision, packageDigest[:])
 	keys := make([]string, len(severities))
 	for i, severity := range severities {
 		keys[i] = uuid.NewString()
 		fleetSummaryExec(t, f, `INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,source_url)
-VALUES($1,$2,'POSTURE-1','posture-package','1','2','amd64',$3,'{}','https://example.test/feed')`, setID, keys[i], severity)
+ VALUES($1,$2,'POSTURE-1','posture-package','1','2','amd64',$3,'{}','https://example.test/feed')`, setID, keys[i], severity)
 	}
 	if device := listedPosture(t, f); device.GetFindings() != nil {
 		t.Fatalf("evaluation without a bound finding set reported findings: %v", device.GetFindings())
@@ -160,7 +162,7 @@ VALUES($1,$2,'POSTURE-1','posture-package','1','2','amd64',$3,'{}','https://exam
 	fleetSummaryExec(t, f, "UPDATE advisory_evaluations SET finding_set_id=$1 WHERE device_id=$2", setID, f.deviceID)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	fleetSummaryExec(t, f, `INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
-VALUES($1,$2,$3,'posture accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day')`, keys[1], f.deviceID, owner.ID)
+ VALUES($1,$2,$3,'posture accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day')`, keys[1], f.deviceID, owner.ID)
 	want := &adminv1.DeviceFindingCounts{Critical: 1, High: 1, Medium: 1, Other: 1}
 	if got := listedPosture(t, f).GetFindings(); !proto.Equal(got, want) {
 		t.Fatalf("findings = %v, want %v (accepted exception excluded)", got, want)

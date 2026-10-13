@@ -23,6 +23,7 @@ import (
 // content, such as after an OS update run upgraded dnf5; an unchanged
 // snapshot and unrelated refusal reasons hold.
 func TestPackageStateHoldsAreRedispatchedOnPackageChange(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	refuse := func(reason agentv1.ResourceAdmissionRefusalReason, detail string) string {

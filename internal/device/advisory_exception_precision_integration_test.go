@@ -12,6 +12,7 @@ import (
 )
 
 func TestAdvisoryExceptionReceiptMatchesPersistedPrecision(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	request.ExpiresAt.Nanos = 446777608
 	accepted, err := f.svc.AcceptAdvisoryFinding(f.ownerCtx, connect.NewRequest(request))

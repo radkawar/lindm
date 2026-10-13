@@ -47,6 +47,7 @@ func fleetSummaryExec(t *testing.T, f *enrolledFixture, query string, args ...an
 }
 
 func TestFleetSummaryCountsAllAuthorizedDevices(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	// The enrolled device is an explicitly unknown, pending device. More than
@@ -57,19 +58,19 @@ func TestFleetSummaryCountsAllAuthorizedDevices(t *testing.T) {
 		id := uuid.NewString()
 		visible = append(visible, id)
 		fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,os_id,os_version,last_seen_at)
-VALUES($1,'active',CURRENT_TIMESTAMP,'ubuntu','22.04',CURRENT_TIMESTAMP-interval '1 hour')`, id)
+ VALUES($1,'active',CURRENT_TIMESTAMP,'ubuntu','22.04',CURRENT_TIMESTAMP-interval '1 hour')`, id)
 	}
 	active, recovery, revoked := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	visible = append(visible, active, recovery, revoked)
 	fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,os_id,os_version,last_seen_at)
-VALUES($1,'active',CURRENT_TIMESTAMP,'ubuntu','24.04',CURRENT_TIMESTAMP-interval '48 hours'),
-($2,'recovery_hold',CURRENT_TIMESTAMP,'fedora','44',CURRENT_TIMESTAMP-interval '1 hour')`, active, recovery)
+ VALUES($1,'active',CURRENT_TIMESTAMP,'ubuntu','24.04',CURRENT_TIMESTAMP-interval '48 hours'),
+ ($2,'recovery_hold',CURRENT_TIMESTAMP,'fedora','44',CURRENT_TIMESTAMP-interval '1 hour')`, active, recovery)
 	fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,os_id,os_version,revoked_at,revoked_by,revoke_reason)
-VALUES($1,'revoked',CURRENT_TIMESTAMP,'fedora','44',CURRENT_TIMESTAMP,$2,'summary fixture retirement')`, revoked, owner.ID)
+ VALUES($1,'revoked',CURRENT_TIMESTAMP,'fedora','44',CURRENT_TIMESTAMP,$2,'summary fixture retirement')`, revoked, owner.ID)
 	hidden := []string{uuid.NewString(), uuid.NewString(), uuid.NewString()}
 	for _, id := range hidden {
 		fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,os_id,os_version,last_seen_at)
-VALUES($1,'active',CURRENT_TIMESTAMP,'hidden-os','hidden-version',CURRENT_TIMESTAMP-interval '48 hours')`, id)
+ VALUES($1,'active',CURRENT_TIMESTAMP,'hidden-os','hidden-version',CURRENT_TIMESTAMP-interval '48 hours')`, id)
 	}
 	group := uuid.NewString()
 	fleetSummaryExec(t, f, "INSERT INTO device_groups(id,name) VALUES($1,'summary scope')", group)
@@ -128,6 +129,7 @@ VALUES($1,'active',CURRENT_TIMESTAMP,'hidden-os','hidden-version',CURRENT_TIMEST
 }
 
 func TestFleetSummaryOSGroupsAreBoundedWithoutLosingCounts(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	fleetSummaryExec(t, f, "UPDATE devices SET os_id='',os_version='' WHERE id=$1", f.deviceID)
@@ -141,7 +143,7 @@ func TestFleetSummaryOSGroupsAreBoundedWithoutLosingCounts(t *testing.T) {
 	}
 	// This would rank first if authorization were applied after the group limit.
 	fleetSummaryExec(t, f, `INSERT INTO devices(id,state,enrolled_at,os_id,os_version)
-SELECT gen_random_uuid(),'active',CURRENT_TIMESTAMP,'hidden-leading-os','1' FROM generate_series(1,400)`)
+ SELECT gen_random_uuid(),'active',CURRENT_TIMESTAMP,'hidden-leading-os','1' FROM generate_series(1,400)`)
 	ctx := identity.WithPrincipal(f.ctx, scopedReader(owner, &authv1.DeviceScope{Labels: []string{"visible"}}))
 	got := fleetSummary(t, f.svc, ctx, 0)
 	groups := got.GetOperatingSystems().GetGroups()
@@ -178,6 +180,7 @@ func fleetSummaryEnroll(t *testing.T, f *enrolledFixture) *enrolledFixture {
 }
 
 func TestFleetSummaryResourceComplianceMatchesDeviceState(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	assignment := f.assign(t, nil)
 	exec := func(query string, args ...any) {
@@ -189,19 +192,19 @@ func TestFleetSummaryResourceComplianceMatchesDeviceState(t *testing.T) {
 	// Superseded heads must not be counted, even for a visible device.
 	oldAssignment := uuid.NewString()
 	exec(`INSERT INTO resource_assignments(id,device_id,generation_id,request_id,request_digest,actor_id,authorization_version,revision_id,document,assigned_at)
-SELECT $1,device_id,generation_id,$2,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
-FROM resource_assignments WHERE id=$3`, oldAssignment, uuid.NewString(), assignment.GetAssignmentId())
+ SELECT $1,device_id,generation_id,$2,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
+ FROM resource_assignments WHERE id=$3`, oldAssignment, uuid.NewString(), assignment.GetAssignmentId())
 	exec(`INSERT INTO resource_assignment_resources(assignment_id,resource_id,resource_kind,canonical_key,position,document,disposition)
-SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resource_assignment_resources WHERE assignment_id=$2`, oldAssignment, assignment.GetAssignmentId())
+ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resource_assignment_resources WHERE assignment_id=$2`, oldAssignment, assignment.GetAssignmentId())
 	hiddenDevice, hiddenGeneration, hiddenAssignment := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	exec(`INSERT INTO devices(id,state,enrolled_at) VALUES($1,'active',CURRENT_TIMESTAMP)`, hiddenDevice)
 	exec(`INSERT INTO enrollment_generations(id,device_id,state,created_at) VALUES($1,$2,'active',CURRENT_TIMESTAMP)`, hiddenGeneration, hiddenDevice)
 	exec("UPDATE devices SET current_generation_id=$2 WHERE id=$1", hiddenDevice, hiddenGeneration)
 	exec(`INSERT INTO resource_assignments(id,device_id,generation_id,request_id,request_digest,actor_id,authorization_version,revision_id,document,assigned_at)
-SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
-FROM resource_assignments WHERE id=$5`, hiddenAssignment, hiddenDevice, hiddenGeneration, uuid.NewString(), assignment.GetAssignmentId())
+ SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at
+ FROM resource_assignments WHERE id=$5`, hiddenAssignment, hiddenDevice, hiddenGeneration, uuid.NewString(), assignment.GetAssignmentId())
 	exec(`INSERT INTO resource_assignment_resources(assignment_id,resource_id,resource_kind,canonical_key,position,document,disposition)
-SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resource_assignment_resources WHERE assignment_id=$2`, hiddenAssignment, assignment.GetAssignmentId())
+ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resource_assignment_resources WHERE assignment_id=$2`, hiddenAssignment, assignment.GetAssignmentId())
 	exec("INSERT INTO resource_assignment_heads(generation_id,assignment_id) VALUES($1,$2)", hiddenGeneration, hiddenAssignment)
 	principal := scopedReader(f.actor, &authv1.DeviceScope{DeviceIds: []string{f.principal.DeviceID.String()}})
 	ctx := identity.WithPrincipal(t.Context(), principal)
@@ -279,6 +282,7 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document,4 FROM resou
 }
 
 func TestFleetSummaryFindingsUseCanonicalSeverityAndFreshness(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	hidden := fleetSummaryEnroll(t, f)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
@@ -289,12 +293,12 @@ func TestFleetSummaryFindingsUseCanonicalSeverityAndFreshness(t *testing.T) {
 	}
 	feedRevision := uuid.NewString()
 	fleetSummaryExec(t, f, `INSERT INTO advisory_feeds(id,distro,release,source_url,config_bytes,revision,expires_at,checked_at)
-VALUES('summary-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT_TIMESTAMP+interval '1 day',CURRENT_TIMESTAMP)`, feedRevision)
+ VALUES('summary-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT_TIMESTAMP+interval '1 day',CURRENT_TIMESTAMP)`, feedRevision)
 	for _, device := range []*enrolledFixture{f, hidden} {
 		snapshot := device.publishPackages(t, 1, "summary-package")
 		fleetSummaryExec(t, f, "UPDATE devices SET state='active',host_received_at=CURRENT_TIMESTAMP WHERE id=$1", device.deviceID)
 		fleetSummaryExec(t, f, `INSERT INTO advisory_evaluations(device_id,id,snapshot_id,feed_id,feed_revision,evaluated_at,inventory_at,host_received_at,expires_at,state,reason,finding_digest)
-SELECT id,$2,$3,'summary-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_received_at,CURRENT_TIMESTAMP+interval '1 day','evaluated','',decode(repeat('00',32),'hex') FROM devices WHERE id=$1`,
+ SELECT id,$2,$3,'summary-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_received_at,CURRENT_TIMESTAMP+interval '1 day','evaluated','',decode(repeat('00',32),'hex') FROM devices WHERE id=$1`,
 			device.deviceID, uuid.NewString(), snapshot, feedRevision)
 	}
 	// Each device binds its own shared finding set; per-severity counts and the
@@ -313,7 +317,7 @@ SELECT id,$2,$3,'summary-feed',$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,host_recei
 			}
 		}
 		fleetSummaryExec(t, f, `INSERT INTO advisory_finding_sets(id,feed_id,feed_revision,package_digest,state,reason,finding_digest,finding_count,critical_count,high_count,medium_count,low_count,other_count)
-VALUES($1,'summary-feed',$2,$9,'evaluated','',decode(repeat('11',32),'hex'),$3,$4,$5,$6,$7,$8)`,
+ VALUES($1,'summary-feed',$2,$9,'evaluated','',decode(repeat('11',32),'hex'),$3,$4,$5,$6,$7,$8)`,
 			setID, feedRevision, len(severities), counts["critical"], counts["high"], counts["medium"], counts["low"], counts["other"], packageDigest[:])
 		keys := make([]string, 0, len(severities))
 		rollup := map[string]int{}
@@ -322,7 +326,7 @@ VALUES($1,'summary-feed',$2,$9,'evaluated','',decode(repeat('11',32),'hex'),$3,$
 			keys = append(keys, key)
 			rollup[severity]++
 			fleetSummaryExec(t, f, `INSERT INTO advisory_set_findings(set_id,finding_key,advisory_id,package_name,installed_version,fixed_version,architecture,severity,cves,source_url)
-VALUES($1,$2,'SUMMARY-1','summary-package','1','2','amd64',$3,'{}','https://example.test/feed')`, setID, key, severity)
+ VALUES($1,$2,'SUMMARY-1','summary-package','1','2','amd64',$3,'{}','https://example.test/feed')`, setID, key, severity)
 		}
 		for severity, n := range rollup {
 			fleetSummaryExec(t, f, "INSERT INTO advisory_set_advisories(set_id,advisory_id,severity,findings) VALUES($1,'SUMMARY-1',$2,$3)", setID, severity, n)
@@ -333,7 +337,7 @@ VALUES($1,$2,'SUMMARY-1','summary-package','1','2','amd64',$3,'{}','https://exam
 	keys := bindSet(f.deviceID, []string{"critical", "critical", "high", "medium", "low", "unrated", "high"})
 	accepted := keys[len(keys)-1]
 	fleetSummaryExec(t, f, `INSERT INTO advisory_exceptions(finding_id,device_id,actor_id,reason,accepted_at,expires_at)
-VALUES($1,$2,$3,'summary accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day')`, accepted, f.deviceID, owner.ID)
+ VALUES($1,$2,$3,'summary accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+interval '1 day')`, accepted, f.deviceID, owner.ID)
 	bindSet(hidden.deviceID, []string{"critical", "critical", "critical", "critical"})
 	ctx := identity.WithPrincipal(f.ctx, scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}}))
 	want := &adminv1.FleetFindingSummary{CriticalFindings: 2, HighFindings: 1, MediumFindings: 1, LowFindings: 1, OtherFindings: 1, EvaluatedDevices: 1}
@@ -368,6 +372,7 @@ VALUES($1,$2,$3,'summary accepted risk',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP+inte
 }
 
 func TestFleetSummaryPendingApprovalsRespectInboxAuthority(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	hidden := fleetSummaryEnroll(t, f)
 	reviewerCtx := approvalReviewer(t, f.svc, f.ctx)
@@ -436,6 +441,7 @@ func TestFleetSummaryPendingApprovalsRespectInboxAuthority(t *testing.T) {
 }
 
 func TestFleetSummaryAuthorizationAndOmittedSections(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	request := connect.NewRequest(&adminv1.GetFleetSummaryRequest{})
@@ -462,6 +468,7 @@ func TestFleetSummaryAuthorizationAndOmittedSections(t *testing.T) {
 }
 
 func TestFleetSummaryRecentActionsAreNewestBoundedAndScoped(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	hidden := fleetSummaryEnroll(t, f.enrolledFixture)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
@@ -509,11 +516,11 @@ func TestFleetSummaryRecentActionsAreNewestBoundedAndScoped(t *testing.T) {
 		if i%2 == 0 {
 			kind = "resource"
 			fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO resource_actions(id,device_id,generation_id,assignment_id,resource_id,resource_sequence,intent_envelope,intent_document,issued_at,expires_at,closed_at,closed_reason)
-SELECT $1,device_id,generation_id,$2,$3,$4,intent_envelope,intent_document,$5,$6,$5,'expired_unstarted' FROM resource_actions WHERE id=$7`,
+ SELECT $1,device_id,generation_id,$2,$3,$4,intent_envelope,intent_document,$5,$6,$5,'expired_unstarted' FROM resource_actions WHERE id=$7`,
 				id, assignment, resource, i+1, at, at.Add(time.Hour), serviceSeed)
 		} else {
 			fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO device_actions(id,device_id,generation_id,capability,request_id,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,issued_at,expires_at,closed_at,closed_reason)
-SELECT $1,device_id,generation_id,capability,$2,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,$3,$4,$3,'expired_unstarted' FROM device_actions WHERE id=$5`,
+ SELECT $1,device_id,generation_id,capability,$2,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,$3,$4,$3,'expired_unstarted' FROM device_actions WHERE id=$5`,
 				id, uuid.NewString(), at, at.Add(time.Hour), seed.GetActionId())
 		}
 		want = append(want, expectedAction{id: id, device: f.deviceID, kind: kind, at: at})
@@ -528,10 +535,10 @@ SELECT $1,device_id,generation_id,capability,$2,request_digest,request_document,
 	fleetSummaryExec(t, f.enrolledFixture, "UPDATE device_actions SET generation_id=$2 WHERE id=$1", want[23].id, oldGeneration)
 	hiddenAssignment := uuid.NewString()
 	fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO resource_assignments(id,device_id,generation_id,request_id,request_digest,actor_id,authorization_version,revision_id,document,assigned_at)
-SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at FROM resource_assignments WHERE id=$5`,
+ SELECT $1,$2,$3,$4,request_digest,actor_id,authorization_version,revision_id,document,assigned_at FROM resource_assignments WHERE id=$5`,
 		hiddenAssignment, hidden.deviceID, hidden.generation, uuid.NewString(), assignment)
 	fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO resource_assignment_resources(assignment_id,resource_id,resource_kind,canonical_key,position,document)
-SELECT $1,resource_id,resource_kind,canonical_key,position,document FROM resource_assignment_resources WHERE assignment_id=$2`, hiddenAssignment, assignment)
+ SELECT $1,resource_id,resource_kind,canonical_key,position,document FROM resource_assignment_resources WHERE assignment_id=$2`, hiddenAssignment, assignment)
 	// Rows for hidden devices are newer than every visible row and numerous
 	// enough to consume the preview if either branch limits before scoping.
 	hiddenActions := make([]string, 0, 25)
@@ -539,10 +546,10 @@ SELECT $1,resource_id,resource_kind,canonical_key,position,document FROM resourc
 		id := uuid.NewString()
 		hiddenActions = append(hiddenActions, id)
 		fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO device_actions(id,device_id,generation_id,capability,request_id,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,issued_at,expires_at,closed_at,closed_reason)
-SELECT $1,$2,$3,capability,$4,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,$5,$6,$5,'expired_unstarted' FROM device_actions WHERE id=$7`,
+ SELECT $1,$2,$3,capability,$4,request_digest,request_document,actor_id,authorization_version,intent_envelope,intent_document,$5,$6,$5,'expired_unstarted' FROM device_actions WHERE id=$7`,
 			id, hidden.deviceID, hidden.generation, uuid.NewString(), f.now.Add(time.Duration(i)*time.Second), f.now.Add(time.Hour), seed.GetActionId())
 		fleetSummaryExec(t, f.enrolledFixture, `INSERT INTO resource_actions(id,device_id,generation_id,assignment_id,resource_id,resource_sequence,intent_envelope,intent_document,issued_at,expires_at,closed_at,closed_reason)
-SELECT $1,$2,$3,$4,resource_id,$5,intent_envelope,intent_document,$6,$7,$6,'expired_unstarted' FROM resource_actions WHERE id=$8`,
+ SELECT $1,$2,$3,$4,resource_id,$5,intent_envelope,intent_document,$6,$7,$6,'expired_unstarted' FROM resource_actions WHERE id=$8`,
 			id, hidden.deviceID, hidden.generation, hiddenAssignment, i+1, f.now.Add(time.Duration(i)*time.Second), f.now.Add(time.Hour), serviceSeed)
 	}
 	slices.Reverse(want)
@@ -599,6 +606,7 @@ SELECT $1,$2,$3,$4,resource_id,$5,intent_envelope,intent_document,$6,$7,$6,'expi
 // The background population serves unrestricted readers only while fresh;
 // scoped readers and an expired population always read live.
 func TestFleetSummaryBackgroundPopulationIsFreshUnrestrictedOnly(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	if err := f.svc.RefreshFleetPopulation(f.ctx); err != nil {

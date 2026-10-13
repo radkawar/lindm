@@ -21,6 +21,7 @@ import (
 )
 
 func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	reviewerCtx := approvalReviewer(t, f.svc, t.Context())
@@ -89,6 +90,7 @@ func TestApprovalInboxEveryClosedDeviceAction(t *testing.T) {
 }
 
 func TestApprovalRefreshInboxRequiresIndependentFleetRead(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDeviceActionFixture(t)
 	imperativePolicy(t, f, &authv1.AuthorizationPolicy{Roles: []*authv1.RoleDefinition{{Name: "refresh-reviewer", Permissions: []string{string(identity.PermissionManageInventory), string(identity.PermissionManageApprovals)}}}})
 	reviewer := insertPrincipal(t, t.Context(), f.conn, "refresh-reviewer")

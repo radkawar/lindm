@@ -24,6 +24,7 @@ import (
 )
 
 func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))
@@ -116,6 +117,7 @@ func TestProfileCatalogPaginationPreservesRowsWithinJSONBudget(t *testing.T) {
 
 // Owner pass 2: the profile picker finds a profile by name beyond the first page.
 func TestProfileCatalogNameSearch(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	ca, key := testCA(t, time.Now().Add(24*time.Hour))

@@ -62,6 +62,7 @@ func assertDispatched(t *testing.T, f *dispatchFixture, item *policyv1.ProfileRe
 }
 
 func TestResourceApplicabilityMatchesRecordedPlatform(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	reportApplicabilityHost(t, f, 1, nil)
 	// Kernel spelling in the profile matches the Debian spelling in inventory;
@@ -76,6 +77,7 @@ func TestResourceApplicabilityMatchesRecordedPlatform(t *testing.T) {
 }
 
 func TestResourceApplicabilityOutsidePlatformIsNeverDispatchedOrCounted(t *testing.T) {
+	parallelDeviceIntegration(t)
 	cases := []struct {
 		name    string
 		product *resourcev1.PlatformProduct
@@ -116,6 +118,7 @@ func TestResourceApplicabilityOutsidePlatformIsNeverDispatchedOrCounted(t *testi
 }
 
 func TestResourceApplicabilityWaitsForDeviceFacts(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	item := applicabilityResource(f, applicabilityProduct("debian", "12", "x86_64"))
 	publishDispatchResources(t, f, item)
@@ -139,6 +142,7 @@ func TestResourceApplicabilityWaitsForDeviceFacts(t *testing.T) {
 }
 
 func TestResourceApplicabilityFollowsPlatformChange(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	reportApplicabilityHost(t, f, 1, func(o *inventoryv1.HostObservation) { o.OsVersion.Value = "11" })
 	item := applicabilityResource(f, applicabilityProduct("debian", "12", "x86_64"))
@@ -154,6 +158,7 @@ func TestResourceApplicabilityFollowsPlatformChange(t *testing.T) {
 }
 
 func TestResourceFeaturesWithoutEvidenceAreRefused(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	reportApplicabilityHost(t, f, 1, nil)
 	item := applicabilityResource(f, applicabilityProduct("debian", "12", "x86_64"))
@@ -170,6 +175,7 @@ func TestResourceFeaturesWithoutEvidenceAreRefused(t *testing.T) {
 // the registry's rolling row, not missing evidence, but an unavailable version
 // on a versioned release still waits.
 func TestResourceApplicabilityRollingReleaseWithoutVersion(t *testing.T) {
+	parallelDeviceIntegration(t)
 	noVersion := func(id string) func(*inventoryv1.HostObservation) {
 		return func(o *inventoryv1.HostObservation) {
 			o.OsId.Value = id

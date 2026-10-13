@@ -14,6 +14,7 @@ import (
 )
 
 func TestResourceAuthenticatedContactPreservesNativeFreshness(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	if _, err := f.service.SetResourceAssignment(f.adminCtx, connect.NewRequest(f.assignmentRequest(nil))); err != nil {
 		t.Fatal(err)

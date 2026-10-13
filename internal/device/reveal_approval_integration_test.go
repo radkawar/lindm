@@ -109,6 +109,7 @@ func approve(t *testing.T, svc *Service, approver identity.Principal, id string)
 }
 
 func TestRevealApprovalSoleAdminRevealsAlone(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	// Neither an account that never enrolled a credential nor a demoted one can
@@ -121,6 +122,7 @@ func TestRevealApprovalSoleAdminRevealsAlone(t *testing.T) {
 }
 
 func TestRevealApprovalAnotherAdminRequiresApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	second := enrolledAdmin(t, f.svc, identity.RoleAdmin)
@@ -143,6 +145,7 @@ func TestRevealApprovalAnotherAdminRequiresApproval(t *testing.T) {
 }
 
 func TestRevealApprovalApproverDisabledOrRemovedBeforeRequest(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, change := range []struct{ name, query string }{
 		{"disabled", "UPDATE local_accounts SET enabled=false WHERE id=$1"},
 		{"removed from admin role", "UPDATE local_accounts SET role='operator' WHERE id=$1"},
@@ -161,6 +164,7 @@ func TestRevealApprovalApproverDisabledOrRemovedBeforeRequest(t *testing.T) {
 }
 
 func TestRevealApprovalApproverDisabledAtDecideTime(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	second := enrolledAdmin(t, f.svc, identity.RoleAdmin)
@@ -180,6 +184,7 @@ func TestRevealApprovalApproverDisabledAtDecideTime(t *testing.T) {
 }
 
 func TestRevealApprovalApproverDisabledAfterApproving(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	second := enrolledAdmin(t, f.svc, identity.RoleAdmin)
@@ -198,6 +203,7 @@ func TestRevealApprovalApproverDisabledAfterApproving(t *testing.T) {
 }
 
 func TestRevealApprovalScopeRestrictedApproverDoesNotCount(t *testing.T) {
+	parallelDeviceIntegration(t)
 	t.Run("global secret", func(t *testing.T) {
 		f := newSecretFixture(t)
 		summary := f.demoSecret(t)
@@ -219,18 +225,20 @@ func TestRevealApprovalScopeRestrictedApproverDoesNotCount(t *testing.T) {
 }
 
 func TestRevealApprovalServiceAndCLIPrincipalsDoNotCount(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	service := enrolledAdmin(t, f.svc, identity.RoleOwner)
 	execSQL(t, f.svc, "UPDATE principals SET service_account=true WHERE id=$1", service.ID)
 	// A CLI sign-in is a session of the requester, never another principal.
 	execSQL(t, f.svc, `INSERT INTO sessions (token_hash, principal_id, created_at, last_seen_at, idle_expires_at, absolute_expires_at, kind)
-		VALUES (sha256($1::bytea), $2, now(), now(), now() + interval '10 minutes', now() + interval '1 hour', 'cli')`, []byte(uuid.NewString()), f.owner.ID)
+ 		VALUES (sha256($1::bytea), $2, now(), now(), now() + interval '10 minutes', now() + interval '1 hour', 'cli')`, []byte(uuid.NewString()), f.owner.ID)
 	f.assertRule(t, summary.GetSecretId(), adminv1.RevealApprovalRule_REVEAL_APPROVAL_RULE_ONLY_APPROVER)
 	f.revealAlone(t, summary.GetSecretId())
 }
 
 func TestRevealApprovalBreakGlassAccountDoesNotCount(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	emergency := enrolledAdmin(t, f.svc, identity.RoleOwner)
@@ -240,6 +248,7 @@ func TestRevealApprovalBreakGlassAccountDoesNotCount(t *testing.T) {
 }
 
 func TestRevealApprovalServerSettingAlwaysRequiresApproval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	summary := f.demoSecret(t)
 	f.svc.RevealApproval = true

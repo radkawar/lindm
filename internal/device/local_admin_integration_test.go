@@ -155,6 +155,7 @@ func (f *lapsFixture) rotate(t *testing.T, password []byte) uuid.UUID {
 }
 
 func TestLocalAdminPolicyLifecycleAndAuthorization(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newLAPSFixture(t, false)
 	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(localAdminActionSpec(f.deviceActionFixture)))); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "local_admin_policy_required" {
 		t.Fatalf("administrator minted a local-admin action: %v", err)
@@ -207,6 +208,7 @@ func TestLocalAdminPolicyLifecycleAndAuthorization(t *testing.T) {
 }
 
 func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newLAPSFixture(t, false)
 	f.setPolicy(t, f.ownerCtx)
 	work := f.work(t)
@@ -310,6 +312,7 @@ func TestLocalAdminDuePolicyMintsEscrowsAndSettles(t *testing.T) {
 }
 
 func TestLocalAdminAuthorityChangeAndMissingEscrowBlock(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newLAPSFixture(t, false)
 	adminPrincipal := insertPrincipal(t, t.Context(), f.conn, identity.RoleAdmin)
 	f.setPolicy(t, identity.WithPrincipal(t.Context(), adminPrincipal))
@@ -339,6 +342,7 @@ func TestLocalAdminAuthorityChangeAndMissingEscrowBlock(t *testing.T) {
 }
 
 func TestLocalAdminRevealStepUpAuditApprovalAndRotation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newLAPSFixture(t, false)
 	f.setPolicy(t, f.ownerCtx)
 	password := []byte("LAPSREVEALPLAINTEXT2345672")

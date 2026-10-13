@@ -21,6 +21,7 @@ import (
 // A revoked device is read-only: every operator mutation targeting it is
 // refused with device_revoked, while its record stays readable.
 func TestRevokedDeviceRefusesMutations(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newLAPSFixture(t, false)
 	// Configured relay only: the refusal precedes any relay use.
 	relay, err := assistrelay.New(&configv1.AssistanceConfig{MaxConcurrentSessions: 1, Relay: &configv1.AssistanceRelayConfig{

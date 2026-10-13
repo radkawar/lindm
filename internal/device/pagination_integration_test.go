@@ -60,6 +60,7 @@ func assertInventoryPageFits(t *testing.T, message proto.Message) {
 }
 
 func TestListDevicePackagesHandlerBoundsEncodedPages(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, shape := range []struct {
 		name  string
 		value string
@@ -154,6 +155,7 @@ func TestListDevicePackagesHandlerBoundsEncodedPages(t *testing.T) {
 }
 
 func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, shape := range []struct {
 		name     string
 		value    string
@@ -180,7 +182,7 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 				// timestamps exercise the UUID component of the keyset cursor.
 				for range 200 {
 					if _, err := f.conn.Exec(f.ctx, `INSERT INTO devices (id, state, enrolled_at, hostname, os_id, os_version, architecture)
-						SELECT $1, 'pending', enrolled_at, hostname, os_id, os_version, architecture FROM devices WHERE id = $2`, uuid.New(), f.principal.DeviceID); err != nil {
+ 						SELECT $1, 'pending', enrolled_at, hostname, os_id, os_version, architecture FROM devices WHERE id = $2`, uuid.New(), f.principal.DeviceID); err != nil {
 						t.Fatal(err)
 					}
 				}
@@ -254,6 +256,7 @@ func TestListDevicesHandlerBoundsEncodedPages(t *testing.T) {
 // list: the per-actor cursor bound evicts the oldest search, whose pages then
 // read as expired rather than invalid.
 func TestListDevicesEvictsOldestSearchCursorAtCapacity(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	client := inventoryAdminClient(t, f, f.ownerCtx, false)
 	principal, ok := identity.PrincipalFromContext(f.ownerCtx)

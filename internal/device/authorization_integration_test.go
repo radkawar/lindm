@@ -31,6 +31,7 @@ func scopedReader(principal identity.Principal, scopes ...*authv1.DeviceScope) i
 }
 
 func TestDeviceScopeReadMatrix(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	f.publishPackages(t, 1, "visible-package")
 	var err error
@@ -100,6 +101,7 @@ func TestDeviceScopeReadMatrix(t *testing.T) {
 }
 
 func TestGetDeviceReportsCallerPermissionsForThatDevice(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	callerPermissions := func(principal identity.Principal) []string {
@@ -129,6 +131,7 @@ func TestGetDeviceReportsCallerPermissionsForThatDevice(t *testing.T) {
 }
 
 func TestDeviceScopeFiltersBeforePagesAndCounts(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	groupID := uuid.New()
@@ -250,6 +253,7 @@ func splitExportTokens(t *testing.T, data []byte) []string {
 }
 
 func TestDeviceGroupMembershipFencesScopeAndReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	groupID := uuid.NewString()
 	request := &adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: groupID, Name: "managed scope", DeviceIds: []string{f.deviceID}, Reason: "test group authorization"}
@@ -295,6 +299,7 @@ func TestDeviceGroupMembershipFencesScopeAndReplay(t *testing.T) {
 }
 
 func TestDeviceMutationUsesFreshCapturedScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	outside := uuid.New()
 	if _, err := f.conn.Exec(f.ctx, `INSERT INTO devices(id,state,enrolled_at) VALUES($1,'pending',$2)`, outside, f.now); err != nil {
@@ -348,6 +353,7 @@ func TestDeviceMutationUsesFreshCapturedScope(t *testing.T) {
 }
 
 func TestEveryAdminPermissionScopesTheTarget(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
 	for name, policy := range adminAuthorizationCases() {

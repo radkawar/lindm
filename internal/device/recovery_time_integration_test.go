@@ -92,6 +92,7 @@ func (f *recoveryTimeHandlerFixture) authorityState(t *testing.T) string {
 }
 
 func TestRecoveryTimePublicHandlerUsesDatabaseTimeWithoutAuthorityMutation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRecoveryTimeHandlerFixture(t)
 	before := f.authorityState(t)
 	// An unusable process wall clock cannot be the source of signed time.
@@ -138,6 +139,7 @@ func TestRecoveryTimePublicHandlerUsesDatabaseTimeWithoutAuthorityMutation(t *te
 }
 
 func TestRecoveryTimeHandlerRejectsMalformedOrIncompatibleTrust(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRecoveryTimeHandlerFixture(t)
 	before := f.authorityState(t)
 	for _, tc := range []struct {
@@ -170,6 +172,7 @@ func TestRecoveryTimeHandlerRejectsMalformedOrIncompatibleTrust(t *testing.T) {
 }
 
 func TestRecoveryTimeHandlerUsesCurrentSignerAndBoundedDelegationExpiry(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRecoveryTimeHandlerFixture(t)
 	delegation := proto.CloneOf(f.snapshot.Delegation)
 	delegation.Version++
@@ -218,6 +221,7 @@ func TestRecoveryTimeHandlerUsesCurrentSignerAndBoundedDelegationExpiry(t *testi
 }
 
 func TestRecoveryTimeHandlerDeliversRootTransitionWithCurrentTimeSignature(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newRecoveryTimeHandlerFixture(t)
 	root := proto.CloneOf(f.snapshot.Root)
 	root.Version++

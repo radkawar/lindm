@@ -39,6 +39,7 @@ func nativeDetailsFixture() *inventoryv1.NativeDetails {
 }
 
 func TestNativeDetailsLatestStatusAndReplay(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	report := hostObservation(f.generation, 1, "native-details")
 	report.Observation.Details = nativeDetailsFixture()
@@ -92,6 +93,7 @@ func TestNativeDetailsLatestStatusAndReplay(t *testing.T) {
 }
 
 func TestNativeDetailsRejectIncompleteOrFalseSuccess(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	report := hostObservation(f.generation, 1, "invalid-details")
 	report.Observation.Details = &inventoryv1.NativeDetails{}
@@ -106,6 +108,7 @@ func TestNativeDetailsRejectIncompleteOrFalseSuccess(t *testing.T) {
 }
 
 func TestPackageSourceIdentitySurvivesSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	pkg := &inventoryv1.Package{Name: "libc6", Version: "2.39-0ubuntu8.6", Architecture: "amd64", Manager: "dpkg", SourceName: "glibc", SourceVersion: "2.39-0ubuntu8.6"}
 	batch := packageBatch(t, pkg)
@@ -129,6 +132,7 @@ func TestPackageSourceIdentitySurvivesSnapshot(t *testing.T) {
 }
 
 func TestPackageModuleIdentitySurvivesSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	modules := []*inventoryv1.ModuleObservation{
 		nil,
@@ -175,6 +179,7 @@ func TestPackageModuleIdentitySurvivesSnapshot(t *testing.T) {
 }
 
 func TestPackageAptOriginSurvivesSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	verified := inventoryv1.AptReleaseSignature_APT_RELEASE_SIGNATURE_VERIFIED
 	origins := []*inventoryv1.PackageOrigin{
@@ -221,6 +226,7 @@ func TestPackageAptOriginSurvivesSnapshot(t *testing.T) {
 }
 
 func TestNativeDetailsJSONExpansionReservesDetailEnvelope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	report := hostObservation(f.generation, 1, "oversized-details")
 	report.Observation.Details = nativeDetailsFixture()

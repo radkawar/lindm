@@ -103,6 +103,7 @@ func auditCount(t *testing.T, f *deviceActionFixture, action string) int {
 }
 
 func TestCapabilityPolicyAdminContract(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newCapabilityFixture(t, true)
 	listed := listCapabilities(t, f.ownerCtx, f.svc)
 	deployment := listed.GetDeployment()
@@ -222,6 +223,7 @@ func verifiedCapabilityPolicy(t *testing.T, f *deviceActionFixture, envelope []b
 }
 
 func TestCapabilityPolicyIssuanceUnionAndVersions(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newCapabilityFixture(t, true)
 	if _, err := f.svc.GetCapabilityPolicy(f.deviceCtx(), connect.NewRequest(&devicev1.GetCapabilityPolicyRequest{SessionEpoch: 2})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("stale session epoch admitted: %v", err)
@@ -311,6 +313,7 @@ func TestCapabilityPolicyIssuanceUnionAndVersions(t *testing.T) {
 }
 
 func TestCapabilityPolicyRequiresDelegation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newCapabilityFixture(t, false)
 	response := capabilityPoll(t, f, 1, 0, nil)
 	if len(response.GetPolicyEnvelope()) != 0 || response.GetVersion() != 0 || response.GetUnavailableReason() != "capability_policy_not_delegated" {
@@ -332,6 +335,7 @@ func TestCapabilityPolicyRequiresDelegation(t *testing.T) {
 }
 
 func TestDeviceCapabilityState(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newCapabilityFixture(t, true)
 	groupID := uuid.NewString()
 	if _, err := f.svc.SetDeviceGroup(f.ownerCtx, connect.NewRequest(&adminv1.SetDeviceGroupRequest{RequestId: uuid.NewString(), GroupId: groupID, Name: "Workstations", DeviceIds: []string{f.deviceID}, Reason: "capability group"})); err != nil {
@@ -377,6 +381,7 @@ func TestDeviceCapabilityState(t *testing.T) {
 // Rows the executor refused for a capability are dispatched again only when
 // the device's grant or its reported capability status changes.
 func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixtureWithDelegationAge(t, time.Hour, "systemd.service.v1", trust.CapabilityPolicyCapability)
 	f.assign(t, nil)
 	refuse := func() string {

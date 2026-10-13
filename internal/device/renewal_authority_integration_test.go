@@ -31,6 +31,7 @@ import (
 )
 
 func TestRenewalProofAndLostIssuanceRetrieval(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)

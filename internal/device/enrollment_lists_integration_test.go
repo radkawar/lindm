@@ -45,6 +45,7 @@ func assertEnrollmentListHasNoCredential(t *testing.T, message proto.Message, se
 }
 
 func TestEnrollmentGrantListLifecycleAndProjection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	if _, err := f.conn.Exec(t.Context(), "UPDATE local_accounts SET username='enrollment-creator' WHERE id=$1", f.owner.ID); err != nil {
 		t.Fatal(err)
@@ -95,6 +96,7 @@ func TestEnrollmentGrantListLifecycleAndProjection(t *testing.T) {
 }
 
 func TestEnrollmentGrantListPaginationAndInactiveStates(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	want := make(map[string]adminv1.EnrollmentGrantStatus)
 	var secrets []string
@@ -168,6 +170,7 @@ func TestEnrollmentGrantListPaginationAndInactiveStates(t *testing.T) {
 }
 
 func TestProvisioningTokenListCreatorProjection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	if _, err := f.conn.Exec(t.Context(), "UPDATE local_accounts SET username='token-creator' WHERE id=$1", f.owner.ID); err != nil {
 		t.Fatal(err)
@@ -217,6 +220,7 @@ func TestProvisioningTokenListCreatorProjection(t *testing.T) {
 }
 
 func TestEnrollmentListsRequireFreshUnrestrictedAuthority(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	_, _, _, enrolled := enrollDevice(t, t.Context(), f.service, f.ownerCtx, ed25519Key(t))
 	f.mint(t, 1, false)
@@ -247,6 +251,7 @@ func TestEnrollmentListsRequireFreshUnrestrictedAuthority(t *testing.T) {
 }
 
 func TestEnrollmentInstructionsReturnsIsolatedPublicMetadata(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	f.service.EnrollmentInstructions = &adminv1.GetEnrollmentInstructionsResponse{
 		EnrollmentOrigin:    "https://enroll.example.test",

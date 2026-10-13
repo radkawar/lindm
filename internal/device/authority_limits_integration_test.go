@@ -24,6 +24,7 @@ import (
 )
 
 func TestSessionConcurrentReplayAndReceiptCapacity(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
@@ -110,6 +111,7 @@ func TestSessionConcurrentReplayAndReceiptCapacity(t *testing.T) {
 }
 
 func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)
@@ -163,6 +165,7 @@ func TestCompetingSessionSuccessorsCommitRecoveryHold(t *testing.T) {
 }
 
 func TestRenewalReceiptCapacityPreservesOriginalIssuance(t *testing.T) {
+	parallelDeviceIntegration(t)
 	ctx := t.Context()
 	pool, conn := testdb.Open(t)
 	now := time.Now().UTC().Truncate(time.Second)

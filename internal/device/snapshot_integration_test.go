@@ -46,11 +46,13 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 	f := &enrolledFixture{ctx: t.Context(), now: time.Now().UTC().Truncate(time.Microsecond)}
 	pool, conn := testdb.Open(t)
 	f.conn = conn
+	setupStarted := time.Now()
 	ca, caKey := testCA(t, f.now.Add(90*24*time.Hour))
 	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, InventoryBudgetBytes: budget, Identity: localIdentity(t, pool)}, assistance.NewRuntime())
 	if err != nil {
 		t.Fatal(err)
 	}
+	serviceReady := time.Now()
 	svc.Clock = func() time.Time { return f.now }
 	f.svc = svc
 	f.ownerCtx = identity.WithPrincipal(f.ctx, insertPrincipal(t, f.ctx, conn, identity.RoleOwner))
@@ -65,6 +67,7 @@ func newEnrolled(t *testing.T, budget int64) *enrolledFixture {
 	f.generation = enrolled.Msg.GetEnrollmentGeneration()
 	f.deviceID = enrolled.Msg.GetDeviceId()
 	acquireTestSession(t, f.ctx, svc, principal, f.key, 0)
+	t.Logf("enrollment fixture: service=%s enrollment_session=%s", serviceReady.Sub(setupStarted), time.Since(serviceReady))
 	return f
 }
 
@@ -73,6 +76,7 @@ func (f *enrolledFixture) deviceCtx() context.Context {
 }
 
 func TestSnapshotResumeAcrossSessionEpoch(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	first := packageBatch(t, &inventoryv1.Package{Name: "alpha", Version: "1", Architecture: "amd64", Manager: "apt"})
 	second := packageBatch(t, &inventoryv1.Package{Name: "beta", Version: "1", Architecture: "amd64", Manager: "apt"})
@@ -111,6 +115,7 @@ func TestSnapshotResumeAcrossSessionEpoch(t *testing.T) {
 }
 
 func TestOfflineGapAdmissionDoesNotRequireSequenceRewind(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	stale := snapshotManifest(t, f.generation, 1, f.now.Add(-25*time.Hour), nil)
 	if _, err := f.begin(t, stale, 1); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "snapshot_expired" {
@@ -139,6 +144,7 @@ func TestOfflineGapAdmissionDoesNotRequireSequenceRewind(t *testing.T) {
 }
 
 func TestPackageFailurePreservesEmptySnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	manifest := snapshotManifest(t, f.generation, 1, f.now, nil)
 	if _, err := f.begin(t, manifest, 1); err != nil {
@@ -172,6 +178,7 @@ func TestPackageFailurePreservesEmptySnapshot(t *testing.T) {
 }
 
 func TestUnavailableHostFieldDoesNotClearProjection(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	first := hostObservation(f.generation, 1, "alpha")
 	if _, err := f.svc.ReportHostObservation(f.deviceCtx(), connect.NewRequest(first)); err != nil {
@@ -200,6 +207,7 @@ func TestUnavailableHostFieldDoesNotClearProjection(t *testing.T) {
 }
 
 func TestPackagePageTokenFreezesSnapshot(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	prefix := make([]byte, 512)
 	for i := range prefix {
@@ -234,6 +242,7 @@ func TestPackagePageTokenFreezesSnapshot(t *testing.T) {
 }
 
 func TestCleanupRetainsPinnedAndCurrentSnapshots(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	first := f.publishPackages(t, 1, "kept")
 	page, err := f.svc.ListDevicePackages(f.ownerCtx, connect.NewRequest(&adminv1.ListDevicePackagesRequest{DeviceId: f.deviceID}))
@@ -257,6 +266,7 @@ func TestCleanupRetainsPinnedAndCurrentSnapshots(t *testing.T) {
 }
 
 func TestReceiptExpiryRefusesWithoutRepublish(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	manifest := snapshotManifest(t, f.generation, 1, f.now, nil)
 	if _, err := f.begin(t, manifest, 1); err != nil {
@@ -281,6 +291,7 @@ func TestReceiptExpiryRefusesWithoutRepublish(t *testing.T) {
 }
 
 func TestInventoryBudgetAndOpenUpload(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, core.MinInventoryBudget)
 	if _, err := f.begin(t, declaredManifest(t, f.generation, 1, f.now, 80, core.MaxBatchBytes), 1); err != nil {
 		t.Fatal(err)

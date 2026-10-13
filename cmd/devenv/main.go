@@ -35,6 +35,8 @@ const usage = `Usage: go run ./cmd/devenv <init|up|check|trust|test-integration|
          the code under test, so a clean worktree runs against the shared fixture.
          Queues on the host-wide integration lock, then waits for local lab
          memory admission and runs at nice 10.
+         -packages <Go pattern> selects a focused package (default ./internal/...).
+         -json-output <new file> retains owner-only go test JSON for profiling.
   trust  Generate/verify development-only execution/release roots and bootstrap.
   down   Stop this checkout's Compose project; preserve fixture and volumes.
   reset  DESTROY this checkout's fixture and dependency volumes. Requires
@@ -116,9 +118,11 @@ func run() error {
 	if verb == "reset" || verb == "recreate-database" {
 		flags.BoolVar(&confirm, "confirm-delete", false, "confirm destructive deletion for the selected operation")
 	}
-	var code string
+	var code, packages, jsonOutput string
 	if verb == "test-integration" {
 		flags.StringVar(&code, "code", "", "checkout whose code is built and tested (default -root)")
+		flags.StringVar(&packages, "packages", "./internal/...", "Go package pattern to exercise (default all internal packages)")
+		flags.StringVar(&jsonOutput, "json-output", "", "owner-only file retaining go test -json events for per-test profiling")
 	}
 	var usageErr error
 	flags.Usage = func() { _, usageErr = fmt.Fprint(flags.Output(), usage) }
@@ -168,13 +172,13 @@ func run() error {
 		"down":  devlab.Down, "reset": devlab.Reset,
 		"test-integration": func(ctx context.Context, root string) error {
 			if code == "" {
-				return testIntegration(ctx, root, root, runTimeout)
+				return testIntegration(ctx, root, root, runTimeout, packages, jsonOutput)
 			}
 			codeRoot, err := filepath.Abs(code)
 			if err != nil {
 				return err
 			}
-			return testIntegration(ctx, root, codeRoot, runTimeout)
+			return testIntegration(ctx, root, codeRoot, runTimeout, packages, jsonOutput)
 		},
 		"trust": devlab.Trust,
 		"recreate-database": func(ctx context.Context, root string) error {

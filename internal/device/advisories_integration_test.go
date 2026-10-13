@@ -88,6 +88,7 @@ func advisoryAcceptanceFixture(t *testing.T) (*enrolledFixture, *adminv1.AcceptA
 }
 
 func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, request := advisoryAcceptanceFixture(t)
 	restricted, actor, _ := dispatchIdentity(t, f.svc.Pool, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}})
 	f.svc.Identity = restricted
@@ -125,6 +126,7 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 }
 
 func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, test := range []struct {
 		name, distro, release, manager, packages, feed, sourceURL, arch string
 		packageDigest                                                   string

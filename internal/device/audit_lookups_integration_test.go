@@ -14,6 +14,7 @@ import (
 )
 
 func TestAuditOnlyLookupsAreBoundedLiteralAndResolveSavedIDs(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	reader, _ := identity.PrincipalFromContext(f.ownerCtx)
 	reader.Role = identity.RoleAuditor

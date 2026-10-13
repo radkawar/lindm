@@ -17,6 +17,7 @@ import (
 )
 
 func TestNamedEnrollmentCredentials(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	tokenRequest := &adminv1.CreateProvisioningTokenRequest{RequestId: uuid.NewString(), Name: "org/engineering", LifetimeSeconds: 3600, MaxUses: 5, Reason: "named declarative provisioning token"}
 	token, err := f.service.CreateProvisioningToken(f.ownerCtx, connect.NewRequest(tokenRequest))
@@ -74,6 +75,7 @@ func TestNamedEnrollmentCredentials(t *testing.T) {
 }
 
 func TestOrganizationConsumedRevokedGrantReissuesOnce(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	spec := &orgv1.Organization{Name: "grant-cycle", Grants: []*orgv1.EnrollmentGrant{{Name: "single", Request: &adminv1.CreateEnrollmentGrantRequest{LifetimeSeconds: 600}}}}
 	plan, err := orgapply.Plan(f.ownerCtx, f.service, spec)
@@ -127,6 +129,7 @@ func TestOrganizationConsumedRevokedGrantReissuesOnce(t *testing.T) {
 }
 
 func TestOrganizationDeletedGroupReceiptCannotClaimCreation(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newProvisioningFixture(t)
 	group := &orgv1.StaticGroup{Id: uuid.NewString(), Name: "temporary"}
 	spec := &orgv1.Organization{Name: "group-cycle", Groups: []*orgv1.StaticGroup{group}}

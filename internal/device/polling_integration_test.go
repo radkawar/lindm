@@ -22,6 +22,7 @@ import (
 )
 
 func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	state, err := f.service.Execution.Get(t.Context())
 	if err != nil {
@@ -114,6 +115,7 @@ func TestPollingReadOnlyTransactionsAndHeartbeat(t *testing.T) {
 }
 
 func TestPollingAuthorityFences(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, change := range []struct {
 		name, statement, reason string
 		code                    connect.Code
@@ -159,6 +161,7 @@ func TestPollingAuthorityFences(t *testing.T) {
 }
 
 func TestPollingCoherentAuthoritySnapshotWithoutWriteXID(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, method := range []string{"trust", "work"} {
 		t.Run(method, func(t *testing.T) {
 			f := newEnrolled(t, 0)
@@ -205,6 +208,7 @@ func TestPollingCoherentAuthoritySnapshotWithoutWriteXID(t *testing.T) {
 }
 
 func TestPollingConcurrentAssignmentAndWriteRecheck(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	lock, err := f.pool.Begin(t.Context())
 	if err != nil {

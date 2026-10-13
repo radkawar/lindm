@@ -37,6 +37,7 @@ func approvedNames(res *adminv1.ListApprovedReferencesResponse) []string {
 }
 
 func TestApprovedReferencesFollowLatestObservationWithinScope(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
 	home, srv, data := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	repository := uuid.NewString()

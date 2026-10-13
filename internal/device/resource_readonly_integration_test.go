@@ -141,6 +141,7 @@ func readOnlyResult(t *testing.T, f *dispatchFixture, work *devicev1.ResourceWor
 }
 
 func TestResourceReadOnlyNativeFindingsPersistWithoutStartAuthority(t *testing.T) {
+	parallelDeviceIntegration(t)
 	for _, disposition := range []resourcev1.VerificationDisposition{
 		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_DRIFTED,
 		resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_UNKNOWN,
@@ -171,6 +172,7 @@ func TestResourceReadOnlyNativeFindingsPersistWithoutStartAuthority(t *testing.T
 }
 
 func TestResourceReadOnlyReleaseDoesNotContributeCompliance(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, work := newReadOnlyDispatchFixture(t, true)
 	action, err := devicedb.New(f.pool).GetResourceAction(t.Context(), uuid.MustParse(work.GetActionId()))
 	if err != nil {
@@ -217,6 +219,7 @@ func TestResourceReadOnlyReleaseDoesNotContributeCompliance(t *testing.T) {
 }
 
 func TestResourceReadOnlyNotApplicableRequiresSignedRelease(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, work := newReadOnlyDispatchFixture(t, false)
 	request := readOnlyResult(t, f, work, resourcev1.VerificationDisposition_VERIFICATION_DISPOSITION_NOT_APPLICABLE)
 	_, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request))
@@ -228,6 +231,7 @@ func TestResourceReadOnlyNotApplicableRequiresSignedRelease(t *testing.T) {
 }
 
 func TestReadOnlyNativeHealthDistinguishesUnknownFromDrift(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f, work := newReadOnlyDispatchFixture(t, false)
 	assignment := uuid.MustParse(f.intent(t, work).GetDesiredRevision())
 	// Rollout health is projected only for active devices; the fixture device
@@ -263,6 +267,7 @@ func TestReadOnlyNativeHealthDistinguishesUnknownFromDrift(t *testing.T) {
 }
 
 func TestResourceReadOnlyEvidenceCannotHideIssuedGrant(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	f.assign(t, nil)
 	work := f.work(t)

@@ -5,8 +5,6 @@ package device
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,7 +29,6 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/devlab/webauthnlab"
-	"lindm/internal/escrow"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
 )
@@ -61,19 +58,7 @@ func newSecretFixture(t *testing.T) *secretFixture {
 			t.Error(err)
 		}
 	})
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 3072)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kek := make([]byte, 32)
-	if _, err := rand.Read(kek); err != nil {
-		t.Fatal(err)
-	}
-	custody, err := escrow.New(rsaKey, kek)
-	clear(kek)
-	if err != nil {
-		t.Fatal(err)
-	}
+	custody := newFixtureCustody(t)
 	ca, caKey := testCA(t, time.Now().Add(90*24*time.Hour))
 	svc, err := New(pool, core.Config{DeploymentID: uuid.NewString(), CACertificate: ca, CAKey: caKey, Identity: authority, Escrow: custody}, assistance.NewRuntime())
 	if err != nil {
@@ -175,6 +160,7 @@ func scopedSecretPrincipal(owner identity.Principal, permissions ...identity.Per
 }
 
 func TestSecretStoreLifecycleAndIdempotency(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	first := "vpn-credential-version-one-7f3c"
 	create := &adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_VPN_AUTHENTICATION, DisplayName: "branch vpn", Material: opaqueMaterial(first), Reason: "provision vpn credential"}
@@ -337,6 +323,7 @@ func TestSecretStoreLifecycleAndIdempotency(t *testing.T) {
 }
 
 func TestSecretRevealApprovalRequired(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	f.svc.RevealApproval = true
 	summary := f.create(t, &adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_DIRECTORY_JOIN, DisplayName: "domain join", Material: opaqueMaterial("domain-join-credential"), Reason: "provision join account"})
@@ -379,6 +366,7 @@ func TestSecretRevealApprovalRequired(t *testing.T) {
 }
 
 func TestOpenManagedSecretBindingRefusals(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	hash := "$6$saltsalt$" + strings.Repeat("a", 86)
 	summary := f.create(t, &adminv1.CreateSecretRequest{RequestId: uuid.NewString(), Purpose: resourcev1.SecretPurpose_SECRET_PURPOSE_PASSWORD_HASH, DisplayName: "local user", Material: &agentv1.SecretMaterial{Material: &agentv1.SecretMaterial_PasswordHash{PasswordHash: []byte(hash)}}, Reason: "provision local user"})
@@ -419,10 +407,11 @@ func TestOpenManagedSecretBindingRefusals(t *testing.T) {
 }
 
 func TestSecretRevealApprovalConstraints(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newSecretFixture(t)
 	insert := func(action, permission string, device *uuid.UUID) error {
 		_, err := f.pool.Exec(t.Context(), `INSERT INTO approval_requests (id, requester_id, requester_version, action, permission, device_id, mutation_id, payload, payload_sha256, created_at, expires_at)
-			VALUES ($1, $2, 1, $3, $4, $5, $6, '\x01', decode(repeat('00', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '10 minutes')`, uuid.New(), f.owner.ID, action, permission, device, uuid.NewString())
+ 			VALUES ($1, $2, 1, $3, $4, $5, $6, '\x01', decode(repeat('00', 32), 'hex'), clock_timestamp(), clock_timestamp() + interval '10 minutes')`, uuid.New(), f.owner.ID, action, permission, device, uuid.NewString())
 		return err
 	}
 	device := uuid.New()

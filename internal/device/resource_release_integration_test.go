@@ -36,6 +36,7 @@ func resourceRefusalResult(t *testing.T, f *dispatchFixture, work *devicev1.Reso
 }
 
 func TestResourceReleaseUsesOriginalOwnershipAndCurrentHeadFence(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	item := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	item.DependsOn = nil
@@ -80,6 +81,7 @@ func TestResourceReleaseUsesOriginalOwnershipAndCurrentHeadFence(t *testing.T) {
 }
 
 func TestResourceReleaseReassignmentRejectsOldStartAndDoesNotReleaseNewOwner(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	item := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	item.DependsOn = nil
@@ -117,6 +119,7 @@ func clearResourceAssignment(t *testing.T, f *dispatchFixture, assignment *admin
 }
 
 func TestGrantedResourceReleaseRetainsOneOpenEffectAcrossHeadReplacement(t *testing.T) {
+	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	item := proto.CloneOf(f.revision.GetSpec().GetResources()[1])
 	item.DependsOn = nil
