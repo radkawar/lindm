@@ -107,6 +107,11 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   `/usr/local/share/wayland-sessions/`, not `/usr/share/wayland-sessions/`.
 - **Firewall.** `ufw` is active by default (deny incoming except LocalSend
   53317/tcp+udp); the vendor's unattended `authorized_keys` path opens 22/tcp.
+- **Sysctl.** `/etc/sysctl.d/99-omarchy-sysctl.conf` tunes reclaim for zram
+  (`vm.swappiness=150`, `vm.vfs_cache_pressure=50`, dirty limits,
+  `fs.inotify.max_user_watches`). It sorts after lindm's stanza, so the sysctl
+  provider refuses those keys (`later effective sysctl.d assignment`). The lab's
+  resources lane manages `vm.overcommit_ratio` instead.
 - **Lock.** Omarchy 4 locks through its Quickshell shell (`WlSessionLock`,
   `shell/plugins/lock`), not hyprlock/hypridle. No logind `Lock` listener and no
   `SetLockedHint` caller exist in the v4.0.4 tree. Natively observed

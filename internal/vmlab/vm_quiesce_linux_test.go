@@ -58,7 +58,8 @@ func TestLabQuiescePackageUnitsStopsPopUpdater(t *testing.T) {
 	}
 }
 
-// Pop!_OS's pop-zram-config rewrites vm.swappiness at every boot, and
+// Pop!_OS's pop-zram-config rewrites vm.swappiness at every boot, Omarchy's
+// 99-omarchy-sysctl.conf assigns vm.swappiness and vm.vfs_cache_pressure, and
 // Tumbleweed's installer assigns net.ipv4.ip_forward in 70-yast.conf, so their
 // resources lanes use other keys; every registry override needs a fixture that
 // records the key's prior value and a root approval.

@@ -55,6 +55,11 @@ const (
 	// vendor boot service owns that live value (platform Lab.SysctlKey).
 	resourceLabVendorSysctlKey   = "vm.vfs_cache_pressure"
 	resourceLabVendorSysctlPrior = resourceFixtureRoot + "/sysctl-vendor-prior"
+	// resourceLabTunedSysctlKey stands in for vm.swappiness on releases whose
+	// own later sysctl.d file assigns both vm keys above (Omarchy's
+	// 99-omarchy-sysctl.conf), so the provider correctly refuses them.
+	resourceLabTunedSysctlKey   = "vm.overcommit_ratio"
+	resourceLabTunedSysctlPrior = resourceFixtureRoot + "/sysctl-tuned-prior"
 	// resourceLabInstallerNetKey stands in for net.ipv4.ip_forward on releases
 	// whose installer assigns it in a later sysctl.d file (Lab.SysctlNetKey).
 	resourceLabInstallerNetKey   = "net.ipv4.conf.all.log_martians"
@@ -68,7 +73,7 @@ func provisionHostResourceRoots(config *agentv1.AgentConfig) {
 		ApprovedHomeRoots: []*agentv1.NativeApprovedHomeRoot{{RootId: resourceLabHomeRootID, Path: resourceLabHomeRoot}},
 		MinUid:            24000, MaxUid: 24999, MinGid: 24000, MaxGid: 24999,
 	}
-	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabVendorSysctlKey, resourceLabNetKey, resourceLabInstallerNetKey}}
+	config.SysctlProvider = &agentv1.NativeSysctlProviderConfig{AllowedKeys: []string{resourceLabSysctlKey, resourceLabVendorSysctlKey, resourceLabTunedSysctlKey, resourceLabNetKey, resourceLabInstallerNetKey}}
 }
 
 // labSysctlKey selects the release's lab sysctl key and its recorded prior.
@@ -78,6 +83,8 @@ func labSysctlKey(lab platform.Lab) (key, prior string, err error) {
 		return resourceLabSysctlKey, resourceLabSysctlPrior, nil
 	case resourceLabVendorSysctlKey:
 		return resourceLabVendorSysctlKey, resourceLabVendorSysctlPrior, nil
+	case resourceLabTunedSysctlKey:
+		return resourceLabTunedSysctlKey, resourceLabTunedSysctlPrior, nil
 	}
 	return "", "", fmt.Errorf("no lab sysctl fixture for %s", lab.SysctlKey)
 }
@@ -118,6 +125,7 @@ if command -v restorecon >/dev/null 2>&1; then restorecon -RF ` + resourceLabHom
 systemctl daemon-reload
 sysctl -n ` + resourceLabSysctlKey + ` > ` + resourceLabSysctlPrior + `
 sysctl -n ` + resourceLabVendorSysctlKey + ` > ` + resourceLabVendorSysctlPrior + `
+sysctl -n ` + resourceLabTunedSysctlKey + ` > ` + resourceLabTunedSysctlPrior + `
 sysctl -n ` + resourceLabNetKey + ` > ` + resourceLabNetPrior + `
 sysctl -n ` + resourceLabInstallerNetKey + ` > ` + resourceLabInstallerNetPrior + `
 `

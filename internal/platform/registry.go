@@ -842,7 +842,11 @@ var registry = []*Release{
 			// The ISO always installs Hyprland; encrypted installs autologin
 			// SDDM into omarchy.desktop (uwsm). xdg-terminal-exec selects foot.
 			Session: LabSession{Desktops: map[string][]string{"hyprland": nil}, Name: "omarchy", Terminal: []string{"foot", "--"},
-				Capture: []string{"hyprland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "quickshell"}}},
+				Capture: []string{"hyprland", "xdg-desktop-portal", "xdg-desktop-portal-hyprland", "pipewire", "gst-plugin-pipewire", "gst-plugins-good", "quickshell"}},
+			// /etc/sysctl.d/99-omarchy-sysctl.conf assigns vm.swappiness=150 and
+			// vm.vfs_cache_pressure=50 after lindm's stanza, so the provider
+			// correctly refuses both; no Omarchy or Arch sysctl.d file assigns this.
+			SysctlKey: "vm.overcommit_ratio"},
 		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Definitions, Encryption, Wipe, ReportLoss, Lock}),
 		Gates: gates(string(Advisories), "no vendor advisory feed; the Arch feed does not cover Omarchy packages",
 			string(RecoverySanitize), reasonOmarchyOwnedBoot,
