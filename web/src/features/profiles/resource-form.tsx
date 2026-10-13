@@ -167,29 +167,24 @@ export function ResourceFields({
               {summary.key ? (
                 <>
                   {" "}
-                  <code className="font-mono text-[0.92em] break-all">{summary.key}</code>
+                  <code id={`${id}-key`} className="font-mono text-[0.92em] break-all">
+                    {summary.key}
+                  </code>
                 </>
               ) : null}
             </span>
           ) : null}
         </div>
-        {/* "Remove setting 3: Kernel setting net.ipv4.conf.all.accept_redirects". */}
-        <span id={`${id}-remove`} className="sr-only">
-          Remove setting {index + 1}
-          {summary.label ? `: ${summary.label}` : ""}
-          {summary.key ? (
-            <>
-              {" "}
-              <code>{summary.key}</code>
-            </>
-          ) : null}
-        </span>
         <Button
+          id={`${id}-remove`}
           type="button"
           variant="ghost"
           size="icon-sm"
           disabled={locked}
-          aria-labelledby={`${id}-remove`}
+          // "Remove setting 3: Kernel setting" in words, then the key the
+          // heading shows as code: "… net.ipv4.conf.all.accept_redirects".
+          aria-label={`Remove setting ${index + 1}${summary.label ? `: ${summary.label}` : ""}`}
+          aria-labelledby={summary.key ? `${id}-remove ${id}-key` : undefined}
           title="Remove this setting"
           onClick={onRemove}
         >
