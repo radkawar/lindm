@@ -234,9 +234,10 @@ the token, in `/var/log/installer/autoinstall-user-data` and under
 `/etc/cloud/cloud.cfg.d/`; delete those copies after enrollment. On 24.04 arm64
 both formats passed end to end from the console clipboard through independent
 approval to **Enrolled** ([installer provisioning](../verification.md#installer-provisioning-from-the-console-2026-10-12));
-cloud-init also passed on 24.04 amd64 and on 26.04 amd64 and arm64 (matrix
-ledger, 9021e6a2). 22.04 and the other autoinstall cells are offered but have no
-passing provisioning record.
+cloud-init also passed on 24.04 amd64 and on 26.04 amd64 and arm64 (9021e6a2), and
+autoinstall on 24.04 and 26.04 amd64 (live-server media; see the same section).
+22.04 and 26.04 arm64 autoinstall are offered but have no passing provisioning
+record.
 
 Use the native `lindm-agent` DEB and authenticated APT repository, not `dpkg -i` as a
 signature check. Authentication is signed `InRelease` → hashed `Packages` → archive

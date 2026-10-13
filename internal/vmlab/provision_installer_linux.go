@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -207,7 +208,24 @@ func ProvisionInstallerVM(ctx context.Context, manifest *labv1.ImageManifest, fo
 	result.Pristine = VMProvisionPristine{VendorImageVerified: true, LabPartsSHA256: labDigest, LabPartsLindmFree: true, SnippetOnlyLindmInput: true}
 	if installer == platform.Subiquity {
 		// The snippet's user-data runs in the installed system's first boot.
-		if _, err := vm.guest.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 30*time.Minute); err != nil {
+		// Exit 2 is cloud-init's "done with recoverable errors": 26.04's
+		// cloud-init warns that the installer identity's locked password is
+		// not unlocked. Only unrecoverable errors fail here; the provisioning
+		// unit and enrollment checks below judge the snippet's own outcome.
+		status, err := vm.guest.runResult(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 30*time.Minute)
+		if err != nil {
+			return nil, fmt.Errorf("installed system's first-boot cloud-init: %w", err)
+		}
+		var parsed struct {
+			Errors []string `json:"errors"`
+		}
+		if status.ExitCode != 0 && (status.ExitCode != 2 || json.Unmarshal(status.Stdout, &parsed) != nil || len(parsed.Errors) != 0) {
+			err = fmt.Errorf("installed system's first-boot cloud-init exited with status %d", status.ExitCode)
+			if options.DiagnosticsDir != "" {
+				// The status names the failing or warning modules; it can quote
+				// user-data, so it stays in the private diagnostics directory.
+				err = errors.Join(err, os.WriteFile(filepath.Join(options.DiagnosticsDir, "cloud-init-status.json"), status.Stdout, 0600), recordProvisionDiagnostics(ctx, vm.guest, options.DiagnosticsDir))
+			}
 			return nil, err
 		}
 	}
