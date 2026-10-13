@@ -15,7 +15,7 @@ export const task = {
 
 const timeout = 30_000;
 
-export async function check({ page, demo, visit, require, capture, step }) {
+export async function check({ page, demo, visit, require, capture, step, settle }) {
   const main = page.getByRole("main");
 
   step("profile page order");
@@ -151,10 +151,20 @@ export async function check({ page, demo, visit, require, capture, step }) {
   await capture("setting form wording");
 
   step("secondary explanations share the editor disclosure");
-  await type.click();
-  await page.getByRole("option", { name: "OS update policy", exact: true }).click();
-  await second.getByRole("combobox", { name: "Setting type", exact: true }).click();
-  await page.getByRole("option", { name: "SSH sign-in banner", exact: true }).click();
+  // Check mixed reference types in a new draft, independently of the saved
+  // profile's many expanded advanced controls and the preceding type changes.
+  await visit("/profiles/new");
+  await editor.waitFor({ timeout });
+  const openTypes = page.locator("[data-slot=select-content][data-open]");
+  await settings.nth(0).getByRole("combobox", { name: "Setting type", exact: true }).click();
+  await settle();
+  await openTypes.getByRole("option", { name: "SSH sign-in banner", exact: true }).click();
+  await settle();
+  await editor.getByRole("button", { name: "Add setting", exact: true }).click();
+  await settings.nth(1).getByRole("combobox", { name: "Setting type", exact: true }).click();
+  await settle();
+  await openTypes.getByRole("option", { name: "OS update policy", exact: true }).click();
+  await settle();
   const combinedDisclosures = await editor.locator("details > summary").allInnerTexts();
   require(combinedDisclosures.length === 1 &&
     combinedDisclosures[0] ===

@@ -103,6 +103,10 @@ disclosure, regardless of the number or types of settings. Put secondary setting
 reference text in that editor-level disclosure. Keep safety consequences visible
 beside the affected controls. The OS update review checks the active-voice restart
 deadline explanation; a wording change must not change the scheduling contract.
+The owner walkthrough checks mixed SSH and OS update reference text in a new,
+unpublished draft, independently of earlier changes to the saved profile.
+Select assertions target the open popup; a closing popup can retain its options
+during the exit transition.
 
 ## Current-console editing examples
 
