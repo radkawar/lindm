@@ -12049,6 +12049,38 @@
       "verified": true,
       "manifestSha256": "b0fe5c3bcadd3df46dc0c9bb7104c34f0023eee0a17d629ed1fb114cc6667e7e",
       "mainlineRevision": "5a10048e15601b7efa2aceef9b5f7b01b16e7c83"
+    },
+    {
+      "platform": "almalinux-10",
+      "cell": "tpm-reference-repair",
+      "architecture": "x86_64",
+      "manifest": "almalinux-10.2-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-matrix/debianel2-tpmrep-x86-20261013T134256Z/almalinux-10/tpm-reference-repair-x86_64.json",
+      "sha256": "302cd3ea96b2eb440b68125ec246411e44057ecf7b15ff20e823ca7992734c5c",
+      "recorded": "2026-10-13T16:26:05.472256607Z",
+      "revision": "53d9298a80cb75ef6282f1067a4e0367130f250a",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "4fc3c53a38e35ca03c2fbc9f6b32357d230307b7f7fa62a04a1e2d7a7e88db6b",
+      "recoveryManifest": "almalinux-10.2-20260817.0-x86-64",
+      "recoveryManifestSha256": "b8d90c32acc4af4bf4ec20a22aba3dc413389c5efee12f5004293e274fd6519c",
+      "mainlineRevision": "53d9298a80cb75ef6282f1067a4e0367130f250a"
+    },
+    {
+      "platform": "almalinux-9",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "almalinux-9.8-dvd-encrypted-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/debianel2-a9assist-x86-20261013T150805Z/almalinux-9/assistance-x86_64/assistance.json",
+      "sha256": "ebef0f51db740109770f0d802da35bd4f400848e0fb86e8df59d4cffd9ab8d34",
+      "recorded": "2026-10-13T17:20:25.287846848Z",
+      "revision": "ef926eb0a9564cf4a8be65c711c452634ec0921d",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "bd5cd11035502c75403ec6a6884865d7d2dd318eb974a15a118f41932939dbf0",
+      "mainlineRevision": "ef926eb0a9564cf4a8be65c711c452634ec0921d"
     }
   ]
 }
