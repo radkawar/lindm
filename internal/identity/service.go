@@ -92,6 +92,7 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		&adminv1.UpdateAuthorizationRequest{},
 		&configv1.ServerConfig{},
 		&authv1.RotateSCIMCredentialRequest{}, &configv1.SCIMConfig{},
+		&authv1.UpdateMCPSettingsRequest{}, &authv1.IssueMCPTokenRequest{}, &authv1.RevokeMCPTokenRequest{}, &authv1.MCPAuditRecord{},
 		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.WithdrawApprovalRequest{}, &adminv1.ListApprovalsRequest{},
 		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
 	if err != nil {

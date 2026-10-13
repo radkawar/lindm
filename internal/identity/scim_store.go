@@ -185,7 +185,7 @@ func (s *Service) scimLifecycle(ctx context.Context, q *identitydb.Queries, id u
 	if err := q.DeletePrincipalGroups(ctx, id); err != nil {
 		return err
 	}
-	if _, err := q.RevokePrincipalSessions(ctx, id); err != nil {
+	if _, err := s.revokePrincipalCredentials(ctx, q, id); err != nil {
 		return err
 	}
 	reason := "deactivated"

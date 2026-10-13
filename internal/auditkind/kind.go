@@ -170,6 +170,14 @@ var (
 	IdentityStepUpDenied = kind("identity.step_up_denied")
 )
 
+// Assistant access and credential management.
+var (
+	IdentityMCPSettingsChanged = kind("identity.mcp_settings_changed")
+	IdentityMCPTokenIssued     = kind("identity.mcp_token_issued")
+	IdentityMCPTokenRevoked    = kind("identity.mcp_token_revoked")
+	MCPAttempt                 = kind("mcp.attempt")
+)
+
 // Event destinations (webhooks, syslog).
 var (
 	IntegrationDeliveryReplayed         = kind("integration.delivery.replayed")

@@ -12,6 +12,12 @@ import (
 // Logout, account revocation and runtime-policy revocation use that same lock
 // order, so a session cannot disappear between this check and commit.
 func (s *Service) checkAuthenticatedSession(ctx context.Context, q *identitydb.Queries, actor uuid.UUID, browserOnly bool) error {
+	if token, ok := ctx.Value(mcpAccessKey{}).(mcpAccess); ok && len(token.hash) != 0 {
+		if browserOnly || token.service != s || token.actor != actor {
+			return ErrAuthorizationDenied
+		}
+		return s.checkMCPAccess(ctx, q, actor)
+	}
 	proof, ok := ctx.Value(authenticatedSessionKey{}).(authenticatedSession)
 	if !ok || proof.service != s || proof.actor != actor {
 		return ErrAuthorizationDenied

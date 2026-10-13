@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package lindm.auth.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/auth/v1;authv1";
+
+// GET and POST /auth/mcp/settings return the deployment switch and only the
+// requesting principal's active tokens. All settings require unrestricted
+// integrations.manage and a browser session. Responses are no-store.
+message MCPSettings {
+  bool enabled = 1;
+  repeated MCPToken tokens = 2;
+}
+
+// Token metadata never contains the opaque credential or its stored hash.
+message MCPToken {
+  string id = 1;
+  string label = 2;
+  bool proposals_allowed = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp expires_at = 5;
+}
+
+message UpdateMCPSettingsRequest {
+  bool enabled = 1;
+}
+
+// POST /auth/mcp/tokens issues a credential for the caller's current authority,
+// not a grant of additional permissions. Break-glass issuance is forbidden.
+message IssueMCPTokenRequest {
+  string label = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    max_bytes: 256
+    pattern: "^[^\\x00-\\x1F\\x7F]*\\S[^\\x00-\\x1F\\x7F]*$"
+  }];
+  bool proposals_allowed = 2;
+  uint32 lifetime_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 2592000
+  }];
+}
+
+// Returned once. bearer_token must never enter logs, URLs or persistent storage.
+// A lost response cannot be replayed: list and revoke the unused token before
+// explicitly issuing another. Mutations must not be retried automatically.
+message IssueMCPTokenResponse {
+  MCPToken token = 1;
+  string bearer_token = 2;
+}
+
+message RevokeMCPTokenRequest {
+  string token_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message RevokeMCPTokenResponse {}
+
+// Internal audit input shares protobuf validation with identity HTTP requests.
+// Discovery and transport parsing use a blank tool. No payloads or secrets belong
+// in these fields. Results use a closed vocabulary independent of client text.
+message MCPAuditRecord {
+  string method = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9_./-]+$"
+  }];
+  string tool = 2 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[A-Za-z0-9_.-]*$"
+  }];
+  string client_tag = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    max_bytes: 256
+  }];
+  string outcome = 4 [(buf.validate.field).string = {
+    in: [
+      "attempt",
+      "success",
+      "denied",
+      "failed"
+    ]
+  }];
+}

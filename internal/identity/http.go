@@ -34,6 +34,7 @@ func (s *Service) Handler() http.Handler {
 	s.registerSCIM(mux)
 	s.registerLocalHTTP(mux)
 	s.registerCLIHTTP(mux)
+	s.registerMCPHTTP(mux)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		prepare(w)
 		mux.ServeHTTP(w, r)

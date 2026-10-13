@@ -151,7 +151,7 @@ func (s *Service) invalidateLocalAccount(ctx context.Context, q *identitydb.Quer
 			return err
 		}
 	}
-	if _, err := q.RevokePrincipalSessions(ctx, id); err != nil {
+	if _, err := s.revokePrincipalCredentials(ctx, q, id); err != nil {
 		return s.dbErr(err)
 	}
 	if err := q.DeleteLocalCeremonies(ctx, id); err != nil {

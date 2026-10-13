@@ -133,6 +133,9 @@ func (s *Service) UpdateAuthorization(ctx context.Context, request *adminv1.Upda
 	if err != nil {
 		return nil, s.dbErr(err)
 	}
+	if err := q.RevokeRuntimeMCPTokens(ctx); err != nil {
+		return nil, s.dbErr(err)
+	}
 	result := runtimeAuthorizationState(policy.definition, updated.Revision, true)
 	result.UpdatedAt = timestamppb.New(updated.UpdatedAt.Time)
 	response, err := proto.MarshalOptions{Deterministic: true}.Marshal(result)

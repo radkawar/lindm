@@ -34,7 +34,11 @@ async function rpc(page, method, body) {
 async function session(page) {
   return page.evaluate(async () => {
     const value = await (await fetch("/auth/session", { cache: "no-store" })).json();
-    return { role: value.role, permissions: value.permissions ?? [] };
+    return {
+      role: value.role,
+      permissions: value.permissions ?? [],
+      unrestrictedPermissions: value.unrestrictedPermissions ?? [],
+    };
   });
 }
 
@@ -138,7 +142,7 @@ export async function reviewRoleWalkthroughs({
           page.setDefaultTimeout(30_000);
           await page.setViewportSize({ width: 1440, height: 900 });
         }
-        const { permissions } = await session(page);
+        const { permissions, unrestrictedPermissions } = await session(page);
 
         step = "navigation";
         await visit(page, "/dashboard");
@@ -223,6 +227,29 @@ export async function reviewRoleWalkthroughs({
             screenshots.push(await screenshot(page, `${prefix}-out-of-scope-device.png`, true));
           }
         }
+
+        step = "assistant access authorization";
+        await visit(page, "/settings/assistant-access");
+        await settle(page);
+        if (unrestrictedPermissions.includes("integrations.manage")) {
+          await inspect("assistant access");
+          require((await page
+            .getByRole("heading", {
+              name: "Your tokens",
+              exact: true,
+            })
+            .count()) === 1, "assistant access omits own tokens for an authorized account");
+        } else {
+          require((await page.locator('[data-review-state="restricted"]').count()) ===
+            1, "assistant access does not restrict an account without unrestricted integration management");
+          require((await page
+            .getByRole("button", {
+              name: "Create token",
+              exact: true,
+            })
+            .count()) === 0, "assistant access offers token issuance without permission");
+        }
+        screenshots.push(await screenshot(page, `${prefix}-assistant-access.png`, true));
 
         step = "audit";
         await visit(page, "/audit");

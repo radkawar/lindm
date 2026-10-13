@@ -125,6 +125,7 @@ export const navigation = [
       { permission: "enrollment.manage", unrestricted: true },
       { permission: "inventory.manage", unrestricted: true },
       { permission: "execution_trust.manage", unrestricted: true },
+      { permission: "integrations.manage", unrestricted: true },
     ],
     group: "Administration",
   },

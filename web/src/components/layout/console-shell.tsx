@@ -83,7 +83,9 @@ export function ConsoleShell({
       : currentPage?.to === "/secrets"
         ? "Secret details"
         : currentPage?.to === "/settings"
-          ? "Device capabilities"
+          ? pathname.endsWith("/assistant-access")
+            ? "Assistant access"
+            : "Device capabilities"
           : pathname.endsWith("/new")
             ? "Create profile"
             : "Profile details";

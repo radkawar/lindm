@@ -393,7 +393,7 @@ func (s *Service) revokeAndAudit(ctx context.Context, q *identitydb.Queries, id 
 	revoked := int64(0)
 	if w.revoke {
 		var err error
-		revoked, err = q.RevokePrincipalSessions(ctx, id)
+		revoked, err = s.revokePrincipalCredentials(ctx, q, id)
 		if err != nil {
 			return s.dbErr(err)
 		}
@@ -537,7 +537,7 @@ func (s *Service) revokePrincipal(ctx context.Context, id uuid.UUID) error {
 		if !dec.RevokeSessions {
 			return nil
 		}
-		n, err := q.RevokePrincipalSessions(ctx, id)
+		n, err := s.revokePrincipalCredentials(ctx, q, id)
 		if err != nil {
 			return s.dbErr(err)
 		}

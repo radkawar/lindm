@@ -29,6 +29,7 @@ import (
 	"lindm/internal/identity"
 	"lindm/internal/integrations"
 	"lindm/internal/jobs"
+	"lindm/internal/mcp"
 	"lindm/internal/offlinebundle"
 	"lindm/internal/reports"
 	"lindm/internal/targeting"
@@ -346,6 +347,11 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 	}
 	path, handler := p.consoleDevices.AdminHandler()
 	mux.Handle(path, p.auth.RequireSession(handler))
+	assistant, err := mcp.New(handler, p.auth)
+	if err != nil {
+		return nil, fmt.Errorf("initialize MCP transport: %w", err)
+	}
+	mux.Handle("/mcp", p.auth.RequireMCP(assistant))
 	path, handler = p.consoleDevices.ReleaseManagementHandler()
 	mux.Handle(path, p.auth.RequireSession(handler))
 	if p.releaseHandler != nil {

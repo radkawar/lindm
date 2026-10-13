@@ -26,6 +26,7 @@ import { reviewDirectoryAuthorization } from "./review-directory-authorization.m
 import { reviewSSHBanner } from "./review-ssh-banner.mjs";
 import { reviewOSUpdate } from "./review-os-update.mjs";
 import { reviewCapabilities } from "./review-capabilities.mjs";
+import { reviewMCPAccess } from "./review-mcp-access.mjs";
 import { reviewAdvisoryControls } from "./review-advisory-approvals.mjs";
 import { reviewOwnerEdits } from "./review-owner-edits.mjs";
 import { reviewRoleWalkthroughs } from "./review-roles.mjs";
@@ -944,6 +945,18 @@ async function main() {
     for (const entry of [
       ...(await reviewOSUpdate({ pages, combos, config, screenshot, axe, probe, settle })),
       ...(await reviewCapabilities({ pages, combos, config, screenshot, axe, probe, settle })),
+      ...(await reviewMCPAccess({
+        pages,
+        combos,
+        visit,
+        settle,
+        screenshot,
+        axe,
+        probe,
+        protectSecret: (value) => {
+          if (value) secrets.push(value);
+        },
+      })),
     ]) {
       summarize(entry);
       report.results.push(entry);

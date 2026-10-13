@@ -77,6 +77,17 @@ type LocalCeremony struct {
 	SessionHash          []byte
 }
 
+type McpToken struct {
+	ID               uuid.UUID
+	PrincipalID      uuid.UUID
+	TokenHash        []byte
+	Label            string
+	ProposalsAllowed bool
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	RevokedAt        pgtype.Timestamptz
+}
+
 type Principal struct {
 	ID                   uuid.UUID
 	Issuer               string

@@ -479,6 +479,9 @@ func (s *Service) lockAuthorizations(ctx context.Context, tx pgx.Tx, shared bool
 	if err != nil {
 		return s.authorizationStoreError(err)
 	}
+	if err := s.checkMCPAccess(ctx, q, actorID); err != nil {
+		return err
+	}
 	if row.Issuer != s.issuer && row.Issuer != s.localIssuer {
 		return ErrAuthorizationDenied
 	}

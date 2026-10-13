@@ -152,7 +152,10 @@ func (s *Store) StartRollout(ctx context.Context, tx pgx.Tx, p identity.Principa
 	if len(planned) == 0 {
 		return nil, ErrNotReady
 	}
-	approvalRequired := current.AdoptingCount > 0 || p.ApprovalRequired(perm)
+	// Assistant requests may retain a reviewed proposal, but must never save
+	// assignments or admit stages before an independent approval. Keep this
+	// fence in the domain, not only in the MCP transport adapter.
+	approvalRequired := current.AdoptingCount > 0 || p.ApprovalRequired(perm) || identity.MCPClientTag(ctx) != ""
 	definition, err := encodedCatalog(r.Rollout)
 	if err != nil {
 		return nil, err

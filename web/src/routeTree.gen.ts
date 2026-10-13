@@ -31,6 +31,7 @@ import { Route as AuthenticatedDevicesDeviceIdRouteImport } from './routes/_auth
 import { Route as AuthenticatedProfilesProfileIdRouteImport } from './routes/_authenticated/profiles_.$profileId'
 import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenticated/profiles_.new'
 import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets_.$secretId'
+import { Route as AuthenticatedSettingsAssistantAccessRouteImport } from './routes/_authenticated/settings_.assistant-access'
 import { Route as AuthenticatedSettingsCapabilitiesRouteImport } from './routes/_authenticated/settings_.capabilities'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryEnrollmentRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery-enrollment'
 import { Route as AuthenticatedDevicesDeviceIdActionsActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.actions.$actionId'
@@ -153,6 +154,12 @@ const AuthenticatedSecretsSecretIdRoute =
     path: '/secrets/$secretId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsAssistantAccessRoute =
+  AuthenticatedSettingsAssistantAccessRouteImport.update({
+    id: '/settings_/assistant-access',
+    path: '/settings/assistant-access',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSettingsCapabilitiesRoute =
   AuthenticatedSettingsCapabilitiesRouteImport.update({
     id: '/settings_/capabilities',
@@ -212,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
+  '/settings/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/settings/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
@@ -241,6 +249,7 @@ export interface FileRoutesByTo {
   '/profiles/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/profiles/new': typeof AuthenticatedProfilesNewRoute
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
+  '/settings/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/settings/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
@@ -272,6 +281,7 @@ export interface FileRoutesById {
   '/_authenticated/profiles_/$profileId': typeof AuthenticatedProfilesProfileIdRoute
   '/_authenticated/profiles_/new': typeof AuthenticatedProfilesNewRoute
   '/_authenticated/secrets_/$secretId': typeof AuthenticatedSecretsSecretIdRoute
+  '/_authenticated/settings_/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/_authenticated/settings_/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
   '/_authenticated/devices_/$deviceId_/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/_authenticated/devices_/$deviceId_/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/profiles/$profileId'
     | '/profiles/new'
     | '/secrets/$secretId'
+    | '/settings/assistant-access'
     | '/settings/capabilities'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
@@ -332,6 +343,7 @@ export interface FileRouteTypes {
     | '/profiles/$profileId'
     | '/profiles/new'
     | '/secrets/$secretId'
+    | '/settings/assistant-access'
     | '/settings/capabilities'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
@@ -362,6 +374,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profiles_/$profileId'
     | '/_authenticated/profiles_/new'
     | '/_authenticated/secrets_/$secretId'
+    | '/_authenticated/settings_/assistant-access'
     | '/_authenticated/settings_/capabilities'
     | '/_authenticated/devices_/$deviceId_/recovery-enrollment'
     | '/_authenticated/devices_/$deviceId_/actions/$actionId'
@@ -532,6 +545,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSecretsSecretIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings_/assistant-access': {
+      id: '/_authenticated/settings_/assistant-access'
+      path: '/settings/assistant-access'
+      fullPath: '/settings/assistant-access'
+      preLoaderRoute: typeof AuthenticatedSettingsAssistantAccessRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/settings_/capabilities': {
       id: '/_authenticated/settings_/capabilities'
       path: '/settings/capabilities'
@@ -597,6 +617,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProfilesProfileIdRoute: typeof AuthenticatedProfilesProfileIdRoute
   AuthenticatedProfilesNewRoute: typeof AuthenticatedProfilesNewRoute
   AuthenticatedSecretsSecretIdRoute: typeof AuthenticatedSecretsSecretIdRoute
+  AuthenticatedSettingsAssistantAccessRoute: typeof AuthenticatedSettingsAssistantAccessRoute
   AuthenticatedSettingsCapabilitiesRoute: typeof AuthenticatedSettingsCapabilitiesRoute
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute: typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   AuthenticatedDevicesDeviceIdActionsActionIdRoute: typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
@@ -625,6 +646,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProfilesProfileIdRoute: AuthenticatedProfilesProfileIdRoute,
   AuthenticatedProfilesNewRoute: AuthenticatedProfilesNewRoute,
   AuthenticatedSecretsSecretIdRoute: AuthenticatedSecretsSecretIdRoute,
+  AuthenticatedSettingsAssistantAccessRoute:
+    AuthenticatedSettingsAssistantAccessRoute,
   AuthenticatedSettingsCapabilitiesRoute:
     AuthenticatedSettingsCapabilitiesRoute,
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute:
