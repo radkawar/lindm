@@ -49,6 +49,7 @@ type VMConsoleEnrollmentResult struct {
 	Runtime              *vmRuntimeEvidence `json:"runtime"`
 	CommandSHA256        string             `json:"command_sha256"`
 	Pristine             bool               `json:"pristine"`
+	Lifecycle            string             `json:"lifecycle"`
 	DeviceID             string             `json:"device_id"`
 	Generation           string             `json:"generation"`
 	Package              string             `json:"package"`
@@ -207,6 +208,7 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 		return nil, errors.New("enrollment did not install an enrolled device identity")
 	}
 	result.DeviceID, result.Generation = status.GetDeviceId(), status.GetEnrollmentGeneration()
+	result.Lifecycle = status.GetLifecycle().String()
 	if _, err := vm.run(ctx, "sudo -n systemctl is-active --quiet lindm-executor.service && sudo -n systemctl is-active --quiet lindm-agent.service", nil, 4096, time.Minute); err != nil {
 		return nil, err
 	}

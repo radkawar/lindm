@@ -94,17 +94,18 @@ type acceptancePasswordProbe struct {
 }
 
 type acceptanceRecord struct {
-	StartedAt            time.Time                    `json:"started_at"`
-	DurationSeconds      float64                      `json:"duration_seconds"`
-	Mode                 string                       `json:"mode"`
-	Passed               bool                         `json:"passed"`
-	Browsers             []acceptanceBrowser          `json:"browsers"`
-	Feeds                *devlab.AcceptanceFeedResult `json:"feeds,omitempty"`
-	Native               any                          `json:"native,omitempty"`
-	Failures             []string                     `json:"failures,omitempty"`
-	OwnedCleanupComplete bool                         `json:"owned_cleanup_complete"`
-	ServerSHA256         string                       `json:"server_sha256"`
-	LabSHA256            string                       `json:"lab_sha256"`
+	StartedAt            time.Time                          `json:"started_at"`
+	DurationSeconds      float64                            `json:"duration_seconds"`
+	Mode                 string                             `json:"mode"`
+	Passed               bool                               `json:"passed"`
+	Browsers             []acceptanceBrowser                `json:"browsers"`
+	Feeds                *devlab.AcceptanceFeedResult       `json:"feeds,omitempty"`
+	Native               any                                `json:"native,omitempty"`
+	Repository           *devlab.NativeEnrollmentRepository `json:"repository"`
+	Failures             []string                           `json:"failures,omitempty"`
+	OwnedCleanupComplete bool                               `json:"owned_cleanup_complete"`
+	ServerSHA256         string                             `json:"server_sha256"`
+	LabSHA256            string                             `json:"lab_sha256"`
 }
 
 type acceptanceOptions struct {
@@ -206,6 +207,7 @@ func runAcceptance(ctx context.Context, args []string, stdout, stderr io.Writer)
 	if err != nil {
 		return err
 	}
+	record.Repository = fixture.NativeRepository
 	defer func() {
 		err := fixture.Close()
 		record.OwnedCleanupComplete = err == nil

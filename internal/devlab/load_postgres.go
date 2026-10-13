@@ -46,6 +46,9 @@ type LoadAuthorityOptions struct {
 	// publicHost names the console and device origins instead of localhost so
 	// installers can reach them through a lab-owned hosts entry.
 	publicHost string
+	// stockEnrollment suppresses the separate mutable TUF fixture; native
+	// repositories come exclusively from the authenticated server artifact.
+	stockEnrollment bool
 	// ListenAddress binds admin/device listeners to one local IPv4 address
 	// (default loopback) so a generator on another host can reach them. TLS
 	// names and signed origins are unchanged; clients dial this address.
@@ -58,8 +61,8 @@ type LoadAuthorityOptions struct {
 	// PostgresSettings are allowlisted durable-safe server parameters for the
 	// dedicated cluster (name=value), recorded with the experiment.
 	PostgresSettings []string
-	// NativeEnrollmentArchitectures publishes current-build native packages
-	// before this isolated connected fixture starts; never used by airgap.
+	// NativeEnrollmentArchitectures requires these architectures in the signed
+	// stock agent artifact before this connected fixture starts; never airgap.
 	NativeEnrollmentArchitectures    []string
 	NativeEnrollmentSourceRepository string
 }

@@ -110,6 +110,20 @@ func openPersistentFixture(ctx context.Context, repository, binary, stateDir str
 	if err := readPersistentJSON(filepath.Join(dir, "native-repository.json"), &f.NativeRepository); err != nil {
 		return nil, err
 	}
+	if f.NativeRepository != nil {
+		expected := filepath.Join(dir, "server-artifact", "lindmd")
+		if f.NativeRepository.ServerBinary != expected {
+			return nil, errors.New("persistent native fixture lacks its authenticated server artifact; recreate explicitly")
+		}
+		digest, err := scaleOutBinaryDigest(binary)
+		if err != nil {
+			return nil, err
+		}
+		if digest != f.NativeRepository.ServerSHA256 {
+			return nil, errors.New("persistent native fixture server artifact changed; recreate explicitly")
+		}
+		f.binary = expected
+	}
 	if err := readPersistentJSON(filepath.Join(dir, "database.json"), &f.DatabaseName); err != nil {
 		return nil, err
 	}
@@ -151,7 +165,7 @@ func openPersistentFixture(ctx context.Context, repository, binary, stateDir str
 	if err != nil {
 		return nil, err
 	}
-	if err := labexec.Run(ctx, labexec.Command{Path: binary, Args: []string{"migrate", "-config", f.configPath()}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute}); err != nil {
+	if err := labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"migrate", "-config", f.configPath()}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute}); err != nil {
 		return nil, fmt.Errorf("migrate persistent fixture: %w", err)
 	}
 	if err := f.start(ctx); err != nil {

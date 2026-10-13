@@ -254,7 +254,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		}
 		f.ConsoleOrigin = fmt.Sprintf("https://%s:%d", host, adminAddress.Port)
 		cfg.PublicUrl = f.ConsoleOrigin
-		if mode == authorityDeviceActions || mode == authorityHA {
+		if mode == authorityDeviceActions || mode == authorityHA || options.stockEnrollment {
 			deviceOrigin = fmt.Sprintf("https://%s:%d", host, deviceAddress.Port)
 		}
 		if options.splitDevice.IsValid() {
@@ -312,17 +312,16 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 			return nil, err
 		}
 	}
-	if mode == authorityReleaseUpdates || mode == authorityDeviceActions {
+	if mode == authorityReleaseUpdates || mode == authorityDeviceActions && !options.stockEnrollment {
 		if err := f.configureReleaseRepository(ctx, cfg, material, options.nativeReleasePackages); err != nil {
 			return nil, err
 		}
 	}
 	if len(options.NativeEnrollmentArchitectures) != 0 {
-		if mode != authorityDeviceActions {
-			return nil, errors.New("native enrollment publication requires the connected device-action authority fixture")
+		if mode != authorityDeviceActions && mode != authorityLocalConsole {
+			return nil, errors.New("native enrollment artifact requires a console authority fixture")
 		}
-		f.NativeRepository, err = ConfigureNativeEnrollmentRepository(ctx, cfg, options.NativeEnrollmentSourceRepository, filepath.Join(f.directory, "native-package-custody"), options.NativeEnrollmentArchitectures)
-		if err != nil {
+		if err := f.buildNativeEnrollmentArtifact(ctx, cfg, options.NativeEnrollmentSourceRepository, options.NativeEnrollmentArchitectures); err != nil {
 			return nil, err
 		}
 	}
@@ -399,6 +398,9 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	}
 	if err := f.RegisterRelease(ctx, ""); err != nil {
 		return nil, fmt.Errorf("register isolated server release: %w", err)
+	}
+	if err := f.recordNativeEnrollmentReadiness(ctx); err != nil {
+		return nil, err
 	}
 	return f, nil
 }

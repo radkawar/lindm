@@ -22,6 +22,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	flags := flag.NewFlagSet("console", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	repo := flags.String("repo", ".", "repository with read-only development trust, running Postgres and the shared demo advisory cache")
+	source := flags.String("code", ".", "checkout whose agent sources form the signed stock artifact; independent of fixture -repo")
 	binary := flags.String("lindmd", "", "prebuilt real lindmd executable with current embedded console")
 	devices := flags.Int("devices", 300, "simulated devices with host and package inventory (1..10000)")
 	packages := flags.Int("packages", 200, "simulated packages per device (1..5000)")
@@ -50,7 +51,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 	}
 	setup, cancel := context.WithTimeout(ctx, setupTimeout)
 	defer cancel()
-	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(setup, *repo, *binary)
+	fixture, err := devlab.OpenStockConsoleAuthorityFixture(setup, *repo, *source, *binary)
 	if err != nil {
 		return err
 	}

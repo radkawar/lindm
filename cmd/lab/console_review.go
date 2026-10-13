@@ -97,7 +97,7 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		return err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(private)) }()
-	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, *repo, *binary)
+	fixture, err := devlab.OpenStockConsoleAuthorityFixture(ctx, *repo, checkout, *binary)
 	if err != nil {
 		return err
 	}
