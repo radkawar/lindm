@@ -7,7 +7,8 @@ const devices = [
     hostname: "ubuntu-ws-02",
     expect: [
       "Unavailable",
-      "isn't one lindm recognizes",
+      "recognized OS repository signing key",
+      "Restore ubuntu-keyring",
       "already exists on the device",
       "An item this depends on needs attention",
     ],
@@ -19,7 +20,7 @@ const devices = [
   // A profile service with no systemd unit on the device; also a long hostname.
   {
     hostname: "fedora-ci-gpu-runner-0042.build-farm.eu-central-1.lab.example.internal",
-    expect: ["isn't installed on the device"],
+    expect: ["The device lacks the required systemd unit", "Install the package that provides it"],
   },
 ];
 

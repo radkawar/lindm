@@ -181,6 +181,37 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// Pin review scenarios to their named host and item: a reason found on
+		// some other host must not satisfy the Services review fixture contract.
+		type reviewRow struct {
+			key         string
+			disposition adminv1.ResourceDisposition
+			reason      string
+		}
+		var expectedRows []reviewRow
+		switch device.Hostname {
+		case "ubuntu-ws-02":
+			if !slices.ContainsFunc(reported.GetCapabilities(), func(item *agentv1.CapabilityObservation) bool {
+				return item.GetCapability() == agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES && item.GetStatus() == agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE && item.GetDetail() == "vendor_key_unrecognized"
+			}) {
+				t.Fatalf("ubuntu-ws-02 lacks the unavailable vendor-key package report: %v", reported)
+			}
+			expectedRows = []reviewRow{
+				{"deb/git", adminv1.ResourceDisposition_RESOURCE_DISPOSITION_BLOCKED, "capability_packages_not_enabled"},
+				{"rpm/git", adminv1.ResourceDisposition_RESOURCE_DISPOSITION_NOT_APPLICABLE, "resource_platform_not_applicable"},
+			}
+		case demoScaleHostname:
+			expectedRows = []reviewRow{
+				{"cups.service", adminv1.ResourceDisposition_RESOURCE_DISPOSITION_UNSUPPORTED, "unit_not_installed"},
+			}
+		}
+		for _, want := range expectedRows {
+			if !slices.ContainsFunc(state.Msg.GetResources(), func(item *adminv1.ResourceState) bool {
+				return item.GetDesired().GetRef().GetCanonicalKey() == want.key && item.GetDisposition() == want.disposition && item.GetReason() == want.reason
+			}) {
+				t.Fatalf("%s lacks %s with %v / %s: %v", device.Hostname, want.key, want.disposition, want.reason, state.Msg.GetResources())
+			}
+		}
 		for _, item := range state.Msg.GetResources() {
 			reasons[item.GetReason()] = true
 		}

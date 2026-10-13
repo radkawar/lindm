@@ -1241,6 +1241,13 @@ dependent `developer` account at `dependency_attention`) and
 a create-only SSH notice meets `existing_banner_file`. The simulator has no SSH or
 kernel-setting executor, so admitted adoption rows end unsupported, never compliant.
 
+The Services review checks the reported vendor-key cause and the package remedy
+on `ubuntu-ws-02`, and the missing-unit cause and installation remedy on the CI
+runner. It does not require obsolete wording. Platform applicability remains
+separate: Ubuntu's RPM rows are Not applicable, not package capability refusals.
+The console-lab regression pins these reasons and dispositions to the named device
+and item, rather than accepting a matching reason anywhere in the fleet.
+
 With `-feeds real` (always for review), advisories come from registry-derived
 real Ubuntu OSV, Fedora updateinfo and RHEL CSAF exports, not single-record
 fixtures or a loopback feed server. First refresh
