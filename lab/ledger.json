@@ -11640,6 +11640,40 @@
       "verified": true,
       "scope": "supplementary: 30/30 unattended TPM2 cold boots, Secure Boot off; main 7158bb48",
       "mainlineRevision": "699d03b07a6c4da3facce806e4462d3711d4c63c"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "rhel-10.2-dvd-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-tpm-x86c-20261013T131317Z/rhel-10/tpm-unattended-boots-x86_64.json",
+      "sha256": "5cfeda350d2e9ebbc6c9fda6a43f5b6852c10417dce96ba818a75db39f5539d7",
+      "recorded": "2026-10-13T14:27:13.327826094Z",
+      "revision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "2c5526fef58d9b63b455c9a59a1924cb335191af8d0c298040b0d589490d9bfa",
+      "recoveryManifest": "rhel-10.2-kvm-x86-64",
+      "recoveryManifestSha256": "66c1657e4c5faefdcaf3459fb7851228e9a9cb69e9c47751e695eba87bb74cf3",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "tpm-unattended-boots",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-dvd-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-matrix/rhelmatrix-tpm-x86c-20261013T131317Z/rhel-9/tpm-unattended-boots-x86_64.json",
+      "sha256": "70a2bba77ff65a5088139fa8f033ec92a973cdd4ecb39e41befd36e7e5fcf0a4",
+      "recorded": "2026-10-13T14:43:23.486664575Z",
+      "revision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b0fe5c3bcadd3df46dc0c9bb7104c34f0023eee0a17d629ed1fb114cc6667e7e",
+      "recoveryManifest": "rhel-9.8-kvm-x86-64",
+      "recoveryManifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "ac84fbaa1ec02e644bd0c71fe645fc46de5a79c6"
     }
   ]
 }
