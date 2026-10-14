@@ -756,7 +756,7 @@ the dispatch lane's systemd service evidence.
 | Linux Mint 22.3     | gated                                                        | gated                                                            | [pass (golden recipe linuxmint-ubiquity-v3; 1905 packages; APT origins verified)][r2]  | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | pass                            | [pass (signed DEB 0.7.0→0.7.1; control-plane trust; local authority)][r2]               | [pass (service scenarios, clock skew, revocation)][r2] | [pass (connected firewall with probe-peer guest)][r2]                                                                                                                   | pass     | [pass (scenario all: inventory, escrow, reveal, rotation, TPM2 bind, cold-boot recovery)][r2]                   | [pass (30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff)][r2]      | [pass (legacy 1 of 4 TPM references repaired to 4 of 4; 30 cold boots; Secure Boot on)][r2] | [pass (scenario all: crypto-erase, report-loss, lock unverifiable (no LockedHint), release, quarantine)][r2]                            | [pass (Mint golden as original device; measured shim+GRUB; SATA overwrite)][r2] | [pass (signed agent self-update, interrupted unpack recovery)][r2] | gated                                                                                                                                                                                                  | pass (partial-feed matching)                              | gated                                                              | gated           |
 | Pop!\_OS 24.04 LTS  | gated                                                        | gated                                                            | pass (distinst golden (generic build 28, COSMIC); 1754 packages; APT origins verified) | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | pass                            | pass (signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation) | pass (service scenarios)                               | pass (connected packages: 15 scenarios incl. vendor-updater busy and approved adoption)                                                                                 | pass     | pass (encryption compliance scenario; main 7158bb48)                                                            | gated                                                                                      | gated                                                                                       | pass (report-loss blocks the original device; main 7158bb48)                                                                            | gated                                                                           | pass (signed agent self-update)                                    | gated                                                                                                                                                                                                  | pass (partial-feed matching)                              | gated                                                              | gated           |
 | Arch Linux          | gated                                                        | gated                                                            | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                                                                                    | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | pass                                                                            | pass                                                               | pass                                                                                                                                                                                                   | pass (partial-feed matching)                              | pass                                                               | gated           |
-| Omarchy 4.0.4       | gated                                                        | gated                                                            | [pass (native inspect: 967 packages matched)][r26]                                     | gated                                                                                                                           | gated                 | gated                         | gated                | gated               | gated                           | [pass (signed pacman 0.7.0 to 0.7.1 lifecycle)][r26]                                    | [pass (power actions)][r26]                            | [pass (connected: secret-password, local-admin)][r26]                                                                                                                   | pass     | [pass (escrow, reveal, rotation, cold recovery, TPM2 bind; unattended TPM boot observed unsupported)][r26]      | gated                                                                                      | gated                                                                                       | [pass (live-root report loss)][r26]                                                                                                     | gated                                                                           | [pass (signed agent self-update)][r26]                             | gated                                                                                                                                                                                                  | gated                                                     | gated                                                              | gated           |
+| Omarchy 4.0.4       | gated                                                        | gated                                                            | [pass (native inspect: 967 packages matched)][r26]                                     | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | gated                           | [pass (signed pacman 0.7.0 to 0.7.1 lifecycle)][r26]                                    | [pass (power actions)][r26]                            | [pass (connected: secret-password, local-admin)][r26]                                                                                                                   | pass     | [pass (escrow, reveal, rotation, cold recovery, TPM2 bind; unattended TPM boot observed unsupported)][r26]      | gated                                                                                      | gated                                                                                       | [pass (live-root report loss)][r26]                                                                                                     | gated                                                                           | [pass (signed agent self-update)][r26]                             | gated                                                                                                                                                                                                  | gated                                                     | gated                                                              | gated           |
 | openSUSE Tumbleweed | gated                                                        | gated                                                            | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | pass                | x86_64 —; aarch64 pass          | x86_64 —; aarch64 pass                                                                  | x86_64 —; aarch64 pass                                 | x86_64 pass; aarch64 fail                                                                                                                                               | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 superseded by 9b4e6f5f                                     | x86_64 —; aarch64 pass                                             | pass                                                                                                                                                                                                   | pass (partial-feed matching)                              | x86_64 pass; aarch64 —                                             | gated           |
 
 [r1]: #1-launch-platform-qualification
@@ -1995,6 +1995,74 @@ pacman 0.7.0/0.7.1 packages and repositories built from it:
 These records sit in `~/.cache/lindm-mutabledistros3-20261010/`. They do not
 cover Arch whole-system upgrade/rollback, desktop, encryption, air-gap or physical
 gates, and Arch Linux ARM inherits nothing.
+
+### Fresh pacman console enrollment (2026-10-14)
+
+The DesktopDerivatives Omarchy probe
+(`~/.cache/lindm-desktopderiv-20261011/omarchy/omarchy-console-pacman-sync-probe.txt`,
+SHA-256 `4496f21c9d5ecc3f768bc8a8aa9de9e4648fc4c84162b9628c708d1e9359a3d2`)
+found no distribution sync databases after the offline ISO installation. The
+copied command's unconditional `pacman --sync --needed ca-certificates curl
+gnupg openssl` therefore failed `target not found` even though all four packages
+were installed. Its later agent transaction also consulted the ordinary
+distribution configuration. Refreshing moving repositories with `pacman -Sy`
+would be an unsupported partial upgrade, and Omarchy's own ALPM guard correctly
+refuses direct whole-system upgrades.
+
+The console now checks installed bootstrap packages with a repository-free local
+query, authenticates the customer's signer, and both refreshes and installs using
+only that server's signed repository. Package signatures and signed database
+trust remain required. Agent packaging requires pacman/libalpm and the Python
+transaction runtime; missing distribution dependencies remain fatal rather than
+being silently fetched or downgraded to optional packages. The command asks for
+the owner's supported full-system updater and missing package installation when
+needed (`pacman -Syu` on Arch, `omarchy update` on Omarchy). Omarchy's lane keeps
+its authenticated offline ISO snapshot, unlike Arch's dated whole-system Archive
+preparation.
+
+Maintained `lab matrix run -cells enroll-from-console -parallel 1` records under
+`~/.cache/lindm-omarchy-enroll-20261014/` use normal FIFO host admission, native
+x86_64 KVM, package-pinned OVMF and Secure Boot off. Each captures the production
+console clipboard command, checks pristine absence of the agent, verifies native
+installation and active units, and confirms the exact device is **Enrolled** in
+the browser before owned cleanup. Pacman evidence independently compares the
+distribution package inventory and every non-lindm sync database before and
+after enrollment.
+
+| Platform                                                    | Record                                                    | SHA-256                                                            |
+| ----------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ |
+| Arch Linux (arch-boxes 20261001.604814, Archive 2026-10-02) | `matrix-01/arch/enroll-from-console-x86_64.json`          | `112b653ca092205cbe31c1d9cde9e7a639fa662cc192212d6d4de4c4b0914642` |
+| Omarchy 4.0.4 (authenticated offline ISO install)           | `matrix-03/omarchy-4.0.4/enroll-from-console-x86_64.json` | `17705591e7708e5847359d813a400db65ee99f4410c2d2e3a1a2f1952060e353` |
+
+Omarchy began with only `offline.db`, no core/extra/multilib/omarchy sync
+databases, and ended with those distribution bytes and its distribution package
+inventory unchanged (`pacman.distribution_unchanged: true`). Only the copied
+command supplied lindm's trust, repository and agent. Device
+`98d9472b-a5c4-46cf-b608-90b312359365` was confirmed **Enrolled** in Chromium,
+with clipboard digest
+`6f82a72db4329387f255f6febcb10ead32c796306386ca0e17ecc95bfd086086`.
+Arch likewise preserved its already-pinned distribution databases and package
+set; its proof does not claim an offline Arch installer.
+
+The recorded pass removes the previous fresh-install console flow restriction
+described in the README audit notes above. The generated support table now marks
+Omarchy enrollment ✓ and totals 117 ✓, 9 ✗ and no “not yet tested” marks.
+Earlier README preview captures retain the preceding audit's table.
+
+The first two Omarchy attempts exposed lab prerequisites rather than a new
+product bypass: whole-system preparation had consulted the base Arch lab row
+instead of Omarchy's own installer policy, and the final package oracle still
+consulted configured repositories during a local query. The maintained lane now
+uses the exact release's installer policy and a repository-free pacman query.
+Failed logs remain beside the completed proof.
+
+`make check-web` runs the snippet regression suite before the browser journey;
+all 13 snippet tests and the Chromium web-only journey passed, with owned cleanup
+recorded in `check-web/acceptance.json` (SHA-256
+`ac115e3fd0219728846dd9a155c64e658d325d4119e5b9640674167c5146e6bc`).
+Focused Go tests for platform, packaging, vmlab and the lab command also passed.
+This is console installation/enrollment
+evidence, not a complete release or physical-hardware qualification.
 
 Tier 2 encrypted/desktop source additions (2026-10-11) are **not native
 qualification**: Arch's signed ISO plus dated Archive recipe supports explicit

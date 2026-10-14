@@ -3564,14 +3564,20 @@ The two isolated native installer builds use this same pinned Go executable,
 read-only module graph and isolated builder environment.
 
 The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
-Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
-x86_64/aarch64, including native aarch64 on a
+Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux and Omarchy 4.0.4 x86_64,
+and Tumbleweed x86_64/aarch64, including native aarch64 on a
 configured Spark. Use the declared pinned firmware arguments and normal host
 admission; never substitute an amd64 guest or pre-provision lindm's server CA, agent
 packages or bootstrap trust into the machine under test. The copied command must
 perform those steps. Rolling guests first bind only their separate vendor
 repositories to the manifest's dated snapshot; Arch establishes that whole-system
 snapshot before enrollment instead of refreshing databases for a partial upgrade.
+Omarchy instead keeps its authenticated offline ISO package set and absent
+distribution sync databases: no moving-mirror refresh or system upgrade precedes
+the copied command. Pacman enrollment queries installed bootstrap tools and uses
+only the server's signed repository for both refresh and installation; missing
+native dependencies require the owner's supported full-system update first
+(`pacman -Syu` on Arch, `omarchy update` on Omarchy), never a partial refresh.
 A release with `Lab.RootPermissionsRepair` (Fedora 43's group-writable cloud `/`)
 is enrolled from the stock image: the lane passes only when the device page shows
 the unprotected-tool-path alert with both remedies, and keeps light/dark

@@ -104,19 +104,23 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
 
 ## Quirks observed
 
-- **No sync databases after install.** The offline install leaves no
-  `/var/lib/pacman/sync/*.db`, so any `pacman` query prints "database file for
-  'core' does not exist" (also extra, multilib, omarchy) on stderr until the owner
-  runs `omarchy-update`. The agent reads `/var/lib/pacman/local` directly and its
-  updater accepts warnings with exit 0; the accounts provider's `pacman -Qo`
-  shadow version lookup drops exactly these notices and fails on any other
-  stderr. The lab's package oracle and probes use a repository-free
-  `--config /dev/null` query. The console's copied pacman install command begins
-  with `pacman --sync --needed ca-certificates curl gnupg openssl`, which fails
-  `target not found` on a fresh install (measured on the golden,
-  `omarchy/omarchy-console-pacman-sync-probe.txt`), so a device must run
-  `omarchy update` first. The enroll-from-console lane is gated: those mirrors
-  move with releases and have no snapshot to pin the lane to.
+- **No distribution sync databases after install.** The offline install leaves
+  no core/extra/multilib/omarchy databases in `/var/lib/pacman/sync`, so repository
+  queries print missing-database notices. The bootstrap prerequisites
+  (`ca-certificates curl gnupg openssl`) and the agent's native runtime
+  dependencies are already installed on the 4.0.4 ISO. Console enrollment checks
+  installed prerequisites using `pacman --config /dev/null --query`, then
+  refreshes and installs from a temporary configuration containing **only the
+  customer's signed lindm repository**. Pacman resolves dependencies against its
+  local installed database; it cannot pull or upgrade distribution packages.
+  Missing prerequisites or dependencies stop visibly: use `omarchy update`,
+  install the missing package, then retry. Never use `pacman -Sy` or bypass
+  Omarchy's system-upgrade guard. No distribution refresh or upgrade is needed
+  on a fresh 4.0.4 install. The maintained enroll-from-console lane uses the
+  authenticated offline-installed golden without a rolling-mirror transaction.
+  The agent reads `/var/lib/pacman/local` directly; the accounts provider drops
+  exactly the missing-sync-database notices from `pacman -Qo`, and fails on other
+  stderr. Lab read-only package queries use `--config /dev/null`.
 - **Session file location.** `omarchy.desktop` (uwsm-managed Hyprland) is in
   `/usr/local/share/wayland-sessions/`, not `/usr/share/wayland-sessions/`.
 - **Firewall.** `ufw` is active by default (deny incoming except LocalSend
@@ -232,6 +236,19 @@ Ubuntu `ovmf` 2024.02-2ubuntu0.10, Secure Boot off), each cited by SHA-256:
 | resources connected (host kinds)      | pass    | `omarchy/omarchy-x86_64-resources-connected-host-fin7.json` (`374fc4e909cbdfc5bfbd59cb53ea0a3c881224604fdcec554320d2160d79eb32`)     |
 | resources connected (secret, LAPS)    | pass    | `omarchy/omarchy-x86_64-resources-connected-pw-fin7.json` (`c66ec5595adb685b15432f23953b80cd7db43a81e5cbb52b67c060b17cad0ab0`)       |
 | services (matrix run)                 | pass    | `omarchy/matrix-services-01/omarchy-4.0.4/services-x86_64.json` (`ba771c0d0d315711afa9ced3353ee6e4799f468f6500a5ecd9f5ba80a089b06d`) |
+
+Console installation/enrollment also passed on a fresh clone of the authenticated
+offline-installed 4.0.4 golden (2026-10-14, normal FIFO `lab matrix run`,
+x86_64 KVM, the same package-pinned OVMF and Secure Boot off):
+`~/.cache/lindm-omarchy-enroll-20261014/matrix-03/omarchy-4.0.4/enroll-from-console-x86_64.json`,
+SHA-256 `17705591e7708e5847359d813a400db65ee99f4410c2d2e3a1a2f1952060e353`.
+Before and after enrollment, the only non-lindm sync database was `offline.db`;
+distribution package identities and database bytes were independently unchanged.
+The production browser copied and executed the same install command, then
+confirmed device `98d9472b-a5c4-46cf-b608-90b312359365` **Enrolled** before
+owned guest cleanup. No `omarchy update`, direct system upgrade or partial
+distribution refresh was performed. [Verification](../verification.md#fresh-pacman-console-enrollment-2026-10-14)
+retains the Arch companion proof, web regression gate and root-cause details.
 
 The encryption record covers escrow, server reveal, the retired key's rejected
 boot, committed and interrupted rotation, a real TPM2 bind (`systemd-tpm2`

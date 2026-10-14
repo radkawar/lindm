@@ -68,6 +68,16 @@ type VMConsoleEnrollmentResult struct {
 	RedHat                 *VMRedHatEvidence        `json:"redhat,omitempty"`
 	PackageSources         *VMPackageSourceEvidence `json:"package_sources,omitempty"`
 	ConsoleCleanupComplete bool                     `json:"console_cleanup_complete,omitempty"`
+	Pacman                 *VMConsolePacmanEvidence `json:"pacman,omitempty"`
+}
+
+// The before/after digests exclude only lindm's own package and repository.
+// Equality proves enrollment did not change the distribution package snapshot
+// or refresh any of its sync databases, including an offline-only installation.
+type VMConsolePacmanEvidence struct {
+	DistributionPackagesSHA256 string `json:"distribution_packages_sha256"`
+	DistributionDatabases      string `json:"distribution_databases"`
+	DistributionUnchanged      bool   `json:"distribution_unchanged"`
 }
 
 // EnrollFromConsoleVM never stages a lindm agent, repository, CA or bootstrap
@@ -135,7 +145,9 @@ func EnrollFromConsoleVM(ctx context.Context, manifest *labv1.ImageManifest, opt
 	// Arch's stock cloud databases belong to its image date, not necessarily
 	// the repository date. Establish that whole-system snapshot together;
 	// never refresh its databases and leave a partially upgraded base.
-	if backend == platform.BackendPacman {
+	// Installer package policy belongs to the exact derivative, not its base's
+	// native tooling row. Omarchy keeps its offline ISO snapshot unchanged.
+	if backend == platform.BackendPacman && !release.Lab.Guest.FromInstaller {
 		if _, err := vm.run(ctx, "sudo -n pacman --sync --refresh --sysupgrade --noconfirm", nil, 1<<20, 20*time.Minute); err != nil {
 			return nil, fmt.Errorf("prepare whole-system enrollment snapshot: %w", err)
 		}
@@ -154,6 +166,12 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 		return nil, errors.New("console enrollment refuses a guest with a preinstalled agent or prior enrollment state")
 	}
 	result = &VMConsoleEnrollmentResult{ImageID: manifest.GetId(), ImageSHA256: image.SHA256, Pristine: true}
+	if backend == platform.BackendPacman {
+		result.Pacman, err = consolePacmanSnapshot(ctx, vm)
+		if err != nil {
+			return nil, err
+		}
+	}
 	result.Runtime, err = vm.runtimeEvidence(ctx)
 	if err != nil {
 		return nil, err
@@ -218,6 +236,16 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 	if executed.ExitCode != 0 {
 		failure := fmt.Errorf("captured console command exited %d (output withheld; command not retried)", executed.ExitCode)
 		return nil, errors.Join(failure, saveConsolePackageLog(ctx, vm, backend, options.DiagnosticsDir))
+	}
+	if result.Pacman != nil {
+		after, err := consolePacmanSnapshot(ctx, vm)
+		if err != nil {
+			return nil, err
+		}
+		if result.Pacman.DistributionPackagesSHA256 != after.DistributionPackagesSHA256 || result.Pacman.DistributionDatabases != after.DistributionDatabases {
+			return nil, errors.New("console enrollment changed distribution packages or sync databases")
+		}
+		result.Pacman.DistributionUnchanged = true
 	}
 	if _, err := vm.run(ctx, "sudo -n install -d -m 0755 /var/tmp/lindm-native-lab", nil, 4096, time.Minute); err != nil {
 		return nil, err
@@ -311,7 +339,9 @@ func consoleEnrollmentPackageQuery(backend platform.Backend) (tool, query string
 	case platform.BackendDNF4, platform.BackendDNF5, platform.BackendZypper:
 		return "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent", nil
 	case platform.BackendPacman:
-		return "pacman", "pacman --query lindm-agent", nil
+		// A local identity query needs no sync databases. Offline-installed
+		// derivatives legitimately have none for their configured vendor repos.
+		return "pacman", "pacman --config /dev/null --query lindm-agent", nil
 	default:
 		return "", "", errors.New("console enrollment has no native package query for this backend")
 	}
@@ -381,4 +411,26 @@ func readConsoleCommand(path string) (_ []byte, err error) {
 		return nil, errors.New("captured console command is oversized or contains NUL")
 	}
 	return data, nil
+}
+
+func consolePacmanSnapshot(ctx context.Context, vm *guestVM) (*VMConsolePacmanEvidence, error) {
+	script := `set -eu
+pacman --config /dev/null --query | grep -v '^lindm-agent ' | LC_ALL=C sort | sha256sum
+for database in /var/lib/pacman/sync/*; do
+  case "$database" in */lindm.db*|*/lindm.files*) continue ;; esac
+  if test -f "$database"; then sha256sum "$database"; fi
+done`
+	output, err := vm.run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), nil, 64<<10, time.Minute)
+	if err != nil {
+		return nil, fmt.Errorf("capture native pacman enrollment snapshot: %w", err)
+	}
+	packageLine, databases, ok := strings.Cut(string(output), "\n")
+	fields := strings.Fields(packageLine)
+	if !ok || len(fields) != 2 || len(fields[0]) != 64 {
+		return nil, errors.New("native pacman enrollment snapshot digest missing")
+	}
+	if _, err := hex.DecodeString(fields[0]); err != nil {
+		return nil, errors.New("native pacman enrollment snapshot digest invalid")
+	}
+	return &VMConsolePacmanEvidence{DistributionPackagesSHA256: fields[0], DistributionDatabases: strings.TrimSpace(databases)}, nil
 }

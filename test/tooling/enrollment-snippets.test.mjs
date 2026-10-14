@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -133,13 +133,57 @@ test("APT publishes a deb822 source restricted to its pinned signing key", () =>
   assert.doesNotMatch(install, /\/etc\/apt\/sources.list.d\/lindm.list/);
 });
 
-test("pacman refreshes only lindmd but retains native dependency resolution", () => {
+test("fresh pacman enrollment uses local prerequisites and only the signed server repository", () => {
+  for (const osId of ["arch", "omarchy"]) {
+    const script = enrollmentInstallScript(instructions, {
+      ...platform,
+      osId,
+      packageFamily: "pacman",
+    });
+    checkShell(script);
+    assert.match(script, /pacman --config \/dev\/null --query ca-certificates curl gnupg openssl/);
+    assert.match(script, /pacman --config "\$work\/pacman.conf" --sync --refresh --noconfirm\n/);
+    assert.match(
+      script,
+      /pacman --config "\$work\/pacman.conf" --sync --noconfirm 'lindm\/lindm-agent'/,
+    );
+    assert.match(script, /SigLevel = PackageRequired DatabaseRequired TrustedOnly/);
+    assert.doesNotMatch(script, /^pacman --sync|--sysupgrade|--nodeps|SigLevel = Never/m);
+    assert.ok(script.indexOf("--query") < script.indexOf("--show-keys"));
+  }
+});
+
+test("missing pacman bootstrap prerequisites fail before trust changes with full-update guidance", () => {
   const script = enrollmentInstallScript(instructions, { ...platform, packageFamily: "pacman" });
-  checkShell(script);
-  assert.match(script, /pacman --config "\$work\/pacman.conf" --sync --refresh --noconfirm\n/);
-  assert.match(script, /pacman --sync --noconfirm 'lindm\/lindm-agent'/);
-  assert.doesNotMatch(script, /pacman --config[^\n]*lindm-agent/);
-  assert.doesNotMatch(script, /pacman --sync --refresh/);
+  const query = script.slice(
+    script.indexOf("if ! pacman --config /dev/null"),
+    script.indexOf("\nfi\n") + 4,
+  );
+  const dir = mkdtempSync(join(tmpdir(), "lindm-pacman-"));
+  try {
+    writeFileSync(
+      join(dir, "pacman"),
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> '${dir}/args'\nexit "$QUERY_STATUS"\n`,
+    );
+    chmodSync(join(dir, "pacman"), 0o755);
+    for (const status of ["0", "1"]) {
+      const result = spawnSync("/bin/sh", ["-c", `set -eu\n${query}`], {
+        encoding: "utf8",
+        env: { PATH: `${dir}:/usr/bin:/bin`, QUERY_STATUS: status },
+      });
+      assert.equal(result.status, Number(status), result.stderr);
+      if (status === "1") {
+        assert.match(result.stderr, /supported full-system update/);
+        assert.match(result.stderr, /Do not use pacman -Sy/);
+      }
+    }
+    assert.deepEqual(readFileSync(join(dir, "args"), "utf8").trim().split("\n"), [
+      "--config /dev/null --query ca-certificates curl gnupg openssl",
+      "--config /dev/null --query ca-certificates curl gnupg openssl",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("every native manager shares CA certificate and execution-root authentication", () => {

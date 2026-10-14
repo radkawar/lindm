@@ -88,7 +88,7 @@ func TestConsoleEnrollmentQueriesNativePackageDatabase(t *testing.T) {
 		{platform.BackendDNF4, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
 		{platform.BackendDNF5, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
 		{platform.BackendZypper, "rpm", "rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n' lindm-agent"},
-		{platform.BackendPacman, "pacman", "pacman --query lindm-agent"},
+		{platform.BackendPacman, "pacman", "pacman --config /dev/null --query lindm-agent"},
 	} {
 		tool, query, err := consoleEnrollmentPackageQuery(test.backend)
 		if err != nil || tool != test.tool || query != test.query {

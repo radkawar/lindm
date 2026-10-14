@@ -13518,6 +13518,67 @@
       "verified": true,
       "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
       "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
+    },
+    {
+      "platform": "arch",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "arch-cloud-20261001.604814-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-omarchy-enroll-20261014/matrix-01/arch/enroll-from-console-x86_64.json",
+      "sha256": "112b653ca092205cbe31c1d9cde9e7a639fa662cc192212d6d4de4c4b0914642",
+      "recorded": "2026-10-14T20:06:04.704925591Z",
+      "revision": "820ee6b51cd43aeb464c9178ebec1ab64097371c-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "dbd9d64d5426d249e5492b7f6e767d3555d0e6a65e89ace2e5614f6dfddb5d86",
+      "repositorySnapshotDate": "2026-10-02",
+      "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
+    },
+    {
+      "platform": "omarchy-4.0.4",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "omarchy-4.0.4-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-omarchy-enroll-20261014/matrix-01/omarchy-4.0.4/enroll-from-console-x86_64.log",
+      "sha256": "eecd1478514b0fd201d0032b933790c1583b17500edfa62b18354baa601da966",
+      "recorded": "2026-10-14T20:07:17.663822666Z",
+      "revision": "820ee6b51cd43aeb464c9178ebec1ab64097371c-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
+      "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
+    },
+    {
+      "platform": "omarchy-4.0.4",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "omarchy-4.0.4-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-omarchy-enroll-20261014/matrix-02/omarchy-4.0.4/enroll-from-console-x86_64.log",
+      "sha256": "3779e18571c85c5181aef562306c8ad59046e2556768f46f84415cca261a07e9",
+      "recorded": "2026-10-14T20:09:48.514577607Z",
+      "revision": "820ee6b51cd43aeb464c9178ebec1ab64097371c-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
+      "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
+    },
+    {
+      "platform": "omarchy-4.0.4",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "omarchy-4.0.4-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-omarchy-enroll-20261014/matrix-03/omarchy-4.0.4/enroll-from-console-x86_64.json",
+      "sha256": "17705591e7708e5847359d813a400db65ee99f4410c2d2e3a1a2f1952060e353",
+      "recorded": "2026-10-14T20:12:08.163801371Z",
+      "revision": "820ee6b51cd43aeb464c9178ebec1ab64097371c-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
+      "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
     }
   ]
 }

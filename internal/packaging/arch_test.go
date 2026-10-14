@@ -196,6 +196,9 @@ func assertArchArchive(t *testing.T, artifact Artifact, staged []stagedFile) {
 			t.Fatalf("advertised native resource runtime is only optional: %s", dependency)
 		}
 	}
+	if !slices.Contains(info["depend"], "pacman") || !slices.Contains(info["depend"], "python") {
+		t.Fatalf("missing native transaction runtime dependencies: %v", info["depend"])
+	}
 	buildinfo := string(data[".BUILDINFO"])
 	for _, required := range []string{"format = 2\n", "pkgarch = x86_64\n", "buildtool = go\n", "buildtoolver = " + strings.TrimPrefix(runtime.Version(), "go") + "-1-any\n", fmt.Sprintf("pkgbuild_sha256sum = %x\n", sha256.Sum256(data[".PKGBUILD"]))} {
 		if !strings.Contains(buildinfo, required) {

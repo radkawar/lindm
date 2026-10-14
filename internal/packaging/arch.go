@@ -75,6 +75,10 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	var info strings.Builder
 	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = Apache-2.0\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", p.name, p.name, pkgver, p.summary, epoch, size, arch.Arch)
 	if p.name == PackageName {
+		// Native pacman/libalpm and the Python transaction helper are runtime
+		// requirements, not optional helpers. An isolated server-repository
+		// install must refuse missing distribution dependencies, never fetch
+		// them from a newly refreshed rolling repository.
 		for _, dependency := range platform.BackendPacman.ResourceDependencies() {
 			fmt.Fprintf(&info, "depend = %s\n", dependency)
 		}

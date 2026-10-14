@@ -340,7 +340,11 @@ apt_get -y -o APT::Get::AllowUnauthenticated=false install lindm-agent${trust}`;
     const archConfig = `[${name}]
 SigLevel = PackageRequired DatabaseRequired TrustedOnly
 Server = ${repository.baseUrl}`;
-    return `${header}pacman --sync --needed --noconfirm ca-certificates curl gnupg openssl
+    return `${header}# Query installed prerequisites without consulting distribution sync databases.
+if ! pacman --config /dev/null --query ca-certificates curl gnupg openssl >/dev/null 2>&1; then
+  echo 'Install ca-certificates curl gnupg openssl with your distribution package manager after its supported full-system update, then retry. Do not use pacman -Sy (partial upgrades are unsupported).' >&2
+  exit 1
+fi
 ${privateCA}${verifyKey}
 pacman-key --init
 pacman-key --add "$work/key.asc"
@@ -354,9 +358,12 @@ fi
 # Refresh only the server repository, not distribution databases.
 printf '%s\\n' '[options]' 'Architecture = auto' 'SigLevel = PackageRequired DatabaseRequired TrustedOnly' ${shellQuote(archConfig)} > "$work/pacman.conf"
 pacman --config "$work/pacman.conf" --sync --refresh --noconfirm
-# Resolve native dependencies from existing distribution databases without
-# refreshing them or hiding them behind the server-only refresh configuration.
-pacman --sync --noconfirm ${shellQuote(`${name}/lindm-agent`)}${trust}`;
+# Install from that same restricted configuration. Pacman still checks the local
+# installed dependency database, but cannot update any distribution package.
+if ! pacman --config "$work/pacman.conf" --sync --noconfirm ${shellQuote(`${name}/lindm-agent`)}; then
+  echo 'Agent installation failed. If a native dependency is missing, run your distribution supported full-system updater and install that dependency before retrying. Do not use pacman -Sy.' >&2
+  exit 1
+fi${trust}`;
   }
   if (family === "zypper") {
     const config = `[lindm]

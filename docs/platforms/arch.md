@@ -149,6 +149,15 @@ or execution bootstrap; vendor snapshot preparation does not provide any of
 those. The browser must confirm the resulting server-side enrollment before
 guest teardown. The periodic rolling matrix includes this core installation path.
 
+The server-repository-only command passed again on 2026-10-14 with normal FIFO
+`lab matrix run` admission: record
+`~/.cache/lindm-omarchy-enroll-20261014/matrix-01/arch/enroll-from-console-x86_64.json`,
+SHA-256 `112b653ca092205cbe31c1d9cde9e7a639fa662cc192212d6d4de4c4b0914642`.
+Independent before/after observations attest unchanged distribution package
+identities and sync database bytes, plus exact-device **Enrolled** confirmation
+in Chromium and owned cleanup. This companion proof keeps the cloud image's
+dated whole-system preparation; it does not claim an offline Arch install.
+
 Console enrollment selects pacman for Arch only when the customer's own `lindmd`
 has the signed native repository for that architecture. The command authenticates
 the signer and server/bootstrap trust before installing and enrolling; missing
@@ -156,11 +165,15 @@ packages or signed database produce an explicit setup gate, not an AUR or
 external-agent-host fallback. See the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server).
 The APT/RPM console-enrollment lanes do not qualify pacman enrollment.
-The copied command refreshes only lindmd's signed database through a restricted
-temporary configuration, then installs its explicitly named agent with the
-ordinary pacman configuration. This preserves existing distribution databases
-for native dependencies such as the registry-required Python runtime without
-performing a partial distribution-database refresh.
+The copied command checks installed bootstrap prerequisites without consulting
+sync databases, then refreshes **and installs** using a restricted temporary
+configuration containing only lindmd's signed repository. Pacman still resolves
+dependencies against its local installed database; distribution databases are
+neither needed nor refreshed and distribution packages cannot be upgraded by this
+command. Agent packaging requires the native pacman/libalpm runtime and Python
+transaction helper. If bootstrap tools or a native dependency are absent, the
+command fails visibly: run a supported whole-system upgrade (`pacman -Syu`), install
+the missing packages, then retry. Never use `pacman -Sy` to prepare enrollment.
 The console enrollment fixture publishes the signed pacman database and detached
 package signatures before starting lindmd, and configures that exact signer.
 Its architecture selection comes from lifecycle-enabled pacman registry rows;
