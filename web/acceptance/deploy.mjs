@@ -246,7 +246,10 @@ async function createIntegrationProof(ui) {
   // Keep this cryptographic restore fixture local: no outbound attempt targets
   // the reserved invalid domain, and no receiver/signing secret is exported.
   await ui.click({ role: "checkbox", text: "Send events" });
-  await ui.fill({ label: "Reason" }, "Prove encrypted destination recovery");
+  await ui.fill(
+    { label: "Reason (audited)", dialog: true },
+    "Prove encrypted destination recovery",
+  );
   await ui.click({ role: "button", text: "Create destination" });
   await ui.wait({ role: "button", text: "Add destination", first: true });
   const deadline = Date.now() + 30_000;

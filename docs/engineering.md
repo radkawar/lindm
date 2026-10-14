@@ -4280,6 +4280,15 @@ works. The deployment journey now uses that existing driver convention for
 the toolbar action. The failed full lane stays scoped to source `281123aa7`;
 it does not prove integration-secret recovery, enrollment, upgrade or restore.
 
+`native-ubuntu-attempt11.json` reached the real Add destination dialog, filled
+its receiver fields, generated a signing secret and paused outbound delivery.
+It failed before submission because the exact label is `Reason (audited)`,
+not `Reason`. The masked screenshot and unchanged production form confirm
+that label. The lane now fills that exact field inside the visible dialog.
+A real Chromium regression verifies that a matching background field remains
+untouched. The record remains a scoped full-lane failure; generating a secret
+does not prove its encrypted storage or restored decryption.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
