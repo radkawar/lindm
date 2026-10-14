@@ -1262,6 +1262,10 @@ walks. Serial shell checks attach to session evidence, not to the existence of
 a successful dashboard capture. The contact sheet links every session screenshot,
 and route failures remain in the final report even if a later runner step throws.
 
+The error text and heading are read in one DOM observation, before a reload can
+replace either. The failure is recorded before attempting its screenshot, so a
+capture failure cannot erase the original load error.
+
 Undo controls include their visible **Undo** or **Undo again** text and the
 named lock or quarantine in their accessible name. An expired request therefore
 keeps the same visible and spoken next action; this does not send a new request

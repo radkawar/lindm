@@ -687,17 +687,17 @@ async function reviewRoute(page, route, theme, viewport) {
     const { state, settled } = await visit(page, target.url);
     const expected = new URL(`${config.origin}${target.url}`).pathname;
     if (state.path !== expected || state.routeError) {
-      const diagnostic = state.routeError
-        ? (await page.locator("main [role=alert]").first().innerText()).slice(0, 400)
-        : state.path;
+      const diagnostic = state.routeError ? state.routeErrorMessage : state.path;
+      const errorIndex =
+        record.errors.push(
+          `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : "a different route"}: ${diagnostic}`,
+        ) - 1;
       const image = await screenshot(
         page,
         `${slug(`${route.path}-${target.label}-${theme}-${viewport.name}-route-error`)}.png`,
         true,
       );
-      record.errors.push(
-        `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : "a different route"}: ${diagnostic}; see ${image}`,
-      );
+      record.errors[errorIndex] += `; see ${image}`;
       continue;
     }
     if (!settled)

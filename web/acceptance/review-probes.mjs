@@ -905,11 +905,15 @@ export function installProbes(rules) {
       return !busy && document.readyState === "complete";
     },
     page() {
+      const heading = normalize(document.querySelector("h1")?.innerText ?? "");
+      const routeError = heading === "Unable to load the console";
       return {
         path: location.pathname,
-        heading: normalize(document.querySelector("h1")?.innerText ?? ""),
-        routeError:
-          normalize(document.querySelector("h1")?.innerText ?? "") === "Unable to load the console",
+        heading,
+        routeError,
+        routeErrorMessage: routeError
+          ? normalize(document.querySelector("main [role=alert]")?.innerText ?? "").slice(0, 400)
+          : "",
         main: !!document.getElementById("main"),
         tabs: [
           ...(document
