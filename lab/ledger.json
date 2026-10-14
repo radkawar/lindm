@@ -12571,6 +12571,22 @@
       "verified": true,
       "manifestSha256": "a8f990e64985ef9bb7af3f1641b3fd267e3b6b52028e99ab12c66927ed05a95d",
       "mainlineRevision": "49220ad876b98c8d101b36bf8aede6d22ee74aee"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "production-release-signing",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/release-production-signing-retry-BIhbIali/production-signing.json",
+      "sha256": "56c1513adefde9e30b3da1024febe017cc02a26f843b0eabdce288937c8e9039",
+      "recorded": "2026-10-14T03:20:24.338767812Z",
+      "revision": "5c23613c2e472cce13267ba086b221d3329aed97-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "production-signing-tests-only",
+      "reference": "#operator-production-release-signing-qualification",
+      "mainlineRevision": "5c23613c2e472cce13267ba086b221d3329aed97"
     }
   ]
 }
