@@ -3965,6 +3965,28 @@ The authenticator is Chromium's CTAP2 user-verified virtual authenticator, not
 physical-authenticator qualification. No password, setup code, enrollment command,
 age identity or offline private signer enters the public record/screenshots.
 
+Before declaring a native console browser-compatible, run the maintained
+`web/acceptance/deploy.mjs` `tls` phase with its protected configuration, exact
+HTTPS origin, independently authenticated CA and private evidence directory.
+It launches the stock Chromium channel, imports that CA into the child's NSS
+store and loads the protected setup page. It supplies no credentials or virtual
+authenticator and ignores no HTTPS errors. No TLS algorithm override is passed.
+The pass record requires the actual setup control to be visible. A successful
+curl or OpenSSL request does not establish browser TLS compatibility.
+
+The same maintained `web/acceptance/deploy.mjs` harness also accepts a separate
+`findings` phase with an enrolled `deviceId` and the independently selected
+`advisoryFeedId`. Use the usual protected browser configuration, CA, password and
+persisted user-verifying credential inputs. This phase reads the actual visible
+inventory, advisory-source and device-findings pages and their real browser-issued
+RPC replies. It requires an unexpired published source, a current package snapshot
+and matching source/snapshot digests. Up to five displayed findings are compared
+with the device's real package/version/architecture inventory through the normal
+inventory page. Its private `inventory-findings.json` retains coverage limitations;
+partial coverage is never reported as clean. This additional phase is not run or
+claimed by the default native lifecycle lane. Configure and publish real vendor
+feeds separately using the supported advisory feed operations below.
+
 Deployment exercises the generated quick custody path with **zero supplied
 execution recipients**. Three age identities exist only in memory; execution roots
 are sealed individually and the generated identities leave only in one

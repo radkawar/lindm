@@ -13,6 +13,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Require DCO trailers for each new commit's author and recorded coauthors in public CI.
 - Weekly Dependabot version updates for Go modules, npm and GitHub Actions.
 - Create the native integrations encryption key automatically, retain root-only custody through systemd credentials, and preserve the original key with encrypted backups and restores.
+- Add stock-Chromium console TLS qualification and a strict-TLS browser proof for real device inventory, vendor advisory publication and findings matched to native package identities, with explicit partial-coverage evidence.
 
 ### Changed
 

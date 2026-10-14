@@ -88,6 +88,7 @@ async function openTrustedBrowser() {
   driver = new ChromiumDriver();
   driver.browser = await chromium.launch({
     headless: true,
+    channel: config.phase === "tls" ? "chromium" : undefined,
     timeout: 30_000,
     env: { ...process.env, HOME: home },
   });
@@ -98,12 +99,26 @@ async function openTrustedBrowser() {
   driver.page = await driver.context.newPage();
   driver.page.setDefaultTimeout(30_000);
   result.browser_version = driver.browser.version();
+  if (config.phase === "tls") return;
   await driver.context.grantPermissions(["clipboard-read", "clipboard-write"], {
     origin: config.origin,
   });
   const credentials = config.phase === "setup" ? [] : await readPrivateJSON(config.credentialPath);
   await driver.authenticator(credentials);
   result.authenticator = "chromium-ctap2-user-verified-virtual";
+}
+
+async function proveStockBrowserTLS(ui) {
+  const reply = await driver.page.goto(`${config.origin}/setup`, {
+    waitUntil: "domcontentloaded",
+  });
+  if (!reply?.ok()) throw new Error("stock_browser_console_load_failed");
+  await ui.wait({ label: "Setup code" });
+  await capture("stock-chromium-trusted-console");
+  result.stock_chromium_console_load = true;
+  result.deployment_ca_imported = true;
+  result.ignore_https_errors = false;
+  result.tls_override_arguments = [];
 }
 
 async function managedRefresh(ui) {
@@ -168,6 +183,97 @@ async function managedRefresh(ui) {
     await delay(1_000);
   }
   throw new Error("live_management_action_timeout");
+}
+
+async function inspectInventoryAndFindings(ui) {
+  await confirmEnrolledDevice(ui, config);
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(config.advisoryFeedId ?? ""))
+    throw new Error("advisory_feed_id_required");
+  const devicePath = `/devices/${encodeURIComponent(config.deviceId)}`;
+  const readPage = async (path, method) => {
+    const pending = driver.page.waitForResponse(
+      (reply) => new URL(reply.url()).pathname === `/lindm.admin.v1.AdminService/${method}`,
+      { timeout: 30_000 },
+    );
+    const [, reply] = await Promise.all([driver.goto(`${config.origin}${path}`), pending]);
+    if (!reply.ok()) throw new Error("inventory_findings_query_failed");
+    return reply.json();
+  };
+  const inventory = await readPage(`${devicePath}?tab=inventory`, "ListDevicePackages");
+  if (!inventory.snapshotId || !inventory.packages?.length)
+    throw new Error("live_package_inventory_missing");
+  await ui.wait({ text: "Installed packages", exact: true });
+  await capture("live-package-inventory");
+
+  const sources = await readPage("/advisories", "ListAdvisoryFeeds");
+  const feed = sources.feeds?.find((source) => source.id === config.advisoryFeedId);
+  if (
+    !feed ||
+    feed.error ||
+    !/^[a-f0-9]{64}$/.test(feed.sourceSha256 ?? "") ||
+    !(BigInt(feed.advisoryCount ?? "0") > 0n) ||
+    !(Date.parse(feed.checkedAt) <= Date.now()) ||
+    !(Date.parse(feed.expiresAt) > Date.now())
+  )
+    throw new Error("published_vendor_advisories_missing_or_expired");
+  await ui.wait({ css: `[id="advisory-source-${config.advisoryFeedId}"]` });
+  await capture("published-vendor-advisories");
+
+  const findings = await readPage(`${devicePath}?tab=findings`, "ListDeviceFindings");
+  const freshness = findings.freshness;
+  if (
+    !freshness ||
+    freshness.snapshotId !== inventory.snapshotId ||
+    freshness.feedId !== feed.id ||
+    freshness.sourceSha256 !== feed.sourceSha256 ||
+    !(Date.parse(freshness.inventoryExpiresAt) > Date.now()) ||
+    !(Date.parse(freshness.feedExpiresAt) > Date.now()) ||
+    ![
+      "ADVISORY_FINDING_STATE_AFFECTED",
+      "ADVISORY_FINDING_STATE_ACCEPTED",
+      "ADVISORY_FINDING_STATE_CLEAR",
+      "ADVISORY_FINDING_STATE_PARTIAL",
+    ].includes(freshness.state)
+  )
+    throw new Error("current_vendor_inventory_evaluation_missing");
+  await ui.wait({ css: "[data-finding-totals]" });
+  await capture("live-device-findings");
+
+  const matches = [];
+  const visibleFindings = findings.findings ?? [];
+  for (const finding of visibleFindings.slice(0, 5)) {
+    const query = new URLSearchParams({
+      tab: "inventory",
+      namePrefix: finding.packageName,
+    });
+    const packages = await readPage(`${devicePath}?${query}`, "ListDevicePackages");
+    const installed = packages.packages?.find(
+      (record) =>
+        record.name === finding.packageName &&
+        record.version === finding.installedVersion &&
+        record.architecture === finding.architecture,
+    );
+    if (packages.snapshotId !== freshness.snapshotId || !installed || finding.feedId !== feed.id)
+      throw new Error("vendor_finding_does_not_match_native_inventory");
+    matches.push({ finding, installed });
+  }
+  if (BigInt(findings.totals?.open ?? "0") > 0n && matches.length === 0)
+    throw new Error("open_vendor_findings_not_observed");
+  await writePrivateJSON(join(config.evidenceDirectory, "inventory-findings.json"), {
+    device_id: config.deviceId,
+    snapshot_id: inventory.snapshotId,
+    inventory_sequence: inventory.sequence,
+    inventory_first_page: inventory.packages,
+    feed,
+    freshness,
+    totals: findings.totals,
+    visible_findings: visibleFindings,
+    verified_inventory_matches: matches,
+    complete_coverage: freshness.state !== "ADVISORY_FINDING_STATE_PARTIAL",
+  });
+  result.device_id = config.deviceId;
+  result.vendor_inventory_findings_observed = true;
+  result.complete_advisory_coverage = freshness.state !== "ADVISORY_FINDING_STATE_PARTIAL";
 }
 
 async function confirmOffServerCustody(ui) {
@@ -305,7 +411,9 @@ async function proveRepositoryReadiness() {
 try {
   config = await readPrivateJSON(process.argv[2]);
   if (
-    !["setup", "custody", "copy", "manage", "integration"].includes(config.phase) ||
+    !["tls", "setup", "custody", "copy", "manage", "findings", "integration"].includes(
+      config.phase,
+    ) ||
     new URL(config.origin).protocol !== "https:"
   )
     throw new Error("invalid_deployment_browser_configuration");
@@ -313,7 +421,8 @@ try {
   await privateDirectory(config.evidenceDirectory);
   await openTrustedBrowser();
   const ui = new AuditedUI(driver, 180_000);
-  if (config.phase === "setup") {
+  if (config.phase === "tls") await proveStockBrowserTLS(ui);
+  else if (config.phase === "setup") {
     if (config.setupMethod === "native-bootstrap") {
       await driver.goto(config.origin);
       await capture("manual-owner-bootstrap");
@@ -359,6 +468,7 @@ try {
       await capture("console-command-copied");
     } else if (config.phase === "custody") await confirmOffServerCustody(ui);
     else if (config.phase === "integration") await createIntegrationProof(ui);
+    else if (config.phase === "findings") await inspectInventoryAndFindings(ui);
     else await managedRefresh(ui);
     await writePrivateJSON(config.credentialPath, await driver.credentials());
   }
