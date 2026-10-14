@@ -296,11 +296,25 @@ func quickGate(ctx context.Context, root string, files []string) error {
 		if err := formatted(ctx, root, lint, goDirs); err != nil {
 			return err
 		}
-		affected, err := dependents(ctx, root, packages)
+	}
+	// Packages that embed or open a changed data file are raced like touched
+	// ones, together with everything that imports them.
+	readers, err := dataReaders(ctx, root, files)
+	if err != nil {
+		return err
+	}
+	raced := slices.Clone(packages)
+	for _, dir := range readers {
+		if !slices.Contains(goDirs, dir) {
+			raced = append(raced, "./"+dir)
+		}
+	}
+	if len(raced) != 0 {
+		affected, err := dependents(ctx, root, raced)
 		if err != nil {
 			return err
 		}
-		fmt.Printf("land: race tests for %d touched and %d dependent packages\n", len(packages), len(affected)-len(packages))
+		fmt.Printf("land: race tests for %d touched, %d data-reading and %d dependent packages\n", len(packages), len(raced)-len(packages), len(affected)-len(raced))
 		// A loaded host stretches race suites far past go test's default 10m
 		// per-binary deadline (internal/agent/executor has taken ~15m: every
 		// journal load re-verifies its signed trust chain, CPU-bound under

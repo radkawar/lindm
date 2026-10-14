@@ -100,3 +100,51 @@ func TestWebLintCoversTouchedConsoleSources(t *testing.T) {
 		}
 	}
 }
+
+// lab/demo/org.json once changed without the gate racing internal/ctl, whose
+// test reads it through a package-relative path.
+func TestDataReadersFindEmbedsAndOpenedPaths(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod":                         "module example.test\n\ngo 1.26\n",
+		"lab/demo/org.json":              "{}\n",
+		"lab/other/note.txt":             "x\n",
+		"internal/ctl/ctl.go":            "package ctl\n",
+		"internal/ctl/ctl_test.go":       "package ctl\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestPlan(t *testing.T) { _, _ = os.ReadFile(\"../../lab/demo/org.json\") }\n",
+		"internal/joined/joined_test.go": "package joined\n\nimport (\n\t\"path/filepath\"\n\t\"testing\"\n)\n\nfunc TestJ(t *testing.T) { _ = filepath.Join(\"..\", \"..\", \"lab\", \"demo\", name) }\n\nvar name = \"x\"\n",
+		"rooted/rooted.go":               "package rooted\n\nconst Dir = \"lab/demo\"\n",
+		"assets/assets.go":               "package assets\n\nimport \"embed\"\n\n//go:embed static\nvar Static embed.FS\n",
+		"assets/static/app.css":          "a{}\n",
+		"fixture/fixture_test.go":        "package fixture\n\nimport (\n\t\"os\"\n\t\"testing\"\n)\n\nfunc TestF(t *testing.T) { _, _ = os.ReadFile(\"testdata/case.json\") }\n",
+		"fixture/testdata/case.json":     "{}\n",
+		"bare/bare.go":                   "package bare\n\nconst Words = \"lab\" + \"/\"\n",
+		"unrelated/unrelated.go":         "package unrelated\n\nconst S = \"lab/other/note.txt\"\n",
+	}
+	for name, content := range files {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		changed []string
+		want    []string
+	}{
+		{[]string{"lab/demo/org.json"}, []string{"internal/ctl", "internal/joined", "rooted"}},
+		{[]string{"assets/static/app.css", "fixture/testdata/case.json"}, []string{"assets", "fixture"}},
+		{[]string{"lab/demo/gone.json", "internal/ctl/ctl.go"}, []string{"internal/joined", "rooted"}},
+		{[]string{"internal/ctl/ctl.go"}, nil},
+		{[]string{"README.md"}, nil},
+	} {
+		got, err := dataReaders(t.Context(), root, tc.changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Errorf("dataReaders(%q) = %q, want %q", tc.changed, got, tc.want)
+		}
+	}
+}

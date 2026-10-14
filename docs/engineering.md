@@ -3094,7 +3094,10 @@ console stylesheets change, all of `lint:web` when `eslint.config.mjs`,
 `web/eslint/` or `package.json` change), a refusal of any added
 `db/migrations` file numbered at or below `main`'s highest (it names the number
 to rename to), `generate-docs -check`
-always, race tests of the touched packages plus every module package whose
+always, race tests of the touched packages and of packages that read a changed
+non-Go file (an embed pattern matching it, or a string literal or
+`filepath.Join` of literals naming it or a directory above it, relative to the
+package or the module root), plus every module package whose
 build or tests import them, directly or transitively (each test binary bounded
 by `-timeout 45m`, the integration lock budget, since loaded hosts push
 `internal/agent/executor` past go test's 10m default), and, when the landing
