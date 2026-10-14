@@ -52,6 +52,32 @@ func TestNewRejectsUnsafeRelayAddresses(t *testing.T) {
 	}
 }
 
+func TestValidateRelayNetworkAndPortBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name, listener, address string
+		span                    uint32
+		valid                   bool
+	}{
+		{"production", "0.0.0.0", "192.0.2.10", 4096, true},
+		{"oversized", "0.0.0.0", "192.0.2.10", 4097, false},
+		{"lab_loopback", "127.0.0.1", "127.0.0.1", 100, true},
+		{"exposed_loopback", "0.0.0.0", "127.0.0.1", 100, false},
+		{"remote_loopback", "192.0.2.10", "127.0.0.1", 100, false},
+		{"link_local", "169.254.1.1", "169.254.1.1", 100, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := Validate(&configv1.AssistanceConfig{Relay: &configv1.AssistanceRelayConfig{
+				Listener: &configv1.ListenerConfig{Address: tc.listener, Port: 3478}, RelayAddress: tc.address,
+				RelayPortMin: 40000, RelayPortMax: 40000 + tc.span - 1,
+				Urls: []string{"turn:relay.test:3478"}, Realm: testRealm,
+			}})
+			if (err == nil) != tc.valid {
+				t.Fatalf("valid=%t, error=%v", tc.valid, err)
+			}
+		})
+	}
+}
+
 func TestCredentialsVerifyOnlyLiveUnendedSessions(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	relay := testRelay(t, func() time.Time { return now })
@@ -108,20 +134,33 @@ func TestCredentialsVerifyOnlyLiveUnendedSessions(t *testing.T) {
 	}
 }
 
-func TestPermissionHandlerAdmitsOnlyRelayAddress(t *testing.T) {
+func TestPermissionHandlerRequiresLiveCounterpart(t *testing.T) {
 	relay := testRelay(t, time.Now)
-	if !relay.permit(nil, net.ParseIP("127.0.0.1")) || !relay.permit(nil, net.ParseIP("::ffff:127.0.0.1")) {
-		t.Fatal("relay address refused")
+	server := listen(t, relay)
+	session := uuid.New()
+	device := allocate(t, relay, server, session, RoleDevice, false)
+	if relay.permit(device.control, net.ParseIP("127.0.0.1")) {
+		t.Fatal("permission admitted without a live counterpart")
+	}
+	allocate(t, relay, server, uuid.New(), RoleConsole, false)
+	if relay.permit(device.control, net.ParseIP("127.0.0.1")) {
+		t.Fatal("another session supplied the counterpart")
+	}
+	allocate(t, relay, server, session, RoleConsole, true)
+	if !relay.permit(device.control, net.ParseIP("127.0.0.1")) || !relay.permit(device.control, net.ParseIP("::ffff:127.0.0.1")) {
+		t.Fatal("live counterpart refused")
 	}
 	for _, ip := range []string{"127.0.0.2", "10.0.0.1", "::1", "0.0.0.0"} {
-		if relay.permit(nil, net.ParseIP(ip)) {
+		if relay.permit(device.control, net.ParseIP(ip)) {
 			t.Fatalf("peer %s admitted", ip)
 		}
 	}
-	inside := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(relay.minPort)}
-	outside := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(relay.maxPort) + 1}
-	if !relay.relayPeer(inside) || relay.relayPeer(outside) || relay.relayPeer(&net.TCPAddr{IP: inside.IP, Port: inside.Port}) {
-		t.Fatal("relay peer filter admitted a non-relay endpoint")
+	if relay.permit(nil, net.ParseIP("127.0.0.1")) {
+		t.Fatal("unknown client admitted")
+	}
+	relay.End(session, time.Now().Add(time.Minute))
+	if relay.permit(device.control, net.ParseIP("127.0.0.1")) {
+		t.Fatal("ended allocation admitted")
 	}
 }
 
@@ -142,8 +181,9 @@ func TestRelayGeneratorRefusesTCPAndOutOfRangePorts(t *testing.T) {
 }
 
 type testAllocation struct {
-	client *turn.Client
-	relay  net.PacketConn
+	client  *turn.Client
+	relay   net.PacketConn
+	control net.Addr
 }
 
 // allocate creates a TURN client allocation; tcp selects TURN-over-TCP control.
@@ -185,7 +225,7 @@ func allocate(t *testing.T, relay *Relay, server *Server, session uuid.UUID, rol
 		client.Close()
 		_ = conn.Close()
 	})
-	return testAllocation{client: client, relay: relayed}
+	return testAllocation{client: client, relay: relayed, control: conn.LocalAddr()}
 }
 
 func listen(t *testing.T, relay *Relay) *Server {
@@ -226,6 +266,20 @@ func outsideRange(t *testing.T, relay *Relay) net.PacketConn {
 	return nil
 }
 
+// insideRange is an ordinary UDP listener in the configured allocation range.
+func insideRange(t *testing.T, relay *Relay) net.PacketConn {
+	t.Helper()
+	for port := int(relay.minPort); port <= int(relay.maxPort); port++ {
+		conn, err := net.ListenPacket("udp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+		if err == nil {
+			t.Cleanup(func() { _ = conn.Close() })
+			return conn
+		}
+	}
+	t.Fatal("no free non-allocation port inside the relay range")
+	return nil
+}
+
 // readExpect sends with resend until the receiver observes want or the deadline passes.
 func readExpect(t *testing.T, receiver net.PacketConn, send func() error, want []byte) net.Addr {
 	t.Helper()
@@ -255,6 +309,21 @@ func readExpect(t *testing.T, receiver net.PacketConn, send func() error, want [
 	return nil
 }
 
+func serverAllocation(t *testing.T, relay *Relay, allocation testAllocation) *relayConn {
+	t.Helper()
+	key, valid := clientKey(allocation.relay.LocalAddr())
+	if !valid || key.network != "udp" {
+		t.Fatal("allocation is not a UDP endpoint")
+	}
+	relay.mu.Lock()
+	conn := relay.conns[key.address]
+	relay.mu.Unlock()
+	if conn == nil {
+		t.Fatal("allocation is not registered")
+	}
+	return conn
+}
+
 func TestRelayForwardsOnlyBetweenAllocations(t *testing.T) {
 	relay := testRelay(t, time.Now)
 	server := listen(t, relay)
@@ -262,10 +331,12 @@ func TestRelayForwardsOnlyBetweenAllocations(t *testing.T) {
 	device := allocate(t, relay, server, session, RoleDevice, false)
 	// The console uses TURN-over-TCP control, as browsers behind UDP-blocking proxies do.
 	console := allocate(t, relay, server, session, RoleConsole, true)
-	for _, allocation := range []testAllocation{device, console} {
-		if !relay.relayPeer(allocation.relay.LocalAddr()) {
-			t.Fatalf("allocation %s is outside the configured relay range", allocation.relay.LocalAddr())
-		}
+	deviceConn := serverAllocation(t, relay, device)
+	relay.mu.Lock()
+	admitted := relay.relayPeer(deviceConn, console.relay.LocalAddr())
+	relay.mu.Unlock()
+	if !admitted {
+		t.Fatal("own counterpart refused")
 	}
 	// The console's write installs its permission for the relay address.
 	if _, err := console.relay.WriteTo([]byte("open"), device.relay.LocalAddr()); err != nil {
@@ -283,24 +354,78 @@ func TestRelayForwardsOnlyBetweenAllocations(t *testing.T) {
 		t.Fatal("permission for a non-relay peer address was granted")
 	}
 
-	plain := outsideRange(t, relay)
-	if _, err := device.relay.WriteTo([]byte("leak"), plain.LocalAddr()); err != nil {
+	for _, plain := range []net.PacketConn{outsideRange(t, relay), insideRange(t, relay)} {
+		if _, err := deviceConn.WriteTo([]byte("leak"), plain.LocalAddr()); !errors.Is(err, errPeerRefused) {
+			t.Fatalf("non-allocation socket WriteTo: %v", err)
+		}
+		if _, err := device.relay.WriteTo([]byte("leak"), plain.LocalAddr()); err != nil {
+			t.Fatal(err)
+		}
+		if err := plain.SetReadDeadline(time.Now().Add(500 * time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		if n, _, err := plain.ReadFrom(make([]byte, 64)); err == nil {
+			t.Fatalf("relay forwarded %d bytes to a non-allocation port", n)
+		}
+		// A non-allocation source is not delivered even on an in-range port.
+		if _, err := plain.WriteTo([]byte("inject"), console.relay.LocalAddr()); err != nil {
+			t.Fatal(err)
+		}
+		readExpect(t, console.relay, func() error {
+			_, err := device.relay.WriteTo([]byte("after"), console.relay.LocalAddr())
+			return err
+		}, []byte("after"))
+	}
+	otherSession := uuid.New()
+	other := allocate(t, relay, server, otherSession, RoleConsole, false)
+	allocate(t, relay, server, otherSession, RoleDevice, false)
+	sameRole := allocate(t, relay, server, session, RoleDevice, false)
+	for _, peer := range []testAllocation{other, sameRole} {
+		if err := peer.client.CreatePermission(device.relay.LocalAddr()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := deviceConn.WriteTo([]byte("cross"), peer.relay.LocalAddr()); !errors.Is(err, errPeerRefused) {
+			t.Fatalf("unrelated allocation WriteTo: %v", err)
+		}
+		if _, err := device.relay.WriteTo([]byte("cross"), peer.relay.LocalAddr()); err != nil {
+			t.Fatal(err)
+		}
+		if err := peer.relay.SetReadDeadline(time.Now().Add(500 * time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		if n, _, err := peer.relay.ReadFrom(make([]byte, 64)); err == nil {
+			t.Fatalf("relay forwarded %d bytes to an unrelated allocation", n)
+		}
+		if peer.control == sameRole.control {
+			continue
+		}
+		// Exercise receive filtering without relying on the sender's filter.
+		peerConn := serverAllocation(t, relay, peer)
+		if _, err := peerConn.PacketConn.WriteTo([]byte("cross-inject"), console.relay.LocalAddr()); err != nil {
+			t.Fatal(err)
+		}
+		readExpect(t, console.relay, func() error {
+			_, err := device.relay.WriteTo([]byte("isolated"), console.relay.LocalAddr())
+			return err
+		}, []byte("isolated"))
+	}
+	consoleConn := serverAllocation(t, relay, console)
+	relay.mu.Lock()
+	originalExpiry := consoleConn.expires
+	consoleConn.expires = time.Now().Add(-time.Second)
+	relay.mu.Unlock()
+	if _, err := deviceConn.WriteTo([]byte("expired"), console.relay.LocalAddr()); !errors.Is(err, errPeerRefused) {
+		t.Fatalf("expired counterpart WriteTo: %v", err)
+	}
+	relay.mu.Lock()
+	consoleConn.expires = originalExpiry
+	relay.mu.Unlock()
+	if err := consoleConn.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := plain.SetReadDeadline(time.Now().Add(500 * time.Millisecond)); err != nil {
-		t.Fatal(err)
+	if _, err := deviceConn.WriteTo([]byte("closed"), console.relay.LocalAddr()); !errors.Is(err, errPeerRefused) {
+		t.Fatalf("closed counterpart WriteTo: %v", err)
 	}
-	if n, _, err := plain.ReadFrom(make([]byte, 64)); err == nil {
-		t.Fatalf("relay forwarded %d bytes to a non-relay port on the relay address", n)
-	}
-	// A non-relay source on the relay address is never delivered to an allocation.
-	if _, err := plain.WriteTo([]byte("inject"), console.relay.LocalAddr()); err != nil {
-		t.Fatal(err)
-	}
-	readExpect(t, console.relay, func() error {
-		_, err := device.relay.WriteTo([]byte("after"), console.relay.LocalAddr())
-		return err
-	}, []byte("after"))
 }
 
 func TestEndClosesSessionAllocations(t *testing.T) {

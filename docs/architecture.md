@@ -2961,8 +2961,9 @@ Each side sends its complete current state, never a stream of events:
    - The relay accepts TURN REST credentials,
      `<expiry>:<session>:<device|console>` with an HMAC-SHA1 password under a
      per-process random secret. Expiry is `ends_at`.
-   - It permits peers only on its own relay allocations, so it is never an open
-     proxy.
+   - Every relay datagram is admitted only between live, unexpired allocations of
+     opposite roles in the same session. Neither unused ports in the allocation
+     range nor other sessions' allocations are reachable through the relay.
    - It refuses credentials of ended sessions and closes their allocations.
 
 Termination sources and recorded causes:

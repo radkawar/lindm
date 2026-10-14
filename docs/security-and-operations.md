@@ -1429,8 +1429,12 @@ always request Stop for either mode, without requiring an extra control grant.
 - `relay.listener`: the TURN UDP and TCP listener (for example port 3478). It
   must not overlap the admin, device or profiling listener.
 - `relay.relay_address`, `relay_port_min` and `relay_port_max`: the specific IPv4
-  address and UDP port range that relay allocations bind and advertise. Peers may
-  send only to allocations on this address, so the relay is not an open proxy.
+  address and UDP port range that relay allocations bind and advertise. The inclusive
+  range is limited to 4096 ports, the largest allocation budget. Peers may send only
+  to live allocations of the opposite role in their own assistance session; an
+  unused in-range port or another session's allocation is never a permitted peer.
+  Link-local relay addresses are forbidden. Loopback relay addresses require a
+  loopback TURN listener and are intended only for local tests or labs.
 - `relay.urls`: the exact `turn:` URIs given to devices and consoles. Both must
   reach the listener, and both peers must reach the relay address through it.
 - `max_concurrent_sessions`: the admission budget, default 16 and at most 256.

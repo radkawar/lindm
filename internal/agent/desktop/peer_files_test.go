@@ -17,7 +17,7 @@ import (
 
 func TestPionViewFilesUsesSameRelayDTLSWithoutInputChannel(t *testing.T) {
 	url := startTURN(t)
-	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: iceServers(url), Files: true})
+	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: []*agentv1.AssistanceIceServer{url.device}, Files: true})
 	if err != nil {
 		t.Fatal(err)
 	}

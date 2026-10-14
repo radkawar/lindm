@@ -3,9 +3,9 @@
 // Package assistrelay runs the embedded relay-only TURN service used by
 // graphical remote assistance and mints per-session TURN REST credentials.
 //
-// Boundaries: the relay forwards ciphertext only between its own allocations
-// (peer IP and port must be one of its relay addresses); it is never an open
-// proxy. Credentials are HMACs under a per-process random secret and are never
+// Boundaries: the relay forwards ciphertext only between live allocations of
+// opposite roles in the same session; it is never an open proxy.
+// Credentials are HMACs under a per-process random secret and are never
 // stored. The relay does not decide session authorization: the device service
 // mints credentials for authorized sessions and reports ended sessions through
 // End, which also closes their allocations. Non-goals: TURN-over-TLS, TCP
@@ -37,7 +37,9 @@ const (
 	// Each role may hold a few allocations (one per advertised URL plus ICE
 	// restarts); the total is bounded by the admission cap.
 	maxAllocationsPerCredential = 8
-	maxTCPConnections           = 1024
+	// The largest session admission cap (256), two roles, eight allocations.
+	maxRelayPorts     = 4096
+	maxTCPConnections = 1024
 	// TURN-over-TCP control connections never outlive the longest session.
 	tcpConnectionLifetime = 31 * time.Minute
 	// Ended-session markers outlive the credential expiry they shadow by this
@@ -64,7 +66,8 @@ type Relay struct {
 
 	mu            sync.Mutex
 	ended         map[uuid.UUID]time.Time
-	conns         map[string]*relayConn
+	conns         map[netip.AddrPort]*relayConn
+	clients       map[allocationClient]*relayConn
 	sessions      map[uuid.UUID]map[*relayConn]struct{}
 	perCredential map[string]int
 }
@@ -87,6 +90,13 @@ func Validate(cfg *configv1.AssistanceConfig) error {
 	listener, err := netip.ParseAddr(relay.GetListener().GetAddress())
 	if err != nil {
 		return errors.New("assistrelay: listener address is invalid")
+	}
+	listener = listener.Unmap()
+	if address.IsLinkLocalUnicast() || (address.IsLoopback() && !listener.IsLoopback()) {
+		return errors.New("assistrelay: link-local relay addresses are forbidden; loopback requires a loopback listener")
+	}
+	if relay.GetRelayPortMax()-relay.GetRelayPortMin()+1 > maxRelayPorts {
+		return errors.New("assistrelay: relay port range must contain at most 4096 ports")
 	}
 	port := relay.GetListener().GetPort()
 	if (listener.Unmap() == address || listener.IsUnspecified()) && port >= relay.GetRelayPortMin() && port <= relay.GetRelayPortMax() {
@@ -130,7 +140,8 @@ func New(cfg *configv1.AssistanceConfig, clock func() time.Time, logger *slog.Lo
 		clock:          clock,
 		logger:         logger,
 		ended:          make(map[uuid.UUID]time.Time),
-		conns:          make(map[string]*relayConn),
+		conns:          make(map[netip.AddrPort]*relayConn),
+		clients:        make(map[allocationClient]*relayConn),
 		sessions:       make(map[uuid.UUID]map[*relayConn]struct{}),
 		perCredential:  make(map[string]int),
 	}, nil
@@ -222,22 +233,81 @@ func (r *Relay) quota(name, _ string, _ net.Addr) bool {
 	return r.perCredential[name] < maxAllocationsPerCredential && len(r.conns) < r.maxAllocations
 }
 
-// permit implements turn.PermissionHandler: peers are only this relay.
-func (r *Relay) permit(_ net.Addr, peer net.IP) bool {
+// permit implements turn.PermissionHandler. TURN permissions carry only an IP,
+// not a port: admit it only for a bound client with a live counterpart, then
+// enforce the exact allocation endpoint on every datagram in relayPeer.
+func (r *Relay) permit(clientAddr net.Addr, peer net.IP) bool {
 	address, ok := netip.AddrFromSlice(peer)
-	return ok && address.Unmap() == r.address
-}
-
-func (r *Relay) relayPeer(addr net.Addr) bool {
-	udp, ok := addr.(*net.UDPAddr)
-	if !ok {
+	client, valid := clientKey(clientAddr)
+	if !ok || address.Unmap() != r.address || !valid {
 		return false
 	}
-	address, ok := netip.AddrFromSlice(udp.IP)
-	return ok && address.Unmap() == r.address && udp.Port >= int(r.minPort) && udp.Port <= int(r.maxPort)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	conn := r.clients[client]
+	if !r.live(conn) {
+		return false
+	}
+	for counterpart := range r.sessions[conn.session] {
+		if counterpart.role != conn.role && r.live(counterpart) {
+			return true
+		}
+	}
+	return false
 }
 
-func (r *Relay) register(key string, conn *relayConn) error {
+// live and relayPeer require r.mu. Registry identity fences closed sockets,
+// while explicit expiry/End checks do not depend on the close timer running.
+func (r *Relay) live(conn *relayConn) bool {
+	if conn == nil || !conn.bound || r.conns[conn.key] != conn || !r.clock().Before(conn.expires) {
+		return false
+	}
+	_, ended := r.ended[conn.session]
+	return !ended
+}
+
+func (r *Relay) relayPeer(conn *relayConn, addr net.Addr) bool {
+	udp, ok := addr.(*net.UDPAddr)
+	if !ok || udp == nil || udp.Port <= 0 || udp.Port > 65535 {
+		return false
+	}
+	key := udp.AddrPort()
+	if !key.IsValid() || key.Addr().Unmap() != r.address {
+		return false
+	}
+	peer := r.conns[netip.AddrPortFrom(key.Addr().Unmap(), key.Port())]
+	return r.live(conn) && r.live(peer) && peer.session == conn.session && peer.role != conn.role
+}
+
+type allocationClient struct {
+	network string
+	address netip.AddrPort
+}
+
+func clientKey(addr net.Addr) (allocationClient, bool) {
+	var key allocationClient
+	switch addr := addr.(type) {
+	case *net.UDPAddr:
+		if addr == nil || addr.Port <= 0 || addr.Port > 65535 {
+			return key, false
+		}
+		key = allocationClient{network: "udp", address: addr.AddrPort()}
+	case *net.TCPAddr:
+		if addr == nil || addr.Port <= 0 || addr.Port > 65535 {
+			return key, false
+		}
+		key = allocationClient{network: "tcp", address: addr.AddrPort()}
+	default:
+		return key, false
+	}
+	if !key.address.IsValid() {
+		return key, false
+	}
+	key.address = netip.AddrPortFrom(key.address.Addr().Unmap(), key.address.Port())
+	return key, true
+}
+
+func (r *Relay) register(key netip.AddrPort, conn *relayConn) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.conns) >= r.maxAllocations {
@@ -249,21 +319,28 @@ func (r *Relay) register(key string, conn *relayConn) error {
 
 // allocated binds a fresh allocation socket to its authenticated session and
 // bounds it by the credential expiry.
-func (r *Relay) allocated(name string, relayAddr net.Addr) {
+func (r *Relay) allocated(name string, clientAddr, relayAddr net.Addr) {
 	cred, err := parseUsername(name)
+	client, valid := clientKey(clientAddr)
+	udp, ok := relayAddr.(*net.UDPAddr)
+	if !ok || udp == nil {
+		return
+	}
 	r.mu.Lock()
-	conn := r.conns[relayAddr.String()]
+	conn := r.conns[udp.AddrPort()]
 	if conn == nil {
 		r.mu.Unlock()
 		return
 	}
 	_, ended := r.ended[cred.session]
-	if err != nil || ended || conn.bound {
+	if err != nil || !valid || ended || conn.bound || !r.clock().Before(cred.expires) {
 		r.mu.Unlock()
 		r.closeAllocation(conn)
 		return
 	}
 	conn.bound, conn.username, conn.session = true, name, cred.session
+	conn.role, conn.expires, conn.client = cred.role, cred.expires, client
+	r.clients[client] = conn
 	r.perCredential[name]++
 	if r.sessions[cred.session] == nil {
 		r.sessions[cred.session] = make(map[*relayConn]struct{})
@@ -284,6 +361,9 @@ func (r *Relay) unregister(conn *relayConn) {
 	}
 	if !conn.bound {
 		return
+	}
+	if r.clients[conn.client] == conn {
+		delete(r.clients, conn.client)
 	}
 	if r.perCredential[conn.username]--; r.perCredential[conn.username] <= 0 {
 		delete(r.perCredential, conn.username)
@@ -354,8 +434,8 @@ func (r *Relay) serve(udp net.PacketConn, tcp net.Listener) (*Server, error) {
 		QuotaHandler:  r.quota,
 		LoggerFactory: loggerFactory{logger: r.logger},
 		EventHandler: turn.EventHandler{
-			OnAllocationCreated: func(_, _ net.Addr, _, name, _ string, relayAddr net.Addr, _ int) {
-				r.allocated(name, relayAddr)
+			OnAllocationCreated: func(clientAddr, _ net.Addr, _, name, _ string, relayAddr net.Addr, _ int) {
+				r.allocated(name, clientAddr, relayAddr)
 			},
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{{PacketConn: udp, RelayAddressGenerator: generator(), PermissionHandler: r.permit}},
@@ -400,7 +480,11 @@ func (g *relayGenerator) AllocatePacketConn(config turn.AllocateListenerConfig) 
 	if err != nil {
 		return nil, nil, err
 	}
-	wrapped := &relayConn{PacketConn: conn, relay: g.relay, key: addr.String()}
+	udp, ok := addr.(*net.UDPAddr)
+	if !ok || udp == nil {
+		return nil, nil, errors.Join(errors.New("assistrelay: generator returned a non-UDP address"), conn.Close())
+	}
+	wrapped := &relayConn{PacketConn: conn, relay: g.relay, key: udp.AddrPort()}
 	if err := g.relay.register(wrapped.key, wrapped); err != nil {
 		return nil, nil, errors.Join(err, conn.Close())
 	}
@@ -416,11 +500,11 @@ func (g *relayGenerator) AllocateConn(turn.AllocateConnConfig) (net.Conn, error)
 }
 
 // relayConn is one allocation's relay socket. It only exchanges datagrams
-// with other relay allocations of this server.
+// with live opposite-role allocations of the same assistance session.
 type relayConn struct {
 	net.PacketConn
 	relay *Relay
-	key   string
+	key   netip.AddrPort
 	once  sync.Once
 	err   error
 
@@ -428,20 +512,33 @@ type relayConn struct {
 	bound    bool
 	username string
 	session  uuid.UUID
+	role     string
+	expires  time.Time
+	client   allocationClient
 	timer    *time.Timer
 }
 
 func (c *relayConn) ReadFrom(p []byte) (int, net.Addr, error) {
 	for {
 		n, addr, err := c.PacketConn.ReadFrom(p)
-		if err != nil || c.relay.relayPeer(addr) {
+		if err != nil {
 			return n, addr, err
+		}
+		c.relay.mu.Lock()
+		admitted := c.relay.relayPeer(c, addr)
+		c.relay.mu.Unlock()
+		if admitted {
+			return n, addr, nil
 		}
 	}
 }
 
 func (c *relayConn) WriteTo(p []byte, addr net.Addr) (int, error) {
-	if !c.relay.relayPeer(addr) {
+	// Keep the admission check and send atomic with unregister/End so an
+	// allocation port cannot be recycled after authorization but before send.
+	c.relay.mu.Lock()
+	defer c.relay.mu.Unlock()
+	if !c.relay.relayPeer(c, addr) {
 		return 0, errPeerRefused
 	}
 	return c.PacketConn.WriteTo(p, addr)

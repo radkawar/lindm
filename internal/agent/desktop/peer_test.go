@@ -5,45 +5,55 @@ package desktop
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
+	"math/rand/v2"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pion/ice/v4"
-	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/assistrelay"
 )
 
-const (
-	turnRealm    = "lindm.test"
-	turnUser     = "1900000000:session:device"
-	turnPassword = "relay-secret"
-)
+type turnFixture struct {
+	device, console *agentv1.AssistanceIceServer
+}
 
-// startTURN runs a pion/turn relay on 127.0.0.1 whose relayed addresses are
-// also on loopback.
-func startTURN(t *testing.T) string {
+// startTURN uses the production embedded relay and distinct session-role
+// credentials, so WebRTC media/data tests exercise its actual peer boundary.
+func startTURN(t *testing.T) turnFixture {
 	t.Helper()
-	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	probe, err := net.ListenPacket("udp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	server, err := turn.NewServer(turn.ServerConfig{
-		Realm: turnRealm,
-		AuthHandler: func(request *turn.RequestAttributes) (string, []byte, bool) {
-			if request.Username != turnUser {
-				return "", nil, false
-			}
-			return request.Username, turn.GenerateAuthKey(request.Username, request.Realm, turnPassword), true
-		},
-		PacketConnConfigs: []turn.PacketConnConfig{{
-			PacketConn:            conn,
-			RelayAddressGenerator: &turn.RelayAddressGeneratorStatic{RelayAddress: net.ParseIP("127.0.0.1"), Address: "127.0.0.1"},
-		}},
-	})
+	udp, ok := probe.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		t.Fatal("TURN listener probe is not UDP")
+	}
+	port := uint32(udp.Port)
+	if err := probe.Close(); err != nil {
+		t.Fatal(err)
+	}
+	url := fmt.Sprintf("turn:127.0.0.1:%s?transport=udp", strconv.FormatUint(uint64(port), 10))
+	base := uint32(20000 + rand.IntN(10000))
+	relay, err := assistrelay.New(&configv1.AssistanceConfig{Relay: &configv1.AssistanceRelayConfig{
+		Listener:     &configv1.ListenerConfig{Address: "127.0.0.1", Port: port},
+		RelayAddress: "127.0.0.1", RelayPortMin: base, RelayPortMax: base + 200,
+		Urls: []string{url}, Realm: "lindm.test",
+	}}, time.Now, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := relay.Listen(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,15 +62,20 @@ func startTURN(t *testing.T) string {
 			t.Error(err)
 		}
 	})
-	return fmt.Sprintf("turn:%s?transport=udp", conn.LocalAddr().String())
-}
-
-func iceServers(url string) []*agentv1.AssistanceIceServer {
-	return []*agentv1.AssistanceIceServer{{Urls: []string{url}, Username: turnUser, Credential: turnPassword}}
+	session, expires := uuid.New(), time.Now().Add(time.Minute)
+	device, err := relay.ICEServer(session, assistrelay.RoleDevice, expires)
+	if err != nil {
+		t.Fatal(err)
+	}
+	console, err := relay.ICEServer(session, assistrelay.RoleConsole, expires)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return turnFixture{device: device, console: console}
 }
 
 // browserPeer stands in for the console: relay-only, answers the offer.
-func browserPeer(t *testing.T, url string) *webrtc.PeerConnection {
+func browserPeer(t *testing.T, relay turnFixture) *webrtc.PeerConnection {
 	t.Helper()
 	settings := webrtc.SettingEngine{}
 	settings.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
@@ -69,7 +84,7 @@ func browserPeer(t *testing.T, url string) *webrtc.PeerConnection {
 		t.Fatal(err)
 	}
 	pc, err := webrtc.NewAPI(webrtc.WithSettingEngine(settings), webrtc.WithMediaEngine(media)).NewPeerConnection(webrtc.Configuration{
-		ICEServers:         []webrtc.ICEServer{{URLs: []string{url}, Username: turnUser, Credential: turnPassword}},
+		ICEServers:         []webrtc.ICEServer{{URLs: relay.console.GetUrls(), Username: relay.console.GetUsername(), Credential: relay.console.GetCredential()}},
 		ICETransportPolicy: webrtc.ICETransportPolicyRelay,
 	})
 	if err != nil {
@@ -102,7 +117,7 @@ func answer(t *testing.T, pc *webrtc.PeerConnection, offer string) string {
 
 func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 	url := startTURN(t)
-	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: iceServers(url), Input: true})
+	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: []*agentv1.AssistanceIceServer{url.device}, Input: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +253,7 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 
 func TestPionPeerViewHasNoDataChannel(t *testing.T) {
 	url := startTURN(t)
-	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: iceServers(url)})
+	peer, err := NewPionPeers().NewPeer(PeerConfig{ICEServers: []*agentv1.AssistanceIceServer{url.device}})
 	if err != nil {
 		t.Fatal(err)
 	}

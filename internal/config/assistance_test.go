@@ -47,6 +47,14 @@ func TestResolveAssistanceRelay(t *testing.T) {
 		}},
 		{name: "wildcard relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "0.0.0.0" }},
 		{name: "IPv6 relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "2001:db8::1" }},
+		{name: "link-local relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "169.254.1.1" }},
+		{name: "exposed loopback relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "127.0.0.1" }},
+		{name: "local lab relay", accepted: true, change: func(c *configv1.ServerConfig) {
+			c.Assistance.Relay.RelayAddress = "127.0.0.1"
+			c.Assistance.Relay.Listener.Address = "127.0.0.1"
+		}},
+		{name: "maximum relay port span", accepted: true, change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayPortMax = 53255 }},
+		{name: "oversized relay port span", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayPortMax = 53256 }},
 		{name: "listener inside relay ports", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.Listener.Port = 49170 }},
 		{name: "admin listener port", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.Listener.Port = c.AdminListener.Port }},
 		{name: "distinct address same port", accepted: true, change: func(c *configv1.ServerConfig) {

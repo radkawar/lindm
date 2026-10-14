@@ -555,7 +555,7 @@ message BreakGlassPolicy {
 
 // AssistanceConfig enables built-in graphical remote assistance with the
 // embedded relay-only TURN service. Media is DTLS-SRTP end to end; the relay
-// forwards ciphertext only between its own allocations.
+// forwards ciphertext only between live opposite-role allocations of one session.
 message AssistanceConfig {
   AssistanceRelayConfig relay = 1 [(buf.validate.field).required = true];
   // Admission bound for non-ended sessions; zero selects 16.
@@ -581,9 +581,11 @@ message AssistanceRecordingConfig {
 message AssistanceRelayConfig {
   // UDP and TCP TURN listener.
   ListenerConfig listener = 1 [(buf.validate.field).required = true];
-  // Address relay allocations bind and advertise. Peers may only reach other
-  // allocations on this address.
+  // Address relay allocations bind and advertise. Peers may only reach live
+  // opposite-role allocations of the same session. Link-local is forbidden;
+  // loopback is allowed only with a loopback listener (local tests/labs).
   string relay_address = 2 [(buf.validate.field).string.ip = true];
+  // Inclusive UDP allocation range, at most 4096 ports (the maximum allocation budget).
   uint32 relay_port_min = 3 [(buf.validate.field).uint32 = {
     gte: 1024
     lte: 65535
@@ -612,5 +614,10 @@ message AssistanceRelayConfig {
     id: "assistance_relay.ports"
     message: "relay_port_min must not exceed relay_port_max"
     expression: "this.relay_port_min <= this.relay_port_max"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_relay.port_span"
+    message: "relay port range must contain at most 4096 ports"
+    expression: "this.relay_port_max <= this.relay_port_min + 4095u"
   };
 }

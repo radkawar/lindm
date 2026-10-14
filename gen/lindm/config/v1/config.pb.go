@@ -1967,7 +1967,7 @@ func (x *BreakGlassPolicy) GetRequireIncidentReason() bool {
 
 // AssistanceConfig enables built-in graphical remote assistance with the
 // embedded relay-only TURN service. Media is DTLS-SRTP end to end; the relay
-// forwards ciphertext only between its own allocations.
+// forwards ciphertext only between live opposite-role allocations of one session.
 type AssistanceConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Relay *AssistanceRelayConfig `protobuf:"bytes,1,opt,name=relay,proto3" json:"relay,omitempty"`
@@ -2099,9 +2099,11 @@ type AssistanceRelayConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// UDP and TCP TURN listener.
 	Listener *ListenerConfig `protobuf:"bytes,1,opt,name=listener,proto3" json:"listener,omitempty"`
-	// Address relay allocations bind and advertise. Peers may only reach other
-	// allocations on this address.
+	// Address relay allocations bind and advertise. Peers may only reach live
+	// opposite-role allocations of the same session. Link-local is forbidden;
+	// loopback is allowed only with a loopback listener (local tests/labs).
 	RelayAddress string `protobuf:"bytes,2,opt,name=relay_address,json=relayAddress,proto3" json:"relay_address,omitempty"`
+	// Inclusive UDP allocation range, at most 4096 ports (the maximum allocation budget).
 	RelayPortMin uint32 `protobuf:"varint,3,opt,name=relay_port_min,json=relayPortMin,proto3" json:"relay_port_min,omitempty"`
 	RelayPortMax uint32 `protobuf:"varint,4,opt,name=relay_port_max,json=relayPortMax,proto3" json:"relay_port_max,omitempty"`
 	// TURN URIs advertised to devices and consoles, e.g. turn:relay.example:3478?transport=udp.
@@ -2389,15 +2391,16 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\trecording\x18\x04 \x01(\v2*.lindm.config.v1.AssistanceRecordingConfigR\trecording\"\x7f\n" +
 	"\x19AssistanceRecordingConfig\x12$\n" +
 	"\bkey_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\akeyFile\x12<\n" +
-	"\x11max_storage_bytes\x18\x02 \x01(\x04B\x10\xbaH\r2\v\x18\x80\x80\x80\x80\x80 (\x80\x80@R\x0fmaxStorageBytes\"\xd6\x03\n" +
+	"\x11max_storage_bytes\x18\x02 \x01(\x04B\x10\xbaH\r2\v\x18\x80\x80\x80\x80\x80 (\x80\x80@R\x0fmaxStorageBytes\"\xdd\x04\n" +
 	"\x15AssistanceRelayConfig\x12C\n" +
 	"\blistener\x18\x01 \x01(\v2\x1f.lindm.config.v1.ListenerConfigB\x06\xbaH\x03\xc8\x01\x01R\blistener\x12,\n" +
 	"\rrelay_address\x18\x02 \x01(\tB\a\xbaH\x04r\x02p\x01R\frelayAddress\x122\n" +
 	"\x0erelay_port_min\x18\x03 \x01(\rB\f\xbaH\t*\a\x18\xff\xff\x03(\x80\bR\frelayPortMin\x122\n" +
 	"\x0erelay_port_max\x18\x04 \x01(\rB\f\xbaH\t*\a\x18\xff\xff\x03(\x80\bR\frelayPortMax\x124\n" +
 	"\x04urls\x18\x05 \x03(\tB \xbaH\x1d\x92\x01\x1a\b\x01\x10\x04\"\x14r\x12\x18\x80\x022\r^turn:[^\\s]+$R\x04urls\x122\n" +
-	"\x05realm\x18\x06 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18\x80\x012\x10^[A-Za-z0-9.-]+$R\x05realm:x\xbaHu\x1as\n" +
-	"\x16assistance_relay.ports\x12-relay_port_min must not exceed relay_port_max\x1a*this.relay_port_min <= this.relay_port_maxB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
+	"\x05realm\x18\x06 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18\x80\x012\x10^[A-Za-z0-9.-]+$R\x05realm:\xfe\x01\xbaH\xfa\x01\x1as\n" +
+	"\x16assistance_relay.ports\x12-relay_port_min must not exceed relay_port_max\x1a*this.relay_port_min <= this.relay_port_max\x1a\x82\x01\n" +
+	"\x1aassistance_relay.port_span\x120relay port range must contain at most 4096 ports\x1a2this.relay_port_max <= this.relay_port_min + 4095uB$Z\"lindm/gen/lindm/config/v1;configv1b\x06proto3"
 
 var (
 	file_lindm_config_v1_config_proto_rawDescOnce sync.Once
