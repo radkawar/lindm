@@ -17,6 +17,7 @@ import (
 
 	"lindm/internal/devlab"
 	"lindm/internal/devlab/worktree"
+	"lindm/internal/filelock"
 	"lindm/internal/labexec"
 )
 
@@ -192,7 +193,7 @@ func testIntegration(ctx context.Context, fixtureRoot, codeRoot string, limit ti
 	queue, stopQueue := context.WithTimeout(ctx, integrationQueueLimit)
 	defer stopQueue()
 	var lastHolder string
-	unlock, err := worktree.LockFile(queue, lock, func(holder string) {
+	unlock, err := filelock.LockFile(queue, lock, func(holder string) {
 		lastHolder = holder
 		fmt.Fprintf(os.Stderr, "test-integration: queued %s for %s; the dev PostgreSQL is held by %s\n", time.Since(queued).Round(time.Second), lock, holder)
 	})

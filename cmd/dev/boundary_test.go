@@ -19,6 +19,7 @@ var devtoolPackages = []string{
 	"lindm/internal/devlab/toolchain",
 	"lindm/internal/devlab/worktree",
 	"lindm/internal/diskgc",
+	"lindm/internal/filelock", // Standard-library-only coordination for dev tools and integration fixtures.
 	"lindm/internal/gendoc",
 	"lindm/internal/labexec",
 }

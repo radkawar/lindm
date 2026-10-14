@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"lindm/internal/filelock"
 )
 
 func TestOwnNodeModulesReplacesSymlinkWithoutTouchingTarget(t *testing.T) {
@@ -83,7 +85,7 @@ func TestPublishNodeModulesKeepsOldTreeOnFailure(t *testing.T) {
 
 func TestLockHoldersNamesTheRealHolder(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lock")
-	unlock, err := LockFile(context.Background(), path, nil)
+	unlock, err := filelock.LockFile(context.Background(), path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

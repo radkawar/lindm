@@ -5431,6 +5431,15 @@ volatile deployment and audit-chain identities are regenerated. The golden schem
 is removed after its immutable snapshot is captured. Migration-runner tests and
 the `testdb.New` API still use the uncached application migration path.
 
+Golden initialization holds the existing cross-process file-lock mechanism at
+the fixture's owner-only `integration-template.lock` through migration, `pg_dump`
+and schema removal. PostgreSQL's migration-only lock is insufficient: concurrent
+snapshots and whole-schema drops can otherwise exhaust the cluster's relation-lock
+table. The process-local immutable snapshot cache, independent per-case restores,
+default package concurrency and existing initialization deadlines are unchanged.
+The file lock releases on normal cleanup or process exit; the fixture is not
+restarted and no PostgreSQL durability or security setting is relaxed.
+
 This is a logical schema template, not a per-case database clone: on the loaded
 shared cluster, `DROP DATABASE` forces cluster-wide checkpoints even for tiny
 fixtures. Existing authority-fixture observations recorded consecutive 533-second

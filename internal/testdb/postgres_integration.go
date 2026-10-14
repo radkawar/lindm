@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ import (
 
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/custody"
+	"lindm/internal/filelock"
 	"lindm/internal/labexec"
 )
 
@@ -78,6 +80,15 @@ var migratedTemplate = sync.OnceValues(func() (_ Template, resultErr error) {
 		return Template{}, err
 	}
 	defer clear(dsn)
+	// Migration's PostgreSQL lock alone releases before pg_dump and DROP
+	// SCHEMA. Concurrent package snapshots and drops can exhaust the cluster's
+	// relation-lock table. Hold the fixture-owned cross-process lock until the
+	// golden schema is closed; normal per-case restores remain independent.
+	unlock, err := filelock.LockFile(ctx, filepath.Join(filepath.Dir(path), "integration-template.lock"), nil)
+	if err != nil {
+		return Template{}, fmt.Errorf("lock integration migration snapshot: %w", err)
+	}
+	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
 	started := time.Now()
 	golden, err := New(ctx, strings.TrimSpace(string(dsn)))
 	if err != nil {
