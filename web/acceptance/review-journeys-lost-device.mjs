@@ -279,9 +279,7 @@ async function lostDevice(ctx) {
       .waitFor();
     await revoke
       .getByLabel("Revocation reason", { exact: true })
-      .fill(
-        "Lost laptop reported by its user. Stop access to lindm while the incident is investigated.",
-      );
+      .fill("The user reported a lost laptop. Stop access to lindm during the investigation.");
     await revoke.getByRole("button", { name: "Request revocation approval", exact: true }).click();
     await revoke
       .getByRole("link", { name: "Open approvals to finish revoking once approved", exact: true })

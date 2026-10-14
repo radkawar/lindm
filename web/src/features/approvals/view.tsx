@@ -183,30 +183,35 @@ function RolloutApproval({ approval }: { approval: Approval }) {
         </ol>
       ) : null}
       {adopted.length && state ? (
-        <p className="text-warning">
-          Adopts the existing{" "}
-          {adopted.map((ref, index) => {
-            const identity = settingTitle(ref);
-            return (
-              <span key={`${ref.kind}:${ref.canonicalKey}`}>
-                {index ? ", " : ""}
-                {resourceKindLabel(ref.kind)}
-                {identity && !identity.startsWith("system") ? (
-                  <>
-                    {" "}
-                    {ref.kind === ResourceKind.FIREWALL_ZONE ? (
-                      <span className="break-all">{identity}</span>
-                    ) : (
-                      <code className="font-mono text-[0.92em] break-all">{identity}</code>
-                    )}
-                  </>
-                ) : null}
-              </span>
-            );
-          })}{" "}
-          on {state.adoptingCount} {state.adoptingCount === 1 ? "device" : "devices"}: lindm takes
-          over settings these devices already have.
-        </p>
+        <div className="grid gap-1 text-warning">
+          <p>
+            This rollout lets lindm manage these existing settings on {state.adoptingCount}{" "}
+            {state.adoptingCount === 1 ? "device" : "devices"}.
+          </p>
+          <ul
+            aria-label="Existing settings to adopt"
+            className="flex list-disc flex-wrap gap-x-4 gap-y-1 pl-4"
+          >
+            {adopted.map((ref) => {
+              const identity = settingTitle(ref);
+              return (
+                <li key={`${ref.kind}:${ref.canonicalKey}`}>
+                  {resourceKindLabel(ref.kind)}
+                  {identity && !identity.startsWith("system") ? (
+                    <>
+                      {" "}
+                      {ref.kind === ResourceKind.FIREWALL_ZONE ? (
+                        <span className="break-all">{identity}</span>
+                      ) : (
+                        <code className="font-mono text-[0.92em] break-all">{identity}</code>
+                      )}
+                    </>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       ) : null}
       <p className="text-muted-foreground">
         {approval.state === ApprovalState.PENDING

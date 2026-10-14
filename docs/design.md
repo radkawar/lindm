@@ -237,6 +237,8 @@ Show at most three CVE identifiers per finding. Keep longer identifier lists and
 platform lists in the existing Details disclosure.
 Keep setting identities in technical `code` markup, not prose. Retain their full
 values. Keep human-readable firewall zone names in normal text.
+List affected settings as individual items. Do not turn variable-length lists
+into sentences.
 Recording notices must name lindm as the actor. State the policy, prior notice and
 conditional user-approval requirements directly.
 

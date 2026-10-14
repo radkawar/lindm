@@ -339,9 +339,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                     value={snippet}
                   />
                   <p className="text-sm text-muted-foreground">
-                    After you run it, close this dialog and refresh Enrollment. If approval is
-                    required, review the device waiting for approval. A copied command does not
-                    confirm enrollment.
+                    After you run it, close this dialog. Refresh Enrollment. Review the device in
+                    Enrollment if it needs approval. Copying a command does not confirm enrollment.
                   </p>
                 </>
               ) : !platforms.length ? (
