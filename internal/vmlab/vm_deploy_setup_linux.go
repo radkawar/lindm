@@ -38,6 +38,7 @@ type VMDeploySetupResult struct {
 	ImageSHA256            string                     `json:"image_sha256,omitempty"`
 	GuestOS                []string                   `json:"guest_os"`
 	Runtime                *vmRuntimeEvidence         `json:"runtime,omitempty"`
+	ServerMinimumDiskBytes int64                      `json:"server_minimum_disk_bytes"`
 	ReleaseVersion         string                     `json:"release_version"`
 	AirgapServerInstall    bool                       `json:"airgap_server_install"`
 	Custody                string                     `json:"custody"`
@@ -61,7 +62,7 @@ type VMDeploySetupResult struct {
 // lifecycle. The caller locks secret memory before entering this lab-only API.
 // Success establishes install/first owner only and never qualifies deploy.
 func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDeploySetupOptions) (result *VMDeploySetupResult, err error) {
-	result = &VMDeploySetupResult{Scope: deploylab.FirstRunInstallScope, StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), AirgapServerInstall: options.Airgap}
+	result = &VMDeploySetupResult{Scope: deploylab.FirstRunInstallScope, StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), AirgapServerInstall: options.Airgap, ServerMinimumDiskBytes: deployServerDiskBytes}
 	defer func() { finishDeploySetupResult(result, err) }()
 	if err := validateDeploySetupOptions(manifest, options); err != nil {
 		return result, err
@@ -184,12 +185,12 @@ func prepareDeploySetupBrowser(options VMDeploySetupOptions, private string, fil
 	return deploylab.BrowserRequest{Phase: "setup", Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: ca, PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), ResultPath: filepath.Join(options.EvidenceDirectory, "browser-setup.json")}, nil
 }
 
-func deploySetupHardware(airgap bool) *VMHardwareOptions {
-	return &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: !airgap}
+func deployServerHardware(airgap bool) *VMHardwareOptions {
+	return &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: !airgap, minimumDiskBytes: deployServerDiskBytes}
 }
 
 func newDeploySetupGuest(ctx context.Context, manifest *labv1.ImageManifest, options VMDeploySetupOptions, result *VMDeploySetupResult) (*guestVM, error) {
-	guest, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deploySetupHardware(options.Airgap))
+	guest, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(options.Airgap))
 	if err != nil {
 		return nil, err
 	}

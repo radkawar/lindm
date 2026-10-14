@@ -3780,6 +3780,13 @@ FIFO admission (configured local ceiling remains four), not nested sublane lease
 fresh server, second fresh managed device and third fresh restore server.
 Supported server hosts are Ubuntu 24.04 and entitled RHEL 9 only; the derived
 matrix gate explicitly distinguishes other device targets from supported servers.
+The source and fresh restore servers request a 32 GiB overlay floor, also used by
+the one-server `lab deploy setup` observation. The full multiarchitecture release
+and its private immutable snapshot must fit while preserving the installer's
+4 GiB-free preflight. The managed device and other native lanes keep the existing
+10 GiB default floor; larger vendor bases are not shrunk. Existing conservative
+32 GiB-per-guest disk admission, four slots and FIFO remain unchanged. Evidence
+records `server_minimum_disk_bytes`; this budget is not an installer gate bypass.
 
 ```sh
 go run ./cmd/lab deploy \
@@ -4034,6 +4041,16 @@ bundle using the actual wrapper statement: preserving modes verifies; the old
 private-umask copy must reproduce the provenance failure. These copy checks do not
 qualify a full installation. The failed 805 bundles must be rebuilt and signed
 again with the corrected wrapper before native qualification.
+The rebuilt `da970de98` cold SDK completed both signed production versions 0.2.2
+and 0.2.3 and all verification/cleanup gates. Its first native Ubuntu attempt
+correctly refused the 10 GiB lane server because fewer than 4 GiB remained in
+`/var` after staging the full release and its snapshot. The maintained server
+overlay budget now addresses that lab prerequisite; the product free-disk gate is
+unchanged. That failed native record is retained, not promoted.
+The successful cold-build-only record is
+`~/work/turnkey-cold-key-care-20261014/cold-release-attempt7.json`, SHA-256
+`3fe9c9a6fc53548d7e22327282a02c95284fe284a319f9e68e985d0b8797bfd0`.
+It explicitly retains `lifecycle_qualified: false`; native proof is separate.
 
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated

@@ -25,6 +25,8 @@ import (
 	"lindm/internal/releasebuild"
 )
 
+const deployServerDiskBytes int64 = 32 << 30
+
 // VMDeployOptions consumes independently authenticated private release exports.
 // Browser drives visible production controls; Recovery signs independently
 // retained post-backup security state using the exported offline quorum custody.
@@ -53,6 +55,7 @@ type VMDeployResult struct {
 	GuestOS                          []string                     `json:"guest_os"`
 	Runtime                          *vmRuntimeEvidence           `json:"runtime,omitempty"`
 	RestoreRuntime                   *vmRuntimeEvidence           `json:"restore_runtime,omitempty"`
+	ServerMinimumDiskBytes           int64                        `json:"server_minimum_disk_bytes"`
 	ReleaseVersion                   string                       `json:"release_version"`
 	UpgradeVersion                   string                       `json:"upgrade_version"`
 	Custody                          string                       `json:"custody"`
@@ -92,7 +95,7 @@ type VMDeployResult struct {
 // the server, the console-enrolled device, and the fresh restore destination.
 // It never opens the shared development database or imports a fixture owner.
 func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDeployOptions) (result *VMDeployResult, err error) {
-	result = &VMDeployResult{StartedAt: time.Now().UTC(), ImageID: manifest.GetId()}
+	result = &VMDeployResult{StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), ServerMinimumDiskBytes: deployServerDiskBytes}
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.ManualCommands, result.OperatorDecisions, result.ObservedFailures = deploylab.Counts(result.Operations)
@@ -191,7 +194,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return errors.Join(runErr, deploylab.ValidateBrowserEvidence(request, observed))
 		})
 	}
-	server, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: true})
+	server, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(false))
 	if err != nil {
 		return result, err
 	}
@@ -359,7 +362,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			}
 			result.EvidenceFiles = append(result.EvidenceFiles, name)
 		}
-		restored, _, runErr := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: true})
+		restored, _, runErr := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(false))
 		if runErr != nil {
 			return runErr
 		}

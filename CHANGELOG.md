@@ -29,6 +29,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Budget a 32 GiB cold-release guest overlay for two isolated full builds without changing other native lane disks or sharing compiler caches.
 - Restore canonical public embedded-repository and signed executable modes after private cold transport, with unchanged signed release provenance and custody permissions.
 - Preserve authenticated public bundle modes inside the installer's private immutable snapshot without preserving source ownership or weakening provenance verification.
+- Budget 32 GiB source and restore server overlays for full signed turnkey bundles while preserving the installer's free-disk preflight and normal lab admission.
 - Prepare checkout-owned development trust for container integration without a maintainer cache.
 - Preserve first-owner audit records when testing bounded exports, and release only each acquired test lease in concurrent capacity checks.
 - Add the committer's DCO sign-off to verified maintainer landings and gate commits.
