@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -157,6 +158,13 @@ type Service struct {
 	RecordingStorage       uint64
 }
 
+// Device rules depend only on generated descriptors, not on a deployment or
+// service's mutable dependencies. Compile eagerly once; Validator supports
+// concurrent validation and retains no request or authorization state.
+var deviceRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(validatedMessages()...), protovalidate.WithDisableLazy())
+})
+
 // NewCore validates cfg and builds the shared device dependencies.
 func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, error) {
 	if pool == nil {
@@ -193,7 +201,7 @@ func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, e
 			return nil, errors.New("device: execution signing requires authority and distinct Ed25519 keys")
 		}
 	}
-	compiled, err := protovalidate.New(protovalidate.WithMessages(validatedMessages()...), protovalidate.WithDisableLazy())
+	compiled, err := deviceRules()
 	if err != nil {
 		return nil, err
 	}

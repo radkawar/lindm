@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"sync"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -53,18 +54,23 @@ type Store struct {
 type Resolver func(context.Context, pgx.Tx, []*policyv1.TargetCandidate) (*policyv1.TargetResolution, error)
 type Activator func(context.Context, pgx.Tx, *policyv1.TargetPreview) error
 
-func New() (*Store, error) {
-	return newStore(nil)
-}
-
-func newStore(clock func() time.Time) (*Store, error) {
-	rules, err := protovalidate.New(protovalidate.WithMessages(
+// Schema rules are independent of a store's clock, previews and rollout state.
+var targetingRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
 		&adminv1.PutDynamicGroupRequest{}, &adminv1.ListDynamicGroupsRequest{}, &adminv1.GetDynamicGroupRequest{}, &adminv1.PreviewDynamicGroupRequest{},
 		&adminv1.PutTargetAssignmentRequest{}, &adminv1.ListTargetAssignmentsRequest{},
 		&adminv1.PreviewTargetAssignmentsRequest{}, &adminv1.ActivateTargetPreviewRequest{},
 		&adminv1.PreviewTargetAssignmentImpactRequest{}, &adminv1.StartRolloutRequest{}, &adminv1.ListRolloutDevicesRequest{},
 		&adminv1.PutRolloutRequest{}, &adminv1.ControlRolloutRequest{}, &adminv1.ListRolloutsRequest{},
 	), protovalidate.WithDisableLazy())
+})
+
+func New() (*Store, error) {
+	return newStore(nil)
+}
+
+func newStore(clock func() time.Time) (*Store, error) {
+	rules, err := targetingRules()
 	if err != nil {
 		return nil, err
 	}

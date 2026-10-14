@@ -5387,9 +5387,22 @@ privilege is granted to the migrator or runtime role.
 Independent device integration cases use `t.Parallel` with a four-case bound that
 includes cleanup, rather than the host CPU-derived concurrency default. Nested
 subtests retain their original order. The console-pool latency regression and
-10,000-device impact/report regression stay serial within their binary. Only the
-read-only RSA-3072 escrow transport key is shared; each custody object, wrapping
-key, enrollment, device, authority and database state remains independent.
+10,000-device impact/report regression stay serial within their binary. Custody
+objects, wrapping keys, enrollment, device, authority and database state remain
+independent. The read-only RSA-3072 escrow transport key is shared, as are the
+descriptor-derived validation rules for device, identity, policy and targeting.
+These thread-safe validators compile once per process; device, policy and targeting
+retain eager compilation and fail-closed registration. Identity also constructs its
+fixed unknown-account dummy password hash once, but every login still performs the
+same production-cost Argon2 verification. No real password hash or authorization
+decision is cached across fixtures.
+
+The integration runner leaves Go's package concurrency (`-p`) at its default.
+The four-case device limit applies within that binary, not across packages; tests
+may wait for a slot, and Go's reported elapsed time includes that queue. Compare the
+fixture's `active` and `queue` logs before attributing a long test to a database lock.
+Every case uses private schema rows; the initial golden migration uses the normal
+migration advisory lock, and the cluster's I/O remains shared.
 
 For per-test profiling without bypassing the host-wide integration lock, run
 `go run ./cmd/devenv test-integration -root <fixture-checkout> -code <code-checkout>
@@ -5402,6 +5415,24 @@ connections, identity/service/authority setup, cleanup and active-versus-queued
 test time. `BenchmarkMigrationFixtures` compares uncached migration and template
 restoration including connection and cleanup work. The 30-minute per-binary
 deadline and integration-lock cap are unchanged.
+
+On 2026-10-14, the focused device integration command above passed before and
+after immutable setup caching: the package took 394.358s versus 225.347s (42.9%
+less), and the complete command took 416.22s versus 243.97s. The host's starting
+1/5/15-minute load averages were 4.94/3.18/2.73 and 5.62/6.51/5.57 respectively.
+These natural loads were below the historical timeout conditions; this is not a
+reproduction of the reported 30-minute failure or a whole-suite timing claim.
+The baseline signed-action characterization profile sampled 23.33 CPU seconds,
+including 6.17s under validator construction (5.05s under device-core construction).
+Caching device/policy/targeting rules and the dummy hash reduced that test's sampled
+CPU to 7.30s; its remaining 0.93s of identity request compilation then motivated
+sharing that fixed validator too. Database restoration and cleanup still do real
+schema I/O, and the largest remaining tests exercise real history pruning,
+10,000-device report pagination and encoded page bounds. A concurrent database
+activity snapshot showed no lock waits, but did show shared I/O waiting.
+Retained JSON, active/queue rankings and profiles are in the owner-only maintainer
+archive `~/.cache/lindm-device-timeout-20261014.tar.gz` (SHA-256
+`b99f92ea2fa97be2c133a072f2928d75572e2c874abc7d07a206ce7bcde15800`).
 
 Avoid flaky fixed sleeps. Poll an observable state with a deadline and structured
 failure evidence. Tests use controlled time where appropriate; full lifecycle still

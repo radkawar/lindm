@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"math"
+	"sync"
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
@@ -38,15 +39,20 @@ type Store struct {
 	rules protovalidate.Validator
 }
 
-func NewStore(pool *pgxpool.Pool) (*Store, error) {
-	if pool == nil {
-		return nil, ErrProfileRejected
-	}
-	rules, err := protovalidate.New(protovalidate.WithMessages(
+// Catalog rules are independent of the store's pool and revision state.
+var catalogRules = sync.OnceValues(func() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
 		&adminv1.PublishProfileRevisionRequest{},
 		&adminv1.GetProfileRevisionRequest{},
 		&adminv1.ListProfilesRequest{},
 	), protovalidate.WithDisableLazy())
+})
+
+func NewStore(pool *pgxpool.Pool) (*Store, error) {
+	if pool == nil {
+		return nil, ErrProfileRejected
+	}
+	rules, err := catalogRules()
 	if err != nil {
 		return nil, err
 	}

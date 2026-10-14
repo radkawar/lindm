@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -58,9 +59,11 @@ func verifyPassword(encoded, password string) bool {
 
 // The dummy is not a credential. Its fixed salt and known password only provide
 // the identical Argon2 cost for an unknown account; callers must always deny it.
-func dummyPasswordHash() string {
+// Cache construction of this immutable hash, never password verification: each
+// unknown-account login still performs the full production Argon2 work.
+var dummyPasswordHash = sync.OnceValue(func() string {
 	return encodePassword("lindm unknown-account timing only", []byte("lindm-dummy-salt!"))
-}
+})
 
 func localWebAuthn(publicURL string) (*webauthn.WebAuthn, error) {
 	u, err := url.Parse(publicURL)

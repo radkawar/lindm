@@ -89,7 +89,7 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 	if err != nil {
 		return nil, err
 	}
-	rules, err := newRequestValidator()
+	rules, err := requestRules()
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +189,9 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 	return s, nil
 }
 
-func newRequestValidator() (protovalidate.Validator, error) {
+// Request schemas are fixed generated descriptors. Share their thread-safe
+// compilation cache, not a service's authorization policy or account state.
+var requestRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 	return protovalidate.New(protovalidate.WithMessages(
 		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
 		&authv1.FirstRunSetupRequest{},
@@ -201,7 +203,7 @@ func newRequestValidator() (protovalidate.Validator, error) {
 		&authv1.UpdateMCPSettingsRequest{}, &authv1.IssueMCPTokenRequest{}, &authv1.RevokeMCPTokenRequest{}, &authv1.MCPAuditRecord{},
 		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.WithdrawApprovalRequest{}, &adminv1.ListApprovalsRequest{},
 		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
-}
+})
 
 func (s *Service) armInitialOwnerExecution(ctx context.Context, hook func(context.Context, pgx.Tx, uuid.UUID) error) error {
 	if hook == nil {

@@ -26,11 +26,21 @@ func TestLocalPassword(t *testing.T) {
 	if hash == other {
 		t.Fatal("password salts repeated")
 	}
+	// Only construction of the fixed unknown-account hash is shared. It must
+	// retain the production encoding/cost and safe publication to every service.
+	dummy := encodePassword("lindm unknown-account timing only", []byte("lindm-dummy-salt!"))
 	var wg sync.WaitGroup
 	for _, password := range []string{"correct horse battery staple", "wrong"} {
 		wg.Go(func() {
 			if got := verifyPassword(hash, password); got != (password == "correct horse battery staple") {
 				t.Errorf("password verification = %v", got)
+			}
+		})
+	}
+	for range 8 {
+		wg.Go(func() {
+			if got := dummyPasswordHash(); got != dummy {
+				t.Error("cached dummy hash changed its production encoding")
 			}
 		})
 	}
