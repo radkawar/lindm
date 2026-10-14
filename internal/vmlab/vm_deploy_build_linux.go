@@ -267,6 +267,11 @@ func verifyColdReleaseExports(ctx context.Context, result *VMDeployBuildResult, 
 		if manifest.GetVersion() != expected || manifest.GetRevision() != options.Revision {
 			return errors.New("cold bundle revision/version does not match pinned actual clone")
 		}
+		for _, executable := range []string{"install.sh", "lindm-install"} {
+			if err := os.Chmod(filepath.Join(options.EvidenceDirectory, name, executable), 0755); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

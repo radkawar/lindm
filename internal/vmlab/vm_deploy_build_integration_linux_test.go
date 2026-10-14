@@ -27,7 +27,7 @@ func TestColdProductionExportsVerifyAfterPrivateTransport(t *testing.T) {
 	if err := json.Unmarshal(body, &original); err != nil {
 		t.Fatal(err)
 	}
-	paths := []string{"keys/custody.age", "keys/pins.sig", "first/release.json.dsse", "newer/release.json.dsse", "first/agent-repository/release.json.dsse", "newer/agent-repository/release.json.dsse"}
+	paths := []string{"keys/custody.age", "keys/pins.sig", "first/release.json.dsse", "newer/release.json.dsse", "first/agent-repository/release.json.dsse", "newer/agent-repository/release.json.dsse", "first/install.sh", "newer/install.sh", "first/installer.sha256.sig", "newer/installer.sha256.sig"}
 	before := make(map[string][32]byte, len(paths))
 	for _, name := range paths {
 		content, err := os.ReadFile(filepath.Join(directory, name))
@@ -39,6 +39,13 @@ func TestColdProductionExportsVerifyAfterPrivateTransport(t *testing.T) {
 	custodyBefore, err := os.Stat(filepath.Join(directory, "keys/custody.age"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, name := range []string{"first", "newer"} {
+		for _, executable := range []string{"install.sh", "lindm-install"} {
+			if err := os.Chmod(filepath.Join(directory, name, executable), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	options := VMDeployBuildOptions{EvidenceDirectory: directory, Revision: original.SourceRevision, FirstVersion: original.FirstVersion, NewerVersion: original.NewerVersion}
 	result := original
@@ -57,6 +64,14 @@ func TestColdProductionExportsVerifyAfterPrivateTransport(t *testing.T) {
 	custodyAfter, err := os.Stat(filepath.Join(directory, "keys/custody.age"))
 	if err != nil || custodyAfter.Mode() != custodyBefore.Mode() {
 		t.Fatalf("public normalization changed custody mode: %v", err)
+	}
+	for _, name := range []string{"first", "newer"} {
+		for _, executable := range []string{"install.sh", "lindm-install"} {
+			info, err := os.Stat(filepath.Join(directory, name, executable))
+			if err != nil || info.Mode().Perm() != 0755 {
+				t.Fatalf("signed public executable lacks its canonical mode: %s/%s: %v", name, executable, err)
+			}
+		}
 	}
 	options.Revision = strings.Repeat("0", 40)
 	if err := verifyColdReleaseExports(t.Context(), &result, options); err == nil {

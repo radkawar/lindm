@@ -4008,9 +4008,14 @@ releases, version 0.2.0 and 0.2.1, in one 1708.280-second Make stage. Its final
 observer verification failed because private transport changed embedded repository
 file modes to 0600. The observer now uses the existing
 `releasebuild.CanonicalizeEmbeddedRepository` before each unchanged signature,
-digest, provenance, version and revision verification. Only canonical public
-repository permissions are restored; custody modes and all bytes are unchanged.
-The original failed record is retained and cannot qualify a native lifecycle.
+digest, provenance, version and revision verification. After that verification,
+the two signed public executables, `install.sh` and `lindm-install`, regain mode
+`0755`. Only canonical public permissions are restored; custody modes and all bytes
+are unchanged. The first native Ubuntu attempt observed exit 126 because the
+private transport had also removed `lindm-install`'s executable mode. Its bounded
+encrypted stderr confirms `Permission denied` at the wrapper's execution boundary,
+before the installer binary started. That failed native record is retained.
+The original failed cold SDK record also remains unqualified.
 To verify real transported exports separately, set
 `LINDM_TEST_COLD_RELEASE_EXPORTS` to the private export directory with its original
 sibling `.json` record, then run
