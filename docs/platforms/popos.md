@@ -287,6 +287,10 @@ Connected dispatch passed all ten service scenarios (`dispatch-01.json`,
 `c4b6da37366c9cd09d0a3d290ebc7c1baf7da66d35cef0d64bcfe9ff5afbfdbb`) and the power
 actions (`power-01.json`,
 `860b66a4531e5abae2851a4afa7d6145a3233ea99f1d7d4cebcb3d2a9dc330d4`).
+The native systemd service provider lane (`lab matrix run`, cell `services`, main
+`e399809a`) passed all eleven scenarios
+(`~/.cache/lindm-desktopderiv-20261011/pop/matrix-deriv-03/pop-24.04/services-x86_64.json`,
+`384d1015fad47b9136c1421c7e84e1151b898ee82d208e29ae8d1a09ec7970d8`).
 
 ## Updates
 
@@ -389,6 +393,19 @@ export for Pop!\_OS and require that `partial`/`vendor_feed_unavailable_pop`
 evaluation with uncovered packages; the `advisories` lane checks uncovered vendor
 packages and findings against the guest's own `apt-cache policy` origins, as for
 [Linux Mint](mint.md#advisory-feeds).
+
+The first advisories run
+(`~/.cache/lindm-desktopderiv-20261011/pop/matrix-deriv-03/pop-24.04/advisories-x86_64.json`,
+`9ed777382778b5d4c436036c2957a041e56829b72a6e31ff76c05815e521cfda`, `fail`)
+observed the server's `partial` `vendor_feed_unavailable_pop` evaluation with 400
+uncovered packages (76 `vendor_feed_unavailable`, 324 `origin_unlisted`), then
+failed in the lab oracle, not the product: Pop!\_OS pins its release repository
+to 1001, and `apt-cache policy` prints such index rows with seven leading spaces,
+which the parser took for version rows, so no vendor package showed an origin.
+Fixed in `717dd38f` (regression in
+`TestParseAPTInstalledOriginsJoinsVersionTableToReleaseFields`); the cell awaits
+its rerun, as do `airgap` (the offline bundle defect fixed in `dc2ef9503`, see
+[Linux Mint](mint.md#lab-records)) and `enroll-from-console`.
 
 ## Remote assistance capability roadmap
 
