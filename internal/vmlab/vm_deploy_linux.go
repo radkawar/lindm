@@ -619,7 +619,7 @@ func copyDeployBackup(ctx context.Context, guest *guestVM, source, destination s
 	if err != nil {
 		return err
 	}
-	defer func() { err = errors.Join(err, session.Close()) }()
+	defer func() { err = closeDeployTransfer(err, session) }()
 	hash := sha256.New()
 	bounded := &deployBackupWriter{writer: io.MultiWriter(file, hash)}
 	session.Stdout = bounded
@@ -639,6 +639,15 @@ func copyDeployBackup(ctx context.Context, guest *guestVM, source, destination s
 	}
 	*digest = hex.EncodeToString(hash.Sum(nil))
 	return nil
+}
+
+func closeDeployTransfer(current error, transfer io.Closer) error {
+	closeErr := transfer.Close()
+	if errors.Is(closeErr, io.EOF) {
+		// A completed SSH Run closes the remote channel before deferred cleanup.
+		return current
+	}
+	return errors.Join(current, closeErr)
 }
 
 type deployBackupWriter struct {

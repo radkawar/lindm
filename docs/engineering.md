@@ -3981,6 +3981,12 @@ allowance before `runuser`: its PAM session can reset the inherited limit. The
 2026-10-14 cold run at `334bf7400` captured that gate's refusal in encrypted
 lab-only stderr before any custody export or Make invocation; it was not a
 successful cold build or native lifecycle proof.
+The later `79579e44f` run passed that gate and created signing custody, but Make
+release failed. Its first public artifact copied successfully; deferred SSH
+channel cleanup then returned the expected already-closed `EOF`, preventing the
+remaining encrypted logs from being collected. Artifact transfer now treats only
+that cleanup EOF as completed, preserving actual transfer EOF and every other
+transfer or cleanup failure. This failed run is not release qualification.
 
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated
