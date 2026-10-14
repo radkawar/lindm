@@ -254,7 +254,13 @@ function AssistanceViewerSession({
             <Button
               variant="outline"
               data-review-next-action
-              render={<Link to="/devices/$deviceId" params={{ deviceId }} />}
+              render={
+                <Link
+                  to="/devices/$deviceId"
+                  params={{ deviceId }}
+                  search={{ tab: "assistance" }}
+                />
+              }
             >
               Return to device
             </Button>

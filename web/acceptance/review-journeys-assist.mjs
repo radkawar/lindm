@@ -231,10 +231,20 @@ async function remoteHelp(ctx) {
       "The record fits mobile dark mode and explicitly requires fresh consent for another request.",
     );
     await main.getByRole("link", { name: "Return to device", exact: true }).click();
-    await main.getByRole("tab", { name: "Remote assistance", exact: true }).click();
     await main.getByRole("heading", { name: "Session history", exact: true }).waitFor();
+    requireState(
+      new URL(page.url()).searchParams.get("tab") === "assistance",
+      "assistance_return_lost_context",
+    );
     const recordLink = main.locator(`a[href=${JSON.stringify(sessionPath)}]`);
     await recordLink.waitFor();
+    await main.getByText(reason, { exact: true }).waitFor();
+    await capture(
+      ctx,
+      "return-to-history",
+      "Device assistance history",
+      "Return to device opens the assistance tab in one action, with this request's support reason and record link.",
+    );
     await recordLink.click();
     await main.locator('[data-assistance-state="ended"]').waitFor();
     await main.getByText(reason, { exact: true }).waitFor();

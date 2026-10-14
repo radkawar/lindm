@@ -528,6 +528,8 @@ the disclosure. During consent waiting, the preview and disabled Take control
 explanation remain visible; clipboard, messages, keys and files appear after the
 request leaves the consent-wait state. Session history leads with the support
 reason, people and outcome instead of three separate time columns.
+**Return to device** opens its assistance tab directly, so the administrator can
+review history or request help again without finding the tab a second time.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;
