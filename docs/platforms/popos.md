@@ -403,9 +403,34 @@ failed in the lab oracle, not the product: Pop!\_OS pins its release repository
 to 1001, and `apt-cache policy` prints such index rows with seven leading spaces,
 which the parser took for version rows, so no vendor package showed an origin.
 Fixed in `717dd38f` (regression in
-`TestParseAPTInstalledOriginsJoinsVersionTableToReleaseFields`); the cell awaits
-its rerun, as do `airgap` (the offline bundle defect fixed in `dc2ef9503`, see
-[Linux Mint](mint.md#lab-records)) and `enroll-from-console`.
+`TestParseAPTInstalledOriginsJoinsVersionTableToReleaseFields`). The rerun from
+main `dc2ef9503` passed `qualified_verified_origin_partial_matching`
+(`~/.cache/lindm-desktopderiv-20261011/pop/matrix-deriv-05/pop-24.04/advisories-x86_64.json`,
+`92a6ea10a6ce153b4fdda2f2ca9925bc6e6534599fe8d2528dc0152e9bd327be`): the same
+400 uncovered packages, 1,469 affected findings over 1,755 native packages, every
+one of the 76 vendor packages' installed versions listed by `pop-os-release`, and
+each of the 200 checked finding packages only by Ubuntu's `noble`,
+`noble-security` or `noble-updates` (through `apt.pop-os.org/ubuntu`).
+
+The air-gap cell passed from main `1ecd7588f`
+(`~/.cache/lindm-desktopderiv-20261011/pop/matrix-airgap-05/pop-24.04/airgap-x86_64.json`,
+`6fa542b0a7c1348b469eca892c0c10bc3a44400be3a935cd45690d5e96e92bb6`): offline
+install from the site repository, enrollment, the refused expired, tampered,
+unsigned-edit and replayed bundles, and the audited 0.1.0→0.1.1 rollout, with both
+bundled Ubuntu 24.04 OSV evaluations `partial` `vendor_feed_unavailable_pop` (400
+uncovered, 1,536 affected findings). Earlier attempts stopped on the offline bundle
+regressions recorded for [Linux Mint](mint.md#lab-records).
+
+Enroll from console failed first
+(`~/.cache/lindm-desktopderiv-20261011/pop/matrix-enroll-04/pop-24.04/enroll-from-console-x86_64.log`,
+`b008806e2a2bd72b7e55af9380b5c93e3273e8f1fe7d2139934475ea7a61ff8e`): on the stock
+guest, which keeps the vendor timers, the copied console command exited 100 right
+after boot while `pop-system-updater`'s boot refresh held APT's locks. apt 2.8.3's
+`DPkg::Lock::Timeout` does not cover `apt-get update`'s lists lock (measured), so
+the console's APT command now waits up to ten minutes while every APT error is a
+lock refusal (`57400ed5c`, `test/tooling/enrollment-snippets.test.mjs`). The rerun
+passed (`~/.cache/lindm-desktopderiv-20261011/pop/matrix-enroll-05/pop-24.04/enroll-from-console-x86_64.json`,
+`d35bac654c551e7a12bce7d4a96d923a90c31514ff545d7907de3d35000ab08c`).
 
 ## Remote assistance capability roadmap
 

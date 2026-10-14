@@ -200,27 +200,28 @@ as `464ad5cc` (lab `c944eb4b…`, lindmd `728fa7eb…`). Unencrypted lanes boot 
 installed golden with Secure Boot off (`OVMF_VARS_4M.fd`); encrypted and action
 lanes use `OVMF_VARS_4M.ms.fd` with Secure Boot enforced.
 
-| Cell                                                                                 | Result                       | Record                                                  | SHA-256                                                            |
-| ------------------------------------------------------------------------------------ | ---------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------ |
-| Inventory (golden v3, 1905 packages, APT origins verified)                           | pass                         | `inspect-05.json`                                       | `19ae97aa8fc414a5043e22ec99caac6ecde8c38c9d19f9b417c02005eaaa07ad` |
-| Lifecycle (signed DEB 0.7.0→0.7.1, control-plane trust, local authority)             | pass                         | `lifecycle-05.json`                                     | `c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2` |
-| Dispatch (service scenarios, clock skew, revocation)                                 | pass                         | `dispatch-03.json`                                      | `7169f45460f70f49dfe645d0bf4bf22f961c0c7aafe91930d393f59c27133721` |
-| Power actions (restart, refresh inventory, shutdown)                                 | pass                         | `power-03.json`                                         | `9593e9cafb9118e2a9b0aee037c0953ce8b2d1b56cc5ea34af9d642403316d5e` |
-| Agent self-update                                                                    | pass                         | `updates-03.json`                                       | `b4711034c9ead10d62cde03997d733aec7b553204f5679b554c20b6450657219` |
-| Resources, executor phase (packages, files, accounts, sysctl, definitions, password) | pass                         | `resources-executor-05b.json`                           | `bc3e79333a16a38b22deea5375474650af990f4c64c117da28c5ab8afbdce4ad` |
-| Resources, connected phase (same + secret-password, local-admin)                     | pass                         | `resources-connected-05.json`                           | `b33b84222eb7bf4bf89703604d69334c37f887895f8e1729f04ceae39b1651b0` |
-| Resources, connected firewall (probe-peer guest)                                     | pass                         | `resources-connected-05fw.json`                         | `ca8f29c0173fd03cbf73c2688dbc5be7e9f83731d7fb014c2b812c85e0f99d0c` |
-| Encrypted installer golden (LUKS2, TPM2, Secure Boot, two cold boots, headers)       | pass                         | `encrypted-05.json`                                     | `27a32bf1ec385eaf0e535fc8ad00b2fab22af921d1389c67f7e6122a7e2b0931` |
-| Device actions `-scenario all` (encryption, wipe, lock/quarantine, TPM)              | pass                         | `device-actions-all-all-05.json`                        | `228af3db99b280d06a99e8bac155df00c702bb327be9018b8b53081388eadafd` |
-| Lock/release/quarantine (desktop-session lane)                                       | pass, lock `OUTCOME_UNKNOWN` | `sessions/mint/mint223-lock-quarantine-01.json`         | `dbba0024735008971ccfff6d2d9043ca31df42fcdc4b0d300e0b9249eb7f9f81` |
-| Assistance VIEW/CONTROL                                                              | unavailable                  | `sessions/mint/mint223-assistance-02/assistance.json`   | `ab55da8ff567ac164ddd272238fe7564c7af8f7d49f8e2455cafe1cefcc26ad3` |
-| Recovery sanitize, Mint original, measured GRUB, NVMe format                         | pass                         | `device-actions-mint-original-recovery-nvme-07.json`    | `2ba33c1dbc2d0a2fc0c121382fd98865824e2b8839b76063d2964f3134c81e89` |
-| Recovery sanitize, Mint original, measured GRUB, SATA overwrite                      | pass                         | `device-actions-mint-original-recovery-sata-07b.json`   | `ed05a68121abdece41bba98713216868a569b59ac9db3454a434c7a32bf7e321` |
-| 30 consecutive unattended TPM2 cold boots (main `8c6af7ff`, Secure Boot on)          | pass                         | `device-actions-tpm-unattended-boots-08.json`           | `bf5869a0037cd3f29693b31562bddd2779d6b9a9e17cefac0907cfd38190fabf` |
-| TPM reference repair (legacy agent 1 of 4 references → 4 of 4; 30 cold boots)        | pass                         | `device-actions-tpm-reference-repair-01.json`           | `90822f9b6245ac019b3f180afed2fddd90f9828ca9bb1b01196cb4c9d9ed1c3e` |
-| Services (systemd.service.v1 native provider, eleven scenarios)                      | pass                         | `matrix-deriv-03/linuxmint-22.3/services-x86_64.json`   | `ebab9e0dd0aaee6e570469c6f731d9503c13b79e8e68e97b9186b08fa486be66` |
-| Advisories (verified-origin partial through Ubuntu 24.04 OSV)                        | pass, partial-feed matching  | `matrix-deriv-03/linuxmint-22.3/advisories-x86_64.json` | `0a95850049c7d767591a0ede1c9a4559d940553722a52a4cfea8658c7c32c17d` |
-| Air gap (B1/B2/B3/expired bundles)                                                   | fail, product defect fixed   | `matrix-airgap-01/linuxmint-22.3/airgap-x86_64.json`    | `d338b98d17ef855528bc3588207b4fd0cfa78db1af49ad042f2da90084490be1` |
+| Cell                                                                                 | Result                       | Record                                                            | SHA-256                                                            |
+| ------------------------------------------------------------------------------------ | ---------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Inventory (golden v3, 1905 packages, APT origins verified)                           | pass                         | `inspect-05.json`                                                 | `19ae97aa8fc414a5043e22ec99caac6ecde8c38c9d19f9b417c02005eaaa07ad` |
+| Lifecycle (signed DEB 0.7.0→0.7.1, control-plane trust, local authority)             | pass                         | `lifecycle-05.json`                                               | `c48333450314570f24fbfe56791a8de6834ba676fc82c318664d51ce852b21e2` |
+| Dispatch (service scenarios, clock skew, revocation)                                 | pass                         | `dispatch-03.json`                                                | `7169f45460f70f49dfe645d0bf4bf22f961c0c7aafe91930d393f59c27133721` |
+| Power actions (restart, refresh inventory, shutdown)                                 | pass                         | `power-03.json`                                                   | `9593e9cafb9118e2a9b0aee037c0953ce8b2d1b56cc5ea34af9d642403316d5e` |
+| Agent self-update                                                                    | pass                         | `updates-03.json`                                                 | `b4711034c9ead10d62cde03997d733aec7b553204f5679b554c20b6450657219` |
+| Resources, executor phase (packages, files, accounts, sysctl, definitions, password) | pass                         | `resources-executor-05b.json`                                     | `bc3e79333a16a38b22deea5375474650af990f4c64c117da28c5ab8afbdce4ad` |
+| Resources, connected phase (same + secret-password, local-admin)                     | pass                         | `resources-connected-05.json`                                     | `b33b84222eb7bf4bf89703604d69334c37f887895f8e1729f04ceae39b1651b0` |
+| Resources, connected firewall (probe-peer guest)                                     | pass                         | `resources-connected-05fw.json`                                   | `ca8f29c0173fd03cbf73c2688dbc5be7e9f83731d7fb014c2b812c85e0f99d0c` |
+| Encrypted installer golden (LUKS2, TPM2, Secure Boot, two cold boots, headers)       | pass                         | `encrypted-05.json`                                               | `27a32bf1ec385eaf0e535fc8ad00b2fab22af921d1389c67f7e6122a7e2b0931` |
+| Device actions `-scenario all` (encryption, wipe, lock/quarantine, TPM)              | pass                         | `device-actions-all-all-05.json`                                  | `228af3db99b280d06a99e8bac155df00c702bb327be9018b8b53081388eadafd` |
+| Lock/release/quarantine (desktop-session lane)                                       | pass, lock `OUTCOME_UNKNOWN` | `sessions/mint/mint223-lock-quarantine-01.json`                   | `dbba0024735008971ccfff6d2d9043ca31df42fcdc4b0d300e0b9249eb7f9f81` |
+| Assistance VIEW/CONTROL                                                              | unavailable                  | `sessions/mint/mint223-assistance-02/assistance.json`             | `ab55da8ff567ac164ddd272238fe7564c7af8f7d49f8e2455cafe1cefcc26ad3` |
+| Recovery sanitize, Mint original, measured GRUB, NVMe format                         | pass                         | `device-actions-mint-original-recovery-nvme-07.json`              | `2ba33c1dbc2d0a2fc0c121382fd98865824e2b8839b76063d2964f3134c81e89` |
+| Recovery sanitize, Mint original, measured GRUB, SATA overwrite                      | pass                         | `device-actions-mint-original-recovery-sata-07b.json`             | `ed05a68121abdece41bba98713216868a569b59ac9db3454a434c7a32bf7e321` |
+| 30 consecutive unattended TPM2 cold boots (main `8c6af7ff`, Secure Boot on)          | pass                         | `device-actions-tpm-unattended-boots-08.json`                     | `bf5869a0037cd3f29693b31562bddd2779d6b9a9e17cefac0907cfd38190fabf` |
+| TPM reference repair (legacy agent 1 of 4 references → 4 of 4; 30 cold boots)        | pass                         | `device-actions-tpm-reference-repair-01.json`                     | `90822f9b6245ac019b3f180afed2fddd90f9828ca9bb1b01196cb4c9d9ed1c3e` |
+| Services (systemd.service.v1 native provider, eleven scenarios)                      | pass                         | `matrix-deriv-03/linuxmint-22.3/services-x86_64.json`             | `ebab9e0dd0aaee6e570469c6f731d9503c13b79e8e68e97b9186b08fa486be66` |
+| Advisories (verified-origin partial through Ubuntu 24.04 OSV)                        | pass, partial-feed matching  | `matrix-deriv-03/linuxmint-22.3/advisories-x86_64.json`           | `0a95850049c7d767591a0ede1c9a4559d940553722a52a4cfea8658c7c32c17d` |
+| Air gap (B1/B2/B3/expired bundles, offline install, rollout 0.1.0→0.1.1, partial)    | pass                         | `matrix-airgap-05/linuxmint-22.3/airgap-x86_64.json`              | `f8ccf413ae10442f23776348936d00cd4dde8301287198176cecd3c0dbce8732` |
+| Enroll from console (copied command, waits for APT locks)                            | pass                         | `matrix-enroll-05/linuxmint-22.3/enroll-from-console-x86_64.json` | `9fb6abec2a5d2fe02365224179e8a88b17811649bafbddde03d7adbb8cf29cbf` |
 
 The TPM reference repair record ran from main `b6753033` (lab `-desktop cinnamon`,
 Secure Boot enforced, `-legacy-agent-revision ced6d209…`): the legacy agent's
@@ -242,16 +243,30 @@ the 123 vendor packages' installed versions in `linuxmint/zena` and each of the 
 checked finding packages only in Ubuntu's `noble`, `noble-security` or
 `noble-updates`.
 
-The air-gap record failed before serve on a product regression that was not
-Mint-specific: since `b07ef731d` a server release embeds its attested agent
-repository (`agent-repository/`), which release verification requires, but the
-offline bundle export never copied it, so the first bundle import reported
-`release/agent-repository/release.json: no such file or directory`. Fixed in
-`dc2ef9503` (`TestCopyReleaseKeepsTheServerReleaseAgentRepository`); the air-gap
-and enroll-from-console cells await reruns. Two enroll-from-console attempts do not
-qualify the cell: `matrix-enroll-01` stopped before capture because its browser
-configuration lacked `timeoutMs` (the runner's `invalid_deadline`; operator
-input), and `matrix-enroll-03` was cancelled while queued for owner priority.
+The air-gap cell passed from main `1ecd7588f`: the site imported B1 before serve,
+the guest (no public route: DNS and TCP to 1.1.1.1 failed) installed agent 0.1.0
+only from the site-served signed repository and enrolled, the identical B1 was a
+no-op, the expired, one-byte-tampered, unsigned-edit and replayed bundles were
+refused for their exact reasons, and the audited rollout of B3 installed 0.1.1 with
+the enrollment preserved. Both the B1 and B3 evaluations of the bundled Ubuntu 24.04
+OSV snapshot were `partial` `vendor_feed_unavailable_linuxmint` with 476 uncovered
+packages (findings read to the lane's 20,000 bound). Three earlier attempts failed
+before serve on product regressions that were not Mint-specific, each fixed with a
+regression in `internal/offlinebundle`/`internal/releasebuild`: the bundle omitted a
+server release's embedded agent repository (`matrix-airgap-01`, `d338b98d…`; fixed
+`dc2ef9503`), import verified that repository with the bundle's private file modes
+although the provenance digest binds its canonical ones (`matrix-airgap-03`,
+`8edc0967…`, "canonical agent repository provenance mismatch"; fixed
+`0de14df65`), and the bundle omitted the signed LICENSE/NOTICE/THIRD-PARTY-LICENSES
+(`matrix-airgap-04`, `b6de6102…`; fixed `1ecd7588f`).
+
+Enroll from console passed from main `dc2ef9503` (`matrix-enroll-04`,
+`865a02d9ab2b7f5e70dde88c3c2acf66514be463ab998eb1702557e38563be49`) and again with
+the lock-waiting APT command from main `57400ed5c` (the table's record). Two
+attempts do not qualify the cell: `matrix-enroll-01` stopped before capture because
+its browser configuration lacked `timeoutMs` (the runner's `invalid_deadline`;
+operator input), and `matrix-enroll-03` was cancelled while queued for owner
+priority.
 
 The device-action record covers encryption inventory (LUKS2 UUID, TPM 2.0,
 Secure Boot on, host oracle match), escrow (keyslot 1), audited reveal and custody
