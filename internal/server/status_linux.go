@@ -81,7 +81,7 @@ func operationalProbe(pool, adminPool *pgxpool.Pool, resources *config.Resources
 }
 
 func databaseStatus(ctx context.Context, pool *pgxpool.Pool, component string, now time.Time) *adminv1.ServerStatusCheck {
-	check := statusCheck(component, statusOK, "The verified database connection answered.", "No connection action is needed.", now)
+	check := statusCheck(component, statusOK, "The verified database connection answered.", "This connection needs no action.", now)
 	probe, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := pool.Ping(probe); err != nil {

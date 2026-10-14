@@ -624,11 +624,17 @@ export function installProbes(rules) {
           const blockWalker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
           for (let child = blockWalker.nextNode(); child; child = blockWalker.nextNode()) {
             const element = child.parentElement;
+            // Nested paragraphs and structured fields are independent copy blocks.
+            // Inline links remain part of their surrounding sentence.
+            const semanticBlock = element?.closest(
+              "p,h1,h2,h3,h4,h5,h6,li,dt,dd,[role=alert],[role=status]",
+            );
             if (
               element &&
               rendered(element) &&
               !srOnly(element) &&
               !excluded(element) &&
+              !(semanticBlock && semanticBlock !== block && block.contains(semanticBlock)) &&
               !element.closest("script,style,template,textarea")
             )
               parts.push(child.nodeValue);

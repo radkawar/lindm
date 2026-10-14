@@ -54,6 +54,37 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
         "STE sentence length",
       ),
     );
+    const date = "Oct 14, 4:25 AM British Summer Time · 30 min ago";
+    const dates = ["Checked", "Evidence", "Expires"]
+      .map((label) => `<div><dt>${label}</dt><dd>${date}</dd></div>`)
+      .join("");
+    assert.deepEqual(
+      await inspect(
+        `<ul><li><h3>Server HTTPS certificate</h3><span>Check confirmed</span><p>The certificate has current evidence.</p><dl>${dates}</dl></li></ul>`,
+      ),
+      [],
+    );
+    assert.ok(
+      (await inspect(`<ul><li><p>${sentence}</p></li></ul>`)).includes("STE sentence length"),
+    );
+    assert.ok(
+      (
+        await inspect(
+          `<dl><dt>Evidence</dt><dd>The ${extraWords} other four words here remain.</dd></dl>`,
+        )
+      ).includes("STE sentence length"),
+    );
+    assert.ok(
+      (await inspect(`<p>Select ${extraWords} <a href="/help">device</a>.</p>`)).includes(
+        "STE sentence length",
+      ),
+    );
+    assert.equal(
+      (await inspect("<div role='alert'><p>The request is accepted.</p></div>")).filter(
+        (rule) => rule === "STE passive voice",
+      ).length,
+      1,
+    );
     assert.ok(
       !(
         await inspect(

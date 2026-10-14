@@ -59,20 +59,28 @@ function EvidenceRow({ check }: { check: ServerStatusCheck }) {
         <p className="text-muted-foreground">
           {check.nextAction || "Inspect the server service journal."}
         </p>
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-          <span>
-            Checked:{" "}
-            {check.observedAt ? <Timestamp value={check.observedAt} /> : "No completed check"}
-          </span>
-          <span>
-            Evidence: {check.evidenceAt ? <Timestamp value={check.evidenceAt} /> : "Not available"}
-          </span>
+        <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="font-medium">Checked</dt>
+            <dd className="break-words">
+              {check.observedAt ? <Timestamp value={check.observedAt} /> : "No completed check"}
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="font-medium">Evidence</dt>
+            <dd className="break-words">
+              {check.evidenceAt ? <Timestamp value={check.evidenceAt} /> : "Not available"}
+            </dd>
+          </div>
           {check.expiresAt ? (
-            <span>
-              Expires: <Timestamp value={check.expiresAt} />
-            </span>
+            <div className="min-w-0">
+              <dt className="font-medium">Expires</dt>
+              <dd className="break-words">
+                <Timestamp value={check.expiresAt} />
+              </dd>
+            </div>
           ) : null}
-        </div>
+        </dl>
         <TechnicalDetails
           items={[
             { label: "Check", value: check.component },

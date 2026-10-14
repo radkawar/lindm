@@ -207,6 +207,27 @@ export async function reviewServerStatus({
             ), "Stale presentation advanced the original evidence time");
           }
         }
+        if (variant !== "error") {
+          const fields = await page
+            .locator('section[aria-labelledby="status-evidence"] li')
+            .evaluateAll((rows) =>
+              rows.map((row) => {
+                const metadata = row.querySelector(":scope > div > dl");
+                return [...(metadata?.children ?? [])].map((field) => ({
+                  label: field.querySelector("dt")?.textContent?.trim(),
+                  value: field.querySelector("dd")?.textContent?.trim(),
+                }));
+              }),
+            );
+          require(fields.length === response.checks.length &&
+            fields.every(
+              (row, position) =>
+                row.map((field) => field.label).join(",") ===
+                  (response.checks[position].expiresAt
+                    ? "Checked,Evidence,Expires"
+                    : "Checked,Evidence") && row.every((field) => field.value),
+            ), "Check, evidence and expiry times must remain separate labeled fields with visible values");
+        }
         await page.evaluate(() => window.scrollTo(0, 0));
         entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
         entry.screenshots.full = await screenshot(page, `${prefix}-full.png`, true);

@@ -237,6 +237,9 @@ platform lists in the existing Details disclosure.
 
 `make ui-review` checks rendered copy for sentence length, passive voice,
 forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.
+Inspect paragraphs and structured fields separately. Do not merge nested fields
+into a prose sentence. Keep check, evidence and expiry times in labeled fields.
+Inputs use normal foreground text, not inherited notice colors.
 Declare narrow exceptions with `data-ste-exempt="rule: reason"` in code.
 Use `data-ste-procedure` for procedural text. Explain each exception; never exempt
 a whole page to avoid editing it. Vendor advisory links shown as source data use
