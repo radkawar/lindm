@@ -52,6 +52,7 @@ async function remoteHelp(ctx) {
   let sessionPath = "";
   const reason = "Help diagnose a frozen application. The user decides whether to share.";
   try {
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await ctx.visit("/devices");
     await searchTrigger.focus();
     const shortcuts = await searchTrigger.getAttribute("aria-keyshortcuts");
@@ -251,6 +252,24 @@ async function remoteHelp(ctx) {
       "return-to-history",
       "Device assistance history",
       "Return to device opens the assistance tab in one action. This request's row is already Ended with its support reason and record link, without waiting for a history refresh.",
+    );
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await theme("light");
+    const history = main.getByRole("table", {
+      name: "Remote assistance session history",
+      exact: true,
+    });
+    requireState(
+      await history
+        .locator("..")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+      "assistance_desktop_record_action_clipped",
+    );
+    await capture(
+      ctx,
+      "history-desktop",
+      "Device assistance history on desktop",
+      "Wrapped timestamps keep the support reason, outcome and record action visible without a horizontal scroll.",
     );
     await recordLink.click();
     await main.locator('[data-assistance-state="ended"]').waitFor();

@@ -100,8 +100,15 @@ export function AssistanceGuidance({
   const audioShared =
     audio?.state === AssistanceAudioState.SHARING || audio?.state === AssistanceAudioState.MUTED;
 
+  if (
+    policyMode(session.effectiveCapabilities, "elevation") === AssistancePolicyMode.OFF &&
+    policyMode(session.effectiveCapabilities, "annotation") === AssistancePolicyMode.OFF &&
+    policyMode(session.effectiveCapabilities, "audio") === AssistancePolicyMode.OFF
+  )
+    return null;
+
   return (
-    <div className="grid gap-4 border p-3">
+    <div className="grid gap-4 border p-3" data-assistance-guidance>
       {policyMode(session.effectiveCapabilities, "elevation") !== AssistancePolicyMode.OFF ? (
         <div className="grid gap-2">
           <Label htmlFor={`${id}-note`}>Password prompt guidance</Label>

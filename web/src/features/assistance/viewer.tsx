@@ -1337,6 +1337,7 @@ function AssistanceConnection({
             <p
               ref={frameCoverRef}
               role="status"
+              data-assistance-screen-status
               style={{ display: frameReady ? "none" : "grid" }}
               className="absolute inset-0 place-items-center bg-viewer p-3 text-center text-sm text-viewer-foreground/70"
             >
@@ -1347,7 +1348,9 @@ function AssistanceConnection({
                   : !stream
                     ? "No video yet"
                     : !active
-                      ? "Connection interrupted. You cannot use controls."
+                      ? session.state === AssistanceState.ACTIVE
+                        ? "Connection interrupted. You cannot use controls."
+                        : "Waiting for screen sharing to start…"
                       : presentation.metadataAvailable === false
                         ? "This browser cannot confirm the shared screen. Use a browser with RTP presentation metadata."
                         : "Waiting for the selected screen…"}

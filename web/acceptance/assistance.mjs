@@ -792,6 +792,21 @@ const commands = {
   async screenshot(args) {
     if (!/^[a-z0-9-]{1,80}\.png$/.test(args.name ?? "")) throw new Error("invalid_screenshot_name");
     const path = join(config.evidenceDirectory, args.name);
+    const issue = await driver.page.evaluate(() => {
+      const state = document
+        .querySelector("[data-assistance-state]")
+        ?.getAttribute("data-assistance-state");
+      const screenStatus = document.querySelector("[data-assistance-screen-status]");
+      if (
+        ["offered", "answered"].includes(state) &&
+        screenStatus?.getClientRects().length &&
+        screenStatus.textContent.trim() === "Connection interrupted. You cannot use controls."
+      )
+        return "sharing_start_shown_as_interruption";
+      const guidance = document.querySelector("[data-assistance-guidance]");
+      return guidance && !guidance.innerText.trim() ? "empty_assistance_guidance_panel" : "";
+    });
+    if (issue) throw new Error(issue);
     // Full-page captures otherwise paint the sticky header over the scrolled
     // video's cursor notice. Restore the viewport without changing session state.
     const viewport = await driver.page.evaluate(() => [window.scrollX, window.scrollY]);

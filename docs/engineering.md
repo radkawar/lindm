@@ -533,6 +533,11 @@ review history or request help again without finding the tab a second time.
 A confirmed stop also replaces that session in cached history pages before showing
 the ended record, after canceling older history reads. Returning immediately must
 not show the stopped request as waiting for consent until the next history poll.
+Initial screen setup says that sharing is starting, not that a connection was
+interrupted. The native lane's screenshot step checks this distinction against
+the loaded session state, and refuses an empty guidance panel when no guidance
+tools were requested. History timestamps wrap so the record action fits desktop
+without an unnecessary horizontal scroll.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;

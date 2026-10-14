@@ -31,6 +31,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Keep remote-help requests focused on consent, collapse optional session tools, show support reasons in compact session history and prevent search from stacking over task dialogs.
 - Return from an assistance record directly to the device's assistance tab, preserving support context without an extra navigation step.
 - Apply a confirmed assistance stop to cached session history as well as its record, so returning immediately never shows the stopped request as waiting for consent.
+- Distinguish initial screen-sharing setup from an interrupted live connection, remove empty assistance guidance panels and wrap history timestamps to keep record actions visible on desktop.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.

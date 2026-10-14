@@ -533,7 +533,7 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
         />
       ) : null}
       {data?.sessions.length ? (
-        <Table>
+        <Table aria-label="Remote assistance session history">
           <TableHeader>
             <TableRow>
               <TableHead>Support request</TableHead>
@@ -567,7 +567,7 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
                     <span className="text-muted-foreground">Not answered</span>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="min-w-36 whitespace-normal">
                   <TimeCell value={session.createdAt} />
                   {session.startedAt ? (
                     <p className="mt-1 text-xs text-muted-foreground">
