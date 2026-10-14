@@ -167,17 +167,21 @@ func Export(ctx context.Context, request ExportRequest) (_ *bundlev1.OfflineBund
 }
 
 // copyRelease copies exactly the attested release files and returns the
-// SHA-256 of release.json.
+// SHA-256 of release.json. A server release also carries the attested agent
+// repository subset it embeds (agent-repository/), which release verification
+// requires, so import authenticates it rather than the bundle dropping it.
 func copyRelease(source, destination string, release *releasev1.ReleaseManifest) (string, error) {
 	if err := os.Mkdir(destination, 0755); err != nil {
 		return "", err
 	}
 	names := []string{"release.json", "release.json.dsse"}
+	server := false
 	for _, artifact := range release.GetArtifacts() {
 		names = append(names, artifact.GetPath(), artifact.GetSbomPath(), artifact.GetProvenancePath(), artifact.GetSignaturePath())
 		if artifact.GetNativeSignaturePath() != "" {
 			names = append(names, artifact.GetNativeSignaturePath())
 		}
+		server = server || artifact.GetProduct() == "lindmd"
 	}
 	var manifestDigest string
 	for _, name := range names {
@@ -192,7 +196,39 @@ func copyRelease(source, destination string, release *releasev1.ReleaseManifest)
 			manifestDigest = digest
 		}
 	}
+	if server {
+		if err := copyReleaseTree(filepath.Join(source, agentRepositoryDir), filepath.Join(destination, agentRepositoryDir)); err != nil {
+			return "", fmt.Errorf("offlinebundle: copy embedded agent repository: %w", err)
+		}
+	}
 	return manifestDigest, nil
+}
+
+// agentRepositoryDir is the server release's embedded agent repository.
+const agentRepositoryDir = "agent-repository"
+
+// copyReleaseTree copies a release subtree of directories and regular files
+// only; anything else (a symlink, device or socket) is refused.
+func copyReleaseTree(source, destination string) error {
+	return filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		relative, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, relative)
+		switch {
+		case entry.IsDir():
+			return os.Mkdir(target, 0755)
+		case entry.Type().IsRegular():
+			_, err := copyFileDigest(path, target)
+			return err
+		default:
+			return fmt.Errorf("%s is not a regular file", relative)
+		}
+	})
 }
 
 // buildRepositories publishes one APT and one RPM repository per architecture,
