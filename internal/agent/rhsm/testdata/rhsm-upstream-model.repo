@@ -1,0 +1,33 @@
+# Upstream/model regression fixture, NOT a native registered-device capture.
+# Property names and ui_repoid_vars derivation follow:
+# https://github.com/candlepin/subscription-manager/blob/subscription-manager-1.19.2-1/src/subscription_manager/repolib.py
+# RHEL 9 IDs/CDN/key/CA paths come from lindm's platform registry.
+# Entitlement serial 123 is synthetic; no customer identifier or secret is retained.
+
+[rhel-9-for-x86_64-baseos-rpms]
+name = Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/$releasever/x86_64/baseos/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/123-key.pem
+sslclientcert = /etc/pki/entitlement/123.pem
+metadata_expire = 86400
+ui_repoid_vars = releasever
+skip_if_unavailable = 0
+
+[rhel-9-for-x86_64-appstream-rpms]
+name = Red Hat Enterprise Linux 9 for x86_64 - AppStream (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/$releasever/x86_64/appstream/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/123-key.pem
+sslclientcert = /etc/pki/entitlement/123.pem
+metadata_expire = 86400
+ui_repoid_vars = releasever
+skip_if_unavailable = false

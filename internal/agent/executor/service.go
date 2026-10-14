@@ -148,7 +148,7 @@ type Service struct {
 	capabilityLocal       *config.Document
 	detectHost            func(context.Context) (capabilitypolicy.Host, error)
 	enableUnit            func(context.Context, string) error
-	capabilityGate        func(*resourcev1.ResourceDesiredState) error
+	capabilityGate        func(context.Context, *resourcev1.ResourceDesiredState) error
 	updates               *update.Engine
 	updateHold            bool
 	assistanceEnabled     bool

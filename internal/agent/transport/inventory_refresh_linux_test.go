@@ -64,6 +64,8 @@ type refreshTransportFixture struct {
 	approvedCalls                       int
 	publishedHost                       *inventoryv1.HostObservation
 	capability                          capabilityPolicyFake
+	routinePublication                  bool
+	syncErr                             error
 }
 
 type refreshTransportExecutor struct {
@@ -174,6 +176,9 @@ func (e *refreshTransportExecutor) ConfirmDeviceActionInventory(_ context.Contex
 	return connect.NewResponse(&agentv1.ConfirmDeviceActionInventoryResponse{Status: proto.CloneOf(f.status)}), nil
 }
 func (s *refreshTransportServer) GetSyncState(context.Context, *connect.Request[devicev1.GetSyncStateRequest]) (*connect.Response[devicev1.GetSyncStateResponse], error) {
+	if s.f.syncErr != nil {
+		return nil, s.f.syncErr
+	}
 	return connect.NewResponse(&devicev1.GetSyncStateResponse{SessionEpoch: 1, HostSequence: s.f.host, PackageSequence: s.f.packages, ServerTime: timestamppb.Now()}), nil
 }
 func (s *refreshTransportServer) ReportHostObservation(_ context.Context, req *connect.Request[devicev1.ReportHostObservationRequest]) (*connect.Response[devicev1.ReportHostObservationResponse], error) {
@@ -189,7 +194,7 @@ func (s *refreshTransportServer) ReportHostObservation(_ context.Context, req *c
 	if req.Msg.GetObservation().GetHostname().GetValue() != "refreshed" {
 		f.t.Fatal("fresh host was not fully collected")
 	}
-	if f.boundHost != 0 && f.boundHost != req.Msg.GetSequence() {
+	if !f.routinePublication && f.boundHost != 0 && f.boundHost != req.Msg.GetSequence() {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("refresh host admission already spent"))
 	}
 	f.boundHost = req.Msg.GetSequence()
@@ -205,14 +210,18 @@ func (s *refreshTransportServer) BeginPackageSnapshot(_ context.Context, req *co
 		f.staleUploads++
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("routine package cooldown"))
 	}
-	if f.boundPackages != 0 && f.boundPackages != manifest.GetSequence() {
+	if !f.routinePublication && f.boundPackages != 0 && f.boundPackages != manifest.GetSequence() {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("refresh package admission already spent"))
 	}
-	if f.manifest != nil && !proto.Equal(f.manifest, manifest) {
+	if !f.routinePublication && f.manifest != nil && !proto.Equal(f.manifest, manifest) {
 		if !f.manifest.GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) {
 			f.t.Fatal("same-action immutable manifest changed")
 		}
 		f.superseded = append(f.superseded, f.manifest.GetSnapshotId())
+	}
+	if f.routinePublication && (f.manifest == nil || f.manifest.GetSnapshotId() != manifest.GetSnapshotId()) {
+		f.committed = false
+		f.batches = 0
 	}
 	f.manifest = proto.CloneOf(manifest)
 	f.boundPackages = manifest.GetSequence()

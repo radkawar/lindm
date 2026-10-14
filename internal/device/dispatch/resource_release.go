@@ -125,7 +125,7 @@ func ReleaseResultState(status *agentv1.ResourceExecutionStatus) (string, string
 		return "release_conflict", ResourceReasonUnsafeToolPath
 	case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
 		// Retried (state pending again) when the device's capabilities change.
-		return "release_conflict", core.CapabilityNotEnabledReason(status.GetAdmissionRefusal().GetCapability())
+		return "release_conflict", capabilityRefusalReason(refusal)
 	}
 	if status.GetState() == agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_OUTCOME_UNKNOWN {
 		return "release_conflict", "outcome_unknown"

@@ -14,6 +14,9 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
+	resourcev1 "lindm/gen/lindm/resource/v1"
 )
 
 // Native outputs for one certificate whose signing subkey made the signature:
@@ -137,5 +140,34 @@ func TestInReleaseVerifierInvocation(t *testing.T) {
 		if err := os.RemoveAll(output); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// The verifier must use the approved bytes even if the host keyring changes
+// after source admission. No package-manager network operation may start.
+func TestAPTPreparationRechecksCopiedKeyringDigest(t *testing.T) {
+	directory := rootPackageFixtureDirectory(t)
+	keyPath := filepath.Join(directory, "vendor-key.gpg")
+	original := []byte("original independently approved keyring")
+	digest := sha256.Sum256(original)
+	if err := os.WriteFile(keyPath, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	source := &agentv1.NativePackageSource{
+		Repository:     &resourcev1.RepositoryDesired{Source: &resourcev1.RepositoryDesired_Apt{Apt: nobleArchive()}},
+		SigningKeyFile: keyPath, SigningKeySha256: digest[:],
+	}
+	if err := checkSource(source); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keyPath, []byte("replaced keyring"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	p := &Provider{run: func(context.Context, string, []string, string, []string) (nativeResult, error) {
+		t.Fatal("APT ran with keyring bytes different from the pin")
+		return nativeResult{}, errors.New("unexpected native call")
+	}}
+	if _, err := p.prepareAPT(t.Context(), filepath.Join(directory, "transaction"), source); err == nil {
+		t.Fatal("keyring replacement between admission and copying accepted")
 	}
 }

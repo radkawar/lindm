@@ -201,7 +201,7 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 		disposition, reason := int16(6), "native_unsupported"
 		switch refusal.GetReason() {
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED:
-			return 5, core.CapabilityNotEnabledReason(refusal.GetCapability())
+			return 5, capabilityRefusalReason(refusal)
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_OWNERSHIP_UNKNOWN:
 			return 4, "outcome_unknown"
 		case agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED:
@@ -253,6 +253,15 @@ func resourceResultDisposition(status *agentv1.ResourceExecutionStatus) (int16, 
 	default:
 		return 4, "execution_failed"
 	}
+}
+
+// capabilityRefusalReason preserves the closed device registration remedy while
+// retaining ordinary capability gates for all other causes.
+func capabilityRefusalReason(refusal *agentv1.ResourceAdmissionRefusal) string {
+	if refusal.GetCapability() == agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES && refusal.GetDetail() == "rhsm_registration_required" {
+		return refusal.GetDetail()
+	}
+	return core.CapabilityNotEnabledReason(refusal.GetCapability())
 }
 
 // ResourceReasonPreparationPrecondition is the server reason for a device

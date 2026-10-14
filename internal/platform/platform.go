@@ -392,11 +392,19 @@ type VendorRepository struct {
 	// covers every suite with the same components and signing key.
 	ArchiveURIs map[string]string
 	Suites      []string
-	Components  []string
+	// SuiteURIs overrides ArchiveURIs for a configured pocket (Debian security).
+	SuiteURIs map[string]string
+	// APTFingerprints restricts InRelease signers to authoritative primary
+	// fingerprints in addition to requiring the pinned keyring bytes.
+	APTFingerprints []string
+	Components      []string
 	// NativeRepositories are RPM repositories, the primary first, verified
 	// with the same key: HTTPS base URLs per kernel architecture when the
 	// vendor signs repomd.xml, otherwise an HTTPS metalink per architecture.
 	NativeRepositories []VendorNativeRepository
+	// Entitled selects device-local RHSM definitions instead of public URLs.
+	// No entitlement credentials or endpoints are sent by the control plane.
+	Entitled *VendorEntitledRepository
 	// KeyFile is the vendor-packaged public key on the host: a regular file,
 	// never a distribution symlink. KeyArtifactID names it in ArtifactRef.
 	KeyFile       string
@@ -426,6 +434,38 @@ type VendorNativeRepository struct {
 	ID        string
 	BaseURLs  map[string][]string
 	Metalinks map[string]string
+}
+
+// VendorEntitledRepository pins the only RHSM repositories and local custody
+// namespaces a vendor archive can use. Facts belong exclusively in registry.go.
+type VendorEntitledRepository struct {
+	File                 string
+	Host                 string
+	CAFile               string
+	CertificateDirectory string
+	// ReleaseVersion is the standard major archive's releasever, never an
+	// ambient plugin or DNF variable directory.
+	ReleaseVersion string
+	NativeIDs      map[string][]string
+}
+
+// EntitledRepository matches an exact, ordered architecture-specific archive.
+// Subsets, extra repositories and mixed architectures are never admitted.
+func (r *Release) EntitledRepository(ids []string) (VendorRepository, string, bool) {
+	if r == nil {
+		return VendorRepository{}, "", false
+	}
+	for _, vendor := range r.VendorRepositories {
+		if vendor.Entitled == nil {
+			continue
+		}
+		for architecture, allowed := range vendor.Entitled.NativeIDs {
+			if slices.Equal(ids, allowed) {
+				return vendor, architecture, true
+			}
+		}
+	}
+	return VendorRepository{}, "", false
 }
 
 // AccountDefaults are the vendor's regular local account ranges and home

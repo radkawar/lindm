@@ -62,7 +62,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	if err := r.report(ctx); err != nil {
 		return err
 	}
-	management := &managementLoop{executor: executor, gate: r.authorityGate, refreshInventory: r.requestInventoryRefresh}
+	management := &managementLoop{executor: executor, gate: r.authorityGate, refreshInventory: r.requestInventoryRefresh, refreshCapabilities: r.requestCapabilityRefresh}
 	stopManagement := management.start(ctx)
 	defer stopManagement()
 	stopUpdates := startAgentUpdates(ctx, executor)
@@ -94,7 +94,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 		case <-timer.C:
 		case job := <-r.refreshes:
 			timer.Stop()
-			job.done <- r.refreshInventory(job.ctx, job.status)
+			r.handleInventoryRefresh(job)
 		}
 	}
 }
@@ -115,6 +115,7 @@ type runner struct {
 	waiting          *inventoryv1.NativeObservation
 	refreshes        chan inventoryRefreshJob
 	collectInventory func(context.Context) (*inventoryv1.NativeObservation, error)
+	queuedCapability *agentv1.CapabilityPolicyObservation
 }
 
 func (r *runner) cycle(ctx context.Context) error {
@@ -178,6 +179,7 @@ func (r *runner) bind(ctx context.Context, connection *agentv1.GetConnectionResp
 	r.store = store
 	r.identity = identity
 	r.waiting = nil
+	r.queuedCapability = nil
 	r.nextCollection = time.Time{}
 	if r.status.GetDeploymentId() != identity.Deployment.String() || r.status.GetDeviceId() != identity.Device.String() || r.status.GetEnrollmentGeneration() != identity.Generation.String() {
 		r.status = &agentv1.TransportStatus{DeploymentId: proto.String(identity.Deployment.String()), DeviceId: proto.String(identity.Device.String()), EnrollmentGeneration: proto.String(identity.Generation.String())}
@@ -207,14 +209,17 @@ func (r *runner) collect(ctx context.Context) error {
 
 func (r *runner) queue(ctx context.Context, observation *inventoryv1.NativeObservation) error {
 	err := r.store.Queue(ctx, observation)
-	if !errors.Is(err, spool.ErrCapacity) {
-		return err
+	if errors.Is(err, spool.ErrCapacity) {
+		// Capacity is a complete failed attempt, never a successful prefix. The
+		// collector result is solely owned here; release its rows without copying.
+		observation.Packages.Packages = nil
+		observation.Packages.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_CAPACITY_EXCEEDED
+		err = r.store.Queue(ctx, observation)
 	}
-	// Capacity is a complete failed attempt, never a successful prefix. The
-	// collector result is solely owned here; release its rows without copying.
-	observation.Packages.Packages = nil
-	observation.Packages.Status = inventoryv1.CollectionStatus_COLLECTION_STATUS_CAPACITY_EXCEEDED
-	return r.store.Queue(ctx, observation)
+	if err == nil {
+		r.queuedCapability = observation.GetHost().GetDetails().GetCapabilityPolicy()
+	}
+	return err
 }
 
 func (r *runner) report(ctx context.Context) error {

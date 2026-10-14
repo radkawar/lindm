@@ -288,3 +288,19 @@ and KDE work require parent confirmation.
 - Vendor advisory feed: none for Mint packages (registry `partial`).
 - `mintupdate` automatic updates and Timeshift snapshots versus OS patch policy
   and wipe/rollback claims are not specified or qualified.
+
+## Capability policy facts (signed provider grants)
+
+The default signed PACKAGES grant approves only the pinned Ubuntu 24.04 base
+archive: `noble`, `noble-updates` and `noble-security`, with `main` and `universe`.
+The registry uses Ubuntu's archive keyring digest and signing identity; the
+device must have that exact vendor keyring. It does not import the machine's
+global APT trust or implicitly approve `packages.linuxmint.com`.
+
+Mint's own archive has no package-source key digest pin in the registry, so it
+is deliberately excluded from this grant. Its presence in the OS's APT sources
+does not grant lindm authority to use it. Managing Mint-only packages requires
+an explicitly approved local source with independently pinned vendor key
+material. Standard file roots and local-account defaults match the Ubuntu base.
+This is a derivation contract, not an additional native qualification claim;
+qualification evidence remains in the [verification ledger](../verification.md).

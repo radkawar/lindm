@@ -264,6 +264,7 @@ const DEVICE_CAUSES: Record<string, string> = {
   // Unsupported; these name why, with no second status word.
   native_tool_outdated:
     "The system tool is too old. Fedora requires dnf5 5.4.6.0 or newer. Apply All updates through an OS update policy or Patch now. Fedora security-only updates do not update dnf5. lindm retries when device packages change.",
+  rhsm_registration_required: "Register this device with Red Hat",
   native_tool_missing:
     "Blocked: the device lacks a required system tool. Install it on the device.",
   existing_package_unverified:

@@ -198,40 +198,80 @@ FIREWALL and KERNEL_SETTINGS derive as the local providers, and
 KERNEL_MODULE_BLOCKLIST reports `platform_not_qualified` (no Debian tooling in
 the registry).
 
-PACKAGES reports `platform_not_qualified`: no Debian vendor archive is in the
-registry, because the model cannot carry Debian's security pocket. An
-`AptRepository` has exactly one `uri`; `suite` and `additional_suites` all
-resolve under it, and the package provider writes one `deb <uri> <suite>` line
-per suite and resolves a row only from its own repository identity. Debian
-publishes `bookworm`/`trixie` and `-updates` under
-`https://deb.debian.org/debian`, but `-security` only under a separate archive
-root, `https://deb.debian.org/debian-security` (also
-`https://security.debian.org/debian-security`):
-`https://deb.debian.org/debian/dists/bookworm-security/InRelease` and
-`…/trixie-security/InRelease` return HTTP 404 (2026-10-12). Approving only the
-main and `-updates` suites would silently withhold security updates, and a
-second repository identity for `debian-security` would not serve rows bound to
-the main identity. Representing Debian needs a protocol change (per-suite URIs
-under one identity, or a source-level union of identities), not a registry row.
+PACKAGES derives one stable archive identity,
+`apt/cb2df30f-ba96-553d-bdd7-3bab91d9ea14`, on both amd64 and arm64. Debian 12
+uses `bookworm`, `bookworm-updates` and `bookworm-security`; Debian 13 uses
+`trixie`, `trixie-updates` and `trixie-security`. Main and updates use
+`https://deb.debian.org/debian`; security uses
+`https://security.debian.org/debian-security`. Only component `main` is
+approved. Non-free, non-free-firmware, contrib, backports and proposed updates
+are not part of this grant.
 
-The key facts such a change would pin (2026-10-12):
-`debian-archive-keyring 2023.3+deb12u2` (bookworm) and `2025.1` (trixie), each
-downloaded over HTTPS from `deb.debian.org` with its SHA-256 matching the signed
-`main/binary-amd64/Packages`, ship byte-identical
-`/usr/share/keyrings/debian-archive-keyring.gpg` (bookworm; trixie names it
-`.pgp` and makes `.gpg` a symlink): SHA-256
-`506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017`, 55918
-bytes. It verifies (`gpgv`) the release, `-updates` and `-security` `InRelease`
-of both releases. Every signer's primary key matches
-`ftp-master.debian.org/keys.html`: archive keys 12/bookworm
-`B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8` and 13/trixie
-`04B54C3CDCA79751B16BC6B5225629DF75B188BD` (release and `-updates`), security
-archive keys 11/bullseye `AC530D520F2F3269F5E98313A48449044AAD5C5D`
-(`bookworm-security` only), 12/bookworm
-`05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0` and 13/trixie
-`5E04A1E3223A19A20706E20F9904613D4CCE68C6`, and the stable release keys 12
-`4D64FEC119C2029067D6E791F8D2585B8783D481` and 13
-`41587F7DB8C774BCCF131416762F67A0B2C39DE4`.
+`AptRepository.suite_uris` is an ordered list of typed `AptSuiteURI`
+(`suite`, `uri`) entries, not a map: derived authority must pass the same
+closed protobuf validation as locally configured providers. Each entry names
+a distinct approved suite. This binds security's distinct archive root under
+the same identity, so rows can resolve dependencies and candidates from all
+three pockets in one transaction. The provider writes one `Signed-By`-restricted
+`deb` line per pocket, refreshes only private approved indexes and requires an
+independently verified `InRelease` at every configured URI/suite. Missing
+security metadata, metadata from the wrong root, unapproved pockets, an
+invalid signature or any unapproved primary signer fail closed; an accepted
+main index cannot stand in for security. APT still checks index SHA-256,
+archive SHA-256 and `Valid-Until`; no insecure or unauthenticated fallback is
+enabled. The signed policy carries only PACKAGES, never URLs, key material or
+customer credentials. An independently approved local source with the same
+identity retains precedence.
+
+Native prerequisites are APT/dpkg and the vendor's `debian-archive-keyring`:
+bookworm `2023.3+deb12u2` provides the regular
+`/usr/share/keyrings/debian-archive-keyring.gpg`; trixie `2025.1` provides the
+regular `.pgp` file (its `.gpg` is a symlink and is deliberately not used).
+Both are 55918 bytes, with pinned SHA-256
+`506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017`.
+Missing or different bytes report `vendor_key_unrecognized`; provisioning a
+recognized vendor keyring is required, not disabling that check. The provider
+checks again the exact bytes copied into its private verifier keyring. It uses
+the device's own APT-generation verifier: `gpgv` for APT 2, `sqv` for APT 3
+when installed. Missing native verification fails rather than trusting HTTPS
+alone.
+
+The keyring provenance was collected from Debian's HTTPS packages and their
+SHA-256 entries in signed `main/binary-amd64/Packages`:
+
+- [Bookworm package](https://deb.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2023.3+deb12u2_all.deb):
+  `f699e2f88dca05212f2a452b58475f2993cb6993dfbafb1d0205a3291eb8b4b8`.
+- [Trixie package](https://deb.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb):
+  `9ea7778e443144ca490668737a8ab22dd3e748bb99e805e22ec055abeb3c7fac`.
+
+Every verified signing certificate is also restricted by the registry's
+`signing_key_fingerprints`, not merely any key in the broader keyring. The
+authoritative [archive key list](https://ftp-master.debian.org/keys.html) and
+signed [bookworm](https://lists.debian.org/debian-devel-announce/2023/03/msg00001.html)
+and [trixie](https://lists.debian.org/debian-devel-announce/2025/04/msg00001.html)
+announcements identify these primary fingerprints (signing subkeys map back
+to their primary certificate):
+
+- Archive automatic 12:
+  `B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8`; archive automatic 13:
+  `04B54C3CDCA79751B16BC6B5225629DF75B188BD`. Both releases' main and
+  updates `InRelease` verified with both during provenance collection.
+- Security automatic 11:
+  `AC530D520F2F3269F5E98313A48449044AAD5C5D` (bookworm only), 12:
+  `05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0`, and 13:
+  `5E04A1E3223A19A20706E20F9904613D4CCE68C6`. Bookworm security verified
+  with 11/12; trixie security with 12/13.
+- Stable release 12:
+  `4D64FEC119C2029067D6E791F8D2585B8783D481`; stable release 13:
+  `41587F7DB8C774BCCF131416762F67A0B2C39DE4`. Each is accepted only by its
+  own release's source.
+
+This is an implementation and provenance change, not a new native
+qualification claim. The deterministic source/derivation/security tests cover
+three-pocket authority and fail-closed boundaries; connected and unplugged
+real package transactions still require separate
+[verification evidence](../verification.md#tier-capability-matrix). Historical
+agent lifecycle records above do not qualify this new source contract.
 
 ## Encryption and recovery
 

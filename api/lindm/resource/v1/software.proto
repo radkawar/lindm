@@ -113,6 +113,20 @@ message NativePackageDesired {
     expression: "!has(this.exact) || ((this.package.ecosystem == 1 && has(this.exact.deb)) || (this.package.ecosystem == 2 && has(this.exact.rpm)) || (this.package.ecosystem == 3 && has(this.exact.alpm)) || (this.package.ecosystem == 4 && has(this.exact.nix)))"
   };
 }
+// One archive-root override for a configured suite. A typed ordered list keeps
+// repository authority inside the closed protobuf payload contract.
+message AptSuiteURI {
+  string suite = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"
+  }];
+  string uri = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+    pattern: "^https://[^@#]+$"
+  }];
+}
 message AptRepository {
   string uri = 1 [(buf.validate.field).string = {
     uri: true
@@ -147,9 +161,9 @@ message AptRepository {
     }
   }];
   ArtifactRef signing_key = 5 [(buf.validate.field).required = true];
-  // Further suites of the same archive (for example noble-updates and
-  // noble-security), resolved in one transaction with the same components,
-  // architectures and signing key. One repository identity covers them all.
+  // Further suites resolved in one transaction with the same components,
+  // architectures and signing key. Unless suite_uris overrides a suite,
+  // it uses uri. One stable repository identity covers every pocket.
   repeated string additional_suites = 6 [(buf.validate.field).repeated = {
     max_items: 4
     unique: true
@@ -161,10 +175,33 @@ message AptRepository {
       }
     }
   }];
+  // Per-suite archive roots, for example Debian's separate security archive.
+  // Entries must name distinct configured suites; missing entries use uri.
+  repeated AptSuiteURI suite_uris = 7 [(buf.validate.field).repeated.max_items = 5];
+  // When set, every verified InRelease signer must be one of these primary
+  // OpenPGP certificate fingerprints, in addition to verifying with signing_key.
+  // An empty list trusts all keys in the independently approved key artifact.
+  repeated string signing_key_fingerprints = 8 [(buf.validate.field).repeated = {
+    max_items: 16
+    unique: true
+    items: {
+      string: {pattern: "^([A-F0-9]{40}|[A-F0-9]{64})$"}
+    }
+  }];
   option (buf.validate.message).cel = {
     id: "apt_repository.distinct_suites"
     message: "additional suites must differ from the primary suite"
     expression: "!(this.suite in this.additional_suites)"
+  };
+  option (buf.validate.message).cel = {
+    id: "apt_repository.suite_uris"
+    message: "archive URI overrides must name an approved suite"
+    expression: "this.suite_uris.all(s, s.suite == this.suite || s.suite in this.additional_suites)"
+  };
+  option (buf.validate.message).cel = {
+    id: "apt_repository.distinct_suite_uris"
+    message: "archive URI overrides must name distinct suites"
+    expression: "this.suite_uris.all(s, this.suite_uris.filter(other, other.suite == s.suite).size() == 1)"
   };
 }
 // A further native repository of the same vendor, verified with the parent
@@ -183,6 +220,9 @@ message RpmAdditionalRepository {
       max_len: 2048
       pattern: "^https://[^@#]+$"
     }];
+    // Resolve this ID only from the device's registry-pinned RHSM definitions.
+    // No endpoint, certificate or customer credential is serialized here.
+    bool rhsm_managed = 4 [(buf.validate.field).bool.const = true];
   }
 }
 message RepositoryURLs {
@@ -213,15 +253,16 @@ message RpmRepository {
       max_len: 2048
       pattern: "^https://[^@#]+$"
     }];
+    // Agent-local RHSM source; IDs and CDN/key trust must match the registry.
+    bool rhsm_managed = 8 [(buf.validate.field).bool.const = true];
   }
   repeated ArtifactRef signing_keys = 4 [(buf.validate.field).repeated = {
     min_items: 1
     max_items: 16
   }];
-  // False is accepted only for an HTTPS metalink source: librepo then verifies
-  // repomd.xml against the hashes in the TLS-fetched metalink, and the agent
-  // additionally requires the metalink host to be pinned for the release in the
-  // platform registry. Package signatures are always required.
+  // False is accepted only for pinned HTTPS metalinks or an agent-local RHSM
+  // source whose exact IDs, CDN TLS and release key are registry-checked.
+  // Package signatures are always required.
   bool require_metadata_signature = 5;
   bool require_package_signature = 6 [(buf.validate.field).bool.const = true];
   // Further repositories (for example Fedora updates) resolved in the same
@@ -234,8 +275,8 @@ message RpmRepository {
   };
   option (buf.validate.message).cel = {
     id: "rpm_repository.metadata_authenticity"
-    message: "unsigned repository metadata is accepted only through HTTPS metalinks"
-    expression: "this.require_metadata_signature || (has(this.metalink) && this.additional_repositories.all(a, has(a.metalink)))"
+    message: "unsigned repository metadata requires pinned HTTPS metalinks or local RHSM definitions"
+    expression: "this.require_metadata_signature || (has(this.metalink) && this.additional_repositories.all(a, has(a.metalink))) || (has(this.rhsm_managed) && this.rhsm_managed && this.additional_repositories.all(a, has(a.rhsm_managed) && a.rhsm_managed))"
   };
 }
 message AlpmRepository {

@@ -29,6 +29,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/config"
+	"lindm/internal/agent/rhsm"
 	"lindm/internal/agent/sysctlprovider"
 	"lindm/internal/platform"
 )
@@ -37,6 +38,7 @@ import (
 const (
 	DetailPlatformNotQualified       = "platform_not_qualified"
 	DetailVendorKeyUnrecognized      = "vendor_key_unrecognized"
+	DetailRHSMRegistrationRequired   = "rhsm_registration_required"
 	DetailFirewallSettingsMissing    = "firewall_settings_missing"
 	DetailFirewallRestoreUnitDisable = "firewall_restore_unit_disabled"
 	DetailNoPermanentInterface       = "no_permanent_interface"
@@ -399,7 +401,11 @@ func (d *derivation) vendorSource(release *platform.Release, vendor platform.Ven
 		return nil, DetailVendorKeyUnrecognized
 	}
 	digest := sha256.Sum256(key)
-	if !slices.Contains(vendor.KeySHA256, hex.EncodeToString(digest[:])) {
+	if vendor.Entitled != nil {
+		if _, _, err := rhsm.ReleaseKey(key, vendor.RPMFingerprint); err != nil {
+			return nil, DetailVendorKeyUnrecognized
+		}
+	} else if !slices.Contains(vendor.KeySHA256, hex.EncodeToString(digest[:])) {
 		return nil, DetailVendorKeyUnrecognized
 	}
 	artifact := &resourcev1.ArtifactRef{Sha256: digest[:], SizeBytes: uint64(len(key)), ArtifactId: vendor.KeyArtifactID}
@@ -412,11 +418,38 @@ func (d *derivation) vendorSource(release *platform.Release, vendor platform.Ven
 		if uri == "" || architecture == "" || len(vendor.Suites) == 0 {
 			return nil, DetailPlatformNotQualified
 		}
-		repository.Source = &resourcev1.RepositoryDesired_Apt{Apt: &resourcev1.AptRepository{
+		apt := &resourcev1.AptRepository{
 			Uri: uri, Suite: vendor.Suites[0], AdditionalSuites: slices.Clone(vendor.Suites[1:]),
 			Components: slices.Clone(vendor.Components), Architectures: []string{architecture}, SigningKey: artifact,
-		}}
+			SigningKeyFingerprints: slices.Clone(vendor.APTFingerprints),
+		}
+		// Walk approved suites, not the registry map, so serialized provider
+		// authority has a deterministic order and contains no protobuf maps.
+		for _, suite := range vendor.Suites {
+			if pocketURI, ok := vendor.SuiteURIs[suite]; ok {
+				apt.SuiteUris = append(apt.SuiteUris, &resourcev1.AptSuiteURI{Suite: suite, Uri: pocketURI})
+			}
+		}
+		repository.Source = &resourcev1.RepositoryDesired_Apt{Apt: apt}
 	case platform.PackageDBRPM:
+		if vendor.Entitled != nil {
+			ids := vendor.Entitled.NativeIDs[d.host.Architecture]
+			if len(ids) != 2 || vendor.RPMFingerprint == "" {
+				return nil, DetailPlatformNotQualified
+			}
+			if d.host.ReadEntitledConfig == nil || d.host.ReadEntitledConfig(vendor, d.host.Architecture) != nil {
+				return nil, DetailRHSMRegistrationRequired
+			}
+			repository.Source = &resourcev1.RepositoryDesired_Rpm{Rpm: &resourcev1.RpmRepository{
+				NativeId: ids[0], Location: &resourcev1.RpmRepository_RhsmManaged{RhsmManaged: true},
+				AdditionalRepositories: []*resourcev1.RpmAdditionalRepository{{
+					NativeId: ids[1], Location: &resourcev1.RpmAdditionalRepository_RhsmManaged{RhsmManaged: true},
+				}},
+				SigningKeys: []*resourcev1.ArtifactRef{artifact}, RequirePackageSignature: true,
+			}}
+			source.RpmSigningKeyFingerprint = vendor.RPMFingerprint
+			return source, ""
+		}
 		if len(vendor.NativeRepositories) == 0 || vendor.RPMFingerprint == "" {
 			return nil, DetailPlatformNotQualified
 		}

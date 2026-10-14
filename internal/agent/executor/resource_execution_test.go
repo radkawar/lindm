@@ -223,7 +223,7 @@ func (f *resourceFixture) options() []Option {
 		// The fixture's fake natives stand in for effective providers; the
 		// capability gate itself is exercised in capability_policy_linux_test.go.
 		if !f.capabilityGate {
-			s.capabilityGate = func(*resourcev1.ResourceDesiredState) error { return nil }
+			s.capabilityGate = func(context.Context, *resourcev1.ResourceDesiredState) error { return nil }
 		}
 		s.openResource = func(_ context.Context, _ *agentv1.ResourceExecutionIntent, secrets secretAccessor) (nativeResource, error) {
 			if f.openNative != nil {

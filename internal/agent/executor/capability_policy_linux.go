@@ -18,8 +18,10 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
 	"lindm/internal/agent/capabilitypolicy"
 	"lindm/internal/agent/config"
+	"lindm/internal/platform"
 )
 
 // firewallRestoreUnit is the packaged boot-time restore of the last
@@ -157,11 +159,27 @@ func firewallRestoreDisabled(status []*agentv1.CapabilityObservation) bool {
 }
 
 // requiredCapability is the admission gate: nil when the intent's provider is
-// effective in the current snapshot.
-func (s *Service) requiredCapability(desired *resourcev1.ResourceDesiredState) error {
+// effective. The caller holds the authority lock; local entitlement is re-read
+// before a package can leave the effect-free admission boundary.
+func (s *Service) requiredCapability(ctx context.Context, desired *resourcev1.ResourceDesiredState) error {
+	if desired.GetRef().GetKind() == resourcev1.ResourceKind_RESOURCE_KIND_NATIVE_PACKAGE {
+		s.refreshEntitledProviders(ctx)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+	}
 	snapshot := s.currentProviders()
 	if capability := capabilitypolicy.RequiredCapability(desired, snapshot.config, snapshot.host); capability != agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_UNSPECIFIED {
-		return &capabilityRefusal{capability: capability}
+		refusal := &capabilityRefusal{capability: capability}
+		for _, observed := range snapshot.status {
+			if capability == agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES &&
+				observed.GetCapability() == capability &&
+				observed.GetStatus() == agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE &&
+				observed.GetDetail() == capabilitypolicy.DetailRHSMRegistrationRequired {
+				return admissiondetail.Wrap(refusal, capabilitypolicy.DetailRHSMRegistrationRequired)
+			}
+		}
+		return refusal
 	}
 	return nil
 }
@@ -189,6 +207,10 @@ func (s *Service) GetCapabilityPolicy(ctx context.Context, req *connect.Request[
 		return nil, mapError(err)
 	}
 	defer s.mu.Unlock()
+	s.refreshEntitledProviders(ctx)
+	if err := ctx.Err(); err != nil {
+		return nil, mapError(err)
+	}
 	record, err := capabilitypolicy.LoadRecord(s.directory)
 	if err != nil {
 		return nil, mapError(err)
@@ -240,7 +262,12 @@ func (s *Service) updateCapabilityPolicy(ctx context.Context, req *agentv1.Updat
 		case policy.GetVersion() == previous && storedDigest != digest:
 			return nil, errCapabilityPolicyRollback
 		case policy.GetVersion() == previous && stored.GetActive():
-			// Exact retransmission: no rewrite, no new acceptance time.
+			// Exact retransmission preserves durable acceptance, but local
+			// registration and vendor files can have changed since acceptance.
+			s.refreshEntitledProviders(ctx)
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
 			return s.capabilityObservation(stored), nil
 		}
 	}
@@ -365,4 +392,18 @@ func (s *Service) refreshCapabilityPolicy(ctx context.Context) {
 		slog.Error("local provider derivation failed; all providers withdrawn", "error", err)
 		s.providers.Store(nil)
 	}
+}
+
+// refreshEntitledProviders runs only for a registry entitled-source host and
+// under the authority lock. The existing reverification path preserves the
+// current signed capability ceiling, enrollment and root-custody checks; local
+// registration never creates or reactivates a grant by itself.
+func (s *Service) refreshEntitledProviders(ctx context.Context) {
+	release := s.currentProviders().host.Release
+	if release == nil || !slices.ContainsFunc(release.VendorRepositories, func(vendor platform.VendorRepository) bool {
+		return vendor.Entitled != nil
+	}) {
+		return
+	}
+	s.refreshCapabilityPolicy(ctx)
 }

@@ -533,9 +533,24 @@ two natively qualified desktop releases (the delegation must include
 | SSH login banner        | No capability; base-files ships `/etc/issue.net`, so a create-only row is BLOCKED `existing_banner_file` until an approved adoption                                                                                                                                                  | No capability; the stock `/etc/issue.net` is a symlink, BLOCKED `existing_banner_symlink` until a native administrator replaces it                                                                                                                                                                                                                                                                                           |
 
 Ubuntu 22.04, Rocky Linux 9/10 and AlmaLinux 9/10 derive the same defaults where
-their registry rows qualify the provider (see the platform pages); Debian 12/13
-derive files and accounts but not packages, and RHEL packages need subscription
-credentials, so they report `platform_not_qualified`.
+their registry rows qualify the provider (see the platform pages). Package-source
+defaults on the other Tier 1 releases are:
+
+| Release                        | Default PACKAGES source                                                                                                          | Prerequisite or gate                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Debian 12                      | `bookworm`, `bookworm-updates` (`deb.debian.org/debian`) and `bookworm-security` (`security.debian.org/debian-security`), `main` | Exact registry-pinned `debian-archive-keyring` bytes and archive signing fingerprints                                    |
+| Debian 13                      | `trixie`, `trixie-updates` (`deb.debian.org/debian`) and `trixie-security` (`security.debian.org/debian-security`), `main`       | Exact registry-pinned `debian-archive-keyring` bytes and archive signing fingerprints                                    |
+| RHEL 9/10                      | Device's entitled RHSM-managed BaseOS and AppStream repositories                                                                 | Register this device with Red Hat; pinned Red Hat release key required                                                   |
+| Linux Mint 22.3, Pop!_OS 24.04 | Ubuntu `noble`, `noble-updates`, `noble-security`, `main` and `universe`                                                         | Ubuntu archive keyring pins; own vendor archives excluded because their package-source keys have no registry digest pins |
+
+RHEL entitlement and TLS credentials remain on the device. The server grants a
+catalogue capability, never receives subscription secrets and cannot supply an
+arbitrary entitled repository ID or replace the vendor key. Only the registry's
+BaseOS/AppStream IDs are approved; third-party repositories, including EPEL, are
+not included. Consequently `git` is a vendor-source row on RHEL, while `htop`
+requires a separately approved source and is not promised by this default.
+Signed capability derivation is implementation, not native qualification: see the
+[verification ledger](verification.md) for exercised platforms and architectures.
 
 In the console, **Settings → Device capabilities** (`/settings/capabilities`,
 readable with unrestricted `fleet.read`, editable with unrestricted

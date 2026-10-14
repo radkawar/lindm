@@ -346,7 +346,7 @@ func (s *Service) prepareResourceExecution(ctx context.Context, req *agentv1.Pre
 	}
 	// The capability gate precedes preparation and native preflight alike:
 	// a provider that is not effective never observes or stages anything.
-	if err := s.capabilityGate(intent.GetDesired()); err != nil {
+	if err := s.capabilityGate(ctx, intent.GetDesired()); err != nil {
 		s.mu.Unlock()
 		return s.refuseResourceAdmission(ctx, req.GetIntentEnvelope(), err)
 	}

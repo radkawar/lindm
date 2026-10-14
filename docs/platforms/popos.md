@@ -421,3 +421,19 @@ CONTROL `portal_remote_desktop_unavailable`, both before consent (observed
 natively by DesktopSessions,
 `~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-assistance-10/assistance.json`,
 `bf8b91b6854252ced50a1ba8bfd4e5d46b6500f58ab088fb9a2e2f9483c277dd`).
+
+## Capability policy facts (signed provider grants)
+
+The default signed PACKAGES grant approves only the pinned Ubuntu 24.04 base
+archive: `noble`, `noble-updates` and `noble-security`, with `main` and `universe`.
+It uses Ubuntu's official archive and pinned Ubuntu archive keyring, not the
+device's global APT sources or trust. The Ubuntu mirror observed above is an
+advisory provenance fact, not an implicit package-source approval.
+
+Neither Pop's `release` nor its `proprietary` archive has a package-source key
+digest pin in the registry. Both remain outside the default grant even though
+the installed OS uses them. Pop-only packages require an explicitly approved
+local source with independently pinned vendor key material. Standard file roots
+and local-account defaults match the Ubuntu base. This is a derivation contract,
+not an additional native qualification claim; qualification evidence remains
+in the [verification ledger](../verification.md).

@@ -379,6 +379,29 @@ var (
 	// Every jammy, jammy-updates and jammy-security InRelease on archive and
 	// ports verifies with it (signer F6ECB3762474EDA9D21B7022871920D1991BC93C).
 	jammyArchive = ubuntuSuites(ubuntuArchive, "d74a0281-9d25-5f2c-ac6b-9d4bfa1e8c2e", "1a4dd63e5c76728960a2edddae22e2e0fc53df8e8b87806deb971030ac704eb0", "jammy")
+	// Debian's debian-archive-keyring 2023.3+deb12u2 (bookworm) and 2025.1
+	// (trixie) ship identical 55918-byte public keyrings, SHA256 below.
+	// Package SHA256 f699e2f8…b4b8 / 9ea7778e…7fac is bound by each release's
+	// signed main/binary-amd64/Packages. Trixie's .gpg is a symlink: pin .pgp.
+	// Primary fingerprints are published by ftp-master.debian.org/keys.html
+	// and the 2023/03 and 2025/04 debian-devel-announce key announcements.
+	// Both releases' main/updates currently carry archive keys 12 and 13;
+	// bookworm-security carries security keys 11/12, trixie-security 12/13.
+	debianArchive = VendorRepository{
+		RepositoryID: "cb2df30f-ba96-553d-bdd7-3bab91d9ea14", DB: PackageDBDpkg,
+		ArchiveURIs: map[string]string{"x86_64": "https://deb.debian.org/debian", "aarch64": "https://deb.debian.org/debian"},
+		Components:  []string{"main"}, KeySHA256: []string{"506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017"},
+	}
+	bookwormArchive = debianSuites(debianArchive, "/usr/share/keyrings/debian-archive-keyring.gpg", "2d3a3ca9-ea17-5f8e-88f8-660755566907", "bookworm", []string{
+		"B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8", "04B54C3CDCA79751B16BC6B5225629DF75B188BD",
+		"4D64FEC119C2029067D6E791F8D2585B8783D481",
+		"AC530D520F2F3269F5E98313A48449044AAD5C5D", "05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0",
+	})
+	trixieArchive = debianSuites(debianArchive, "/usr/share/keyrings/debian-archive-keyring.pgp", "8df816b6-111a-56db-9a1a-ace7db4f325e", "trixie", []string{
+		"B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8", "04B54C3CDCA79751B16BC6B5225629DF75B188BD",
+		"41587F7DB8C774BCCF131416762F67A0B2C39DE4",
+		"05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0", "5E04A1E3223A19A20706E20F9904613D4CCE68C6",
+	})
 	// vendorRPMArchiveID is the RPM repository identity profiles bind for the
 	// host's own distribution archive (rpm/<uuid>): Fedora's on Fedora, the
 	// rebuild's own BaseOS/AppStream on Rocky Linux and AlmaLinux.
@@ -401,6 +424,12 @@ var (
 		// MirrorManager metalink (owner decision, docs/security-and-operations.md).
 		MetadataUnsigned: true, MetalinkHost: "mirrors.fedoraproject.org",
 	}
+	// Red Hat's product signing keys page publishes the release key 2
+	// fingerprint and local key path for RHEL 9/10. The installed keyring
+	// also holds auxiliary/PQ keys; only the pinned release key is imported.
+	// RHSM CDN metadata uses authenticated HTTPS, not repomd.xml.asc.
+	rhel9Archive  = rhelEntitledArchive("9")
+	rhel10Archive = rhelEntitledArchive("10")
 	// EL rebuild archives (alma-rocky.md, "Capability policy facts"):
 	// BaseOS and AppStream under the vendor RPM identity profiles bind for
 	// the host's own distribution archive. Both vendors sign repomd.xml, so
@@ -537,9 +566,7 @@ var registry = []*Release{
 		// Debian 12's systemd 252 runs the timer/drop-in lane like EL 9's.
 		Quirks: Quirks{SystemdFloor: 252, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "12", Quality: "1.4.5", PAM: "1.5.2", Manager: "1.5.2"}}, RecoveryGRUB: debianGRUB},
-		// No vendor archive: AptRepository has one URI, but the security pocket
-		// lives only under /debian-security (debian.md, "Capability policy facts").
-		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
+		VendorRepositories: []VendorRepository{bookwormArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit}, Installer: DebianInstaller, Session: debianSession, Guest: debianGuest,
 			OwnedBootUnavailable: reasonNoUkify,
 			TPM:                  LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
@@ -556,7 +583,7 @@ var registry = []*Release{
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "trixie", Exports: debianExports},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
 			Password: []PasswordPins{{Version: "13", Quality: "1.4.5", PAM: "1.7.0", Manager: "1.7.0"}}, RecoveryGRUB: debianGRUB},
-		StandardFileRoots: dropInRoots, Accounts: regularAccounts,
+		VendorRepositories: []VendorRepository{trixieArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// trixie splits systemd-cryptsetup out of systemd and its dracut out of crypt.
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneServices, LaneAirgap, LaneAdvisories, LaneEnrollFromConsole, LaneProvisionCloudInit}, Installer: DebianInstaller, Session: debianSession, Guest: debianTrixieGuest,
 			TPM: LabTPM{Modules: dracutSplitTPM, Packages: []string{"dracut", "tpm2-tools", "libtss2-tcti-device0t64", "systemd-cryptsetup", "cryptsetup-initramfs-"}, Unobservable: debianArmNoTIS}},
@@ -654,8 +681,9 @@ var registry = []*Release{
 			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432",
 		},
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
-		Quirks:   withPins(elQuirks9, el9Pins),
+		Advisory:           Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
+		Quirks:             withPins(elQuirks9, el9Pins),
+		VendorRepositories: []VendorRepository{rhel9Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: append([]LabLane{LaneDeploy}, rhelLanes...), LaneArchitectures: map[LabLane][]string{LaneDeploy: {"x86_64"}}, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			Installer: Anaconda, Session: rhelSession9, Guest: rhelGuest,
 			RPMMedia: &LabRPMMedia{Repositories: []string{"BaseOS", "AppStream"}, Key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"},
@@ -671,8 +699,9 @@ var registry = []*Release{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Desktop: gnomeGDM, Firewall: firewalld,
-		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
-		Quirks:   withPins(elQuirks10, el10Pins),
+		Advisory:           Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
+		Quirks:             withPins(elQuirks10, el10Pins),
+		VendorRepositories: []VendorRepository{rhel10Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			Installer: Anaconda, Session: rhelSession10, Guest: rhelGuest,
 			// dracut 107 ships the split 01systemd-cryptsetup module.
@@ -749,6 +778,9 @@ var registry = []*Release{
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "mint.md", Family: FamilyDebian, Architectures: x86,
 		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver (logind Lock; never sets LockedHint)"}, Firewall: ufw,
+		// Only the Ubuntu base archive has pinned package-source key material.
+		// Mint's own repositories are not implicitly approved by the base grant.
+		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// The ISO's Ubiquity runs noninteractively from a debconf preseed; the
 		// installed root uses Ubuntu's initramfs-tools and archive package names.
 		Lab: Lab{Lanes: derivativeLanes, Installer: Ubiquity, Guest: ubuntuGuest,
@@ -770,6 +802,9 @@ var registry = []*Release{
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "popos.md", Family: FamilyDebian, Architectures: x86,
 		FDE: "LVM on LUKS (distinst)", Desktop: Desktop{Name: "COSMIC", DisplayManager: "cosmic-greeter", Lock: "cosmic-greeter (logind)"}, Firewall: ufw,
+		// Approve Ubuntu's three pockets, not Pop's release/proprietary archives:
+		// their own package-source keys have no registry digest pins.
+		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// The ISO's distinst runs pop-installer's erase layout; the installed
 		// root uses Pop's initramfs-tools and Ubuntu's archive package names.
 		// COSMIC comes from the ISO itself (no packages). The shipped
@@ -972,6 +1007,16 @@ func ubuntuSuites(archive VendorRepository, keyArtifactID, keySHA256, codename s
 	return archive
 }
 
+// debianSuites preserves the release's main/updates archive and binds its
+// separate security archive under the same stable repository identity.
+func debianSuites(archive VendorRepository, keyFile, keyArtifactID, codename string, fingerprints []string) VendorRepository {
+	archive.KeyFile, archive.KeyArtifactID = keyFile, keyArtifactID
+	archive.Suites = []string{codename, codename + "-updates", codename + "-security"}
+	archive.SuiteURIs = map[string]string{codename + "-security": "https://security.debian.org/debian-security"}
+	archive.APTFingerprints = fingerprints
+	return archive
+}
+
 // elArchive completes an EL rebuild's signed BaseOS + AppStream archive;
 // pattern takes the repository directory and the kernel architecture.
 func elArchive(pattern string, key VendorRepository) VendorRepository {
@@ -996,5 +1041,26 @@ func init() {
 			panic("platform: derivative " + r.Key + " names an unknown or derivative base")
 		}
 		r.base = base
+	}
+}
+
+func rhelEntitledArchive(major string) VendorRepository {
+	ids := make(map[string][]string, len(both))
+	for _, architecture := range both {
+		prefix := "rhel-" + major + "-for-" + architecture
+		ids[architecture] = []string{prefix + "-baseos-rpms", prefix + "-appstream-rpms"}
+	}
+	return VendorRepository{
+		RepositoryID: vendorRPMArchiveID, DB: PackageDBRPM,
+		KeyFile:          "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release",
+		KeyArtifactID:    "d89f3e68-349a-5d22-a227-a9e91e9b186e",
+		RPMFingerprint:   "567E347AD0044ADE55BA8A5F199E2F91FD431D51",
+		MetadataUnsigned: true,
+		Entitled: &VendorEntitledRepository{
+			File: "/etc/yum.repos.d/redhat.repo", Host: "cdn.redhat.com",
+			ReleaseVersion:       major,
+			CAFile:               "/etc/rhsm/ca/redhat-uep.pem",
+			CertificateDirectory: "/etc/pki/entitlement", NativeIDs: ids,
+		},
 	}
 }

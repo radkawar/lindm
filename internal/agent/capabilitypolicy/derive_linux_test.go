@@ -203,13 +203,10 @@ func TestDeriveUnavailable(t *testing.T) {
 		"unqualified release sysctl":   {func(h *Host) { h.Release = platform.Identify(platform.OSRelease{ID: "plan9"}) }, capSysctl, DetailPlatformNotQualified},
 		"unqualified release updates":  {func(h *Host) { h.Release = platform.Identify(platform.OSRelease{ID: "plan9"}) }, capUpdates, DetailPlatformNotQualified},
 		"unqualified release firewall": {func(h *Host) { h.Release = platform.Identify(platform.OSRelease{ID: "plan9"}) }, capFirewall, DetailPlatformNotQualified},
-		// Debian 12 gates OS updates; Debian's security pocket has its own
-		// archive root, so no vendor archive is derived.
+		// Debian 12 gates OS updates independently of its package sources.
 		"debian os update gate": {func(h *Host) { h.Release = testRelease(t, "debian-12") }, capUpdates, DetailPlatformNotQualified},
-		"debian packages":       {func(h *Host) { h.Release = testRelease(t, "debian-12") }, capPackages, DetailPlatformNotQualified},
-		"debian 13 packages":    {func(h *Host) { h.Release = testRelease(t, "debian-13") }, capPackages, DetailPlatformNotQualified},
 		// RHEL repositories need entitlement certificates.
-		"rhel packages": {func(h *Host) { h.Release = testRelease(t, "rhel-9") }, capPackages, DetailPlatformNotQualified},
+		"rhel packages": {func(h *Host) { *h = entitledTestHost(t, "rhel-9", "x86_64") }, capPackages, DetailRHSMRegistrationRequired},
 		// Fedora 43's dnf5 is below the package provider floor.
 		"fedora 43 packages": {func(h *Host) { h.Release = testRelease(t, "fedora-43") }, capPackages, DetailPlatformNotQualified},
 	} {

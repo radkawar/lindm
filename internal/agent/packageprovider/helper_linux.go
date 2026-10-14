@@ -22,6 +22,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/config"
 	"lindm/internal/agent/dnf"
 	"lindm/internal/agent/statefs"
 	"lindm/internal/resource"
@@ -462,6 +463,16 @@ func validateCandidatePin(request *agentv1.NativePackageTransactionRequest) erro
 func (p *Provider) checkStagedSource(directory string, source *agentv1.NativePackageSource, manifest *resourcev1.PackageTransactionManifest) error {
 	if err := checkSource(source); err != nil {
 		return err
+	}
+	if config.HasEntitledLocation(source.GetRepository().GetRpm()) {
+		expected, err := entitledRepositoryConfig(source, filepath.Join(directory, "signing-key.asc"))
+		if err != nil {
+			return err
+		}
+		staged, err := custody.ReadRoot(filepath.Join(directory, "repos", "approved.repo"), 1<<20, false)
+		if err != nil || !bytes.Equal(staged, []byte(expected)) {
+			return errors.New("packageprovider: entitled repository state changed")
+		}
 	}
 	name := "lists"
 	if p.rolling() || p.ecosystem == resourcev1.PackageEcosystem_PACKAGE_ECOSYSTEM_RPM {

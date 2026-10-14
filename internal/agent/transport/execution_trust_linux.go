@@ -35,6 +35,9 @@ type managementLoop struct {
 	encryptionKeyCertificate []byte
 	// capabilityUnavailable is the last logged server issuance reason.
 	capabilityUnavailable string
+	// capabilityObserved is the last protected view handed to the inventory owner.
+	capabilityObserved  *agentv1.CapabilityPolicyObservation
+	refreshCapabilities func(context.Context, *agentv1.CapabilityPolicyObservation) error
 }
 
 func (m *managementLoop) start(parent context.Context) func() {

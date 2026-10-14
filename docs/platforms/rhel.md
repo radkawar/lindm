@@ -275,6 +275,91 @@ guests (matrix `self-update` cells); there DNF4's frozen unpack task is named
 after its resolved `dnf-3` script rather than the `/usr/bin/dnf` symlink, which
 the lab's unpack witness accepts. Not exercised: registered or EUS/E4S guests.
 
+### Capability policy vendor source
+
+A signed Packages capability on RHEL 9/10 approves the host's own vendor archive,
+`rpm/12e3a0eb-c710-58d9-bd79-a491c614754c`. It does not register the device or send
+customer credentials to lindmd. Registration remains a local administrator task:
+the agent reads RHSM-managed `/etc/yum.repos.d/redhat.repo` and the device's local
+entitlement certificate/key and Red Hat CA under root custody. A missing, disabled
+or unsafe entitled source refuses before native observation or staging, with the
+console remedy **Register this device with Red Hat**. The signed refusal preserves
+that remedy on the managed item; it is not an instruction to enable an already
+granted capability. A subsequent changed capability observation releases the hold.
+Management observations and package admission re-read local prerequisites while
+re-verifying the same stored signed policy against current enrollment/trust.
+Registration or unregistration therefore changes availability without a policy
+rotation, restart or new acceptance time; it cannot reactivate an inert grant.
+The existing management loop hands changed protected capability status to the
+sole inventory owner, which re-reads it for an ordinary durable host report.
+Stable status does not cause repeated collections. This handoff does not mint a
+policy, fabricate a signed inventory-refresh action, change its audit or bypass
+the server's ordinary inventory admission cooldown; queued immutable reports
+drain through the existing transport.
+If entitlement disappears during staging, the same registration remedy is retained
+and its unsupported hold is also released after a changed capability observation.
+
+The registry admits exactly `rhel-9-for-<arch>-baseos-rpms` plus
+`rhel-9-for-<arch>-appstream-rpms`, or the corresponding `rhel-10` IDs, with
+`<arch>` equal to the device's `x86_64` or `aarch64`. It never inherits other enabled
+host repositories, EUS/E4S, debug, source or mixed-architecture repositories.
+Only those two definitions are written into the transaction's private repository
+directory. Duplicate fields/stanzas, continuation values, foreign key/CA paths,
+non-entitlement credential paths, URL credentials, proxies and disabled signature
+or TLS verification are refused. Credentials remain local file references, never
+source protocol fields, errors or server-side evidence. RHSM registration plugins
+are not loaded by the package transaction.
+RHSM's descriptive `ui_repoid_vars` is accepted but discarded, not used as an
+execution option. `skip_if_unavailable` is accepted only as `0` or `false` and the
+isolated output always forces `0`; unavailable sources are never silently skipped.
+
+`$releasever` is resolved to the registry's standard major archive (`9` or `10`)
+and `$basearch` to the matched architecture before DNF reads the isolated file;
+other substitutions are refused. The transaction does not load ambient DNF
+variable directories or implicitly follow a host EUS/minor-release lock.
+
+CDN metadata has no required detached `repomd.xml` signature: the narrow RHSM
+source authenticates it through verified HTTPS to the registry-pinned
+`cdn.redhat.com` using `/etc/rhsm/ca/redhat-uep.pem` and matching local entitlement
+certificate/key files under `/etc/pki/entitlement`. This is not a generic unsigned
+RPM metadata switch and does not authorize arbitrary base URLs. Package signature
+checks remain mandatory. Disconnected Satellite, public mirrors and alternate
+servicing streams are not admitted by this source contract.
+
+Both RHEL 9 and 10 pin Red Hat **release key 2**:
+`567E347AD0044ADE55BA8A5F199E2F91FD431D51`, published with the installed
+`/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release` path on the
+[Red Hat product signing keys page](https://access.redhat.com/security/team/key)
+([public key](https://security.access.redhat.com/data/fd431d51.txt)).
+The installed file may also contain auxiliary or post-quantum keys; only the
+cryptographically matching public release key is extracted, exported as a public
+ASCII-armored key (required by native `rpm --import`) and imported into the
+isolated RPM verification database. Their presence never expands signer
+authority. The observed whole-file SHA-256 is bound into the approved source and
+rechecked before staging; changed bytes or a different release fingerprint refuse.
+New/PQ-only signers require a separately reviewed registry and native-verifier
+cutover, not acceptance by UID, short key ID or a successful system RPM key import.
+
+Deterministic tests cover both releases/architectures, the signed capability and
+item-refusal boundary, tampered local definitions and full fingerprint selection.
+The `rhsm-upstream-model.repo` compatibility fixture is explicitly derived from
+[upstream subscription-manager property names](https://github.com/candlepin/subscription-manager/blob/subscription-manager-1.19.2-1/src/subscription_manager/repolib.py),
+with synthetic entitlement filenames: it is not a registered RHEL9/10 capture.
+The separate
+[`rhel9-registered-redacted.repo`](../../internal/agent/rhsm/testdata/rhel9-registered-redacted.repo)
+fixture is an actual registered `rhel9-02` guest capture:
+`registered-rhsm-public-stanzas-redacted-paths`, decoded SHA-256
+`afd7e9c1bbf7de72412c14d03db418f757c627f205a18217ead20a85e31fb477`.
+Only BaseOS/AppStream public definitions remain, with entitlement serials replaced
+by `10101` and no certificate/key contents. It records `sslverifystatus`,
+`metadata_expire` and `enabled_metadata`, without `ui_repoid_vars` on that guest.
+The parser regression protects these observed fields, not successful native
+package execution.
+These are implementation/security regressions, not live entitlement, package
+transaction or SELinux qualification. Existing RHEL native records below remain
+the only qualification claims; parent-run source-parity proof must be recorded
+separately in [verification](../verification.md).
+
 ### Package resources (DNF4)
 
 RHEL 9/10 package resources use their own DNF4 backend (`BACKEND_DNF4`), never

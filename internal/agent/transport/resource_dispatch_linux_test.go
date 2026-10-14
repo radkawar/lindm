@@ -465,6 +465,7 @@ type dispatchFixture struct {
 	attestations, workCalls  int
 	establishments           int
 	lastRemoteEstablishment  int
+	capabilityObservations   []*agentv1.CapabilityPolicyObservation
 	closed, moreActions      bool
 	loseAuthorization        bool
 	changeSessionOnTerminal  bool
@@ -490,6 +491,10 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 	f.loop = &managementLoop{
 		executor: &dispatchExecutor{f: f}, gate: make(authorityGate, 1),
 		cache: connectionCache{connection: proto.CloneOf(f.connection), servers: &connections{device: &dispatchServer{f: f}}},
+		refreshCapabilities: func(_ context.Context, observation *agentv1.CapabilityPolicyObservation) error {
+			f.capabilityObservations = append(f.capabilityObservations, proto.CloneOf(observation))
+			return nil
+		},
 	}
 	return f
 }

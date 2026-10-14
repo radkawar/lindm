@@ -43,6 +43,12 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	if err != nil {
 		return nil, err
 	}
+	// Bind the exact bytes handed to the verifier, not an earlier pathname
+	// read in checkSource: the host keyring may change between those reads.
+	digest := sha256.Sum256(keyring)
+	if !bytes.Equal(digest[:], source.GetSigningKeySha256()) {
+		return nil, errors.New("packageprovider: approved signing key bytes changed")
+	}
 	if bytes.HasPrefix(bytes.TrimSpace(keyring), []byte("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
 		block, err := armor.Decode(bytes.NewReader(keyring))
 		if err != nil || block.Type != "PGP PUBLIC KEY BLOCK" {
@@ -91,6 +97,9 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 		if err != nil {
 			return nil, err
 		}
+		if err := aptSignersApproved(apt, fingerprints); err != nil {
+			return nil, err
+		}
 		signers = appendUniqueSigners(signers, fingerprints)
 		verified[entry.Name()] = true
 	}
@@ -107,10 +116,8 @@ func (p *Provider) prepareAPT(ctx context.Context, directory string, source *age
 	return &resourcev1.RepositorySnapshot{Repository: sourceRef(source), MetadataSha256: metadata, SignerSha256: signers}, nil
 }
 
-// appendUniqueSigners adds each signer digest once, in first-seen order. Every
-// suite of one approved archive (noble, noble-updates, noble-security) is
-// signed by the same archive key, and a repository snapshot lists each signer
-// once.
+// appendUniqueSigners adds each signer digest once, in first-seen order.
+// Several pockets may share a signer; the snapshot lists it only once.
 func appendUniqueSigners(signers, fingerprints [][]byte) [][]byte {
 	for _, fingerprint := range fingerprints {
 		if !slices.ContainsFunc(signers, func(signer []byte) bool { return bytes.Equal(signer, fingerprint) }) {
@@ -125,14 +132,44 @@ func aptSuites(apt *resourcev1.AptRepository) []string {
 	return append([]string{apt.GetSuite()}, apt.GetAdditionalSuites()...)
 }
 
-// aptSourcesList writes one deb line per suite of the one approved archive,
-// each bound to the approved key alone.
+// aptSourcesList writes one deb line per approved pocket, each bound to the
+// approved key alone, while retaining one repository identity.
 func aptSourcesList(apt *resourcev1.AptRepository, keyPath string) string {
 	var list strings.Builder
 	for _, suite := range aptSuites(apt) {
-		list.WriteString("deb [arch=" + strings.Join(apt.GetArchitectures(), ",") + " signed-by=" + keyPath + "] " + apt.GetUri() + " " + suite + " " + strings.Join(apt.GetComponents(), " ") + "\n")
+		list.WriteString("deb [arch=" + strings.Join(apt.GetArchitectures(), ",") + " signed-by=" + keyPath + "] " + aptSuiteURI(apt, suite) + " " + suite + " " + strings.Join(apt.GetComponents(), " ") + "\n")
 	}
 	return list.String()
+}
+
+// aptSuiteURI preserves the common archive unless a pocket has its own root.
+func aptSuiteURI(apt *resourcev1.AptRepository, suite string) string {
+	for _, pocket := range apt.GetSuiteUris() {
+		if pocket.GetSuite() == suite {
+			return pocket.GetUri()
+		}
+	}
+	return apt.GetUri()
+}
+
+func aptSignersApproved(apt *resourcev1.AptRepository, signers [][]byte) error {
+	if len(apt.GetSigningKeyFingerprints()) == 0 {
+		return nil
+	}
+	approved := make([][]byte, 0, len(apt.GetSigningKeyFingerprints()))
+	for _, fingerprint := range apt.GetSigningKeyFingerprints() {
+		digest, err := signerDigest(fingerprint)
+		if err != nil {
+			return err
+		}
+		approved = append(approved, digest)
+	}
+	for _, signer := range signers {
+		if !slices.ContainsFunc(approved, func(digest []byte) bool { return bytes.Equal(digest, signer) }) {
+			return errors.New("packageprovider: unapproved APT signing fingerprint")
+		}
+	}
+	return nil
 }
 
 // aptSuitesVerified requires a verified InRelease for every configured suite
@@ -144,7 +181,7 @@ func aptSuitesVerified(apt *resourcev1.AptRepository, verified map[string]bool) 
 		return fmt.Errorf("packageprovider: %d signed InRelease files for %d approved suites", len(verified), len(suites))
 	}
 	for _, suite := range suites {
-		if !verified[aptListName(apt.GetUri(), "dists/"+suite+"/InRelease")] {
+		if !verified[aptListName(aptSuiteURI(apt, suite), "dists/"+suite+"/InRelease")] {
 			return fmt.Errorf("packageprovider: approved suite %s has no signed InRelease", suite)
 		}
 	}

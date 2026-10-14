@@ -421,7 +421,7 @@ WITH releases AS (
     SET state = 'pending', reason = ''
     WHERE generation_id = $1
       AND state = 'release_conflict'
-      AND reason LIKE 'capability\_%'
+      AND (reason LIKE 'capability\_%' OR reason = 'rhsm_registration_required')
     RETURNING id
 )
 UPDATE resource_assignment_resources r
@@ -429,13 +429,13 @@ SET disposition = 1, reason = ''
 FROM resource_assignment_heads h
 WHERE h.generation_id = $1
   AND r.assignment_id = h.assignment_id
-  AND r.disposition = 5
-  AND r.reason LIKE 'capability\_%'
+  AND ((r.disposition = 5 AND r.reason LIKE 'capability\_%')
+       OR (r.disposition IN (5, 6) AND r.reason = 'rhsm_registration_required'))
 `
 
 // Rows and releases the executor refused because a capability was not enabled
-// are dispatched again once the device's grant or its reported capability
-// status changed. Reports the number of assignment rows released.
+// (including device-local RHSM registration) are dispatched again once the
+// device's grant or reported capability status changed. Reports rows released.
 func (q *Queries) ReleaseCapabilityHolds(ctx context.Context, generationID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, releaseCapabilityHolds, generationID)
 	if err != nil {

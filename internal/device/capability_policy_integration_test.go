@@ -383,6 +383,18 @@ func TestDeviceCapabilityState(t *testing.T) {
 // Rows the executor refused for a capability are dispatched again only when
 // the device's grant or its reported capability status changes.
 func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
+	testCapabilityRefusalHolds(t, "", "capability_packages_not_enabled", 5)
+}
+
+func TestEntitlementRefusalHoldsAreRedispatched(t *testing.T) {
+	testCapabilityRefusalHolds(t, "rhsm_registration_required", "rhsm_registration_required", 5)
+}
+
+func TestEntitlementPreparationHoldsAreRedispatched(t *testing.T) {
+	testCapabilityRefusalHolds(t, "rhsm_registration_required", "rhsm_registration_required", 6)
+}
+
+func testCapabilityRefusalHolds(t *testing.T, detail, expectedReason string, heldDisposition int16) {
 	parallelDeviceIntegration(t)
 	f := newDispatchFixtureWithDelegationAge(t, time.Hour, "systemd.service.v1", trust.CapabilityPolicyCapability)
 	f.assign(t, nil)
@@ -400,11 +412,19 @@ func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
 		attestation := &agentv1.ResourceExecutionAttestation{DeploymentId: intent.GetDeploymentId(), DeviceId: intent.GetDeviceId(), EnrollmentGeneration: intent.GetEnrollmentGeneration(), SessionEpoch: 1, ActionRevision: 1, Nonce: work.GetResultNonce(), IssuedAt: stamp, ExpiresAt: timestamppb.New(now.Add(30 * time.Second)), Status: &agentv1.ResourceExecutionStatus{
 			ActionId: work.GetActionId(), IntentSha256: digest[:], State: agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED,
 			Failure: agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, AcceptedAt: stamp, CompletedAt: stamp,
-			AdmissionRefusal: &agentv1.ResourceAdmissionRefusal{Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(), Reason: agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, Capability: agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, BootId: uuid.NewString(), ExecutorIncarnation: uuid.NewString(), NativeEvidenceUnavailable: true},
+			AdmissionRefusal: &agentv1.ResourceAdmissionRefusal{Ref: proto.CloneOf(intent.GetDesired().GetRef()), Operation: intent.GetOperation(), Reason: agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, Capability: agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, BootId: uuid.NewString(), ExecutorIncarnation: uuid.NewString(), NativeEvidenceUnavailable: true, Detail: detail},
 		}}
 		request.AttestationEnvelope = f.sign(t, attestation, f.key)
 		if _, err := f.service.ReportResourceResult(f.deviceCtx, connect.NewRequest(request)); err != nil {
 			t.Fatal(err)
+		}
+		if heldDisposition != 5 {
+			// Dispatch's preparation regression checks the signed unsupported
+			// outcome maps to 6. Exercise that persisted hold with the same SQL
+			// release lifecycle without pretending this service fixture stages RPMs.
+			if _, err := f.pool.Exec(t.Context(), "UPDATE resource_assignment_resources SET disposition=$2 WHERE canonical_key=$1 AND reason=$3", intent.GetDesired().GetRef().GetCanonicalKey(), heldDisposition, expectedReason); err != nil {
+				t.Fatal(err)
+			}
 		}
 		return intent.GetDesired().GetRef().GetCanonicalKey()
 	}
@@ -431,6 +451,9 @@ func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
 		report := hostObservation(f.principal.GenerationID.String(), sequence, "capability-holds")
 		report.Observation.Details = nativeDetailsFixture()
 		report.Observation.Details.CapabilityPolicy = &agentv1.CapabilityPolicyObservation{State: agentv1.CapabilityPolicyState_CAPABILITY_POLICY_STATE_ACTIVE, AppliedVersion: 1, Capabilities: []*agentv1.CapabilityObservation{{Capability: agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, Status: status}}}
+		if detail != "" && status == agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE {
+			report.Observation.Details.CapabilityPolicy.Capabilities[0].Detail = detail
+		}
 		if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(report)); err != nil {
 			t.Fatal(err)
 		}
@@ -438,7 +461,7 @@ func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
 
 	// First issuance is a grant change.
 	key := refuse()
-	if disposition, reason := held(key); disposition != 5 || reason != "capability_packages_not_enabled" {
+	if disposition, reason := held(key); disposition != heldDisposition || reason != expectedReason {
 		t.Fatalf("refusal recorded as %d %s", disposition, reason)
 	}
 	if f.work(t) != nil {
@@ -450,16 +473,20 @@ func TestCapabilityRefusalHoldsAreRedispatched(t *testing.T) {
 	}
 	refuse()
 	poll()
-	if disposition, _ := held(key); disposition != 5 {
+	if disposition, _ := held(key); disposition != heldDisposition {
 		t.Fatal("unchanged grant released the hold")
 	}
-	observe(1, agentv1.CapabilityStatus_CAPABILITY_STATUS_NOT_ENABLED)
+	blockedStatus := agentv1.CapabilityStatus_CAPABILITY_STATUS_NOT_ENABLED
+	if detail != "" {
+		blockedStatus = agentv1.CapabilityStatus_CAPABILITY_STATUS_UNAVAILABLE
+	}
+	observe(1, blockedStatus)
 	if disposition, _ := held(key); disposition != 1 {
 		t.Fatal("first reported capability status did not release the hold")
 	}
 	refuse()
-	observe(2, agentv1.CapabilityStatus_CAPABILITY_STATUS_NOT_ENABLED)
-	if disposition, _ := held(key); disposition != 5 {
+	observe(2, blockedStatus)
+	if disposition, _ := held(key); disposition != heldDisposition {
 		t.Fatal("identical reported status released the hold")
 	}
 	observe(3, agentv1.CapabilityStatus_CAPABILITY_STATUS_LOCAL)

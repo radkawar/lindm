@@ -113,15 +113,15 @@ WHERE device_id = sqlc.arg(device_id) AND generation_id = sqlc.arg(generation_id
   AND version <= sqlc.arg(latest)::bigint - 16;
 
 -- Rows and releases the executor refused because a capability was not enabled
--- are dispatched again once the device's grant or its reported capability
--- status changed. Reports the number of assignment rows released.
+-- (including device-local RHSM registration) are dispatched again once the
+-- device's grant or reported capability status changed. Reports rows released.
 -- name: ReleaseCapabilityHolds :execrows
 WITH releases AS (
     UPDATE resource_releases
     SET state = 'pending', reason = ''
     WHERE generation_id = sqlc.arg(generation_id)
       AND state = 'release_conflict'
-      AND reason LIKE 'capability\_%'
+      AND (reason LIKE 'capability\_%' OR reason = 'rhsm_registration_required')
     RETURNING id
 )
 UPDATE resource_assignment_resources r
@@ -129,8 +129,8 @@ SET disposition = 1, reason = ''
 FROM resource_assignment_heads h
 WHERE h.generation_id = sqlc.arg(generation_id)
   AND r.assignment_id = h.assignment_id
-  AND r.disposition = 5
-  AND r.reason LIKE 'capability\_%';
+  AND ((r.disposition = 5 AND r.reason LIKE 'capability\_%')
+       OR (r.disposition IN (5, 6) AND r.reason = 'rhsm_registration_required'));
 
 -- Rows and releases the executor refused for device-local tool or package
 -- state (an outdated or missing native tool, a unit no package installed, a

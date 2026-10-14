@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
@@ -19,28 +20,62 @@ import (
 	"lindm/internal/rpcreason"
 )
 
-// The unbuffered handoff serializes refresh with periodic collection and spool
-// mutation. Cancellation joins the request; the bounded reply never blocks the
-// inventory owner if management has already stopped.
+// The unbuffered handoff serializes signed refresh and local capability changes
+// with periodic collection and spool mutation. There is at most one waiting job.
+// Cancellation joins the request; the bounded reply never blocks the owner if
+// management has stopped. Only status jobs enter signed action confirmation.
 type inventoryRefreshJob struct {
-	ctx    context.Context
-	status *agentv1.DeviceActionStatus
-	done   chan error
+	ctx        context.Context
+	status     *agentv1.DeviceActionStatus
+	capability *agentv1.CapabilityPolicyObservation
+	done       chan error
 }
 
 func (r *runner) requestInventoryRefresh(ctx context.Context, status *agentv1.DeviceActionStatus) error {
-	job := inventoryRefreshJob{ctx: ctx, status: status, done: make(chan error, 1)}
+	return r.requestRefresh(inventoryRefreshJob{ctx: ctx, status: status, done: make(chan error, 1)})
+}
+
+func (r *runner) requestCapabilityRefresh(ctx context.Context, observation *agentv1.CapabilityPolicyObservation) error {
+	return r.requestRefresh(inventoryRefreshJob{ctx: ctx, capability: observation, done: make(chan error, 1)})
+}
+
+func (r *runner) requestRefresh(job inventoryRefreshJob) error {
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-job.ctx.Done():
+		return job.ctx.Err()
 	case r.refreshes <- job:
 	}
 	select {
-	case <-ctx.Done():
-		return ctx.Err()
+	case <-job.ctx.Done():
+		return job.ctx.Err()
 	case err := <-job.done:
 		return err
 	}
+}
+
+func (r *runner) handleInventoryRefresh(job inventoryRefreshJob) {
+	if job.capability != nil {
+		job.done <- r.refreshCapabilityObservation(job.ctx, job.capability)
+	} else {
+		job.done <- r.refreshInventory(job.ctx, job.status)
+	}
+}
+
+func (r *runner) refreshCapabilityObservation(ctx context.Context, observation *agentv1.CapabilityPolicyObservation) error {
+	if !proto.Equal(observation, r.queuedCapability) &&
+		!proto.Equal(observation, r.waiting.GetHost().GetDetails().GetCapabilityPolicy()) {
+		r.nextCollection = time.Time{}
+	}
+	// Use ordinary sequencing, admission cooldown and durable spool coalescing.
+	// A failed flush retries existing immutable bytes, not another collection;
+	// this is never a signed refresh action or a confirmation of one.
+	if err := r.cycle(ctx); err != nil {
+		return err
+	}
+	if r.queuedCapability == nil {
+		return errors.New("protected capability observation was not collected")
+	}
+	return nil
 }
 
 func (r *runner) refreshInventory(ctx context.Context, status *agentv1.DeviceActionStatus) error {

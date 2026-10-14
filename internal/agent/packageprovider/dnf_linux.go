@@ -24,7 +24,12 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/admissiondetail"
+	"lindm/internal/agent/config"
 	"lindm/internal/agent/dnf"
+	"lindm/internal/agent/inventory"
+	"lindm/internal/agent/rhsm"
+	"lindm/internal/platform"
 )
 
 type dnfRPM struct {
@@ -83,41 +88,86 @@ func (p *Provider) prepareDNF(ctx context.Context, directory string, source *age
 	if err := atomicFile(filepath.Join(directory, "dnf.conf"), []byte(main), 0600); err != nil {
 		return nil, err
 	}
-	if err := atomicFile(filepath.Join(directory, "repos", "approved.repo"), []byte(dnfRepositoryConfig(source)), 0600); err != nil {
-		return nil, err
-	}
 	key, err := custody.ReadRoot(source.GetSigningKeyFile(), 4<<20, false)
 	if err != nil {
 		return nil, err
 	}
-	var entities openpgp.EntityList
-	if bytes.HasPrefix(bytes.TrimSpace(key), []byte("-----BEGIN PGP")) {
-		entities, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
+	keyDigest := sha256.Sum256(key)
+	if !bytes.Equal(keyDigest[:], source.GetSigningKeySha256()) {
+		return nil, errors.New("packageprovider: approved signing key bytes changed")
+	}
+	var fingerprint, importKey []byte
+	if config.HasEntitledLocation(rpm) {
+		importKey, fingerprint, err = rhsm.ReleaseKey(key, source.GetRpmSigningKeyFingerprint())
+		if err != nil {
+			return nil, err
+		}
 	} else {
-		entities, err = openpgp.ReadKeyRing(bytes.NewReader(key))
+		var entities openpgp.EntityList
+		if bytes.HasPrefix(bytes.TrimSpace(key), []byte("-----BEGIN PGP")) {
+			entities, err = openpgp.ReadArmoredKeyRing(bytes.NewReader(key))
+		} else {
+			entities, err = openpgp.ReadKeyRing(bytes.NewReader(key))
+		}
+		if err != nil || len(entities) != 1 {
+			return nil, errors.New("packageprovider: RPM source must bind one valid public signing key")
+		}
+		fingerprint = entities[0].PrimaryKey.Fingerprint
+		if !strings.EqualFold(hex.EncodeToString(fingerprint), source.GetRpmSigningKeyFingerprint()) {
+			return nil, errors.New("packageprovider: approved RPM signing fingerprint mismatch")
+		}
+		importKey = key
 	}
-	if err != nil || len(entities) != 1 {
-		return nil, errors.New("packageprovider: RPM source must bind one valid public signing key")
+	keyFile := filepath.Join(directory, "signing-key.asc")
+	if err := atomicFile(keyFile, importKey, 0600); err != nil {
+		return nil, err
 	}
-	fingerprint := entities[0].PrimaryKey.Fingerprint
-	if !strings.EqualFold(hex.EncodeToString(fingerprint), source.GetRpmSigningKeyFingerprint()) {
-		return nil, errors.New("packageprovider: approved RPM signing fingerprint mismatch")
+	var repositoryConfig string
+	if config.HasEntitledLocation(rpm) {
+		repositoryConfig, err = entitledRepositoryConfig(source, keyFile)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		repositoryConfig = dnfRepositoryConfig(source, keyFile)
+	}
+	if err := atomicFile(filepath.Join(directory, "repos", "approved.repo"), []byte(repositoryConfig), 0600); err != nil {
+		return nil, err
 	}
 	digest := sha256.Sum256(fingerprint)
 	if _, err := p.run(ctx, "/usr/bin/rpm", []string{"--dbpath", filepath.Join(directory, "rpmkeys"), "--initdb"}, "/", nil); err != nil {
 		return nil, err
 	}
-	if _, err := p.run(ctx, "/usr/bin/rpm", []string{"--dbpath", filepath.Join(directory, "rpmkeys"), "--import", source.GetSigningKeyFile()}, "/", nil); err != nil {
+	if _, err := p.run(ctx, "/usr/bin/rpm", []string{"--dbpath", filepath.Join(directory, "rpmkeys"), "--import", keyFile}, "/", nil); err != nil {
 		return nil, err
 	}
 	return digest[:], nil
+}
+
+func entitledRepositoryConfig(source *agentv1.NativePackageSource, keyFile string) (string, error) {
+	identity, err := inventory.HostRelease(context.Background())
+	if err != nil {
+		return "", err
+	}
+	release := platform.Identify(identity)
+	if err := config.CheckEntitledSource(release, source); err != nil {
+		return "", err
+	}
+	vendor, architecture, _ := config.EntitledVendor(release, source.GetRepository().GetRpm())
+	repositoryConfig, err := rhsm.RepositoryConfig(vendor, architecture, keyFile, func(path string) ([]byte, error) {
+		return custody.ReadRoot(path, 1<<20, false)
+	})
+	if err != nil {
+		return "", admissiondetail.Wrap(fmt.Errorf("%w: %w", ErrUnsupported, err), "rhsm_registration_required")
+	}
+	return repositoryConfig, nil
 }
 
 // dnfRepositoryConfig writes one section per approved native repository, all
 // verified with the source's single key. Package signatures are always
 // required; repository metadata signatures are waived only when the source
 // says so, which checkSource admits only for metalinks the release pins.
-func dnfRepositoryConfig(source *agentv1.NativePackageSource) string {
+func dnfRepositoryConfig(source *agentv1.NativePackageSource, keyFile string) string {
 	rpm := source.GetRepository().GetRpm()
 	metadata := "0"
 	if rpm.GetRequireMetadataSignature() {
@@ -128,7 +178,7 @@ func dnfRepositoryConfig(source *agentv1.NativePackageSource) string {
 		if urls != nil {
 			location = "baseurl=" + strings.Join(urls.GetUrls(), " ")
 		}
-		return "[" + id + "]\nname=Lindm approved repository\n" + location + "\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=" + metadata + "\nsslverify=1\nskip_if_unavailable=0\ngpgkey=file://" + source.GetSigningKeyFile() + "\n"
+		return "[" + id + "]\nname=Lindm approved repository\n" + location + "\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=" + metadata + "\nsslverify=1\nskip_if_unavailable=0\ngpgkey=file://" + keyFile + "\n"
 	}
 	config := section(rpm.GetNativeId(), rpm.GetBaseUrls(), rpm.GetMetalink())
 	for _, additional := range rpm.GetAdditionalRepositories() {

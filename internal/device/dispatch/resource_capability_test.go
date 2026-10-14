@@ -49,6 +49,8 @@ func TestResourceResultDispositionNamesRefusals(t *testing.T) {
 		{"packages not enabled", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, ""), 5, "capability_packages_not_enabled"},
 		{"local-only custom roots", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_CUSTOM_FILE_ROOTS, ""), 5, "capability_custom_file_roots_not_enabled"},
 		{"capability detail does not hide the capability", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_KERNEL_SETTINGS, "key_not_allowed"), 5, "capability_kernel_settings_not_enabled"},
+		{"entitlement unavailable", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, "rhsm_registration_required"), 5, "rhsm_registration_required"},
+		{"entitlement detail cannot replace another capability", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_FILES, "rhsm_registration_required"), 5, "capability_files_not_enabled"},
 		{"adoption required", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED, 0, ""), 5, "adoption_required"},
 		{"adoption detail", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_ADOPTION_REQUIRED, 0, "existing_banner_file"), 5, "existing_banner_file"},
 		{"precondition", refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, 0, ""), 5, "admission_precondition"},
@@ -60,6 +62,7 @@ func TestResourceResultDispositionNamesRefusals(t *testing.T) {
 		{"preparation precondition detail blocks", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, "existing_package_unverified"), 5, "existing_package_unverified"},
 		{"preparation precondition", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, ""), 4, ResourceReasonPreparationPrecondition},
 		{"preparation unsupported detail", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated"), 6, "native_tool_outdated"},
+		{"entitlement lost during preparation", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "rhsm_registration_required"), 6, "rhsm_registration_required"},
 		{"preparation unsupported", preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, ""), 6, "native_unsupported"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -97,6 +100,9 @@ func TestReleaseResultStateNamesCapability(t *testing.T) {
 	}
 	if _, reason := ReleaseResultState(refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_PRECONDITION, 0, "native_tool_outdated")); reason != "native_tool_outdated" {
 		t.Fatalf("release dropped the refusal detail: %s", reason)
+	}
+	if state, reason := ReleaseResultState(refusalStatus(agentv1.ResourceAdmissionRefusalReason_RESOURCE_ADMISSION_REFUSAL_REASON_CAPABILITY_NOT_ENABLED, agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, "rhsm_registration_required")); state != "release_conflict" || reason != "rhsm_registration_required" {
+		t.Fatalf("release dropped the entitlement remedy: %s %s", state, reason)
 	}
 	if state, reason := ReleaseResultState(preparationStatus(agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, "native_tool_outdated")); state != "release_conflict" || reason != "native_tool_outdated" {
 		t.Fatalf("release dropped the preparation detail: %s %s", state, reason)

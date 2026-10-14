@@ -556,7 +556,7 @@ func TestSameReleaseAndArchitecture(t *testing.T) {
 func TestVendorCapabilityFacts(t *testing.T) {
 	for _, r := range Releases() {
 		for _, vendor := range r.VendorRepositories {
-			if vendor.RepositoryID == "" || vendor.KeyFile == "" || vendor.KeyArtifactID == "" || len(vendor.KeySHA256) == 0 {
+			if vendor.RepositoryID == "" || vendor.KeyFile == "" || vendor.KeyArtifactID == "" || (len(vendor.KeySHA256) == 0 && vendor.Entitled == nil) {
 				t.Fatalf("%s: incomplete vendor repository %+v", r.Key, vendor)
 			}
 			if vendor.DB != r.Native().Packages.Backend.PackageDB() {
@@ -573,9 +573,27 @@ func TestVendorCapabilityFacts(t *testing.T) {
 					if !strings.HasPrefix(vendor.ArchiveURIs[architecture], "https://") || len(vendor.Suites) == 0 || len(vendor.Components) == 0 {
 						t.Fatalf("%s %s: incomplete APT archive", r.Key, architecture)
 					}
+					for suite, uri := range vendor.SuiteURIs {
+						if !slices.Contains(vendor.Suites, suite) || !strings.HasPrefix(uri, "https://") {
+							t.Fatalf("%s: unapproved APT pocket %s at %s", r.Key, suite, uri)
+						}
+					}
+					for _, fingerprint := range vendor.APTFingerprints {
+						if len(fingerprint) != 40 || strings.ToUpper(fingerprint) != fingerprint {
+							t.Fatalf("%s: invalid APT primary fingerprint %q", r.Key, fingerprint)
+						}
+					}
 				case PackageDBRPM:
-					if len(vendor.RPMFingerprint) != 40 || len(vendor.NativeRepositories) == 0 {
+					if len(vendor.RPMFingerprint) != 40 || (len(vendor.NativeRepositories) == 0 && vendor.Entitled == nil) {
 						t.Fatalf("%s: incomplete RPM archive", r.Key)
+					}
+					if vendor.Entitled != nil {
+						ids := vendor.Entitled.NativeIDs[architecture]
+						approved, arch, ok := r.EntitledRepository(ids)
+						if !ok || arch != architecture || approved.RepositoryID != vendor.RepositoryID || len(ids) != 2 || !vendor.MetadataUnsigned || vendor.MetalinkHost != "" {
+							t.Fatalf("%s %s: incomplete entitled archive", r.Key, architecture)
+						}
+						continue
 					}
 					var metalinks []string
 					for _, native := range vendor.NativeRepositories {
@@ -606,10 +624,9 @@ func TestVendorCapabilityFacts(t *testing.T) {
 			t.Fatalf("%s: invalid account defaults %+v", r.Key, r.Accounts)
 		}
 	}
-	// Which releases can derive PACKAGES: a vendor archive and an open
-	// package gate. Debian's security pocket has its own archive root, RHEL
-	// needs entitlement certificates and Fedora 43's dnf5 is below the floor.
-	derivable := map[string]bool{"ubuntu-22.04": true, "ubuntu-24.04": true, "fedora-44": true, "rocky-9": true, "rocky-10": true, "almalinux-9": true, "almalinux-10": true}
+	// Which releases have a registry archive and an open package gate.
+	// Device-local prerequisites are independently checked during derivation.
+	derivable := map[string]bool{"ubuntu-22.04": true, "ubuntu-24.04": true, "debian-12": true, "debian-13": true, "linuxmint-22.3": true, "pop-24.04": true, "fedora-44": true, "rocky-9": true, "rocky-10": true, "almalinux-9": true, "almalinux-10": true, "rhel-9": true, "rhel-10": true}
 	for _, r := range Releases() {
 		got := len(r.VendorRepositories) != 0 && r.GateReason(Packages) == ""
 		if got != derivable[r.Key] {
@@ -648,8 +665,21 @@ func TestVendorCapabilityFacts(t *testing.T) {
 		t.Errorf("ubuntu-22.04 archive %+v", vendor)
 	}
 	for _, key := range []string{"debian-12", "debian-13"} {
-		if r, _ := Lookup(key); len(r.VendorRepositories) != 0 || !slices.Equal(r.StandardFileRoots, dropInRoots) || r.Accounts != regularAccounts {
-			t.Errorf("%s: vendor facts %+v %v %+v", key, r.VendorRepositories, r.StandardFileRoots, r.Accounts)
+		r, _ := Lookup(key)
+		if len(r.VendorRepositories) != 1 || !slices.Equal(r.StandardFileRoots, dropInRoots) || r.Accounts != regularAccounts {
+			t.Fatalf("%s: vendor facts %+v %v %+v", key, r.VendorRepositories, r.StandardFileRoots, r.Accounts)
+		}
+		vendor := r.VendorRepositories[0]
+		if vendor.RepositoryID != "cb2df30f-ba96-553d-bdd7-3bab91d9ea14" ||
+			!slices.Equal(vendor.Suites, []string{r.Codename, r.Codename + "-updates", r.Codename + "-security"}) ||
+			len(vendor.SuiteURIs) != 1 || vendor.SuiteURIs[r.Codename+"-security"] != "https://security.debian.org/debian-security" ||
+			!slices.Equal(vendor.KeySHA256, []string{"506b815cbb32d9b6066b4a2aa524071e071761e7e7f68c3ac74f3061ba852017"}) || len(vendor.APTFingerprints) < 5 {
+			t.Errorf("%s: incomplete Debian source %+v", key, vendor)
+		}
+		for _, architecture := range r.Architectures {
+			if vendor.ArchiveURIs[architecture] != "https://deb.debian.org/debian" {
+				t.Errorf("%s %s: non-Debian main archive", key, architecture)
+			}
 		}
 	}
 }

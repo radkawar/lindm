@@ -18,6 +18,7 @@ import (
 
 	"lindm/internal/agent/firewallprovider"
 	"lindm/internal/agent/inventory"
+	"lindm/internal/agent/rhsm"
 	"lindm/internal/custody"
 	"lindm/internal/platform"
 )
@@ -54,6 +55,8 @@ type Host struct {
 	Interfaces func() ([]Interface, error)
 	// ReadVendorKey reads a registry vendor key file under root custody.
 	ReadVendorKey func(path string) ([]byte, error)
+	// ReadEntitledConfig observes local RHSM state without exposing secrets.
+	ReadEntitledConfig func(vendor platform.VendorRepository, architecture string) error
 	// PathPresent reports whether a registry variant marker exists; any
 	// error other than absence counts as present.
 	PathPresent func(path string) bool
@@ -80,10 +83,16 @@ func DetectHost(ctx context.Context) (Host, error) {
 		machine = append(machine, byte(c))
 	}
 	return Host{
-		Release:              platform.Identify(release),
-		Architecture:         string(machine),
-		Interfaces:           sysfsInterfaces,
-		ReadVendorKey:        func(path string) ([]byte, error) { return custody.ReadRoot(path, maxKeyBytes, false) },
+		Release:       platform.Identify(release),
+		Architecture:  string(machine),
+		Interfaces:    sysfsInterfaces,
+		ReadVendorKey: func(path string) ([]byte, error) { return custody.ReadRoot(path, maxKeyBytes, false) },
+		ReadEntitledConfig: func(vendor platform.VendorRepository, architecture string) error {
+			_, err := rhsm.RepositoryConfig(vendor, architecture, vendor.KeyFile, func(path string) ([]byte, error) {
+				return custody.ReadRoot(path, 1<<20, false)
+			})
+			return err
+		},
 		PathPresent:          pathPresent,
 		FirewallRestoreReady: firewallprovider.RestoreReady,
 	}, nil

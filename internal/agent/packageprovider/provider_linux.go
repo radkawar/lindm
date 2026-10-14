@@ -254,13 +254,18 @@ func checkSource(source *agentv1.NativePackageSource) error {
 	if !filepath.IsAbs(path) || strings.ContainsAny(path, " \t\r\n\"[];") || filepath.Clean(path) != path {
 		return errors.New("packageprovider: unsafe approved signing key path")
 	}
-	if rpm := source.GetRepository().GetRpm(); rpm != nil && !rpm.GetRequireMetadataSignature() {
+	if rpm := source.GetRepository().GetRpm(); rpm != nil && (!rpm.GetRequireMetadataSignature() || config.HasEntitledLocation(rpm)) {
 		release, err := inventory.HostRelease(context.Background())
 		if err != nil {
 			return err
 		}
 		if !config.RPMMetadataTrusted(platform.Identify(release), rpm) {
 			return fmt.Errorf("%w: %w", ErrUnsupported, config.ErrUnsignedMetadata)
+		}
+		if config.HasEntitledLocation(rpm) {
+			if err := config.CheckEntitledSource(platform.Identify(release), source); err != nil {
+				return fmt.Errorf("%w: %w", ErrUnsupported, err)
+			}
 		}
 	}
 	parent, err := statefs.OpenTemporaryParent(filepath.Dir(path))

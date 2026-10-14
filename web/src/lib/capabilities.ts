@@ -116,6 +116,7 @@ const unavailableCauses: Record<string, string> = {
   platform_not_qualified: "lindm hasn't qualified this on the device's OS release.",
   vendor_key_unrecognized:
     "The device lacks a recognized OS repository signing key. Restore ubuntu-keyring or fedora-gpg-keys on the device. Check lindm's support for the vendor's current key if the keyring is intact.",
+  rhsm_registration_required: "Register this device with Red Hat",
   firewall_settings_missing:
     "The deployment lacks management addresses or a connectivity check for Firewall.",
   firewall_restore_unit_disabled:

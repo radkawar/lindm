@@ -6,11 +6,13 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"buf.build/go/protovalidate"
+	"google.golang.org/protobuf/proto"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	devicev1 "lindm/gen/lindm/device/v1"
@@ -25,7 +27,7 @@ const capabilityPolicyTimeout = time.Minute
 // the executor. The network process only carries bytes: the executor verifies
 // signer, binding and monotonicity. Applied cursors are reported only for an
 // ACTIVE policy so an INERT or absent one is always reissued.
-func (m *managementLoop) synchronizeCapabilityPolicy(ctx context.Context) error {
+func (m *managementLoop) synchronizeCapabilityPolicy(ctx context.Context) (resultErr error) {
 	ctx, cancel := context.WithTimeout(ctx, capabilityPolicyTimeout)
 	defer cancel()
 	authority, err := establish(ctx, m.executor, &m.cache, m.gate)
@@ -40,6 +42,11 @@ func (m *managementLoop) synchronizeCapabilityPolicy(ctx context.Context) error 
 		return fmt.Errorf("invalid protected capability policy view: %w", err)
 	}
 	observation := current.GetObservation()
+	// Local registration can change without any signed grant change. Publish the
+	// protected view even when issuance fails or the server has nothing to relay.
+	defer func() {
+		resultErr = errors.Join(resultErr, m.publishCapabilityObservation(ctx, observation))
+	}()
 	if observation.GetState() == agentv1.CapabilityPolicyState_CAPABILITY_POLICY_STATE_REFUSED_LOCALLY {
 		return nil
 	}
@@ -70,7 +77,24 @@ func (m *managementLoop) synchronizeCapabilityPolicy(ctx context.Context) error 
 	if err := validateManagementMessage(updated); err != nil {
 		return fmt.Errorf("invalid protected capability policy receipt: %w", err)
 	}
+	observation = updated.GetObservation()
 	slog.Info("capability policy synchronized", "version", updated.GetObservation().GetAppliedVersion())
+	return nil
+}
+
+func (m *managementLoop) publishCapabilityObservation(ctx context.Context, observation *agentv1.CapabilityPolicyObservation) error {
+	if proto.Equal(observation, m.capabilityObserved) {
+		return nil
+	}
+	if m.refreshCapabilities == nil {
+		return errors.New("capability observation inventory handoff unavailable")
+	}
+	if err := m.refreshCapabilities(ctx, observation); err != nil {
+		return err
+	}
+	// The RPC result is owned by this loop and never mutated. The handoff uses
+	// it only to coalesce scheduling; uploaded status is re-read from the root.
+	m.capabilityObserved = observation
 	return nil
 }
 

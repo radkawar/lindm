@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 
+	"golang.org/x/sys/unix"
+
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/agent/inventory"
@@ -23,7 +25,7 @@ import (
 func resolvePackageProvider(base string, cfg *agentv1.NativePackageProviderConfig, rootOwner bool) error {
 	var release *platform.Release
 	for _, source := range cfg.GetSources() {
-		if rpm := source.GetRepository().GetRpm(); rpm != nil && !rpm.GetRequireMetadataSignature() {
+		if rpm := source.GetRepository().GetRpm(); rpm != nil && (!rpm.GetRequireMetadataSignature() || HasEntitledLocation(rpm)) {
 			if release == nil {
 				identity, err := inventory.HostRelease(context.Background())
 				if err != nil {
@@ -33,6 +35,11 @@ func resolvePackageProvider(base string, cfg *agentv1.NativePackageProviderConfi
 			}
 			if !RPMMetadataTrusted(release, rpm) {
 				return fmt.Errorf("%w: approved package repository %s is outside the release's pinned HTTPS metalinks", ErrUnsignedMetadata, source.GetRepository().GetRepositoryId())
+			}
+		}
+		if HasEntitledLocation(source.GetRepository().GetRpm()) {
+			if err := CheckEntitledSource(release, source); err != nil {
+				return err
 			}
 		}
 		path := resolve(base, source.GetSigningKeyFile())
@@ -49,16 +56,19 @@ func resolvePackageProvider(base string, cfg *agentv1.NativePackageProviderConfi
 	return nil
 }
 
-// ErrUnsignedMetadata reports an RPM source whose unsigned metadata is not
-// authenticated by a metalink the running release pins.
+// ErrUnsignedMetadata reports a source outside the running release's pinned
+// metadata trust contract (HTTPS metalinks or device-local entitled CDN TLS).
 var ErrUnsignedMetadata = errors.New("unsigned_repository_metadata")
 
-// RPMMetadataTrusted reports whether an RPM source's metadata is
-// authenticated: signed metadata, or (registry decision for vendors that sign
-// no metadata) every repository located by an HTTPS metalink on a host the
-// release pins. A plain base URL without signed metadata is never trusted.
-// Package signatures are required either way.
+// RPMMetadataTrusted admits signed metadata, pinned HTTPS metalinks, or exact
+// registry-approved RHSM IDs. RHSM definitions and credentials are additionally
+// checked locally before staging; this marker alone never authorizes an endpoint.
+// Package signatures remain mandatory.
 func RPMMetadataTrusted(release *platform.Release, rpm *resourcev1.RpmRepository) bool {
+	if HasEntitledLocation(rpm) {
+		_, _, ok := EntitledVendor(release, rpm)
+		return ok
+	}
 	if rpm.GetRequireMetadataSignature() {
 		return true
 	}
@@ -72,4 +82,47 @@ func RPMMetadataTrusted(release *platform.Release, rpm *resourcev1.RpmRepository
 		}
 	}
 	return release.UnsignedMetadataAllowed(metalinks)
+}
+
+// HasEntitledLocation detects even a mixed source, so a signed-metadata flag
+// cannot bypass the device-local source checks.
+func HasEntitledLocation(rpm *resourcev1.RpmRepository) bool {
+	if rpm.GetRhsmManaged() {
+		return true
+	}
+	for _, repository := range rpm.GetAdditionalRepositories() {
+		if repository.GetRhsmManaged() {
+			return true
+		}
+	}
+	return false
+}
+
+// EntitledVendor admits only the release registry's exact architecture IDs.
+func EntitledVendor(release *platform.Release, rpm *resourcev1.RpmRepository) (platform.VendorRepository, string, bool) {
+	if !rpm.GetRhsmManaged() || rpm.GetRequireMetadataSignature() || !rpm.GetRequirePackageSignature() {
+		return platform.VendorRepository{}, "", false
+	}
+	ids := []string{rpm.GetNativeId()}
+	for _, repository := range rpm.GetAdditionalRepositories() {
+		if !repository.GetRhsmManaged() {
+			return platform.VendorRepository{}, "", false
+		}
+		ids = append(ids, repository.GetNativeId())
+	}
+	return release.EntitledRepository(ids)
+}
+
+// CheckEntitledSource prevents local configuration from substituting a key,
+// signer or repository identity for a registry-derived entitled source.
+func CheckEntitledSource(release *platform.Release, source *agentv1.NativePackageSource) error {
+	vendor, architecture, ok := EntitledVendor(release, source.GetRepository().GetRpm())
+	var uts unix.Utsname
+	if err := unix.Uname(&uts); err != nil {
+		return err
+	}
+	if !ok || architecture != unix.ByteSliceToString(uts.Machine[:]) || source.GetRepository().GetRepositoryId() != vendor.RepositoryID || source.GetSigningKeyFile() != vendor.KeyFile || source.GetRpmSigningKeyFingerprint() != vendor.RPMFingerprint {
+		return ErrUnsignedMetadata
+	}
+	return nil
 }
