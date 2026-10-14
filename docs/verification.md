@@ -348,6 +348,51 @@ caller of the removed `BootstrapLocalOwner` API. That caller now uses the existi
 protected first-run owner fixture; no production bypass or compatibility API was
 restored. The failed invocation does not establish an identity integration pass.
 
+The first normal landing gate stopped at integration-tagged lint on an unchecked
+default-transport assertion in the restore-hold regression. The unused transport
+clone was removed; the restore-hold assertion was not weakened.
+The subsequent normal gate committed and pushed `38283dd9c` in 392.53 seconds.
+It passed build, default and integration-tagged lint, canonical regeneration of
+23 derived files and race tests for 38 touched plus 70 dependent packages.
+Its real Chromium web-only journey passed all eight steps in 207.11 seconds,
+with owned cleanup and the stock signed agent repository Ready without either
+repository configuration input. The record is
+`artifacts/land-check-web-20261014T005132Z/acceptance.json`, SHA-256
+`192a80edf38d4f7fe8b9d9852ed4cc0eb6ca120328c1276d683c009b124791ad`.
+This fixture journey does not qualify native first-run installation or recovery.
+
+After landing, the maintained real-PostgreSQL identity wrapper passed
+`internal/identity` in 222.0 seconds (239.99 seconds wall time), including the MCP
+tests through the protected first-owner fixture. Its private stream is
+`$HOME/work/turnkey-identity-53-38283dd9c.json`, SHA-256
+`ccc914bbd640484513d7b6203e578c81406c146bf9e275665462ecbf1c2e63b7`.
+Independent owned authorization-fixture cleanup completed.
+
+Care checks then used the frozen post-landing proof worktree `17a3a1eab`.
+The initial wrapper lacked that new worktree's embedded web assets and stopped
+before package execution. After building those assets, `internal/serverops` passed
+in 11.6 seconds (28.06 seconds including the asset build and wrapper), and
+`internal/server` passed in 88.9 seconds (117.84 seconds wall time).
+Their private streams are, respectively,
+`$HOME/work/turnkey-serverops-53-17a3a1eab.json`, SHA-256
+`9cd764ac248d68ffc7585d6da24fa1336ca9cac4ef696408808bd97adae0e874`, and
+`$HOME/work/turnkey-server-53-17a3a1eab.json`, SHA-256
+`58493c08a9f9e1da66044d1fe39b9a42350d7c82dd0eaf0c5c936a02ffc3a589`.
+Both wrappers retained restricted fixture roles and completed their independent
+owned cleanup. These package passes are not a fresh native restore drill.
+
+The separate frozen-server full visual-review invocation reached its 3,600-second
+deadline. It has no completed visual-review pass. Final integrated release-bundle
+and both-OS native lifecycle qualification require separate maintained records;
+neither the source landing nor the older `4ef2305c3` work substitutes for them.
+
+The same frozen worktree's real-PostgreSQL `internal/executionauthority` suite
+also passed in 33.4 seconds (37.19 seconds wall time), with independent owned
+authorization-fixture cleanup. Its private stream is
+`$HOME/work/turnkey-executionauthority-53-17a3a1eab.json`, SHA-256
+`f797cd57ff00e66a9c7ae814a3ce30c0073e3216eefb07023533b21d54cb4c61`.
+This package evidence does not establish a native quorum recovery drill.
+
 ### Consolidated dependency-audit correction
 
 The consolidated check at `6f178df1` completed lint and race-enabled unit stages,

@@ -149,9 +149,30 @@ fabricated for the failed wrapper. Export/import into
 success with native vendor verification. This producer's transcript also
 records APT trying the absent ambient `/etc/apt/-` configuration directory.
 The owned-empty-directory/file correction does not change snapshot bytes;
-the final integrated parent helper still requires a fresh consumer replay.
+this historical capture does not itself qualify a newer consumer.
 These observations do not qualify managed PostgreSQL, a signed installer
 release or a browser deployment lifecycle.
+
+**Observed frozen-helper consumer.** The existing-digest replay driver
+`889a5b1a749066fbe2d1b4c2f7661633b53f3364` subsequently returned **exit 0**
+and wrote `/home/r/work/lindm-lab/ubuntu-serverdeps-consumer-4ef2305c3.json`.
+It used the immutable product helper `/home/r/work/turnkey-lab-4ef2305c3`,
+identified by the parent as frozen source `4ef2305c3`, with uploaded bytes
+verified against SHA-256
+`5fedde2874ed39bcf9780cf639fb61d695eb7fbb9f2704667f5798e07ab20234`.
+One fresh authenticated Noble guest matched the same retained 664-package
+baseline. The product helper imported the original snapshot with native vendor
+verification and ran its canonical `serverdeps install`, including corrected
+owned-empty APT configuration, with QEMU origin access denied and
+`unshare --net`. The resulting inventory records PostgreSQL server/client
+`16.15-0ubuntu0.24.04.1`, OpenSSL `3.0.13-0ubuntu3.16`, systemd
+`255.4-1ubuntu8.17`, CA certificates `20260601~24.04.1`, gpgv
+`2.4.4-2ubuntu17.6` and util-linux `2.39.3-9ubuntu6.6` installed.
+Joined owned disposable-guest cleanup returned success before the record
+was written; the authenticated image cache and original snapshot/transcripts
+remain intentionally retained. This is actual dependency-consumer qualification
+for that frozen helper, not a promotion to newer source or qualification of
+managed PostgreSQL, a signed installer or browser deployment.
 
 The native installer initializes its own PostgreSQL 16 cluster under
 `/var/lib/postgresql/lindm`, listening on loopback port 15432 and the
