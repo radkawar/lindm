@@ -193,7 +193,8 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	key := flags.String("platform", "", "registry key")
 	cell := flags.String("cell", "", "matrix cell")
 	arch := flags.String("architecture", "", "x86_64 or aarch64")
-	manifest := flags.String("manifest", "", "image manifest id the record booted, when documented")
+	manifest := flags.String("manifest", "", "image manifest id the record booted; required for rolling releases")
+	recovery := flags.String("recovery-manifest", "", "recovery image manifest id a device-actions record booted; required for rolling releases")
 	evidence := flags.String("evidence", "", "evidence file path as recorded")
 	digest := flags.String("sha256", "", "documented record SHA-256; required when the file is not readable here")
 	verdict := flags.String("verdict", "pass", "pass or fail")
@@ -214,16 +215,17 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	if !ok {
 		return fmt.Errorf("unknown platform %q", *key)
 	}
-	if _, err := in.Cells([]string{*cell}); err != nil {
+	specs, err := in.Cells([]string{*cell})
+	if err != nil {
 		return err
 	}
 	if !slices.Contains(release.Architectures, *arch) {
 		return fmt.Errorf("%s has no %s architecture", release.Key, *arch)
 	}
-	if *manifest != "" && !slices.ContainsFunc(in.Manifests, func(m *labmatrix.Manifest) bool { return m.Image.GetId() == *manifest }) {
-		return fmt.Errorf("unknown image manifest id %q", *manifest)
+	entry := &labv1.MatrixLedgerEntry{Platform: release.Key, Cell: *cell, Architecture: *arch, Evidence: homeRelative(*evidence), Source: labv1.MatrixSource_MATRIX_SOURCE_IMPORT, Scope: *scope, Reference: *reference}
+	if err := in.BindImportManifests(entry, release, specs[0], *manifest, *recovery); err != nil {
+		return err
 	}
-	entry := &labv1.MatrixLedgerEntry{Platform: release.Key, Cell: *cell, Architecture: *arch, Manifest: *manifest, Evidence: homeRelative(*evidence), Source: labv1.MatrixSource_MATRIX_SOURCE_IMPORT, Scope: *scope, Reference: *reference}
 	switch *verdict {
 	case "pass":
 		entry.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_PASS

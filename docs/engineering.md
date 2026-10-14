@@ -3527,7 +3527,10 @@ autoinstall on Fedora); a declared format without a lane recipe stays `no lane`.
 A cell marked `tpm` (TPM unattended boots) is `gated` as lab-only on an
 architecture the row's `Lab.TPM.Unobservable` lists: the installed kernel there
 cannot bind the TPM the lab attaches (Debian arm64 builds neither `tpm_tis` nor
-`tpm_tis_i2c`, QEMU 8.2's arm `virt` TPMs).
+`tpm_tis_i2c`, QEMU 8.2's arm `virt` TPMs). It is `gated` as unsupported on a
+row whose `Lab.TPM.Unsupported` states a measured reason the release has no
+TPM2-unlocking boot path (Omarchy's mkinitcpio busybox `encrypt` hook); the
+device-actions lane records the real bind and the observed passphrase prompt.
 A cell marked `tpm2ReferenceRepair` (TPM reference repair) is `gated` as not
 applicable on a release whose registry `TPM2TokenReferences` is one: its systemd
 retries a PCR change itself, so no agent ever left it a single-reference bind
@@ -3586,9 +3589,16 @@ Remote lanes stage source from `-repo` (see above), so keep that tree buildable
 while aarch64 cells run.
 
 `lab matrix import -platform KEY -cell CELL -architecture ARCH -evidence PATH
-[-sha256 HEX] [-recorded DATE] [-scope TEXT] [-reference #ANCHOR]` adds evidence
-recorded outside `run`. A readable file is hashed (and must match `-sha256`);
-an unreadable one needs the documented digest and date and is stored unverified.
+[-manifest ID] [-recovery-manifest ID] [-sha256 HEX] [-recorded DATE]
+[-scope TEXT] [-reference #ANCHOR]` adds evidence recorded outside `run`. A
+readable file is hashed (and must match `-sha256`); an unreadable one needs the
+documented digest and date and is stored unverified. The manifests bind the
+same identity `run` records (manifest bytes SHA-256 and repository snapshot
+pins). A rolling row (its native base declares a requalification interval,
+including Omarchy through Arch) requires `-manifest`, and on the device-actions
+lane `-recovery-manifest`, because the planner counts only entries for the exact
+pinned images it selects. Import from a checkout at the record's source
+revision so the bound manifest bytes and recorded revision are the ones it ran.
 `lab matrix report` regenerates the verification ledger's
 [Tier capability matrix](verification.md#tier-capability-matrix);
 `go run ./cmd/devenv generate-docs -check` fails when it is stale. Commit the

@@ -181,6 +181,36 @@ func TestPlanGatesTPMCellsWhereTPMIsUnobservable(t *testing.T) {
 	}
 }
 
+// Omarchy's vendor mkinitcpio encrypt hook cannot unlock with a systemd TPM2
+// token (Lab.TPM.Unsupported), so its TPM boot cell is gated with that measured
+// reason instead of showing "not run"; a TPM-capable release stays schedulable.
+func TestPlanGatesTPMCellsWhereTPMUnlockIsUnsupported(t *testing.T) {
+	encrypted := labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER
+	boots := &labv1.MatrixCell{Name: "tpm-unattended-boots", Title: "TPM unattended boots", Capabilities: []string{"encryption"}, Image: encrypted, Lane: "device-actions", Tpm: true}
+	for key, unsupported := range map[string]bool{"omarchy-4.0.4": true, "arch": false} {
+		r := release(t, key)
+		if (r.Lab.TPM.Unsupported != "") != unsupported {
+			t.Fatalf("%s: Lab.TPM.Unsupported = %q", key, r.Lab.TPM.Unsupported)
+		}
+		in := &Inputs{
+			Manifests: []*Manifest{
+				{Path: "lab/images/a.json", Image: &labv1.ImageManifest{Id: "a", Edition: "encrypted-lab"}, Release: r, Architecture: "x86_64"},
+				{Path: "lab/images/b.json", Image: &labv1.ImageManifest{Id: "b", Edition: "cloud"}, Release: r, Architecture: "x86_64"},
+			},
+			Ledger: &labv1.MatrixLedger{},
+		}
+		cells := in.Plan([]*platform.Release{r}, []*labv1.MatrixCell{boots})
+		if len(cells) == 0 {
+			t.Fatalf("%s: no cells", key)
+		}
+		c := cells[0]
+		gated := c.State == Gated && strings.Contains(c.Reason, "Lab.TPM.Unsupported") && strings.Contains(c.Reason, r.Lab.TPM.Unsupported)
+		if gated != unsupported {
+			t.Errorf("%s: state %v %q", key, c.State, c.Reason)
+		}
+	}
+}
+
 // The reference-repair cell applies only to releases whose systemd needs
 // several token references (Ubuntu 24.04, EL 9 and their derivatives); a
 // release needing one has no legacy defect and is gated as not applicable.
@@ -484,6 +514,40 @@ func TestRollingRecoveryEvidenceBindsSecondaryManifest(t *testing.T) {
 			t.Fatal("changed or unbound recovery input reused a rolling pass")
 		}
 		*field = value
+	}
+}
+
+// An import for a rolling release (Omarchy's native base is Arch) once stored
+// no manifest identity, so the planner never counted it and the cell stayed
+// "not run". BindImportManifests records the exact pinned manifests, refuses
+// an unbound rolling import and a manifest of another release.
+func TestImportBindsRollingManifestsThePlannerCounts(t *testing.T) {
+	r := release(t, "omarchy-4.0.4")
+	other := release(t, "arch")
+	encrypted := &Manifest{Path: "lab/images/e.json", SHA256: strings.Repeat("a", 64), Image: &labv1.ImageManifest{Id: "omarchy-encrypted", Edition: "encrypted-lab"}, Release: r, Architecture: "x86_64"}
+	cloud := &Manifest{Path: "lab/images/c.json", SHA256: strings.Repeat("b", 64), Image: &labv1.ImageManifest{Id: "omarchy-cloud", Edition: "cloud"}, Release: r, Architecture: "x86_64"}
+	foreign := &Manifest{Path: "lab/images/a.json", SHA256: strings.Repeat("c", 64), Image: &labv1.ImageManifest{Id: "arch-cloud", RepositorySnapshotDate: proto.String("2026-10-02")}, Release: other, Architecture: "x86_64"}
+	actions := &labv1.MatrixCell{Name: "device-actions", Title: "Device actions", Capabilities: []string{"wipe"}, Image: labv1.MatrixImage_MATRIX_IMAGE_ENCRYPTED_INSTALLER, Lane: "device-actions"}
+	in := &Inputs{Manifests: []*Manifest{encrypted, cloud, foreign}, Ledger: &labv1.MatrixLedger{}}
+	newEntry := func() *labv1.MatrixLedgerEntry {
+		return entry(r.Key, actions.GetName(), "x86_64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC))
+	}
+	for name, ids := range map[string][2]string{"unbound": {"", ""}, "no recovery": {"omarchy-encrypted", ""}, "foreign manifest": {"arch-cloud", "omarchy-cloud"}} {
+		if err := in.BindImportManifests(newEntry(), r, actions, ids[0], ids[1]); err == nil {
+			t.Errorf("%s import accepted", name)
+		}
+	}
+	if err := in.BindImportManifests(newEntry(), r, &labv1.MatrixCell{Name: "inventory", Lane: "inventory"}, "omarchy-cloud", "omarchy-cloud"); err == nil {
+		t.Error("recovery manifest accepted outside the device-actions lane")
+	}
+	e := newEntry()
+	if err := in.BindImportManifests(e, r, actions, "omarchy-encrypted", "omarchy-cloud"); err != nil {
+		t.Fatal(err)
+	}
+	in.Ledger.Entries = []*labv1.MatrixLedgerEntry{e}
+	cells := in.Plan([]*platform.Release{r}, []*labv1.MatrixCell{actions})
+	if len(cells) != 1 || cells[0].State != Pass || cells[0].Entry != e {
+		t.Fatalf("bound rolling import not counted: %+v", cells)
 	}
 }
 
