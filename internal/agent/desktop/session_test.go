@@ -53,7 +53,8 @@ func TestConsentAllowOffersAppliesAnswerOnceAndTerminates(t *testing.T) {
 		t.Fatalf("VIEW peer config = %+v", made)
 	}
 	indicator := h.notifier.next(t, "Remote assistance in progress")
-	if !strings.Contains(indicator.notification.Body, "Olga Operator is viewing your screen") {
+	// The body never repeats the title (owner demo polish).
+	if indicator.notification.Body != "Olga Operator is viewing your screen." {
 		t.Fatalf("indicator body = %q", indicator.notification.Body)
 	}
 
@@ -96,7 +97,7 @@ func TestConsentAllowOffersAppliesAnswerOnceAndTerminates(t *testing.T) {
 		t.Fatal("indicator not withdrawn")
 	}
 	ended := h.notifier.next(t, "Remote assistance ended")
-	if !strings.Contains(ended.notification.Body, "stopped by the operator") {
+	if ended.notification.Body != "Stopped by the operator." {
 		t.Fatalf("end notice = %q", ended.notification.Body)
 	}
 	// The ENDED report keeps flowing while the executor still lists it.
@@ -584,5 +585,19 @@ func TestRunShutdownEndsSessionsAndReportsOnce(t *testing.T) {
 	if len(last.GetReports()) != 1 || last.GetReports()[0].GetEndCause() != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED ||
 		last.GetReports()[0].GetEndDetail() != "helper_stopped" {
 		t.Fatalf("final reports = %v", last.GetReports())
+	}
+}
+
+// Notice bodies are sentences that never repeat their titles.
+func TestNoticeBodiesDoNotRepeatTitles(t *testing.T) {
+	for cause := range agentv1.AssistanceEndCause_name {
+		c := agentv1.AssistanceEndCause(cause)
+		if c == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED {
+			continue
+		}
+		body := sentence(causeText(c))
+		if body == "" || strings.Contains(strings.ToLower(body), "remote assistance ended") || !strings.HasSuffix(body, ".") || strings.ToUpper(body[:1]) != body[:1] {
+			t.Errorf("%s ended body = %q", c, body)
+		}
 	}
 }

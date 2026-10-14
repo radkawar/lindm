@@ -700,7 +700,7 @@ func (s *session) cleanup(r *sessionResources) {
 	if prompted && cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED {
 		notice, err := s.deps.notifier.Notify(ctx, Notification{
 			Summary:  "Remote assistance ended",
-			Body:     "Remote assistance ended: " + causeText(cause),
+			Body:     sentence(causeText(cause)),
 			Lifetime: 10 * time.Second,
 		})
 		s.logIfErr("post end notice", err)
@@ -762,11 +762,20 @@ func (s *session) indicatorNotification(markup bool) Notification {
 	}
 	return Notification{
 		Summary:    "Remote assistance in progress",
-		Body:       fmt.Sprintf("Remote assistance in progress — %s is %s your screen.", operator, activity),
+		Body:       fmt.Sprintf("%s is %s your screen.", operator, activity),
 		Actions:    []NotificationAction{{Key: actionStop, Label: "Stop"}},
 		Critical:   true,
 		Persistent: true,
 	}
+}
+
+// sentence capitalizes a lowercase cause fragment and ends it with a period,
+// so a notice body reads as a sentence and never repeats its title.
+func sentence(fragment string) string {
+	if fragment == "" {
+		return ""
+	}
+	return strings.ToUpper(fragment[:1]) + fragment[1:] + "."
 }
 
 // relayOnly requires at least one candidate and only relay candidates.
