@@ -61,7 +61,7 @@ alma-ALSA-2024-6783.json (2284 bytes)
 
 SYNTHETIC Fedora repository metadata
 ------------------------------------
-  All three files below are independently authored for lindm under Apache-2.0.
+  All four files below are independently authored for lindm under Apache-2.0.
   Copyright 2026 lindm contributors. They replace the removed original updateinfo
   and repomd fixtures because no explicit grant for those dataset bytes was
   confirmed. Fedora's conditional FPCA content policy is not treated as one.
@@ -82,6 +82,19 @@ synthetic-fedora44-updateinfo.xml
   Neither replay nor the demo proves a real sudo vulnerability or Fedora fix.
   A single update remains partial; the demo's authored <updates> container is
   complete only for its fixture-owned controlled repository, not Fedora.
+
+synthetic-fedora43-critical-updateinfo.xml
+  SHA256 1e807357b03dde5717b864bbcc71c6ff9cc5a279ca02c9aa20b1c38dc0f55907
+  Fictional Critical FEDORA-2099-123456789abc / CVE-2099-99021 and fixed EVR
+  0:2.0-1.fc43 for synthetic-critical-library x86_64. Independently authored
+  Apache-2.0 supplement, served as demo-authored-critical-fedora-43 alongside
+  unchanged real vendor feeds. Its separate Fedora 43 product and two explicitly
+  synthetic devices prevent replacement or mixing of vendor snapshots.
+  lab/demo/fedora-43-packages.json is independently authored Apache-2.0 inventory:
+  SHA256 03f9922aa3b6938a4e8a1a2b9453a7f74162b4e321794f466752f084897b230c
+  It contains only the fictional library at 0:1.0-1.fc43. This supplement is not
+  a real vulnerability, vendor notice, vendor fix or native remediation proof.
+  The original High fixture and maintained native replay contracts are unchanged.
 
 synthetic-fedora45-updateinfo.xml
   SHA256 5aa765c95a1c884f5b54d77635144d7258525cd7b9aa9020bc6e1de8cb42d81e

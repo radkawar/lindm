@@ -1,0 +1,20 @@
+<update from="fixtures@example.invalid" status="stable" type="security" version="2.0">
+  <id>FEDORA-2099-123456789abc</id>
+  <title>Authored Critical demo supplement</title>
+  <issued date="2026-01-04 12:00:00"/>
+  <updated date="2026-01-05 12:00:00"/>
+  <rights>Copyright 2026 lindm contributors. SPDX-License-Identifier: Apache-2.0</rights>
+  <release>Fedora 43</release>
+  <severity>Critical</severity>
+  <summary>A fictional critical assessment for two synthetic demo devices.</summary>
+  <description>Independently authored demo supplement for CVE-2099-99021. This is not a real vulnerability or vendor fix.</description>
+  <references/>
+  <pkglist>
+    <collection short="F43">
+      <name>Fedora 43</name>
+      <package name="synthetic-critical-library" version="2.0" release="1.fc43" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-critical-library-2.0-1.fc43.x86_64.rpm">
+        <filename>synthetic-critical-library-2.0-1.fc43.x86_64.rpm</filename>
+      </package>
+    </collection>
+  </pkglist>
+</update>

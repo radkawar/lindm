@@ -266,6 +266,13 @@ export function AdvisoryFleet() {
                       {status.label}
                     </StatusBadge>
                   </div>
+                  {feed.id.startsWith("demo-authored-critical-") ? (
+                    <p className="rounded border border-warning/40 bg-warning/5 p-3">
+                      <strong className="block">Authored demo supplement</strong>
+                      These findings are fictional and apply only to the two synthetic demo devices.
+                      This source does not prove a real vulnerability or a vendor fix.
+                    </p>
+                  ) : null}
                   <p>
                     {feed.advisoryCount === 1n
                       ? "1 advisory"

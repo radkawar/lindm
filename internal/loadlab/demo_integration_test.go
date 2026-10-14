@@ -26,6 +26,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/devlab"
 	"lindm/internal/orgapply"
+	"lindm/internal/platform"
 )
 
 // SeedDemo must leave every review state as real server state, read back here
@@ -70,7 +71,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	for _, device := range demo.Devices {
 		states[device.State]++
 	}
-	if len(demo.Devices) != 13 || states["enrolled"] != 9 || states["pending"] != 1 || states["awaiting-inventory"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
+	if len(demo.Devices) != 15 || states["enrolled"] != 11 || states["pending"] != 1 || states["awaiting-inventory"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes
@@ -348,8 +349,31 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			published++
 		}
 	}
-	if len(feeds.Msg.GetFeeds()) != 3 || published != 3 {
-		t.Fatalf("real vendor publications=%d feeds=%d; want three current publications with retained provenance", published, len(feeds.Msg.GetFeeds()))
+	if len(feeds.Msg.GetFeeds()) != 4 || published != 3 {
+		t.Fatalf("real vendor publications=%d feeds=%d; want three current vendor publications plus the authored supplement", published, len(feeds.Msg.GetFeeds()))
+	}
+	for _, key := range []string{"ubuntu-24.04", "fedora-44", "rhel-9"} {
+		release, ok := platform.Lookup(key)
+		if !ok {
+			t.Fatalf("original demo release missing: %s", key)
+		}
+		expected, err := devlab.HeldAdvisories(*release, "amd64")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, source := range expected.GetFeeds() {
+			if !slices.ContainsFunc(feeds.Msg.GetFeeds(), func(feed *adminv1.AdvisoryFeedStatus) bool {
+				return feed.GetId() == source.GetId() && feed.GetSourceUrl() == source.GetUrl()
+			}) {
+				t.Fatalf("Critical supplement replaced the original real vendor source: %s %s", source.GetId(), source.GetUrl())
+			}
+		}
+	}
+	if !slices.ContainsFunc(feeds.Msg.GetFeeds(), func(feed *adminv1.AdvisoryFeedStatus) bool {
+		return feed.GetId() == "demo-authored-critical-fedora-43" && feed.GetAdvisoryCount() == 1 &&
+			feed.GetFresh() && strings.HasSuffix(feed.GetSourceUrl(), "/feeds/fedora-43/authored-critical-supplement.xml")
+	}) {
+		t.Fatal("clearly marked Critical supplement was not published alongside the real vendor feeds")
 	}
 	for _, device := range demo.Devices {
 		if device.State == "pending" || device.State == "revoked" {
@@ -360,6 +384,13 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 			t.Fatal(err)
 		}
 		t.Logf("%s: compliance=%v findings=%d freshness=%v/%s", device.Hostname, listed[device.ID].GetCompliance(), len(findings.Msg.GetFindings()), findings.Msg.GetFreshness().GetState(), findings.Msg.GetFreshness().GetReason())
+		if strings.HasPrefix(device.Hostname, "synthetic-critical-fedora-") {
+			if len(findings.Msg.GetFindings()) != 1 || findings.Msg.GetFindings()[0].GetAdvisoryId() != "FEDORA-2099-123456789abc" ||
+				findings.Msg.GetFindings()[0].GetSeverity() != "critical" ||
+				findings.Msg.GetFindings()[0].GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
+				t.Fatalf("synthetic Critical device lost its current authored finding: %s %v", device.Hostname, findings.Msg)
+			}
+		}
 		if device.Hostname == "rhel-srv-05" && findings.Msg.GetFreshness().GetReason() != "rhel_platform_stream_unavailable" {
 			t.Fatalf("captured unregistered RHEL platform invented coverage: %v", findings.Msg.GetFreshness())
 		}
@@ -684,8 +715,8 @@ func TestDemoOrganizationResourceConvergence(t *testing.T) {
 	}
 }
 
-// Interactive seeding accepts Fedora's only fixture finding before the
-// asynchronous refused-scan setup starts. Acceptance must not stall that setup.
+// Critical exposure stays on two explicitly synthetic devices. The original
+// workstation has accepted-only risk before its background refused scan.
 func TestInteractiveDemoRefusedScanAfterAcceptedFinding(t *testing.T) {
 	repository, binary := os.Getenv("LINDM_CONSOLE_REPOSITORY"), os.Getenv("LINDM_CONSOLE_LINDMD")
 	if repository == "" || binary == "" {
@@ -728,6 +759,29 @@ func TestInteractiveDemoRefusedScanAfterAcceptedFinding(t *testing.T) {
 			t.Error(err)
 		}
 	})
+	criticalDevices, err := owner.Admin.ListDevices(ctx, connect.NewRequest(&adminv1.ListDevicesRequest{
+		PageSize: 200, AdvisoryId: "FEDORA-2099-123456789abc", AdvisorySeverity: "critical",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(criticalDevices.Msg.GetDevices()))
+	for _, device := range criticalDevices.Msg.GetDevices() {
+		names = append(names, device.GetHostname())
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"synthetic-critical-fedora-01", "synthetic-critical-fedora-02"}) {
+		t.Fatalf("authored Critical supplement must affect exactly its two synthetic devices: %v", names)
+	}
+	summary, err := owner.Admin.ListAdvisorySummary(ctx, connect.NewRequest(&adminv1.ListAdvisorySummaryRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(summary.Msg.GetAdvisories(), func(row *adminv1.AdvisorySummary) bool {
+		return row.GetAdvisoryId() == "FEDORA-2099-123456789abc" && row.GetSeverity() == "critical" && row.GetAffectedDevices() == 2
+	}) {
+		t.Fatal("Critical summary did not match the two named affected devices")
+	}
 	var deviceID string
 	for _, device := range demo.Devices {
 		if device.Hostname == "fedora-ws-03" {
@@ -741,8 +795,8 @@ func TestInteractiveDemoRefusedScanAfterAcceptedFinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first.Msg.GetTotals().GetAccepted() == 0 {
-		t.Fatal("regression prerequisite: the only fixture finding must already have an accepted exception")
+	if first.Msg.GetTotals().GetOpen() != 0 || first.Msg.GetTotals().GetAccepted() != 1 {
+		t.Fatal("regression prerequisite: only the original High finding must have an accepted exception")
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()

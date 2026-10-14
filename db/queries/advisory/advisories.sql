@@ -293,6 +293,7 @@ SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;
 -- a fresh device is affected unless every finding of the advisory is under an
 -- active exception, accepted if any is, and stale devices are unknown. Only
 -- active devices count, the same population as CountAdvisoryDevices.
+-- Severity-first ordering uses the same rank for both the seek key and page order.
 WITH dev AS (
  SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
  JOIN devices d ON d.id=s.device_id AND d.state='active'
@@ -305,7 +306,9 @@ WITH dev AS (
 ), totals AS (
  SELECT a.advisory_id, a.severity, sum(b.fresh)::bigint AS fresh, sum(b.stale)::bigint AS stale
  FROM bound b JOIN advisory_set_advisories a ON a.set_id=b.finding_set_id
- WHERE (a.advisory_id,a.severity)>(sqlc.arg('after_advisory')::text,sqlc.arg('after_severity')::text)
+ WHERE sqlc.arg('after_advisory')::text='' OR
+  (CASE lower(a.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, a.advisory_id, a.severity)>
+  (CASE lower(sqlc.arg('after_severity')::text) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, sqlc.arg('after_advisory')::text, sqlc.arg('after_severity')::text)
  GROUP BY a.advisory_id, a.severity
 ), accepted AS (
  SELECT f.advisory_id, f.severity, dev.device_id, count(*)::integer AS accepted, max(sa.findings) AS findings
@@ -320,7 +323,9 @@ SELECT t.advisory_id, t.severity,
  (t.fresh - coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity AND a.accepted>=a.findings),0))::bigint AS affected_devices,
  coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity),0)::bigint AS accepted_devices,
  t.stale::bigint AS unknown_devices
-FROM totals t ORDER BY t.advisory_id, t.severity LIMIT sqlc.arg('row_limit');
+FROM totals t
+ORDER BY CASE lower(t.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, t.advisory_id, t.severity
+LIMIT sqlc.arg('row_limit');
 
 -- name: CountAdvisoryDevices :one
 -- A current evaluation is complete ('evaluated') or covers only verified

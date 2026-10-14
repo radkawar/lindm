@@ -82,7 +82,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 		// refused package scan state, gated by the server's five-minute package
 		// admission interval, finishes in the background after the console is ready.
 		_, _ = fmt.Fprintf(stderr, "lab console +%s: seeding demo\n", time.Since(started).Round(time.Second))
-		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache, FixtureFeeds: *feeds == "fixtures", Progress: stderr, BackgroundPackageFailure: true})
+		seeded, presence, err := loadlab.SeedDemo(ctx, fixture, loadlab.DemoOptions{SourceDirectory: *source, HostObservationFile: *hostObservation, AdvisoryCache: *advisoryCache, FixtureFeeds: *feeds == "fixtures", Progress: stderr, BackgroundPackageFailure: true})
 		if err != nil {
 			return err
 		}

@@ -961,7 +961,9 @@ WITH dev AS (
 ), totals AS (
  SELECT a.advisory_id, a.severity, sum(b.fresh)::bigint AS fresh, sum(b.stale)::bigint AS stale
  FROM bound b JOIN advisory_set_advisories a ON a.set_id=b.finding_set_id
- WHERE (a.advisory_id,a.severity)>($4::text,$5::text)
+ WHERE $4::text='' OR
+  (CASE lower(a.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, a.advisory_id, a.severity)>
+  (CASE lower($5::text) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, $4::text, $5::text)
  GROUP BY a.advisory_id, a.severity
 ), accepted AS (
  SELECT f.advisory_id, f.severity, dev.device_id, count(*)::integer AS accepted, max(sa.findings) AS findings
@@ -976,7 +978,9 @@ SELECT t.advisory_id, t.severity,
  (t.fresh - coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity AND a.accepted>=a.findings),0))::bigint AS affected_devices,
  coalesce((SELECT count(*) FROM accepted a WHERE a.advisory_id=t.advisory_id AND a.severity=t.severity),0)::bigint AS accepted_devices,
  t.stale::bigint AS unknown_devices
-FROM totals t ORDER BY t.advisory_id, t.severity LIMIT $1
+FROM totals t
+ORDER BY CASE lower(t.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, t.advisory_id, t.severity
+LIMIT $1
 `
 
 type ListAdvisorySummaryParams struct {
@@ -999,6 +1003,7 @@ type ListAdvisorySummaryRow struct {
 // a fresh device is affected unless every finding of the advisory is under an
 // active exception, accepted if any is, and stale devices are unknown. Only
 // active devices count, the same population as CountAdvisoryDevices.
+// Severity-first ordering uses the same rank for both the seek key and page order.
 func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySummaryParams) ([]ListAdvisorySummaryRow, error) {
 	rows, err := q.db.Query(ctx, listAdvisorySummary,
 		arg.RowLimit,

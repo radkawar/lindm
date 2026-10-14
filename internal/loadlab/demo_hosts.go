@@ -67,6 +67,9 @@ type demoDevice struct {
 	historical        bool
 	proposal          bool // carries the pending advisory risk-acceptance proposal
 	bulk              int  // synthetic scale packages beside the captured baseline
+	// authoredCritical keeps the clearly synthetic supplement separate from
+	// the existing devices and their full real-vendor feed selection.
+	authoredCritical bool
 	// factsWithheld never reports host inventory, so platform-limited items
 	// wait for its facts while unrestricted items still apply.
 	factsWithheld bool
@@ -130,6 +133,8 @@ func demoDevices(source string) ([]*demoDevice, error) {
 		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
 		{hostname: "fleet-pilot-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "fleet-pilot", labels: []string{"workstation", "fleet-pilot"}, fleetPilot: true},
 		{hostname: "fleet-pilot-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "fleet-pilot", labels: []string{"workstation", "fleet-pilot"}, fleetPilot: true},
+		{hostname: "synthetic-critical-fedora-01", key: "fedora-43", kernel: "6.17.1-300.fc43.x86_64", assistance: assistanceOff, encryption: encryptionUnknown, department: "contractors", labels: []string{"synthetic", "critical-supplement"}, authoredCritical: true},
+		{hostname: "synthetic-critical-fedora-02", key: "fedora-43", kernel: "6.17.1-300.fc43.x86_64", assistance: assistanceOff, encryption: encryptionUnknown, department: "contractors", labels: []string{"synthetic", "critical-supplement"}, authoredCritical: true},
 	}
 	agents := demoAgents()
 	baselines := make(map[string][]*inventoryv1.Package)

@@ -188,19 +188,8 @@ func (s *demoSeed) relabel(ctx context.Context, d *simulatedDevice) error {
 	return nil
 }
 
-// awaitScaleFindings waits until the server's own evaluation of the scale
-// device reports an AFFECTED finding from the real Fedora export, so console
-// review never sees the large inventory before its findings exist.
-func (s *demoSeed) awaitScaleFindings(ctx context.Context) error {
-	var device *simulatedDevice
-	for _, d := range s.devices {
-		if d.demo.hostname == demoScaleHostname {
-			device = d
-		}
-	}
-	if device == nil {
-		return errors.New("scale device missing")
-	}
+// awaitAffectedFindings waits for the server's own evaluation before review.
+func (s *demoSeed) awaitAffectedFindings(ctx context.Context, device *simulatedDevice) error {
 	ctx, cancel := context.WithTimeout(ctx, demoEvaluationWait)
 	defer cancel()
 	ticker := time.NewTicker(2 * time.Second)
@@ -212,7 +201,7 @@ func (s *demoSeed) awaitScaleFindings(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("wait for an AFFECTED finding on %s (last freshness %v %q): %w", demoScaleHostname, freshness.GetState(), freshness.GetReason(), errors.Join(ctx.Err(), err))
+			return fmt.Errorf("wait for an AFFECTED finding on %s (last freshness %v %q): %w", device.demo.hostname, freshness.GetState(), freshness.GetReason(), errors.Join(ctx.Err(), err))
 		case <-ticker.C:
 		}
 	}

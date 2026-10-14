@@ -285,10 +285,10 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 			return nil, ErrInvalid
 		}
 		parts := strings.Split(string(data), "\x00")
-		if len(parts) != 2 {
+		if len(parts) != 3 || parts[0] != "severity-v1" {
 			return nil, ErrInvalid
 		}
-		afterAdvisory, afterSeverity = parts[0], parts[1]
+		afterAdvisory, afterSeverity = parts[1], parts[2]
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
@@ -315,7 +315,7 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 	}
 	if len(rows) > int(limit) {
 		last := rows[limit-1]
-		out.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte(last.AdvisoryID + "\x00" + last.Severity))
+		out.NextPageToken = base64.RawURLEncoding.EncodeToString([]byte("severity-v1\x00" + last.AdvisoryID + "\x00" + last.Severity))
 		rows = rows[:limit]
 	}
 	for _, row := range rows {

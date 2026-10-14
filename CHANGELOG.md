@@ -36,6 +36,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Return from an assistance record directly to the device's assistance tab, preserving support context without an extra navigation step.
 - Apply a confirmed assistance stop to cached session history as well as its record, so returning immediately never shows the stopped request as waiting for consent.
 - Distinguish initial screen-sharing setup from an interrupted live connection, remove empty assistance guidance panels and wrap history timestamps to keep record actions visible on desktop.
+- Add a clearly marked, independently authored Critical supplement alongside the unchanged real-vendor review feeds. Its two explicitly synthetic Fedora devices retain open Critical risk for the vulnerability walkthrough, which requires Critical evidence rather than falling back to High and checks the exact two-to-one affected count after an approved exception.
+- Put the most severe advisories first across the full fleet summary, with matching versioned cursor pagination, so dashboard Critical review does not bury urgent work among alphabetically earlier records.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.

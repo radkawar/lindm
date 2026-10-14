@@ -1441,9 +1441,11 @@ separate: Ubuntu's RPM rows are Not applicable, not package capability refusals.
 The console-lab regression pins these reasons and dispositions to the named device
 and item, rather than accepting a matching reason anywhere in the fleet.
 
-With `-feeds real` (always for review), advisories come from registry-derived
-real Ubuntu OSV, Fedora updateinfo and RHEL CSAF exports, not single-record
-fixtures or a loopback feed server. First refresh
+With `-feeds real` (always for review), the original demo devices' advisories come
+from registry-derived real Ubuntu OSV, Fedora updateinfo and RHEL CSAF exports.
+Their sources and inventories are not replaced by fixtures. A separately labeled
+authored Critical supplement serves two explicitly synthetic Fedora 43 devices
+through the owned origin, alongside those real feeds. First refresh
 uses the revalidating HTTP cache at `<repo>/.cache/lab/advisories`, shared across
 worktrees using the same `-repo` development-trust checkout; `-advisory-cache DIRECTORY`
 selects another persistent cache. Cache revalidation/index publication holds a
@@ -1463,7 +1465,7 @@ to the protocol maximum of one hour. Without it, a changed 778 MB Ubuntu OSV
 archive at the observed ~1 MB/s trips the default five-minute idle watchdog before
 any document is parsed. The fixture server's persisted configuration carries the
 same bound, because a feed whose configuration differs from its publication is
-retired on restart. The webhook alone uses the fixture-owned loopback origin.
+retired on restart. Only the webhook and authored supplement use the fixture-owned loopback origin.
 
 The full-feed fixture regression also checks that a post-seed organization apply
 has no changes or new credentials. Run it after `make acceptance-build`, using
@@ -1682,6 +1684,21 @@ The vulnerability walkthrough opens an advisory's named affected-device list,
 reviews a maintenance window and Patch now, then proposes a time-limited exception.
 A second test-owned administrator enrolls through the UI and approves the proposal;
 the requester applies it and checks the recorded acceptance on the device.
+The review keeps its full real-vendor dataset by default and adds the independently
+authored `demo-authored-critical-fedora-43` supplement. Its fictional
+`synthetic-critical-library` record affects `synthetic-critical-fedora-01` and
+`synthetic-critical-fedora-02` only. The separate registered product preserves the
+original vendor snapshots; one feed is selected per product. The source card labels
+the supplement and states that it does not prove a real vulnerability or vendor fix.
+The walkthrough requires the supplement's Critical dashboard and finding evidence,
+both named targets, and the exact two-to-one affected count after an exception.
+The original Fedora workstation's refused scan remains Unknown, never clear.
+Fixtures are read from `-code`, separate from the `-repo` development-trust resources.
+Maintained native replay fixtures and licensed vendor documents remain unchanged.
+The fleet advisory summary orders Critical before High, Medium and Low across
+the full server population, not just the visible page. Its versioned cursor uses
+the same severity rank and advisory/severity tie-breakers as the query order.
+Older advisory-ID-order cursors are rejected, not silently reinterpreted.
 The existing device list carries an exact advisory and severity filter. Its
 actor-, scope- and filter-bound cursor preserves the normal list authorization
 and pagination contract. Current findings without active exceptions match the

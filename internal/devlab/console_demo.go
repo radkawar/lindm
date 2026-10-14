@@ -56,36 +56,41 @@ func (o *consoleDemoOrigin) close() error {
 	return err
 }
 
-// consoleDemoFeed serves one licensed upstream or authored synthetic fixture as
+// consoleDemoFeed serves licensed upstream or authored synthetic fixtures as
 // /feeds/<release>/<name> for the registry row release. Signed upstream documents
-// also serve their vendor .sha256 and .asc proofs. The synthetic Fedora node
-// inside an <updates> root covers only the fixture-owned controlled repository.
+// also serve their vendor .sha256 and .asc proofs. The synthetic Fedora fragments
+// inside an <updates> root cover only the fixture-owned controlled repository.
 type consoleDemoFeed struct {
 	release, name, fixture string
 	format                 advisoryv1.FeedFormat
 	stream                 string
 	signed, repository     bool
+	supplement             bool
 }
 
 // Single notices remain partial, so their devices' findings stay UNKNOWN
-// (feed_partial_coverage). Only the synthetic Fedora repository is complete.
-// Its fictional assessment exercises AFFECTED on native sudo inventory; it is
-// not vendor vulnerability proof. Provenance lives in the feed testdata directory.
+// (feed_partial_coverage). Synthetic controlled repositories alone are complete.
+// The authored Critical supplement uses its own product and explicitly synthetic
+// devices, never replacing the real vendor feeds. Provenance is in feed testdata.
 func consoleDemoFeeds() []consoleDemoFeed {
 	return []consoleDemoFeed{
 		{release: "ubuntu-24.04", name: "USN-6859-1.json", fixture: "ubuntu-USN-6859-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
 		{release: "debian-12", name: "synthetic-DSA-99001-1.json", fixture: "synthetic-debian-DSA-99001-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
 		{release: "fedora-44", name: "synthetic-updateinfo.xml", fixture: "synthetic-fedora44-updateinfo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true},
 		{release: "rhel-9", name: "rhsa-2024_6783.json", fixture: "redhat-rhsa-2024_6783.json", format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, stream: "standard", signed: true},
+		{release: "fedora-43", name: "authored-critical-supplement.xml", fixture: "synthetic-fedora43-critical-updateinfo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true, supplement: true},
 	}
 }
 
 // consoleDemoFixtureFeeds reads the served documents, keyed by origin-relative
-// path, and their feed sources with URLs beneath origin.
-func consoleDemoFixtureFeeds(repository, origin string) (map[string][]byte, *configv1.AdvisoryConfig, error) {
+// path, and their feed sources. Real-vendor mode requests only the supplement.
+func consoleDemoFixtureFeeds(repository, origin string, supplementOnly bool) (map[string][]byte, *configv1.AdvisoryConfig, error) {
 	files := make(map[string][]byte)
 	advisories := &configv1.AdvisoryConfig{RefreshEnabled: true, InventoryMaxAgeSeconds: proto.Uint32(604800)}
 	for _, feed := range consoleDemoFeeds() {
+		if supplementOnly && !feed.supplement {
+			continue
+		}
 		release, ok := platform.Lookup(feed.release)
 		if !ok {
 			return nil, nil, fmt.Errorf("console demo release %s is not registered", feed.release)
@@ -105,18 +110,22 @@ func consoleDemoFixtureFeeds(repository, origin string) (map[string][]byte, *con
 		if feed.repository {
 			files[path] = slices.Concat([]byte("<updates>"), files[path], []byte("</updates>"))
 		}
-		advisories.Feeds = append(advisories.Feeds, &advisoryv1.FeedSource{Id: "demo-" + feed.release, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: origin + path, MaxAgeSeconds: 604800})
+		id := "demo-" + feed.release
+		if feed.supplement {
+			id = "demo-authored-critical-" + feed.release
+		}
+		advisories.Feeds = append(advisories.Feeds, &advisoryv1.FeedSource{Id: id, Distro: release.ID, Release: release.Version.Value, PlatformStream: feed.stream, Architecture: "x86_64", Format: feed.format, Url: origin + path, MaxAgeSeconds: 604800})
 	}
 	return files, advisories, nil
 }
 
-// ConfigureConsoleDemo enables the demo's vendor feeds plus an owned webhook
-// sink and assistance relay. Non-nil advisories are real registry-derived
-// feeds refreshed through the revalidating cache in cacheDir. Nil advisories
-// serve the licensed upstream and authored synthetic fixtures (consoleDemoFeeds) from the
-// owned origin instead, so the first refresh takes seconds. Only that origin
-// uses the ephemeral CA. Call once, before enrolling demo devices.
-func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories *configv1.AdvisoryConfig, cacheDir string) (*ConsoleDemo, error) {
+// ConfigureConsoleDemo enables vendor feeds, an authored Critical supplement,
+// an owned webhook sink and assistance relay. Non-nil advisories retain the real
+// registry-derived feeds refreshed through the revalidating cache in cacheDir.
+// Nil advisories serve the licensed upstream and authored synthetic fixtures
+// from sourceDir instead. The supplement always uses the owned origin; only
+// that origin uses the ephemeral CA. Call once, before enrolling demo devices.
+func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories *configv1.AdvisoryConfig, sourceDir, cacheDir string) (*ConsoleDemo, error) {
 	if f.closed || f.local == nil || f.ConsoleOrigin == consoleOrigin || f.demo != nil {
 		return nil, errors.New("console demo requires one live dynamic local console fixture")
 	}
@@ -154,20 +163,23 @@ func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories 
 	}
 	origin := fmt.Sprintf("https://localhost:%d", address.Port)
 	mux := http.NewServeMux()
-	if advisories == nil {
-		files, fixtures, err := consoleDemoFixtureFeeds(f.repository, origin)
-		if err != nil {
-			return nil, errors.Join(err, listener.Close())
+	files, fixtures, err := consoleDemoFixtureFeeds(sourceDir, origin, advisories != nil)
+	if err != nil {
+		return nil, errors.Join(err, listener.Close())
+	}
+	mux.HandleFunc("GET /feeds/", func(w http.ResponseWriter, r *http.Request) {
+		data, ok := files[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
 		}
-		mux.HandleFunc("GET /feeds/", func(w http.ResponseWriter, r *http.Request) {
-			data, ok := files[r.URL.Path]
-			if !ok {
-				http.NotFound(w, r)
-				return
-			}
-			http.ServeContent(w, r, r.URL.Path, time.Time{}, bytes.NewReader(data))
-		})
+		http.ServeContent(w, r, r.URL.Path, time.Time{}, bytes.NewReader(data))
+	})
+	if advisories == nil {
 		document.Proto.Advisories = fixtures
+	} else {
+		advisories = proto.CloneOf(advisories)
+		advisories.Feeds = append(advisories.Feeds, fixtures.GetFeeds()...)
 	}
 	mux.HandleFunc("POST /webhook", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := io.Copy(io.Discard, io.LimitReader(r.Body, 1<<20)); err != nil {

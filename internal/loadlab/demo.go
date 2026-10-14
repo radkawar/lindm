@@ -222,6 +222,9 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		feeds = &configv1.AdvisoryConfig{RefreshEnabled: true}
 		seen := make(map[string]bool)
 		for _, device := range devices {
+			if device.authoredCritical {
+				continue
+			}
 			if seen[device.release.Key] {
 				continue
 			}
@@ -244,7 +247,7 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	configureCtx, cancelConfigure := context.WithTimeout(ctx, configureWait)
 	defer cancelConfigure()
 	progress.begin("configure advisory feeds, relay and webhook")
-	origin, err := fixture.ConfigureConsoleDemo(configureCtx, feeds, options.AdvisoryCache)
+	origin, err := fixture.ConfigureConsoleDemo(configureCtx, feeds, options.SourceDirectory, options.AdvisoryCache)
 	if err != nil {
 		return Demo{}, nil, fmt.Errorf("configure console demo: %w", err)
 	}
@@ -585,9 +588,13 @@ func (s *demoSeed) seed(ctx context.Context, historical *inventoryv1.HostObserva
 			return err
 		}
 	}
-	s.progress.begin("await scale findings")
-	if err := s.awaitScaleFindings(ctx); err != nil {
-		return err
+	s.progress.begin("await scale and authored Critical findings")
+	for _, d := range s.devices {
+		if d.demo.hostname == demoScaleHostname || d.demo.authoredCritical {
+			if err := s.awaitAffectedFindings(ctx, d); err != nil {
+				return err
+			}
+		}
 	}
 	if !s.backgroundPackageFailure {
 		s.progress.begin("refused package scan")
@@ -1223,8 +1230,7 @@ func (s *demoSeed) adoptionRollout(ctx context.Context) error {
 // carry thousands of packages, so a loaded shared host can need minutes.
 const demoEvaluationWait = 8 * time.Minute
 
-// acceptFinding waits for the server's own evaluation of the route device
-// against the real vendor exports, then accepts one finding for review.
+// acceptFinding waits for the server's own evaluation, then accepts one finding.
 func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error {
 	ctx, cancel := context.WithTimeout(ctx, demoEvaluationWait)
 	defer cancel()

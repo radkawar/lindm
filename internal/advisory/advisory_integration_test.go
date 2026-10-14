@@ -8,10 +8,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"maps"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -140,6 +142,54 @@ func TestDeviceFindingsSortFiltersTotals(t *testing.T) {
 	// A token is bound to its sort and filters.
 	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken, PackagePrefix: "synthetic-rpm-tool"}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
 		t.Fatalf("token reused with different filters: %v", err)
+	}
+}
+
+func TestAdvisorySummarySeverityFirstPagination(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
+	doc.Advisories = nil
+	for _, record := range []struct{ id, severity string }{
+		{"A-low", "low"}, {"B-high", "high"}, {"C-unknown", "unknown"},
+		{"M-medium", "medium"}, {"Z-critical", "critical"}, {"Y-critical", "critical"},
+	} {
+		doc.Advisories = append(doc.Advisories, &advisoryv1.Advisory{
+			Id: record.id, Severity: record.severity, PackageName: "synthetic-rpm-tool",
+			Architecture: "x86_64", FixedVersion: "0:8.4.2-12.p3.fc44", SourceUrl: source.Url,
+		})
+	}
+	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{
+		Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm",
+	})
+	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]")); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	var token string
+	for range 6 {
+		page, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{PageSize: 1, PageToken: token}, true, []byte("[]"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.GetAdvisories()) != 1 || page.GetAdvisories()[0].GetAffectedDevices() != 1 {
+			t.Fatalf("severity page lost a scoped affected advisory: %v", page)
+		}
+		got = append(got, page.GetAdvisories()[0].GetAdvisoryId())
+		token = page.GetNextPageToken()
+	}
+	if token != "" || !slices.Equal(got, []string{"Y-critical", "Z-critical", "B-high", "M-medium", "A-low", "C-unknown"}) {
+		t.Fatalf("severity-first pages skipped or repeated an advisory: %v token=%q", got, token)
+	}
+	hidden, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{PageSize: 1}, false, []byte("[]"))
+	if err != nil || len(hidden.GetAdvisories()) != 0 || hidden.GetEvaluatedDevices() != 0 || hidden.GetUnknownDevices() != 0 {
+		t.Fatalf("severity order leaked out-of-scope exposure: %v %v", hidden, err)
+	}
+	legacy := base64.RawURLEncoding.EncodeToString([]byte("Y-critical\x00critical"))
+	if _, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{PageToken: legacy}, true, []byte("[]")); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("old advisory-ID cursor silently changed order: %v", err)
 	}
 }
 
