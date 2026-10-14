@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { toJsonString } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 import { queryOptions } from "@tanstack/react-query";

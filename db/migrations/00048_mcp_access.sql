@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Dedicated assistant credentials cannot authenticate ordinary sessions.
 -- +goose Up
 CREATE TABLE mcp_settings (

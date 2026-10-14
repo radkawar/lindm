@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package toolchain puts the repository's pinned Node (.node-version) and Go
 // (go.mod's toolchain or go line) first on the PATH of development gates, so
 // a gate never runs, or refuses, whatever version happens to be first on the

@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 set -eu
 
 # Mounted fixture secrets belong to the host user and remain mode 0600. Copy

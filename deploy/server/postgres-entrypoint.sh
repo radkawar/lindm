@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 set -eu
 
 # Only these database inputs cross the root-to-postgres privilege boundary.

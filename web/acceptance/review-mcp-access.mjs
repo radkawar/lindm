@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real Settings/token requests against the private ui-review server. Screenshots
 // mask the shown-once token. A lost response is injected only after the server's
 // real issuance request returns, so recovery tests a committed, unused token.

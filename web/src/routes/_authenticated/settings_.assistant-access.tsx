@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute } from "@tanstack/react-router";
 import { RestrictedPage } from "@/components/layout/restricted-page";
 import { MCPAccessView } from "@/features/auth/mcp-access";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { fromJsonString, type DescMessage, type MessageShape } from "@bufbuild/protobuf";
 import { Code, ConnectError } from "@connectrpc/connect";
 

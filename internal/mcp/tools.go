@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package mcp adapts a fixed set of authenticated admin APIs to MCP. It never
 // executes mutations: proposal tools only create the existing approval requests.
 package mcp

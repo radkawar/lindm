@@ -162,9 +162,11 @@ func (q *Queries) LockMCPTokenByHash(ctx context.Context, tokenHash []byte) (Mcp
 }
 
 const readMCPEnabled = `-- name: ReadMCPEnabled :one
+
 SELECT enabled FROM mcp_settings WHERE id = true
 `
 
+// SPDX-License-Identifier: Apache-2.0
 func (q *Queries) ReadMCPEnabled(ctx context.Context) (bool, error) {
 	row := q.db.QueryRow(ctx, readMCPEnabled)
 	var enabled bool
