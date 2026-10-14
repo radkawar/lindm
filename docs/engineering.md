@@ -4302,6 +4302,17 @@ A real Chromium regression verifies that a matching background field remains
 untouched. The record remains a scoped full-lane failure; generating a secret
 does not prove its encrypted storage or restored decryption.
 
+`native-ubuntu-attempt12.json` created the paused integration through the real
+console. The native observer found stored ciphertext and successfully decrypted
+it with the installed root-only encryption key; its SHA-256 matched the secret
+generated in the browser. That proves initial encrypted storage, not backup or
+restore. The next enrollment-copy phase failed opening `Details`: frozen SDK10
+source `281123aa7` uses `Credential details and safe delivery` instead. Current
+signed-source `385fe8997` uses `Details`, matching the maintained journey.
+The failed older-source record remains scoped. The next native qualification
+requires fresh matching signed exports, not a patch to the frozen bundle or a
+legacy-label compatibility path.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

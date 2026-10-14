@@ -13458,6 +13458,21 @@
       "scope": "specific-source-281123aa7",
       "reference": "#control-plane-deployment-matrix",
       "mainlineRevision": "302c85bdafa1f02380f0c47ce0049a206b60443b"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt12.json",
+      "sha256": "2bb9ef8f47f880c140b0c0bb8f9d246bf9f817fbbbc409ea99dc3750d4bb9c1d",
+      "recorded": "2026-10-14T16:56:51.433354010Z",
+      "revision": "a879a93a31de61106e3af2cd05923325d1e572b8",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-281123aa7",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "a879a93a31de61106e3af2cd05923325d1e572b8"
     }
   ]
 }
