@@ -2,6 +2,9 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import {
   enrollmentInstallScript,
@@ -263,4 +266,77 @@ test("DNF and zypper installs work without distribution repositories in an insta
 
 test("NixOS is a registry gate, never a snippet depending on outside hosting", () => {
   assert.equal(provisioningSnippet("nixos", token, instructions, install), "");
+});
+
+// Runs the install script's apt_get against a stand-in apt-get that prints the
+// given stderr lines (one invocation per entry, last one repeating) and exits
+// 100, or exits 0 for "ok"; date advances 100 s per call and sleep is free.
+function runAptGet(responses) {
+  const dir = mkdtempSync(join(tmpdir(), "lindm-apt-"));
+  const fake = (name, body) => {
+    writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`);
+    chmodSync(join(dir, name), 0o755);
+  };
+  writeFileSync(join(dir, "responses"), responses.join("\n@@\n"));
+  fake(
+    "apt-get",
+    `n=$(cat "${dir}/calls" 2>/dev/null || echo 0); echo $((n + 1)) > "${dir}/calls"
+printf '%s\\n' "$*" >> "${dir}/args"
+r=$(awk -v n="$n" 'BEGIN { RS = "\\n@@\\n" } { last = $0; if (NR - 1 == n) { print; found = 1; exit } } END { if (!found) print last }' "${dir}/responses")
+test "$r" = ok && exit 0
+printf '%s\\n' "$r" >&2; exit 100`,
+  );
+  fake(
+    "date",
+    `n=$(cat "${dir}/clock" 2>/dev/null || echo 0); echo $((n + 100)) > "${dir}/clock"; echo "$n"`,
+  );
+  fake("sleep", "exit 0");
+  const start = install.indexOf("apt_get() {");
+  const fn = install.slice(start, install.indexOf("\n}\n", start) + 3);
+  const result = spawnSync("/bin/sh", ["-c", `set -eu\nwork=${dir}\n${fn}apt_get update`], {
+    encoding: "utf8",
+    env: { PATH: `${dir}:/usr/bin:/bin` },
+  });
+  const calls = Number(readFileSync(join(dir, "calls"), "utf8"));
+  const args = readFileSync(join(dir, "args"), "utf8");
+  return { status: result.status, stderr: result.stderr, calls, args };
+}
+
+const listsLock =
+  "E: Could not get lock /var/lib/apt/lists/lock. It is held by process 1234 (apt-get)\nE: Unable to lock directory /var/lib/apt/lists/";
+const frontendLock =
+  "E: Could not get lock /var/lib/dpkg/lock-frontend. It is held by process 6853 (dpkg)\nE: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), is another process using it?";
+
+// pop-system-updater's boot refresh held APT's lists lock and the copied
+// command exited 100 on Pop!_OS 24.04; DPkg::Lock::Timeout does not cover
+// apt-get update's lists lock, so the script waits only on lock refusals.
+test("APT commands wait for another package manager's locks, bounded, and fail on anything else", () => {
+  checkShell(install);
+  assert.doesNotMatch(install.replace(/apt_get\(\) \{[\s\S]*?\n\}\n/, ""), /(^|\n)apt-get /);
+  assert.equal(install.match(/\napt_get /g).length, 4);
+  for (const format of ["cloud-init", "autoinstall"]) {
+    assert.ok(provisioningSnippet(format, token, instructions, install).includes("apt_get() {"));
+  }
+
+  const waited = runAptGet([listsLock, frontendLock, "ok"]);
+  assert.equal(waited.status, 0, waited.stderr);
+  assert.equal(waited.calls, 3);
+  assert.equal(waited.stderr.match(/Waiting for another package manager to finish…/g).length, 1);
+  assert.match(waited.args, /^-o DPkg::Lock::Timeout=600 update$/m);
+
+  const broken = runAptGet([
+    `${listsLock}\nE: The repository 'https://mdm.example.test/repo/apt stable Release' is not signed.`,
+  ]);
+  assert.notEqual(broken.status, 0);
+  assert.equal(broken.calls, 1);
+  assert.match(broken.stderr, /is not signed/);
+
+  const silent = runAptGet([""]);
+  assert.notEqual(silent.status, 0);
+  assert.equal(silent.calls, 1);
+
+  const held = runAptGet([listsLock]);
+  assert.notEqual(held.status, 0);
+  assert.ok(held.calls > 1 && held.calls <= 7, `lock wait unbounded: ${held.calls} calls`);
+  assert.match(held.stderr, /Could not get lock/);
 });

@@ -199,6 +199,34 @@ LINDM_ENROLL
 `;
 }
 
+// A desktop's own updater (Pop!_OS pop-system-updater at boot and every 12 h,
+// Ubuntu's apt-daily and unattended-upgrades) can hold APT's locks when the
+// command runs. apt-get's DPkg::Lock::Timeout waits only for dpkg's lock, not
+// for the lists lock apt-get update takes (apt 2.8 fails at once), so apt_get
+// retries for at most ten minutes while every apt error is a lock refusal.
+// Any other failure stays fatal, and no completed transaction is repeated.
+const aptWait = `apt_get() {
+  deadline=$(($(date +%s) + 600))
+  waiting=
+  until LC_ALL=C apt-get -o DPkg::Lock::Timeout=600 "$@" 2>"$work/apt-error"; do
+    if ! grep -q '^E: ' "$work/apt-error" || grep '^E: ' "$work/apt-error" | grep -qv -e '^E: Could not get lock ' -e '^E: Unable to lock ' -e '^E: Unable to acquire the dpkg frontend lock '; then
+      cat "$work/apt-error" >&2
+      return 1
+    fi
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      cat "$work/apt-error" >&2
+      return 1
+    fi
+    if [ -z "$waiting" ]; then
+      echo 'Waiting for another package manager to finish…' >&2
+      waiting=1
+    fi
+    sleep 5
+  done
+  cat "$work/apt-error" >&2
+}
+`;
+
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
@@ -296,16 +324,16 @@ URIs: ${apt.baseUrl}
 Suites: ${apt.suite}
 Components: ${apt.components.join(" ")}
 Signed-By: /etc/apt/keyrings/lindm.gpg`;
-    return `${header}apt-get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
-apt-get -y -o APT::Get::AllowUnauthenticated=false install ca-certificates curl gnupg openssl
+    return `${header}${aptWait}apt_get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
+apt_get -y -o APT::Get::AllowUnauthenticated=false install ca-certificates curl gnupg openssl
 ${privateCA}${verifyKey}
 install -d -m 0755 /etc/apt/keyrings
 gpg --batch --yes --dearmor --output /etc/apt/keyrings/lindm.gpg "$work/key.asc"
 chmod 0644 /etc/apt/keyrings/lindm.gpg
 printf '%s\\n' ${shellQuote(source)} > /etc/apt/sources.list.d/lindm.sources
 chmod 0644 /etc/apt/sources.list.d/lindm.sources
-apt-get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
-apt-get -y -o APT::Get::AllowUnauthenticated=false install lindm-agent${trust}`;
+apt_get -o Acquire::AllowInsecureRepositories=false -o APT::Get::AllowUnauthenticated=false update
+apt_get -y -o APT::Get::AllowUnauthenticated=false install lindm-agent${trust}`;
   }
   if (family === "pacman" && instructions.archRepository) {
     const name = instructions.archRepository.repositoryName;

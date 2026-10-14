@@ -83,6 +83,11 @@ Include any private server CA certificate and its fingerprint.
 The command verifies these pins before installing repository trust or starting enrollment.
 It verifies the HTTPS hostname and certificate chain throughout.
 The agent verifies the DSSE bundle against the authenticated execution root, including expiry and exact deployment bindings.
+On APT systems the command waits, for at most ten minutes, while another package
+manager holds APT's locks (Pop!\_OS's `pop-system-updater` refreshes at boot and
+every 12 hours; Ubuntu's `apt-daily` and unattended-upgrades run on timers). It
+prints "Waiting for another package manager to finish…" once and retries only
+while every APT error is a lock refusal; any other APT failure stops it.
 
 Never use HTTP or disable certificate checks.
 Never use a short OpenPGP key ID.
