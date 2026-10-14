@@ -5,8 +5,12 @@ import { promisify } from "node:util";
 import { createServer } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createRequire } from "node:module";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
+
+const require = createRequire(import.meta.url);
+const playwrightVersion = require("playwright/package.json").version;
 
 const exec = promisify(execFile);
 const elementKey = "element-6066-11e4-a52e-4f735466cecf";
@@ -134,7 +138,7 @@ export class ChromiumDriver {
     this.metadata = {
       transport: "playwright-cdp",
       browserVersion: this.browser.version(),
-      playwright: "1.64.0",
+      playwright: playwrightVersion,
     };
   }
   // Page-load diagnostics for a failed step: same-origin request paths only
