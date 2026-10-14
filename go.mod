@@ -11,7 +11,7 @@ require (
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/foxboron/go-uefi v0.0.0-20251010190908-d29549a44f29
-	github.com/fxamacker/cbor/v2 v2.9.4
+	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/godbus/dbus/v5 v5.2.2
