@@ -263,6 +263,64 @@ func TestTargetingPriorityExclusionAndScope(t *testing.T) {
 		t.Fatalf("scope denial leaked target: %v", err)
 	}
 }
+
+func TestRolloutMetadataIndependentCohortsUseBoundedMembershipPages(t *testing.T) {
+	for _, kind := range []string{"static group", "device"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newTargetingFixture(t)
+			group := f.impactGroup(t, 1000)
+			if _, err := f.pool.Exec(t.Context(), "INSERT INTO device_group_memberships(group_id,device_id) VALUES ($1,$2)", group, f.device); err != nil {
+				t.Fatal(err)
+			}
+			// Include devices outside the static cohort too: the frozen stage
+			// must retain their excluded rows, not just the selected cohort.
+			if _, err := f.pool.Exec(t.Context(), "INSERT INTO devices(id,state,enrolled_at) SELECT gen_random_uuid(),'pending',now() FROM generate_series(1,999)"); err != nil {
+				t.Fatal(err)
+			}
+			target := impactGroup(group)
+			if kind == "device" {
+				target = impactDevice(f.device)
+			}
+			request := &adminv1.PutRolloutRequest{RequestId: uuid.NewString(), Reason: "Freeze metadata-independent membership", Rollout: singleStage(target)}
+			var out *adminv1.PutRolloutResponse
+			var counted *impactCountingTx
+			if err := f.transaction(t, func(tx pgx.Tx) error {
+				counted = &impactCountingTx{Tx: tx}
+				var err error
+				out, err = f.store.PutRollout(t.Context(), counted, f.actor, identity.PermissionAssignResources, request)
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			// Ten bounded membership pages need no per-page clock queries.
+			// This catches reintroducing the full inventory evaluation pass.
+			if counted.calls > 40 || counted.copies != 10 || counted.copiedRows != 2000 || counted.maxCopyRows > 200 {
+				t.Fatalf("unbounded/redundant stage work: calls=%d copies=%d rows=%d max_rows=%d", counted.calls, counted.copies, counted.copiedRows, counted.maxCopyRows)
+			}
+			state := out.Rollout
+			if state.SelectedCount != 1 || state.PendingCount != 0 || state.ExcludedCount != 1999 {
+				t.Fatalf("metadata-independent stage changed eligibility: %v", state)
+			}
+			id := uuid.MustParse(request.Rollout.RolloutId)
+			var members, includedMembers, pendingGenerations int
+			if err := f.pool.QueryRow(t.Context(), "SELECT count(*),count(*) FILTER(WHERE membership=1),count(*) FILTER(WHERE generation_id IS NULL AND membership=2) FROM resource_rollout_members WHERE rollout_id=$1 AND ring_index=0", id).Scan(&members, &includedMembers, &pendingGenerations); err != nil {
+				t.Fatal(err)
+			}
+			if members != 2000 || includedMembers != 1 || pendingGenerations != 1999 {
+				t.Fatalf("frozen stage lost fleet members: members=%d included=%d pending_generations=%d", members, includedMembers, pendingGenerations)
+			}
+			var generation uuid.UUID
+			var bucket int32
+			if err := f.pool.QueryRow(t.Context(), "SELECT generation_id,bucket FROM resource_rollout_members WHERE rollout_id=$1 AND ring_index=0 AND device_id=$2 AND membership=1", id, f.device).Scan(&generation, &bucket); err != nil {
+				t.Fatal(err)
+			}
+			if generation != f.generation || uint32(bucket) != Bucket(id, request.Rollout.Salt, f.device) {
+				t.Fatal("frozen membership changed generation or canonical bucket")
+			}
+		})
+	}
+}
+
 func TestRolloutFrozenCanaryPauseAndSoak(t *testing.T) {
 	f := newTargetingFixture(t)
 	request := &adminv1.PutRolloutRequest{RequestId: uuid.NewString(), Reason: "Frozen canary campaign", Rollout: &policyv1.RolloutSpec{RolloutId: uuid.NewString(), Salt: make([]byte, 32), Rings: []*policyv1.RolloutRing{{Name: "canary", Cohort: &policyv1.TargetRef{Target: &policyv1.TargetRef_DeviceId{DeviceId: f.device.String()}}, CumulativeBasisPoints: 0, MinimumCanaries: 1, MinimumObserved: 1, SoakSeconds: 60, HealthMaxAgeSeconds: 60, FailureBasisPoints: 0, UnknownBasisPoints: 0, UnavailableBasisPoints: 0, ManualPromotion: true}}}}

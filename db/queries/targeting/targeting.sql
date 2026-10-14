@@ -85,6 +85,20 @@ WHERE d.id > sqlc.arg(after_id)::uuid
 ORDER BY d.id LIMIT 200
 FOR UPDATE OF d;
 
+-- name: ListRolloutMembershipPage :many
+-- Device and static-group cohorts need no host observations, attributes, labels
+-- or clock. Keep excluded devices in the same bounded, locked fleet traversal.
+SELECT d.id, d.current_generation_id,
+ (d.state='active' AND CASE WHEN sqlc.arg(device_target)::boolean
+  THEN d.id=sqlc.arg(device_id)::uuid
+  ELSE EXISTS (SELECT 1 FROM device_group_memberships m
+   WHERE m.device_id=d.id AND m.group_id=sqlc.arg(group_id)::uuid)
+ END)::boolean AS eligible
+FROM devices d
+WHERE d.id > sqlc.arg(after_id)::uuid
+ORDER BY d.id LIMIT 200
+FOR UPDATE OF d;
+
 -- name: ListTargetingDevicePage :many
 -- Read-only evaluation input for unsaved group previews: the TargetingDevice
 -- columns without row locks, one bounded page at a time.

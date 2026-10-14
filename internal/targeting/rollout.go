@@ -142,46 +142,9 @@ func (s *Store) freezeStage(ctx context.Context, q *targetingdb.Queries, p ident
 	}
 	ring := spec.Rings[index]
 	id := uuid.MustParse(spec.RolloutId)
-	after := uuid.Nil
-	members := make([]member, 0)
-	var excludedCount int32
-	for {
-		devices, err := q.ListRolloutDevicePage(ctx, after)
-		if err != nil {
-			return err
-		}
-		// Query the clock after the page's device locks have been acquired.
-		now, err := q.TargetingClock(ctx)
-		if err != nil {
-			return err
-		}
-		for _, device := range devices {
-			e, err := evaluationFromDevice(q, targetingdb.TargetingDeviceRow(device), now.Time)
-			if err != nil {
-				return err
-			}
-			match, err := e.target(ctx, ring.Cohort)
-			if err != nil {
-				return err
-			}
-			if match == unknown {
-				return ErrNotReady
-			}
-			if match == excluded || e.input.Device.State != "active" {
-				excludedCount++
-				match = excluded
-			} else {
-				match = unknown
-			}
-			members = append(members, member{id: device.ID, generation: e.input.Device.CurrentGenerationID, bucket: Bucket(id, spec.Salt, device.ID), match: match})
-			if len(members) > 10000 {
-				return ErrCapacity
-			}
-			after = device.ID
-		}
-		if len(devices) < 200 {
-			break
-		}
+	members, excludedCount, err := s.collectStageMembers(ctx, q, spec, index)
+	if err != nil {
+		return err
 	}
 	slices.SortFunc(members, func(a, b member) int {
 		if a.bucket < b.bucket {
@@ -225,6 +188,93 @@ func (s *Store) freezeStage(ctx context.Context, q *targetingdb.Queries, p ident
 		}
 	}
 	return nil
+}
+
+func (s *Store) collectStageMembers(ctx context.Context, q *targetingdb.Queries, spec *policyv1.RolloutSpec, index int32) ([]member, int32, error) {
+	ring := spec.Rings[index]
+	if ring.Cohort.GetDynamicGroupId() == "" {
+		return collectDirectStageMembers(ctx, q, spec, ring.Cohort)
+	}
+	id := uuid.MustParse(spec.RolloutId)
+	after := uuid.Nil
+	members := make([]member, 0)
+	var excludedCount int32
+	for {
+		devices, err := q.ListRolloutDevicePage(ctx, after)
+		if err != nil {
+			return nil, 0, err
+		}
+		// Dynamic membership retains the clock and every inventory input.
+		now, err := q.TargetingClock(ctx)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, device := range devices {
+			e, err := evaluationFromDevice(q, targetingdb.TargetingDeviceRow(device), now.Time)
+			if err != nil {
+				return nil, 0, err
+			}
+			match, err := e.target(ctx, ring.Cohort)
+			if err != nil {
+				return nil, 0, err
+			}
+			if match == unknown {
+				return nil, 0, ErrNotReady
+			}
+			if match == excluded || e.input.Device.State != "active" {
+				excludedCount++
+				match = excluded
+			} else {
+				match = unknown
+			}
+			members = append(members, member{id: device.ID, generation: e.input.Device.CurrentGenerationID, bucket: Bucket(id, spec.Salt, device.ID), match: match})
+			if len(members) > 10000 {
+				return nil, 0, ErrCapacity
+			}
+			after = device.ID
+		}
+		if len(devices) < 200 {
+			break
+		}
+	}
+	return members, excludedCount, nil
+}
+
+// Direct device/static-group membership depends only on identity, state and the
+// static membership relation, not metadata or observation freshness. The caller
+// still requires unrestricted authority and retains every excluded fleet row.
+func collectDirectStageMembers(ctx context.Context, q *targetingdb.Queries, spec *policyv1.RolloutSpec, cohort *policyv1.TargetRef) ([]member, int32, error) {
+	id := uuid.MustParse(spec.RolloutId)
+	params := targetingdb.ListRolloutMembershipPageParams{AfterID: uuid.Nil, DeviceTarget: cohort.GetDeviceId() != ""}
+	if params.DeviceTarget {
+		params.DeviceID = uuid.MustParse(cohort.GetDeviceId())
+	} else {
+		params.GroupID = uuid.MustParse(cohort.GetStaticGroupId())
+	}
+	members := make([]member, 0)
+	var excludedCount int32
+	for {
+		devices, err := q.ListRolloutMembershipPage(ctx, params)
+		if err != nil {
+			return nil, 0, err
+		}
+		for _, device := range devices {
+			match := unknown
+			if !device.Eligible {
+				match = excluded
+				excludedCount++
+			}
+			members = append(members, member{id: device.ID, generation: device.CurrentGenerationID, bucket: Bucket(id, spec.Salt, device.ID), match: match})
+			if len(members) > 10000 {
+				return nil, 0, ErrCapacity
+			}
+			params.AfterID = device.ID
+		}
+		if len(devices) < 200 {
+			break
+		}
+	}
+	return members, excludedCount, nil
 }
 func (s *Store) assess(ctx context.Context, q *targetingdb.Queries, id uuid.UUID) (bool, string, error) {
 	row, err := q.GetRollout(ctx, id)

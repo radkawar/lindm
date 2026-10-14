@@ -546,6 +546,59 @@ func (q *Queries) ListRolloutDevicePage(ctx context.Context, afterID uuid.UUID) 
 	return items, nil
 }
 
+const listRolloutMembershipPage = `-- name: ListRolloutMembershipPage :many
+SELECT d.id, d.current_generation_id,
+ (d.state='active' AND CASE WHEN $1::boolean
+  THEN d.id=$2::uuid
+  ELSE EXISTS (SELECT 1 FROM device_group_memberships m
+   WHERE m.device_id=d.id AND m.group_id=$3::uuid)
+ END)::boolean AS eligible
+FROM devices d
+WHERE d.id > $4::uuid
+ORDER BY d.id LIMIT 200
+FOR UPDATE OF d
+`
+
+type ListRolloutMembershipPageParams struct {
+	DeviceTarget bool
+	DeviceID     uuid.UUID
+	GroupID      uuid.UUID
+	AfterID      uuid.UUID
+}
+
+type ListRolloutMembershipPageRow struct {
+	ID                  uuid.UUID
+	CurrentGenerationID *uuid.UUID
+	Eligible            bool
+}
+
+// Device and static-group cohorts need no host observations, attributes, labels
+// or clock. Keep excluded devices in the same bounded, locked fleet traversal.
+func (q *Queries) ListRolloutMembershipPage(ctx context.Context, arg ListRolloutMembershipPageParams) ([]ListRolloutMembershipPageRow, error) {
+	rows, err := q.db.Query(ctx, listRolloutMembershipPage,
+		arg.DeviceTarget,
+		arg.DeviceID,
+		arg.GroupID,
+		arg.AfterID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRolloutMembershipPageRow{}
+	for rows.Next() {
+		var i ListRolloutMembershipPageRow
+		if err := rows.Scan(&i.ID, &i.CurrentGenerationID, &i.Eligible); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRollouts = `-- name: ListRollouts :many
 SELECT id FROM resource_rollouts
 WHERE id > $1::uuid
