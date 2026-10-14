@@ -261,8 +261,8 @@ are also privileged code; publisher approval and source integrity are required.
 ### Remote assistance capabilities
 
 This is the delivery contract for P13/P14 and L09/L12/L16. Status: Tier 1 is
-implemented and partially qualified (qualified on Ubuntu 24.04 x86_64 GNOME
-Wayland only); Tier 2 and later capabilities have not shipped. Existing consent-controlled view/control evidence
+implemented and partially qualified (qualified on Ubuntu 24.04 and Fedora 44
+x86_64, GNOME Wayland); Tier 2 and later capabilities have not shipped. Existing consent-controlled view/control evidence
 does not qualify clipboard, file transfer, recording or unattended access. The
 [assistance evidence ledger](verification.md#built-in-graphical-remote-assistance-l09-l12)
 records each platform/capability separately.

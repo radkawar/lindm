@@ -985,7 +985,11 @@ Its live console screenshot shows the notice alongside the actual head marker.
 The matching Ubuntu 24.04 `control,monitors` regression retained GNOME 46
 EMBEDDED. See the [scoped native proof](../verification.md#native-cursor-mitigation-and-source-removal-proof)
 for hashes and limits: these `-hold` diagnostics are not a replacement for a
-complete Tier 1 qualification record or an aarch64 rerun.
+complete Tier 1 qualification record or an aarch64 rerun. The complete Fedora 44
+x86_64 record is `fedora44-tier1-28` (main `c6591fbdd`, HIDDEN cursor), which
+qualifies Tier 1 there; see the
+[Tier 1 runs](../verification.md#commercial-assistance-capability-qualification).
+Aarch64 reruns are blocked: lab hosts offline.
 
 ## Advisory feeds
 

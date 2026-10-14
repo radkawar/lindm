@@ -12651,6 +12651,22 @@
       "scope": "signed PACKAGES; entitled git; console unregister gate; same-policy registration retry",
       "reference": "#registry-package-source-native-parity",
       "mainlineRevision": "3ca147d201e6277c16f903a70e4a9a0d18648a06"
+    },
+    {
+      "platform": "fedora-44",
+      "cell": "assistance",
+      "architecture": "x86_64",
+      "manifest": "fedora-server-encrypted-44-1.7-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-assistance-roadmap-20261011/fedora44-tier1-28/assistance.json",
+      "sha256": "1436943cd835e9ac92d191adb41b405cd2cf214b93d1e1efe9650969c1cd163d",
+      "recorded": "2026-10-14T03:31:44.578093617Z",
+      "revision": "47764507cfa76865c82f76272ef163aef14bd7ef-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "GNOME; Tier 1 clipboard, keyboard, displays, messages; HIDDEN cursor on GNOME 50",
+      "reference": "#commercial-assistance-capability-qualification",
+      "mainlineRevision": "47764507cfa76865c82f76272ef163aef14bd7ef"
     }
   ]
 }
