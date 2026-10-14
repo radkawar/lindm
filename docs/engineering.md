@@ -187,6 +187,11 @@ the page's main landmark through its live element ref, without clipping them in
 table scroll containers. Shell review checks both the collapse hint's semantics
 and landmark ownership. Sign-in uses the brand lockup and a task heading, not a
 second product-name heading.
+Modal page locking transfers the viewport offset into the app root and resets
+the viewport offset; it must not apply the same scroll twice. Existing popup
+stability checks cover long profile pages as well as the top-bar command palette
+and mobile menu. Page contracts scope headings and actions to `main`, not the
+contextual navigation; in-app journeys follow visible work-area and page controls.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Explanations of how a feature works are not inline page text: keep at most one short

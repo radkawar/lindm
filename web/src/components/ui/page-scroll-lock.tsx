@@ -35,6 +35,8 @@ function lockPage(): () => void {
   if (insetScrollbar) html.style.scrollbarGutter = "stable";
   root.style.height = "100dvh";
   root.style.overflow = "hidden";
+  // Transfer the offset: retaining it on both the viewport and root doubles the scroll.
+  window.scrollTo({ left: 0, top: 0, behavior: "instant" });
   root.scrollTo({ left, top, behavior: "instant" });
   return () => {
     // Focus moves while locked scroll the root; the page keeps that position.

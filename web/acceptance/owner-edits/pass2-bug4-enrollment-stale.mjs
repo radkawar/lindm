@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { openNavigationPage } from "../review-navigation.mjs";
+
 // Owner pass 2, bug 4: after approving the pending device, Enrollment still said
 // "1 device waiting for approval / Awaiting approval", even after Refresh. The
 // server reported an approved reservation as still pending: the device only
@@ -74,7 +76,7 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   );
 
   step("return to enrollment in-app");
-  await page.locator('a[href="/enrollment"]').filter({ hasText: "Enrollment" }).first().click();
+  await openNavigationPage(page, "Enrollment");
   const approved = main.getByRole("heading", { name: APPROVED });
   await approved.waitFor({ timeout });
   await settle();

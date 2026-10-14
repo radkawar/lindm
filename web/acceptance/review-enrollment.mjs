@@ -108,6 +108,7 @@ async function reviewEnrollment({
   settle,
 }) {
   const results = [];
+  const main = page.getByRole("main");
   let step = "open scenario";
   async function record(route, variant, operation) {
     const prefix = `${route.slice(1)}-${publication}-${variant}-${theme}-${viewport.name}`;
@@ -170,12 +171,12 @@ async function reviewEnrollment({
     await page.goto(`${origin}/settings`);
     await settle(page);
     for (const name of contract.headings)
-      await page.getByRole("heading", { name, exact: true }).waitFor();
+      await main.getByRole("heading", { name, exact: true }).waitFor();
     // The page Refresh is disabled while any read on the page is in flight
     // (readiness, attributes, capabilities); it must become available, not
     // be enabled at one arbitrary instant.
     for (const name of contract.buttons) {
-      const button = page.getByRole("button", { name, exact: true });
+      const button = main.getByRole("button", { name, exact: true });
       let enabled = false;
       for (const deadline = Date.now() + 15_000; !enabled && Date.now() < deadline;) {
         enabled = await button.isEnabled();
