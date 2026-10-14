@@ -201,32 +201,48 @@ confirmation.
 Private records under `~/.cache/lindm-desktopderiv-20261011/` (x86_64, KVM,
 Ubuntu `ovmf` 2024.02-2ubuntu0.10, Secure Boot off), each cited by SHA-256:
 
-| Lane                                  | Outcome | Record (SHA-256)                                                                                                                 |
-| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| inspect (967 packages matched)        | pass    | `omarchy/omarchy-x86_64-inspect-s2.json` (`126b1c842857812121b897e61d9da0cf14151afe84e4ae9df3f8d9a1e36964f8`)                    |
-| lifecycle (signed pacman 0.7.0→0.7.1) | pass    | `omarchy/omarchy-x86_64-lifecycle-s2b.json` (`552f689c0348ea9c48e57d7f06416652a05847dd59ffdca32cc757b42e1f61cd`)                 |
-| encrypted smoke (2 prompted unlocks)  | pass    | `omarchy/omarchy-x86_64-encrypted-s5.json` (`adca53b03e8a71868e10eca298bf77b2d660aded7062e82d4620383f6c7d5e4e`)                  |
-| dispatch (9 native scenarios)         | pass    | `omarchy/omarchy-x86_64-dispatch-s5.json` (`08fe06f8a3365a8be8438e039604c1a89b6edaf80aa9ebc6dfa8d24ae6b8f120`)                   |
-| dispatch power actions                | pass    | `omarchy/omarchy-x86_64-power-s5.json` (`be843e9473b34ab486c4f05ad5c9e647ae8d1fb797c509432ffdbcd4d0ee6bef`)                      |
-| device actions: encryption            | pass    | `omarchy/omarchy-x86_64-encryption-s8.json` (`972e18fed3a609c8e1b4ecb3869ab1604ed4dba9a6287bdfebe82c662079380b`)                 |
-| lock-quarantine                       | pass    | `sessions/omarchy/omarchy404-lock-quarantine-01.json` (`c5933f0fcdd35f5e54fa899d984f7a0e39901873a62d3f017259bf92080fe060`)       |
-| assistance refusals                   | pass    | `sessions/omarchy/omarchy404-assistance-03/assistance.json` (`68f21814beafbac0c9758b3f111378998ff51ef0ce23b461447de2ff5d2df2f0`) |
-| wipe live-erase                       | fail    | `omarchy/omarchy-x86_64-live-erase-s8.json` (`4ac010264027b6ee8989f54de58dae6d2f8f847b6cc1b0949521fb0e71fc0275`)                 |
-| wipe live-report-loss                 | fail    | `omarchy/omarchy-x86_64-live-report-loss-s8.json` (`561b7802a8b942191fba3f6075faaeefb200dede3c6d3c34c87b8e56fd790c5b`)           |
-| agent self-update                     | fail    | `omarchy/omarchy-x86_64-updates-s8.json` (`af73f1a29801dab8960b69989d40a9bb989c6a368590c6eead72c60fd47a53f5`)                    |
-| resources executor                    | fail    | `omarchy/omarchy-x86_64-resources-executor-s8.json` (`1827b6015b011da2efa3feb6c3126697c4dcab6d753ff655eb9e3cc660a180f9`)         |
+| Lane                                  | Outcome | Record (SHA-256)                                                                                                                  |
+| ------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| inspect (967 packages matched)        | pass    | `omarchy/omarchy-x86_64-inspect-s2.json` (`126b1c842857812121b897e61d9da0cf14151afe84e4ae9df3f8d9a1e36964f8`)                     |
+| lifecycle (signed pacman 0.7.0→0.7.1) | pass    | `omarchy/omarchy-x86_64-lifecycle-s2b.json` (`552f689c0348ea9c48e57d7f06416652a05847dd59ffdca32cc757b42e1f61cd`)                  |
+| encrypted smoke (2 prompted unlocks)  | pass    | `omarchy/omarchy-x86_64-encrypted-s5.json` (`adca53b03e8a71868e10eca298bf77b2d660aded7062e82d4620383f6c7d5e4e`)                   |
+| dispatch (9 native scenarios)         | pass    | `omarchy/omarchy-x86_64-dispatch-s5.json` (`08fe06f8a3365a8be8438e039604c1a89b6edaf80aa9ebc6dfa8d24ae6b8f120`)                    |
+| dispatch power actions                | pass    | `omarchy/omarchy-x86_64-power-s5.json` (`be843e9473b34ab486c4f05ad5c9e647ae8d1fb797c509432ffdbcd4d0ee6bef`)                       |
+| device actions: encryption            | pass    | `omarchy/omarchy-x86_64-encryption-s8.json` (`972e18fed3a609c8e1b4ecb3869ab1604ed4dba9a6287bdfebe82c662079380b`)                  |
+| lock-quarantine                       | pass    | `sessions/omarchy/omarchy404-lock-quarantine-01.json` (`c5933f0fcdd35f5e54fa899d984f7a0e39901873a62d3f017259bf92080fe060`)        |
+| assistance refusals                   | pass    | `sessions/omarchy/omarchy404-assistance-03/assistance.json` (`68f21814beafbac0c9758b3f111378998ff51ef0ce23b461447de2ff5d2df2f0`)  |
+| wipe live-erase                       | pass    | `omarchy/omarchy-x86_64-live-erase-fin3.json` (`f77e8c58e85f785246e25a72273e8d40a2d613d49576f9298888c3bb94935fbf`)                |
+| wipe live-report-loss                 | pass    | `omarchy/omarchy-x86_64-live-report-loss-fin3.json` (`cb029a617dfd1df7acf341a82c4723c5f73015a0f10df64b03f40c75f689a1aa`)          |
+| agent self-update                     | pass    | `omarchy/omarchy-x86_64-updates-fin4.json` (`a27d1d74c73bc7d79760a81507c25d219214bfdd4672c445da25230a12ed4917`)                   |
+| resources executor                    | pass    | `omarchy/omarchy-x86_64-resources-executor-fin3.json` (`c5838345f9b6fb51d4684f498872f9ef96b6ebc90f0ac2da11c48243bdd6c505`)        |
+| resources connected                   | partial | `omarchy/omarchy-x86_64-resources-connected-nomod-fin7.json` (`80abe02d25c3061db0cdcc66b4f2180af8e4cfe918b35233cb4e94302105fb02`) |
 
 The encryption record covers escrow, server reveal, the retired key's rejected
 boot, committed and interrupted rotation, a real TPM2 bind (`systemd-tpm2`
 token) and the observed passphrase prompt that makes the unattended TPM boot
-unsupported. Failures: both wipe lanes stop before the erase because the server
-rejects the refreshed inventory with the formatted whole-disk LUKS data volume
-(`invalid_argument: constraint`, a PostgreSQL check/not-null/length violation).
-The self-update simulation at base 6f06a3b6 failed `pacman -U` with
-`required key missing from keyring` (fixed for lanes by 0ab02988, not rerun). The
-resources executor failed preparation with `package_staging_native_failed`, the
-fixture database's missing `%PGPSIG%` that Arch qualification diagnosed (not
-rerun).
+unsupported. Live erase: two distinct approvers, three destructive approval
+denials, root and data escrow with a revealed-key data unlock and cold root
+boot, then server `SUCCEEDED` attested before the forced power-off, both LUKS
+headers absent and both post-erase credential boots rejected. Report loss: the
+result channel was blocked, the server stayed `OUTCOME_UNKNOWN`, the timer powered
+off the guest and both headers were absent. Self-update interrupts the pacman
+unpack with a QEMU reset; the boot helper then completes the exact update and a
+fresh catalog cannot downgrade it.
+
+The connected record passed every scenario of packages (9), files (9), groups
+(7), users (11), sysctl (8, including reboot persistence) and timers/drop-ins
+(10), and the SSH banner's unowned-notice refusal. It failed only on the lane's
+fixed 50-minute budget during SSH banner adoption, so the remaining banner
+scenarios, secret-password and local-admin did not run in it.
+
+Root causes fixed on the way (superseded failed records stay in the evidence
+directory): relay credential retry e7f5ee6d (escrow start consumed after the 30 s
+challenge), Btrfs root mapping fa75d78f (live erase refused before a challenge),
+stale `db.lck` release b6753033 (self-update recovery), sync-database notices
+82a58470 (accounts), `vm.overcommit_ratio` lab key 90a0fa80 (sysctl) and `sshd -T`
+keyword case 538c13cf (SSH banner). The earlier `invalid_argument: constraint`
+inventory rejection (`live-erase-s8`, base 6f06a3b6) did not recur in three
+later runs; that run kept no server log, so its column is unidentified.
 
 ## Known gaps
 
@@ -235,6 +251,11 @@ rerun).
   own PAM stack has no measured pins.
 - Firewall is gated: the Arch provider manages firewalld zones; Omarchy runs `ufw`
   active by default and its ISO carries no `firewalld`.
+- Kernel module blocklist is unsupported: the registry has initramfs tooling only
+  for initramfs-tools and dracut, not Omarchy's mkinitcpio, and the lane refuses
+  with `module blocklist platform has no qualified initramfs tooling`.
+- SSH banner adoption onward, secret-password and local-admin have no completed
+  Omarchy record yet (see the connected record above).
 - Recovery sanitize, assistance, advisories, OS update and release upgrade are
   gated with the reasons above.
 - VM results are not physical qualification.
