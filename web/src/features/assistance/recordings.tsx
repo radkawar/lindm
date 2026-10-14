@@ -94,7 +94,7 @@ export function DeviceRecordings({ deviceId }: { deviceId: string }) {
       {data?.recordings.length === 0 ? (
         <EmptyState
           title="No recordings"
-          description="Sessions are recorded only when policy allows it and the user is told."
+          description="lindm records a session only after policy allows recording and lindm tells the user. The user must approve recording when policy requires approval."
         />
       ) : null}
       {data?.recordings.length ? (

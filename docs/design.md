@@ -235,6 +235,10 @@ the documentation served by the customer's lindmd. Console help links use `/help
 public repository links are not console help.
 Show at most three CVE identifiers per finding. Keep longer identifier lists and
 platform lists in the existing Details disclosure.
+Keep setting identities in technical `code` markup, not prose. Retain their full
+values. Keep human-readable firewall zone names in normal text.
+Recording notices must name lindm as the actor. State the policy, prior notice and
+conditional user-approval requirements directly.
 
 `make ui-review` checks rendered copy for sentence length, passive voice,
 forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.

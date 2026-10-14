@@ -15,6 +15,7 @@ import {
 } from "../../../gen/lindm/admin/v1/approvals_pb";
 import { CryptoEraseMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import type { TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
+import { ResourceKind } from "../../../gen/lindm/resource/v1/identity_pb";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { PageHeader } from "@/components/ui/page-header";
@@ -193,7 +194,11 @@ function RolloutApproval({ approval }: { approval: Approval }) {
                 {identity && !identity.startsWith("system") ? (
                   <>
                     {" "}
-                    <span className="break-all">{identity}</span>
+                    {ref.kind === ResourceKind.FIREWALL_ZONE ? (
+                      <span className="break-all">{identity}</span>
+                    ) : (
+                      <code className="font-mono text-[0.92em] break-all">{identity}</code>
+                    )}
                   </>
                 ) : null}
               </span>
