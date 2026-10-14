@@ -5,11 +5,15 @@
 package targeting
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"google.golang.org/protobuf/proto"
@@ -22,8 +26,28 @@ import (
 // Groups and rollouts saved before the targeting names migration become
 // searchable by the names in their stored definitions, including multi-byte
 // names whose length takes two varint bytes and fields stored after the name.
+// Security-state migrations are deliberately one-way: prepare an empty owned
+// historical schema rather than downgrading the current migrated fixture.
 func TestMigrationBackfillsTargetingNames(t *testing.T) {
-	pool, _ := testdb.Open(t)
+	current, _ := testdb.Open(t)
+	schema := "lindm_targeting_names_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	if _, err := current.Exec(t.Context(), "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if _, err := current.Exec(ctx, "DROP SCHEMA "+pgx.Identifier{schema}.Sanitize()+" CASCADE"); err != nil {
+			t.Error(err)
+		}
+	})
+	cfg := current.Config()
+	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, os.DirFS("../../db/migrations"))
@@ -39,7 +63,7 @@ func TestMigrationBackfillsTargetingNames(t *testing.T) {
 	if version == 0 {
 		t.Fatal("targeting names migration not found")
 	}
-	if _, err := provider.DownTo(t.Context(), version-1); err != nil {
+	if _, err := provider.UpTo(t.Context(), version-1); err != nil {
 		t.Fatal(err)
 	}
 

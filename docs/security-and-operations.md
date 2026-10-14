@@ -1938,6 +1938,12 @@ The new schema compatibility, first-run, recovery, status and custody migrations
 are versions 49–53. They follow the already-landed MCP migration 48 without
 renumbering existing history. Online status/custody expansions retain floor 51;
 rollback still obeys the declared floor, never an automatic down migration.
+Migrations 51–53 are deliberately **one-way**, including on an empty deployment:
+their Down commands refuse to discard recovery fences, retained status audit
+state or recovery-key custody attestations. Compatible package rollback keeps
+those migrations applied. Historical migration tests create a fresh owned schema
+at the predecessor version and migrate forward; they do not undo these security
+records to arrange test data.
 
 Run the next independently authenticated private bundle's `sudo ./install.sh`;
 it refuses same-version installation and unrequested downgrade. It checks the
