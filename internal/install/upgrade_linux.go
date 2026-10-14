@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/mod/semver"
@@ -28,9 +29,13 @@ import (
 )
 
 type installState struct {
+	// Version is the last release that passed verified runtime readiness.
 	Version, Origin, DeviceOrigin, TLSCA string
-	LocalDatabase                        bool
-	Pending                              *installationProgress
+	// AttemptedVersion is authenticated before native mutation; InstalledVersion
+	// checkpoints the native package database independently of runtime readiness.
+	AttemptedVersion, InstalledVersion string
+	LocalDatabase                      bool
+	Pending                            *installationProgress
 }
 
 func upgradeRelease(ctx context.Context, o Options, version, packagePath string, release *platform.Release) (err error) {
@@ -49,12 +54,12 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 	if err := json.Unmarshal(data, &state); err != nil {
 		return err
 	}
-	if !semver.IsValid("v"+state.Version) || !semver.IsValid("v"+version) {
-		return errors.New("invalid release version")
+	installedVersion, err := nativeInstalledVersion(ctx, release)
+	if err != nil {
+		return err
 	}
-	comparison := semver.Compare("v"+version, "v"+state.Version)
-	if comparison == 0 || (comparison < 0 && !o.Rollback) || (comparison > 0 && o.Rollback) {
-		return errors.New("upgrade requires a newer release; authenticated older rollback requires explicit --rollback and compatible schema")
+	if err := checkUpgradeVersion(&state, installedVersion, version, o.Rollback); err != nil {
+		return err
 	}
 	if o.Origin != state.Origin || o.DeviceOrigin != state.DeviceOrigin {
 		return errors.New("upgrade cannot change deployment public origins")
@@ -125,7 +130,7 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 	if err := directory("/var/lib/lindmd-operations/rollback", 0, 0, 0755); err != nil {
 		return err
 	}
-	previousDir := filepath.Join("/var/lib/lindmd-operations/rollback", state.Version)
+	previousDir := filepath.Join("/var/lib/lindmd-operations/rollback", installedVersion)
 	if err := directory(previousDir, 0, 0, 0755); err != nil {
 		return err
 	}
@@ -133,15 +138,7 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 	if err := copyFileNew("/usr/bin/lindmd", previousBinary, 0755); err != nil && !errors.Is(err, os.ErrExist) {
 		return err
 	}
-	// A version-bound, one-use authorization is consumed by the package pre-hook.
-	if err := directory("/run/lindm-install", 0, 0, 0700); err != nil {
-		return err
-	}
-	authorization, err := packageAuthorization(version)
-	if err != nil {
-		return err
-	}
-	if err := newFile("/run/lindm-install/authorized-version", authorization, 0, 0, 0600); err != nil {
+	if err := authorizeUpgrade(version); err != nil {
 		return err
 	}
 	defer func() {
@@ -150,17 +147,76 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 			err = errors.Join(err, removeErr)
 		}
 	}()
-	if err := activateUpgrade(ctx, &o, packagePath, release, previousBinary, policy.Online); err != nil {
+	state.AttemptedVersion = version
+	state.InstalledVersion = installedVersion
+	if err := writeInstallationState(&state); err != nil {
+		return err
+	}
+	if err := activateUpgrade(ctx, &o, &state, packagePath, release, previousBinary, policy.Online); err != nil {
 		return err
 	}
 	return finishUpgrade(ctx, lease, &state, version)
 }
 
+// A version-bound, one-use authorization is consumed by the package pre-hook.
+func authorizeUpgrade(version string) error {
+	if err := directory("/run/lindm-install", 0, 0, 0700); err != nil {
+		return err
+	}
+	authorization, err := packageAuthorization(version)
+	if err != nil {
+		return err
+	}
+	return newFile("/run/lindm-install/authorized-version", authorization, 0, 0, 0600)
+}
+
+func checkUpgradeVersion(state *installState, installedVersion, version string, rollback bool) error {
+	if !semver.IsValid("v"+state.Version) || !semver.IsValid("v"+installedVersion) || !semver.IsValid("v"+version) {
+		return errors.New("invalid release version")
+	}
+	comparison := semver.Compare("v"+version, "v"+installedVersion)
+	if comparison == 0 || (comparison < 0 && !rollback) || (comparison > 0 && rollback) {
+		return errors.New("upgrade requires a newer release; authenticated older rollback requires explicit --rollback and compatible schema")
+	}
+	return nil
+}
+
+// The last-ready record is not evidence of the currently installed package:
+// unpacking or configuring the next release can fail before runtime readiness.
+func nativeInstalledVersion(ctx context.Context, release *platform.Release) (string, error) {
+	var data []byte
+	var err error
+	if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
+		data, err = command(ctx, nil, "dpkg-query", "--show", "--showformat=${Version}", "lindmd")
+	} else {
+		data, err = command(ctx, nil, "rpm", "--query", "--queryformat", "%{VERSION}", "lindmd")
+	}
+	if err != nil {
+		return "", err
+	}
+	version := strings.TrimSpace(string(data))
+	if !semver.IsValid("v" + version) {
+		return "", errors.New("native server package returned invalid release version")
+	}
+	return version, nil
+}
+
 // activateUpgrade preserves native authorization in its caller while migrations
 // and both old/new runtime readiness gates run.
-func activateUpgrade(ctx context.Context, o *Options, packagePath string, release *platform.Release, previousBinary string, online bool) error {
-	if err := installPackage(ctx, packagePath, release, o.Rollback); err != nil {
-		return err
+func activateUpgrade(ctx context.Context, o *Options, state *installState, packagePath string, release *platform.Release, previousBinary string, online bool) error {
+	installErr := installPackage(ctx, packagePath, release, o.Rollback)
+	// Native hooks may fail after replacing the payload. Record the observed
+	// package even on an error, without promoting it to the last-ready release.
+	installedVersion, err := nativeInstalledVersion(ctx, release)
+	if err != nil {
+		return errors.Join(installErr, err)
+	}
+	state.InstalledVersion = installedVersion
+	if err := writeInstallationState(state); err != nil {
+		return errors.Join(installErr, err)
+	}
+	if installErr != nil {
+		return installErr
 	}
 	if !o.Rollback {
 		if _, err := command(ctx, nil, "systemctl", "start", "lindmd-migrate.service"); err != nil {
@@ -195,15 +251,7 @@ func activateUpgrade(ctx context.Context, o *Options, packagePath string, releas
 
 func finishUpgrade(ctx context.Context, lease *serverops.UpgradeLease, state *installState, version string) error {
 	state.Version = version
-	encoded, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	stateTmp := "/etc/lindm/install-state.new"
-	if err := newFile(stateTmp, encoded, 0, 0, 0600); err != nil {
-		return err
-	}
-	if err := os.Rename(stateTmp, "/etc/lindm/install-state.json"); err != nil {
+	if err := writeInstallationState(state); err != nil {
 		return err
 	}
 	if _, statErr := os.Stat("/var/lib/lindmd-operations/release-feed-state.json"); statErr == nil {
