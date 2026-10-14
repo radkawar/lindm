@@ -433,7 +433,7 @@ func (v *guestVM) runtimeEvidence(ctx context.Context) (*vmRuntimeEvidence, erro
 		if v.tpm == nil {
 			return nil, errors.New("selected TPM has no owned emulator process")
 		}
-		version, err := hostCommand(ctx, v.dir, fmt.Sprintf("/proc/%d/exe", v.tpm.cmd.Process.Pid), nil, "--version")
+		version, err := hostCommand(ctx, v.dir, fmt.Sprintf("/proc/%d/exe", v.tpm.pid), nil, "--version")
 		if err != nil {
 			return nil, err
 		}

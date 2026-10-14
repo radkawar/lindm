@@ -36,20 +36,26 @@ func hostQEMUArchitecture(t *testing.T) (architecture, machine string) {
 }
 
 // TestSwtpmLabProcess stands in for a lab run when re-executed by
-// TestSwtpmEndsWithKilledLabProcess: it starts a paused QEMU and its swtpm
-// exactly as a guest boot does, reports both, and waits to be SIGKILLed.
+// TestSwtpmEndsWithKilledLabProcess: it starts a QEMU and its swtpm exactly as
+// a guest boot does, reports both, and waits to be SIGKILLed. The QEMU is a
+// real paused one, or a stand-in that queues QEMU's first control command
+// (CMD_GET_CAPABILITY) and never reaches CMD_SET_DATAFD, so swtpm's
+// --terminate has no data channel to lose.
 func TestSwtpmLabProcess(t *testing.T) {
 	dir := os.Getenv("LINDM_TEST_SWTPM_LAB_DIR")
 	if dir == "" {
 		return
 	}
-	architecture, machine := hostQEMUArchitecture(t)
 	control, err := newSwtpmControl()
 	if err != nil {
 		t.Fatal(err)
 	}
-	args := append([]string{"-no-user-config", "-nodefaults", "-display", "none", "-monitor", "none", "-S", "-machine", machine + ",accel=tcg"}, swtpmArguments(architecture, 3)...)
-	qemu, err := startEncryptedProcessFiles(t.Context(), dir, []*os.File{control.qemu}, "qemu-system-"+architecture, args...)
+	name, args := "/bin/sh", []string{"-c", `printf '\000\000\000\001' >&3 && exec sleep 600`}
+	if os.Getenv("LINDM_TEST_SWTPM_LAB_QEMU") == "real" {
+		architecture, machine := hostQEMUArchitecture(t)
+		name, args = "qemu-system-"+architecture, append([]string{"-no-user-config", "-nodefaults", "-display", "none", "-monitor", "none", "-S", "-machine", machine + ",accel=tcg"}, swtpmArguments(architecture, 3)...)
+	}
+	qemu, err := startEncryptedProcessFiles(t.Context(), dir, []*os.File{control.qemu}, name, args...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,22 +63,35 @@ func TestSwtpmLabProcess(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, qemu.stop())
 	}
-	fmt.Printf("lab qemu=%d swtpm=%d\n", qemu.cmd.Process.Pid, tpm.cmd.Process.Pid)
+	fmt.Printf("lab qemu=%d swtpm=%d\n", qemu.pid, tpm.pid)
 	<-qemu.done
 	t.Fatalf("QEMU exited: %v: %s", qemu.err, qemu.log.diagnostic(dir))
 }
 
 // swtpm's AppArmor profile clears its Pdeathsig, so a SIGKILLed lab run used
-// to leave swtpm running forever. Its lifetime now follows QEMU's, which
-// follows the lab process's.
+// to leave swtpm running forever, including while QEMU had not yet handed
+// swtpm its data channel.
 func TestSwtpmEndsWithKilledLabProcess(t *testing.T) {
-	hostQEMUArchitecture(t)
+	if _, err := exec.LookPath("swtpm"); err != nil {
+		t.Skip("swtpm lifetime oracle requires swtpm")
+	}
+	for _, qemu := range []string{"real", "before-data-channel"} {
+		t.Run(qemu, func(t *testing.T) {
+			if qemu == "real" {
+				hostQEMUArchitecture(t)
+			}
+			killLabProcess(t, qemu)
+		})
+	}
+}
+
+func killLabProcess(t *testing.T, qemuKind string) {
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, "tpm"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	lab := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestSwtpmLabProcess$")
-	lab.Env = append(os.Environ(), "LINDM_TEST_SWTPM_LAB_DIR="+dir)
+	lab.Env = append(os.Environ(), "LINDM_TEST_SWTPM_LAB_DIR="+dir, "LINDM_TEST_SWTPM_LAB_QEMU="+qemuKind)
 	lab.Stderr = os.Stderr
 	stdout, err := lab.StdoutPipe()
 	if err != nil {
@@ -90,15 +109,20 @@ func TestSwtpmEndsWithKilledLabProcess(t *testing.T) {
 	if qemu == 0 {
 		t.Fatalf("lab process reported no QEMU and swtpm: %v", lab.Wait())
 	}
+	qemuName := "(qemu-system-"
+	if qemuKind != "real" {
+		qemuName = "(sleep)"
+	}
 	t.Cleanup(func() {
 		for _, pid := range []int{qemu, swtpm} {
-			if processRunning(pid) {
-				_ = syscall.Kill(pid, syscall.SIGKILL)
-			}
+			_ = syscall.Kill(pid, syscall.SIGKILL)
 		}
 	})
-	if !processRunning(qemu) || !processRunning(swtpm) {
-		t.Fatal("QEMU and swtpm must run until the lab process dies")
+	// The watcher reports swtpm's PID as soon as it forks, before the exec.
+	for started := time.Now(); !processRunning(qemu, qemuName) || !processRunning(swtpm, "(swtpm)"); time.Sleep(10 * time.Millisecond) {
+		if time.Since(started) > 30*time.Second {
+			t.Fatal("QEMU and swtpm must run until the lab process dies")
+		}
 	}
 	if err := lab.Process.Kill(); err != nil {
 		t.Fatal(err)
@@ -110,8 +134,8 @@ func TestSwtpmEndsWithKilledLabProcess(t *testing.T) {
 	for _, child := range []struct {
 		name string
 		pid  int
-	}{{"QEMU", qemu}, {"swtpm", swtpm}} {
-		for processRunning(child.pid) {
+	}{{qemuName, qemu}, {"(swtpm)", swtpm}} {
+		for processRunning(child.pid, child.name) {
 			if time.Now().After(deadline) {
 				t.Fatalf("%s %d outlived the SIGKILLed lab process", child.name, child.pid)
 			}
@@ -120,17 +144,19 @@ func TestSwtpmEndsWithKilledLabProcess(t *testing.T) {
 	}
 }
 
-// processRunning reports whether pid is a live (not zombie) QEMU or swtpm.
-func processRunning(pid int) bool {
+// processRunning reports whether pid is a live (not zombie) process whose
+// /proc/PID/stat name starts with prefix, so a reused PID is not mistaken.
+func processRunning(pid int, prefix string) bool {
 	stat, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
 	if err != nil {
 		return false
 	}
-	name, state, ok := strings.Cut(string(stat), ") ")
+	_, rest, _ := strings.Cut(string(stat), " ")
+	name, state, ok := strings.Cut(rest, ") ")
 	if !ok || strings.HasPrefix(state, "Z") || strings.HasPrefix(state, "X") {
 		return false
 	}
-	return strings.HasSuffix(name, "(swtpm") || strings.Contains(name, "(qemu-system-")
+	return strings.HasPrefix(name+")", prefix)
 }
 
 // A QEMU that dies before queuing its first TPM control command never gets an

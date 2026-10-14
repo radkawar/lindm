@@ -82,6 +82,8 @@ type encryptedProcess struct {
 	done chan struct{}
 	err  error
 	log  *vmLog
+	// pid is the program's own process: cmd's, or the swtpm a watcher runs.
+	pid int
 }
 
 func startEncryptedProcess(ctx context.Context, dir, name string, args ...string) (*encryptedProcess, error) {
@@ -97,6 +99,13 @@ func startEncryptedProcessFiles(ctx context.Context, dir string, files []*os.Fil
 // A separate stdout sink permits bounded private installer-console diagnostics
 // without mixing guest serial bytes into the ordinary QEMU stderr log.
 func startEncryptedProcessOutput(ctx context.Context, dir string, files []*os.File, stdout io.Writer, name string, args ...string) (*encryptedProcess, error) {
+	return startProcessGroup(ctx, dir, files, stdout, syscall.SIGKILL, name, args...)
+}
+
+// startProcessGroup starts name as the leader of its own process group, sent
+// deathSignal when the lab process dies. Cancellation and stop kill the whole
+// group, so a leader's children (the swtpm a watcher runs) go with it.
+func startProcessGroup(ctx context.Context, dir string, files []*os.File, stdout io.Writer, deathSignal syscall.Signal, name string, args ...string) (*encryptedProcess, error) {
 	// Not labexec: the Pdeathsig must be bound to a thread locked for the process's lifetime.
 	p := &encryptedProcess{cmd: exec.CommandContext(ctx, name, args...), done: make(chan struct{}), log: new(vmLog)}
 	p.cmd.Dir = dir
@@ -107,7 +116,8 @@ func startEncryptedProcessOutput(ctx context.Context, dir string, files []*os.Fi
 	}
 	p.cmd.WaitDelay = 2 * time.Second
 	// The owning lane handles terminal signals and joins these exact children.
-	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL, Setpgid: true}
+	p.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: deathSignal, Setpgid: true}
+	p.cmd.Cancel = p.killGroup
 	started := make(chan error, 1)
 	go func() {
 		runtime.LockOSThread()
@@ -122,7 +132,17 @@ func startEncryptedProcessOutput(ctx context.Context, dir string, files []*os.Fi
 	if err := <-started; err != nil {
 		return nil, fmt.Errorf("start %s: %w", name, err)
 	}
+	p.pid = p.cmd.Process.Pid
 	return p, nil
+}
+
+// killGroup SIGKILLs the process group. Until the leader is waited for its
+// group ID cannot be reused, nor afterwards while any member remains.
+func (p *encryptedProcess) killGroup() error {
+	if err := syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+		return err
+	}
+	return nil
 }
 
 func (p *encryptedProcess) stop() error {
@@ -134,7 +154,7 @@ func (p *encryptedProcess) stop() error {
 		return nil
 	default:
 	}
-	if err := p.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+	if err := p.killGroup(); err != nil {
 		return err
 	}
 	select {

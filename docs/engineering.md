@@ -2252,11 +2252,16 @@ by `pgrep`.
 
 swtpm cannot use parent-death killing: its AppArmor profile makes its exec a
 secure exec, which clears the signal, so swtpm used to outlive SIGKILLed lab
-runs. Each QEMU therefore starts first on one end of a TPM control socketpair
-(`-chardev socket,fd=N`). Its swtpm starts on the other end
-(`--ctrl type=unixio,clientfd=3 --terminate`) only after QEMU has queued its
-data channel, so swtpm exits when that channel closes: QEMU powered off, crashed
-or died with the lab process (`internal/vmlab/swtpm_linux.go`).
+runs. It therefore runs under a `/bin/sh` watcher whose parent-death signal
+(SIGTERM) holds; the watcher SIGKILLs swtpm when the lab process dies, and
+stopping the TPM kills the watcher's whole process group. swtpm's own
+`--terminate` is not enough: it ends swtpm only when QEMU's data channel
+closes, and a QEMU that died after its first control command but before
+handing over that channel left swtpm waiting forever. Each QEMU starts first on
+one end of a TPM control socketpair (`-chardev socket,fd=N`); its swtpm starts
+on the other end (`--ctrl type=unixio,clientfd=3`) only once QEMU has queued a
+command, and never for a QEMU that already closed it
+(`internal/vmlab/swtpm_linux.go`).
 
 Admission also samples native `MemAvailable` and `pswpout`: available memory must
 cover the configured per-guest RAM ceiling plus 8 GiB of headroom, with no
