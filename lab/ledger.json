@@ -13079,6 +13079,21 @@
       "reference": "#tier-capability-matrix",
       "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
       "mainlineRevision": "be49850ddda9211ff21ba76063a8ecd9a7faeed9"
+    },
+    {
+      "platform": "omarchy-4.0.4",
+      "cell": "services",
+      "architecture": "x86_64",
+      "manifest": "omarchy-4.0.4-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/omarchy/matrix-services-01/omarchy-4.0.4/services-x86_64.json",
+      "sha256": "ba771c0d0d315711afa9ced3353ee6e4799f468f6500a5ecd9f5ba80a089b06d",
+      "recorded": "2026-10-14T07:54:22.707885178Z",
+      "revision": "ced7e359069fd61c3391a07a44d6cc7f433b26e6",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
+      "mainlineRevision": "ced7e359069fd61c3391a07a44d6cc7f433b26e6"
     }
   ]
 }
