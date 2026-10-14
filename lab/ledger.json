@@ -13503,6 +13503,21 @@
       "scope": "first-run-install-only",
       "reference": "#control-plane-deployment-matrix",
       "mainlineRevision": "c2486e5fb3eb74df774e2af608e961c4b6f84931"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-u2404-fw-20261014/ubuntu-24.04/resources-x86_64.json",
+      "sha256": "ddf8418aff8458855ed6daefedae6c8e665a7fa674b73ae3452f67f543f41952",
+      "recorded": "2026-10-14T20:03:42.248287945Z",
+      "revision": "820ee6b51cd43aeb464c9178ebec1ab64097371c",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
     }
   ]
 }
