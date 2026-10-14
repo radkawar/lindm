@@ -200,3 +200,29 @@ func TestDeployCredentialSourcesRequireExactNativeTuples(t *testing.T) {
 		t.Fatal("runtime source admitted for migration handoff")
 	}
 }
+
+func TestDeploySQLPrivilegeDenialRequiresExactStateAndPsqlExit(t *testing.T) {
+	for _, stderr := range []string{"ERROR:  42501\n", "ERROR: 42501\n", "ERROR:\t42501\r\n"} {
+		if !deploySQLPrivilegeDenied(3, []byte(stderr)) {
+			t.Fatal("standard psql SQLSTATE whitespace rejected")
+		}
+	}
+	for _, test := range []struct {
+		exit   int
+		stderr string
+	}{
+		{0, "ERROR:  42501\n"},
+		{1, "ERROR:  42501\n"},
+		{2, "ERROR:  42501\n"},
+		{3, "ERROR:  42P01\n"},
+		{3, "FATAL:  42501\n"},
+		{3, "ERROR:  42501 secret-canary\n"},
+		{3, "WARNING: unrelated\nERROR:  42501\n"},
+		{3, "ERROR:  42501\nERROR:  42501\n"},
+		{3, ""},
+	} {
+		if deploySQLPrivilegeDenied(test.exit, []byte(test.stderr)) {
+			t.Fatal("non-specific native failure was accepted as insufficient privilege")
+		}
+	}
+}

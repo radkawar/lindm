@@ -4196,6 +4196,19 @@ additional, misrouted or malformed tuples fail closed; the old text-printer
 assumption is removed. This correction changes only the lab, not signed SDKs or
 the installer's custody policy.
 
+`native-ubuntu-attempt8.json` passed the actual signed installer, hardened
+PostgreSQL, root-only persistent/structured credential proof, and first-owner
+setup in real Chromium. The owner set a password and user-verified CTAP2 passkey,
+signed out, and signed in again. A real runtime query with required channel
+binding recorded `runtime SCRAM-SHA-256-PLUS handshake` and SQLSTATE `00000`.
+The next SQL privilege probe failed. Its old exact comparison expected one
+space after `ERROR:`, while a genuine read-only psql SQLSTATE observation uses
+two spaces. The probe now admits that formatting while still requiring psql exit `3` and
+the sole SQLSTATE `42501`; another state, extra diagnostics, success or a
+connection failure is refused. It names only the fixed attempted operation.
+This failed full lane is retained, not promoted to enrollment/restore
+qualification.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

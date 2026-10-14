@@ -174,8 +174,8 @@ func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []
 		if runErr != nil {
 			return gates, errors.New("deploy runtime SQL transport failed")
 		}
-		if observed.ExitCode != 3 || strings.TrimSpace(string(observed.Stderr)) != "ERROR: 42501" {
-			return gates, errors.New("deploy runtime SQL write did not fail specifically for insufficient privilege")
+		if !deploySQLPrivilegeDenied(observed.ExitCode, observed.Stderr) {
+			return gates, errors.New("deploy runtime SQL privilege rejection did not match: " + attempt.name)
 		}
 		gates = append(gates, VMDeploySQLGate{Name: attempt.name, SQLState: "42501"})
 	}
@@ -183,4 +183,9 @@ func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []
 		return gates, err
 	}
 	return gates, nil
+}
+
+func deploySQLPrivilegeDenied(exitCode int, stderr []byte) bool {
+	state, severity := strings.CutPrefix(strings.TrimSpace(string(stderr)), "ERROR:")
+	return exitCode == 3 && severity && strings.TrimSpace(state) == "42501"
 }
