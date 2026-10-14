@@ -43,7 +43,7 @@ func Open(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
 	defer clear(dsn)
 	var database *Database
 	if container := os.Getenv("LINDM_TEST_DATABASE_TEMPLATE_CONTAINER"); container != "" {
-		template, templateErr := migratedTemplate()
+		template, templateErr := migratedTemplate(t.Context())
 		if templateErr != nil {
 			t.Fatal(templateErr)
 		}
@@ -68,9 +68,20 @@ func Open(t *testing.T) (*pgxpool.Pool, *pgx.Conn) {
 // One integration binary uses one run-owned database fixture. Cache only its
 // immutable migration snapshot; never application connections or mutable rows.
 // The code under test (not the checkout launching devenv) runs its migrations.
-var migratedTemplate = sync.OnceValues(func() (_ Template, resultErr error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
+var templateCache struct {
+	once     sync.Once
+	template Template
+	err      error
+}
+
+func migratedTemplate(ctx context.Context) (Template, error) {
+	templateCache.once.Do(func() {
+		templateCache.template, templateCache.err = createMigratedTemplate(ctx)
+	})
+	return templateCache.template, templateCache.err
+}
+
+func createMigratedTemplate(queue context.Context) (_ Template, resultErr error) {
 	path := os.Getenv("LINDM_TEST_DATABASE_URL_FILE")
 	if _, err := custody.Owned(path, false); err != nil {
 		return Template{}, err
@@ -84,11 +95,15 @@ var migratedTemplate = sync.OnceValues(func() (_ Template, resultErr error) {
 	// SCHEMA. Concurrent package snapshots and drops can exhaust the cluster's
 	// relation-lock table. Hold the fixture-owned cross-process lock until the
 	// golden schema is closed; normal per-case restores remain independent.
-	unlock, err := filelock.LockFile(ctx, filepath.Join(filepath.Dir(path), "integration-template.lock"), nil)
+	unlock, err := filelock.LockFile(queue, filepath.Join(filepath.Dir(path), "integration-template.lock"), nil)
 	if err != nil {
 		return Template{}, fmt.Errorf("lock integration migration snapshot: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, unlock()) }()
+	// Queueing is bounded by the calling test, not charged to migration or
+	// snapshot work. Preserve the existing initialization budget once admitted.
+	ctx, cancel := context.WithTimeout(queue, 5*time.Minute)
+	defer cancel()
 	started := time.Now()
 	golden, err := New(ctx, strings.TrimSpace(string(dsn)))
 	if err != nil {
@@ -122,4 +137,4 @@ var migratedTemplate = sync.OnceValues(func() (_ Template, resultErr error) {
 	}
 	fmt.Printf("integration migration template: migrate=%s snapshot=%s bytes=%d\n", migrated.Sub(started), time.Since(migrated), sql.Len())
 	return Template{Schema: golden.Schema(), SQL: sql.String()}, nil
-})
+}

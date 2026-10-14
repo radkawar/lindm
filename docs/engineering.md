@@ -5450,6 +5450,9 @@ and schema removal. PostgreSQL's migration-only lock is insufficient: concurrent
 snapshots and whole-schema drops can otherwise exhaust the cluster's relation-lock
 table. The process-local immutable snapshot cache, independent per-case restores,
 default package concurrency and existing initialization deadlines are unchanged.
+Lock acquisition uses the calling test's bounded context; the unchanged five-minute
+initialization budget starts only after admission, so package queueing cannot
+consume the migration or two-minute snapshot budget.
 The file lock releases on normal cleanup or process exit; the fixture is not
 restarted and no PostgreSQL durability or security setting is relaxed.
 

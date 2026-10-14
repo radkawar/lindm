@@ -16,6 +16,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Bound golden-schema initialization queueing by the calling test and start the unchanged migration/snapshot deadline after lock admission, so waiting packages retain their actual work budget.
 - Serialize golden integration-schema migration, PostgreSQL snapshot and removal across package processes to avoid exhausting shared relation locks, without serializing normal test cases or restarting the fixture.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.

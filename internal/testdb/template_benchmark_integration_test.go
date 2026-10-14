@@ -25,7 +25,7 @@ func BenchmarkMigrationFixtures(b *testing.B) {
 	}
 	defer clear(data)
 	dsn := strings.TrimSpace(string(data))
-	template, err := migratedTemplate()
+	template, err := migratedTemplate(b.Context())
 	if err != nil {
 		b.Fatal(err)
 	}
