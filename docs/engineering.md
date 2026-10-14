@@ -2011,9 +2011,12 @@ Default admission reserves one quarter of CPU and RAM, budgets each slot at
 4 vCPU/4096 MiB, and takes the smaller CPU/memory capacity (at least one slot).
 The measured 24-core/62 GiB workstation therefore defaults to four guests, not
 one slot per two-vCPU QEMU. Ordinary clouds still use 2 vCPU/2048 MiB and encrypted
-guests 2 vCPU/4096 MiB. The operator config installed for this lab sets local
-capacity to two after observed swap pressure with five guests plus test suites;
-each Spark retains its baseline's four slots.
+guests 2 vCPU/4096 MiB. On 2026-10-14, the operator authorized the local lab's
+per-guest `maxMemoryMib` ceiling to increase from 4096 to 8192 for the maintained
+one-guest cold release builder. Its `maxGuests` remains four; FIFO, KVM, disk,
+memory and swap-pressure guards are unchanged. Four guests at that ceiling need
+32 GiB on the measured 64 GiB host. This ceiling does not resize running guests.
+The Sparks are offline; no remote capacity is used for this proof.
 
 Copy and adjust `lab/hosts.example.json` for local amd64 plus the two arm64 SSH
 hosts. Each entry declares its transport/SSH alias, native architectures, KVM,
