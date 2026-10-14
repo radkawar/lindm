@@ -361,6 +361,14 @@ not weaker APT signature checks. See the
 [install runbook](../security-and-operations.md#enrollment-installation-from-your-server)
 and the [zero-configuration evidence](../verification.md#zero-configuration-agent-repository-2026-10-13).
 This delivery path does not transfer qualification between Ubuntu releases.
+
+Native server repository reads retain `RestrictSUIDSGID` and syscall filtering.
+They pin `openat` descriptors and reject symlinks in the full path; `openat2`
+is unavailable under that sandbox. The SDK12 Ubuntu 24.04 production-bundle
+diagnosis recorded this compatibility failure without promoting its partial
+first-run result into lifecycle qualification; see the
+[deployment evidence boundary](../verification.md#control-plane-deployment-matrix).
+
 The no-configuration path passed a fresh Ubuntu 24.04 x86_64 cloud VM through the
 local `enroll-from-console` lane: actual clipboard command, installed signed
 package, local enrolled identity and independently observed console **Enrolled**

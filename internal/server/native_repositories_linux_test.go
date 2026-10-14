@@ -12,14 +12,20 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
+	"unsafe"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	"github.com/ProtonMail/go-crypto/openpgp/clearsign"
@@ -383,5 +389,130 @@ func TestNativeRepositoryBoundsAndCancellation(t *testing.T) {
 	}
 	if repo := loadNativeRepository(t.Context(), f.directory, "apt", f.fingerprint); repo.err == nil {
 		t.Fatal("oversized package admitted")
+	}
+}
+
+func TestNativeRepositoryLoadsWhenOpenat2IsUnavailable(t *testing.T) {
+	const child = "LINDM_NATIVE_OPENAT2_DENIED"
+	mode := os.Getenv(child)
+	if mode == "" {
+		binary, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+		defer cancel()
+		command := exec.CommandContext(ctx, binary, "-test.run=^TestNativeRepositoryLoadsWhenOpenat2IsUnavailable$")
+		command.Env = append(os.Environ(), child+"=kernel")
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("native repository sandbox subprocess: %v\n%s", err, output)
+		}
+		return
+	}
+	if mode != "kernel" && mode != "systemd" {
+		t.Fatal("native repository syscall regression requires kernel or actual-systemd mode")
+	}
+	fixture := bundledNativeFixture(t, false)
+	if mode == "kernel" {
+		denyNativeOpenat2(t)
+	}
+	fd, err := unix.Openat2(unix.AT_FDCWD, fixture.directory, &unix.OpenHow{Flags: unix.O_PATH | unix.O_DIRECTORY})
+	if fd >= 0 {
+		if closeErr := unix.Close(fd); closeErr != nil {
+			t.Fatal(closeErr)
+		}
+	}
+	if !errors.Is(err, unix.ENOSYS) {
+		t.Fatalf("kernel did not refuse openat2 with ENOSYS: %v", err)
+	}
+	repositories := loadNativeBundle(t.Context(), fixture.directory)
+	for index, repository := range []*nativeRepository{repositories.apt, repositories.rpm, repositories.arch} {
+		if repository.err != nil {
+			t.Fatalf("signed %s repository refused with openat2 unavailable: %v", [...]string{"apt", "rpm", "arch"}[index], repository.err)
+		}
+	}
+}
+
+func denyNativeOpenat2(t *testing.T) {
+	t.Helper()
+	// Scope irreversible seccomp to the fresh test subprocess, across its Go
+	// threads. Match the kernel's openat2 refusal under RestrictSUIDSGID.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	if err := unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	filter := []unix.SockFilter{
+		{Code: unix.BPF_LD | unix.BPF_W | unix.BPF_ABS, K: 0},
+		{Code: unix.BPF_JMP | unix.BPF_JEQ | unix.BPF_K, K: uint32(unix.SYS_OPENAT2), Jf: 1},
+		{Code: unix.BPF_RET | unix.BPF_K, K: unix.SECCOMP_RET_ERRNO | uint32(unix.ENOSYS)},
+		{Code: unix.BPF_RET | unix.BPF_K, K: unix.SECCOMP_RET_ALLOW},
+	}
+	program := unix.SockFprog{Len: uint16(len(filter)), Filter: &filter[0]}
+	result, _, errno := unix.Syscall6(unix.SYS_SECCOMP, unix.SECCOMP_SET_MODE_FILTER, unix.SECCOMP_FILTER_FLAG_TSYNC, uintptr(unsafe.Pointer(&program)), 0, 0, 0)
+	runtime.KeepAlive(filter)
+	runtime.KeepAlive(program)
+	if errno != 0 || result != 0 {
+		t.Fatalf("install native repository kernel-seccomp regression boundary: result=%d errno=%v", result, errno)
+	}
+}
+
+func TestNativeRepositoryRefusesSymlinkAboveRepositoryRoot(t *testing.T) {
+	root := t.TempDir()
+	directory := filepath.Join(root, "real", "repository")
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "package.rpm"), []byte("signed fixture"), 0444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, "real"), filepath.Join(root, "alias")); err != nil {
+		t.Fatal(err)
+	}
+	repository := &nativeRepository{directory: filepath.Join(root, "alias", "repository")}
+	if file, err := repository.open("package.rpm"); err == nil {
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("symlink in absolute ancestry above repository root was followed")
+	}
+}
+
+func TestNativeRepositoryPinsOpenedFileAcrossAncestorReplacement(t *testing.T) {
+	root := t.TempDir()
+	directory, replacement := filepath.Join(root, "repository"), filepath.Join(root, "replacement")
+	for path, contents := range map[string]string{directory: "original", replacement: "replacement"} {
+		if err := os.Mkdir(path, 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(path, "package.rpm"), []byte(contents), 0444); err != nil {
+			t.Fatal(err)
+		}
+	}
+	repository := &nativeRepository{directory: directory}
+	file, err := repository.open("package.rpm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := file.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := os.Rename(directory, directory+".original"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(replacement, directory); err != nil {
+		t.Fatal(err)
+	}
+	contents, err := io.ReadAll(file)
+	if err != nil || string(contents) != "original" {
+		t.Fatalf("opened native descriptor followed replacement: contents=%q err=%v", contents, err)
+	}
+	if next, err := repository.open("package.rpm"); err == nil {
+		if err := next.Close(); err != nil {
+			t.Fatal(err)
+		}
+		t.Fatal("subsequent native open followed replacement symlink")
 	}
 }

@@ -195,6 +195,13 @@ Actual owner/mode, both accounts' unreadability and native credential handoff ar
 required deploy-lane assertions, not a source-only qualification claim. See the
 [root custody evidence boundary](../verification.md#turnkey-source-security-reinspection).
 
+Bundled agent-repository reads preserve `RestrictSUIDSGID` and syscall filtering.
+They use pinned `openat` descriptors with no symlinks in any path component,
+including ancestry above the repository root. This retains the native sandbox
+when `openat2` is refused; no SELinux or signature check is disabled. Ubuntu's
+specific-source diagnosis and kernel regression do not qualify the RHEL server
+lifecycle; that still requires its own signed-bundle `lab deploy` record.
+
 The `internal/platform` registry's RHEL 9 server installation facts own the
 snapshot filename, required native packages and PostgreSQL data/bin/port layout.
 Consumers use the row's native package database and entitlement facts rather

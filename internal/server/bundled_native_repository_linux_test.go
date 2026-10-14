@@ -34,13 +34,10 @@ func bundledNativeFixture(t *testing.T, differingRelease bool) *nativeFixture {
 	if err := os.Chmod(f.directory, 0700); err != nil {
 		t.Fatal(err)
 	}
-	name := f.apt(t, "amd64")
-	payload, err := os.ReadFile(filepath.Join(f.directory, "repo", "apt", name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if differingRelease {
-		payload = []byte("a different authenticated agent release")
+	publications := []struct{ family, path, format string }{
+		{"apt", f.apt(t, "amd64"), "deb"},
+		{"rpm", f.rpm(t, "x86_64"), "rpm"},
+		{"arch", f.arch(t), "arch"},
 	}
 	write := func(name string, body []byte) {
 		t.Helper()
@@ -74,25 +71,47 @@ func bundledNativeFixture(t *testing.T, differingRelease bool) *nativeFixture {
 		}
 		return envelope
 	}
-	name = filepath.Base(name)
-	write(name, payload)
-	digest := nativeTestDigest(payload)
-	artifact := &releasev1.ReleaseArtifact{Path: name, Product: "lindm-agent", Architecture: "amd64", Format: "deb", Sha256: digest, Size: int64(len(payload)), UnsignedSha256: digest, SecondUnsignedSha256: digest, SbomPath: name + ".sbom", ProvenancePath: name + ".provenance", SignaturePath: name + ".signature"}
-	for _, item := range []struct{ name, kind string }{{artifact.SbomPath, "https://cyclonedx.org/bom"}, {artifact.ProvenancePath, "https://slsa.dev/provenance/v1"}, {artifact.SignaturePath, "https://lindm.invalid/release/artifact/v1"}} {
-		statement, err := json.Marshal(map[string]any{"_type": "https://in-toto.io/Statement/v1", "subject": []any{map[string]any{"name": name, "digest": map[string]string{"sha256": digest}}}, "predicateType": item.kind, "predicate": map[string]string{"test": "signature admission only"}})
+	artifacts := make([]*releasev1.ReleaseArtifact, 0, len(publications))
+	unsigned := make(map[string]string, len(publications))
+	for _, publication := range publications {
+		payload, err := os.ReadFile(filepath.Join(f.directory, "repo", publication.family, publication.path))
 		if err != nil {
 			t.Fatal(err)
 		}
-		write(item.name, sign(statement, "application/vnd.in-toto+json"))
+		if differingRelease && publication.format == "deb" {
+			payload = []byte("a different authenticated agent release")
+		}
+		name := filepath.Base(publication.path)
+		write(name, payload)
+		digest := nativeTestDigest(payload)
+		artifact := &releasev1.ReleaseArtifact{Path: name, Product: "lindm-agent", Architecture: "amd64", Format: publication.format, Sha256: digest, Size: int64(len(payload)), UnsignedSha256: digest, SecondUnsignedSha256: digest, SbomPath: name + ".sbom", ProvenancePath: name + ".provenance", SignaturePath: name + ".signature"}
+		if publication.format == "arch" {
+			detached, err := os.ReadFile(filepath.Join(f.directory, "repo", publication.family, publication.path+".sig"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			artifact.NativeSignaturePath = name + ".sig"
+			write(artifact.NativeSignaturePath, detached)
+		}
+		for _, item := range []struct{ name, kind string }{{artifact.SbomPath, "https://cyclonedx.org/bom"}, {artifact.ProvenancePath, "https://slsa.dev/provenance/v1"}, {artifact.SignaturePath, "https://lindm.invalid/release/artifact/v1"}} {
+			statement, err := json.Marshal(map[string]any{"_type": "https://in-toto.io/Statement/v1", "subject": []any{map[string]any{"name": name, "digest": map[string]string{"sha256": digest}}}, "predicateType": item.kind, "predicate": map[string]string{"test": "signature admission only"}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			write(item.name, sign(statement, "application/vnd.in-toto+json"))
+		}
+		artifacts = append(artifacts, artifact)
+		unsigned[name] = digest
 	}
-	observation := &releasev1.BuildObservation{SourceSha256: digest, StartedAt: "2026-10-13T00:00:00Z", FinishedAt: "2026-10-13T00:00:01Z", UnsignedSha256: map[string]string{name: digest}}
+	sourceDigest := nativeTestDigest([]byte("signature-boundary fixture source"))
+	observation := &releasev1.BuildObservation{SourceSha256: sourceDigest, StartedAt: "2026-10-13T00:00:00Z", FinishedAt: "2026-10-13T00:00:01Z", UnsignedSha256: unsigned}
 	licenses := make(map[string]string, 3)
 	for _, document := range []string{"LICENSE", "NOTICE", "THIRD-PARTY-LICENSES"} {
 		body := []byte("Signature-boundary fixture document: " + document + "\n")
 		write(document, body)
 		licenses[document] = nativeTestDigest(body)
 	}
-	manifest := &releasev1.ReleaseManifest{Version: "1.0.0", Revision: "signature-fixture", SourceSha256: digest, SourceDateEpoch: 1760000000, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: nativeTestDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}, LicenseSha256: licenses}
+	manifest := &releasev1.ReleaseManifest{Version: "1.0.0", Revision: "signature-fixture", SourceSha256: sourceDigest, SourceDateEpoch: 1760000000, Artifacts: artifacts, AttestationKeyId: nativeTestDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}, LicenseSha256: licenses}
 	body, err := protojson.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)

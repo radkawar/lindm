@@ -4347,6 +4347,35 @@ response before admitting first-run success, retains only readiness fields in a
 private diagnostic, and seals bounded service journals to the lab operator on
 setup failure. It does not bypass browser authentication or repository admission.
 
+A one-slot, authenticated `repository-readiness-attempt1.json` diagnosis used the
+same untouched SDK12 release. Installation, hardened PostgreSQL, root-only
+credentials and real password/passkey sign-in passed; repository readiness did
+not. The actual Settings remedy was `function not implemented`, after the
+release-attestation stage. Its record SHA-256 is
+`0c6523a1fcdeb1a319c16ebfcad240507daaad5baafcfdef66bd67569fe34a51`.
+This remains first-run-install-only failure evidence. Native repository reads
+previously called `openat2`, which `RestrictSUIDSGID` refuses. The repair uses
+pinned `openat` descriptors with `O_NOFOLLOW` on every component, without changing
+the shipped sandbox, repository ownership policy or authentication checks.
+The deterministic regression installs an irreversible kernel-seccomp refusal
+only in a fresh test subprocess, proves `openat2` returns `ENOSYS`, then exercises
+signed APT/RPM/Arch bundle admission. Separate tests cover symlinks above the
+repository root and descriptor identity across ancestor replacement. These
+source tests do not qualify a rebuilt customer bundle or the full lifecycle.
+
+The focused race regressions passed (`internal/server`, 2.256 seconds). The
+actual owned transient systemd unit also passed signed all-family admission and
+the baseline `openat2`-`ENOSYS` assertion, with the shipped filesystem/syscall
+hardening retained and an unprivileged `DynamicUser` test harness. That path did
+not install the synthetic seccomp filter. Its private, nonsecret record is
+`native-repository-hardened-unit.json`, SHA-256
+`52e7e2bb1ac4339f5de702ba1a98b6f27ef3495683886a48bb567a89254c6330`.
+The record pins the probe executable and source-file digests before landing.
+It covers repository I/O, not production service credentials, native package
+installation, or the fresh-VM deployment lifecycle. The descriptor-replacement
+test retains an already opened final file; it does not claim a deterministic
+mid-traversal race barrier.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

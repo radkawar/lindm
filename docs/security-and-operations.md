@@ -109,6 +109,12 @@ Upgrade all replicas to the same authenticated artifact and restart them togethe
 The server reads the installed payload; it never rebuilds or re-signs packages,
 copies private keys, or repairs a failed signature check.
 
+The native daemon keeps `RestrictSUIDSGID=yes` and its syscall filter enabled.
+Repository reads pin each directory with `openat` and reject symlinks in every
+path component, including ancestry above the repository root. Linux returns
+`ENOSYS` for `openat2` under that hardening; turning the hardening off is not the
+remedy. Signature, package-digest, file-identity and size checks remain required.
+
 The air-gap installer uses exactly the same `lindmd` artifact and repository
 payload. Internet access is not required to publish or download these agent
 packages. Native OS dependencies still need the site's own trusted distribution

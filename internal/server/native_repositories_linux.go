@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -222,12 +223,31 @@ func (r *nativeRepository) open(name string) (*os.File, error) {
 	if !nativePath(name) {
 		return nil, errors.New("invalid native artifact path")
 	}
-	fd, err := unix.Openat2(unix.AT_FDCWD, filepath.Join(r.directory, filepath.FromSlash(name)), &unix.OpenHow{
-		Flags:   unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NONBLOCK,
-		Resolve: unix.RESOLVE_NO_SYMLINKS,
-	})
+	path, err := filepath.Abs(filepath.Join(r.directory, filepath.FromSlash(name)))
 	if err != nil {
 		return nil, err
+	}
+	// RestrictSUIDSGID returns ENOSYS for openat2. Pin each directory instead;
+	// O_NOFOLLOW on only the leaf would not preserve RESOLVE_NO_SYMLINKS.
+	fd, err := unix.Open("/", unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC|unix.O_NOFOLLOW, 0)
+	if err != nil {
+		return nil, err
+	}
+	for remaining := path[1:]; remaining != ""; {
+		component, rest, _ := strings.Cut(remaining, "/")
+		flags := unix.O_PATH | unix.O_DIRECTORY
+		if rest == "" {
+			flags = unix.O_RDONLY
+		}
+		next, openErr := unix.Openat(fd, component, flags|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
+		closeErr := unix.Close(fd)
+		if err := errors.Join(openErr, closeErr); err != nil {
+			if next >= 0 {
+				err = errors.Join(err, unix.Close(next))
+			}
+			return nil, fmt.Errorf("open native artifact: %w", err)
+		}
+		fd, remaining = next, rest
 	}
 	f := os.NewFile(uintptr(fd), name)
 	info, err := f.Stat()
