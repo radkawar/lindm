@@ -45,7 +45,7 @@ const minGuestDiskBytes = 10 << 30
 
 // createGuestOverlay writes dir/overlay.qcow2 over the verified standalone
 // base, which QEMU later receives as inherited descriptor 3.
-func createGuestOverlay(ctx context.Context, dir string, base *os.File) error {
+func createGuestOverlay(ctx context.Context, dir string, base *os.File, minimumBytes int64) error {
 	infoBytes, err := hostCommand(ctx, dir, "qemu-img", []*os.File{base}, "info", "--output=json", "-f", "qcow2", "/proc/self/fd/3")
 	if err != nil {
 		return err
@@ -61,8 +61,19 @@ func createGuestOverlay(ctx context.Context, dir string, base *os.File) error {
 	if info.Format != "qcow2" || info.Backing != "" || info.VirtualSize <= 0 || info.VirtualSize > 64<<30 {
 		return errors.New("base must be standalone qcow2 with virtual size at most 64 GiB")
 	}
-	_, err = hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "-F", "qcow2", "-b", "/proc/self/fd/3", "-u", "overlay.qcow2", strconv.FormatInt(max(info.VirtualSize, minGuestDiskBytes), 10))
+	size, err := guestOverlayBytes(info.VirtualSize, minimumBytes)
+	if err != nil {
+		return err
+	}
+	_, err = hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "-F", "qcow2", "-b", "/proc/self/fd/3", "-u", "overlay.qcow2", strconv.FormatInt(size, 10))
 	return err
+}
+
+func guestOverlayBytes(baseBytes, minimumBytes int64) (int64, error) {
+	if minimumBytes < 0 || minimumBytes > 32<<30 {
+		return 0, errors.New("requested cloud overlay minimum exceeds the 32 GiB per-guest disk budget")
+	}
+	return max(baseBytes, minGuestDiskBytes, minimumBytes), nil
 }
 
 // guestVM owns a single disposable machine, its credentials, and its directory.
@@ -207,7 +218,7 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 		return nil, err
 	}
 
-	if err := createGuestOverlay(ctx, dir, base); err != nil {
+	if err := createGuestOverlay(ctx, dir, base, h.minimumDiskBytes); err != nil {
 		return nil, err
 	}
 

@@ -19,11 +19,14 @@ func TestGuestOverlayDiskFloor(t *testing.T) {
 		t.Skip("native overlay oracle requires qemu-img")
 	}
 	for _, tc := range []struct {
-		base string
-		want int64
+		base    string
+		minimum int64
+		want    int64
 	}{
-		{"1619001344", minGuestDiskBytes},
-		{"12G", 12 << 30},
+		{"1619001344", 0, minGuestDiskBytes},
+		{"12G", 0, 12 << 30},
+		{"1619001344", coldReleaseDiskBytes, coldReleaseDiskBytes},
+		{"48G", coldReleaseDiskBytes, 48 << 30},
 	} {
 		t.Run(tc.base, func(t *testing.T) {
 			dir := t.TempDir()
@@ -35,7 +38,7 @@ func TestGuestOverlayDiskFloor(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = base.Close() })
-			if err := createGuestOverlay(t.Context(), dir, base); err != nil {
+			if err := createGuestOverlay(t.Context(), dir, base, tc.minimum); err != nil {
 				t.Fatal(err)
 			}
 			output, err := exec.CommandContext(t.Context(), "qemu-img", "info", "--output=json", "-f", "qcow2", filepath.Join(dir, "overlay.qcow2")).Output()

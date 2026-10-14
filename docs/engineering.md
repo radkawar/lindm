@@ -3987,6 +3987,12 @@ channel cleanup then returned the expected already-closed `EOF`, preventing the
 remaining encrypted logs from being collected. Artifact transfer now treats only
 that cleanup EOF as completed, preserving actual transfer EOF and every other
 transfer or cleanup failure. This failed run is not release qualification.
+The `2538c343a` run recovered the encrypted Make logs and identified native
+`ENOSPC` in the second isolated build's Go module cache. The cold SDK now requests
+a 32 GiB root overlay before first boot; cloud-init expands the guest filesystem.
+This fits the existing 32 GiB-per-guest host disk admission budget. All other
+lanes keep the 10 GiB default floor, and larger vendor bases are never shrunk.
+Both fresh build caches and all signing, no-swap and custody gates remain intact.
 
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated

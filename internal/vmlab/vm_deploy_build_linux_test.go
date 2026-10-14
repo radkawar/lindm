@@ -36,6 +36,31 @@ func TestColdReleaseRequiresStrictlyNewerNumericVersions(t *testing.T) {
 	}
 }
 
+func TestColdReleaseOverlayBudgetDoesNotResizeOtherLanes(t *testing.T) {
+	for _, test := range []struct {
+		base, minimum, want int64
+	}{
+		{2 << 30, 0, minGuestDiskBytes},
+		{16 << 30, 0, 16 << 30},
+		{2 << 30, coldReleaseDiskBytes, 32 << 30},
+		{64 << 30, coldReleaseDiskBytes, 64 << 30},
+	} {
+		got, err := guestOverlayBytes(test.base, test.minimum)
+		if err != nil || got != test.want {
+			t.Fatalf("overlay base=%d minimum=%d got=%d want=%d: %v", test.base, test.minimum, got, test.want, err)
+		}
+	}
+	for _, minimum := range []int64{-1, (32 << 30) + 1} {
+		if _, err := guestOverlayBytes(2<<30, minimum); err == nil {
+			t.Fatalf("accepted overlay minimum beyond the admitted budget: %d", minimum)
+		}
+	}
+	hardware, err := resolveVMHardware(&VMHardwareOptions{minimumDiskBytes: coldReleaseDiskBytes}, "amd64")
+	if err != nil || hardware.minimumDiskBytes != coldReleaseDiskBytes {
+		t.Fatalf("hardware resolution lost the cold-only overlay budget: %v", err)
+	}
+}
+
 func TestColdReleaseScopeCannotClaimNativeLifecycleQualification(t *testing.T) {
 	body, err := json.Marshal(VMDeployBuildResult{Scope: coldReleaseScope, Passed: true})
 	if err != nil {

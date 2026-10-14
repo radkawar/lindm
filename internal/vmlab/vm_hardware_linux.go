@@ -63,6 +63,8 @@ type VMHardwareOptions struct {
 	// diagnostics; empty keeps them in the lane work directory. Lanes set it
 	// when the work directory is removed (remote hosts) before inspection.
 	goldenDiagnosticsDir string
+	// Cold release SDKs need two isolated builds; zero retains the cloud floor.
+	minimumDiskBytes int64
 }
 
 func (h *VMHardwareOptions) goldenDiagnosticsParent(workDir string) string {

@@ -27,6 +27,7 @@ import (
 )
 
 const DeployBuildMemoryMiB = 8192
+const coldReleaseDiskBytes = 32 << 30
 const coldReleaseScope = "production-cold-release-build-only"
 
 var coldReleaseRevision = regexp.MustCompile(`^[0-9a-f]{40}$`)
@@ -49,6 +50,7 @@ type VMDeployBuildResult struct {
 	ImageID              string                               `json:"image_id"`
 	ImageSHA256          string                               `json:"image_sha256"`
 	MemoryMiB            int                                  `json:"memory_mib"`
+	MinimumDiskBytes     int64                                `json:"minimum_disk_bytes"`
 	ReleaseKeyID         string                               `json:"release_key_id"`
 	FirstVersion         string                               `json:"first_version"`
 	NewerVersion         string                               `json:"newer_version"`
@@ -68,7 +70,7 @@ func RunVMDeployBuild(ctx context.Context, manifest *labv1.ImageManifest, option
 	if ctx == nil || !coldReleaseRevision.MatchString(options.Revision) || !coldReleaseVersionsValid(options.FirstVersion, options.NewerVersion) {
 		return nil, errors.New("cold release build requires context, exact committed revision and strictly newer semantic release versions")
 	}
-	hardware, err := productionSigningHardware(manifest, &VMHardwareOptions{MemoryMiB: DeployBuildMemoryMiB, CPUs: 2, Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: true})
+	hardware, err := productionSigningHardware(manifest, &VMHardwareOptions{MemoryMiB: DeployBuildMemoryMiB, CPUs: 2, Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: true, minimumDiskBytes: coldReleaseDiskBytes})
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +79,7 @@ func RunVMDeployBuild(ctx context.Context, manifest *labv1.ImageManifest, option
 			return nil, err
 		}
 	}
-	result = &VMDeployBuildResult{Scope: coldReleaseScope, SourceRevision: options.Revision, ImageID: manifest.GetId(), MemoryMiB: DeployBuildMemoryMiB, FirstVersion: options.FirstVersion, NewerVersion: options.NewerVersion, StartedAt: time.Now().UTC()}
+	result = &VMDeployBuildResult{Scope: coldReleaseScope, SourceRevision: options.Revision, ImageID: manifest.GetId(), MemoryMiB: DeployBuildMemoryMiB, MinimumDiskBytes: coldReleaseDiskBytes, FirstVersion: options.FirstVersion, NewerVersion: options.NewerVersion, StartedAt: time.Now().UTC()}
 	work, err := os.MkdirTemp(options.WorkDir, "cold-release-")
 	if err != nil {
 		return result, err
