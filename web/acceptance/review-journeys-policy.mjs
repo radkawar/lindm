@@ -27,10 +27,15 @@ export async function packageSourcePrerequisite(page, screenshot) {
 
 export async function configureFleet(ctx) {
   const { page, config } = ctx;
-  const device =
-    (config.demo?.Devices ?? []).find((entry) => entry.ID === config.demo?.Routes?.DeviceID) ??
-    (config.demo?.Devices ?? []).find((entry) => entry.Hostname === "ubuntu-ws-01");
-  if (!device?.Hostname) throw new Error("fleet_route_device_missing");
+  const conflictDevice = (config.demo?.Devices ?? []).find(
+    (entry) => entry.Hostname === "ubuntu-ws-01",
+  );
+  const devices = ["fleet-pilot-01", "fleet-pilot-02"].map((hostname) =>
+    (config.demo?.Devices ?? []).find((entry) => entry.Hostname === hostname),
+  );
+  if (!conflictDevice || devices.some((entry) => !entry?.Hostname))
+    throw new Error("fleet_pilot_devices_missing");
+  const device = devices[0];
   const record = async (name, screen, outcome, observedPage = page) => {
     await ctx.capture(
       name,
@@ -44,7 +49,7 @@ export async function configureFleet(ctx) {
       observedPage,
     );
   };
-  const group = await createGroup(ctx, "configure-fleet", "Fleet pilot", device);
+  const group = await createGroup(ctx, "configure-fleet", "Fleet pilot", devices);
   await openNavigationPage(page, "Profiles");
   await page.getByRole("link", { name: "Create profile", exact: true }).click();
   const another = page.getByRole("button", { name: "Create another profile", exact: true });
@@ -93,6 +98,15 @@ export async function configureFleet(ctx) {
         .getByRole("textbox", { name: "Network address", exact: true })
         .fill("192.0.2.0");
       await setting.getByRole("spinbutton", { name: "Prefix length", exact: true }).fill("24");
+      await setting.getByRole("button", { name: "Add source networks", exact: true }).click();
+      await setting
+        .getByRole("textbox", { name: "Network address", exact: true })
+        .nth(1)
+        .fill("2001:db8::");
+      await setting
+        .getByRole("spinbutton", { name: "Prefix length", exact: true })
+        .nth(1)
+        .fill("32");
       await setting.getByText(/Firewall rules can block SSH and device contact/).waitFor();
     } else {
       await setting
@@ -158,8 +172,33 @@ export async function configureFleet(ctx) {
   await proposal
     .getByRole("button", { name: `Version ${profileName}, version 1`, exact: true })
     .waitFor({ timeout });
+  // Keep the real baseline conflict as a separate review, without activating it.
+  await proposal.getByRole("radio", { name: "One device", exact: true }).check();
+  await chooseNamed(ctx, proposal, "Target", conflictDevice.Hostname, "fleet-conflict-device");
+  await proposal.getByRole("button", { name: "Review impact", exact: true }).click();
+  await proposal
+    .getByText(/conflicts with another assignment of equal priority/)
+    .waitFor({ timeout });
+  await proposal
+    .getByRole("row")
+    .filter({ has: page.getByRole("link", { name: conflictDevice.Hostname, exact: true }) })
+    .getByText("Needs review", { exact: true })
+    .waitFor({ timeout });
+  await proposal
+    .getByRole("link", { name: conflictDevice.Hostname, exact: true })
+    .scrollIntoViewIfNeeded();
+  await record(
+    "conflict-preview",
+    "Rollouts / genuine baseline conflict",
+    "The existing Company baseline and this version have different OS-update settings at priority zero. No rollout is submitted for this conflicted device.",
+  );
+  await proposal.getByRole("radio", { name: "Device group", exact: true }).check();
   await chooseNamed(ctx, proposal, "Target", group.name, "fleet-group");
   await proposal.getByRole("radio", { name: "In stages", exact: true }).check();
+  await proposal.getByText("Stage 1 health checks", { exact: true }).click();
+  await proposal
+    .getByRole("spinbutton", { name: "Stage 1 observation period (minutes)", exact: true })
+    .fill("1");
   await proposal.getByRole("textbox", { name: "Stage 1 name", exact: true }).fill("pilot");
   await proposal.getByRole("textbox", { name: "Stage 2 name", exact: true }).fill("fleet");
   await proposal.getByRole("button", { name: "Review impact", exact: true }).click();
@@ -171,12 +210,10 @@ export async function configureFleet(ctx) {
     )
   )
     throw new Error("fleet_impact_promises_execution");
+  for (const member of devices)
+    await proposal.getByRole("link", { name: member.Hostname, exact: true }).waitFor({ timeout });
   if (await proposal.getByText(/Resolve the problem before this device changes\./).count())
-    await proposal
-      .getByRole("row")
-      .filter({ has: page.getByRole("link", { name: device.Hostname, exact: true }) })
-      .getByText("Needs review", { exact: true })
-      .waitFor({ timeout });
+    throw new Error("fleet_clean_pilot_has_resolution_problem");
   await proposal.getByRole("link", { name: device.Hostname, exact: true }).scrollIntoViewIfNeeded();
   await record(
     "impact",
@@ -274,6 +311,24 @@ export async function configureFleet(ctx) {
   const rollout = page
     .locator("article")
     .filter({ has: page.getByRole("heading", { name: rolloutName, exact: true }) });
+  const countNode = (label) =>
+    rollout
+      .locator("dl > div")
+      .filter({ has: page.getByText(label, { exact: true }) })
+      .locator("dd");
+  const count = async (label) => Number(await countNode(label).innerText());
+  await countNode("Applied").filter({ hasText: /^1$/ }).waitFor({ timeout: 180_000 });
+  await rollout
+    .getByRole("button", { name: "Advance to fleet", exact: true })
+    .and(page.locator(":enabled"))
+    .waitFor({ timeout: 180_000 });
+  if (
+    (await count("Planned")) !== 2 ||
+    (await count("Waiting for a later stage")) !== 1 ||
+    (await count("Failed")) !== 0 ||
+    (await count("Needs review")) !== 0
+  )
+    throw new Error("fleet_pilot_did_not_apply_cleanly");
   await rollout.getByRole("button", { name: "Pause", exact: true }).waitFor({ timeout: 120_000 });
   await record(
     "progress",
@@ -290,7 +345,7 @@ export async function configureFleet(ctx) {
     .waitFor();
   await pause
     .getByRole("textbox", { name: "Reason", exact: true })
-    .fill("Pause after pilot review. Do not send this change to further devices.");
+    .fill("Pause the healthy pilot for administrator review before fleet promotion.");
   await record(
     "pause-review",
     "Rollouts / pause consequences",
@@ -300,24 +355,65 @@ export async function configureFleet(ctx) {
   await pause.waitFor({ state: "hidden", timeout });
   await rollout.getByText("Paused", { exact: true }).waitFor({ timeout });
   await rollout.getByRole("button", { name: "Resume", exact: true }).waitFor({ timeout });
-  const reviewCount = Number(
-    await rollout
-      .locator("dl > div")
-      .filter({ has: page.getByText("Needs review", { exact: true }) })
-      .locator("dd")
-      .innerText(),
-  );
-  if (reviewCount > 0)
-    await rollout.getByRole("link", { name: device.Hostname, exact: true }).waitFor({ timeout });
+  if ((await count("Applied")) !== 1 || (await count("Needs review")) !== 0)
+    throw new Error("fleet_pause_did_not_preserve_healthy_pilot");
   await record(
     "paused",
     "Rollouts / confirmed paused state",
-    "The actual control request paused this rollout. No promotion or rollback was sent.",
+    "The actual control request paused the healthy pilot. Its applied settings remain; the fleet stage has not started.",
+  );
+  await rollout.getByRole("button", { name: "Resume", exact: true }).click();
+  const resume = page.getByRole("dialog", { name: `Resume: ${rolloutName}`, exact: true });
+  await resume
+    .getByRole("textbox", { name: "Reason", exact: true })
+    .fill("Pilot changes remain healthy. Resume, then promote the reviewed fleet stage.");
+  await resume.getByRole("button", { name: "Resume", exact: true }).click();
+  await resume.waitFor({ state: "hidden", timeout });
+  await rollout.getByRole("button", { name: "Advance to fleet", exact: true }).waitFor({ timeout });
+  await record(
+    "pilot-applied",
+    "Rollouts / applied pilot and manual gate",
+    "The pilot has applied on one synthetic device. The second device remains in the later stage until an administrator promotes it.",
+  );
+  await rollout.getByRole("button", { name: "Advance to fleet", exact: true }).click();
+  const promote = page.getByRole("dialog", {
+    name: `Advance to fleet: ${rolloutName}`,
+    exact: true,
+  });
+  await promote
+    .getByText(
+      "If health checks pass, fleet starts. Up to 100% of targeted devices get this change.",
+      { exact: true },
+    )
+    .waitFor();
+  await promote
+    .getByRole("textbox", { name: "Reason", exact: true })
+    .fill(
+      "The approved pilot applied and passed its health checks. Promote both isolated devices to fleet.",
+    );
+  await record(
+    "promotion-review",
+    "Rollouts / explicit fleet promotion",
+    "The dialog names the next stage and its full cohort share. Promotion needs an administrator reason.",
+  );
+  await promote.getByRole("button", { name: "Advance to fleet", exact: true }).click();
+  await promote.waitFor({ state: "hidden", timeout });
+  await rollout.getByText("Finished", { exact: true }).waitFor({ timeout: 180_000 });
+  if (
+    (await count("Applied")) !== 2 ||
+    (await count("Failed")) !== 0 ||
+    (await count("Needs review")) !== 0
+  )
+    throw new Error("fleet_completed_without_both_devices_applied");
+  await record(
+    "complete",
+    "Rollouts / both devices applied and complete",
+    "Both isolated synthetic devices applied all four settings through signed execution results. Stage 2 completed. This is a simulated policy rollout, not native Linux qualification.",
   );
   return {
     outcome: "completed",
     reason:
-      "Created a named group, published all four setting types with a reported approved source, reviewed device impact, requested and obtained a separate administrator's approval for a staged rollout, read real progress, and paused it. Device observations are synthetic, not native qualification.",
+      "Created a two-device group, published all four settings, kept the real baseline conflict as a separate review, obtained a second administrator's approval, observed pilot application, paused and resumed it, manually promoted fleet, and observed both devices applied and the rollout completed. Execution observations remain explicitly synthetic.",
   };
 }
 

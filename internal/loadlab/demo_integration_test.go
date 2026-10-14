@@ -70,7 +70,7 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 	for _, device := range demo.Devices {
 		states[device.State]++
 	}
-	if len(demo.Devices) != 11 || states["enrolled"] != 7 || states["pending"] != 1 || states["awaiting-inventory"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
+	if len(demo.Devices) != 13 || states["enrolled"] != 9 || states["pending"] != 1 || states["awaiting-inventory"] != 1 || states["stale"] != 1 || states["revoked"] != 1 {
 		t.Fatalf("unexpected demo fleet: %v", states)
 	}
 	routes := demo.Routes

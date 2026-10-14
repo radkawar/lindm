@@ -72,9 +72,11 @@ func (s *Store) rolloutState(ctx context.Context, q *targetingdb.Queries, id uui
 		UnavailableCount: uint32(counts.Unavailable), GateReason: reason,
 	}
 	ring := spec.Rings[row.RingIndex]
+	if !row.Paused && int(row.RingIndex)+1 < len(spec.Rings) {
+		state.PromotionReady = ready
+	}
 	if !row.Paused && !ring.ManualPromotion && int(row.RingIndex)+1 < len(spec.Rings) {
 		state.NextPromotionAt = timestamppb.New(row.StageStartedAt.Time.Add(time.Duration(ring.SoakSeconds) * time.Second))
-		state.PromotionReady = ready
 	}
 	if err := planState(ctx, q, row, state); err != nil {
 		return nil, err

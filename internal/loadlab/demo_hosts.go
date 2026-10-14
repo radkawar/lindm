@@ -82,6 +82,9 @@ type demoDevice struct {
 	// agent is the host's capability-policy-aware executor; nil for an agent
 	// older than capability policies.
 	agent *demoAgent
+	// Only these isolated hosts own the explicit synthetic four-setting model.
+	fleetPilot bool
+	fleet      fleetState
 }
 
 func dpkg(name, version, source, sourceVersion string) *inventoryv1.Package {
@@ -125,6 +128,8 @@ func demoDevices(source string) ([]*demoDevice, error) {
 		// A new Engineering laptop that has not reported inventory: Engineering
 		// tools' platform-limited package rows wait for its facts.
 		{hostname: "ubuntu-ws-09", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", sessions: 1, encryption: encryptionLUKS, service: serviceConverged, department: "engineering", labels: []string{"workstation", "new-hire"}, state: "awaiting-inventory", factsWithheld: true},
+		{hostname: "fleet-pilot-01", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "fleet-pilot", labels: []string{"workstation", "fleet-pilot"}, fleetPilot: true},
+		{hostname: "fleet-pilot-02", key: "ubuntu-24.04", kernel: "6.8.0-90-generic", assistance: assistanceOn, encryption: encryptionLUKS, service: serviceConverged, department: "fleet-pilot", labels: []string{"workstation", "fleet-pilot"}, fleetPilot: true},
 	}
 	agents := demoAgents()
 	baselines := make(map[string][]*inventoryv1.Package)
@@ -287,6 +292,15 @@ func (s *demoDevice) immediateResult(intent *agentv1.ResourceExecutionIntent, in
 		return refuse(reason, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, capability, "")
 	case reason != 0 && intent.GetOperation() == resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE:
 		return refuse(reason, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, 0, detail)
+	}
+	if s.fleetSupports(desired) {
+		if intent.GetOperation() != resourcev1.ResourceOperation_RESOURCE_OPERATION_RECONCILE {
+			return refuse(unsupported, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_UNSUPPORTED, 0, "synthetic_fleet_reconcile_only")
+		}
+		if desired.GetNativePackage() != nil && s.fleetSource(desired.GetNativePackage()) == nil {
+			return refuse(unsupported, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_PRECONDITION, 0, "approved_source_unavailable")
+		}
+		return nil, nil
 	}
 	verification := new(resourcev1.ResourceVerification)
 	var observation *resourcev1.ResourceObservation

@@ -1694,10 +1694,18 @@ Accounts keep role, device scope, sign-in state and Edit together on narrow scre
 their one-time handoff has separate copy actions for the secret and enrollment address.
 Server status puts failed checks, attention and missing evidence before confirmed checks.
 
-The fleet configuration walk creates an isolated named group, publishes all four
-setting types, carries the exact saved profile version into Rollouts, reviews
-device impact, uses a separately enrolled administrator for approval, reads pilot
-progress, and pauses the rollout. Approval shows stage shares and manual promotion.
+The fleet configuration walk creates an isolated named group for the two synthetic
+pilot hosts, publishes all four setting types, and carries the exact saved profile
+version into Rollouts. It first previews the real equal-priority OS-update conflict
+on `ubuntu-ws-01` without submitting that target. It then previews the clean pilot
+group, gets approval from a separately enrolled administrator, waits for one
+applied device and a healthy manual stage gate, pauses and resumes, advances to the
+fleet stage, and waits for both devices to report Applied and the rollout Finished.
+Approval shows stage shares and manual promotion.
+The walkthrough explicitly chooses a one-minute pilot observation period; product
+defaults and health budgets stay unchanged. Manual promotion stays disabled until
+the server reports that both health and observation-period checks passed. The card
+names the earliest observation end and explains the remaining gate.
 Pause feedback names the rollout and states that existing device changes remain.
 Impact describes proposed settings, not successful device execution. A device with
 unresolved settings shows **Needs review** before approval instead of a promise to change.
@@ -1707,6 +1715,16 @@ stays visible as a mismatch until the administrator selects a matching source.
 Synthetic approved configurations copy the simulated executor's effective providers,
 derived by the same registry-backed capability policy code as stock agents. Synthetic
 archive keys remain explicitly synthetic; no native package execution is inferred.
+Only `fleet-pilot-01` and `fleet-pilot-02` retain a stateful synthetic package,
+SSH-banner, firewall-zone and OS-update policy model. They have no baseline profile
+assignments. They continue checking in after seeding, so later rollouts use the
+existing signed prepare, challenge and start protocol. Results read the retained
+simulated state. Other synthetic devices
+still refuse unsupported native operations. The pilot group's firewall capability
+is explicitly enabled; the deployment's probe endpoints, targets and keys are
+synthetic model inputs, not executed network probes. Backend and probe evidence
+identify the synthetic model. Neither these results nor the walkthrough qualify
+native Linux package, SSH, firewall or update execution.
 
 The same run emits `edit-sheet.html`, linked from the contact sheet,
 `edit-sheet.json` (run-bound screen/evidence manifest) and

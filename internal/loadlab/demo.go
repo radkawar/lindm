@@ -141,9 +141,9 @@ type demoSeed struct {
 	backgroundPackageFailure bool
 }
 
-// DemoPresence keeps the route device checking in after seeding, so the console
-// can request remote assistance and inventory refreshes from it, and finishes
-// any background seed step. Stop ends both and releases their devices.
+// DemoPresence keeps the route device and the isolated fleet pilot checking in
+// after seeding, and finishes any background seed step. Stop ends these workers
+// and releases their devices.
 type DemoPresence struct {
 	cancel  context.CancelFunc
 	done    chan error
@@ -167,13 +167,12 @@ func (p *DemoPresence) Stop() error {
 // SeedDemo applies the maintained organization and adds synthetic review history
 // on a caller-owned dynamic local fixture. Organization and device mutations use
 // product APIs; advisory publications come from current real vendor exports.
-// Devices are labelled synthetic. All but
-// the route device stop reporting afterwards; that one keeps polling its
-// assistance state and action work (real check-ins) and completes requested
-// inventory refreshes until the caller stops the returned presence, which it
-// must do before closing the fixture. It configures the fixture's demo feeds,
-// relay and organization authorization, never returns or logs secret material,
-// and releases its sessions and other device transports before return.
+// Devices are labelled synthetic. The route device and isolated fleet-pilot hosts
+// keep polling action and resource work through real check-ins until the caller
+// stops the returned presence, which it must do before closing the fixture.
+// Other devices stop reporting after population. It configures the fixture's demo
+// feeds, relay and organization authorization, never returns or logs secret
+// material, and releases its sessions and other device transports before return.
 // The caller must not concurrently close or reconfigure the fixture.
 func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options DemoOptions) (_ Demo, presence *DemoPresence, resultErr error) {
 	// Registered first so it runs last: a cleanup failure must not leak the presence loop.
@@ -302,11 +301,11 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 	}()
 	progress.begin("enroll demo devices")
 	enrolled, err := r.enrollBatch(seedCtx, 0, len(devices))
-	var present *simulatedDevice
+	var present []*simulatedDevice
 	var background []*simulatedDevice
 	defer func() {
 		for _, device := range enrolled {
-			if device != present && !slices.Contains(background, device) {
+			if !slices.Contains(present, device) && !slices.Contains(background, device) {
 				device.close()
 			}
 		}
@@ -334,14 +333,21 @@ func SeedDemo(ctx context.Context, fixture *devlab.AuthorityFixture, options Dem
 		return Demo{}, nil, err
 	}
 	progress.begin("ready")
-	present = enrolled[0]
+	present = append(present, enrolled[0])
+	for _, device := range enrolled[1:] {
+		if device.demo.fleetPilot {
+			present = append(present, device)
+		}
+	}
 	presenceCtx, stop := context.WithCancel(ctx)
-	done := make(chan error, 2)
-	presence = &DemoPresence{cancel: stop, done: done, workers: 1}
-	go func() {
-		defer present.close()
-		done <- s.checkIns(presenceCtx, present)
-	}()
+	done := make(chan error, len(present)+1)
+	presence = &DemoPresence{cancel: stop, done: done, workers: len(present)}
+	for _, device := range present {
+		go func() {
+			defer device.close()
+			done <- s.checkIns(presenceCtx, device)
+		}()
+	}
 	if s.backgroundPackageFailure {
 		background = slices.DeleteFunc(slices.Clone(enrolled), func(d *simulatedDevice) bool { return !d.demo.packageScanDenied })
 		ownerHandedOff = true

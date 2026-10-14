@@ -152,8 +152,12 @@ export async function chooseNamed(ctx, container, label, name, prefix) {
   await option.click();
 }
 
-export async function createGroup(ctx, id, department, device) {
+export async function createGroup(ctx, id, department, devices) {
   const { page } = ctx;
+  const selected = Array.isArray(devices) ? devices : [devices];
+  const device = selected[0];
+  const memberCount = `${selected.length} device${selected.length === 1 ? "" : "s"}`;
+  const memberNames = selected.map((member) => member.Hostname).join(", ");
   await navigate(ctx, "Devices", "Devices");
   await visible(page.getByRole("link", { name: device.Hostname, exact: true }));
   await shot(
@@ -182,14 +186,20 @@ export async function createGroup(ctx, id, department, device) {
   await visible(form);
   await form.getByRole("textbox", { name: "Group name", exact: true }).fill(name);
   const members = form.getByRole("group", { name: "Devices", exact: true });
-  await chooseNamed(ctx, members, "Add a device", device.Hostname, `${id}-member`);
   const chosen = members.getByRole("list", { name: "Selected devices", exact: true });
-  await visible(chosen.getByText(device.Hostname, { exact: true }));
+  for (const [index, member] of selected.entries()) {
+    await chooseNamed(
+      ctx,
+      members,
+      "Add a device",
+      member.Hostname,
+      selected.length === 1 ? `${id}-member` : `${id}-member-${index + 1}`,
+    );
+    await visible(chosen.getByText(member.Hostname, { exact: true }));
+  }
   await form
     .getByRole("textbox", { name: "Group change reason", exact: true })
-    .fill(
-      `Isolated ${department} walkthrough group for ${device.Hostname}; preserve existing groups.`,
-    );
+    .fill(`Isolated ${department} walkthrough group for ${memberNames}; preserve existing groups.`);
   await shot(
     ctx,
     `${id}-group-members-populated`,
@@ -197,7 +207,7 @@ export async function createGroup(ctx, id, department, device) {
     "yes",
     "The selected hostname is visible instead of a raw identifier.",
     "Explain any existing account-access changes when editing a shared group.",
-    `Only ${device.Hostname} is selected for this new isolated group; no existing group is changed.`,
+    `Only ${memberNames} ${selected.length === 1 ? "is" : "are"} selected for this new isolated group; no existing group is changed.`,
   );
   await form.getByRole("button", { name: "Create group", exact: true }).click();
   await dialog.waitFor({ state: "hidden", timeout });
@@ -224,7 +234,7 @@ export async function createGroup(ctx, id, department, device) {
     await list.and(page.locator('[aria-busy="false"]')).waitFor({ timeout });
     turned += 1;
   }
-  await visible(row.getByText("1 device", { exact: true }));
+  await visible(row.getByText(memberCount, { exact: true }));
   await row.scrollIntoViewIfNeeded();
   await shot(
     ctx,
@@ -235,13 +245,14 @@ export async function createGroup(ctx, id, department, device) {
       ? `The saved group was not on the first page: groups page in internal order and sort by name only within a page, so it took ${turned} page turn${turned === 1 ? "" : "s"} to find.`
       : "The saved group happened to be on the first page; groups page in internal order and sort by name only within a page.",
     "Keep a just-created group in view after the dialog closes, and order or search groups by name across pages.",
-    `The saved ${name} row shows 1 device${turned ? ` on page ${turned + 1} of the list` : " on the first page of the list"}.`,
+    `The saved ${name} row shows ${memberCount}${turned ? ` on page ${turned + 1} of the list` : " on the first page of the list"}.`,
   );
   await row.getByRole("button", { name: `Edit ${name}`, exact: true }).click();
   const saved = page.getByRole("form", { name: `Edit ${name}`, exact: true });
   const savedMembers = saved.getByRole("list", { name: "Selected devices", exact: true });
-  await visible(savedMembers.getByText(device.Hostname, { exact: true }));
-  if ((await savedMembers.getByRole("listitem").count()) !== 1)
+  for (const member of selected)
+    await visible(savedMembers.getByText(member.Hostname, { exact: true }));
+  if ((await savedMembers.getByRole("listitem").count()) !== selected.length)
     throw new Error("group_membership_not_saved");
   await shot(
     ctx,
@@ -250,7 +261,7 @@ export async function createGroup(ctx, id, department, device) {
     "yes",
     "The saved member remains human-readable; no copy-ID handoff is needed.",
     "Keep linked department tasks contextual; preserve named identity across destinations.",
-    `The actual saved ${department} group shows exactly one named simulator member.`,
+    `The actual saved ${department} group shows exactly ${selected.length} named simulator member${selected.length === 1 ? "" : "s"}.`,
   );
   await page.keyboard.press("Escape");
   await saved.waitFor({ state: "hidden", timeout });

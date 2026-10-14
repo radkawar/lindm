@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { create } from "@bufbuild/protobuf";
-import { timestampDate } from "@bufbuild/protobuf/wkt";
+import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -426,7 +426,28 @@ function RolloutCard({ state, onRollOut }: { state: RolloutState; onRollOut?: ()
         (PAUSE_REASONS[state.gateReason] ??
         `Health checks for ${stage?.name ?? "this stage"} haven't passed yet.`)
       ) : stage?.manualPromotion ? (
-        `Waiting for an administrator to advance to ${next.name}.`
+        state.promotionReady ? (
+          `Health checks passed. An administrator can advance to ${next.name}.`
+        ) : (
+          <>
+            {stage.name} must finish its observation period
+            {state.stageStartedAt ? (
+              <>
+                {" "}
+                after{" "}
+                <Timestamp
+                  value={timestampFromDate(
+                    new Date(
+                      timestampDate(state.stageStartedAt).getTime() + stage.soakSeconds * 1000,
+                    ),
+                  )}
+                  relative={false}
+                />
+              </>
+            ) : null}{" "}
+            and enough devices must report healthy before you can advance to {next.name}.
+          </>
+        )
       ) : state.nextPromotionAt ? (
         <>
           Advances to {next.name} after <Timestamp value={state.nextPromotionAt} relative={false} />{" "}
@@ -802,7 +823,19 @@ function ControlButton({
         if (!value && !ambiguous) setFailure(undefined);
       }}
     >
-      <DialogTrigger render={<Button type="button" variant="outline" />}>{label}</DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={
+              operation === ControlRolloutRequest_Operation.PROMOTE && !state.promotionReady
+            }
+          />
+        }
+      >
+        {label}
+      </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{`${label}: ${title}`}</DialogTitle>

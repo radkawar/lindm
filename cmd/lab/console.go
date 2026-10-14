@@ -88,7 +88,7 @@ func runConsole(ctx context.Context, args []string, stdout, stderr io.Writer) (r
 		}
 		defer func() { resultErr = errors.Join(resultErr, presence.Stop()) }()
 		summary = demoSummary(seeded)
-		reporting = "other devices stop reporting after population."
+		reporting = "the route device and two isolated fleet-pilot hosts keep checking in; other devices stop reporting after population."
 	} else {
 		population, err := loadlab.Populate(setup, fixture, loadlab.PopulateOptions{Devices: *devices, Packages: *packages, AssignmentPercent: *assignments, EnrollmentWorkers: *workers, HostObservationFile: *hostObservation})
 		if err != nil {
@@ -127,6 +127,7 @@ func demoSummary(demo loadlab.Demo) string {
 	routes := demo.Routes
 	fmt.Fprintf(&b, "Routes: device %s, profile %s, secret %s, action %s, assistance %s, recovery %s\n", routes.DeviceID, routes.ProfileID, routes.SecretID, routes.ActionID, routes.AssistanceSessionID, routes.RecoveryActionID)
 	fmt.Fprintf(&b, "Device %s keeps checking in so remote assistance and inventory refreshes can be requested; it completes refreshes, no user answers.\n", routes.DeviceID)
+	fmt.Fprintln(&b, "The two fleet-pilot hosts retain simulated package, SSH-banner, firewall-zone and update-policy state for staged rollouts; this is not native execution evidence.")
 	fmt.Fprintf(&b, "Assistance turned off (headless): device %s; refused before start: device %s session %s\n", routes.AssistanceOffDeviceID, routes.RefusedAssistanceDeviceID, routes.RefusedAssistanceSessionID)
 	if demo.HistoricalDeviceID != "" {
 		fmt.Fprintf(&b, "Historical host replay device: %s\nOriginal observation fields and collection times are preserved; package inventory and action results remain synthetic.\n", demo.HistoricalDeviceID)

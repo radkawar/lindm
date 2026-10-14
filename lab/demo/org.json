@@ -16,6 +16,10 @@
     {
       "id": "93d3baa6-5ff8-5eb2-8840-ee544b678db6",
       "name": "Contractors"
+    },
+    {
+      "id": "fecd06a9-ce59-4fdf-ae82-722527f58b77",
+      "name": "Synthetic fleet pilot prerequisites"
     }
   ],
   "dynamicGroups": [
@@ -97,7 +101,74 @@
           "net.ipv4.conf.all.accept_redirects",
           "net.ipv4.conf.default.accept_redirects",
           "net.ipv6.conf.all.accept_redirects"
-        ]
+        ],
+        "firewall": {
+          "managementEndpoints": [
+            { "address": "127.0.0.1", "port": 443 },
+            { "address": "::1", "port": 443 }
+          ],
+          "connectivityGuard": {
+            "confirmationPublicKey": "enkeNd/JrgtV6CpoSUvjsfDbErE/JhnZPkBFtY6c0MU=",
+            "probes": [
+              {
+                "id": "154e4926-713c-46e1-8467-43da8b208ce3",
+                "address": "127.0.0.1",
+                "port": 443,
+                "sourceAddress": "192.0.2.1",
+                "sourcePort": 32001,
+                "expected": "CONNECTIVITY_PROBE_VERDICT_ALLOW",
+                "direction": "CONNECTIVITY_PROBE_DIRECTION_INPUT",
+                "protocol": "CONNECTIVITY_PROBE_PROTOCOL_TCP",
+                "sender": {
+                  "origin": "https://synthetic-fleet-probe.invalid",
+                  "publicKey": "enkeNd/JrgtV6CpoSUvjsfDbErE/JhnZPkBFtY6c0MU="
+                }
+              },
+              {
+                "id": "6cd3d7f9-6110-4c0d-bcde-c05a5a6078ce",
+                "address": "127.0.0.1",
+                "port": 444,
+                "sourceAddress": "192.0.2.1",
+                "sourcePort": 32002,
+                "expected": "CONNECTIVITY_PROBE_VERDICT_DENY",
+                "direction": "CONNECTIVITY_PROBE_DIRECTION_INPUT",
+                "protocol": "CONNECTIVITY_PROBE_PROTOCOL_TCP",
+                "sender": {
+                  "origin": "https://synthetic-fleet-probe.invalid",
+                  "publicKey": "enkeNd/JrgtV6CpoSUvjsfDbErE/JhnZPkBFtY6c0MU="
+                }
+              },
+              {
+                "id": "af3ab442-0ef8-4343-88ea-111617dd5ab5",
+                "address": "::1",
+                "port": 443,
+                "sourceAddress": "2001:db8::1",
+                "sourcePort": 32003,
+                "expected": "CONNECTIVITY_PROBE_VERDICT_ALLOW",
+                "direction": "CONNECTIVITY_PROBE_DIRECTION_INPUT",
+                "protocol": "CONNECTIVITY_PROBE_PROTOCOL_TCP",
+                "sender": {
+                  "origin": "https://synthetic-fleet-probe.invalid",
+                  "publicKey": "enkeNd/JrgtV6CpoSUvjsfDbErE/JhnZPkBFtY6c0MU="
+                }
+              },
+              {
+                "id": "847c2407-dd23-4f30-b952-fa56be5d9514",
+                "address": "::1",
+                "port": 444,
+                "sourceAddress": "2001:db8::1",
+                "sourcePort": 32004,
+                "expected": "CONNECTIVITY_PROBE_VERDICT_DENY",
+                "direction": "CONNECTIVITY_PROBE_DIRECTION_INPUT",
+                "protocol": "CONNECTIVITY_PROBE_PROTOCOL_TCP",
+                "sender": {
+                  "origin": "https://synthetic-fleet-probe.invalid",
+                  "publicKey": "enkeNd/JrgtV6CpoSUvjsfDbErE/JhnZPkBFtY6c0MU="
+                }
+              }
+            ]
+          }
+        }
       }
     },
     {
@@ -115,6 +186,12 @@
         },
         "capabilities": ["MANAGEMENT_CAPABILITY_KERNEL_SETTINGS"],
         "sysctlKeys": ["fs.inotify.max_user_watches"]
+      }
+    },
+    {
+      "request": {
+        "scope": { "staticGroupId": "fecd06a9-ce59-4fdf-ae82-722527f58b77" },
+        "capabilities": ["MANAGEMENT_CAPABILITY_FIREWALL"]
       }
     }
   ],
@@ -1224,6 +1301,15 @@
           "labels": ["department/contractors"]
         },
         "groupIds": ["93d3baa6-5ff8-5eb2-8840-ee544b678db6"]
+      }
+    },
+    {
+      "name": "fleet-pilot",
+      "request": {
+        "lifetimeSeconds": 86400,
+        "maxUses": 10,
+        "metadata": { "labels": ["department/fleet-pilot"] },
+        "groupIds": ["fecd06a9-ce59-4fdf-ae82-722527f58b77"]
       }
     }
   ],

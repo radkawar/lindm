@@ -77,6 +77,9 @@ function Setting({
   kind?: boolean;
 }) {
   const label = resourceKindLabel(value?.kind);
+  // A singleton's internal "system" key does not identify a setting to an administrator.
+  if (value?.kind === ResourceKind.SSH_SERVER || value?.kind === ResourceKind.OS_UPDATE_POLICY)
+    return <>{label}</>;
   // Firewall zones read by name ("Unnamed zone" without one), never their UUID.
   const identity = settingTitle(value, desired) ?? "";
   if (!identity) return <>{label}</>;

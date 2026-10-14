@@ -110,7 +110,8 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 	now := time.Now()
 	accepted := timestamppb.New(now)
 	digest := sha256.Sum256(work.GetIntentEnvelope())
-	native := &resourcev1.SystemdServiceObservation{Unit: intent.GetDesired().GetRef().GetCanonicalKey(), BootId: d.boot, ObservedAt: accepted, LoadState: "loaded", ActiveState: "inactive", DefinitionSha256: digest[:], FingerprintSha256: digest[:]}
+	fleet := d.demo != nil && d.demo.fleetSupports(intent.GetDesired())
+	var native *resourcev1.SystemdServiceObservation
 	before := &resourcev1.ResourceObservation{
 		Ref: intent.GetDesired().GetRef(),
 		Metadata: &resourcev1.ObservationMetadata{
@@ -118,7 +119,15 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 			ObservationStatus: resourcev1.ObservationStatus_OBSERVATION_STATUS_OK,
 			Backend:           &resourcev1.BackendSelection{Backend: resourcev1.Backend_BACKEND_SYSTEMD, NativeVersion: "synthetic", ProviderVersion: "loadlab-synthetic", Product: &resourcev1.PlatformProduct{OsId: "synthetic", Product: "protocol load fixture", Version: "1", Architecture: "synthetic"}},
 		},
-		Observed: &resourcev1.ResourceObservation_SystemdService{SystemdService: native},
+	}
+	if fleet {
+		before, err = d.demo.fleetObservation(intent.GetDesired(), before.GetMetadata())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		native = &resourcev1.SystemdServiceObservation{Unit: intent.GetDesired().GetRef().GetCanonicalKey(), BootId: d.boot, ObservedAt: accepted, LoadState: "loaded", ActiveState: "inactive", DefinitionSha256: digest[:], FingerprintSha256: digest[:]}
+		before.Observed = &resourcev1.ResourceObservation_SystemdService{SystemdService: native}
 	}
 	if d.demo != nil {
 		status, err := d.demo.immediateResult(intent, digest[:], before)
@@ -129,19 +138,27 @@ func (r *runner) prepareService(ctx context.Context, d *simulatedDevice, work *d
 			return &pendingService{work: work, intent: intent, status: status}, nil
 		}
 	}
-	desiredDigest, err := resource.DesiredDigest(intent.GetDesired())
-	if err != nil {
-		return nil, err
-	}
-	observedDigest, err := resource.ObservationDigest(before)
-	if err != nil {
-		return nil, err
-	}
-	plan := &resourcev1.ResourcePlan{
-		Ref: intent.GetDesired().GetRef(), Operation: intent.GetOperation(), DesiredSha256: desiredDigest[:],
-		ObservationSha256: observedDigest[:], Backend: before.GetMetadata().GetBackend(), Before: before, OwnershipRevisionSha256: digest[:],
-		Safety: &resourcev1.PlanSafety{LockDomains: []resourcev1.ClaimDomain{resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME}, Reversibility: resourcev1.Reversibility_REVERSIBILITY_PARTIAL, RollbackScope: resourcev1.RollbackScope_ROLLBACK_SCOPE_NONE, Confirmation: resourcev1.ConfirmationPolicy_CONFIRMATION_POLICY_NOT_REQUIRED},
-		Plan:   &resourcev1.ResourcePlan_SystemdService{SystemdService: &resourcev1.SystemdServicePlan{Desired: intent.GetDesired().GetSystemdService(), Before: native, ChangeRuntime: true}},
+	var plan *resourcev1.ResourcePlan
+	if fleet {
+		plan, err = d.demo.fleetPlan(intent, before, digest[:])
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		desiredDigest, err := resource.DesiredDigest(intent.GetDesired())
+		if err != nil {
+			return nil, err
+		}
+		observedDigest, err := resource.ObservationDigest(before)
+		if err != nil {
+			return nil, err
+		}
+		plan = &resourcev1.ResourcePlan{
+			Ref: intent.GetDesired().GetRef(), Operation: intent.GetOperation(), DesiredSha256: desiredDigest[:],
+			ObservationSha256: observedDigest[:], Backend: before.GetMetadata().GetBackend(), Before: before, OwnershipRevisionSha256: digest[:],
+			Safety: &resourcev1.PlanSafety{LockDomains: []resourcev1.ClaimDomain{resourcev1.ClaimDomain_CLAIM_DOMAIN_SERVICE_RUNTIME}, Reversibility: resourcev1.Reversibility_REVERSIBILITY_PARTIAL, RollbackScope: resourcev1.RollbackScope_ROLLBACK_SCOPE_NONE, Confirmation: resourcev1.ConfirmationPolicy_CONFIRMATION_POLICY_NOT_REQUIRED},
+			Plan:   &resourcev1.ResourcePlan_SystemdService{SystemdService: &resourcev1.SystemdServicePlan{Desired: intent.GetDesired().GetSystemdService(), Before: native, ChangeRuntime: true}},
+		}
 	}
 	planDigest, err := resource.PlanDigest(plan)
 	if err != nil {
@@ -192,6 +209,10 @@ func (r *runner) startService(ctx context.Context, d *simulatedDevice, p *pendin
 		if err := r.effects(d.id, p.intent.GetActionId(), p.intent.GetResourceSequence()); err != nil {
 			return err
 		}
+	}
+	if d.demo != nil && d.demo.fleetSupports(p.intent.GetDesired()) {
+		p.status.StartedAt = timestamppb.New(now)
+		return d.demo.applyFleet(p)
 	}
 	if d.demo != nil && d.demo.service == serviceFails {
 		p.status.State, p.status.Failure = agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_FAILED, agentv1.ResourceExecutionFailure_RESOURCE_EXECUTION_FAILURE_NATIVE

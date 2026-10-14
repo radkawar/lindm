@@ -20,6 +20,7 @@ import (
 	resourcev1 "lindm/gen/lindm/resource/v1"
 	"lindm/internal/identity"
 	"lindm/internal/policy"
+	"lindm/internal/targeting/targetingdb"
 	"lindm/internal/testdb"
 )
 
@@ -380,6 +381,15 @@ func TestRolloutSoakPromotionAndExpiredProofPause(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := f.transaction(t, func(tx pgx.Tx) error {
+		state, err := f.store.rolloutState(t.Context(), targetingdb.New(tx), id)
+		if err == nil && (state.PromotionReady || state.NextPromotionAt != nil) {
+			t.Fatal("manual stage promised promotion before its observation period")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
 	control := &adminv1.ControlRolloutRequest{RequestId: uuid.NewString(), RolloutId: id.String(), ExpectedRevision: 1, Operation: adminv1.ControlRolloutRequest_OPERATION_PROMOTE, Reason: "Promote only after soak"}
 	if err := f.transaction(t, func(tx pgx.Tx) error {
 		_, err := f.store.ControlRollout(t.Context(), tx, f.actor, identity.PermissionAssignResources, control)
@@ -388,6 +398,15 @@ func TestRolloutSoakPromotionAndExpiredProofPause(t *testing.T) {
 		t.Fatalf("promotion ignored soak: %v", err)
 	}
 	if _, err := f.pool.Exec(t.Context(), "UPDATE resource_rollouts SET stage_started_at=clock_timestamp()-interval '2 minutes' WHERE id=$1", id); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.transaction(t, func(tx pgx.Tx) error {
+		state, err := f.store.rolloutState(t.Context(), targetingdb.New(tx), id)
+		if err == nil && (!state.PromotionReady || state.NextPromotionAt != nil) {
+			t.Fatal("healthy manual stage did not expose readiness after its observation period")
+		}
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	var promoted *adminv1.ControlRolloutResponse

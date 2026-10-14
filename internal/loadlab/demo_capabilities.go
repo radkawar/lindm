@@ -67,6 +67,8 @@ func demoAgents() map[string]*demoAgent {
 		// Root on the build server approved its build output root by hand.
 		"ubuntu-srv-04":   {vendorKey: true, local: &agentv1.AgentConfig{FileProvider: &agentv1.NativeFileProviderConfig{AllowedRoots: []string{"/etc/issue.d", "/etc/motd.d", "/srv/build/etc"}}}},
 		demoScaleHostname: {vendorKey: true},
+		"fleet-pilot-01":  {vendorKey: true, collisions: banner},
+		"fleet-pilot-02":  {vendorKey: true, collisions: banner},
 	}
 }
 
