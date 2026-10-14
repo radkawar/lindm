@@ -243,12 +243,19 @@ func exportColdReleases(ctx context.Context, guest *guestVM, result *VMDeployBui
 	if err := collectColdReleaseFiles(ctx, guest, result, options, false); err != nil {
 		return err
 	}
+	return verifyColdReleaseExports(ctx, result, options)
+}
+
+func verifyColdReleaseExports(ctx context.Context, result *VMDeployBuildResult, options VMDeployBuildOptions) error {
 	kit, err := releasekit.Load(filepath.Join(options.EvidenceDirectory, "keys"))
 	if err != nil {
 		return err
 	}
 	result.ReleaseKeyID = kit.AttestationKeyID
 	for _, name := range []string{"first", "newer"} {
+		if err := releasebuild.CanonicalizeEmbeddedRepository(filepath.Join(options.EvidenceDirectory, name)); err != nil {
+			return err
+		}
 		manifest, err := releasebuild.Verify(ctx, filepath.Join(options.EvidenceDirectory, name), filepath.Join(options.EvidenceDirectory, "keys", releasekit.AttestationPublicFile), kit.AttestationKeyID)
 		if err != nil {
 			return err

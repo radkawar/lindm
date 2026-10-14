@@ -4003,6 +4003,21 @@ a 32 GiB root overlay before first boot; cloud-init expands the guest filesystem
 This fits the existing 32 GiB-per-guest host disk admission budget. All other
 lanes keep the 10 GiB default floor, and larger vendor bases are never shrunk.
 Both fresh build caches and all signing, no-swap and custody gates remain intact.
+The `80565782a` run completed literal `make release-keys` and both real production
+releases, version 0.2.0 and 0.2.1, in one 1708.280-second Make stage. Its final
+observer verification failed because private transport changed embedded repository
+file modes to 0600. The observer now uses the existing
+`releasebuild.CanonicalizeEmbeddedRepository` before each unchanged signature,
+digest, provenance, version and revision verification. Only canonical public
+repository permissions are restored; custody modes and all bytes are unchanged.
+The original failed record is retained and cannot qualify a native lifecycle.
+To verify real transported exports separately, set
+`LINDM_TEST_COLD_RELEASE_EXPORTS` to the private export directory with its original
+sibling `.json` record, then run
+`go test -race -tags integration ./internal/vmlab -run '^TestColdProductionExportsVerifyAfterPrivateTransport$'`.
+This maintained regression verifies both signed releases and source pins, rejects
+a different source revision, and checks unchanged custody modes and signed bytes.
+It does not alter the original SDK record or qualify installation or lifecycle.
 
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated
