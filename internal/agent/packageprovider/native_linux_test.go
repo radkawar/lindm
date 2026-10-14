@@ -7,11 +7,13 @@ package packageprovider
 import (
 	"bytes"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
 
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/agent/nativeexec"
 )
 
 func TestDatabaseAuthoritativeAbsenceRequiresCompleteNativeRecords(t *testing.T) {
@@ -153,23 +155,55 @@ func TestDNFStoredManifestIsClosedAndBounded(t *testing.T) {
 		}
 	}
 }
-func TestUnsignedRPMDoesNotPassDigestOnlyOutput(t *testing.T) {
-	fingerprint := "12345678901234567890123456789012ABCDEFAB"
-	if err := checkRPMSignature([]byte("proof.rpm:\n    Header SHA256 digest: OK\n    Payload SHA256 digest: OK\n"), fingerprint); err == nil {
-		t.Fatal("digest-only RPM accepted as signed")
-	}
-	if err := checkRPMSignature([]byte("proof.rpm:\n    Header V4 RSA/SHA256 Signature, key ID abcdefab: OK\n"), fingerprint); err != nil {
-		t.Fatal(err)
-	}
-	if err := checkRPMSignature([]byte("proof.rpm:\n    Header V4 RSA/SHA256 Signature, key ID 00000000: OK\n"), fingerprint); err == nil {
-		t.Fatal("foreign signer accepted")
-	}
-	// RPM 6 reports the full fingerprint of a known key.
-	if err := checkRPMSignature([]byte("proof.rpm:\n    Header OpenPGP V4 RSA/SHA256 signature, key fingerprint: 12345678901234567890123456789012abcdefab: OK\n"), fingerprint); err != nil {
-		t.Fatal(err)
-	}
-	if err := checkRPMSignature([]byte("proof.rpm:\n    Header OpenPGP V4 RSA/SHA256 signature, key fingerprint: 00000000901234567890123456789012ABCDEFAB: OK\n"), fingerprint); err == nil {
-		t.Fatal("foreign RPM 6 signer accepted")
+func TestRPMSignatureRequiresApprovedSignerAndEveryDigest(t *testing.T) {
+	const fingerprint = "567E347AD0044ADE55BA8A5F199E2F91FD431D51"
+	const approved = "    Header V4 RSA/SHA256 Signature, key ID fd431d51: OK\n"
+	const secondary = "    Header V6 ML-DSA-87+Ed448/SHA512 Signature, key ID 05707a62: NOKEY\n"
+	const digests = "    Header SHA256 digest: OK\n    Header SHA1 digest: OK\n    Payload SHA256 digest: OK\n    MD5 digest: OK\n"
+	exitOne := &nativeexec.ExitError{Program: "rpmkeys", Code: 1}
+	full := "    Header OpenPGP V4 RSA/SHA256 signature, key fingerprint: 567e347ad0044ade55ba8a5f199e2f91fd431d51: OK\n"
+	for _, tc := range []struct {
+		name, output, stderr string
+		runErr               error
+		accepted             bool
+	}{
+		{"approved RSA", "proof.rpm:\n" + approved + digests, "", nil, true},
+		{"approved full fingerprint", "proof.rpm:\n" + full + digests, "", nil, true},
+		// Actual rhel10-03 perl-Git-2.52.0-1.el10.noarch verification shape.
+		{"approved plus unknown secondary", "proof.rpm:\n" + secondary + approved + digests, "", exitOne, true},
+		{"approved plus verified secondary", "proof.rpm:\n" + strings.ReplaceAll(secondary, "NOKEY", "OK") + approved + digests, "", nil, true},
+		{"approved plus bad secondary", "proof.rpm:\n" + strings.ReplaceAll(secondary, "NOKEY", "BAD") + approved + digests, "", exitOne, false},
+		{"unknown secondary only", "proof.rpm:\n" + secondary + digests, "", exitOne, false},
+		{"unapproved verified signer only", "proof.rpm:\n" + strings.ReplaceAll(secondary, "NOKEY", "OK") + digests, "", nil, false},
+		{"unapproved full fingerprint only", "proof.rpm:\n" + strings.ReplaceAll(full, "567e347a", "00000000") + digests, "", nil, false},
+		{"digest only", "proof.rpm:\n" + digests, "", nil, false},
+		{"header digest failure", "proof.rpm:\n" + approved + strings.ReplaceAll(digests, "Header SHA256 digest: OK", "Header SHA256 digest: BAD"), "", exitOne, false},
+		{"payload digest failure", "proof.rpm:\n" + approved + strings.ReplaceAll(digests, "Payload SHA256 digest: OK", "Payload SHA256 digest: BAD"), "", exitOne, false},
+		{"missing header digest", "proof.rpm:\n" + approved + "    Payload SHA256 digest: OK\n", "", nil, false},
+		{"missing payload digest", "proof.rpm:\n" + approved + "    Header SHA256 digest: OK\n", "", nil, false},
+		{"duplicate digest", "proof.rpm:\n" + approved + digests + "    Payload SHA256 digest: OK\n", "", nil, false},
+		{"approved unknown key", "proof.rpm:\n" + strings.ReplaceAll(approved, "OK", "NOKEY") + digests, "", exitOne, false},
+		{"bad approved signature", "proof.rpm:\n" + strings.ReplaceAll(approved, "OK", "BAD") + secondary + digests, "", exitOne, false},
+		{"failed secondary verification", "proof.rpm:\n" + strings.ReplaceAll(secondary, "NOKEY", "NOT OK") + approved + digests, "", exitOne, false},
+		{"unknown status", "proof.rpm:\n" + strings.ReplaceAll(secondary, "NOKEY", "UNKNOWN") + approved + digests, "", exitOne, false},
+		{"unknown line", "proof.rpm:\n" + approved + digests + "    unrecognized check: OK\n", "", nil, false},
+		{"unknown algorithm", "proof.rpm:\n" + strings.ReplaceAll(approved, "RSA/SHA256", "unknown/SHA256") + digests, "", nil, false},
+		{"malformed signer", "proof.rpm:\n" + strings.ReplaceAll(approved, "fd431d51", "fd431d5z") + digests, "", nil, false},
+		{"truncated output", strings.TrimSuffix("proof.rpm:\n"+secondary+approved+digests, "\n"), "", exitOne, false},
+		{"warning", "proof.rpm:\n" + secondary + approved + digests, "unexpected warning\n", exitOne, false},
+		{"unexplained exit one", "proof.rpm:\n" + approved + digests, "", exitOne, false},
+		{"wrong executable exit", "proof.rpm:\n" + secondary + approved + digests, "", &nativeexec.ExitError{Program: "rpm", Code: 1}, false},
+		{"other exit code", "proof.rpm:\n" + secondary + approved + digests, "", &nativeexec.ExitError{Program: "rpmkeys", Code: 2}, false},
+		{"joined output limit", "proof.rpm:\n" + secondary + approved + digests, "", errors.Join(exitOne, nativeexec.ErrOutputLimit), false},
+		{"joined deadline", "proof.rpm:\n" + secondary + approved + digests, "", errors.Join(exitOne, nativeexec.ErrDeadline), false},
+		{"joined descriptor failure", "proof.rpm:\n" + secondary + approved + digests, "", errors.Join(exitOne, errors.New("descriptor failure")), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkRPMSignature(nativeResult{stdout: []byte(tc.output), stderr: []byte(tc.stderr)}, tc.runErr, fingerprint)
+			if (err == nil) != tc.accepted {
+				t.Fatalf("accepted=%t, want %t: %v", err == nil, tc.accepted, err)
+			}
+		})
 	}
 }
 func TestTransactionVerificationDetectsUnmanifestedEffects(t *testing.T) {

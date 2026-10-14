@@ -12667,6 +12667,22 @@
       "scope": "GNOME; Tier 1 clipboard, keyboard, displays, messages; HIDDEN cursor on GNOME 50",
       "reference": "#commercial-assistance-capability-qualification",
       "mainlineRevision": "47764507cfa76865c82f76272ef163aef14bd7ef"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "rhel-10.2-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-pkg-source-proof/rhel10-03/lindm-cloud-init-41948844.json",
+      "sha256": "1e09eb8325589a11a6a56301e88d53d2d66bd3836172b1395020bb89d21c53e9",
+      "recorded": "2026-10-14T05:27:21.793336434Z",
+      "revision": "04a970f0d6960a83f1f66d60e64a903ba06ccaa2-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed PACKAGES; entitled git; console unregister gate; same-policy registration retry",
+      "reference": "#registry-package-source-native-parity",
+      "mainlineRevision": "04a970f0d6960a83f1f66d60e64a903ba06ccaa2"
     }
   ]
 }

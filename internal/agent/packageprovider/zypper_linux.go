@@ -151,10 +151,7 @@ func (p *Provider) verifyZypperRPM(ctx context.Context, directory, path string, 
 			args = append([]string{"--dbpath", keydb}, args...)
 		}
 		result, err := p.run(ctx, "/usr/bin/rpmkeys", args, "/", nil)
-		if err != nil {
-			return err
-		}
-		if err := checkRPMSignature(result.stdout, source.GetRpmSigningKeyFingerprint()); err != nil {
+		if err := checkRPMSignature(result, err, source.GetRpmSigningKeyFingerprint()); err != nil {
 			return err
 		}
 	}

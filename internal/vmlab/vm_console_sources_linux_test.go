@@ -5,6 +5,7 @@
 package vmlab
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -19,9 +20,25 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/platform"
 )
 
 // These are proof-guard/capture regressions, not native package evidence.
+func TestSourceProofAdmitsRHEL10WithoutBroadeningTheLane(t *testing.T) {
+	for _, key := range []string{"debian-12", "debian-13", "rhel-9", "rhel-10", "rhel-8", "fedora-44"} {
+		t.Run(key, func(t *testing.T) {
+			_, err := proveRegistryPackageSources(context.Background(), nil, &platform.Release{Key: key}, "", VMConsoleEnrollmentOptions{}, nil)
+			want := "release has no registry package source"
+			if key == "rhel-8" || key == "fedora-44" {
+				want = "package-source proof requires Debian12/13 or RHEL9/10"
+			}
+			if err == nil || err.Error() != want {
+				t.Fatalf("release %s: got %v, want %s", key, err, want)
+			}
+		})
+	}
+}
+
 func TestSourceCapabilityRequiresCurrentSignedDeploymentGrant(t *testing.T) {
 	notBefore := time.Unix(100, 0)
 	state := &adminv1.DeviceCapabilityState{IssuedVersion: 3, IssuedAt: timestamppb.New(notBefore), Granted: []*adminv1.DeviceCapabilityGrant{{Capability: agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, Sources: []*adminv1.CapabilityPolicyScope{{Scope: &adminv1.CapabilityPolicyScope_Deployment{Deployment: true}}}}}, Reported: &agentv1.CapabilityPolicyObservation{State: agentv1.CapabilityPolicyState_CAPABILITY_POLICY_STATE_ACTIVE, AppliedVersion: 3, AppliedSha256: make([]byte, 32), Capabilities: []*agentv1.CapabilityObservation{{Capability: agentv1.ManagementCapability_MANAGEMENT_CAPABILITY_PACKAGES, Status: agentv1.CapabilityStatus_CAPABILITY_STATUS_ENABLED}}}}

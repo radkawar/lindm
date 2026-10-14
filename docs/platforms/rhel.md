@@ -350,6 +350,17 @@ rechecked before staging; changed bytes or a different release fingerprint refus
 New/PQ-only signers require a separately reviewed registry and native-verifier
 cutover, not acceptance by UID, short key ID or a successful system RPM key import.
 
+RPM verification requires every reported header/payload digest to be `OK` and at
+least one `OK` signature from the pinned approved key. RHEL 10 dual-signs some
+packages with release-key-2 RSA and a separate release-key-4
+ML-DSA-87+Ed448 signature. A secondary, unapproved `NOKEY` signature is
+non-authoritative; it neither grants trust nor invalidates the verified approved
+signature. Only that exact case may account for native `rpmkeys` exit status 1.
+Any bad or failed-verification signature, failed digest, approved-key `NOKEY`,
+unknown/ambiguous output, warning or other execution failure refuses. The
+isolated keyring still contains only release key 2, and native installation's
+signature/digest verification flags remain unchanged.
+
 Deterministic tests cover both releases/architectures, the signed capability and
 item-refusal boundary, tampered local definitions and full fingerprint selection.
 The `rhsm-upstream-model.repo` compatibility fixture is explicitly derived from

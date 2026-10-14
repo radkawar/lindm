@@ -45,8 +45,8 @@ type VMPackageSourceEvidence struct {
 }
 
 func proveRegistryPackageSources(ctx context.Context, vm *guestVM, release *platform.Release, device string, options VMConsoleEnrollmentOptions, registration *vmRedHatRegistration) (_ *VMPackageSourceEvidence, err error) {
-	if release.Key != "debian-12" && release.Key != "debian-13" && release.Key != "rhel-9" {
-		return nil, errors.New("package-source proof requires Debian12/13 or RHEL9")
+	if release.Key != "debian-12" && release.Key != "debian-13" && release.Key != "rhel-9" && release.Key != "rhel-10" {
+		return nil, errors.New("package-source proof requires Debian12/13 or RHEL9/10")
 	}
 	if len(release.VendorRepositories) == 0 {
 		return nil, errors.New("release has no registry package source")
@@ -386,7 +386,7 @@ func capturePackageSourceFailure(ctx context.Context, vm *guestVM, diagnostics s
 	if cursorErr == nil {
 		evidence.Native = append(evidence.Native, cursor)
 	}
-	journal, journalErr := resourceOracle(ctx, vm, "package-agent-and-executor-failure-journal", "sudo -n journalctl --no-pager -u lindm-agent -u lindm-executor -n 1500 -o short-iso-precise")
+	journal, journalErr := resourceOracle(ctx, vm, "package-agent-and-executor-failure-journal", "sudo -n journalctl --no-pager -u lindm-agent -u lindm-executor -u 'lindm-package-*' -n 1500 -o short-iso-precise")
 	if journalErr == nil {
 		evidence.Native = append(evidence.Native, journal)
 	}

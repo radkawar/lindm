@@ -28,6 +28,7 @@ import (
 	"lindm/internal/agent/config"
 	"lindm/internal/agent/dnf"
 	"lindm/internal/agent/inventory"
+	"lindm/internal/agent/nativeexec"
 	"lindm/internal/agent/rhsm"
 	"lindm/internal/platform"
 )
@@ -448,18 +449,12 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 				return nil, errors.New("packageprovider: stored RPM identity mismatch")
 			}
 			result, err = p.run(ctx, "/usr/bin/rpmkeys", []string{"--dbpath", filepath.Join(directory, "rpmkeys"), "--checksig", "--verbose", path}, "/", nil)
-			if err != nil {
-				return nil, err
-			}
-			if err := checkRPMSignature(result.stdout, source.GetRpmSigningKeyFingerprint()); err != nil {
+			if err := checkRPMSignature(result, err, source.GetRpmSigningKeyFingerprint()); err != nil {
 				return nil, err
 			}
 			result, err = p.run(ctx, "/usr/bin/rpmkeys", []string{"--checksig", "--verbose", path}, "/", nil)
-			if err != nil {
+			if err := checkRPMSignature(result, err, source.GetRpmSigningKeyFingerprint()); err != nil {
 				return nil, fmt.Errorf("packageprovider: package signing key must already be root-provisioned in system RPM trust: %w", err)
-			}
-			if err := checkRPMSignature(result.stdout, source.GetRpmSigningKeyFingerprint()); err != nil {
-				return nil, err
 			}
 			entry.Artifact, err = artifactFor(path)
 			if err != nil {
@@ -492,37 +487,145 @@ func (p *Provider) dnfEntries(ctx context.Context, directory string, transaction
 	return entries, nil
 }
 
-func checkRPMSignature(output []byte, fingerprint string) error {
-	valid := false
-	for line := range strings.SplitSeq(string(output), "\n") {
-		if strings.Contains(line, "NOT OK") || strings.Contains(line, "NOKEY") || strings.Contains(line, "NOTTRUSTED") {
+// checkRPMSignature requires every reported digest and at least one signature
+// from the pinned approved key. An independent, unapproved NOKEY co-signature
+// supplies no authority; only that condition can explain rpmkeys exit status 1.
+// Failed signatures, warnings, incomplete output and other execution errors
+// remain refusals. No additional key is imported or approved.
+func checkRPMSignature(result nativeResult, runErr error, fingerprint string) error {
+	if len(result.stderr) != 0 || (len(fingerprint) != 40 && len(fingerprint) != 64) || !rpmSignerHex(fingerprint) {
+		return errors.New("packageprovider: ambiguous RPM verification")
+	}
+	text := string(result.stdout)
+	if !strings.HasSuffix(text, "\n") {
+		return errors.New("packageprovider: incomplete RPM verification")
+	}
+	var digests uint8
+	valid, unknown, header := false, false, false
+	for line := range strings.SplitSeq(text[:len(text)-1], "\n") {
+		for _, char := range line {
+			if char < ' ' || char > '~' {
+				return errors.New("packageprovider: malformed RPM verification")
+			}
+		}
+		if !header {
+			if !strings.HasSuffix(line, ".rpm:") || len(line) == len(".rpm:") {
+				return errors.New("packageprovider: missing RPM verification header")
+			}
+			header = true
+			continue
+		}
+		line, indented := strings.CutPrefix(line, "    ")
+		separator := strings.LastIndex(line, ": ")
+		if !indented || separator < 0 {
+			return errors.New("packageprovider: unknown RPM verification")
+		}
+		entry, status := line[:separator], line[separator+2:]
+		var digest uint8
+		switch entry {
+		case "Header SHA256 digest":
+			digest = 1
+		case "Header SHA512 digest":
+			digest = 2
+		case "Header SHA1 digest":
+			digest = 4
+		case "Payload SHA256 digest":
+			digest = 8
+		case "Payload SHA512 digest":
+			digest = 16
+		case "MD5 digest":
+			digest = 32
+		}
+		if digest != 0 {
+			if status != "OK" || digests&digest != 0 {
+				return errors.New("packageprovider: unverified RPM digest")
+			}
+			digests |= digest
+			continue
+		}
+		description, signer, signature := strings.Cut(entry, " Signature, ")
+		if !signature {
+			description, signer, signature = strings.Cut(entry, " signature, ")
+		}
+		description = strings.TrimPrefix(strings.TrimPrefix(description, "Header "), "OpenPGP ")
+		version, algorithm, described := strings.Cut(description, " ")
+		if !signature || !described || (version != "V3" && version != "V4" && version != "V6") {
+			return errors.New("packageprovider: unknown RPM signature")
+		}
+		switch algorithm {
+		case "RSA/SHA1", "RSA/SHA256", "RSA/SHA512", "DSA/SHA1", "DSA/SHA256",
+			"ECDSA/SHA256", "ECDSA/SHA384", "ECDSA/SHA512", "EdDSA/SHA256", "EdDSA/SHA512",
+			"ML-DSA-87+Ed448/SHA512":
+		default:
+			return errors.New("packageprovider: unknown RPM signature algorithm")
+		}
+		id, short := strings.CutPrefix(signer, "key ID ")
+		if !short {
+			var full bool
+			id, full = strings.CutPrefix(signer, "key fingerprint: ")
+			if !full || (len(id) != 40 && len(id) != 64) {
+				return errors.New("packageprovider: ambiguous RPM signer")
+			}
+		} else if len(id) != 8 && len(id) != 16 {
+			return errors.New("packageprovider: ambiguous RPM signer")
+		}
+		if !rpmSignerHex(id) {
+			return errors.New("packageprovider: malformed RPM signer")
+		}
+		approved := strings.EqualFold(id, fingerprint)
+		if short {
+			approved = strings.EqualFold(id, fingerprint[len(fingerprint)-len(id):])
+		}
+		switch status {
+		case "OK":
+			valid = valid || approved
+		case "NOKEY":
+			if approved {
+				return errors.New("packageprovider: approved RPM signature is unverified")
+			}
+			unknown = true
+		default:
 			return errors.New("packageprovider: untrusted RPM signature")
 		}
-		// RPM 4 prints "Signature, key ID <id>: OK"; RPM 6 prints
-		// "signature, key fingerprint: <fingerprint>: OK" for a known key.
-		if !strings.Contains(strings.ToLower(line), "signature,") || !strings.HasSuffix(strings.TrimSpace(line), ": OK") {
-			continue
-		}
-		if _, suffix, ok := strings.Cut(line, "key fingerprint: "); ok {
-			signer, _, ok := strings.Cut(suffix, ":")
-			if !ok || !strings.EqualFold(signer, fingerprint) {
-				return errors.New("packageprovider: wrong RPM signer")
-			}
-			valid = true
-			continue
-		}
-		_, suffix, ok := strings.Cut(line, "key ID ")
-		if !ok {
-			continue
-		}
-		id, _, ok := strings.Cut(suffix, ":")
-		if !ok || len(id) < 8 || !strings.HasSuffix(strings.ToLower(fingerprint), strings.ToLower(id)) {
-			return errors.New("packageprovider: wrong RPM signer")
-		}
-		valid = true
 	}
-	if !valid {
-		return errors.New("packageprovider: RPM has no verified package signature")
+	if !valid || digests&3 == 0 || digests&24 == 0 {
+		return errors.New("packageprovider: RPM lacks an approved signature or verified header/payload digest")
+	}
+	if runErr != nil && (!unknown || !rpmKeysUnknownSignatureExit(runErr)) {
+		return runErr
 	}
 	return nil
+}
+
+func rpmSignerHex(value string) bool {
+	for _, char := range value {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') && (char < 'A' || char > 'F') {
+			return false
+		}
+	}
+	return value != ""
+}
+
+// Every error leaf must be rpmkeys' ordinary unknown-signature exit. In
+// particular, a joined deadline, output limit or descriptor error is not lost.
+func rpmKeysUnknownSignatureExit(err error) bool {
+	switch wrapped := err.(type) {
+	case *nativeexec.ExitError:
+		return wrapped.Program == "rpmkeys" && wrapped.Code == 1
+	case interface{ Unwrap() []error }:
+		children := wrapped.Unwrap()
+		if len(children) == 0 {
+			return false
+		}
+		for _, child := range children {
+			if !rpmKeysUnknownSignatureExit(child) {
+				return false
+			}
+		}
+		return true
+	case interface{ Unwrap() error }:
+		return rpmKeysUnknownSignatureExit(wrapped.Unwrap())
+	default:
+		return false
+	}
 }

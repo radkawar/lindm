@@ -504,7 +504,7 @@ func (p *Provider) proveRPM(ctx context.Context, directory, scratch string, reco
 		return nil, errors.New("packageprovider: fetched RPM differs from its declared size")
 	}
 	signature, err := p.run(ctx, "/usr/bin/rpmkeys", []string{"--dbpath", filepath.Join(directory, "rpmkeys"), "--checksig", "--verbose", path}, "/", nil)
-	if err != nil || checkRPMSignature(signature.stdout, source.GetRpmSigningKeyFingerprint()) != nil {
+	if checkRPMSignature(signature, err, source.GetRpmSigningKeyFingerprint()) != nil {
 		return nil, unproven("approved key does not verify the repository package")
 	}
 	const format = "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SHA256HEADER}\n"
