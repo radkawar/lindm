@@ -134,21 +134,30 @@ func processRunning(pid int) bool {
 }
 
 // A QEMU that dies before queuing its first TPM control command never gets an
-// swtpm, which would otherwise wait for it forever.
+// swtpm, which would otherwise wait for it forever. Its closed end reads as
+// end of file, which poll also reports as readable; a QEMU already gone when
+// the poll runs once started swtpm under load.
 func TestSwtpmNotStartedForQEMUThatNeverUsedControl(t *testing.T) {
-	control, err := newSwtpmControl()
-	if err != nil {
-		t.Fatal(err)
-	}
-	gone, err := startEncryptedProcessFiles(t.Context(), t.TempDir(), []*os.File{control.qemu}, "true")
-	if err != nil {
-		t.Fatal(err)
-	}
-	tpm, err := control.start(t.Context(), t.Context(), t.TempDir(), gone.done)
-	if err == nil || tpm != nil || !strings.Contains(err.Error(), "QEMU") {
-		t.Fatalf("swtpm %v started for a QEMU that never used its control channel: %v", tpm, err)
-	}
-	if control.qemu != nil || control.swtpm != nil {
-		t.Fatal("control channel ends must be closed")
+	for _, exited := range []bool{false, true} {
+		t.Run(fmt.Sprintf("exited=%v", exited), func(t *testing.T) {
+			control, err := newSwtpmControl()
+			if err != nil {
+				t.Fatal(err)
+			}
+			gone, err := startEncryptedProcessFiles(t.Context(), t.TempDir(), []*os.File{control.qemu}, "true")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if exited {
+				<-gone.done
+			}
+			tpm, err := control.start(t.Context(), t.Context(), t.TempDir(), gone.done)
+			if err == nil || tpm != nil || !strings.Contains(err.Error(), "QEMU") {
+				t.Fatalf("swtpm %v started for a QEMU that never used its control channel: %v", tpm, err)
+			}
+			if control.qemu != nil || control.swtpm != nil {
+				t.Fatal("control channel ends must be closed")
+			}
+		})
 	}
 }

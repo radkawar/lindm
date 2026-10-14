@@ -86,11 +86,15 @@ func (c *swtpmControl) start(ctx, process context.Context, dir string, qemu <-ch
 		if pollErr != nil && !errors.Is(pollErr, unix.EINTR) {
 			return nil, fmt.Errorf("poll swtpm control: %w", pollErr)
 		}
-		if events&unix.POLLIN != 0 {
-			break
-		}
+		// A closed peer also reads as POLLIN (end of file), so hangup is checked
+		// first: QEMU holds its end for its whole life, and an swtpm started
+		// on a channel whose QEMU is gone would only fail. Only a live QEMU's
+		// queued command makes the end readable without a hangup.
 		if events&(unix.POLLHUP|unix.POLLERR) != 0 {
 			return nil, errors.New("QEMU closed its TPM control channel before using it")
+		}
+		if events&unix.POLLIN != 0 {
+			break
 		}
 		select {
 		case <-ctx.Done():
