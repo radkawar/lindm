@@ -139,18 +139,18 @@ func TestStockRepositoryCacheReusesSourceAndRefusesTamper(t *testing.T) {
 		}
 		return stockCacheSignedFixture(t, bundle, digest), nil
 	}
-	first, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build)
+	first, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build)
 	if err != nil || first.hit {
 		t.Fatalf("cold cache: %v", err)
 	}
-	second, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build)
+	second, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build)
 	if err != nil || !second.hit || second.directory != first.directory || builds != 1 {
 		t.Fatalf("cache did not reuse authenticated source: %v; builds=%d", err, builds)
 	}
 	if err := os.WriteFile(filepath.Join(source, "source.go"), []byte("changed source\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	changed, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build)
+	changed, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build)
 	if err != nil || changed.hit || changed.directory == first.directory || builds != 2 {
 		t.Fatalf("source change did not invalidate cache: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestStockRepositoryCacheReusesSourceAndRefusesTamper(t *testing.T) {
 	if err := os.WriteFile(manifest, []byte("tampered signed manifest"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build); err == nil || builds != 2 {
+	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build); err == nil || builds != 2 {
 		t.Fatal("tampered cache was admitted or silently rebuilt")
 	}
 }
@@ -182,7 +182,7 @@ func TestStockRepositoryCacheSingleFlightAndCancellation(t *testing.T) {
 	results := make(chan error, 4)
 	for range 4 {
 		go func() {
-			_, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build)
+			_, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build)
 			results <- err
 		}()
 	}
@@ -196,7 +196,7 @@ func TestStockRepositoryCacheSingleFlightAndCancellation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := cachedNativeEnrollmentRepository(ctx, source, cache, build); err == nil {
+	if _, err := cachedNativeEnrollmentRepository(ctx, source, cache, releasebuild.SourceDigest, build); err == nil {
 		t.Fatal("cache ignored canceled preparation")
 	}
 }
@@ -258,7 +258,7 @@ func TestStockRepositoryCacheRefusesSharedDirectoryAndSourceRace(t *testing.T) {
 	build := func(context.Context, string, string, string) (*releasev1.ReleaseManifest, error) {
 		return &releasev1.ReleaseManifest{SourceSha256: stockCacheDigest([]byte("a different captured source"))}, nil
 	}
-	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, build); err == nil {
+	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build); err == nil {
 		t.Fatal("published a cache entry after its source changed")
 	}
 	entries, err := os.ReadDir(cache)
@@ -301,5 +301,51 @@ func TestStockCacheRefusesReplaceableAncestorAndUsesOSCache(t *testing.T) {
 	expected := filepath.Join(parent, "lindm", "lab", "agent-repositories")
 	if err != nil || actual != expected {
 		t.Fatalf("cache is not independent of worktree ancestry: got %q, want %q: %v", actual, expected, err)
+	}
+}
+
+// The cache key follows the artifact inputs, not the tree: a change outside
+// them reuses the entry whose manifest names the tree it was built from, and
+// an entry no longer bound to its input digest is refused, never rebuilt.
+func TestStockRepositoryCacheKeysOnArtifactInputs(t *testing.T) {
+	source, cache := stockCacheSource(t), stockCacheDirectory(t)
+	inputs := func(_ context.Context, source string) (string, error) {
+		body, err := os.ReadFile(filepath.Join(source, "source.go"))
+		return stockCacheDigest(body), err
+	}
+	builds := 0
+	build := func(ctx context.Context, source, bundle, _ string) (*releasev1.ReleaseManifest, error) {
+		builds++
+		digest, err := releasebuild.SourceDigest(ctx, source)
+		if err != nil {
+			return nil, err
+		}
+		return stockCacheSignedFixture(t, bundle, digest), nil
+	}
+	first, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, inputs, build)
+	if err != nil || first.hit {
+		t.Fatalf("cold cache: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "console.tsx"), []byte("console-only change\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	reused, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, inputs, build)
+	if err != nil || !reused.hit || reused.directory != first.directory || builds != 1 {
+		t.Fatalf("non-input change rebuilt the artifact: %v; builds=%d", err, builds)
+	}
+	if reused.manifest.GetSourceSha256() != first.manifest.GetSourceSha256() {
+		t.Fatal("reused manifest does not name the tree it was built from")
+	}
+	if err := os.WriteFile(first.directory+".inputs", []byte(stockCacheDigest([]byte("other inputs"))), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, inputs, build); err == nil || builds != 1 {
+		t.Fatal("entry bound to other inputs was admitted or silently rebuilt")
+	}
+	if err := os.Remove(first.directory + ".inputs"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, inputs, build); err == nil || builds != 1 {
+		t.Fatal("unbound entry was admitted or silently rebuilt")
 	}
 }

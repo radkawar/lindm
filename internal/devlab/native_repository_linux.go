@@ -78,7 +78,7 @@ func (f *AuthorityFixture) buildNativeEnrollmentArtifact(ctx context.Context, cf
 	if err != nil {
 		return err
 	}
-	cached, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, buildDevelopmentNativeRepository)
+	cached, err := cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, stockAgentInputs, buildDevelopmentNativeRepository)
 	if err != nil {
 		return err
 	}

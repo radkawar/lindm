@@ -1127,8 +1127,17 @@ deadline after seeding. Interactively, the refused package scan state on
 `fedora-ws-03` finishes in the background about five minutes after enrollment
 (the server admits one package report per device per five minutes); its
 failure is printed and returned when the console stops. Review seeds it before
-returning. The signed stock artifact cache is keyed by the source digest, so
-the first run after a source change rebuilds it (about eight minutes here).
+returning. The signed stock artifact cache is keyed by
+`releasebuild.AgentInputDigest`, not the whole tree: the captured files under
+every in-module package directory that `lindm-agent` (linux amd64, arm64 and
+the host architecture), `internal/packaging` and `internal/releasebuild` depend
+on, plus `go.mod`, `go.sum`, the Node/mise pins, the `lab packages` helper
+(`cmd/lab/main.go`, `cmd/lab/packages.go`) and the cache's own build request.
+Console, server, seed and documentation changes reuse the entry; an artifact
+input change rebuilds it (about eight minutes here). A reused manifest still
+records the full source digest of the tree it was built from, and a sibling
+`<entry>.inputs` file binds each entry to its input digest; an unbound entry is
+refused, never rebuilt over.
 For a private worktree, use `make ui-review UI_REVIEW_REPO=/path/to/shared-checkout`
 to read the shared fixture's protected trust without copying credentials. The
 embedded UI and browser runner still come from the current worktree; the default

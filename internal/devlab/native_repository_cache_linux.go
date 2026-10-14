@@ -33,6 +33,16 @@ const nativeFixtureBuildBudget = time.Hour
 
 type nativeRepositoryBuild func(context.Context, string, string, string) (*releasev1.ReleaseManifest, error)
 
+// nativeRepositoryInputs digests the source inputs that decide the stock
+// artifact; it is the cache key, so it must err toward including an input.
+type nativeRepositoryInputs func(context.Context, string) (string, error)
+
+// stockAgentInputs keys the cache on releasebuild.AgentInputDigest plus this
+// file, which chooses the build request and signers.
+func stockAgentInputs(ctx context.Context, source string) (string, error) {
+	return releasebuild.AgentInputDigest(ctx, source, "internal/devlab/native_repository_cache_linux.go")
+}
+
 type cachedNativeRepository struct {
 	directory   string
 	manifest    *releasev1.ReleaseManifest
@@ -48,7 +58,7 @@ func PrepareNativeEnrollmentRepository(ctx context.Context, sourceRepository str
 	if err != nil {
 		return err
 	}
-	_, err = cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, buildDevelopmentNativeRepository)
+	_, err = cachedNativeEnrollmentRepository(ctx, sourceRepository, cache, stockAgentInputs, buildDevelopmentNativeRepository)
 	return err
 }
 
@@ -61,15 +71,19 @@ func nativeRepositoryCacheDirectory() (string, error) {
 	return filepath.Join(base, "lindm", "lab", "agent-repositories"), nil
 }
 
-func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string, build nativeRepositoryBuild) (_ *cachedNativeRepository, resultErr error) {
+// cachedNativeEnrollmentRepository keys entries on the artifact's inputs, not the
+// whole tree, so console, server and documentation changes reuse the signed
+// build. The reused manifest records the full source digest of the tree it was
+// built from; a sibling <entry>.inputs file binds the entry to its input digest.
+func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string, inputs nativeRepositoryInputs, build nativeRepositoryBuild) (_ *cachedNativeRepository, resultErr error) {
 	if err := ensureNativeRepositoryCache(cache); err != nil {
 		return nil, err
 	}
-	sourceDigest, err := releasebuild.SourceDigest(ctx, source)
+	inputDigest, err := inputs(ctx, source)
 	if err != nil {
 		return nil, err
 	}
-	key := sha256.Sum256([]byte(fmt.Sprintf("stock-agent-v1\x00%s\x000.1.0\x00console-enrollment-lab\x00%d", sourceDigest, packaging.DefaultSourceDateEpoch)))
+	key := sha256.Sum256(fmt.Appendf(nil, "stock-agent-v2\x00%s\x000.1.0\x00console-enrollment-lab\x00%d", inputDigest, packaging.DefaultSourceDateEpoch))
 	entry := filepath.Join(cache, hex.EncodeToString(key[:]))
 	lock, err := lockAcceptanceFeedCache(ctx, entry+".lock")
 	if err != nil {
@@ -77,13 +91,25 @@ func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string,
 	}
 	defer func() { resultErr = errors.Join(resultErr, lock.Close()) }()
 	if _, err := os.Lstat(entry); err == nil {
-		result, err := loadCachedNativeRepository(ctx, entry, sourceDigest)
+		recorded, err := os.ReadFile(entry + ".inputs")
+		if err == nil && string(recorded) != inputDigest {
+			err = errors.New("recorded input digest differs")
+		}
+		if err != nil {
+			return nil, fmt.Errorf("cached stock agent artifact %q is not bound to its inputs; remove this cache entry before rebuilding: %w", entry, err)
+		}
+		result, err := loadCachedNativeRepository(ctx, entry)
 		if err != nil {
 			return nil, fmt.Errorf("cached stock agent artifact %q failed verification; remove this cache entry before rebuilding: %w", entry, err)
 		}
 		result.hit = true
 		return result, nil
 	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	// The build must capture exactly this tree, whose inputs were keyed.
+	sourceDigest, err := releasebuild.SourceDigest(ctx, source)
+	if err != nil {
 		return nil, err
 	}
 	work, err := os.MkdirTemp(cache, ".build-")
@@ -101,8 +127,19 @@ func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string,
 	if manifest.GetSourceSha256() != sourceDigest {
 		return nil, errors.New("stock agent source changed during the build; no cache entry was published")
 	}
-	result, err := loadCachedNativeRepository(buildCtx, bundle, sourceDigest)
+	if after, err := inputs(buildCtx, source); err != nil || after != inputDigest {
+		return nil, errors.Join(errors.New("stock agent inputs changed during the build; no cache entry was published"), err)
+	}
+	result, err := loadCachedNativeRepository(buildCtx, bundle)
 	if err != nil {
+		return nil, err
+	}
+	// Bind the input digest before the entry appears, so no entry is unbound.
+	binding := filepath.Join(work, "inputs")
+	if err := os.WriteFile(binding, []byte(inputDigest), 0600); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(binding, entry+".inputs"); err != nil {
 		return nil, err
 	}
 	if err := os.Rename(bundle, entry); err != nil {
@@ -144,7 +181,7 @@ func buildDevelopmentNativeRepository(ctx context.Context, source, bundle, custo
 	})
 }
 
-func loadCachedNativeRepository(ctx context.Context, directory, sourceDigest string) (*cachedNativeRepository, error) {
+func loadCachedNativeRepository(ctx context.Context, directory string) (*cachedNativeRepository, error) {
 	if err := checkNativeRepositoryCacheFiles(directory); err != nil {
 		return nil, err
 	}
@@ -164,7 +201,7 @@ func loadCachedNativeRepository(ctx context.Context, directory, sourceDigest str
 	if err != nil {
 		return nil, err
 	}
-	if manifest.GetSourceSha256() != sourceDigest || manifest.GetVersion() != "0.1.0" || manifest.GetRevision() != "console-enrollment-lab" || manifest.GetSourceDateEpoch() != packaging.DefaultSourceDateEpoch || manifest.GetCustody() != "development" {
+	if manifest.GetSourceSha256() == "" || manifest.GetVersion() != "0.1.0" || manifest.GetRevision() != "console-enrollment-lab" || manifest.GetSourceDateEpoch() != packaging.DefaultSourceDateEpoch || manifest.GetCustody() != "development" {
 		return nil, errors.New("stock cache does not match the requested development release and source")
 	}
 	public, err = os.ReadFile(filepath.Join(directory, "package-signing.asc"))

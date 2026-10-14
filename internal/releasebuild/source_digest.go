@@ -13,6 +13,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -25,6 +27,105 @@ func SourceDigest(ctx context.Context, repository string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return digestPaths(ctx, repository, paths)
+}
+
+// agentInputFiles are captured-source files outside the agent's Go package
+// closure that still decide the development agent repository: the module graph,
+// the Go and Node toolchain pins the build enforces, and the `lab packages`
+// helper's entry point and subcommand, which the build recompiles from the
+// captured source to generate and sign the native packages.
+var agentInputFiles = []string{"go.mod", "go.sum", ".node-version", ".tool-versions", "mise.toml", ".mise.toml", "cmd/lab/main.go", "cmd/lab/packages.go"}
+
+// agentInputPackages are the Go packages whose dependency closure, for every
+// built and host architecture, is compiled into the agent or drives its
+// packaging, signing and release manifest.
+var agentInputPackages = []string{"./cmd/lindm-agent", "./internal/packaging", "./internal/releasebuild"}
+
+// AgentInputDigest is a conservative cache key for BuildDevelopmentAgentRepository:
+// the same bounded, captured files as SourceDigest, restricted to the directory
+// trees of every in-module package the agent, packaging and release build code
+// depend on (whole trees, so embedded assets, tests and nested packages count),
+// plus agentInputFiles and the caller's extra captured paths. Console, server,
+// documentation and other lab changes keep the key. The resulting build still
+// records the full SourceDigest of the tree it was built from.
+func AgentInputDigest(ctx context.Context, repository string, extra ...string) (string, error) {
+	paths, err := sourcePaths(ctx, repository)
+	if err != nil {
+		return "", err
+	}
+	directories, err := agentInputDirectories(ctx, repository)
+	if err != nil {
+		return "", err
+	}
+	files := slices.Concat(agentInputFiles, extra)
+	selected := slices.DeleteFunc(paths, func(name string) bool {
+		if slices.Contains(files, name) {
+			return false
+		}
+		for _, directory := range directories {
+			// A dependency at the module root covers the whole tree.
+			if directory == "." || strings.HasPrefix(name, directory+"/") {
+				return false
+			}
+		}
+		return true
+	})
+	return digestPaths(ctx, repository, selected)
+}
+
+// agentInputDirectories lists repository-relative directories of the in-module
+// Go dependencies of agentInputPackages for linux on each built architecture
+// and the host. Out-of-module dependencies are pinned by go.sum and the Go
+// toolchain version in go.mod.
+func agentInputDirectories(ctx context.Context, repository string) ([]string, error) {
+	root, err := filepath.Abs(repository)
+	if err != nil {
+		return nil, err
+	}
+	if root, err = filepath.EvalSymlinks(root); err != nil {
+		return nil, err
+	}
+	environment := []string{"GOOS=linux", "CGO_ENABLED=0", "GOWORK=off", "GOFLAGS=-mod=readonly"}
+	for _, key := range []string{"HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "MISE_DATA_DIR", "MISE_CONFIG_DIR", "GOPATH", "GOMODCACHE", "GOCACHE", "GOPROXY", "GOPRIVATE", "GONOSUMDB", "GONOPROXY", "GOTOOLCHAIN"} {
+		if value, ok := os.LookupEnv(key); ok {
+			environment = append(environment, key+"="+value)
+		}
+	}
+	var directories []string
+	for _, architecture := range slices.Compact(slices.Sorted(slices.Values([]string{"amd64", "arm64", runtime.GOARCH}))) {
+		listed, err := command(ctx, repository, append(slices.Clone(environment), "GOARCH="+architecture), "go", slices.Concat([]string{"list", "-deps", "-f", "{{.Dir}}"}, agentInputPackages)...)
+		if err != nil {
+			return nil, fmt.Errorf("releasebuild: list agent input packages: %w", err)
+		}
+		for _, directory := range strings.Split(strings.TrimSpace(string(listed)), "\n") {
+			if directory == "" {
+				continue
+			}
+			// Compare resolved paths so a symlinked checkout cannot silently drop
+			// in-module packages from the key.
+			resolved, err := filepath.EvalSymlinks(directory)
+			if err != nil {
+				return nil, err
+			}
+			relative, err := filepath.Rel(root, resolved)
+			if err != nil {
+				return nil, err
+			}
+			if relative != "." && !filepath.IsLocal(relative) {
+				continue // module cache or GOROOT: pinned by go.sum and go.mod
+			}
+			directories = append(directories, filepath.ToSlash(relative))
+		}
+	}
+	if len(directories) == 0 {
+		return nil, errors.New("releasebuild: agent input packages resolved outside the repository")
+	}
+	slices.Sort(directories)
+	return slices.Compact(directories), nil
+}
+
+func digestPaths(ctx context.Context, repository string, paths []string) (string, error) {
 	root, err := os.OpenRoot(repository)
 	if err != nil {
 		return "", err
