@@ -1,16 +1,25 @@
 # Engineering and developer experience
 
-Status: control-plane implementation in progress. Commands listed in the root README
-run against actual application sources and a real PostgreSQL/Keycloak lab. Broader
-agent, platform and release gates below remain requirements, not passing targets.
+Status: lindm is a development preview, not a production-ready release.
+The commands use real application sources and a PostgreSQL/Keycloak development lab.
+Use the [verification ledger](verification.md) for qualified Tier 1 x86_64 operations and their limits.
+Arm64 release qualification awaits the lab, despite partial native passes.
+Requirements below do not mean that a gate passed.
+
+**Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
+The repository does not include these records or provide public downloads.
 
 ## 1. Maintainability standard
 
 Follow the [Google Go style guide](https://google.github.io/styleguide/go/guide),
 [decisions](https://google.github.io/styleguide/go/decisions), and
-[best practices](https://google.github.io/styleguide/go/best-practices): clarity,
-simplicity, explicit contracts, ownership and useful errors. This is an engineering
-standard, not a claim of Google certification. Linters cannot certify maintainability.
+[best practices](https://google.github.io/styleguide/go/best-practices).
+Keep code clear and simple.
+Define contracts and ownership explicitly.
+Return useful errors.
+
+This standard does not claim Google certification.
+Linters cannot certify maintainability.
 
 - One Go module initially, small cohesive `internal` domain packages, concrete types
   by default, interfaces at real consumer/test boundaries and explicit constructors.
@@ -1124,13 +1133,17 @@ through the real password and WebAuthn flow (CDP virtual authenticator). Credent
 stay in a private 0600 file that is removed afterwards; the report is redacted and
 screenshots mask sensitive and password fields. `lab console -demo` serves the same
 seeded fleet interactively. Its `-feeds` defaults to `fixtures`: the small
-checked-in vendor documents (USN-6859-1, DSA-5724-1, the Fedora 44 sudo
-updateinfo node as a complete controlled repository, and RHSA-2024:6783 with its
-`.sha256`/`.asc` proofs) served from the fixture-owned loopback origin, so the
-console is ready in minutes. Only Fedora devices report AFFECTED there, so the
-accepted and proposed finding exceptions sit on `fedora-ws-03` and the scale
-device. `-feeds real` seeds the full exports described below, as `ui-review`
-always does. The demo owner's admin client waits 20 s for response headers
+checked-in licensed records (USN-6859-1 and RHSA-2024:6783 with its
+`.sha256`/`.asc` proofs) and independently authored synthetic Debian/Fedora
+documents. The fixture-owned loopback origin serves them. The synthetic Fedora
+updateinfo covers only its controlled demo repository. Its fictional assessment
+produces AFFECTED findings on native sudo inventory; it does not prove a vendor
+vulnerability or fix. The accepted and proposed finding exceptions sit on
+`fedora-ws-03` and the scale device. `-feeds real` uses actual vendor exports,
+as `ui-review` always does. Existing real-feed records remain in
+[`lab/ledger.json`](../lab/ledger.json) and the
+[advisory verification ledger](verification.md#l11-distro-advisory-classification).
+The demo owner's admin client waits 20 s for response headers
 (above the server's 15 s RPC bound) and retries reads and `request_id`
 mutations, which the server replays exactly, up to four attempts on
 `deadline_exceeded` or `unavailable`, so one slow call on a loaded host does not
@@ -4227,6 +4240,11 @@ artifact. Their complete unsigned native archives and deterministic OCI archives
 must agree before atomic export. Sharing only this already-compared signed input
 avoids pretending wall-clock-dependent native signatures are reproducible.
 
+The capture selects tracked and non-ignored untracked files from the current working tree.
+It omits Git-reported tracked deletions, whether or not those deletions are staged.
+A file that disappears after selection still stops hashing or copying.
+Do not change the source tree while capture runs.
+
 Native exports cover DEB/RPM and the registry's supported pacman architectures;
 OCI exports are the server and CLI, not the privileged split agent. Every server
 native/OCI artifact includes `/usr/share/lindmd/agent-repository`. It contains
@@ -4245,12 +4263,38 @@ hermetic networking, transparency-log inclusion or SLSA certification. Release
 verification uses an externally obtained public key and key ID, never a trust key
 from the export being checked.
 
+For a self-built operator release, run `make release-keys`, then `make release`.
+The helper generates distinct production-purpose keys and a pinned public trust inventory.
+Private custody remains encrypted at rest.
+It unlocks attestation material in memory and passes the native signing passphrase through a sealed file descriptor.
+The encrypted native GPG custody remains separate from the attestation signer.
+The default bundle is connected; offline platform snapshots are explicit inputs.
+
+The helper disables core dumps and checks swap before it unlocks custody.
+Production signing refuses unencrypted disk swap, even when the parent can lock memory.
+Follow the named `swapoff`, encrypted-swap or RAM-only zram remedy.
+Run the build as your normal user, not root.
+See [self-built releases and signing keys](self-built-releases.md) for custody, verification and backup procedures.
+These controls do not protect a compromised signing workstation.
+
+Native staging uses a private `0700` directory under a validated temporary root.
+Strict native signing custody checks still apply.
+The helper independently verifies the export before atomic move or copy to the selected output.
+Normal errors and cancellation remove temporary staging.
+
+Reproducibility mismatches retain unsigned diagnostics in `artifacts/reproducibility-mismatch-<timestamp>/`.
+The error prints the logical byte size and a quoted cleanup command.
+Retained diagnostics are not a verified release or qualification pass.
+
+Established custodians can use the lower-level release interface:
+
 ```sh
 go run ./cmd/lab release build -repo . -output /private/release-export \
   -version 1.2.3 -revision RELEASE_LABEL -source-date-epoch UNIX_SECONDS \
   -signer-home /private/package-signing -fingerprint PACKAGE_FINGERPRINT \
   -attestation-key /private/attestation.pem -attestation-key-id PINNED_SPKI_ID \
   -oci-ca-bundle /private/approved-roots.pem -oci-ca-sha256 PINNED_CA_SHA256 \
+  -tuf-root-file /private/trusted-root.json -tuf-root-sha256 PINNED_TUF_ROOT_SHA256 \
   -signing-trust-inventory /private/signing-public-inventory.json \
   -signing-trust-inventory-sha256 PINNED_INVENTORY_SHA256
 go run ./cmd/lab release verify -directory /private/release-export \
@@ -4268,13 +4312,15 @@ authenticated offline payload; `--airgap` refuses an absent host-platform add-on
 not just the application artifacts. Transfer this authenticated directory through
 the private customer channel; it is not an automatically created archive.
 
-Production attestation custody is operator-provisioned PKCS#8 mode `0600` with the
-purpose sidecar required by the tool. The strict protobuf `SigningTrustInventory`
-contains authenticated execution and TLS public keys and signed TUF public trust
-metadata, including delegated-role identities. All domains are required. Keys are
-compared by actual public material, not incompatible OpenPGP/TUF identifier strings;
-the same exclusions reach the native package signer. Inventory and CA pins must
-come from an independently authenticated release-custodian process.
+The lower-level file interface accepts dedicated production PKCS#8 custody at mode `0600`, with its required purpose sidecar.
+The operator helper instead uses encrypted custody and a memory-only signer.
+The strict protobuf `SigningTrustInventory` contains authenticated execution, TLS and signed TUF public trust material.
+It includes delegated-role identities. All trust domains are required.
+The builder compares actual public material, not incompatible OpenPGP or TUF identifier strings.
+
+The same exclusions apply to the native package signer.
+Authenticate the inventory and CA pins through the release custodian's independent process.
+Never use a public key from unverified output as its own trust anchor.
 
 OCI images are deterministic nonroot scratch images with a `0555` static executable
 and the explicitly pinned CA bundle at `0444`; that material is covered by the image
@@ -4895,13 +4941,14 @@ and all persistence/confirmation crash boundaries on each advertised platform.
 
 ## 2. Toolchain and quality gates
 
-Pin a supported Go release and `toolchain`, PostgreSQL major/patch image digests, Node
-LTS, package lock, Buf/protoc/Connect generators, sqlc, golangci-lint, govulncheck,
-packaging/signing tools and VM firmware/images. Download/cache through a single
-bootstrap path with verified integrity; CI and local development resolve the same
-versions. Development offline bundles include module/npm/tool/image caches when an
-offline engineering environment is required. Runtime air-gap support does not depend
-on a developer having external package registries.
+Pin a supported Go release and `toolchain`.
+Pin PostgreSQL image digests, Node LTS, the package lock, Buf/protoc/Connect generators, sqlc, golangci-lint and govulncheck.
+Pin packaging/signing tools and VM firmware/images.
+Download and cache dependencies through one bootstrap path that verifies integrity.
+CI and local development resolve the same versions.
+Include module, npm, tool and image caches when an offline engineering environment is required.
+
+Runtime air-gap support does not require developer access to external package registries.
 
 Required Go checks: gofmt, goimports, `go vet`, golangci-lint with staticcheck,
 error-handling and resource-leak checks, govulncheck and race tests. Begin with a small
@@ -4953,10 +5000,18 @@ files that do not exist.
 
 ## 3. One repeatable command surface
 
-Use a small Makefile as orchestration once product code exists. Use Go for lifecycle
-stateful orchestration, declarative manifests for matrices, and existing tools for
-format/lint/build/packaging. Shell recipes should compose tools, not contain a second
-implementation of business logic. CI calls the same targets as developers.
+Use a small Makefile to coordinate commands.
+Use Go for orchestration that manages lifecycle state.
+Use declarative manifests for matrices.
+Use existing tools for formatting, linting, builds and packaging.
+Keep business logic out of shell recipes.
+CI calls the same targets as developers.
+
+These commands manage development fixtures, not production deployments.
+Use the [native installation runbook](security-and-operations.md#native-single-host-installation) for server installation.
+Development keys, certificates and secrets must not enter production.
+The table defines required command contracts; it is not a list of implemented targets.
+Use the root [README](../README.md) for current development commands.
 
 For in-place greenfield migration edits, recover a stale shared development schema
 with `go run ./cmd/devenv recreate-database -confirm-delete`, not a cluster reset.
@@ -4992,11 +5047,12 @@ test endpoint. Missing privilege yields an actionable error, not a swallowed fai
 
 ## 4. Fast loop without weakening evidence
 
-Cache immutable VM images and compiler/module dependencies; use per-test overlays and
-fresh enrollment identities. Do not rebuild installer ISOs or download distribution
-repositories for every provider edit. Keep a cached representative Debian and RPM
-image available locally. PostgreSQL/IdP integration runs in isolated containers;
-boot/session/TPM/encryption tests run on VMs/hardware, not containers.
+Cache immutable VM images and compiler/module dependencies.
+Use per-test overlays and fresh enrollment identities.
+Do not rebuild installer ISOs or download distribution repositories for every provider edit.
+Keep representative Debian and RPM images in the local cache.
+Run PostgreSQL/IdP integration in isolated containers.
+Run boot, session, TPM and encryption tests on VMs or physical hardware, not containers.
 
 Targets on a documented developer machine: focused cached tests within 5 seconds,
 format/lint feedback within 30 seconds, representative cached VM lifecycle within
@@ -5049,11 +5105,11 @@ operator's global configuration, production network or shared mutable device.
 
 ## 5. Contribution and delivery contract
 
-Every change includes intent, threat/compatibility impact, affected P/L requirements,
-actual exercised verification and any unsupported environment. Update docs and release
-notes with behavior changes. Keep commits coherent and reviewable; no claim that a
-planned gate passed. A release manifest references immutable evidence, not a mutable
-"latest successful" badge.
+Describe each change's intent, threat and compatibility impact, affected P/L requirements, exercised verification and unsupported environments.
+Update documentation and release notes when behavior changes.
+Keep commits coherent and reviewable.
+Never claim that a planned gate passed.
+A release manifest references immutable evidence, not a mutable "latest successful" badge.
 
 Each implementation slice requires consecutive implementation and review rounds:
 
@@ -5067,9 +5123,11 @@ Do not manufacture empty corrective commits or superficial tests to satisfy this
 sequence. Do not mix unverified work into a verified implementation commit. Review
 must inspect behavior and failure boundaries, not merely confirm formatting.
 
-The initial specification and automation are committed without selecting a public
-software license on the owner's behalf. Before external distribution, choose product
-licensing and review all source/content redistribution. Clones used for research live
-outside this repo under `~/dev/minor/clones` (third-party sources only; lindm
-worktrees use `cmd/dev worktree`); no vendored commercial Fleet code or
-unattributed documentation copying.
+The owner selected Apache-2.0 for lindm's original code.
+Third-party code and data retain their own terms in `NOTICE` and the bundled license texts.
+
+Preserve upstream copyright, license and attribution notices.
+Review redistribution rights before you add source, data or binary fixtures.
+Keep research clones outside this repository under `~/dev/minor/clones`.
+Use `cmd/dev worktree` for maintainer lindm worktrees.
+Do not vendor commercial Fleet code or copy documentation without attribution.

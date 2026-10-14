@@ -30,6 +30,30 @@ Scopes include resource subsets and successful refusal scenarios.
 A passed refusal does not prove that the refused operation is supported.
 These counts describe that audit snapshot, not a live total or v0.1 release qualification.
 
+## README screenshots
+
+The README images show synthetic demo data from the actual console.
+The frozen source checkout was `548acb5963ff76872f523ea00bb7469d628a9ed5`,
+with the palette from `1b61e22ce`.
+The built `lindmd` SHA-256 was
+`b31d41227c679020b8404f4b05b2545fd0bcfac7a967ff742cb3de9e72daf4bc`.
+The capture used an isolated PostgreSQL fixture, local password authentication
+and browser WebAuthn registration. It did not use native devices.
+The assistance image shows a synthetic ended session record.
+No real screen sharing or remote control occurred.
+
+The eight published images in `docs/images/` are 1440 × 1000 lossless WebP files.
+Their combined size is 318,424 bytes, compared with 832,553 bytes for the PNG originals.
+Both owned fixtures stopped and private one-time credential logs were removed.
+No shared fixture was stopped.
+
+The maintainer-local record is
+`~/.cache/lindm-publicscreens-20261014/image-provenance.json`, SHA-256
+`282954908406849541a8828de87da593d918d16295456dcd69026fe8a851f176`.
+It contains the exact commands, sanitized capture recipes, browser version,
+routes, dimensions, original and optimized hashes, byte sizes and redaction notes.
+That retained JSON is not included in a clone.
+
 ## Device integration performance
 
 The race-enabled `internal/device` package passed twice on the loaded development

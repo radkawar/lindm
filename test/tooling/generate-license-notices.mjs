@@ -52,22 +52,28 @@ async function collect(directory, identity, source, extra = []) {
     entries.push({ identity, source, ...item });
   }
 }
-const products = ["lindmd", "lindm-agent", "lindmctl", "lindm-recovery-build"];
-// An explicitly supplied audit inventory permits initial collection without
-// building web assets. Normal regeneration derives the current product graph.
-const graph = process.argv[2]
-  ? await readFile(process.argv[2], "utf8")
-  : execFileSync(
+const products = ["lindmd", "lindm-agent", "lindmctl", "lindm-recovery-build", "lindm-install"];
+// Cover both Linux artifact architectures, including the exported installer.
+const graph = ["amd64", "arm64"]
+  .map((architecture) =>
+    execFileSync(
       "go",
       [
         "list",
+        "-mod=readonly",
         "-deps",
         "-f",
         "{{with .Module}}{{.Path}}{{end}}",
         ...products.map((p) => `./cmd/${p}`),
       ],
-      { cwd: root, encoding: "utf8" },
-    );
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: { ...process.env, GOOS: "linux", GOARCH: architecture, CGO_ENABLED: "0" },
+      },
+    ),
+  )
+  .join("\n");
 const selected = new Set(graph.split("\n").filter((p) => p && p !== "lindm"));
 const modules = execFileSync(
   "go",
@@ -108,6 +114,7 @@ for (const [path, pkg] of Object.entries(lock.packages)) {
 for (const path of [
   "web/LICENSE.shadcn",
   "web/LICENSE.fonts",
+  "docs/brand/Inter-LICENSE.txt",
   "internal/agent/desktop/keysymdata/LICENSE",
 ]) {
   entries.push({

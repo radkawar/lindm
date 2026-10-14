@@ -9,9 +9,9 @@ COPIED SOURCE AND BUNDLED FONT
 
 shadcn/ui: Copyright (c) 2023 shadcn. MIT License.
 Source: https://github.com/shadcn-ui/ui
-Copied portions: web/src/components/ui, web/src/hooks/use-mobile.ts,
-web/src/styles/shadcn.css and the block-derived console layout. Local changes
-include the documented preset, formatting, accessibility, RTL and CSP changes.
+Copied portions: web/src/components/ui and web/src/styles/shadcn.css.
+Local changes include the documented preset, formatting, accessibility,
+RTL and CSP changes.
 The full copyright and permission notice and detailed provenance are retained
 in web/LICENSE.shadcn. Project additions do not replace the upstream MIT grant.
 
@@ -20,6 +20,12 @@ SIL Open Font License 1.1; full text and reserved-name terms: web/LICENSE.fonts.
 Source: https://github.com/IBM/plex
 Font distribution: pinned @fontsource-variable/ibm-plex-sans package.
 License: https://openfontlicense.org/open-font-license-official-text/
+
+Inter: Copyright 2016-2023 The Inter Project Authors <rasmus@notion.se>.
+Source: https://github.com/rsms/inter
+Brand wordmark outlines use Inter. The original font provenance and published
+OFL-1.1 and Apache-2.0 terms are retained in docs/brand/Inter-LICENSE.txt.
+Project graphics do not replace the upstream font grant.
 
 libxkbcommon xkbcommon-1.11.0: graphical keysym table derived from src/keysym-utf.c.
 Source: https://github.com/xkbcommon/libxkbcommon/tree/xkbcommon-1.11.0
