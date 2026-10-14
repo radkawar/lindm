@@ -94,6 +94,11 @@ const (
 	// and busybox, absent from the authenticated Omarchy ISO's offline
 	// repository; a partial install from rolling mirrors is not used.
 	reasonOmarchyOwnedBoot = "owned-boot recovery fixture packages (systemd-ukify, sbsigntools, busybox) are not on the authenticated Omarchy ISO and partial pacman upgrades are unsupported"
+	// Measured on the installed golden: the console's pacman command starts
+	// with `pacman --sync --needed ca-certificates curl gnupg openssl`, which
+	// fails "target not found" because the offline install leaves no sync
+	// databases; only `omarchy update` against moving mirrors creates them.
+	reasonOmarchyConsoleEnrollment = "the console's pacman install command needs synced databases, and Omarchy 4.0.4's offline install has none (`target not found: ca-certificates`); only `omarchy update` creates them, from moving stable mirrors with no immutable snapshot to pin the lane to, and its ALPM guard aborts the lab's pinned `pacman -Syu`"
 )
 
 func caps(groups ...[]Capability) []Capability { return slices.Concat(groups...) }
@@ -880,7 +885,8 @@ var registry = []*Release{
 		Firewall: "ufw (active)",
 		// The ISO's offline repository supplies cloud-init and the action
 		// prerequisites at the install snapshot; see vmlab omarchy installer.
-		Lab: Lab{Lanes: []LabLane{LaneUpdates, LaneResources}, Installer: OmarchyCidata,
+		Lab: Lab{Lanes: []LabLane{LaneUpdates, LaneResources, LaneServices}, Installer: OmarchyCidata,
+			LaneGates: map[LabLane]LaneGate{LaneEnrollFromConsole: {Reason: reasonOmarchyConsoleEnrollment}},
 			// Arch's resource tools as shipped on the 4.0.4 ISO (no firewalld).
 			ResourcePackages: []string{"gnupg", "openssl", "python", "attr", "acl", "curl", "libarchive", "zstd", "pacman-contrib", "nftables", "libpwquality", "pam", "pambase"},
 			Guest:            LabGuest{Actions: []string{"cryptsetup", "nftables", "iproute2", "iputils", "tpm2-tools", "bind", "curl"}, FromInstaller: true},
