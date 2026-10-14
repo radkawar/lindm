@@ -39,8 +39,9 @@ func (r rejectIdentityTransport) RoundTrip(*http.Request) (*http.Response, error
 func localIntegrationService(t *testing.T) (*Service, context.Context, *pgxpool.Pool) {
 	t.Helper()
 	pool, _ := testdb.Open(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-	t.Cleanup(cancel)
+	// The fixture lives for the test, not one shared login-operation deadline.
+	// Policy cases each perform real password hashing before the next flow.
+	ctx := t.Context()
 	s, err := New(ctx, pool, Config{Local: true, PublicURL: localTestOrigin, HTTPClient: &http.Client{Transport: rejectIdentityTransport{t}}})
 	if err != nil {
 		t.Fatal(err)

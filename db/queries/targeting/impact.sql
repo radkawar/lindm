@@ -19,7 +19,33 @@ AND (sqlc.arg(all_devices)::boolean OR d.id = ANY(sqlc.arg(device_ids)::uuid[])
  OR EXISTS (SELECT 1 FROM device_group_memberships m WHERE m.device_id=d.id AND m.group_id=ANY(sqlc.arg(group_ids)::uuid[])))
 ORDER BY d.id LIMIT 200;
 
--- name: InsertImpactDevice :exec
+-- name: ListImpactDevicePage :many
+-- Load the same scoped, locked TargetingDevice inputs for one candidate page.
+-- Candidate visibility remains separate so hidden members make the report
+-- incomplete without disclosing their inputs or aggregate counts.
+SELECT d.id, d.current_generation_id, d.state,
+ coalesce(h.hostname_value,'')::text AS hostname,
+ coalesce(h.os_id_value,'')::text AS os_id,
+ coalesce(h.os_version_value,'')::text AS os_version,
+ coalesce(h.hostname_status,0)::smallint AS hostname_status,
+ coalesce(h.os_id_status,0)::smallint AS os_id_status,
+ coalesce(h.os_version_status,0)::smallint AS os_version_status,
+ coalesce(g.host_sequence,0)::bigint AS host_sequence,
+ coalesce(h.digest,''::bytea)::bytea AS host_digest,
+ d.architecture, d.last_seen_at, h.received_at AS host_received_at, d.metadata,
+ ARRAY(SELECT label FROM device_labels WHERE device_id=d.id ORDER BY label)::text[] AS labels,
+ ARRAY(SELECT group_id::text FROM device_group_memberships WHERE device_id=d.id ORDER BY group_id)::text[] AS groups,
+ coalesce((SELECT preview_id::text FROM target_execution_heads WHERE device_id=d.id),'')::text AS previous_preview_id,
+ coalesce((SELECT assignment_id::text FROM resource_assignment_heads WHERE generation_id=d.current_generation_id),'')::text AS resource_assignment_id
+FROM devices d
+LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
+LEFT JOIN host_observations h ON h.generation_id=g.id AND h.sequence=g.host_sequence
+WHERE d.id=ANY(sqlc.arg(device_ids)::uuid[])
+AND device_scope_matches(d.id, sqlc.arg(unrestricted)::boolean, sqlc.arg(scopes)::jsonb)
+ORDER BY d.id LIMIT 200
+FOR UPDATE OF d;
+
+-- name: InsertImpactDevice :copyfrom
 INSERT INTO target_assignment_impact_devices(report_id,device_id,document) VALUES ($1,$2,$3);
 
 -- name: InsertImpactReport :exec

@@ -6,11 +6,16 @@ package advisory
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"lindm/internal/advisory/advisorydb"
 )
@@ -19,31 +24,46 @@ import (
 // vendor acquisition or native package execution.
 func TestAdvisoryGenerationCleanupResumesAfterCancellation(t *testing.T) {
 	f := newStreamPublicationFixture(t)
+	tracer := new(generationCleanupTracer)
+	config := f.pool.Config()
+	config.ConnConfig.Tracer = tracer
+	pool, err := pgxpool.NewWithConfig(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(pool.Close)
+	service, err := New(t.Context(), pool, f.service.config, http.DefaultClient)
+	if err != nil {
+		t.Fatal(err)
+	}
 	retired := seedStreamCleanupGeneration(t, f, 5001)
 	queueStreamGenerationCleanup(t, f, retired)
 
-	more, err := f.service.cleanupAdvisoryGenerationBatch(t.Context())
+	bounded, cancelBatch := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancelBatch()
+	more, err := service.cleanupAdvisoryGenerationBatch(bounded)
 	if err != nil || !more {
 		t.Fatalf("first cleanup batch: more=%v err=%v", more, err)
 	}
+	assertGenerationCleanupPlan(t, f.pool, tracer.sql, f.source.Id, retired)
 	assertStreamCleanupGeneration(t, f, retired, 1, 1)
 	f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+1, 1)
 	f.assertUnchanged(t, f.before, f.findings)
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if err := f.service.drainAdvisoryGenerationCleanup(ctx); !errors.Is(err, context.Canceled) {
+	if err := service.drainAdvisoryGenerationCleanup(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("canceled cleanup returned %v, want context.Canceled", err)
 	}
 	assertStreamCleanupGeneration(t, f, retired, 1, 1)
 
-	if err := f.service.drainAdvisoryGenerationCleanup(t.Context()); err != nil {
+	if err := service.drainAdvisoryGenerationCleanup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	assertStreamCleanupGeneration(t, f, retired, 0, 0)
 	f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount, 0)
 	f.assertUnchanged(t, f.before, f.findings)
-	if more, err := f.service.cleanupAdvisoryGenerationBatch(t.Context()); err != nil || more {
+	if more, err := service.cleanupAdvisoryGenerationBatch(t.Context()); err != nil || more {
 		t.Fatalf("drained cleanup queue still has work: more=%v err=%v", more, err)
 	}
 }
@@ -194,4 +214,64 @@ func assertStreamCleanupGeneration(t *testing.T, f *streamPublicationFixture, ge
 	if gotRecords != records || gotQueued != queued {
 		t.Fatalf("generation %s: records=%d queued=%d; want records=%d queued=%d", generation, gotRecords, gotQueued, records, queued)
 	}
+}
+
+// Capture the executed sqlc statement rather than duplicating its deletion SQL.
+type generationCleanupTracer struct {
+	sql string
+}
+
+func (c *generationCleanupTracer) TraceQueryStart(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	if strings.HasPrefix(data.SQL, "-- name: DeleteInactiveAdvisoryGenerationBatch ") {
+		c.sql = data.SQL
+	}
+	return ctx
+}
+
+func (*generationCleanupTracer) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+func assertGenerationCleanupPlan(t *testing.T, pool *pgxpool.Pool, statement, feedID string, generation uuid.UUID) {
+	t.Helper()
+	if statement == "" {
+		t.Fatal("generation cleanup did not execute its bounded deletion")
+	}
+	var plan []byte
+	if err := pool.QueryRow(t.Context(), "EXPLAIN (FORMAT JSON) "+statement, feedID, generation).Scan(&plan); err != nil {
+		t.Fatal(err)
+	}
+	var root []struct{ Plan planNode }
+	if err := json.Unmarshal(plan, &root); err != nil {
+		t.Fatal(err)
+	}
+	if len(root) != 1 {
+		t.Fatalf("unexpected generation cleanup plan:\n%s", plan)
+	}
+	// Fresh private generations need not have ANALYZE statistics. Even when
+	// estimated as one row, deleting a batch must not repeat its bounded scan
+	// as the inner side of a loop over every row in the generation. This also
+	// rejects a materialized victim set repeatedly joined against those rows;
+	// a scalar prefix boundary is instead computed once by an InitPlan.
+	var scansBatch func(planNode, bool) bool
+	scansBatch = func(node planNode, limited bool) bool {
+		limited = limited || node.NodeType == "Limit"
+		if node.NodeType == "CTE Scan" || limited && node.RelationName == "advisory_record_generations" {
+			return true
+		}
+		for _, child := range node.Plans {
+			if scansBatch(child, limited) {
+				return true
+			}
+		}
+		return false
+	}
+	var walk func(planNode)
+	walk = func(node planNode) {
+		if node.NodeType == "Nested Loop" && len(node.Plans) > 1 && scansBatch(node.Plans[len(node.Plans)-1], false) {
+			t.Fatalf("generation cleanup rescans the victim batch for every generation row:\n%s", plan)
+		}
+		for _, child := range node.Plans {
+			walk(child)
+		}
+	}
+	walk(root[0].Plan)
 }

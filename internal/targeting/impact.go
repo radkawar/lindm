@@ -201,11 +201,14 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 	h := sha256.New()
 	_, _ = h.Write(catalog.digest)
 	totalBytes, scanned := 0, 0
+	page := impactDevicePage{ids: make([]uuid.UUID, 0, 200)}
+	batch := impactDeviceBatch{report: retain}
 	for {
-		rows, err := q.ListImpactCandidates(ctx, params)
+		rows, devices, err := page.load(ctx, q, params, maxImpactDevices-scanned)
 		if err != nil {
 			return nil, nil, err
 		}
+		deviceIndex := 0
 		stop := false
 		for _, candidate := range rows {
 			params.AfterID = candidate.ID
@@ -224,11 +227,12 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 				continue
 			}
 			report.CandidateCount++
-			// TargetingDevice already locks the scoped row; the report uses one
-			// pinned evaluation clock rather than querying the clock per member.
-			device, err := q.TargetingDevice(ctx, targetingdb.TargetingDeviceParams{DeviceID: candidate.ID, Unrestricted: params.Unrestricted, Scopes: params.Scopes})
-			if err != nil {
-				return nil, nil, err
+			// The bounded preload locks the same scoped inputs in device-ID
+			// order. Keep one pinned evaluation clock for the whole report.
+			device := targetingdb.TargetingDeviceRow(devices[deviceIndex])
+			deviceIndex++
+			if device.ID != candidate.ID {
+				return nil, nil, ErrRejected
 			}
 			e, err := evaluationFromDevice(q, device, now.Time)
 			if err != nil {
@@ -272,26 +276,19 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 			}
 			_, _ = h.Write(input)
 			_, _ = h.Write(digest("impact.device", b))
-			if retain != nil {
-				if err := q.InsertImpactDevice(ctx, targetingdb.InsertImpactDeviceParams{ReportID: *retain, DeviceID: device.ID, Document: b}); err != nil {
-					return nil, nil, err
-				}
+			if err := batch.append(ctx, q, device.ID, b); err != nil {
+				return nil, nil, err
 			}
 			countImpactDevice(report, rawMatch, match, e.timeLimit)
-			// Change and adoption counts cover only devices a rollout plans (the
-			// StartRollout planner): a device without an active generation keeps
-			// its row, marked device_not_active, but no rollout would change it.
-			if device.CurrentGenerationID != nil && device.State == "active" {
-				if match == included {
-					countAdoption(report, proposed)
-				}
-				countImpactChange(report, match, changed, direct)
-			}
+			countPlannableImpact(report, device, proposed, match, changed, direct)
 			if plan != nil {
 				if err := plan(plannedDevice{id: device.ID, generation: device.CurrentGenerationID, state: device.State, match: match, proposed: proposed, changed: changed, head: device.ResourceAssignmentID}); err != nil {
 					return nil, nil, err
 				}
 			}
+		}
+		if err := batch.flush(ctx, q); err != nil {
+			return nil, nil, err
 		}
 		if stop || len(rows) < 200 {
 			break
@@ -303,6 +300,90 @@ func (s *Store) evaluateImpact(ctx context.Context, tx pgx.Tx, q *targetingdb.Qu
 	}
 	_, _ = h.Write(dependencies)
 	return report, h.Sum(nil), nil
+}
+
+// impactDevicePage reuses the candidate-ID buffer while loading the same scoped,
+// locked inputs in bounded device-ID order.
+type impactDevicePage struct {
+	ids []uuid.UUID
+}
+
+func (page *impactDevicePage) load(ctx context.Context, q *targetingdb.Queries, params targetingdb.ListImpactCandidatesParams, remaining int) ([]targetingdb.ListImpactCandidatesRow, []targetingdb.ListImpactDevicePageRow, error) {
+	rows, err := q.ListImpactCandidates(ctx, params)
+	if err != nil {
+		return nil, nil, err
+	}
+	page.ids = page.ids[:0]
+	for _, candidate := range rows[:min(len(rows), remaining)] {
+		if candidate.Visible {
+			page.ids = append(page.ids, candidate.ID)
+		}
+	}
+	if len(page.ids) == 0 {
+		return rows, nil, nil
+	}
+	devices, err := q.ListImpactDevicePage(ctx, targetingdb.ListImpactDevicePageParams{DeviceIds: page.ids, Unrestricted: params.Unrestricted, Scopes: params.Scopes})
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(devices) != len(page.ids) {
+		return nil, nil, pgx.ErrNoRows
+	}
+	return rows, devices, nil
+}
+
+// impactDeviceBatch replaces per-member insert round trips with COPY, retaining
+// at most 200 rows and 1 MiB of documents. Reevaluation without retention never
+// allocates a row buffer.
+type impactDeviceBatch struct {
+	report *uuid.UUID
+	rows   []targetingdb.InsertImpactDeviceParams
+	bytes  int
+}
+
+func (batch *impactDeviceBatch) append(ctx context.Context, q *targetingdb.Queries, device uuid.UUID, document []byte) error {
+	if batch.report == nil {
+		return nil
+	}
+	if batch.rows == nil {
+		batch.rows = make([]targetingdb.InsertImpactDeviceParams, 0, 200)
+	}
+	if batch.bytes+len(document) > maxDocumentBytes {
+		if err := batch.flush(ctx, q); err != nil {
+			return err
+		}
+	}
+	batch.rows = append(batch.rows, targetingdb.InsertImpactDeviceParams{ReportID: *batch.report, DeviceID: device, Document: document})
+	batch.bytes += len(document)
+	if len(batch.rows) == cap(batch.rows) {
+		return batch.flush(ctx, q)
+	}
+	return nil
+}
+
+func (batch *impactDeviceBatch) flush(ctx context.Context, q *targetingdb.Queries) error {
+	if len(batch.rows) == 0 {
+		return nil
+	}
+	if _, err := q.InsertImpactDevice(ctx, batch.rows); err != nil {
+		return err
+	}
+	clear(batch.rows)
+	batch.rows = batch.rows[:0]
+	batch.bytes = 0
+	return nil
+}
+
+// Change and adoption counts cover only devices a rollout plans. A device without
+// an active generation keeps its reviewed row, but no rollout would change it.
+func countPlannableImpact(report *adminv1.PreviewTargetAssignmentImpactResponse, device targetingdb.TargetingDeviceRow, proposed *policyv1.TargetResolution, match policyv1.TargetMatch, changed, direct bool) {
+	if device.CurrentGenerationID == nil || device.State != "active" {
+		return
+	}
+	if match == included {
+		countAdoption(report, proposed)
+	}
+	countImpactChange(report, match, changed, direct)
 }
 
 // dependencyDigest binds the groups, definitions and rollouts the report read.

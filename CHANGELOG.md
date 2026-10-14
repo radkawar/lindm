@@ -24,3 +24,6 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Preserve first-owner audit records when testing bounded exports, and release only each acquired test lease in concurrent capacity checks.
 - Add the committer's DCO sign-off to verified maintainer landings and gate commits.
 - Keep an admitted main-branch CI run active when another commit arrives. Cancel superseded runs only for pull requests.
+- Delete bounded advisory cleanup victims directly, without rescanning the batch for each staged record.
+- Preload impact inputs in scoped, locked pages and retain impact rows through count- and byte-bounded PostgreSQL COPY batches. Keep the existing build deadline and report limits.
+- Give local-authentication fixtures the test's lifetime instead of sharing one login-operation deadline across independent password-hashing flows.

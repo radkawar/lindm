@@ -64,14 +64,19 @@ ON CONFLICT(feed_id,generation,id) DO NOTHING;
 DELETE FROM advisory_publication_batch WHERE publication_id=$1;
 
 -- name: DeleteInactiveAdvisoryGenerationBatch :execrows
-WITH doomed AS (
+-- Materialize the bounded, sorted victims once, then delete the generation's
+-- prefix through the final victim. An active generation yields no boundary.
+-- Fresh staging generations have no useful planner statistics: joining their
+-- IDs can rescan the entire victim batch for every row in the generation.
+WITH doomed AS MATERIALIZED (
  SELECT r.id FROM advisory_record_generations r
  WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
   AND NOT EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.id=sqlc.arg('feed_id') AND f.revision=sqlc.arg('generation'))
  ORDER BY r.id LIMIT 5000
 )
-DELETE FROM advisory_record_generations r USING doomed
-WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation') AND r.id=doomed.id;
+DELETE FROM advisory_record_generations r
+WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
+ AND r.id<=(SELECT id FROM doomed ORDER BY id DESC LIMIT 1);
 
 -- name: StartAdvisoryGeneration :exec
 INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)

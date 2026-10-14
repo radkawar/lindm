@@ -507,14 +507,15 @@ func (q *Queries) DeleteAdvisoryPublicationBatch(ctx context.Context, publicatio
 }
 
 const deleteInactiveAdvisoryGenerationBatch = `-- name: DeleteInactiveAdvisoryGenerationBatch :execrows
-WITH doomed AS (
+WITH doomed AS MATERIALIZED (
  SELECT r.id FROM advisory_record_generations r
  WHERE r.feed_id=$1 AND r.generation=$2
   AND NOT EXISTS (SELECT 1 FROM advisory_feeds f WHERE f.id=$1 AND f.revision=$2)
  ORDER BY r.id LIMIT 5000
 )
-DELETE FROM advisory_record_generations r USING doomed
-WHERE r.feed_id=$1 AND r.generation=$2 AND r.id=doomed.id
+DELETE FROM advisory_record_generations r
+WHERE r.feed_id=$1 AND r.generation=$2
+ AND r.id<=(SELECT id FROM doomed ORDER BY id DESC LIMIT 1)
 `
 
 type DeleteInactiveAdvisoryGenerationBatchParams struct {
@@ -522,6 +523,10 @@ type DeleteInactiveAdvisoryGenerationBatchParams struct {
 	Generation uuid.UUID
 }
 
+// Materialize the bounded, sorted victims once, then delete the generation's
+// prefix through the final victim. An active generation yields no boundary.
+// Fresh staging generations have no useful planner statistics: joining their
+// IDs can rescan the entire victim batch for every row in the generation.
 func (q *Queries) DeleteInactiveAdvisoryGenerationBatch(ctx context.Context, arg DeleteInactiveAdvisoryGenerationBatchParams) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteInactiveAdvisoryGenerationBatch, arg.FeedID, arg.Generation)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -374,11 +375,77 @@ func TestImpactPaginationRetentionAndProposalBinding(t *testing.T) {
 	}
 }
 
+// Count actual PostgreSQL round trips, not SQL text or a simulated database.
+type impactCountingTx struct {
+	pgx.Tx
+	calls, copies           int
+	copiedRows, maxCopyRows int64
+	maxCopyBytes            int
+}
+
+func (tx *impactCountingTx) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+	tx.calls++
+	return tx.Tx.Exec(ctx, sql, args...)
+}
+
+func (tx *impactCountingTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	tx.calls++
+	return tx.Tx.Query(ctx, sql, args...)
+}
+
+func (tx *impactCountingTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	tx.calls++
+	return tx.Tx.QueryRow(ctx, sql, args...)
+}
+
+func (tx *impactCountingTx) CopyFrom(ctx context.Context, table pgx.Identifier, columns []string, source pgx.CopyFromSource) (int64, error) {
+	tx.calls++
+	tx.copies++
+	counted := &impactCountingSource{CopyFromSource: source}
+	n, err := tx.Tx.CopyFrom(ctx, table, columns, counted)
+	tx.copiedRows += n
+	tx.maxCopyRows = max(tx.maxCopyRows, n)
+	tx.maxCopyBytes = max(tx.maxCopyBytes, counted.bytes)
+	return n, err
+}
+
+type impactCountingSource struct {
+	pgx.CopyFromSource
+	bytes int
+}
+
+func (source *impactCountingSource) Values() ([]any, error) {
+	values, err := source.CopyFromSource.Values()
+	if err != nil {
+		return nil, err
+	}
+	for _, value := range values {
+		if b, ok := value.([]byte); ok {
+			source.bytes += len(b)
+		}
+	}
+	return values, nil
+}
+
 func TestImpactTenThousandCandidatesAndOverflow(t *testing.T) {
 	f := newTargetingFixture(t)
 	group := f.impactGroup(t, maxImpactDevices)
 	r := f.impactRequest(impactGroup(group))
-	report := f.impact(t, r)
+	var report *adminv1.PreviewTargetAssignmentImpactResponse
+	var counted *impactCountingTx
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
+		counted = &impactCountingTx{Tx: tx}
+		var err error
+		report, err = f.store.Impact(t.Context(), counted, f.actor, r, emptyImpact)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A per-device input read or insert would exceed this by two orders of
+	// magnitude. The canonical RPC/resource regression remains a separate test.
+	if counted.calls > 200 || counted.copies != 50 || counted.copiedRows != maxImpactDevices || counted.maxCopyRows > 200 || counted.maxCopyBytes > maxDocumentBytes {
+		t.Fatalf("10k impact did not batch bounded real database work: calls=%d copies=%d rows=%d max_rows=%d max_bytes=%d", counted.calls, counted.copies, counted.copiedRows, counted.maxCopyRows, counted.maxCopyBytes)
+	}
 	if !report.Complete || report.EvaluatedDeviceCount != maxImpactDevices || report.CandidateCount != maxImpactDevices || len(report.Devices) != 20 {
 		t.Fatalf("normal 10k cohort not supported: %v", report)
 	}
@@ -428,12 +495,17 @@ func TestImpactByteAwarePagesNeverSkipLargeRows(t *testing.T) {
 		return &policyv1.TargetResolution{}, &policyv1.TargetResolution{Resources: []*policyv1.ResolvedResource{{Reason: strings.Repeat("x", 400000)}}}, nil
 	}
 	var report *adminv1.PreviewTargetAssignmentImpactResponse
+	var counted *impactCountingTx
 	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
+		counted = &impactCountingTx{Tx: tx}
 		var err error
-		report, err = f.store.Impact(t.Context(), tx, f.actor, r, resolve)
+		report, err = f.store.Impact(t.Context(), counted, f.actor, r, resolve)
 		return err
 	}); err != nil {
 		t.Fatal(err)
+	}
+	if counted.copiedRows != 4 || counted.copies != 2 || counted.maxCopyBytes > maxDocumentBytes {
+		t.Fatalf("large impact rows escaped the COPY byte bound: rows=%d copies=%d max_bytes=%d", counted.copiedRows, counted.copies, counted.maxCopyBytes)
 	}
 	if len(report.Devices) != 2 || report.NextAfterDeviceId == nil {
 		t.Fatalf("page did not shrink to byte ceiling: rows=%d", len(report.Devices))

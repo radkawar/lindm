@@ -172,6 +172,10 @@ func TestAdvisoryStreamPublicationFailurePreservesActiveGeneration(t *testing.T)
 			release, cancel, result := f.startBlocked(t, "failed", 2*advisoryPublicationBatchSize+1, 2*advisoryPublicationBatchSize, failure)
 			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount+2*advisoryPublicationBatchSize, 2*advisoryPublicationBatchSize)
 			f.assertUnchanged(t, f.before, f.findings)
+			var staging uuid.UUID
+			if err := f.pool.QueryRow(t.Context(), "SELECT generation FROM advisory_generation_cleanup WHERE feed_id=$1 AND generation<>$2", f.source.Id, f.before.Revision).Scan(&staging); err != nil {
+				t.Fatal(err)
+			}
 			wantErr := producerErr
 			if canceled {
 				cancel()
@@ -179,11 +183,14 @@ func TestAdvisoryStreamPublicationFailurePreservesActiveGeneration(t *testing.T)
 			} else {
 				close(release)
 			}
-			if err := awaitStreamPublication(t, result); !errors.Is(err, wantErr) {
+			// Completion includes the detached cleanup, not just producer exit.
+			// Do not let the caller's 30-second ceiling hide a cleanup stall.
+			if err := awaitStreamPublicationWithin(t, result, 5*time.Second); !errors.Is(err, wantErr) {
 				t.Fatalf("publication error = %v, want %v", err, wantErr)
 			}
 			f.assertUnchanged(t, f.before, f.findings)
 			f.assertStorage(t, f.before.AdvisoryCount, f.before.AdvisoryCount, 0)
+			assertStreamCleanupGeneration(t, f, staging, 0, 0)
 		})
 	}
 }
@@ -430,15 +437,15 @@ func (f *streamPublicationFixture) startBlocked(t *testing.T, label string, coun
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		result <- f.service.publishStream(ctx, f.source, f.before.CheckedAt.Time.Add(time.Second), func(_ context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
+		result <- f.service.publishStream(ctx, f.source, f.before.CheckedAt.Time.Add(time.Second), func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, _ func() error) (*advisoryv1.FeedDocument, error) {
 			if err := f.emit(label, 0, pauseAfter, emit); err != nil {
 				return nil, err
 			}
 			close(staged)
 			select {
 			case <-release:
-			case <-ctx.Done():
-				return nil, ctx.Err()
+			case <-producerCtx.Done():
+				return nil, context.Cause(producerCtx)
 			}
 			if err := f.emit(label, pauseAfter, count, emit); err != nil {
 				return nil, err
@@ -469,10 +476,15 @@ func (f *streamPublicationFixture) startBlocked(t *testing.T, label string, coun
 
 func awaitStreamPublication(t *testing.T, result <-chan error) error {
 	t.Helper()
+	return awaitStreamPublicationWithin(t, result, 30*time.Second)
+}
+
+func awaitStreamPublicationWithin(t *testing.T, result <-chan error, timeout time.Duration) error {
+	t.Helper()
 	select {
 	case err := <-result:
 		return err
-	case <-time.After(30 * time.Second):
+	case <-time.After(timeout):
 		t.Fatal("stream publication did not complete")
 		return nil
 	}

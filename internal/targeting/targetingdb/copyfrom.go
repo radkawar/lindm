@@ -11,6 +11,40 @@ import (
 	"context"
 )
 
+// iteratorForInsertImpactDevice implements pgx.CopyFromSource.
+type iteratorForInsertImpactDevice struct {
+	rows                 []InsertImpactDeviceParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertImpactDevice) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertImpactDevice) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].ReportID,
+		r.rows[0].DeviceID,
+		r.rows[0].Document,
+	}, nil
+}
+
+func (r iteratorForInsertImpactDevice) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertImpactDevice(ctx context.Context, arg []InsertImpactDeviceParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"target_assignment_impact_devices"}, []string{"report_id", "device_id", "document"}, &iteratorForInsertImpactDevice{rows: arg})
+}
+
 // iteratorForInsertRolloutMember implements pgx.CopyFromSource.
 type iteratorForInsertRolloutMember struct {
 	rows                 []InsertRolloutMemberParams
