@@ -43,9 +43,31 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 	if handler == nil || cfg.NetworkUID == 0 || cfg.NetworkGID == 0 || cfg.SocketName == "" {
 		return errors.New("invalid executor listener")
 	}
-	compiled, err := protovalidate.New(protovalidate.WithMessages(
+	compiled, err := executorValidator()
+	if err != nil {
+		return err
+	}
+	path, rpc := agentv1connect.NewExecutorServiceHandler(handler,
+		connect.WithInterceptors(validate.NewInterceptor(validate.WithValidator(compiled))),
+		connect.WithReadMaxBytes(maxMessageBytes),
+		connect.WithSendMaxBytes(maxMessageBytes),
+		connect.WithCodec(strictJSONCodec{name: "json"}),
+		connect.WithCodec(strictJSONCodec{name: "json; charset=utf-8"}),
+	)
+	limited := http.MaxBytesHandler(rpc, maxMessageBytes+maxMessageOverhead)
+	mux := http.NewServeMux()
+	mux.Handle(path, &peerGate{networkUID: cfg.NetworkUID, next: limited, slots: make(chan struct{}, maxInFlight)})
+	return serveSocket(ctx, cfg.Directory, cfg.SocketName, executorAccess(cfg.NetworkGID), mux)
+}
+
+// executorValidator compiles every executor request eagerly. Lazy compilation
+// is off, so a request missing here fails every call with "no evaluator
+// available" before its handler runs (ImportOfflineEnrollment did).
+func executorValidator() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.PrepareBootstrapRequest{},
 		&agentv1.InstallEnrollmentRequest{},
+		&agentv1.ImportOfflineEnrollmentRequest{},
 		&agentv1.GetConnectionRequest{},
 		&agentv1.SignTLSClientMessageRequest{},
 		&agentv1.PrepareSessionRequest{},
@@ -80,20 +102,6 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 		&agentv1.StatusRequest{},
 		&agentv1.SyncAssistanceRequest{},
 	), protovalidate.WithDisableLazy())
-	if err != nil {
-		return err
-	}
-	path, rpc := agentv1connect.NewExecutorServiceHandler(handler,
-		connect.WithInterceptors(validate.NewInterceptor(validate.WithValidator(compiled))),
-		connect.WithReadMaxBytes(maxMessageBytes),
-		connect.WithSendMaxBytes(maxMessageBytes),
-		connect.WithCodec(strictJSONCodec{name: "json"}),
-		connect.WithCodec(strictJSONCodec{name: "json; charset=utf-8"}),
-	)
-	limited := http.MaxBytesHandler(rpc, maxMessageBytes+maxMessageOverhead)
-	mux := http.NewServeMux()
-	mux.Handle(path, &peerGate{networkUID: cfg.NetworkUID, next: limited, slots: make(chan struct{}, maxInFlight)})
-	return serveSocket(ctx, cfg.Directory, cfg.SocketName, executorAccess(cfg.NetworkGID), mux)
 }
 
 func serveSocket(ctx context.Context, directory, name string, access socketAccess, handler http.Handler) error {
