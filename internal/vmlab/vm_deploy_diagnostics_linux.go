@@ -32,6 +32,13 @@ func executeDeployInstaller(ctx context.Context, guest *guestVM, options VMDeplo
 	}
 	recipient := options.CustodyEscrowRecipientFile
 	captureErr := writeDeployInstallerDiagnostics(recipient, options.EvidenceDirectory, filepath.Base(destination), output.Stdout, output.Stderr)
+	diagnostic, diagnosticErr := guest.runResult(ctx, "sudo -n sh -eu -c 'chmod 0755 /root/lindm-deploy-input/lab-helper; /root/lindm-deploy-input/lab-helper deploy database-diagnostic'", nil, 64<<10, time.Minute)
+	defer clear(diagnostic.Stdout)
+	defer clear(diagnostic.Stderr)
+	captureErr = errors.Join(captureErr, writeDeployInstallerDiagnostics(recipient, options.EvidenceDirectory, filepath.Base(destination)+"-database", diagnostic.Stdout, diagnostic.Stderr))
+	if diagnosticErr != nil || diagnostic.ExitCode != 0 {
+		captureErr = errors.Join(captureErr, errors.New("lab database failure observer did not complete"))
+	}
 	if err != nil {
 		return errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
 	}

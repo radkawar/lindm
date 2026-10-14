@@ -44,3 +44,14 @@ func runDeployIntegrationProof(ctx context.Context, args []string, stdout, stder
 	}
 	return json.NewEncoder(stdout).Encode(proof)
 }
+
+func runDeployDatabaseDiagnostic(ctx context.Context, args []string, stdout io.Writer) error {
+	if len(args) != 0 {
+		return errors.New("deploy database-diagnostic accepts no arguments or credentials")
+	}
+	result, err := vmlab.ObserveDeployDatabaseDiagnostic(ctx)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(result)
+}

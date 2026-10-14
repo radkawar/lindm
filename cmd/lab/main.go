@@ -29,6 +29,9 @@ func main() {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "deploy" {
+		if len(args) > 1 && args[1] == "database-diagnostic" {
+			return runDeployDatabaseDiagnostic(ctx, args[2:], stdout)
+		}
 		if len(args) > 1 && args[1] == "integrations-proof" {
 			return runDeployIntegrationProof(ctx, args[2:], stdout, stderr)
 		}

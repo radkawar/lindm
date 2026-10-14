@@ -4059,6 +4059,14 @@ bundled `release-root.json`. It does not pass the unsupported installer flag
 the observer keeps only bounded streams in protected memory and writes separate
 `lindm-release-*-stdout.age` / `lindm-release-*-stderr.age` lab-only ciphertexts
 before cleanup, never plaintext diagnostics or product/support artifacts.
+Failed installer observations also retain a separate encrypted database diagnosis
+before guest cleanup. A lab-only root helper uses the same protected migrator
+configuration, TLS policy and locked-memory gate. It reports only successful
+staging/pool/query booleans, the four enforced migrator privilege predicates,
+fixed error categories and validated five-character SQLSTATE values. It never
+returns driver messages, URLs, passwords or names from customer input. Diagnosis
+does not change roles or qualify a failed run. The observer is compiled into
+`lab`, not the product installer, `lindmd` or `lindmctl`.
 
 #### Durable laboratory custody escrow
 
