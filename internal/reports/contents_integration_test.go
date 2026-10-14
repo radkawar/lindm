@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -77,6 +78,24 @@ VALUES($1,$2,1,$3,$4,$5,$6,$7)`, assignment, id, id.String()+".service", i, []by
 	for i, want := range []string{"ATTENTION", "ATTENTION", "ATTENTION", "STALE", "DRIFT_REMEDIATED", "UNKNOWN"} {
 		if states[resources[i].String()] != want {
 			t.Fatalf("resource %d state=%q want=%q", i, states[resources[i].String()], want)
+		}
+	}
+	output.Reset()
+	count, err = writeDomainReport(ctx, reportdb.New(pool), &output, integrationsv1.ReportKind_REPORT_KIND_COMPLIANCE, integrationsv1.ReportFormat_REPORT_FORMAT_CSV)
+	if err != nil || count != 6 {
+		t.Fatalf("compliance CSV row count=%d: %v", count, err)
+	}
+	complianceCSV, err := csv.NewReader(&output).ReadAll()
+	if err != nil || len(complianceCSV) != 7 {
+		t.Fatalf("compliance CSV rows=%v: %v", complianceCSV, err)
+	}
+	wantColumns := []string{"device_id", "assignment_id", "resource_id", "resource_kind", "canonical_key", "reason", "last_verified_at", "observed_at", "state"}
+	if !slices.Equal(complianceCSV[0], wantColumns) {
+		t.Fatalf("compliance CSV columns=%v want=%v", complianceCSV[0], wantColumns)
+	}
+	for _, row := range complianceCSV[1:] {
+		if row[0] != device.String() || row[1] != assignment.String() || row[3] != "1" || row[4] != row[2]+".service" || row[8] != states[row[2]] {
+			t.Fatalf("compliance CSV lost typed resource identity or state: %v", row)
 		}
 	}
 	finding, set := uuid.New(), uuid.New()

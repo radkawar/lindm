@@ -2689,6 +2689,13 @@ jobs cannot expose partial chunks. Retention removes expired artifacts in bounde
 batches; audit-chain source continuity is retained independently of artifact expiry.
 Large packages and release payloads still belong in the external artifact store.
 
+Compliance CSV and JSON retain `resource_id`, the numeric `resource_kind`
+(`lindm.resource.v1.ResourceKind`), and `canonical_key`, so evidence identifies the
+affected native name, path or package rather than only an opaque UUID. CSV uses
+the same snake-case fields as JSON; `resource_kind` and `canonical_key` replace the
+obsolete service-only `unit_name` column. CSV neutralizes spreadsheet formulas;
+JSON preserves the exact canonical key.
+
 ## 7. Deliberate tradeoffs
 
 - Connect avoids separate browser API and transport gateway; protobuf is a product

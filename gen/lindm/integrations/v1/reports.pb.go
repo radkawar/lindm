@@ -14,6 +14,7 @@ import (
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	v1 "lindm/gen/lindm/audit/v1"
+	v11 "lindm/gen/lindm/resource/v1"
 	_ "lindm/gen/lindm/validation/v1"
 	reflect "reflect"
 	sync "sync"
@@ -1515,16 +1516,19 @@ func (x *InventoryReportRow) GetPublishedSequence() uint64 {
 	return 0
 }
 
+// Compliance exports retain each resource's numeric ResourceKind and canonical
+// native identity (name, path or package key), not just its UUID.
 type ComplianceReportRow struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	DeviceId       string                 `protobuf:"bytes,1,opt,name=device_id,proto3" json:"device_id,omitempty"`
 	AssignmentId   string                 `protobuf:"bytes,2,opt,name=assignment_id,proto3" json:"assignment_id,omitempty"`
 	ResourceId     string                 `protobuf:"bytes,3,opt,name=resource_id,proto3" json:"resource_id,omitempty"`
-	UnitName       string                 `protobuf:"bytes,4,opt,name=unit_name,proto3" json:"unit_name,omitempty"`
 	Reason         string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
 	LastVerifiedAt *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_verified_at,proto3" json:"last_verified_at,omitempty"`
 	ObservedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=observed_at,proto3" json:"observed_at,omitempty"`
 	State          string                 `protobuf:"bytes,8,opt,name=state,proto3" json:"state,omitempty"`
+	ResourceKind   v11.ResourceKind       `protobuf:"varint,9,opt,name=resource_kind,proto3,enum=lindm.resource.v1.ResourceKind" json:"resource_kind,omitempty"`
+	CanonicalKey   string                 `protobuf:"bytes,10,opt,name=canonical_key,proto3" json:"canonical_key,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1580,13 +1584,6 @@ func (x *ComplianceReportRow) GetResourceId() string {
 	return ""
 }
 
-func (x *ComplianceReportRow) GetUnitName() string {
-	if x != nil {
-		return x.UnitName
-	}
-	return ""
-}
-
 func (x *ComplianceReportRow) GetReason() string {
 	if x != nil {
 		return x.Reason
@@ -1611,6 +1608,20 @@ func (x *ComplianceReportRow) GetObservedAt() *timestamppb.Timestamp {
 func (x *ComplianceReportRow) GetState() string {
 	if x != nil {
 		return x.State
+	}
+	return ""
+}
+
+func (x *ComplianceReportRow) GetResourceKind() v11.ResourceKind {
+	if x != nil {
+		return x.ResourceKind
+	}
+	return v11.ResourceKind(0)
+}
+
+func (x *ComplianceReportRow) GetCanonicalKey() string {
+	if x != nil {
+		return x.CanonicalKey
 	}
 	return ""
 }
@@ -1743,7 +1754,7 @@ var File_lindm_integrations_v1_reports_proto protoreflect.FileDescriptor
 
 const file_lindm_integrations_v1_reports_proto_rawDesc = "" +
 	"\n" +
-	"#lindm/integrations/v1/reports.proto\x12\x15lindm.integrations.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1blindm/audit/v1/filter.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcc\x03\n" +
+	"#lindm/integrations/v1/reports.proto\x12\x15lindm.integrations.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1blindm/audit/v1/filter.proto\x1a lindm/resource/v1/identity.proto\x1a&lindm/validation/v1/string_rules.proto\"\xcc\x03\n" +
 	"\x0eReportSchedule\x12\x18\n" +
 	"\x02id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x02id\x12\x1e\n" +
 	"\x04name\x18\x02 \x01(\tB\n" +
@@ -1883,16 +1894,18 @@ const file_lindm_integrations_v1_reports_proto_rawDesc = "" +
 	"\x10host_received_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x10host_received_at\x12N\n" +
 	"\x14snapshot_received_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\x14snapshot_received_at\x12.\n" +
-	"\x12published_sequence\x18\v \x01(\x04R\x12published_sequence\"\xcd\x02\n" +
+	"\x12published_sequence\x18\v \x01(\x04R\x12published_sequence\"\xad\x03\n" +
 	"\x13ComplianceReportRow\x12\x1c\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\tdevice_id\x12$\n" +
 	"\rassignment_id\x18\x02 \x01(\tR\rassignment_id\x12 \n" +
-	"\vresource_id\x18\x03 \x01(\tR\vresource_id\x12\x1c\n" +
-	"\tunit_name\x18\x04 \x01(\tR\tunit_name\x12\x16\n" +
+	"\vresource_id\x18\x03 \x01(\tR\vresource_id\x12\x16\n" +
 	"\x06reason\x18\x05 \x01(\tR\x06reason\x12F\n" +
 	"\x10last_verified_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x10last_verified_at\x12<\n" +
 	"\vobserved_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\vobserved_at\x12\x14\n" +
-	"\x05state\x18\b \x01(\tR\x05state\"\xc1\x03\n" +
+	"\x05state\x18\b \x01(\tR\x05state\x12E\n" +
+	"\rresource_kind\x18\t \x01(\x0e2\x1f.lindm.resource.v1.ResourceKindR\rresource_kind\x12$\n" +
+	"\rcanonical_key\x18\n" +
+	" \x01(\tR\rcanonical_keyJ\x04\b\x04\x10\x05R\tunit_name\"\xc1\x03\n" +
 	"\x11FindingsReportRow\x12\x1e\n" +
 	"\n" +
 	"finding_id\x18\x01 \x01(\tR\n" +
@@ -1967,6 +1980,7 @@ var file_lindm_integrations_v1_reports_proto_goTypes = []any{
 	nil,                                    // 21: lindm.integrations.v1.AuditEventPayload.DetailsEntry
 	(*timestamppb.Timestamp)(nil),          // 22: google.protobuf.Timestamp
 	(*v1.AuditFilter)(nil),                 // 23: lindm.audit.v1.AuditFilter
+	(v11.ResourceKind)(0),                  // 24: lindm.resource.v1.ResourceKind
 }
 var file_lindm_integrations_v1_reports_proto_depIdxs = []int32{
 	0,  // 0: lindm.integrations.v1.ReportSchedule.kind:type_name -> lindm.integrations.v1.ReportKind
@@ -1996,23 +2010,24 @@ var file_lindm_integrations_v1_reports_proto_depIdxs = []int32{
 	22, // 24: lindm.integrations.v1.InventoryReportRow.snapshot_received_at:type_name -> google.protobuf.Timestamp
 	22, // 25: lindm.integrations.v1.ComplianceReportRow.last_verified_at:type_name -> google.protobuf.Timestamp
 	22, // 26: lindm.integrations.v1.ComplianceReportRow.observed_at:type_name -> google.protobuf.Timestamp
-	22, // 27: lindm.integrations.v1.FindingsReportRow.evaluated_at:type_name -> google.protobuf.Timestamp
-	22, // 28: lindm.integrations.v1.FindingsReportRow.inventory_at:type_name -> google.protobuf.Timestamp
-	3,  // 29: lindm.integrations.v1.ReportService.CreateAuditExport:input_type -> lindm.integrations.v1.CreateAuditExportRequest
-	5,  // 30: lindm.integrations.v1.ReportService.UpsertReportSchedule:input_type -> lindm.integrations.v1.UpsertReportScheduleRequest
-	7,  // 31: lindm.integrations.v1.ReportService.ListReportSchedules:input_type -> lindm.integrations.v1.ListReportSchedulesRequest
-	9,  // 32: lindm.integrations.v1.ReportService.ListReportArtifacts:input_type -> lindm.integrations.v1.ListReportArtifactsRequest
-	12, // 33: lindm.integrations.v1.ReportService.DownloadReportArtifact:input_type -> lindm.integrations.v1.DownloadReportArtifactRequest
-	4,  // 34: lindm.integrations.v1.ReportService.CreateAuditExport:output_type -> lindm.integrations.v1.CreateAuditExportResponse
-	6,  // 35: lindm.integrations.v1.ReportService.UpsertReportSchedule:output_type -> lindm.integrations.v1.UpsertReportScheduleResponse
-	8,  // 36: lindm.integrations.v1.ReportService.ListReportSchedules:output_type -> lindm.integrations.v1.ListReportSchedulesResponse
-	10, // 37: lindm.integrations.v1.ReportService.ListReportArtifacts:output_type -> lindm.integrations.v1.ListReportArtifactsResponse
-	13, // 38: lindm.integrations.v1.ReportService.DownloadReportArtifact:output_type -> lindm.integrations.v1.DownloadReportArtifactResponse
-	34, // [34:39] is the sub-list for method output_type
-	29, // [29:34] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	24, // 27: lindm.integrations.v1.ComplianceReportRow.resource_kind:type_name -> lindm.resource.v1.ResourceKind
+	22, // 28: lindm.integrations.v1.FindingsReportRow.evaluated_at:type_name -> google.protobuf.Timestamp
+	22, // 29: lindm.integrations.v1.FindingsReportRow.inventory_at:type_name -> google.protobuf.Timestamp
+	3,  // 30: lindm.integrations.v1.ReportService.CreateAuditExport:input_type -> lindm.integrations.v1.CreateAuditExportRequest
+	5,  // 31: lindm.integrations.v1.ReportService.UpsertReportSchedule:input_type -> lindm.integrations.v1.UpsertReportScheduleRequest
+	7,  // 32: lindm.integrations.v1.ReportService.ListReportSchedules:input_type -> lindm.integrations.v1.ListReportSchedulesRequest
+	9,  // 33: lindm.integrations.v1.ReportService.ListReportArtifacts:input_type -> lindm.integrations.v1.ListReportArtifactsRequest
+	12, // 34: lindm.integrations.v1.ReportService.DownloadReportArtifact:input_type -> lindm.integrations.v1.DownloadReportArtifactRequest
+	4,  // 35: lindm.integrations.v1.ReportService.CreateAuditExport:output_type -> lindm.integrations.v1.CreateAuditExportResponse
+	6,  // 36: lindm.integrations.v1.ReportService.UpsertReportSchedule:output_type -> lindm.integrations.v1.UpsertReportScheduleResponse
+	8,  // 37: lindm.integrations.v1.ReportService.ListReportSchedules:output_type -> lindm.integrations.v1.ListReportSchedulesResponse
+	10, // 38: lindm.integrations.v1.ReportService.ListReportArtifacts:output_type -> lindm.integrations.v1.ListReportArtifactsResponse
+	13, // 39: lindm.integrations.v1.ReportService.DownloadReportArtifact:output_type -> lindm.integrations.v1.DownloadReportArtifactResponse
+	35, // [35:40] is the sub-list for method output_type
+	30, // [30:35] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_lindm_integrations_v1_reports_proto_init() }

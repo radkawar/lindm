@@ -3,6 +3,7 @@
 package update
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -223,6 +224,45 @@ func TestRetentionRefusesPersistentRecoveryOwnership(t *testing.T) {
 			}
 			if _, err := os.Lstat(path); err != nil {
 				t.Fatal("reclamation changed another transaction's unit:", err)
+			}
+		})
+	}
+}
+
+func TestTerminalCleanupRelaunchesExactIndependentHelper(t *testing.T) {
+	ctx := context.Background()
+	tx := &agentv1.AgentUpdateTransaction{Id: uuid.NewString()}
+	directory := filepath.Join(t.TempDir(), tx.GetId())
+	for _, scenario := range []string{"owned", "foreign", "launch-failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			existing := recoveryUnitBytes(directory)
+			if scenario == "foreign" {
+				existing = recoveryUnitBytes(filepath.Join(t.TempDir(), uuid.NewString()))
+			}
+			calls := 0
+			launchErr := errors.New("systemd unavailable")
+			err := resumeTerminalCleanup(ctx, directory, tx, existing, func(gotCtx context.Context, gotDirectory string, gotTx *agentv1.AgentUpdateTransaction) error {
+				calls++
+				if gotCtx != ctx || gotDirectory != directory || gotTx != tx {
+					t.Fatal("cleanup did not replay the exact admitted transaction")
+				}
+				if scenario == "launch-failure" {
+					return launchErr
+				}
+				return nil
+			})
+			if err == nil {
+				t.Fatal("staging must remain fenced until helper cleanup completes")
+			}
+			if scenario == "foreign" {
+				if calls != 0 {
+					t.Fatal("launched cleanup for another transaction's recovery unit")
+				}
+			} else if calls != 1 {
+				t.Fatalf("cleanup helper launches = %d, want 1", calls)
+			}
+			if scenario == "launch-failure" && !errors.Is(err, launchErr) {
+				t.Fatalf("lost helper launch failure: %v", err)
 			}
 		})
 	}

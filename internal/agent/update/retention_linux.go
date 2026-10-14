@@ -33,7 +33,12 @@ func (e *Engine) reclaimRetired(ctx context.Context, state *agentv1.AgentUpdateJ
 		if active {
 			return errors.New("terminal update helper is still active")
 		}
-		if err := removeRecoveryUnit(ctx, filepath.Join(e.store.Directory, tx.GetId())); err != nil {
+		directory := filepath.Join(e.store.Directory, tx.GetId())
+		existing, err := readOwnedUnit(filepath.Join(unitDirectory, recoveryUnit))
+		if err == nil {
+			return resumeTerminalCleanup(ctx, directory, tx, existing, launchHelper)
+		}
+		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
@@ -45,6 +50,19 @@ func (e *Engine) reclaimRetired(ctx context.Context, state *agentv1.AgentUpdateJ
 	return reclaimTransactions(e.store.Directory, state.GetTransaction().GetId(), func(id string) (bool, error) {
 		return helperActive(ctx, &agentv1.AgentUpdateTransaction{Id: id})
 	})
+}
+
+// The executor cannot mutate /etc/systemd/system under ProtectSystem=strict.
+// Replay cleanup through the transaction's independent helper, keeping staging
+// fenced until a later pass observes that its persistent recovery unit is gone.
+func resumeTerminalCleanup(ctx context.Context, directory string, tx *agentv1.AgentUpdateTransaction, existing []byte, launch func(context.Context, string, *agentv1.AgentUpdateTransaction) error) error {
+	if string(existing) != string(recoveryUnitBytes(directory)) {
+		return errors.New("refuse resuming unowned update recovery unit")
+	}
+	if err := launch(ctx, directory, tx); err != nil {
+		return err
+	}
+	return errors.New("terminal update helper cleanup pending")
 }
 
 func recoveryUnitAbsent(directory string) error {

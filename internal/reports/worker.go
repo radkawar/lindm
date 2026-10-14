@@ -289,7 +289,7 @@ func reportColumns(kind integrationsv1.ReportKind) []string {
 	case integrationsv1.ReportKind_REPORT_KIND_INVENTORY:
 		return []string{"device_id", "hostname", "state", "os_id", "os_version", "architecture", "enrolled_at", "last_seen_at", "host_received_at", "snapshot_received_at", "published_sequence"}
 	case integrationsv1.ReportKind_REPORT_KIND_COMPLIANCE:
-		return []string{"device_id", "assignment_id", "resource_id", "unit_name", "reason", "last_verified_at", "observed_at", "state"}
+		return []string{"device_id", "assignment_id", "resource_id", "resource_kind", "canonical_key", "reason", "last_verified_at", "observed_at", "state"}
 	case integrationsv1.ReportKind_REPORT_KIND_FINDINGS:
 		return []string{"finding_id", "device_id", "advisory_id", "package_name", "installed_version", "fixed_version", "architecture", "severity", "state", "evaluated_at", "inventory_at"}
 	default:

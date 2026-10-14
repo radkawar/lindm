@@ -7,6 +7,7 @@ package lindm.integrations.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/audit/v1/filter.proto";
+import "lindm/resource/v1/identity.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/integrations/v1;integrationsv1";
@@ -234,15 +235,21 @@ message InventoryReportRow {
   uint64 published_sequence = 11 [json_name = "published_sequence"];
 }
 
+// Compliance exports retain each resource's numeric ResourceKind and canonical
+// native identity (name, path or package key), not just its UUID.
 message ComplianceReportRow {
+  reserved 4;
+  reserved "unit_name";
+
   string device_id = 1 [json_name = "device_id"];
   string assignment_id = 2 [json_name = "assignment_id"];
   string resource_id = 3 [json_name = "resource_id"];
-  string unit_name = 4 [json_name = "unit_name"];
   string reason = 5;
   google.protobuf.Timestamp last_verified_at = 6 [json_name = "last_verified_at"];
   google.protobuf.Timestamp observed_at = 7 [json_name = "observed_at"];
   string state = 8;
+  lindm.resource.v1.ResourceKind resource_kind = 9 [json_name = "resource_kind"];
+  string canonical_key = 10 [json_name = "canonical_key"];
 }
 
 message FindingsReportRow {

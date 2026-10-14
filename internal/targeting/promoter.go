@@ -30,11 +30,12 @@ const rolloutPromotionInterval = 10 * time.Second
 // Each pass bounds its work: 100 rollouts promoted, 100 awaiting approvals
 // checked and 50 planned devices activated.
 type Promoter struct {
-	pool     *pgxpool.Pool
-	identity *identity.Service
-	store    *Store
-	hooks    RolloutHooks
-	after    uuid.UUID
+	pool          *pgxpool.Pool
+	identity      *identity.Service
+	store         *Store
+	hooks         RolloutHooks
+	after         uuid.UUID
+	awaitingAfter uuid.UUID
 }
 
 // RolloutHooks are the device-domain operations a started rollout needs: the
@@ -246,10 +247,12 @@ func (p *Promoter) creatorAuthority(ctx context.Context, creator uuid.UUID) (*id
 // startApproved decides rollouts awaiting their single approval: an approved
 // request is consumed and started under the creator's fresh authority; a
 // rejected, expired or never-requested approval ends the rollout.
+// Each bounded pass advances past every inspected plan, including undecided or
+// failed decisions, and wraps after a short page so approvals cannot be starved.
 func (p *Promoter) startApproved(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	rows, err := targetingdb.New(p.pool).ListAwaitingRolloutPlans(ctx, uuid.Nil)
+	rows, err := targetingdb.New(p.pool).ListAwaitingRolloutPlans(ctx, p.awaitingAfter)
 	if err != nil {
 		return err
 	}
@@ -261,6 +264,10 @@ func (p *Promoter) startApproved(ctx context.Context) error {
 		if err := p.decide(ctx, row); err != nil && first == nil {
 			first = fmt.Errorf("start rollout %s: %w", row.RolloutID, err)
 		}
+		p.awaitingAfter = row.RolloutID
+	}
+	if len(rows) < 100 {
+		p.awaitingAfter = uuid.Nil
 	}
 	return first
 }

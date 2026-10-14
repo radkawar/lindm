@@ -227,6 +227,151 @@ func TestStartRolloutAdoptionWaitsForOneApprovalAndSavesNothing(t *testing.T) {
 	}
 }
 
+func TestPromoterAwaitingApprovalCursorAdvancesAndWraps(t *testing.T) {
+	for _, scenario := range []struct {
+		name          string
+		decisionError bool
+	}{
+		{name: "waiting"},
+		{name: "decision_error", decisionError: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			f, h, promoter, ctx := newPlanFixture(t, resourcev1.OwnershipMode_OWNERSHIP_MODE_APPROVED_ADOPTION)
+			late := f.startReviewed(t, h).Rollout
+			lateID := uuid.MustParse(late.Rollout.RolloutId)
+			plan, err := targetingdb.New(f.pool).GetRolloutPlan(ctx, lateID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := new(adminv1.StartRolloutRequest)
+			if err := proto.Unmarshal(plan.Request, request); err != nil {
+				t.Fatal(err)
+			}
+			// Retain a full lower-ID page with no approvals. Distinct assignments
+			// ensure starting the later plan cannot supersede these blockers.
+			var firstID, lastID uuid.UUID
+			if err := f.transaction(t, func(tx pgx.Tx) error {
+				q := targetingdb.New(tx)
+				now, err := q.TargetingClock(ctx)
+				if err != nil {
+					return err
+				}
+				for i := 1; i <= 100; i++ {
+					id := uuid.Nil
+					id[15] = byte(i)
+					if i == 1 {
+						firstID = id
+					}
+					lastID = id
+					pending := proto.CloneOf(request)
+					pending.RequestId = uuid.NewString()
+					pending.Rollout.RolloutId = id.String()
+					pending.Assignment.AssignmentId = uuid.NewString()
+					definition, err := encodedCatalog(pending.Rollout)
+					if err != nil {
+						return err
+					}
+					if _, err := q.InsertPlannedRollout(ctx, targetingdb.InsertPlannedRolloutParams{
+						ID: id, Definition: definition, CreatorID: f.actor.ID, StageStartedAt: now,
+						Paused: true, PauseReason: awaitingApprovalReason, Name: rolloutName(pending.Rollout),
+					}); err != nil {
+						return err
+					}
+					payload, err := encoded(pending)
+					if err != nil {
+						return err
+					}
+					if scenario.decisionError && i == 100 {
+						payload = []byte{0xff}
+					}
+					if err := q.InsertRolloutPlan(ctx, targetingdb.InsertRolloutPlanParams{
+						RolloutID: id, AssignmentID: uuid.MustParse(pending.Assignment.AssignmentId),
+						RequestID: uuid.MustParse(pending.RequestId), Request: payload,
+						ApprovalRequired: true, Status: planAwaitingApproval, Reason: pending.Reason, Adopted: plan.Adopted,
+					}); err != nil {
+						return err
+					}
+				}
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+			approval, err := promoter.identity.CreateApproval(ctx, f.actor.ID, &adminv1.CreateApprovalRequest{
+				LifetimeSeconds: 600, Payload: &adminv1.CreateApprovalRequest_StartRollout{StartRollout: request},
+			}, promoter.hooks.ApprovalScope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reviewer := uuid.New()
+			if _, err := f.pool.Exec(ctx, `INSERT INTO principals(id,issuer,subject,authorization_role,directory_enabled)
+VALUES ($1,$2,$3,$4,true)`, reviewer, f.actor.Issuer, reviewer.String(), identity.RoleAdmin); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.pool.Exec(ctx, "INSERT INTO local_accounts(id,username,role) VALUES ($1,$2,$3)", reviewer, "rollout-reviewer-"+reviewer.String(), identity.RoleAdmin); err != nil {
+				t.Fatal(err)
+			}
+			approvalID := uuid.MustParse(approval.Id)
+			if _, err := promoter.identity.DecideApproval(ctx, reviewer, approvalID, true, "Review the retained rollout beyond the first page", promoter.hooks.ApprovalScope, func(ctx context.Context, tx pgx.Tx, approval *adminv1.Approval) error {
+				return f.store.RolloutApprovalScope(ctx, tx, approval.GetStartRollout())
+			}); err != nil {
+				t.Fatal(err)
+			}
+			// Approval scanning has a cursor independent of active promotion.
+			activeAfter := uuid.New()
+			promoter.after = activeAfter
+			if err := promoter.startApproved(ctx); (err != nil) != scenario.decisionError {
+				t.Fatalf("first page error=%v, want decision error=%v", err, scenario.decisionError)
+			}
+			if promoter.awaitingAfter != lastID {
+				t.Fatalf("awaiting cursor=%s, want last inspected plan %s", promoter.awaitingAfter, lastID)
+			}
+			if after := f.rolloutState(t, late.Rollout.RolloutId); after.Status != adminv1.RolloutStatus_ROLLOUT_STATUS_AWAITING_APPROVAL {
+				t.Fatalf("first page inspected a later plan: %v", after)
+			}
+			if err := promoter.startApproved(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if after := f.rolloutState(t, late.Rollout.RolloutId); after.Status != adminv1.RolloutStatus_ROLLOUT_STATUS_ACTIVE || after.Paused || after.ApprovalId != approval.Id {
+				t.Fatalf("approved plan beyond 100 awaiting plans did not start: %v", after)
+			}
+			if _, state, err := promoter.identity.ApprovalForRequest(ctx, f.pool, f.actor.ID, request); err != nil || state != adminv1.ApprovalState_APPROVAL_STATE_CONSUMED {
+				t.Fatalf("later approval state=%v err=%v, want consumed", state, err)
+			}
+			var awaiting int
+			if err := f.pool.QueryRow(ctx, "SELECT count(*) FROM resource_rollout_plans WHERE status=$1", planAwaitingApproval).Scan(&awaiting); err != nil || awaiting != 100 {
+				t.Fatalf("lower-ID awaiting plans=%d err=%v, want 100", awaiting, err)
+			}
+			if promoter.awaitingAfter != uuid.Nil {
+				t.Fatalf("short page did not wrap awaiting cursor: %s", promoter.awaitingAfter)
+			}
+			// A wrapped scan must revisit earlier plans rather than leave them
+			// permanently behind the started plan's UUID.
+			if _, err := f.pool.Exec(ctx, "UPDATE resource_rollout_plans SET created_at=created_at-interval '2 hours' WHERE rollout_id=$1", firstID); err != nil {
+				t.Fatal(err)
+			}
+			if err := promoter.startApproved(ctx); (err != nil) != scenario.decisionError {
+				t.Fatalf("wrapped page error=%v, want decision error=%v", err, scenario.decisionError)
+			}
+			expired, err := targetingdb.New(f.pool).GetRolloutPlan(ctx, firstID)
+			if err != nil || expired.Status != planApprovalExpired {
+				t.Fatalf("wrapped scan did not revisit expired lower-ID plan: status=%d err=%v", expired.Status, err)
+			}
+			if promoter.awaitingAfter != lastID {
+				t.Fatalf("full wrapped page cursor=%s, want %s", promoter.awaitingAfter, lastID)
+			}
+			if err := promoter.startApproved(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if promoter.awaitingAfter != uuid.Nil {
+				t.Fatalf("empty page did not wrap awaiting cursor: %s", promoter.awaitingAfter)
+			}
+			if promoter.after != activeAfter {
+				t.Fatalf("approval scanning changed active cursor: got %s, want %s", promoter.after, activeAfter)
+			}
+		})
+	}
+}
+
 func TestStartRolloutRejectsMismatchedStagePlan(t *testing.T) {
 	f, h, _, _ := newPlanFixture(t, resourcev1.OwnershipMode_OWNERSHIP_MODE_CREATE_ONLY)
 	var report *adminv1.PreviewTargetAssignmentImpactResponse

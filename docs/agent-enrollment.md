@@ -1233,6 +1233,10 @@ removed receipts. Unresolved or ambiguous helper state and unsafe filesystem
 entries block new staging rather than deleting recovery material or accumulating
 unbounded packages. Neither reclamation nor unit cleanup removes another active
 transaction's recovery state.
+If a terminal helper was interrupted before removing its owned recovery unit,
+the executor relaunches that exact transaction's independent helper and keeps
+staging fenced until cleanup completes. The executor never writes the system
+unit directory or relaxes its `ProtectSystem=strict` sandbox for recovery.
 
 The executor records `staged` then `applying` before launching
 `lindm-agent-update-<transaction-uuid>.service` through systemd. This independently
