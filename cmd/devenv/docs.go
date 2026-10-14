@@ -51,9 +51,9 @@ func docBlocks(root string) ([]gendoc.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	matrix, err := labmatrix.DocBlock(root)
+	matrix, err := labmatrix.DocBlocks(root)
 	if err != nil {
 		return nil, err
 	}
-	return append(blocks, matrix), nil
+	return append(blocks, matrix...), nil
 }

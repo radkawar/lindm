@@ -14,19 +14,49 @@ import (
 // DocBlock renders the verification ledger's Tier capability matrix from the
 // matrix, manifests and ledger under root.
 func DocBlock(root string) (gendoc.Block, error) {
-	in, err := Load(root)
+	specs, cells, err := docPlan(root)
 	if err != nil {
 		return gendoc.Block{}, err
 	}
-	releases, err := Platforms(nil)
-	if err != nil {
-		return gendoc.Block{}, err
-	}
-	body, err := Render(in.Matrix.GetCells(), in.Plan(releases, in.Matrix.GetCells()))
+	body, err := Render(specs, cells)
 	if err != nil {
 		return gendoc.Block{}, err
 	}
 	return gendoc.Block{File: "docs/verification.md", Name: "lab-matrix", Body: body}, nil
+}
+
+// DocBlocks renders both the detailed verification table and public support
+// summary from the same loaded inputs and planned states.
+func DocBlocks(root string) ([]gendoc.Block, error) {
+	specs, cells, err := docPlan(root)
+	if err != nil {
+		return nil, err
+	}
+	matrix, err := Render(specs, cells)
+	if err != nil {
+		return nil, err
+	}
+	support, err := RenderSupport(cells)
+	if err != nil {
+		return nil, err
+	}
+	return []gendoc.Block{
+		{File: "docs/verification.md", Name: "lab-matrix", Body: matrix},
+		{File: "README.md", Name: "readme-support", Body: support},
+	}, nil
+}
+
+func docPlan(root string) ([]*labv1.MatrixCell, []*Cell, error) {
+	in, err := Load(root)
+	if err != nil {
+		return nil, nil, err
+	}
+	releases, err := Platforms(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	specs := in.Matrix.GetCells()
+	return specs, in.Plan(releases, specs), nil
 }
 
 // Render tables planned cells: one row per release, one column per matrix

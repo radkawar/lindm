@@ -80,38 +80,66 @@ evidence is under
 The fresh demo uses synthetic device inventory, not native device qualification.
 The owner demo was not restarted or probed after its teardown was announced.
 
-## README screenshots
+## README visuals
 
-The README images show synthetic demo data from the actual console.
-The frozen source checkout was `548acb5963ff76872f523ea00bb7469d628a9ed5`,
-with the palette from `1b61e22ce`.
+The README images and short GIFs show synthetic data from `lab console -demo
+-feeds fixtures`, not native device execution. Capture uses an isolated owned
+PostgreSQL fixture and real local-account enrollment, password sign-in and
+browser WebAuthn registration. Remote assistance shows requests and consent
+states, not a shared desktop.
+
+The stills and enrollment, vulnerability, lost-device, administration and
+assistance sequences were captured from checkout
+`c2486e5fb3eb74df774e2af608e961c4b6f84931` after `make acceptance-build`.
 The built `lindmd` SHA-256 was
-`b31d41227c679020b8404f4b05b2545fd0bcfac7a967ff742cb3de9e72daf4bc`.
-The capture used an isolated PostgreSQL fixture, local password authentication
-and browser WebAuthn registration. It did not use native devices.
-The assistance image shows a synthetic ended session record.
-No real screen sharing or remote control occurred.
+`32cbb1f78ab2a6fc947fd566435346ad601ebb6ea7a02bf511195ef98b2ef529`.
+The capture invokes the maintained `review-journeys-*.mjs` definitions.
+Published GIFs select captured task steps, with each frame shown for 2.4 seconds;
+they do not simulate device effects. Sensitive fields use the review runner's
+Playwright masks, recolored from magenta to neutral slate in the published GIFs.
 
-The eight published images in `docs/images/` are 1440 × 1000 lossless WebP files.
-Their combined size is 318,424 bytes, compared with 832,553 bytes for the PNG originals.
-Both owned fixtures stopped and private one-time credential logs were removed.
-No shared fixture was stopped.
+The rollout GIF uses the landed journey at
+`9b04951301af26479d16ea322e6852bb063169dc`, built in a separate capture worktree.
+Its `lindmd` SHA-256 was
+`602b673122346c25a29c22e3991aab4635fc64f6ccdf16db4e3ddcb5aeaee43d`.
+The maintained journey completed 25 steps: four settings, two isolated synthetic
+devices, independent approval, an observed pilot, pause/resume, explicit fleet
+promotion and `Finished` with `Applied 2`, `Failed 0`, `Needs review 0`.
+The initial capture changed themes by clicking the toolbar and dismissed an open
+picker. The completed capture follows the browser's color-scheme preference
+without clicking controls during screenshots. Its records are in
+`~/.cache/lindm-readme-v01/rollout/capture-record.json`.
 
-The maintainer-local record is
-`~/.cache/lindm-publicscreens-20261014/image-provenance.json`, SHA-256
-`282954908406849541a8828de87da593d918d16295456dcd69026fe8a851f176`.
-It contains the exact commands, sanitized capture recipes, browser version,
-routes, dimensions, original and optimized hashes, byte sizes and redaction notes.
-That retained JSON is not included in a clone.
+The full administration journey stopped at its later recovery-audit step.
+The published account/role sequence uses earlier captured steps, not that failed
+step. Other journeys reached their stated synthetic-device boundaries.
 
-The README image layout was rendered by GitHub's Markdown API and wrapped in
-`github-markdown-css` 5.9.0, with repository images resolved from the worktree.
-Chromium screenshots at 880px and 400px in light and dark themes showed no page
-overflow, no image distortion and one equal-height thumbnail row.
-The maintainer-local record
-`~/.cache/lindm-readme-gfm-20261014/layout-proof.json` has SHA-256
-`13eea9760c47515300974d2a01e83ec005773ee4734ef898d18f0136c93aad04`.
-It records the checked README hash, image geometry and all four screenshot hashes.
+Maintainer-local records and the raw README are in
+`~/.cache/lindm-readme-v01/`: `capture-record.json` records steps and browser
+version; `assets.json` records source frames, durations, byte sizes and redaction.
+The eight paired stills and twelve paired GIFs are 1440 × 1000. Stills total
+416,240 bytes; GIFs total 5,224,054 bytes. The largest still is 73,888 bytes and
+the largest GIF is 516,760 bytes.
+
+`go test ./internal/labmatrix ./cmd/devenv -run
+'^(TestRenderSupport|TestDocBlocksIncludesRegistryDrivenReadmeSupport)' -count=1`
+passed. The tests cover complete and partial outcomes, missing records,
+unsupported capabilities, architecture differences, composite capabilities,
+rolling release labels and registry-driven document generation.
+
+GitHub's Markdown API rendered the final README, wrapped in
+`github-markdown-css` 5.9.0 and opened in Chromium at 880px and 400px in light
+and dark. All four appearances passed with the extra flows both collapsed and
+expanded: no page overflow, proportional images, the intended light/dark assets,
+and a 96 × 96 icon. The support table scrolls within its own container instead
+of widening the page.
+
+The raw README, API response, rendered HTML, eight preview PNGs and geometry
+record are in `~/.cache/lindm-readme-v01/`. Preview names are
+`readme-{880,400}-{light,dark}.png` and their `-expanded.png` variants.
+`layout-proof.json` records the README hash, selected images, geometry and
+screenshot hashes. Both owned capture fixtures stopped cleanly; private owner
+password/authenticator files and one-time enrollment logs were removed.
 
 ## Device integration performance
 
