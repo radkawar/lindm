@@ -446,13 +446,14 @@ export async function executeApprovedEnrollment(ui, config, pending) {
 
 export async function confirmEnrolledDevice(ui, config) {
   const path = `/devices/${encodeURIComponent(config.deviceId)}`;
+  const query = config.expectPackageRegistration ? "?tab=resources" : "";
   const toolPath = config.expectToolCustodyPath;
   const deadline = Date.now() + (toolPath ? 420_000 : 180_000);
   // Read-only page loads; an interrupted load or observation reloads the page
   // until the deadline, never Request inventory or an enrollment retry.
   const load = async () => {
     try {
-      await ui.driver.goto(`${config.origin}${path}`);
+      await ui.driver.goto(`${config.origin}${path}${query}`);
     } catch (error) {
       if (!interrupted(error)) throw error;
     }
@@ -474,10 +475,20 @@ export async function confirmEnrolledDevice(ui, config) {
           const codes = [...(alert?.querySelectorAll("code") ?? [])].map((code) =>
             code.textContent.trim(),
           );
+          const servicesTab = section?.querySelector('[role="tab"][aria-selected="true"]');
+          const servicesPanel =
+            servicesTab?.textContent.trim() === "Services"
+              ? document.getElementById(servicesTab.getAttribute("aria-controls"))
+              : null;
           return {
             exactDevicePage: location.pathname === expectedPath,
             lifecycle: visible ? badge.textContent.trim() : "",
             busy: section?.getAttribute("aria-busy") !== "false",
+            packageRegistrationRequired: [...(servicesPanel?.querySelectorAll("*") ?? [])].some(
+              (node) =>
+                node.getClientRects().length > 0 &&
+                node.textContent.trim() === "Register this device with Red Hat",
+            ),
             toolCustody:
               alert && alert.getClientRects().length > 0 && codes[0] === expectedToolPath
                 ? {
@@ -498,11 +509,17 @@ export async function confirmEnrolledDevice(ui, config) {
       continue;
     }
     if (!state.exactDevicePage) throw new Error("enrollment_device_page_mismatch");
-    if (!state.busy && state.lifecycle === "Enrolled" && (!toolPath || state.toolCustody?.remedy))
+    if (
+      !state.busy &&
+      state.lifecycle === "Enrolled" &&
+      (!toolPath || state.toolCustody?.remedy) &&
+      (!config.expectPackageRegistration || state.packageRegistrationRequired)
+    )
       return {
         deviceId: config.deviceId,
         lifecycle: "Enrolled",
         ...(toolPath ? { toolCustody: state.toolCustody } : {}),
+        ...(config.expectPackageRegistration ? { packageRegistrationRequired: true } : {}),
       };
     if (state.lifecycle === "Revoked" || state.lifecycle === "Recovery hold")
       throw new Error("enrollment_device_not_active");

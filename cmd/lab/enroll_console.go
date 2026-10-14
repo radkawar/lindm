@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"lindm/internal/devlab"
 	"lindm/internal/labhost"
 	"lindm/internal/platform"
 	"lindm/internal/vmlab"
@@ -24,7 +25,9 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 	manifestPath := flags.String("manifest", "", "signed manifest for a registry-admitted console enrollment lane")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, written only after cleanup")
 	repository := flags.String("repo", ".", "checkout under test containing the maintained browser runner")
-	browserConfig := flags.String("browser-config", "", "required owned mode0600 Chromium owner config for clipboard capture and server-side enrollment confirmation")
+	browserConfig := flags.String("browser-config", "", "owned mode0600 Chromium owner config for clipboard capture and enrollment confirmation; alternatively use -package-source-fixture")
+	proofFixture := flags.String("package-source-fixture", "", "protected dev fixture checkout; opt in to real signed registry package-source proof with a disposable console")
+	proofServer := flags.String("lindmd", "", "current release-stamped server required with -package-source-fixture")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "parent for owned disposable guest state")
 	flags.StringVar(&options.LabBinary, "lab-binary", "", "matching guest-architecture read-only lab observer")
@@ -36,8 +39,8 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || *browserConfig == "" || options.LabBinary == "" {
-		return errors.New("enroll-from-console requires -manifest, -record, -lab-binary and -browser-config; no positional arguments")
+	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || (*browserConfig == "" && *proofFixture == "") || options.LabBinary == "" {
+		return errors.New("enroll-from-console requires -manifest, -record, -lab-binary and either -browser-config or -package-source-fixture; no positional arguments")
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {
@@ -52,10 +55,24 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 			resultErr = errors.Join(resultErr, os.RemoveAll(private))
 		}
 	}()
+	if *proofFixture != "" {
+		if *browserConfig != "" || *proofServer == "" {
+			return errors.New("package-source proof requires -lindmd and owns its browser configuration")
+		}
+		fixture, configPath, err := openPackageSourceConsole(ctx, *proofFixture, *repository, *proofServer, private, filepath.Dir(*record))
+		if err != nil {
+			return err
+		}
+		defer func() { resultErr = errors.Join(resultErr, fixture.Close()) }()
+		options.PackageSourceFixture = fixture
+		options.AdminAddress, options.DeviceAddress = fixture.AdminAddress, fixture.DeviceAddress
+		*browserConfig = configPath
+	}
 	options.Hardware = hardware.options()
 	options.CommandFile = filepath.Join(private, "clipboard-command")
 	var capture *consoleBrowserCapture
 	var enrollment *consoleBrowserEnrollment
+	var registrationGate *consoleBrowserEnrollment
 	options.Ready = func() error {
 		if _, err := fmt.Fprintln(stderr, "Fresh guest ready: capturing the production console Copy command and screenshots in Chromium."); err != nil {
 			return err
@@ -73,12 +90,25 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 		if len(platform.Identify(platform.OSRelease{ID: manifest.GetDistribution(), VersionID: manifest.GetVersion()}).Lab.RootPermissionsRepair) != 0 {
 			expectToolPath = "/"
 		}
-		enrollment, err = confirmConsoleBrowserEnrollment(ctx, *repository, private, *browserConfig, result.DeviceID, expectToolPath)
+		enrollment, err = confirmConsoleBrowserEnrollment(ctx, *repository, private, *browserConfig, result.DeviceID, expectToolPath, false)
+		return err
+	}
+	options.VerifyPackageRegistrationGate = func(ctx context.Context, device string) error {
+		var err error
+		registrationGate, err = confirmConsoleBrowserEnrollment(ctx, *repository, private, *browserConfig, device, "", true)
 		return err
 	}
 	result, err := vmlab.EnrollFromConsoleVM(ctx, manifest, options)
 	if err != nil {
 		return err
+	}
+	var publication *devlab.NativeEnrollmentRepository
+	if options.PackageSourceFixture != nil {
+		publication = options.PackageSourceFixture.NativeRepository
+		if err := options.PackageSourceFixture.Close(); err != nil {
+			return err
+		}
+		result.ConsoleCleanupComplete = true
 	}
 	if err := os.RemoveAll(private); err != nil {
 		return err
@@ -86,9 +116,11 @@ func runVMEnrollFromConsole(ctx context.Context, args []string, stdout, stderr i
 	private = ""
 	return writeLabEvidence(stdout, *record, struct {
 		*vmlab.VMConsoleEnrollmentResult
-		BrowserCapture    *consoleBrowserCapture    `json:"browser_capture"`
-		ConsoleEnrollment *consoleBrowserEnrollment `json:"console_enrollment"`
-	}{result, capture, enrollment})
+		BrowserCapture    *consoleBrowserCapture             `json:"browser_capture"`
+		ConsoleEnrollment *consoleBrowserEnrollment          `json:"console_enrollment"`
+		RegistrationGate  *consoleBrowserEnrollment          `json:"registration_gate,omitempty"`
+		Publication       *devlab.NativeEnrollmentRepository `json:"publication,omitempty"`
+	}{result, capture, enrollment, registrationGate, publication})
 }
 
 func consoleEnrollmentReverseForwards(args []string) ([]string, error) {

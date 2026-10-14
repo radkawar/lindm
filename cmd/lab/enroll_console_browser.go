@@ -86,13 +86,14 @@ type consoleBrowserEnrollment struct {
 	Screenshots []string `json:"screenshots"`
 	// ToolCustodyPath is the unprotected tool path the device page named with
 	// its remedy; set only for a stock image whose / the agent refuses.
-	ToolCustodyPath string `json:"tool_custody_path,omitempty"`
+	ToolCustodyPath             string `json:"tool_custody_path,omitempty"`
+	PackageRegistrationRequired bool   `json:"package_registration_required,omitempty"`
 }
 
 // confirmConsoleBrowserEnrollment requires the exact device's Enrolled state
 // and, when expectToolPath is set, the device page's unprotected-tool-path
 // alert naming that path and its native remedy.
-func confirmConsoleBrowserEnrollment(ctx context.Context, repository, private, configPath, deviceID, expectToolPath string) (*consoleBrowserEnrollment, error) {
+func confirmConsoleBrowserEnrollment(ctx context.Context, repository, private, configPath, deviceID, expectToolPath string, expectRegistration bool) (*consoleBrowserEnrollment, error) {
 	var cfg acceptanceBrowserConfig
 	if err := readConsoleBrowserJSON(configPath, &cfg); err != nil {
 		return nil, err
@@ -101,8 +102,9 @@ func confirmConsoleBrowserEnrollment(ctx context.Context, repository, private, c
 	cfg.EnrollmentCommandPaths, cfg.EnrollmentPlatforms = nil, nil
 	cfg.EnrollmentSecret = ""
 	cfg.ExpectToolCustodyPath = expectToolPath
+	cfg.ExpectPackageRegistration = expectRegistration
 	// Light/dark desktop/mobile captures of the alert, never of a credential.
-	cfg.EnrollmentScreenshots = expectToolPath != ""
+	cfg.EnrollmentScreenshots = expectToolPath != "" || expectRegistration
 	cfg.ResultPath = filepath.Join(private, "browser-enrollment-result.json")
 	_, err := runAcceptanceBrowser(ctx, repository, private, cfg)
 	cfg.Password = ""
@@ -117,6 +119,7 @@ func confirmConsoleBrowserEnrollment(ctx context.Context, repository, private, c
 				Path   string `json:"path"`
 				Remedy bool   `json:"remedy"`
 			} `json:"toolCustody"`
+			PackageRegistrationRequired bool `json:"packageRegistrationRequired"`
 		} `json:"enrolledDevice"`
 		Screenshots []string `json:"screenshots"`
 	}
@@ -126,11 +129,14 @@ func confirmConsoleBrowserEnrollment(ctx context.Context, repository, private, c
 	if confirmation.EnrolledDevice.DeviceID != deviceID || confirmation.EnrolledDevice.Lifecycle != "Enrolled" || len(confirmation.Screenshots) == 0 {
 		return nil, errors.New("browser did not confirm the installed device is enrolled on the server")
 	}
+	if expectRegistration && !confirmation.EnrolledDevice.PackageRegistrationRequired {
+		return nil, errors.New("browser did not show the Red Hat registration remedy on the device page")
+	}
 	custody := confirmation.EnrolledDevice.ToolCustody
 	if expectToolPath != "" && (custody.Path != expectToolPath || !custody.Remedy) {
 		return nil, errors.New("browser did not show the device's unprotected tool path with its remedy")
 	}
-	return &consoleBrowserEnrollment{DeviceID: deviceID, Lifecycle: confirmation.EnrolledDevice.Lifecycle, Screenshots: confirmation.Screenshots, ToolCustodyPath: custody.Path}, nil
+	return &consoleBrowserEnrollment{DeviceID: deviceID, Lifecycle: confirmation.EnrolledDevice.Lifecycle, Screenshots: confirmation.Screenshots, ToolCustodyPath: custody.Path, PackageRegistrationRequired: confirmation.EnrolledDevice.PackageRegistrationRequired}, nil
 }
 
 func readConsoleBrowserJSON(path string, target any) (err error) {

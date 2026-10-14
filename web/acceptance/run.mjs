@@ -203,6 +203,11 @@ function validate(value) {
       !value.expectToolCustodyPath.startsWith("/"))
   )
     throw new Error("tool_custody_expectation_requires_enrollment_status_path");
+  if (
+    value.expectPackageRegistration !== undefined &&
+    (value.mode !== "enrollment-status" || typeof value.expectPackageRegistration !== "boolean")
+  )
+    throw new Error("package_registration_expectation_requires_enrollment_status");
   for (const kind of value.storageActions ?? ["escrowRotate", "cryptoErase"]) {
     if (!["escrowRotate", "cryptoErase", "tpm2Bind", "sanitize"].includes(kind))
       throw new Error("invalid_storage_action");
@@ -402,10 +407,14 @@ async function journey() {
     result.enrolledDevice = await step("confirm_enrolled_device", () =>
       confirmEnrolledDevice(ui, config),
     );
-    // The unprotected-tool-path alert is console UI the lane must show; keep
-    // light/dark desktop/mobile captures of the exact device page for review.
-    if (config.expectToolCustodyPath && config.enrollmentScreenshots)
-      await enrollmentScreenshots("device-tool-custody");
+    // Capture actionable native gates on the exact enrolled device page.
+    if (
+      config.enrollmentScreenshots &&
+      (config.expectToolCustodyPath || config.expectPackageRegistration)
+    )
+      await enrollmentScreenshots(
+        config.expectPackageRegistration ? "device-redhat-registration" : "device-tool-custody",
+      );
     await writePrivateJSON(config.resultPath, result);
   }
   if (config.mode === "native") {

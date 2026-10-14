@@ -57,7 +57,7 @@ func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) erro
 		return guestALPMLock(ctx, args[1], stdout)
 	}
 	if len(args) != 1 {
-		return errors.New("guest requires a single probe operation without flags (bootstrap-interrupted, network-boundaries, executor-ready, connection-identity, connection-certificate, services, action-authorize-denied, live-erase-no-report, update-unpack, redhat-ready, redhat-register, redhat-identity, redhat-repositories, or redhat-unregister), or alpm-lock-boundary <signed-fixture-archive>")
+		return errors.New("guest requires a single probe operation without flags (bootstrap-interrupted, network-boundaries, executor-ready, capability-state, connection-identity, connection-certificate, services, action-authorize-denied, live-erase-no-report, update-unpack, redhat-ready, redhat-register, redhat-identity, redhat-repositories, or redhat-unregister), or alpm-lock-boundary <signed-fixture-archive>")
 	}
 	if args[0] == "redhat-ready" || args[0] == "redhat-register" || args[0] == "redhat-unregister" || args[0] == "redhat-identity" || args[0] == "redhat-repositories" {
 		return guestRedHat(ctx, args[0])
@@ -74,6 +74,8 @@ func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) erro
 		return guestNetworkBoundaries(ctx, stdout)
 	case "executor-ready":
 		return guestExecutorReady(ctx, stdout)
+	case "capability-state":
+		return guestCapabilityState(ctx, stdout)
 	case "connection-identity":
 		return guestConnectionIdentity(ctx, stdout)
 	case "connection-certificate":
@@ -87,6 +89,28 @@ func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) erro
 	default:
 		return errors.New("unknown guest probe")
 	}
+}
+
+// guestCapabilityState retains only the protected executor's public observation.
+// It never reads identity private keys, RHSM credentials or raw journal records.
+func guestCapabilityState(ctx context.Context, output io.Writer) (err error) {
+	if os.Geteuid() != 0 {
+		return errors.New("capability observation requires root")
+	}
+	doc, err := config.Load(config.ExecutorConfigPath)
+	if err != nil {
+		return errors.New("cannot load protected executor configuration")
+	}
+	client, cleanup, err := localrpc.Dial(doc.SocketPath)
+	if err != nil {
+		return errors.New("cannot dial root executor")
+	}
+	defer func() { err = errors.Join(err, cleanup()) }()
+	response, err := client.GetCapabilityPolicy(ctx, connect.NewRequest(&agentv1.GetCapabilityPolicyRequest{}))
+	if err != nil {
+		return guestRPCFailure("capability observation", err)
+	}
+	return writeGuestEvidence(output, response.Msg.GetObservation())
 }
 
 // guestExecutorReady waits only for an absent or not-yet-listening socket. A

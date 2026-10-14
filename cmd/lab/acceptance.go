@@ -71,7 +71,8 @@ type acceptanceBrowserConfig struct {
 	EnrollmentScreenshots      bool                     `json:"enrollmentScreenshots,omitempty"`
 	// ExpectToolCustodyPath requires the device page's unprotected-tool-path
 	// alert for this path with its remedy (enrollment-status mode).
-	ExpectToolCustodyPath string `json:"expectToolCustodyPath,omitempty"`
+	ExpectToolCustodyPath     string `json:"expectToolCustodyPath,omitempty"`
+	ExpectPackageRegistration bool   `json:"expectPackageRegistration,omitempty"`
 	// HostResolverRules is Chromium's --host-resolver-rules, mapping a lab
 	// public console host to the fixture listeners without system DNS.
 	HostResolverRules    string                    `json:"hostResolverRules,omitempty"`

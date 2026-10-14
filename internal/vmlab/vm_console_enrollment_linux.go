@@ -21,6 +21,7 @@ import (
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
 	"lindm/internal/packaging"
 	"lindm/internal/platform"
 )
@@ -44,23 +45,29 @@ type VMConsoleEnrollmentOptions struct {
 	CompletionTimeout time.Duration
 	Ready             func() error
 	VerifyEnrollment  func(context.Context, *VMConsoleEnrollmentResult) error
+	// PackageSourceFixture opts into real registry-derived package rows after
+	// clipboard enrollment; never an executor.json provider override.
+	PackageSourceFixture          *devlab.AuthorityFixture
+	VerifyPackageRegistrationGate func(context.Context, string) error
 }
 
 // VMConsoleEnrollmentResult contains only independent native observations. A
 // completed record proves installation/enrollment, not physical qualification.
 type VMConsoleEnrollmentResult struct {
-	ImageID              string             `json:"image_id"`
-	ImageSHA256          string             `json:"image_sha256"`
-	Runtime              *vmRuntimeEvidence `json:"runtime"`
-	CommandSHA256        string             `json:"command_sha256"`
-	Pristine             bool               `json:"pristine"`
-	Lifecycle            string             `json:"lifecycle"`
-	DeviceID             string             `json:"device_id"`
-	Generation           string             `json:"generation"`
-	Package              string             `json:"package"`
-	BinarySHA256         string             `json:"binary_sha256"`
-	OwnedCleanupComplete bool               `json:"owned_cleanup_complete"`
-	RedHat               *VMRedHatEvidence  `json:"redhat,omitempty"`
+	ImageID                string                   `json:"image_id"`
+	ImageSHA256            string                   `json:"image_sha256"`
+	Runtime                *vmRuntimeEvidence       `json:"runtime"`
+	CommandSHA256          string                   `json:"command_sha256"`
+	Pristine               bool                     `json:"pristine"`
+	Lifecycle              string                   `json:"lifecycle"`
+	DeviceID               string                   `json:"device_id"`
+	Generation             string                   `json:"generation"`
+	Package                string                   `json:"package"`
+	BinarySHA256           string                   `json:"binary_sha256"`
+	OwnedCleanupComplete   bool                     `json:"owned_cleanup_complete"`
+	RedHat                 *VMRedHatEvidence        `json:"redhat,omitempty"`
+	PackageSources         *VMPackageSourceEvidence `json:"package_sources,omitempty"`
+	ConsoleCleanupComplete bool                     `json:"console_cleanup_complete,omitempty"`
 }
 
 // EnrollFromConsoleVM never stages a lindm agent, repository, CA or bootstrap
@@ -151,15 +158,24 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 	if err != nil {
 		return nil, err
 	}
+	var registration *vmRedHatRegistration
 	if release.Lab.Entitlement {
 		result.RedHat = new(VMRedHatEvidence)
-		var registration *vmRedHatRegistration
 		if registration, err = registerConsoleEnrollmentRedHat(ctx, vm, options, result.RedHat); err != nil {
 			return nil, err
 		}
 		defer func() {
-			err = errors.Join(err, releaseConsoleEnrollmentRedHat(ctx, vm, options.LabBinary, registration))
+			cleanupErr := releaseConsoleEnrollmentRedHat(ctx, vm, options.LabBinary, registration)
+			err = errors.Join(err, cleanupErr)
+			if options.PackageSourceFixture != nil {
+				err = errors.Join(err, captureSourceRHSMCleanup(options.DiagnosticsDir, registration.evidence, cleanupErr))
+			}
 		}()
+		if options.PackageSourceFixture != nil {
+			if err := captureSourceRHSMFixture(ctx, vm, release, options.DiagnosticsDir); err != nil {
+				return nil, err
+			}
+		}
 	}
 	var forwards []*guestForward
 	defer func() { err = errors.Join(err, closeLifecycleForwards(forwards)) }()
@@ -241,6 +257,12 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 	if err := options.VerifyEnrollment(ctx, result); err != nil {
 		return nil, fmt.Errorf("server-side enrollment was not confirmed before guest teardown: %w", err)
 	}
+	if options.PackageSourceFixture != nil {
+		result.PackageSources, err = proveRegistryPackageSources(ctx, vm, release, result.DeviceID, options, registration)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
 }
 
@@ -269,6 +291,9 @@ func registerConsoleEnrollmentRedHat(ctx context.Context, vm *guestVM, options V
 // Unregistration runs through the observer probe, which the lane uploads only
 // after a successful command; it is restored when the lane stopped earlier.
 func releaseConsoleEnrollmentRedHat(ctx context.Context, vm *guestVM, labBinary string, registration *vmRedHatRegistration) error {
+	if registration != nil && registration.evidence.Unregistered && registration.evidence.ActivationKeyDeleted {
+		return nil // The source proof already observed cleanup before its gate.
+	}
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Minute)
 	defer cancel()
 	if _, err := vm.run(ctx, "test -x "+guestLifecycleProbe, nil, 1024, time.Minute); err != nil {
