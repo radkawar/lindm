@@ -40,6 +40,7 @@ export function RevealedSecret({
       <p
         className="whitespace-pre-wrap break-words rounded-md border p-3 font-mono text-base tracking-wide"
         aria-label={label}
+        data-sensitive="true"
       >
         {display}
       </p>

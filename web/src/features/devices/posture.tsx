@@ -84,10 +84,11 @@ function EncryptionState({
       </span>
     );
   const escrow = custody.error ? undefined : custody.data?.escrow;
+  const unknown = custody.isPending || !!custody.error;
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <StatusBadge status={escrow ? "success" : "warning"}>
-        {escrow ? "Recoverable" : "No recovery key"}
+      <StatusBadge status={unknown ? "neutral" : escrow ? "success" : "warning"}>
+        {unknown ? "Unknown" : escrow ? "Recoverable" : "No recovery key"}
       </StatusBadge>
       {custody.isPending ? (
         "Root disk encrypted. Checking the recovery key…"

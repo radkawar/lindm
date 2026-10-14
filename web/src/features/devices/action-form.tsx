@@ -1581,7 +1581,17 @@ export function DeviceActionForm({
                     </>
                   ) : null}
                   {currentLockId ? (
-                    <p className="text-warning">Undo the current account lock first.</p>
+                    <p className="text-sm text-warning">
+                      An account lock is already active.{" "}
+                      <Link
+                        to="/devices/$deviceId/actions/$actionId"
+                        params={{ deviceId, actionId: currentLockId }}
+                        className="underline underline-offset-4"
+                      >
+                        Review the current lock
+                      </Link>
+                      . Do not undo it while the device is lost.
+                    </p>
                   ) : null}
                 </fieldset>
               ) : null}
@@ -1921,9 +1931,8 @@ export function DeviceActionForm({
                     ? attempt.payload.spec.action.value.nvmeScope?.controllerWide
                       ? "This permanently wipes every namespace on the controller. Another admin must approve."
                       : "This permanently wipes the disk. Another admin must approve."
-                    : attempt.payload.spec?.action.case === "lockSessions" &&
-                        attempt.payload.spec.action.value.terminateSessions
-                      ? "Signing out sessions can lose unsaved work."
+                    : attempt.payload.spec?.action.case === "lockSessions"
+                      ? `${attempt.payload.spec.action.value.terminateSessions ? "Signing out sessions can lose unsaved work. " : ""}The device must be in recent contact. This does not erase data or isolate the network. Undo account lock restores the accounts lindm disabled; users must unlock their screens.`
                       : attempt.payload.spec?.action.case === "restart" ||
                           attempt.payload.spec?.action.case === "shutdown"
                         ? "Users can lose unsaved work."

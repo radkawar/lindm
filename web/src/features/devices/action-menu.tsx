@@ -125,7 +125,8 @@ export function DeviceActionMenu({
           <DialogHeader>
             <DialogTitle>Revoke {device.hostname.trim() || "Unnamed device"}</DialogTitle>
             <DialogDescription>
-              Review the access change before requesting approval.
+              Stop this device&apos;s access to lindm if it is lost or no longer in use. Review the
+              access change before requesting approval.
             </DialogDescription>
           </DialogHeader>
           <DeviceRevocationImpact device={device} />

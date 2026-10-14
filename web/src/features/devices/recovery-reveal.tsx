@@ -246,7 +246,7 @@ export function RecoveryKeyReveal({
     );
   }
   return (
-    <div className="grid gap-3 rounded-md border p-3">
+    <div className="grid min-w-0 gap-3 rounded-md border p-3">
       <p className="text-sm text-muted-foreground">
         The key hides after 30 seconds or when you leave the page.
       </p>
@@ -276,12 +276,18 @@ export function RecoveryKeyReveal({
       />
       <RevealApprovalNote approval={approval} />
       {approvalState !== null ? (
-        <p>
-          Approval: {ApprovalState[approvalState]?.toLowerCase()}.{" "}
-          <Link to="/approvals" className="underline">
-            Open approvals
-          </Link>
-        </p>
+        <div role="status" className="grid gap-2 text-sm">
+          <p>
+            Approval: {ApprovalState[approvalState]?.toLowerCase()}.{" "}
+            <Link to="/approvals" target="_blank" rel="noopener noreferrer" className="underline">
+              Open approvals in a new tab
+            </Link>
+          </p>
+          <p className="text-muted-foreground">
+            Keep this page open. Ask another admin to approve the recovery key request for{" "}
+            {confirmationName}. Then select Refresh approval status here.
+          </p>
+        </div>
       ) : null}
       {failure ? (
         <RpcError
@@ -295,7 +301,7 @@ export function RecoveryKeyReveal({
           {notice}
         </p>
       ) : null}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
           variant={approvalRequired === null || awaitingApproval ? "outline" : "default"}
           disabled={busy || ambiguous === "approval" || awaitingApproval}

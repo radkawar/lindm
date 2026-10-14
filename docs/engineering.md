@@ -1607,8 +1607,18 @@ shortcuts. Any runner failure or unexpected administrator RPC HTTP error fails
 the review, even if a later read succeeds. Diagnostic records contain only bounded
 operation names, status codes and machine reasons, never request bodies or secrets.
 
-The walks run once in light desktop mode; they do not multiply the route
-matrix into claims of native end-to-end qualification. A walk reports
+The walks start in light desktop mode; the lost-device recovery handoff also checks
+light/dark desktop/mobile layouts. They do not establish native qualification.
+The lost-device walk delays a real encryption read to check that pending status
+does not claim a missing key. It preserves an existing lock, enrolls a separate
+administrator through the console, obtains approval and reveals the synthetic key.
+Secret values are masked in evidence. It reviews wipe safeguards without sending
+a wipe, records a lost-device reason, independently approves and completes access
+revocation for a separate offline fixture device, then opens device-scoped audit
+history. The offline lock remains blocked; revocation is not a disk wipe or a
+local account lock. Single-eligible-admin reveal behavior remains covered by
+`internal/device/reveal_approval_integration_test.go`, not this multi-admin demo.
+A walk reports
 **blocked**, not completed, when the actual UI cannot finish its job or a native
 installation, user consent, second approver or real device execution is required.
 An explicitly recorded product/prerequisite blocker is not itself a browser

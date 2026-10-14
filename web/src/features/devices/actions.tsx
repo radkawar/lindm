@@ -231,6 +231,15 @@ export function DeviceRestrictions({
           >
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <RestrictionText restriction={restriction} />
+              {restriction.action ? (
+                <Link
+                  to="/devices/$deviceId/actions/$actionId"
+                  params={{ deviceId, actionId: restriction.action.actionId }}
+                  className="underline underline-offset-4"
+                >
+                  Review {restriction.kind === "lock" ? "lock" : "quarantine"} result
+                </Link>
+              ) : null}
               {canPermission(principal, actionPermissions[kind]) ? (
                 <Button
                   size="sm"
@@ -305,6 +314,7 @@ export function DeviceActionsPanel({
 
 function DeviceActionHistory({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
+  const principal = usePrincipal();
   const [pageToken, setPageToken] = useState("");
   const query = useQuery(deviceActionsQueryOptions(lifetime, deviceId, pageToken));
   const failure = query.error ? toRpcFailure(query.error) : null;
@@ -318,11 +328,26 @@ function DeviceActionHistory({ deviceId }: { deviceId: string }) {
             One line per action, newest first. Open a line for its full result.
           </CardDescription>
         </div>
-        <Button variant="outline" disabled={query.isFetching} onClick={() => void query.refetch()}>
-          {query.isFetching ? "Refreshing…" : "Refresh"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canPermission(principal, "audit.read", true) ? (
+            <Button variant="outline" render={<Link to="/audit" search={{ deviceId }} />}>
+              Open device audit log
+            </Button>
+          ) : null}
+          <Button
+            variant="outline"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {query.isFetching ? "Refreshing…" : "Refresh"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="grid gap-4">
+        <p className="text-sm text-muted-foreground">
+          This history shows device commands and their reported results. The audit log also records
+          approvals, recovery key access and enrollment changes.
+        </p>
         {query.isPending ? <p role="status">Loading action history…</p> : null}
         {failure ? <RpcError failure={failure} /> : null}
         {data?.actions.length === 0 ? (
