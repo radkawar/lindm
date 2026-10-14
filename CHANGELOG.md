@@ -28,3 +28,4 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Preload impact inputs in scoped, locked pages and retain impact rows through count- and byte-bounded PostgreSQL COPY batches. Keep the existing build deadline and report limits.
 - Give local-authentication fixtures the test's lifetime instead of sharing one login-operation deadline across independent password-hashing flows.
 - Freeze device and static-group rollout cohorts from bounded identity and membership pages. Keep full inventory evaluation for dynamic cohorts, all excluded fleet rows and the existing save deadline.
+- Build temporary development signing custody outside long user-cache paths. Keep private-key cleanup and atomic native repository cache publication.

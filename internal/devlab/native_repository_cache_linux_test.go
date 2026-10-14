@@ -15,9 +15,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -169,6 +171,76 @@ func TestStockRepositoryCacheReusesSourceAndRefusesTamper(t *testing.T) {
 	}
 	if _, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build); err == nil || builds != 2 {
 		t.Fatal("tampered cache was admitted or silently rebuilt")
+	}
+}
+
+func TestStockRepositoryCacheKeepsCustodyShortAndPrivate(t *testing.T) {
+	for _, tool := range []string{"gpg", "gpgconf"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("native package signing requires %s: %v", tool, err)
+		}
+	}
+	for _, fail := range []bool{false, true} {
+		name := "success"
+		if fail {
+			name = "failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			source := stockCacheSource(t)
+			cache := filepath.Join(stockCacheDirectory(t), strings.Repeat("nested-", 16))
+			oldSocket := filepath.Join(cache, ".build-1234567890", "custody", "package-signing-gnupg", "S.gpg-agent")
+			if len(oldSocket) <= 107 {
+				t.Fatal("fixture does not exceed the Linux Unix socket path limit")
+			}
+			refused := errors.New("deliberate build refusal after real signer generation")
+			var custodyRoot string
+			build := func(ctx context.Context, source, bundle, custody string) (*releasev1.ReleaseManifest, error) {
+				custodyRoot = filepath.Dir(custody)
+				info, err := os.Stat(custodyRoot)
+				if err != nil || !info.IsDir() || info.Mode().Perm() != 0700 {
+					t.Fatalf("temporary custody is not private: %v", err)
+				}
+				if filepath.Dir(filepath.Dir(bundle)) != cache {
+					t.Fatal("bundle left the cache filesystem before atomic publication")
+				}
+				socket := filepath.Join(custody, "package-signing-gnupg", "S.gpg-agent")
+				if len(socket) > 107 {
+					t.Fatalf("signer Unix socket path remains too long: %d", len(socket))
+				}
+				if err := os.Mkdir(custody, 0700); err != nil {
+					return nil, err
+				}
+				key, err := packaging.GenerateDevelopmentSigner(ctx, custody)
+				if err != nil {
+					return nil, err
+				}
+				if key.Custody != packaging.CustodyDevelopment || key.Fingerprint == "" {
+					t.Fatal("temporary signer lost its development purpose")
+				}
+				if fail {
+					return nil, refused
+				}
+				digest, err := releasebuild.SourceDigest(ctx, source)
+				if err != nil {
+					return nil, err
+				}
+				return stockCacheSignedFixture(t, bundle, digest), nil
+			}
+			result, err := cachedNativeEnrollmentRepository(t.Context(), source, cache, releasebuild.SourceDigest, build)
+			if fail {
+				if !errors.Is(err, refused) || result != nil {
+					t.Fatalf("build refusal changed: %v", err)
+				}
+			} else if err != nil || result == nil || result.hit || filepath.Dir(result.directory) != cache {
+				t.Fatalf("cold cache publication failed: %v", err)
+			}
+			if custodyRoot == "" {
+				t.Fatal("cold build never received temporary custody")
+			}
+			if _, err := os.Lstat(custodyRoot); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("temporary custody survived the build: %v", err)
+			}
+		})
 	}
 }
 

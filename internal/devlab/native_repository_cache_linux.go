@@ -117,10 +117,18 @@ func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string,
 		return nil, err
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(work)) }()
+	// GnuPG puts Unix sockets below its home. Keep temporary custody out of
+	// the potentially long user cache path; the bundle stays on the cache
+	// filesystem so publication remains an atomic rename.
+	custodyWork, err := os.MkdirTemp("", "lindm-native-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(custodyWork)) }()
 	bundle := filepath.Join(work, "agent-repository")
 	buildCtx, cancel := context.WithTimeout(ctx, nativeFixtureBuildBudget)
 	defer cancel()
-	manifest, err := build(buildCtx, source, bundle, filepath.Join(work, "custody"))
+	manifest, err := build(buildCtx, source, bundle, filepath.Join(custodyWork, "custody"))
 	if err != nil {
 		return nil, fmt.Errorf("build signed stock artifact: %w", err)
 	}

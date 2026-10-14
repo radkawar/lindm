@@ -6,12 +6,16 @@ package device
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
@@ -133,6 +137,7 @@ func TestProposedImpactCanonicalAssignmentReplacement(t *testing.T) {
 // and native readiness; only the enrolled fixture has a fresh named observation.
 func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	f := newDispatchFixture(t)
+	startTrace := traceImpactSave(t, f)
 	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "finance-canary"))); err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +216,7 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 		t.Fatalf("unbounded persisted report: rows=%d bytes=%d", persistedRows, persistedBytes)
 	}
 	t.Logf("10k impact before start: build=%s pages=%s", buildDuration, pageDuration)
+	startTrace()
 	saveStart := time.Now()
 	saveCtx, cancelSave := context.WithTimeout(f.adminCtx, 30*time.Second)
 	defer cancelSave()
@@ -231,6 +237,94 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 		t.Fatalf("10k first stage lost durable members: members=%d included=%d pending_generations=%d", members, included, pendingGenerations)
 	}
 	t.Logf("10k impact build=%s pages=%s save=%s max_protobuf=%d max_json=%d persisted_rows=%d persisted_bytes=%d", buildDuration, pageDuration, saveDuration, maxProto, maxJSON, persistedRows, persistedBytes)
+}
+
+// Trace only the real save, without statement arguments or changes to its
+// authority, transaction isolation, input locks or transport/runtime deadlines.
+func traceImpactSave(t *testing.T, f *dispatchFixture) func() {
+	t.Helper()
+	trace := &impactSaveTrace{t: t, active: make(map[impactSaveTraceKey]impactSaveOperation), totals: make(map[string]time.Duration)}
+	cfg := f.pool.Config()
+	cfg.ConnConfig.Tracer = trace
+	pool, err := pgxpool.NewWithConfig(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.service.Pool = pool
+	t.Cleanup(func() {
+		f.service.Pool = f.pool
+		pool.Close()
+		for operation, duration := range trace.totals {
+			t.Logf("10k save operation=%s total=%s", operation, duration)
+		}
+	})
+	return func() {
+		trace.mu.Lock()
+		trace.enabled = true
+		trace.mu.Unlock()
+	}
+}
+
+type impactSaveTraceKey struct {
+	conn *pgx.Conn
+	copy bool
+}
+
+type impactSaveOperation struct {
+	name    string
+	started time.Time
+}
+
+type impactSaveTrace struct {
+	t       *testing.T
+	mu      sync.Mutex
+	enabled bool
+	active  map[impactSaveTraceKey]impactSaveOperation
+	totals  map[string]time.Duration
+}
+
+func (trace *impactSaveTrace) start(conn *pgx.Conn, copy bool, name string) {
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	if !trace.enabled {
+		return
+	}
+	trace.active[impactSaveTraceKey{conn, copy}] = impactSaveOperation{name, time.Now()}
+}
+
+func (trace *impactSaveTrace) end(conn *pgx.Conn, copy bool, err error) {
+	trace.mu.Lock()
+	defer trace.mu.Unlock()
+	key := impactSaveTraceKey{conn, copy}
+	operation, recorded := trace.active[key]
+	if !recorded {
+		return
+	}
+	delete(trace.active, key)
+	duration := time.Since(operation.started)
+	trace.totals[operation.name] += duration
+	if err != nil || duration > 250*time.Millisecond {
+		trace.t.Logf("10k save operation=%s duration=%s error=%v", operation.name, duration, err)
+	}
+}
+
+func (trace *impactSaveTrace) TraceQueryStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryStartData) context.Context {
+	name, _, _ := strings.Cut(strings.TrimSpace(data.SQL), "\n")
+	trace.start(conn, false, name)
+	return ctx
+}
+
+func (trace *impactSaveTrace) TraceQueryEnd(_ context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+	trace.end(conn, false, data.Err)
+}
+
+func (trace *impactSaveTrace) TraceCopyFromStart(ctx context.Context, conn *pgx.Conn, data pgx.TraceCopyFromStartData) context.Context {
+	trace.start(conn, true, fmt.Sprintf("COPY %s", data.TableName.Sanitize()))
+	return ctx
+}
+
+func (trace *impactSaveTrace) TraceCopyFromEnd(_ context.Context, conn *pgx.Conn, data pgx.TraceCopyFromEndData) {
+	trace.end(conn, true, data.Err)
 }
 
 // reviewedRollout rolls out exactly the reviewed proposal to everyone at once.
