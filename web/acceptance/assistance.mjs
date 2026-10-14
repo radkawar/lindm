@@ -346,6 +346,11 @@ const commands = {
     const take = driver.page.getByRole("button", { name: "Take control", exact: true });
     if (await take.count()) await take.click();
     await ui.wait({ role: "button", text: "Release control" });
+    const screen = driver.page.getByRole("region", { name: "Remote screen", exact: true });
+    await screen.waitFor({ state: "visible" });
+    const description = await screen.getAttribute("aria-describedby");
+    if (!description || !(await driver.page.locator(`[id="${description}"]`).isVisible()))
+      throw new Error("remote_screen_control_instructions_missing");
     return {};
   },
   async click(args) {
@@ -443,6 +448,9 @@ const commands = {
   async releaseControl() {
     await ui.click({ role: "button", text: "Release control" });
     await ui.wait({ role: "button", text: "Take control" });
+    await driver.page
+      .getByRole("region", { name: "Remote screen", exact: true })
+      .waitFor({ state: "visible" });
     // This local browser keyup occurs after control authority was released.
     await driver.page.keyboard.up("Shift");
     return {};

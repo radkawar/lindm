@@ -499,6 +499,16 @@ permission and a return-to-device action, not a dead screen/control panel.
 The request form asks for the user-visible reason before mode and duration.
 Session lifecycle, user consent, exact-request recovery and transport behavior
 remain unchanged; a UI-review fixture cannot qualify real screen or input transport.
+The viewer exposes its lifecycle through `data-assistance-state`; review waits for
+the loaded situation rather than matching prose. A shown screen always has the
+accessible name **Remote screen**, with control instructions in its description.
+Screen and Clipboard use level-two headings; the user consent preview is a
+level-three subsection under Screen. The device tab has a level-two Remote
+assistance heading above its level-three request and history sections.
+After a confirmed stop, cancel older in-flight session polls before installing the
+ended response, so the record appears without a reload and cannot regress to live
+controls. Review accepts an already-ended request but verifies the visible record
+has neither a screen nor live controls before starting task walkthroughs.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;

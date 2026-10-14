@@ -209,7 +209,11 @@ function AssistanceViewerSession({
   }, [lifetime, sessionId]);
 
   return (
-    <section className="grid min-w-0 gap-4" data-review-page="assistance">
+    <section
+      className="grid min-w-0 gap-4"
+      data-review-page="assistance"
+      data-assistance-state={session ? AssistanceState[session.state].toLowerCase() : "loading"}
+    >
       <nav aria-label="Remote assistance breadcrumbs" className="flex flex-wrap gap-2 text-sm">
         <Link to="/devices" className="underline">
           Devices
@@ -336,6 +340,7 @@ function SessionStatus({
   return (
     <section
       aria-label="Session situation"
+      data-assistance-situation
       className="grid gap-4 border-l-2 border-primary bg-muted/30 p-4"
     >
       <div className="flex flex-wrap items-center gap-3">
@@ -506,10 +511,10 @@ function StopButton({ sessionId, deviceId }: { sessionId: string; deviceId: stri
             onSuccess: async (response) => {
               toast.success("Remote assistance stopped");
               if (response.session?.id === sessionId && response.session.deviceId === deviceId) {
-                queryClient.setQueryData(
-                  assistanceSessionQueryOptions(lifetime, deviceId, sessionId).queryKey,
-                  response.session,
-                );
+                const { queryKey } = assistanceSessionQueryOptions(lifetime, deviceId, sessionId);
+                // An older in-flight poll must not replace the confirmed ended record.
+                await queryClient.cancelQueries({ queryKey, exact: true });
+                queryClient.setQueryData(queryKey, response.session);
               }
               await queryClient.invalidateQueries({
                 queryKey: ["assistance-sessions", lifetime.generation, deviceId],
@@ -950,7 +955,7 @@ function AssistanceConnection({
       <Card className={fullscreen ? "flex min-h-0 flex-1 flex-col overflow-hidden" : undefined}>
         <CardHeader className="shrink-0">
           <CardTitle className="flex flex-wrap items-center justify-between gap-3">
-            <span>Screen</span>
+            <h2>Screen</h2>
             <div className="flex flex-wrap items-center gap-2 text-sm font-normal">
               <span className="text-muted-foreground">
                 {link.stage === "answered"
@@ -1082,11 +1087,8 @@ function AssistanceConnection({
               ref={surfaceRef}
               tabIndex={capturing ? 0 : -1}
               role="region"
-              aria-label={
-                capturing
-                  ? "Remote screen. Your keyboard and pointer input goes to the device. Select outside the screen to release the keyboard."
-                  : "Remote screen"
-              }
+              aria-label="Remote screen"
+              aria-describedby={capturing ? `${controlHelpId}-capture` : undefined}
               className={
                 capturing
                   ? "relative aspect-video w-full touch-none overflow-auto bg-viewer outline-none ring-2 ring-destructive"
@@ -1150,7 +1152,7 @@ function AssistanceConnection({
             </p>
           </div>
           {capturing ? (
-            <p className="text-sm text-muted-foreground">
+            <p id={`${controlHelpId}-capture`} className="text-sm text-muted-foreground">
               Control is on. Your keys and clicks go to the device. Select outside the screen to
               release the keyboard.
             </p>

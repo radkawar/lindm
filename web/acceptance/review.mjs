@@ -1018,9 +1018,19 @@ async function main() {
       await visit(requester, `/devices/${config.deviceId}`);
       step = "open Remote assistance tab";
       await requester.getByRole("tab", { name: "Remote assistance", exact: true }).click();
+      step = "check assistance panel heading hierarchy";
+      await requester
+        .getByRole("heading", { name: "Remote assistance", level: 2, exact: true })
+        .waitFor({ state: "visible" });
+      await requester
+        .getByRole("heading", { name: "Session history", level: 3, exact: true })
+        .waitFor({ state: "visible" });
       const form = requester.locator("form").filter({
         has: requester.getByRole("button", { name: "Request remote assistance" }),
       });
+      await form
+        .getByRole("heading", { name: "Ask to help", level: 3, exact: true })
+        .waitFor({ state: "visible" });
       step = "choose control mode";
       await form.getByRole("combobox").first().click();
       await requester.getByRole("option", { name: "View and request control" }).click();
@@ -1042,32 +1052,48 @@ async function main() {
       const where = `${theme} ${viewport.name}`;
       if (page !== requester) await visit(page, viewerUrl);
       await settle(page);
+      // Navigation can settle before the first session RPC. Wait for the actual
+      // situation, not a copy-dependent phrase or an unpopulated viewer.
+      const viewer = page.locator('[data-review-page="assistance"]');
+      await viewer.locator("[data-assistance-situation]").waitFor({ state: "visible" });
+      const state = await viewer.getAttribute("data-assistance-state");
       if (await page.getByText("The user allowed viewing only.", { exact: true }).count())
         report.failures.push(
           `assistance: ${where} claims a user viewing-only decision before consent`,
         );
       // While the request waits for consent nothing is shared and the screen
       // surface is hidden; the named region is required only once it shows.
-      const waiting =
-        (await page
-          .getByText("The device shares no screen or input yet", { exact: false })
-          .count()) > 0;
+      const waiting = state === "requested" || state === "prompted";
       const regions = await page
         .getByRole("region", { name: "Remote screen", exact: true })
         .count();
-      if (regions !== (waiting ? 0 : 1))
+      if (regions !== (waiting || state === "ended" ? 0 : 1))
         report.failures.push(
           waiting
             ? `assistance: ${where} exposes a remote screen region before anything is shared`
             : `assistance: ${where} remote screen lacks its named accessible region`,
         );
       if (
+        state !== "ended" &&
         (await page.getByRole("heading", { name: "Clipboard", level: 2, exact: true }).count()) !==
-        1
+          1
       )
         report.failures.push(
           `assistance: ${where} clipboard section skips the page heading hierarchy`,
         );
+      if (state !== "ended") {
+        if (
+          (await page.getByRole("heading", { name: "Screen", level: 2, exact: true }).count()) !== 1
+        )
+          report.failures.push(`assistance: ${where} screen section lacks its level-two heading`);
+        if (
+          waiting &&
+          (await page
+            .getByRole("heading", { name: "What the user sees", level: 3, exact: true })
+            .count()) !== 1
+        )
+          report.failures.push(`assistance: ${where} consent preview skips its screen heading`);
+      }
       await review(
         page,
         viewerRoute,
@@ -1075,7 +1101,7 @@ async function main() {
         theme,
         viewport,
         "requested by you",
-        viewerControls,
+        state === "ended" ? [] : viewerControls,
       );
       viewerRoute.visits += 1;
     }
@@ -1083,10 +1109,20 @@ async function main() {
     // asks to help the same device; navigation cleanup is not an observed end.
     if (viewerUrl) {
       try {
-        await requester.getByRole("button", { name: "Stop session", exact: true }).click();
+        const viewer = requester.locator('[data-review-page="assistance"]');
+        // A request can end during the route captures (expiry or device loss).
+        // Observe that record rather than waiting for a stop button it no longer has.
+        if ((await viewer.getAttribute("data-assistance-state")) !== "ended")
+          await requester.getByRole("button", { name: "Stop session", exact: true }).click();
         await requester
-          .getByRole("heading", { name: "Why this session ended", exact: true })
+          .locator('[data-review-page="assistance"][data-assistance-state="ended"]')
           .waitFor({ state: "visible", timeout: 30_000 });
+        if (
+          (await viewer.getByRole("button", { name: "Stop session", exact: true }).count()) ||
+          (await viewer.getByRole("region", { name: "Remote screen", exact: true }).count()) ||
+          (await viewer.getByRole("heading", { name: "Clipboard", exact: true }).count())
+        )
+          throw new Error("ended_session_retains_live_controls");
       } catch {
         report.failures.push(
           "assistance: route-review request did not visibly end before task walkthroughs",

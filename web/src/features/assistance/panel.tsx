@@ -82,7 +82,9 @@ export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Remote assistance</CardTitle>
+        <CardTitle>
+          <h2>Remote assistance</h2>
+        </CardTitle>
         <CardDescription>
           The person on the device decides whether to share. They can stop at any time.
         </CardDescription>
