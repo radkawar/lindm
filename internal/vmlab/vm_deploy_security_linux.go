@@ -20,17 +20,25 @@ type VMDeploySQLGate struct {
 
 // Run on the actual installed guest after install, upgrade and restore. Native
 // services may read their systemd credential, never the persistent URL secret.
-const deployDatabaseCredentialsCommand = `for path in /etc/lindm/database-url /etc/lindm/migrate/database-url /etc/lindm/integrations.key; do
+const deployDatabaseCredentialsCommand = `gate=secret_symlink
+trap 'status=$?; if test "$status" -ne 0; then printf "%s\n" "$gate"; fi' EXIT
+for path in /etc/lindm/database-url /etc/lindm/migrate/database-url /etc/lindm/integrations.key; do
+gate=secret_symlink
 test ! -L "$path"
+gate=secret_regular_file
 test -f "$path"
+gate=secret_owner_mode_links
 test "$(stat -c %u:%g:%a:%h "$path")" = 0:0:600:1
 for account in lindmd lindmd-migrate; do
+gate=service_can_read_at_rest
 if runuser -u "$account" -- test -r "$path"; then exit 1; fi
 done
 done
+gate=integration_key_length
 test "$(stat -c %s /etc/lindm/integrations.key)" = 32
 database_credential=false
 integration_credential=false
+gate=runtime_credential_handoff
 for credential in $(systemctl show --value -p LoadCredential lindmd.service); do
 case "$credential" in
 database-url:/etc/lindm/database-url) database_credential=true ;;
@@ -40,12 +48,45 @@ esac
 done
 test "$database_credential" = true
 test "$integration_credential" = true
+gate=migration_credential_handoff
 test "$(systemctl show --value -p LoadCredential lindmd-migrate.service)" = database-url:/etc/lindm/migrate/database-url
+gate=runtime_service_inactive
 systemctl is-active --quiet lindmd.service`
 
 func proveDeployDatabaseCredentials(ctx context.Context, guest *guestVM) error {
-	_, err := serverGuestCommand(ctx, guest, "prove root-only persistent DB and integration secrets and native credential handoff", deployDatabaseCredentialsCommand, nil)
-	return err
+	output, err := guest.runResult(ctx, "sudo -n env LC_ALL=C sh -eu -c "+nativeQuote(deployDatabaseCredentialsCommand), nil, 4096, time.Minute)
+	defer clear(output.Stdout)
+	defer clear(output.Stderr)
+	if err != nil {
+		return errors.New("deploy native credential proof transport failed")
+	}
+	if output.ExitCode == 0 {
+		return nil
+	}
+	return errors.New("deploy native credential proof failed: " + deployCredentialFailure(output.Stdout))
+}
+
+func deployCredentialFailure(output []byte) string {
+	switch string(output) {
+	case "secret_symlink\n":
+		return "secret_symlink"
+	case "secret_regular_file\n":
+		return "secret_regular_file"
+	case "secret_owner_mode_links\n":
+		return "secret_owner_mode_links"
+	case "service_can_read_at_rest\n":
+		return "service_can_read_at_rest"
+	case "integration_key_length\n":
+		return "integration_key_length"
+	case "runtime_credential_handoff\n":
+		return "runtime_credential_handoff"
+	case "migration_credential_handoff\n":
+		return "migration_credential_handoff"
+	case "runtime_service_inactive\n":
+		return "runtime_service_inactive"
+	default:
+		return "unclassified"
+	}
 }
 
 // This is a real PostgreSQL runtime connection with unchanged verify-full and

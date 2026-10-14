@@ -157,3 +157,19 @@ func TestDeployDatabaseCredentialGateRequiresRootOwnerAndNativeHandoff(t *testin
 		}
 	}
 }
+
+func TestDeployCredentialFailureNeverRelaysNativeOutput(t *testing.T) {
+	for _, label := range []string{"secret_symlink", "secret_regular_file", "secret_owner_mode_links", "service_can_read_at_rest", "integration_key_length", "runtime_credential_handoff", "migration_credential_handoff", "runtime_service_inactive"} {
+		if !strings.Contains(deployDatabaseCredentialsCommand, "gate="+label) {
+			t.Fatalf("credential probe does not set fixed label %q", label)
+		}
+		if got := deployCredentialFailure([]byte(label + "\n")); got != label {
+			t.Fatalf("known fixed credential failure lost: %q", got)
+		}
+	}
+	for _, unsafe := range []string{"", "postgresql://private:secret@example.invalid/db\n", "runtime_credential_handoff\nsecret-canary", "runtime_credential_handoff", "secret_owner_mode_links\r\n"} {
+		if got := deployCredentialFailure([]byte(unsafe)); got != "unclassified" {
+			t.Fatal("native credential output was relayed instead of a fixed class")
+		}
+	}
+}

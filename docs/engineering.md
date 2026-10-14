@@ -4146,6 +4146,19 @@ mistaking `0550`/`0440` for ordinary group access. Kernel-backed regression case
 reject ordinary group modes, a different or extra reader, group/other access,
 and a write mask. At-rest credentials and restore retain root:root `0600`.
 
+The fresh `281123aa7` literal cold SDK pair passed signing and authenticated
+export; `cold-release-attempt10.json` SHA-256 is
+`0e39392fb4a7cc2cd77ca9cee153a80ba94c7e55763cbbcc909bc5a57663de99`.
+In `native-ubuntu-attempt7.json`, the real one-command signed installation
+passed, including migration and verified HTTPS readiness, followed by the
+hardened local PostgreSQL check. The next independent root-only credential
+proof failed before the browser. Its record SHA-256 is
+`29aaa2ba6f46cff826dd60db8262d1cbb5833ce846ab8655868206d0ba99da69`.
+The maintained credential proof now reports only an exact fixed failure class,
+not native output or secret values. All original custody assertions remain.
+This is installer-success evidence inside a failed full lane, not a lifecycle
+qualification or a completed browser/restore drill.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
