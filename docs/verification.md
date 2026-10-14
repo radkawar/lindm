@@ -122,20 +122,32 @@ The eight paired stills and twelve paired GIFs are 1440 × 1000. Stills total
 the largest GIF is 516,760 bytes.
 
 `go test ./internal/labmatrix ./cmd/devenv -run
-'^(TestRenderSupport|TestDocBlocksIncludesRegistryDrivenReadmeSupport)' -count=1`
-passed. The tests cover complete and partial outcomes, missing records,
-unsupported capabilities, architecture differences, composite capabilities,
-rolling release labels and registry-driven document generation.
+'^(TestRenderSupport|TestSupportHistory|TestDocBlocksIncludesRegistryDrivenReadmeSupport|TestReadmeSupport)' -count=1`
+passed. The support summary counts scoped feature passes and retains successful
+subsets using the detailed table's image identity and revision rules. A newer
+scoped pass does not erase earlier tested operations; a newer failed result does
+not become a pass. Unsupported providers or assistance tools are footnotes on
+their supported feature. Whole-feature restrictions retain ✗.
+
+The follow-up audit covers all 126 feature cells in 18 x86_64 release rows.
+Findings now count the vendor-feed passes, including upstream-only coverage on
+Mint and Pop!_OS. Encryption, TPM and lock/wipe retain their separately tested
+operations; profile passes count the settings actually exercised. The audit and
+source record references are in
+`~/.cache/lindm-readme-v01/correction/support-corrections.json`.
+Table-row mark counts changed from 61 ✓, 29 ✗ and 54 “not yet tested” in the old
+x86_64 rows (including paired marks) to 116 ✓, 9 ✗ and 1 “not yet tested”.
+The remaining untested feature is Omarchy's console install-and-enroll flow.
 
 GitHub's Markdown API rendered the final README, wrapped in
 `github-markdown-css` 5.9.0 and opened in Chromium at 880px and 400px in light
 and dark. All four appearances passed with the extra flows both collapsed and
 expanded: no page overflow, proportional images, the intended light/dark assets,
-and a 96 × 96 icon. The support table scrolls within its own container instead
-of widening the page.
+and a 96 × 96 icon. The corrected support table fits the 880px view and scrolls
+within its own container at 400px instead of widening the page.
 
 The raw README, API response, rendered HTML, eight preview PNGs and geometry
-record are in `~/.cache/lindm-readme-v01/`. Preview names are
+record are in `~/.cache/lindm-readme-v01/correction/`. Preview names are
 `readme-{880,400}-{light,dark}.png` and their `-expanded.png` variants.
 `layout-proof.json` records the README hash, selected images, geometry and
 screenshot hashes. Both owned capture fixtures stopped cleanly; private owner

@@ -7,168 +7,232 @@ import (
 	"slices"
 	"strings"
 
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/gendoc"
 	"lindm/internal/platform"
 )
 
-// supportRequirement names the outcomes needed for one public claim. Empty
-// cells selects outcomes by capability, rather than treating a base desktop
-// outcome as proof of independently implemented remote-desktop components.
-type supportRequirement struct {
+type supportFeature struct {
 	capabilities []platform.Capability
-	cells        []string
-	allowScope   string
-	tpm          bool
+	cell         string
 }
 
-var supportRequirements = []supportRequirement{
-	{capabilities: []platform.Capability{platform.Lifecycle}, cells: []string{"enroll-from-console"}},
-	{capabilities: append(slices.Clone(platform.ResourceCapabilities), platform.Dispatch), cells: []string{"resources", "dispatch", "services"}},
-	{capabilities: []platform.Capability{platform.Encryption}, cells: []string{"encrypted"}},
-	{capabilities: []platform.Capability{platform.Encryption}, cells: []string{"encrypted", "tpm-unattended-boots"}, tpm: true},
-	{capabilities: []platform.Capability{platform.Lock}, cells: []string{"device-actions"}},
-	{capabilities: []platform.Capability{platform.Encryption, platform.Wipe}, cells: []string{"encrypted", "device-actions"}},
-	{capabilities: []platform.Capability{platform.OSUpdate}, cells: []string{"os-update"}},
-	{capabilities: []platform.Capability{platform.Advisories}, cells: []string{"advisories"}},
-	{capabilities: []platform.Capability{platform.Assistance}, cells: []string{"assistance"}, allowScope: "GNOME"},
-	{capabilities: []platform.Capability{platform.Assistance, platform.AssistanceClipboard, platform.AssistanceKeyboard, platform.AssistanceDisplays, platform.AssistanceMessages}, allowScope: "GNOME"},
+var supportFeatures = []supportFeature{
+	{[]platform.Capability{platform.Lifecycle}, "enroll-from-console"},
+	{platform.ResourceCapabilities, "resources"},
+	{[]platform.Capability{platform.Encryption}, "encrypted"},
+	{[]platform.Capability{platform.Lock, platform.Wipe}, "device-actions"},
+	{[]platform.Capability{platform.OSUpdate}, "os-update"},
+	{[]platform.Capability{platform.Advisories}, "advisories"},
+	{[]platform.Capability{platform.Assistance}, "assistance"},
 }
 
-// RenderSupport summarizes planned outcomes without exposing execution details.
-// A failure, missing image or execution-only restriction never means that an
-// implemented product capability is unsupported. Partial outcomes cannot prove
-// a complete composite, and every architecture remains a separate row.
-func RenderSupport(cells []*Cell) (string, error) {
-	type rowKey struct{ release, architecture string }
-	var order []rowKey
-	rowsByKey := map[rowKey][]*Cell{}
-	for _, c := range cells {
-		key := rowKey{c.Release.Key, c.Architecture}
-		if _, ok := rowsByKey[key]; !ok {
-			order = append(order, key)
+// supportHistory retains successful subsets of the same feature. A later scoped
+// pass supplements an earlier run rather than erasing it. Image identity and
+// revision floors are exactly those used by the detailed verification table;
+// a latest failure does not get replaced with an older successful result.
+func (in *Inputs) supportHistory(cells []*Cell) []*Cell {
+	type key struct{ release, architecture, cell string }
+	entries := make(map[key][]*labv1.MatrixLedgerEntry)
+	for _, e := range in.Ledger.GetEntries() {
+		if e.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_PASS && !in.superseded[e] {
+			k := key{e.GetPlatform(), e.GetArchitecture(), e.GetCell()}
+			entries[k] = append(entries[k], e)
 		}
-		rowsByKey[key] = append(rowsByKey[key], c)
+	}
+	out := slices.Clone(cells)
+	for _, c := range cells {
+		if c.Entry == nil || c.Entry.GetVerdict() != labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
+			continue
+		}
+		for _, e := range entries[key{c.Release.Key, c.Architecture, c.Spec.GetName()}] {
+			if e == c.Entry || !in.entryMatches(c, e) {
+				continue
+			}
+			recorded := *c
+			recorded.Entry = e
+			out = append(out, &recorded)
+		}
+	}
+	return out
+}
+
+// RenderSupport describes feature support, not the completeness of a test run.
+// Scoped successes count for the feature they exercised; unsupported subfeatures
+// become short footnotes on a supported feature, not a whole-column refusal.
+func RenderSupport(cells []*Cell) (string, error) {
+	var releases []*platform.Release
+	byRelease := make(map[string][]*Cell)
+	var armReleases []*platform.Release
+	for _, c := range cells {
+		if platform.SameArchitecture(c.Architecture, "aarch64") {
+			if supportPassed(c) && !slices.Contains(armReleases, c.Release) {
+				armReleases = append(armReleases, c.Release)
+			}
+			continue
+		}
+		if !platform.SameArchitecture(c.Architecture, "x86_64") {
+			continue
+		}
+		if _, ok := byRelease[c.Release.Key]; !ok {
+			releases = append(releases, c.Release)
+		}
+		byRelease[c.Release.Key] = append(byRelease[c.Release.Key], c)
 	}
 	var notes []string
-	note := func(reason string) string {
-		i := slices.Index(notes, reason)
-		if i < 0 {
-			i, notes = len(notes), append(notes, reason)
+	note := func(mark string, reasons []string) string {
+		if len(reasons) == 0 {
+			return mark
 		}
-		return fmt.Sprintf("✗ [^support-%d]", i+1)
-	}
-	pair := func(a, b string) string {
-		if a == b {
-			return a
+		var b strings.Builder
+		b.WriteString(mark)
+		for _, reason := range reasons {
+			i := slices.Index(notes, reason)
+			if i < 0 {
+				i, notes = len(notes), append(notes, reason)
+			}
+			fmt.Fprintf(&b, " [^support-%d]", i+1)
 		}
-		return a + " / " + b
+		return b.String()
 	}
 	var rows [][]string
-	for _, key := range order {
-		planned := rowsByKey[key]
-		r := planned[0].Release
-		arch := key.architecture
-		if arch == "aarch64" {
-			arch = "arm64"
+	for _, r := range releases {
+		row := []string{supportReleaseLink(r)}
+		for i, feature := range supportFeatures {
+			mark, reason := supportFeatureText(r, byRelease[r.Key], i, feature)
+			row = append(row, note(mark, reason))
 		}
-		distribution := fmt.Sprintf("[%s](docs/platforms/%s)", gendoc.Escape(r.Name), r.Page)
-		if r.Version.Rule == platform.VersionAbsent || r.Version.Rule == platform.VersionSnapshot {
-			distribution += " (rolling)"
-		}
-		statuses := make([]string, len(supportRequirements))
-		for i, requirement := range supportRequirements {
-			statuses[i] = supportText(r, key.architecture, planned, requirement, note)
-		}
-		findings := statuses[7]
-		if r.BaseCoverage() != nil && findings == "✓" {
-			findings += " (base packages)"
-		}
-		rows = append(rows, []string{
-			distribution, gendoc.Escape(arch),
-			statuses[0], statuses[1], pair(statuses[2], statuses[3]), pair(statuses[4], statuses[5]),
-			statuses[6], findings, pair(statuses[8], statuses[9]),
-		})
+		rows = append(rows, row)
 	}
-	table, err := gendoc.Table([]string{"Distribution / release", "Architecture", "Enrolment", "Profiles", "Disk / TPM", "Lock / wipe", "OS updates", "Findings", "Assistance"}, rows)
+	table, err := gendoc.Table([]string{"Distribution / release", "Enrolment", "Profiles", "Encryption / TPM", "Lock & wipe", "OS updates", "Findings", "Assistance"}, rows)
 	if err != nil {
 		return "", err
 	}
 	var b strings.Builder
-	b.WriteString("✓ supported · ✗ not supported (reason below) · not yet tested.\n\n")
-	b.WriteString("Paired values show disk encryption / TPM2 unlock, lock / cryptographic wipe, and GNOME viewing / controls. A single value applies to both. Profiles include all configuration providers; assistance controls include keyboard, clipboard, display selection and messages.\n\n")
+	b.WriteString("x86_64: ✓ supported · ✗ not supported · not yet tested. Footnotes name feature limits.\n\n")
 	b.WriteString(table)
-	b.WriteString("\nEncryption and wipe require an encrypted installation; TPM2 unlock requires a compatible TPM and boot configuration. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent. Distribution pages describe other desktops and assistance tools. Findings cover distribution packages; derived distributions marked “base packages” cover their upstream packages.\n")
+	if len(armReleases) > 0 {
+		var links []string
+		for _, r := range releases {
+			if slices.Contains(armReleases, r) {
+				links = append(links, supportReleaseLink(r))
+			}
+		}
+		fmt.Fprintf(&b, "\narm64 builds are available for %s; their distribution pages list the tested features.\n", strings.Join(links, ", "))
+	}
+	b.WriteString("\nEncryption and wipe require an encrypted installation. TPM2 unlock needs a compatible TPM and boot setup. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent.\n")
 	for i, reason := range notes {
 		fmt.Fprintf(&b, "\n[^support-%d]: %s\n", i+1, reason)
 	}
 	return b.String(), nil
 }
 
-func supportText(r *platform.Release, arch string, cells []*Cell, requirement supportRequirement, note func(string) string) string {
-	var reasons []string
-	for _, capability := range requirement.capabilities {
-		if reason := r.GateReasonOn(capability, arch); reason != "" {
-			reasons = appendUnique(reasons, publicSupportReason(capability, reason))
-		}
+func supportReleaseLink(r *platform.Release) string {
+	link := fmt.Sprintf("[%s](docs/platforms/%s)", gendoc.Escape(r.Name), r.Page)
+	if r.Version.Rule == platform.VersionAbsent || r.Version.Rule == platform.VersionSnapshot {
+		link += " (rolling)"
 	}
-	if requirement.tpm && r.Lab.TPM.Unsupported != "" {
-		reasons = appendUnique(reasons, "The installed boot configuration cannot unlock systemd TPM2 tokens.")
-	}
-	if len(reasons) > 0 {
-		return note(strings.Join(reasons, " "))
-	}
-	complete := func(c *Cell) bool {
-		return c.State == Pass && c.Entry != nil && (c.Entry.GetScope() == "" || (requirement.allowScope != "" && c.Entry.GetScope() == requirement.allowScope))
-	}
-	for _, name := range requirement.cells {
-		if !slices.ContainsFunc(cells, func(c *Cell) bool { return c.Spec.GetName() == name && complete(c) }) {
-			return "not yet tested"
-		}
-	}
-	for _, capability := range requirement.capabilities {
-		if !slices.ContainsFunc(cells, func(c *Cell) bool {
-			if len(requirement.cells) > 0 && !slices.Contains(requirement.cells, c.Spec.GetName()) {
-				return false
-			}
-			return complete(c) && slices.Contains(c.Kinds, capability)
-		}) {
-			return "not yet tested"
-		}
-	}
-	return "✓"
+	return link
 }
 
-// Registry restrictions choose the status; these capability-level explanations
-// deliberately do not copy internal recipe names, error codes or test jargon.
+func supportPassed(c *Cell) bool {
+	return c.Entry != nil && c.Entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_PASS
+}
+
+func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature supportFeature) (string, []string) {
+	var restrictions []string
+	available := 0
+	for _, capability := range feature.capabilities {
+		if reason := r.GateReasonOn(capability, "x86_64"); reason != "" {
+			restrictions = appendUnique(restrictions, publicSupportReason(capability, reason))
+		} else {
+			available++
+		}
+	}
+	if available == 0 {
+		return "✗", restrictions
+	}
+	var passed []*Cell
+	for _, c := range cells {
+		if c.Spec.GetName() != feature.cell || !supportPassed(c) {
+			continue
+		}
+		scope := strings.ToLower(c.Entry.GetScope())
+		if index == 3 && (strings.Contains(scope, "report-loss") || strings.Contains(scope, "report loss")) &&
+			!strings.HasPrefix(scope, "lock") && !strings.Contains(scope, " lock") && !strings.Contains(scope, "erase") && !strings.Contains(scope, "wipe") {
+			continue
+		}
+		passed = append(passed, c)
+	}
+	if len(passed) == 0 {
+		return "not yet tested", restrictions
+	}
+	scopeContains := func(text string) bool {
+		return slices.ContainsFunc(passed, func(c *Cell) bool { return strings.Contains(strings.ToLower(c.Entry.GetScope()), text) })
+	}
+	switch index {
+	case 1:
+		if scopeContains("no firewall") && !slices.ContainsFunc(passed, func(c *Cell) bool {
+			return c.Entry.GetScope() == "" || strings.Contains(strings.ToLower(c.Entry.GetScope()), "firewall with") || strings.Contains(strings.ToLower(c.Entry.GetScope()), "all kinds")
+		}) {
+			restrictions = appendUnique(restrictions, "Firewall settings were not included in these profile tests.")
+		}
+	case 2:
+		if r.Lab.TPM.Unsupported != "" {
+			restrictions = appendUnique(restrictions, "TPM2 unattended unlock is unavailable with this boot setup.")
+		} else if !slices.ContainsFunc(cells, func(c *Cell) bool {
+			return supportPassed(c) && (c.Spec.GetName() == "tpm-unattended-boots" ||
+				(c.Spec.GetName() == "encrypted" && strings.Contains(strings.ToLower(c.Entry.GetScope()), "unattended")))
+		}) {
+			restrictions = appendUnique(restrictions, "TPM2 unattended unlock has not yet been tested.")
+		}
+	case 3:
+		if scopeContains("lock unverifiable") || scopeContains("session_lock_state_unreported") {
+			restrictions = appendUnique(restrictions, "Account locks and wipe work; the desktop does not report its screen-lock state.")
+		} else if scopeContains("session lock unsupported") {
+			restrictions = appendUnique(restrictions, "Account locks and wipe work; screen locking is unavailable.")
+		}
+	case 5:
+		if r.BaseCoverage() != nil {
+			restrictions = appendUnique(restrictions, "Findings cover upstream base packages only.")
+		} else if scopeContains("partial-feed") || scopeContains("not complete device coverage") {
+			restrictions = appendUnique(restrictions, "Findings cover packages included in the available vendor feeds.")
+		}
+	case 6:
+		for _, capability := range []platform.Capability{platform.AssistanceClipboard, platform.AssistanceKeyboard, platform.AssistanceDisplays, platform.AssistanceMessages} {
+			if r.GateReasonOn(capability, "x86_64") != "" {
+				restrictions = appendUnique(restrictions, "Extra assistance tools depend on the installed desktop; see the distribution page.")
+			}
+		}
+	}
+	return "✓", restrictions
+}
+
 func publicSupportReason(capability platform.Capability, reason string) string {
 	switch {
 	case strings.Contains(reason, "no ScreenCast or RemoteDesktop"):
-		return "The desktop portal provides neither screen capture nor remote control."
+		return "The desktop has no screen-sharing or remote-control portal."
 	case strings.Contains(reason, "notification_actions_hidden"):
-		return "The desktop cannot display the required Allow/Decline consent buttons."
+		return "The desktop cannot show the required consent buttons."
 	case strings.Contains(reason, "session_lock_state_unreported"):
-		return "The desktop does not report its locked state, so screen sharing cannot stop safely at lock."
+		return "The desktop does not report screen-lock state for safe sharing."
 	case strings.Contains(reason, "no vendor advisory feed"):
-		return "No vendor advisory feed covers this distribution's packages."
+		return "No vendor advisory feed covers this distribution."
 	case strings.Contains(reason, "Origins-Pattern"):
-		return "The update runner does not implement this distribution's security-origin selection."
+		return "Security-origin selection is not implemented for this update runner."
 	case strings.Contains(reason, "ALPM guard"):
-		return "The distribution requires its own updater and refuses direct package-manager system upgrades."
+		return "System upgrades must use the distribution's own updater."
 	case strings.Contains(reason, "definition provider floor"):
-		return "The shipped systemd is older than the configuration definition provider requires."
+		return "Systemd unit definitions require a newer systemd."
 	case strings.Contains(reason, "store a transaction without privileges"):
-		return "The shipped package manager cannot prepare the required unprivileged transaction."
+		return "Package profiles require a newer DNF."
 	case strings.Contains(reason, "Omarchy") && capability == platform.Firewall:
-		return "The firewall provider requires firewalld, but the installed firewall uses ufw."
+		return "Firewall profiles require firewalld rather than the installed ufw."
 	case capability == platform.Password:
-		return "Password-policy integration is not supported with this release's PAM stack."
+		return "Password-policy profiles are unavailable with this PAM stack."
 	case capability == platform.OSUpdate:
-		return "No automatic OS-update integration is supported for this release."
-	case capability == platform.AssistanceClipboard || capability == platform.AssistanceKeyboard || capability == platform.AssistanceDisplays || capability == platform.AssistanceMessages:
-		return "The desktop does not support all requested remote-assistance controls."
-	case capability == platform.Encryption || capability == platform.Lock || capability == platform.Wipe || capability == platform.Assistance:
-		return "The required encrypted-installation or desktop integration is not supported for this release."
+		return "Automatic OS updates are not supported on this release."
 	default:
-		return fmt.Sprintf("The %s provider is not implemented for this release or architecture.", gendoc.Escape(string(capability)))
+		return fmt.Sprintf("The %s integration is unavailable on this release.", gendoc.Escape(string(capability)))
 	}
 }

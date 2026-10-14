@@ -28,15 +28,21 @@ func DocBlock(root string) (gendoc.Block, error) {
 // DocBlocks renders both the detailed verification table and public support
 // summary from the same loaded inputs and planned states.
 func DocBlocks(root string) ([]gendoc.Block, error) {
-	specs, cells, err := docPlan(root)
+	in, err := Load(root)
 	if err != nil {
 		return nil, err
 	}
+	releases, err := Platforms(nil)
+	if err != nil {
+		return nil, err
+	}
+	specs := in.Matrix.GetCells()
+	cells := in.Plan(releases, specs)
 	matrix, err := Render(specs, cells)
 	if err != nil {
 		return nil, err
 	}
-	support, err := RenderSupport(cells)
+	support, err := RenderSupport(in.supportHistory(cells))
 	if err != nil {
 		return nil, err
 	}

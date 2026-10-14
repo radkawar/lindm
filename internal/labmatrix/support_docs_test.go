@@ -14,27 +14,10 @@ import (
 
 func supportFixture() (*platform.Release, []*Cell) {
 	r := &platform.Release{Key: "fixture", Name: "Fixture Linux 1", Page: "fixture.md", Architectures: []string{"x86_64", "aarch64"}, Supports: slices.Clone(platform.Capabilities)}
-	specs := []*labv1.MatrixCell{
-		{Name: "enroll-from-console", Capabilities: []string{"lifecycle"}},
-		{Name: "resources", Capabilities: []string{"packages", "accounts", "sysctl", "definitions", "password", "firewall"}, CapabilityKinds: true},
-		{Name: "dispatch", Capabilities: []string{"dispatch"}},
-		{Name: "services", Capabilities: []string{"dispatch"}},
-		{Name: "encrypted", Capabilities: []string{"encryption"}},
-		{Name: "tpm-unattended-boots", Capabilities: []string{"encryption"}, Tpm: true},
-		{Name: "device-actions", Capabilities: []string{"lock", "wipe", "report-loss"}},
-		{Name: "os-update", Capabilities: []string{"os-update"}},
-		{Name: "advisories", Capabilities: []string{"advisories"}},
-		{Name: "assistance", Capabilities: []string{"assistance"}},
-		{Name: "desktop-controls", Capabilities: []string{"assistance-clipboard", "assistance-keyboard", "assistance-displays", "assistance-messages"}},
-	}
 	var cells []*Cell
 	for _, arch := range r.Architectures {
-		for _, spec := range specs {
-			c := &Cell{Release: r, Architecture: arch, Spec: spec, State: Pass, Entry: entry(r.Key, spec.GetName(), arch, labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now())}
-			for _, capability := range spec.GetCapabilities() {
-				c.Kinds = append(c.Kinds, platform.Capability(capability))
-			}
-			cells = append(cells, c)
+		for _, name := range []string{"enroll-from-console", "resources", "encrypted", "device-actions", "os-update", "advisories", "assistance", "tpm-unattended-boots"} {
+			cells = append(cells, &Cell{Release: r, Architecture: arch, Spec: &labv1.MatrixCell{Name: name}, State: Pass, Entry: entry(r.Key, name, arch, labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now())})
 		}
 	}
 	return r, cells
@@ -51,158 +34,181 @@ func supportCell(t *testing.T, cells []*Cell, name, arch string) *Cell {
 	return nil
 }
 
-func supportRow(t *testing.T, body, arch string) []string {
+func supportRow(t *testing.T, body string) []string {
 	t.Helper()
 	for _, line := range strings.Split(body, "\n") {
-		parts := strings.Split(line, "|")
-		if len(parts) == 11 && strings.TrimSpace(parts[2]) == arch {
+		if strings.HasPrefix(line, "| [") {
+			parts := strings.Split(line, "|")[1:9]
 			for i := range parts {
 				parts[i] = strings.TrimSpace(parts[i])
 			}
-			return parts[1:10]
+			return parts
 		}
 	}
-	t.Fatalf("missing %s row", arch)
+	t.Fatal("missing x86_64 feature row")
 	return nil
 }
 
-func TestRenderSupportCompleteOutcomesAndArchitectures(t *testing.T) {
+func TestRenderSupportOneRowAndSeparateArmBuilds(t *testing.T) {
 	_, cells := supportFixture()
 	body, err := RenderSupport(cells)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, arch := range []string{"x86_64", "arm64"} {
-		row := supportRow(t, body, arch)
-		if row[0] != "[Fixture Linux 1](docs/platforms/fixture.md)" {
-			t.Fatalf("distribution page = %q", row[0])
-		}
-		for _, text := range row[2:] {
-			if text != "✓" {
-				t.Errorf("%s status = %q, want recorded support", arch, text)
-			}
+	if strings.Count(body, "| [Fixture") != 1 || !strings.Contains(body, "arm64 builds are available for") {
+		t.Fatal("architecture rows were not replaced by a separate arm64 summary")
+	}
+	for _, value := range supportRow(t, body)[1:] {
+		if value != "✓" {
+			t.Errorf("supported feature = %q", value)
 		}
 	}
-}
-
-func TestRenderSupportUnrecordedStatesAreNotUnsupported(t *testing.T) {
-	for _, state := range []State{Fail, NotRun, Gated, NoLane, NoImage} {
-		t.Run(string(state), func(t *testing.T) {
-			_, cells := supportFixture()
-			c := supportCell(t, cells, "enroll-from-console", "aarch64")
-			c.State, c.Reason = state, "internal execution restriction"
-			body, err := RenderSupport(cells)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := supportRow(t, body, "arm64")[2]; got != "not yet tested" {
-				t.Fatalf("%s = %q, want neutral", state, got)
-			}
-			if got := supportRow(t, body, "x86_64")[2]; got != "✓" {
-				t.Fatalf("arm64 state changed x86_64 to %q", got)
-			}
-			if strings.Contains(body, "internal execution restriction") {
-				t.Fatal("public body exposed execution details")
-			}
-		})
+	if strings.Contains(body, " / not yet tested") || strings.Contains(body, "✓ / ") {
+		t.Fatal("paired status values leaked into the table")
 	}
 }
 
-func TestRenderSupportRequiresRecordsAndCapabilityCoverage(t *testing.T) {
-	for _, change := range []string{"absent entry", "absent outcome", "partial scope", "missing provider"} {
-		t.Run(change, func(t *testing.T) {
-			_, cells := supportFixture()
-			c := supportCell(t, cells, "resources", "x86_64")
-			switch change {
-			case "absent entry":
-				c.Entry = nil
-			case "absent outcome":
-				cells = slices.DeleteFunc(cells, func(c *Cell) bool { return c.Spec.GetName() == "resources" && c.Architecture == "x86_64" })
-			case "partial scope":
-				c.Entry.Scope = "seven kinds, no firewall"
-			case "missing provider":
-				c.Kinds = slices.DeleteFunc(c.Kinds, func(capability platform.Capability) bool { return capability == platform.Firewall })
-			}
-			body, err := RenderSupport(cells)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := supportRow(t, body, "x86_64")[3]; got != "not yet tested" {
-				t.Fatalf("%s gave profile status %q", change, got)
-			}
-		})
+func TestRenderSupportScopedPassesCountForFeatures(t *testing.T) {
+	_, cells := supportFixture()
+	for _, name := range []string{"resources", "encrypted", "device-actions", "advisories", "assistance"} {
+		supportCell(t, cells, name, "x86_64").Entry.Scope = "selected phases"
+	}
+	supportCell(t, cells, "advisories", "x86_64").Entry.Scope = "native feed matching; not complete device coverage"
+	supportCell(t, cells, "assistance", "x86_64").Entry.Scope = "KDE Plasma Wayland; view and control"
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range supportRow(t, body)[1:] {
+		if !strings.HasPrefix(value, "✓") {
+			t.Errorf("scoped success became %q", value)
+		}
+	}
+	if !strings.Contains(body, "Findings cover packages included in the available vendor feeds.") {
+		t.Fatal("advisory coverage limitation was lost")
 	}
 }
 
-func TestRenderSupportUnsupportedAndArchitectureRestrictions(t *testing.T) {
+func TestRenderSupportProviderRestrictionIsFeatureFootnote(t *testing.T) {
 	r, cells := supportFixture()
-	r.ArchitectureGates = map[string]map[platform.Capability]string{"aarch64": {platform.Wipe: "not implemented on this architecture"}}
+	r.Gates = map[platform.Capability]string{platform.Definitions: "definition provider floor", platform.Password: "PAM stack unavailable"}
+	r.Supports = slices.DeleteFunc(r.Supports, func(c platform.Capability) bool { return c == platform.Definitions || c == platform.Password })
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value := supportRow(t, body)[2]; !strings.HasPrefix(value, "✓ [^support-") {
+		t.Fatalf("one unavailable provider changed Profiles to %q", value)
+	}
+	if !strings.Contains(body, "Systemd unit definitions require a newer systemd.") || !strings.Contains(body, "Password-policy profiles are unavailable") {
+		t.Fatal("missing named provider limits")
+	}
+}
+
+func TestRenderSupportDeduplicatesProviderFootnotes(t *testing.T) {
+	r, cells := supportFixture()
+	other, more := supportFixture()
+	other.Key, other.Name = "other", "Other Linux 1"
+	for _, c := range more {
+		c.Entry.Platform = other.Key
+	}
+	for _, release := range []*platform.Release{r, other} {
+		release.Gates = map[platform.Capability]string{platform.Password: "PAM stack unavailable"}
+		release.Supports = slices.DeleteFunc(release.Supports, func(c platform.Capability) bool { return c == platform.Password })
+	}
+	body, err := RenderSupport(append(cells, more...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(body, "Password-policy profiles are unavailable with this PAM stack.") != 1 {
+		t.Fatal("shared provider restriction produced duplicate footnotes")
+	}
+}
+
+func TestRenderSupportMissingAndFailedAreNeutral(t *testing.T) {
+	for _, verdict := range []labv1.MatrixVerdict{labv1.MatrixVerdict_MATRIX_VERDICT_UNSPECIFIED, labv1.MatrixVerdict_MATRIX_VERDICT_FAIL} {
+		_, cells := supportFixture()
+		c := supportCell(t, cells, "enroll-from-console", "x86_64")
+		if verdict == labv1.MatrixVerdict_MATRIX_VERDICT_UNSPECIFIED {
+			c.Entry = nil
+		} else {
+			c.Entry.Verdict = verdict
+			c.State = Fail
+		}
+		body, err := RenderSupport(cells)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := supportRow(t, body)[1]; got != "not yet tested" {
+			t.Fatalf("missing or failed result became %q", got)
+		}
+	}
+}
+
+func TestRenderSupportWholeUnsupportedFeatureAndDeduplication(t *testing.T) {
+	r, cells := supportFixture()
+	r.Gates = map[platform.Capability]string{platform.Assistance: "no ScreenCast or RemoteDesktop"}
 	r.Supports = slices.DeleteFunc(r.Supports, func(c platform.Capability) bool { return c == platform.Assistance })
-	r.Gates = map[platform.Capability]string{platform.Assistance: "portal_screencast_unavailable: no ScreenCast or RemoteDesktop; internal lane unavailable"}
 	body, err := RenderSupport(cells)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := supportRow(t, body, "arm64")[5]; !strings.HasPrefix(got, "✓ / ✗ [^support-") {
-		t.Fatalf("architecture-restricted wipe = %q", got)
+	if got := supportRow(t, body)[7]; !strings.HasPrefix(got, "✗ [^support-") {
+		t.Fatalf("unavailable desktop sharing became %q", got)
 	}
-	if got := supportRow(t, body, "x86_64")[5]; got != "✓" {
-		t.Fatalf("unrestricted lock/wipe = %q", got)
-	}
-	if got := supportRow(t, body, "x86_64")[8]; !strings.HasPrefix(got, "✗ [^support-") {
-		t.Fatalf("unsupported assistance = %q", got)
-	}
-	if !strings.Contains(body, "The desktop portal provides neither screen capture nor remote control.") || strings.Contains(body, "internal lane") {
-		t.Fatal("missing factual public restriction or leaked execution detail")
+	if strings.Count(body, "The desktop has no screen-sharing or remote-control portal.") != 1 {
+		t.Fatal("duplicate desktop footnotes")
 	}
 }
 
-func TestRenderSupportEncryptionTPMAndDesktopComposites(t *testing.T) {
+func TestRenderSupportTPMAndScreenLockLimitsDoNotEraseFeature(t *testing.T) {
 	r, cells := supportFixture()
-	supportCell(t, cells, "tpm-unattended-boots", "aarch64").State = Gated
-	supportCell(t, cells, "assistance", "x86_64").Entry.Scope = "GNOME"
-	cells = slices.DeleteFunc(cells, func(c *Cell) bool { return c.Spec.GetName() == "desktop-controls" })
+	r.Lab.TPM.Unsupported = "vendor boot hook cannot unlock systemd TPM2 tokens"
+	supportCell(t, cells, "device-actions", "x86_64").Entry.Scope = "crypto-erase, lock unverifiable (no LockedHint), account locks"
 	body, err := RenderSupport(cells)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := supportRow(t, body, "arm64")[4]; got != "✓ / not yet tested" {
-		t.Fatalf("TPM execution restriction changed disk support: %q", got)
+	row := supportRow(t, body)
+	if !strings.HasPrefix(row[3], "✓ [^support-") || !strings.HasPrefix(row[4], "✓ [^support-") {
+		t.Fatalf("subfeature limits erased encryption or lock/wipe: %v", row)
 	}
-	if got := supportRow(t, body, "x86_64")[8]; got != "✓ / not yet tested" {
-		t.Fatalf("desktop result implied independently unrecorded controls: %q", got)
-	}
-	r.Lab.TPM.Unsupported = "vendor boot hook cannot unlock systemd TPM2 tokens"
-	body, err = RenderSupport(cells)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := supportRow(t, body, "x86_64")[4]; !strings.HasPrefix(got, "✓ / ✗ [^support-") {
-		t.Fatalf("real TPM incompatibility = %q", got)
-	}
-	if !strings.Contains(body, "installed boot configuration cannot unlock systemd TPM2 tokens") {
-		t.Fatal("missing TPM requirement explanation")
+	if !strings.Contains(body, "TPM2 unattended unlock is unavailable") || !strings.Contains(body, "desktop does not report its screen-lock state") {
+		t.Fatal("missing TPM or screen-lock limits")
 	}
 }
 
-func TestRenderSupportCompositeNeedsEveryRequiredOutcome(t *testing.T) {
-	for _, name := range []string{"dispatch", "services", "encrypted", "device-actions"} {
-		t.Run(name, func(t *testing.T) {
-			_, cells := supportFixture()
-			supportCell(t, cells, name, "x86_64").State = Fail
-			body, err := RenderSupport(cells)
-			if err != nil {
-				t.Fatal(err)
-			}
-			row := supportRow(t, body, "x86_64")
-			column := 3
-			if name == "encrypted" || name == "device-actions" {
-				column = 5
-			}
-			if !strings.Contains(row[column], "not yet tested") || strings.Contains(row[column], "✗") {
-				t.Fatalf("failed %s gave complete composite status %q", name, row[column])
-			}
-		})
+func TestSupportHistoryRetainsOlderSuccessfulSubsets(t *testing.T) {
+	r, cells := supportFixture()
+	c := supportCell(t, cells, "device-actions", "x86_64")
+	c.Entry.Scope = "report-loss blocks the original device"
+	older := entry(r.Key, "device-actions", "x86_64", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, time.Now().Add(-time.Hour))
+	older.Scope = "lock, release, crypto-erase"
+	in := &Inputs{Ledger: &labv1.MatrixLedger{Entries: []*labv1.MatrixLedgerEntry{older, c.Entry}}}
+	body, err := RenderSupport(in.supportHistory(cells))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[4]; got != "✓" {
+		t.Fatalf("later loss-reporting subset erased tested lock/wipe: %q", got)
+	}
+	in.superseded = map[*labv1.MatrixLedgerEntry]bool{older: true}
+	body, err = RenderSupport(in.supportHistory(cells))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[4]; got != "not yet tested" {
+		t.Fatalf("superseded subset counted as support: %q", got)
+	}
+	older.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_PASS
+	c.Entry.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_FAIL
+	in.superseded = nil
+	body, err = RenderSupport(in.supportHistory(cells))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[4]; got != "not yet tested" {
+		t.Fatalf("latest failure was hidden by an old success: %q", got)
 	}
 }
 
@@ -214,7 +220,7 @@ func TestRenderSupportLabelsRollingReleases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := supportRow(t, body, "x86_64")[0]; got != "[Fixture Linux 1](docs/platforms/fixture.md) (rolling)" {
+		if got := supportRow(t, body)[0]; got != "[Fixture Linux 1](docs/platforms/fixture.md) (rolling)" {
 			t.Fatalf("rolling release label = %q", got)
 		}
 	}

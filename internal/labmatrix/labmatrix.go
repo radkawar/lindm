@@ -488,22 +488,7 @@ func (in *Inputs) manifest(r *platform.Release, kind labv1.MatrixImage, arch, ed
 // scope.
 func (in *Inputs) latest(c *Cell) (out *labv1.MatrixLedgerEntry, superseded bool) {
 	for _, e := range in.Ledger.GetEntries() {
-		if e.GetPlatform() != c.Release.Key || e.GetCell() != c.Spec.GetName() || e.GetArchitecture() != c.Architecture {
-			continue
-		}
-		if c.Spec.GetLane() == "production-release-signing" && (e.GetScope() != "production-signing-tests-only" || !e.GetVerified()) {
-			continue
-		}
-		if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||
-			e.GetManifest() != c.Manifest.Image.GetId() || e.GetManifestSha256() != c.Manifest.SHA256 ||
-			e.GetRepositorySnapshotDate() != c.Manifest.Image.GetRepositorySnapshotDate()) {
-			continue
-		}
-		if c.Release.Native().RequalificationDays != 0 && c.Recovery != nil &&
-			(e.GetRecoveryManifest() != c.Recovery.Image.GetId() || e.GetRecoveryManifestSha256() != c.Recovery.SHA256 ||
-				e.GetRecoveryRepositorySnapshotDate() != c.Recovery.Image.GetRepositorySnapshotDate() ||
-				e.GetRecoveryRepositoryClosureSha256() != c.Recovery.Image.GetRepositorySnapshotManifestSha256() ||
-				e.GetRecoveryRepositoryMetadataSha256() != c.Recovery.Image.GetRepositorySnapshotRepomdSha256()) {
+		if !in.entryMatches(c, e) {
 			continue
 		}
 		if in.superseded[e] {
@@ -515,6 +500,30 @@ func (in *Inputs) latest(c *Cell) (out *labv1.MatrixLedgerEntry, superseded bool
 		}
 	}
 	return out, superseded
+}
+
+// entryMatches applies the same release, architecture and immutable-image
+// identity rules to the latest result and to retained successful feature runs.
+func (in *Inputs) entryMatches(c *Cell, e *labv1.MatrixLedgerEntry) bool {
+	if e.GetPlatform() != c.Release.Key || e.GetCell() != c.Spec.GetName() || e.GetArchitecture() != c.Architecture {
+		return false
+	}
+	if c.Spec.GetLane() == "production-release-signing" && (e.GetScope() != "production-signing-tests-only" || !e.GetVerified()) {
+		return false
+	}
+	if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||
+		e.GetManifest() != c.Manifest.Image.GetId() || e.GetManifestSha256() != c.Manifest.SHA256 ||
+		e.GetRepositorySnapshotDate() != c.Manifest.Image.GetRepositorySnapshotDate()) {
+		return false
+	}
+	if c.Release.Native().RequalificationDays != 0 && c.Recovery != nil &&
+		(e.GetRecoveryManifest() != c.Recovery.Image.GetId() || e.GetRecoveryManifestSha256() != c.Recovery.SHA256 ||
+			e.GetRecoveryRepositorySnapshotDate() != c.Recovery.Image.GetRepositorySnapshotDate() ||
+			e.GetRecoveryRepositoryClosureSha256() != c.Recovery.Image.GetRepositorySnapshotManifestSha256() ||
+			e.GetRecoveryRepositoryMetadataSha256() != c.Recovery.Image.GetRepositorySnapshotRepomdSha256()) {
+		return false
+	}
+	return true
 }
 
 func appendUnique(list []string, s string) []string {

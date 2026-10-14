@@ -30,8 +30,6 @@ Screenshots and animations use synthetic demo data.
 - A signed audit log and exports.
 - An MCP server for AI assistants.
 
-## A look at the console
-
 ### Enroll devices
 
 Choose a distribution, create a one-time code or a bounded provisioning token, and copy the install command.
@@ -99,76 +97,68 @@ Create administrator accounts, define roles and review changes in the audit log.
 
 <!-- BEGIN GENERATED readme-support -->
 
-✓ supported · ✗ not supported (reason below) · not yet tested.
+x86_64: ✓ supported · ✗ not supported · not yet tested. Footnotes name feature limits.
 
-Paired values show disk encryption / TPM2 unlock, lock / cryptographic wipe, and GNOME viewing / controls. A single value applies to both. Profiles include all configuration providers; assistance controls include keyboard, clipboard, display selection and messages.
+| Distribution / release                                      | Enrolment      | Profiles                     | Encryption / TPM | Lock & wipe     | OS updates      | Findings        | Assistance      |
+| ----------------------------------------------------------- | -------------- | ---------------------------- | ---------------- | --------------- | --------------- | --------------- | --------------- |
+| [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md)                | ✓              | ✓ [^support-1]               | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md)                | ✓              | ✓ [^support-4]               | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓               |
+| [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md)                | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Debian 12](docs/platforms/debian.md)                       | ✓              | ✓                            | ✓                | ✓               | ✗ [^support-5]  | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Debian 13](docs/platforms/debian.md)                       | ✓              | ✓                            | ✓                | ✓               | ✗ [^support-5]  | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Fedora 43](docs/platforms/fedora.md)                       | ✓              | ✓ [^support-6] [^support-7]  | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Fedora 44](docs/platforms/fedora.md)                       | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓               |
+| [RHEL 9](docs/platforms/rhel.md)                            | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [RHEL 10](docs/platforms/rhel.md)                           | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Rocky Linux 9](docs/platforms/alma-rocky.md)               | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Rocky Linux 10](docs/platforms/alma-rocky.md)              | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [AlmaLinux 9](docs/platforms/alma-rocky.md)                 | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [AlmaLinux 10](docs/platforms/alma-rocky.md)                | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Linux Mint 22.3](docs/platforms/mint.md)                   | ✓              | ✓                            | ✓                | ✓ [^support-8]  | ✗ [^support-9]  | ✓ [^support-10] | ✗ [^support-11] |
+| [Pop!\_OS 24.04 LTS](docs/platforms/popos.md)               | ✓              | ✓                            | ✓                | ✓ [^support-8]  | ✗ [^support-9]  | ✓ [^support-10] | ✗ [^support-12] |
+| [Arch Linux](docs/platforms/arch.md) (rolling)              | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
+| [Omarchy 4.0.4](docs/platforms/omarchy.md)                  | not yet tested | ✓ [^support-7] [^support-13] | ✓ [^support-14]  | ✓ [^support-15] | ✗ [^support-16] | ✗ [^support-17] | ✗ [^support-18] |
+| [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling) | ✓              | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-2]  | ✓ [^support-3]  |
 
-| Distribution / release                                      | Architecture | Enrolment      | Profiles        | Disk / TPM                       | Lock / wipe        | OS updates      | Findings        | Assistance                        |
-| ----------------------------------------------------------- | ------------ | -------------- | --------------- | -------------------------------- | ------------------ | --------------- | --------------- | --------------------------------- |
-| [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md)                | x86_64       | ✓              | ✗ [^support-1]  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md)                | arm64        | ✓              | ✗ [^support-1]  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md)                | x86_64       | ✓              | not yet tested  | ✓ / not yet tested               | not yet tested     | ✓               | not yet tested  | not yet tested                    |
-| [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md)                | arm64        | not yet tested | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested                    |
-| [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md)                | x86_64       | ✓              | not yet tested  | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md)                | arm64        | ✓              | not yet tested  | ✓                                | ✓                  | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Debian 12](docs/platforms/debian.md)                       | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-3]  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Debian 12](docs/platforms/debian.md)                       | arm64        | not yet tested | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-3]  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Debian 13](docs/platforms/debian.md)                       | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-3]  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Debian 13](docs/platforms/debian.md)                       | arm64        | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-3]  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Fedora 43](docs/platforms/fedora.md)                       | x86_64       | ✓              | ✗ [^support-4]  | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Fedora 43](docs/platforms/fedora.md)                       | arm64        | ✓              | ✗ [^support-4]  | ✓ / not yet tested               | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Fedora 44](docs/platforms/fedora.md)                       | x86_64       | ✓              | ✓               | ✓                                | not yet tested     | ✓               | not yet tested  | not yet tested                    |
-| [Fedora 44](docs/platforms/fedora.md)                       | arm64        | not yet tested | not yet tested  | not yet tested                   | ✓ / not yet tested | ✓               | not yet tested  | not yet tested                    |
-| [RHEL 9](docs/platforms/rhel.md)                            | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [RHEL 9](docs/platforms/rhel.md)                            | arm64        | ✓              | not yet tested  | ✓                                | ✓                  | not yet tested  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [RHEL 10](docs/platforms/rhel.md)                           | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [RHEL 10](docs/platforms/rhel.md)                           | arm64        | ✓              | not yet tested  | ✓                                | ✓                  | not yet tested  | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Rocky Linux 9](docs/platforms/alma-rocky.md)               | x86_64       | ✓              | ✓               | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Rocky Linux 9](docs/platforms/alma-rocky.md)               | arm64        | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Rocky Linux 10](docs/platforms/alma-rocky.md)              | x86_64       | ✓              | ✓               | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Rocky Linux 10](docs/platforms/alma-rocky.md)              | arm64        | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [AlmaLinux 9](docs/platforms/alma-rocky.md)                 | x86_64       | ✓              | ✓               | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [AlmaLinux 9](docs/platforms/alma-rocky.md)                 | arm64        | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [AlmaLinux 10](docs/platforms/alma-rocky.md)                | x86_64       | ✓              | ✓               | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [AlmaLinux 10](docs/platforms/alma-rocky.md)                | arm64        | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✓               | not yet tested  | not yet tested / ✗ [^support-2]   |
-| [Linux Mint 22.3](docs/platforms/mint.md)                   | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-5]  | not yet tested  | ✗ [^support-6] / ✗ [^support-7]   |
-| [Pop!\_OS 24.04 LTS](docs/platforms/popos.md)               | x86_64       | ✓              | not yet tested  | not yet tested                   | not yet tested     | ✗ [^support-5]  | not yet tested  | ✗ [^support-8] / ✗ [^support-9]   |
-| [Arch Linux](docs/platforms/arch.md) (rolling)              | x86_64       | ✓              | ✓               | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [Omarchy 4.0.4](docs/platforms/omarchy.md)                  | x86_64       | not yet tested | ✗ [^support-10] | not yet tested / ✗ [^support-11] | not yet tested     | ✗ [^support-12] | ✗ [^support-13] | ✗ [^support-14] / ✗ [^support-15] |
-| [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling) | x86_64       | ✓              | not yet tested  | ✓                                | ✓                  | ✓               | not yet tested  | ✓ / ✗ [^support-2]                |
-| [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling) | arm64        | ✓              | not yet tested  | ✓                                | ✓                  | not yet tested  | not yet tested  | ✓ / ✗ [^support-2]                |
+arm64 builds are available for [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md), [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md), [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md), [Debian 12](docs/platforms/debian.md), [Debian 13](docs/platforms/debian.md), [Fedora 43](docs/platforms/fedora.md), [Fedora 44](docs/platforms/fedora.md), [RHEL 9](docs/platforms/rhel.md), [RHEL 10](docs/platforms/rhel.md), [Rocky Linux 9](docs/platforms/alma-rocky.md), [Rocky Linux 10](docs/platforms/alma-rocky.md), [AlmaLinux 9](docs/platforms/alma-rocky.md), [AlmaLinux 10](docs/platforms/alma-rocky.md), [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling); their distribution pages list the tested features.
 
-Encryption and wipe require an encrypted installation; TPM2 unlock requires a compatible TPM and boot configuration. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent. Distribution pages describe other desktops and assistance tools. Findings cover distribution packages; derived distributions marked “base packages” cover their upstream packages.
+Encryption and wipe require an encrypted installation. TPM2 unlock needs a compatible TPM and boot setup. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent.
 
-[^support-1]: The shipped systemd is older than the configuration definition provider requires.
+[^support-1]: Systemd unit definitions require a newer systemd.
 
-[^support-2]: The desktop does not support all requested remote-assistance controls.
+[^support-2]: Findings cover packages included in the available vendor feeds.
 
-[^support-3]: The update runner does not implement this distribution's security-origin selection.
+[^support-3]: Extra assistance tools depend on the installed desktop; see the distribution page.
 
-[^support-4]: The shipped package manager cannot prepare the required unprivileged transaction. Password-policy integration is not supported with this release's PAM stack.
+[^support-4]: Firewall settings were not included in these profile tests.
 
-[^support-5]: No automatic OS-update integration is supported for this release.
+[^support-5]: Security-origin selection is not implemented for this update runner.
 
-[^support-6]: The desktop portal provides neither screen capture nor remote control.
+[^support-6]: Package profiles require a newer DNF.
 
-[^support-7]: The desktop portal provides neither screen capture nor remote control. The desktop does not support all requested remote-assistance controls.
+[^support-7]: Password-policy profiles are unavailable with this PAM stack.
 
-[^support-8]: The desktop cannot display the required Allow/Decline consent buttons.
+[^support-8]: Account locks and wipe work; the desktop does not report its screen-lock state.
 
-[^support-9]: The desktop cannot display the required Allow/Decline consent buttons. The desktop does not support all requested remote-assistance controls.
+[^support-9]: Automatic OS updates are not supported on this release.
 
-[^support-10]: Password-policy integration is not supported with this release's PAM stack. The firewall provider requires firewalld, but the installed firewall uses ufw.
+[^support-10]: Findings cover upstream base packages only.
 
-[^support-11]: The installed boot configuration cannot unlock systemd TPM2 tokens.
+[^support-11]: The desktop has no screen-sharing or remote-control portal.
 
-[^support-12]: The distribution requires its own updater and refuses direct package-manager system upgrades.
+[^support-12]: The desktop cannot show the required consent buttons.
 
-[^support-13]: No vendor advisory feed covers this distribution's packages.
+[^support-13]: Firewall profiles require firewalld rather than the installed ufw.
 
-[^support-14]: The desktop does not report its locked state, so screen sharing cannot stop safely at lock.
+[^support-14]: TPM2 unattended unlock is unavailable with this boot setup.
 
-[^support-15]: The desktop does not report its locked state, so screen sharing cannot stop safely at lock. The desktop does not support all requested remote-assistance controls.
+[^support-15]: Account locks and wipe work; screen locking is unavailable.
+
+[^support-16]: System upgrades must use the distribution's own updater.
+
+[^support-17]: No vendor advisory feed covers this distribution.
+
+[^support-18]: The desktop does not report screen-lock state for safe sharing.
 
 <!-- END GENERATED readme-support -->
 
