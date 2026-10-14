@@ -18,7 +18,7 @@ export const resourceKinds = [
   {
     arm: "nativePackage",
     label: "Package",
-    help: "Install or remove a DEB or RPM package from an approved repository.",
+    help: "Install or remove a DEB, RPM or pacman package from an approved repository.",
   },
   {
     arm: "managedFile",

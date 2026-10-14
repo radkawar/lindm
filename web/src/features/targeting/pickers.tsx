@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ComponentType, type ReactNode } from "react";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { TargetRef } from "../../../gen/lindm/policy/v1/targeting_pb";
@@ -27,7 +27,7 @@ export type NameSlot = (props: { value: string }) => ReactNode;
 export type TargetPickers = {
   devicePicker: PickerSlot;
   groupPicker: PickerSlot;
-  profileRevisionPicker: PickerSlot;
+  profileRevisionPicker: ComponentType<PickerProps & { initialProfileId?: string }>;
 };
 // Read-only names for saved records, composed by the route like the pickers.
 export type TargetNames = {

@@ -20,7 +20,7 @@ const TYPE_NAMES = ["Device group", "Dynamic group", "One device"];
 // A title made only of stage names, e.g. "pilot, fleet" or "Stage-1".
 const STAGE_LIST = /^[A-Za-z0-9_.-]+(, [A-Za-z0-9_.-]+)*$/;
 const SUMMARY =
-  /^(At least )?\d+ devices? will change( · \d+ unchanged)?( · \d+ not targeted)?( · \d+ unknown)?$/;
+  /^Proposed changes on (at least )?\d+ devices?( · \d+ unchanged)?( · \d+ not targeted)?( · \d+ unknown)?$/;
 
 // The persistent page column must not change state when the picker opens.
 function navigationState(page) {
@@ -136,7 +136,7 @@ export async function check({ page, visit, settle, require, capture, step }) {
     const line = (await summary.innerText()).trim();
     require(SUMMARY.test(
       line,
-    ), `Impact summary "${line}" is not "N devices will change · N unchanged · N not targeted · N unknown"`);
+    ), `Impact summary "${line}" does not distinguish proposed setting changes from device execution`);
     const lines = await summary.evaluate((node) =>
       Math.round(
         node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).lineHeight),

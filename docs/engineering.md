@@ -1612,9 +1612,11 @@ in the existing visible-copy scope; they do not detect every generic phrase or
 phrases split across text nodes.
 
 Every run also records seeded, authenticated administrator walkthroughs:
-Engineering laptop onboarding, a Finance baseline with impact preview, a lost
-laptop, critical-CVE exposure and patching, remote help, a limited-access helpdesk
-hire, recovery-key reveals last week, and running the organisation. `task-audit.html` and `task-audit.json`
+Engineering laptop onboarding, a Finance baseline with impact preview, a fleet
+configuration with packages, an SSH banner, firewall and OS updates, a lost laptop,
+critical-CVE exposure and patching, remote help, a limited-access helpdesk hire,
+recovery-key reveals last week, and running the organisation. `task-audit.html`
+and `task-audit.json`
 show each captured step, its task-shaped/partly/API-shaped assessment, generic
 material and proposed remedy. These are authored draft assessments for owner
 editing, not automated usability scores. Walkthrough screenshots join the owner
@@ -1656,6 +1658,20 @@ prerequisites before submission; authentication and one-time setup authority are
 Accounts keep role, device scope, sign-in state and Edit together on narrow screens;
 their one-time handoff has separate copy actions for the secret and enrollment address.
 Server status puts failed checks, attention and missing evidence before confirmed checks.
+
+The fleet configuration walk creates an isolated named group, publishes all four
+setting types, carries the exact saved profile version into Rollouts, reviews
+device impact, uses a separately enrolled administrator for approval, reads pilot
+progress, and pauses the rollout. Approval shows stage shares and manual promotion.
+Pause feedback names the rollout and states that existing device changes remain.
+Impact describes proposed settings, not successful device execution. A device with
+unresolved settings shows **Needs review** before approval instead of a promise to change.
+The empty stock fixture separately checks the absent-approved-source prerequisite.
+Package source choices match the package format. A saved source of another format
+stays visible as a mismatch until the administrator selects a matching source.
+Synthetic approved configurations copy the simulated executor's effective providers,
+derived by the same registry-backed capability policy code as stock agents. Synthetic
+archive keys remain explicitly synthetic; no native package execution is inferred.
 
 The same run emits `edit-sheet.html`, linked from the contact sheet,
 `edit-sheet.json` (run-bound screen/evidence manifest) and

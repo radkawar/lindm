@@ -14,9 +14,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
+import { usePrincipal } from "@/hooks/use-permissions";
 import { getAuthLifetime } from "@/lib/auth-lifetime";
 import { classifyRpcFailure, toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
+import { canPermission } from "@/lib/permissions";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
 import {
@@ -549,6 +551,7 @@ export function ProfileEditor({
 
 // Moves the reader to the outcome: the form above it has just been replaced.
 function PublishedOutcome({ published }: { published: ProfileRevision }) {
+  const principal = usePrincipal();
   const outcome = useRef<HTMLDivElement>(null);
   useEffect(() => {
     outcome.current?.scrollIntoView({ block: "nearest" });
@@ -559,13 +562,26 @@ function PublishedOutcome({ published }: { published: ProfileRevision }) {
       <AlertTitle>Profile published</AlertTitle>
       <AlertDescription>
         <p>
-          The server saved version {formatRevisionNumber(published.revisionNumber)}. Devices remain
-          unchanged until you activate it from{" "}
-          <Link to="/rollouts" className="underline underline-offset-4">
-            Rollouts
-          </Link>
-          .
+          The server saved version {formatRevisionNumber(published.revisionNumber)}. Publishing does
+          not change devices.
         </p>
+        {canPermission(principal, "resources.assign", true) ? (
+          <p>
+            <Link
+              to="/rollouts"
+              search={{
+                create: true,
+                profile: published.profileId,
+                revision: published.revisionId,
+              }}
+              className="font-medium underline underline-offset-4"
+            >
+              Roll out this version
+            </Link>
+          </p>
+        ) : (
+          <p>Ask an administrator with full rollout access to roll out this version.</p>
+        )}
         <p>
           <Link
             to="/profiles/$profileId"

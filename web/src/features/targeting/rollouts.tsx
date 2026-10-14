@@ -90,14 +90,24 @@ const DEVICE_STATES: Record<RolloutDeviceState, { label: string; tone: StatusTon
   [RolloutDeviceState.NEEDS_REVIEW]: { label: "Needs review", tone: "warning" },
 };
 
-type Flow = { open: boolean; candidate?: TargetCandidate; generation: number };
+type Flow = {
+  open: boolean;
+  candidate?: TargetCandidate;
+  profile?: string;
+  revision?: string;
+  generation: number;
+};
 
 export function RolloutsView({
   initialDevice = "",
+  initialProfile,
+  initialRevision,
   creating,
   onCreatingChange,
 }: {
   initialDevice?: string;
+  initialProfile?: string;
+  initialRevision?: string;
   // ?create=true (the command palette's New rollout) opens the dialog once.
   creating: boolean;
   onCreatingChange: (creating: boolean) => void;
@@ -117,22 +127,25 @@ export function RolloutsView({
     ...targetAssignmentsQueryOptions(lifetime, ""),
     enabled: canAssign,
   });
-  const rollOut = (candidate?: TargetCandidate) =>
+  const rollOut = (candidate?: TargetCandidate, profile?: string, revision?: string) =>
     setFlow((current) => ({
       open: true,
       candidate,
+      profile,
+      revision,
       generation:
-        current.candidate?.assignment?.assignmentId === candidate?.assignment?.assignmentId
+        current.candidate?.assignment?.assignmentId === candidate?.assignment?.assignmentId &&
+        current.revision === revision
           ? current.generation
           : current.generation + 1,
     }));
   useEffect(() => {
     if (!creating || !canAssign) return;
-    rollOut();
+    rollOut(undefined, initialProfile, initialRevision);
     onCreatingChange(false);
     // rollOut only reads state through its updater.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [creating, canAssign]);
+  }, [creating, canAssign, initialProfile, initialRevision]);
   return (
     <section className="grid min-w-0 gap-6">
       <PageHeader
@@ -199,6 +212,8 @@ export function RolloutsView({
               <RolloutFlow
                 key={`${flow.candidate?.assignment?.assignmentId ?? "new"}:${flow.generation}`}
                 candidate={flow.candidate}
+                initialProfile={flow.profile}
+                initialRevision={flow.revision}
                 onClose={() =>
                   setFlow((current) => ({
                     open: false,
@@ -757,7 +772,13 @@ function ControlButton({
     try {
       await adminClient.controlRollout(request, { signal: lifetime.signal });
       lifetime.signal.throwIfAborted();
-      toast.success(`${label}: done`);
+      toast.success(
+        operation === ControlRolloutRequest_Operation.PAUSE
+          ? `${title} paused. Devices that already changed keep the change.`
+          : operation === ControlRolloutRequest_Operation.RESUME
+            ? `${title} resumed. Check device results below.`
+            : `${title}: ${nextName} requested. Check device results below.`,
+      );
       setOpen(false);
       setSent(undefined);
       setReason("");

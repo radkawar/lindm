@@ -107,7 +107,7 @@ async function enabled(locator) {
   return false;
 }
 
-async function chooseNamed(ctx, container, label, name, prefix) {
+export async function chooseNamed(ctx, container, label, name, prefix) {
   const { page } = ctx;
   trackAdminReads(page);
   const trigger = container.getByRole("button", { name: new RegExp(`^${label} `) });
@@ -152,7 +152,7 @@ async function chooseNamed(ctx, container, label, name, prefix) {
   await option.click();
 }
 
-async function createGroup(ctx, id, department, device) {
+export async function createGroup(ctx, id, department, device) {
   const { page } = ctx;
   await navigate(ctx, "Devices", "Devices");
   await visible(page.getByRole("link", { name: device.Hostname, exact: true }));

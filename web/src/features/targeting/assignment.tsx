@@ -160,9 +160,13 @@ function freshAssignment(candidate?: TargetCandidate) {
 // nothing changes before another administrator approves when approval is needed.
 export function RolloutFlow({
   candidate,
+  initialProfile,
+  initialRevision,
   onClose,
 }: {
   candidate?: TargetCandidate;
+  initialProfile?: string;
+  initialRevision?: string;
   onClose: () => void;
 }) {
   const lifetime = useAuthLifetime();
@@ -170,7 +174,11 @@ export function RolloutFlow({
   const { profileRevisionPicker: ProfileRevisionPicker } = useTargetPickers();
   const key = candidate?.assignment?.assignmentId ?? "new";
   const attempt = useSyncExternalStore(subscribe, () => attempts.get(key));
-  const [draft, setDraft] = useState(() => freshAssignment(candidate));
+  const [draft, setDraft] = useState(() => {
+    const assignment = freshAssignment(candidate);
+    if (!candidate && initialRevision) assignment.profileRevisionId = initialRevision;
+    return assignment;
+  });
   const [plan, setPlan] = useState<StagePlan>(initialStagePlan);
   const [name, setName] = useState<string>();
   const [review, setReview] = useState<PreviewTargetAssignmentImpactResponse>();
@@ -351,6 +359,7 @@ export function RolloutFlow({
         <fieldset disabled={frozen || read.isPending} className="grid min-w-0 gap-4">
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <ProfileRevisionPicker
+              initialProfileId={initialProfile}
               label="Version"
               value={assignment.profileRevisionId}
               disabled={frozen || read.isPending}

@@ -11,13 +11,26 @@ import { TargetPickerProvider } from "@/features/targeting/pickers";
 import { canonicalUuid } from "@/lib/ids";
 
 export const Route = createFileRoute("/_authenticated/rollouts")({
-  // ?create=true opens the New rollout form.
-  validateSearch: (search: Record<string, unknown>): { device?: string; create?: true } => {
-    const create = search.create === true ? { create: true as const } : {};
-    if (search.device === undefined) return create;
-    const device = typeof search.device === "string" ? canonicalUuid(search.device) : null;
-    if (!device) throw new Error("Choose a valid device from the device list.");
-    return { device, ...create };
+  // Profile handoffs carry the exact published version, never a moving latest version.
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    device?: string;
+    create?: true;
+    profile?: string;
+    revision?: string;
+  } => {
+    const result: { device?: string; create?: true; profile?: string; revision?: string } = {};
+    if (search.create === true) result.create = true;
+    for (const key of ["device", "profile", "revision"] as const) {
+      if (search[key] === undefined) continue;
+      const value = typeof search[key] === "string" ? canonicalUuid(search[key]) : null;
+      if (!value) throw new Error(`Choose a valid ${key} from the console.`);
+      result[key] = value;
+    }
+    if (!!result.profile !== !!result.revision)
+      throw new Error("Choose a saved profile version from Profiles.");
+    return result;
   },
   beforeLoad: ({ context }) => {
     if (!canPermission(context.principal, "resources.assign"))
@@ -27,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/rollouts")({
 });
 
 function RolloutsPage() {
-  const { device, create } = Route.useSearch();
+  const { device, create, profile, revision } = Route.useSearch();
   const navigate = Route.useNavigate();
   return (
     <TargetPickerProvider
@@ -40,6 +53,8 @@ function RolloutsPage() {
     >
       <RolloutsView
         initialDevice={device}
+        initialProfile={profile}
+        initialRevision={revision}
         creating={create === true}
         onCreatingChange={(next) =>
           void navigate({

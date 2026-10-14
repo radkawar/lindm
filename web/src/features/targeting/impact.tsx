@@ -177,10 +177,12 @@ export function Adoption({ adopted, devices }: { adopted: ResourceRef[]; devices
   );
 }
 
-// One line: "4 devices will change · 2 unchanged · 6 not targeted · 1 unknown".
+// A projection of desired settings, not a promise of successful device execution.
 export function impactSummary(review: PreviewTargetAssignmentImpactResponse) {
   const changing = review.changedCount + review.removingCount;
-  const parts = [`${review.complete ? "" : "At least "}${plural(changing, "device")} will change`];
+  const parts = [
+    `Proposed changes on ${review.complete ? "" : "at least "}${plural(changing, "device")}`,
+  ];
   const unchanged = Math.max(0, review.includedCount - review.changedCount);
   if (unchanged) parts.push(`${unchanged} unchanged`);
   const untargeted = Math.max(0, review.excludedCount - review.removingCount);
@@ -202,7 +204,12 @@ function ChangeList({ device }: { device: TargetAssignmentDeviceImpact }) {
     return (
       <p>The server could not determine settings. Review this device again before activation.</p>
     );
-  if (!device.changed)
+  if (
+    !device.changed &&
+    device.proposedResolution.resources.every(
+      (resource) => resource.disposition === ResourceResolutionDisposition.READY,
+    )
+  )
     return <p className="text-muted-foreground">Already has these settings; nothing changes.</p>;
   const change = deviceChange(device);
   const lines: { key: string; text: ReactNode; tone?: "warning" | "destructive" }[] = [];
@@ -300,8 +307,15 @@ function deviceStatus(device: TargetAssignmentDeviceImpact) {
     return <StatusBadge status="warning">Membership unknown</StatusBadge>;
   if (device.match !== TargetMatch.INCLUDED)
     return <StatusBadge status="warning">Leaves this assignment</StatusBadge>;
+  if (
+    !device.proposedResolution ||
+    device.proposedResolution.resources.some(
+      (resource) => resource.disposition !== ResourceResolutionDisposition.READY,
+    )
+  )
+    return <StatusBadge status="warning">Needs review</StatusBadge>;
   return device.changed ? (
-    <StatusBadge status="info">Will change</StatusBadge>
+    <StatusBadge status="info">Proposed change</StatusBadge>
   ) : (
     <StatusBadge status="neutral">Unchanged</StatusBadge>
   );

@@ -3,11 +3,13 @@
 import { journeys as administration } from "./review-journeys-admin.mjs";
 import { journeys as enrollment } from "./review-journeys-enrollment.mjs";
 import { journeys as lostDevice } from "./review-journeys-lost-device.mjs";
+import { journeys as policy } from "./review-journeys-policy.mjs";
 import { journeys as provisioning } from "./review-journeys-provision.mjs";
 import { journeys as security } from "./review-journeys-security.mjs";
 
 const order = [
   "baseline",
+  "configure-fleet",
   "critical-cve",
   "first-device",
   "helpdesk",
@@ -27,11 +29,12 @@ const escape = (value) =>
 // These are administrator task walks through the real seeded console, not native
 // device qualification. A prerequisite or product blocker remains a recorded
 // blocker; a screenshot never turns a request into an observed device effect.
-export async function taskWalkthroughs({ page, config, visit, settle, screenshot }) {
+export async function taskWalkthroughs({ page, config, visit, settle, screenshot, protectSecret }) {
   const definitions = [
     ...administration,
     ...enrollment,
     ...lostDevice,
+    ...policy,
     ...provisioning,
     ...security,
   ];
@@ -77,7 +80,7 @@ export async function taskWalkthroughs({ page, config, visit, settle, screenshot
       pendingDiagnostics.add(diagnostic);
     };
     page.on("response", recordResponse);
-    const capture = async (name, assessment) => {
+    const capture = async (name, assessment, observedPage = page) => {
       if (
         !/^[a-z0-9-]+$/.test(name) ||
         !["yes", "partly", "no"].includes(assessment.taskShaped) ||
@@ -87,15 +90,15 @@ export async function taskWalkthroughs({ page, config, visit, settle, screenshot
       ) {
         throw new Error("task_assessment_incomplete");
       }
-      await settle(page);
+      await settle(observedPage);
       const prefix = `task-${id}-${String(entry.steps.length + 1).padStart(2, "0")}-${name}`;
       entry.steps.push({
         name,
         ...assessment,
-        url: new URL(page.url()).pathname,
+        url: new URL(observedPage.url()).pathname,
         screenshots: {
-          full: await screenshot(page, `${prefix}-full.png`, true),
-          viewport: await screenshot(page, `${prefix}.png`, false),
+          full: await screenshot(observedPage, `${prefix}-full.png`, true),
+          viewport: await screenshot(observedPage, `${prefix}.png`, false),
         },
       });
     };
@@ -105,6 +108,7 @@ export async function taskWalkthroughs({ page, config, visit, settle, screenshot
         config,
         visit: (path) => visit(page, path),
         capture,
+        protectSecret,
       });
       if (
         !entry.steps.length ||

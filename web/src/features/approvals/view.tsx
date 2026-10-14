@@ -33,6 +33,8 @@ import { classifyRpcFailure, toRpcFailure, type RpcFailure } from "@/lib/errors"
 import { revealedText } from "@/lib/reveal";
 import { adminClient } from "@/lib/rpc";
 import { formatTimestamp } from "@/lib/time";
+import { resourceKindLabel } from "@/lib/resource-labels";
+import { settingTitle } from "@/lib/setting-identity";
 import { approvalsQueryOptions } from "./queries";
 import {
   actionLabels,
@@ -164,15 +166,39 @@ function RolloutApproval({ approval }: { approval: Approval }) {
           ? "everyone at once"
           : `${rings.length} stages: ${rings.map((ring) => ring.name).join(", ")}`}
       </p>
+      {rings.length > 1 ? (
+        <ol className="grid gap-1" aria-label="Rollout stages">
+          {rings.map((ring, index) => (
+            <li key={ring.name}>
+              Stage {index + 1}: {ring.name} · up to {ring.cumulativeBasisPoints / 100}% of targeted
+              devices
+              {index < rings.length - 1
+                ? ring.manualPromotion
+                  ? ` · an administrator must advance to ${rings[index + 1].name}`
+                  : " · advances after health checks pass"
+                : ""}
+            </li>
+          ))}
+        </ol>
+      ) : null}
       {adopted.length && state ? (
         <p className="text-warning">
           Adopts the existing{" "}
-          {adopted.map((ref, index) => (
-            <span key={`${ref.kind}:${ref.canonicalKey}`}>
-              {index ? ", " : ""}
-              <code className="font-mono text-[0.92em] break-all">{ref.canonicalKey}</code>
-            </span>
-          ))}{" "}
+          {adopted.map((ref, index) => {
+            const identity = settingTitle(ref);
+            return (
+              <span key={`${ref.kind}:${ref.canonicalKey}`}>
+                {index ? ", " : ""}
+                {resourceKindLabel(ref.kind)}
+                {identity && !identity.startsWith("system") ? (
+                  <>
+                    {" "}
+                    <span className="break-all">{identity}</span>
+                  </>
+                ) : null}
+              </span>
+            );
+          })}{" "}
           on {state.adoptingCount} {state.adoptingCount === 1 ? "device" : "devices"}: lindm takes
           over settings these devices already have.
         </p>

@@ -138,9 +138,6 @@ export function ResourceFields({
     !!selectedQualification &&
     (supportedOwnership.mode !== ownership.mode ||
       supportedOwnership.release !== ownership.release);
-  const unavailable = resourceKinds
-    .filter((entry) => desiredField(entry.arm))
-    .some((entry) => kindQualification(qualification, entry.arm) === undefined);
   function choose(nextDesired: JsonObject, nextArm: string) {
     const ownership = qualifiedOwnership(
       object(document.ownership),
@@ -199,7 +196,6 @@ export function ResourceFields({
           id={`${id}-kind`}
           value={selectedTask}
           disabled={locked}
-          aria-describedby={unavailable ? `${id}-kind-help` : undefined}
           options={[
             { value: "", label: "Choose a setting type", disabled: true },
             ...(!kind && arm ? [{ value: arm, label: "Existing setting type" }] : []),
@@ -235,11 +231,6 @@ export function ResourceFields({
             }
           }}
         />
-        {unavailable ? (
-          <p id={`${id}-kind-help`} className="text-xs text-muted-foreground">
-            This server cannot apply types marked unavailable to devices.
-          </p>
-        ) : null}
       </div>
       {arm && selectedQualification === undefined ? (
         <p role="note" className="border border-warning/30 bg-warning/10 p-3 text-sm">
@@ -270,6 +261,12 @@ export function ResourceFields({
       ) : null}
       {kind && !moduleBlocklist ? (
         <p className="text-sm text-muted-foreground">{kind.help}</p>
+      ) : null}
+      {arm === "firewallZone" ? (
+        <p role="note" className="border border-warning/30 bg-warning/10 p-3 text-sm">
+          Firewall rules can block SSH and device contact with lindm. Keep the required network
+          access in your rules. Review the impact and test a pilot before the fleet stage.
+        </p>
       ) : null}
       {moduleBlocklist ? (
         <div className="grid gap-3">

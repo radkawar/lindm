@@ -17,8 +17,9 @@ const first = { name: "", referenceId: "" };
 // by path or repository. The reference identity is carried, never shown.
 export function ApprovedReferencePicker({
   kind,
+  sourceFormat,
   ...props
-}: PickerProps & { kind: ApprovedReferenceKind }) {
+}: PickerProps & { kind: ApprovedReferenceKind; sourceFormat?: string }) {
   const lifetime = useAuthLifetime();
   const [search, setSearch] = useState("");
   const [prefix, setPrefix] = useState("");
@@ -35,7 +36,14 @@ export function ApprovedReferencePicker({
     enabled: !props.disabled,
     placeholderData: keepPreviousData,
   });
-  const references = list.data?.references ?? [];
+  const reported = list.data?.references ?? [];
+  const references = sourceFormat
+    ? reported.filter((reference) => reference.format === sourceFormat)
+    : reported;
+  const mismatched = reported.find(
+    (reference) =>
+      reference.referenceId === props.value && !!sourceFormat && reference.format !== sourceFormat,
+  );
   const options: PickerOption[] = references.map((reference) => ({
     value: reference.referenceId,
     label: reference.format
@@ -51,11 +59,15 @@ export function ApprovedReferencePicker({
   if (props.value && !options.some((option) => option.value === props.value))
     options.unshift({
       value: props.value,
-      label:
-        kind === ApprovedReferenceKind.HOME_ROOT
+      label: mismatched
+        ? `${formats[mismatched.format] ?? mismatched.format} · ${mismatched.name} (wrong package format)`
+        : kind === ApprovedReferenceKind.HOME_ROOT
           ? "Saved home root no device reports"
           : "Saved source no device reports",
-      description: "Kept as saved. Devices without this approval refuse the setting.",
+      description: mismatched
+        ? `Choose a matching ${formats[sourceFormat ?? ""] ?? sourceFormat} source.`
+        : "Kept as saved. Devices without this approval refuse the setting.",
+      disabled: !!mismatched,
     });
   const empty = list.isSuccess && references.length === 0;
   const noun = kind === ApprovedReferenceKind.HOME_ROOT ? "home roots" : "package sources";
@@ -65,9 +77,18 @@ export function ApprovedReferencePicker({
       search={search}
       onSearchChange={setSearch}
       options={options}
-      note={`Approved ${noun} that devices report from their local configuration.`}
+      note={
+        sourceFormat
+          ? `Approved ${formats[sourceFormat] ?? sourceFormat} package sources reported by devices.`
+          : `Approved ${noun} that devices report from their local configuration.`
+      }
       footer={
-        list.isPending || list.error || empty || after.name || list.data?.nextAfterName ? (
+        list.isPending ||
+        list.error ||
+        empty ||
+        mismatched ||
+        after.name ||
+        list.data?.nextAfterName ? (
           <>
             {list.isPending && !props.disabled ? (
               <p role="status" className="text-xs text-muted-foreground">
@@ -81,7 +102,17 @@ export function ApprovedReferencePicker({
                 </Button>
               </RpcError>
             ) : null}
-            {empty ? (
+            {mismatched ? (
+              <p className="text-sm text-warning">
+                The saved source does not match this package's format. Choose a matching source.
+              </p>
+            ) : null}
+            {empty && reported.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                No {formats[sourceFormat ?? ""] ?? sourceFormat} package source matches this page.
+                Search by repository name.
+              </p>
+            ) : empty ? (
               <p className="text-xs text-muted-foreground">
                 {prefix
                   ? `No reported ${noun} start with “${prefix}”.`

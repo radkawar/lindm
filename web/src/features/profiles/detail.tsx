@@ -147,9 +147,13 @@ export function ProfileDetailView({
         }}
         refreshing={displayed.isFetching}
         actions={
-          canPermission(principal, "resources.assign") ? (
-            <Link to="/rollouts" className="text-sm font-medium underline underline-offset-4">
-              Assign in Rollouts
+          record && canPermission(principal, "resources.assign", true) ? (
+            <Link
+              to="/rollouts"
+              search={{ create: true, profile: record.profileId, revision: record.revisionId }}
+              className="text-sm font-medium underline underline-offset-4"
+            >
+              Roll out this version
             </Link>
           ) : null
         }

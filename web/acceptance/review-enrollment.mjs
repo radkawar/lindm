@@ -4,6 +4,7 @@
 // Missing repository configuration alone is not an installation failure.
 import { ChromiumDriver } from "./drivers.mjs";
 import { reviewSetup } from "./review-setup.mjs";
+import { packageSourcePrerequisite } from "./review-journeys-policy.mjs";
 
 export async function reviewEnrollmentFixtures({
   driver,
@@ -71,6 +72,40 @@ export async function reviewEnrollmentFixtures({
             ...helpers,
           })),
         );
+      }
+      if (publication === "stock-empty-fleet") {
+        await published.page.setViewportSize({ width: 1440, height: 900 });
+        await published.page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+        const entry = {
+          route: "/profiles/new",
+          url: "/profiles/new",
+          variant: `${publication} package-source-prerequisite`,
+          theme: "light",
+          viewport: "desktop",
+          size: "1440x900",
+          passed: false,
+          screenshots: {},
+          checks: { contract: { findings: [] } },
+        };
+        try {
+          entry.screenshots.prerequisite = await packageSourcePrerequisite(
+            published.page,
+            helpers.screenshot,
+          );
+          entry.passed = true;
+        } catch {
+          entry.checks.contract.findings.push({
+            message:
+              "The empty stock fixture does not explain the approved package source prerequisite.",
+            elements: [],
+          });
+          entry.screenshots.blocked = await helpers.screenshot(
+            published.page,
+            "package-source-prerequisite-blocked.png",
+            true,
+          );
+        }
+        results.push(entry);
       }
     } finally {
       await published.close();

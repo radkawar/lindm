@@ -192,6 +192,19 @@ func (s *demoDevice) observation(historical *inventoryv1.HostObservation, boot s
 	host.Details.Platform = s.platform
 	if s.agent != nil {
 		host.Details.CapabilityPolicy = s.agent.report
+		if s.agent.effective != nil {
+			// Mirror the stock executor report from its effective providers. The
+			// existing capability derivation uses the platform registry; the demo
+			// key remains explicitly synthetic, never a real archive key claim.
+			approved := &agentv1.ApprovedConfigurationObservation{ObservedAt: proto.CloneOf(now)}
+			for _, source := range s.agent.effective.Config.GetPackageProvider().GetSources() {
+				approved.PackageSources = append(approved.PackageSources, proto.CloneOf(source.GetRepository()))
+			}
+			for _, root := range s.agent.effective.Config.GetAccountProvider().GetApprovedHomeRoots() {
+				approved.HomeRoots = append(approved.HomeRoots, proto.CloneOf(root))
+			}
+			host.Details.ApprovedConfiguration = approved
+		}
 	}
 	if s.encryption == encryptionUnknown {
 		return host

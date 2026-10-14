@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
@@ -140,6 +141,9 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 			if device == nil || device.agent == nil {
 				t.Fatalf("%s has no capability-aware agent", tc.hostname)
 			}
+			if device.observation(nil, "synthetic-boot", timestamppb.Now()).GetDetails().GetApprovedConfiguration() != nil {
+				t.Fatal("an executor without accepted configuration reported approvals")
+			}
 			policy := &agentv1.AgentCapabilityPolicy{FormatVersion: 1, DeploymentId: "11111111-1111-4111-8111-111111111111", DeviceId: "22222222-2222-4222-8222-222222222222", EnrollmentGeneration: "33333333-3333-4333-8333-333333333333", Version: 1, IssuedAt: timestamppb.Now(), Capabilities: slices.Clone(deployment.GetCapabilities()), SysctlKeys: slices.Clone(deployment.GetSysctlKeys())}
 			// The server signs the union of every applicable scope.
 			if extra := group[device.department]; extra != nil {
@@ -156,6 +160,21 @@ func TestDemoAgentsDeriveEveryCapabilityState(t *testing.T) {
 			}
 			if err := device.agent.accept(device.release, &agentv1.CapabilityPolicyRecord{FormatVersion: 1, PolicyEnvelope: []byte("synthetic envelope"), Policy: policy, AcceptedAt: timestamppb.Now(), Active: true}); err != nil {
 				t.Fatal(err)
+			}
+			now := timestamppb.Now()
+			approved := device.observation(nil, "synthetic-boot", now).GetDetails().GetApprovedConfiguration()
+			sources := device.agent.effective.Config.GetPackageProvider().GetSources()
+			if !proto.Equal(approved.GetObservedAt(), now) || len(approved.GetPackageSources()) != len(sources) {
+				t.Fatalf("approved configuration did not report effective package sources: %v", approved)
+			}
+			for index, source := range sources {
+				if !proto.Equal(approved.PackageSources[index], source.GetRepository()) {
+					t.Fatalf("approved source lost registry-derived authority: %v", approved.PackageSources[index])
+				}
+				approved.PackageSources[index].RepositoryId = "changed"
+				if source.GetRepository().GetRepositoryId() == "changed" {
+					t.Fatal("inventory report shares mutable effective package authority")
+				}
 			}
 			report := device.agent.report
 			if report.GetState() != agentv1.CapabilityPolicyState_CAPABILITY_POLICY_STATE_ACTIVE || report.GetAppliedVersion() != 1 || len(report.GetAppliedSha256()) != 32 || len(report.GetCapabilities()) != len(tc.statuses) {

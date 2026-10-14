@@ -1136,6 +1136,9 @@ async function main() {
       visit,
       settle,
       screenshot,
+      protectSecret: (value) => {
+        if (value) secrets.push(value);
+      },
     });
     for (const job of report.walkthroughs.results) {
       if (job.failure) report.failures.push(`task ${job.id}: ${job.failure}`);

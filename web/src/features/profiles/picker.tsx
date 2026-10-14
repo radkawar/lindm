@@ -122,10 +122,11 @@ export function ProfilePicker({
 
 export function ProfileRevisionPicker({
   profileId: fixedProfile,
+  initialProfileId,
   ...props
-}: PickerProps & { profileId?: string }) {
+}: PickerProps & { profileId?: string; initialProfileId?: string }) {
   const lifetime = useAuthLifetime();
-  const [chosenProfile, setChosenProfile] = useState("");
+  const [chosenProfile, setChosenProfile] = useState(initialProfileId ?? "");
   const [cursor, setCursor] = useState({ profile: "", token: "" });
   const profiles = useQuery(profilesQueryOptions(lifetime, 100, ""));
   const profileId =

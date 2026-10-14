@@ -96,7 +96,7 @@ td ul{padding-left:16px;margin:4px 0;font-size:12px;word-break:break-word}
 <h1>Console UI machine checks: ${report.passed ? "passed" : "failed"}</h1>
 <p>Started ${escape(report.startedAt)}, finished ${escape(report.finishedAt)}. axe-core ${escape(report.axeVersion)}. ${report.results.length} captures.</p>
 <p><a href="edit-sheet.html">Owner editing pass</a> · <a href="edit-sheet.json">Screen manifest</a>. No owner review or approval is inferred. Semantic markers check presence, not truth or good choices; generic controls count only as structural action coverage. Unmarked metrics, unopened dialogs and unvisited states still need human review.</p>
-${report.walkthroughs ? '<p><a href="task-audit.html">Seven administrator task walkthroughs</a> · <a href="task-audit.json">Task evidence and blockers</a>. Route green does not mean every administrator job is complete.</p>' : ""}
+${report.walkthroughs ? '<p><a href="task-audit.html">Administrator task walkthroughs</a> · <a href="task-audit.json">Task evidence and blockers</a>. Route green does not mean every administrator job is complete.</p>' : ""}
 <h2>Session checks</h2><ul>${sessions}</ul>
 ${ownerEdits ? `<h2>Owner edit acceptance</h2><p>Each imported owner task's acceptance criterion against the seeded fleet. A pass is not owner approval.</p><ul>${ownerEdits}</ul>` : ""}
 ${failures ? `<h2>Failures (${report.failures.length})</h2><details><summary>Show all</summary><ul>${failures}</ul></details>` : ""}

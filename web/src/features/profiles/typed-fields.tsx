@@ -118,6 +118,11 @@ const packageManagers: Record<string, string> = {
   PACKAGE_ECOSYSTEM_RPM: "rpm",
   PACKAGE_ECOSYSTEM_ALPM: "pacman",
 };
+const packageSourceFormats: Record<string, string> = {
+  PACKAGE_ECOSYSTEM_DEB: "apt",
+  PACKAGE_ECOSYSTEM_RPM: "rpm",
+  PACKAGE_ECOSYSTEM_ALPM: "alpm",
+};
 
 // Values the fleet already reports are suggested; a profile may still name one
 // that no device has yet, so typed values stay allowed.
@@ -609,6 +614,12 @@ function TypedField({
           label={label}
           references={references}
           disabled={disabled}
+          sourceFormat={
+            field.parent.typeName === "lindm.resource.v1.NativePackageDesired" &&
+            field.jsonName === "repository"
+              ? packageSourceFormats[String(object(siblings.package).ecosystem ?? "")]
+              : undefined
+          }
         />
       ) : field.fieldKind === "enum" ? (
         <SelectField
@@ -717,7 +728,8 @@ function MessageInput({
   label,
   references,
   disabled,
-}: Props & { label: string }) {
+  sourceFormat,
+}: Props & { label: string; sourceFormat?: string }) {
   const pickers = useProfilePickers();
   const BindingPicker =
     schema.typeName === "lindm.resource.v1.SecretRef"
@@ -786,6 +798,7 @@ function MessageInput({
         {repository ? (
           <ApprovedReferencePicker
             kind={ApprovedReferenceKind.PACKAGE_SOURCE}
+            sourceFormat={sourceFormat}
             label={
               allowed.length === 0 ? "Approved package source" : "Or an approved source on devices"
             }

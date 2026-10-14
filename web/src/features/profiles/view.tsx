@@ -74,13 +74,23 @@ export function ProfilesView({
       </div>
       {canPermission(principal, "profiles.manage") && attempts.length > 0 ? (
         <Alert>
-          <AlertTitle>A profile hasn't finished saving</AlertTitle>
+          <AlertTitle>Profile save results</AlertTitle>
           <AlertDescription>
             <ul className="grid gap-1">
               {attempts.map((attempt) => (
                 <li key={attempt.payload.requestId} className="break-all">
                   {ATTEMPT_LABEL[attempt.status]}{" "}
-                  {attempt.mode === "create" ? (
+                  {attempt.status === "published" && attempt.published ? (
+                    <Link
+                      to="/profiles/$profileId"
+                      params={{ profileId: attempt.profileId }}
+                      search={{ revision: attempt.published.revisionId }}
+                      className="underline underline-offset-4"
+                    >
+                      View published version:{" "}
+                      {attempt.published.spec?.name.trim() || "Unnamed profile"}
+                    </Link>
+                  ) : attempt.mode === "create" ? (
                     <Link to="/profiles/new" className="underline underline-offset-4">
                       Continue creating it
                     </Link>
