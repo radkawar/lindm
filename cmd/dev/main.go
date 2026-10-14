@@ -13,7 +13,7 @@ import (
 	"os"
 )
 
-const usage = `Usage: go run ./cmd/dev <land|gate-commit|sync|status|protect|worktree> [options]
+const usage = `Usage: go run ./cmd/dev <land|gate-commit|sync|status|protect|worktree|toolchain-path> [options]
 
   land -from WORKTREE  Under the landing lock, apply a worktree's change to the
          shared tree, gate the touched files, roll back on failure; see land -h.
@@ -25,6 +25,8 @@ const usage = `Usage: go run ./cmd/dev <land|gate-commit|sync|status|protect|wor
          uncommitted files; re-protects tracked files it finds writable.
   protect  Make the shared checkout's tracked files read-only (a-w) unless a
          landing holds the lock; see protect -h.
+  toolchain-path  Print PATH with the checkout's pinned Node (.node-version)
+         and Go (go.mod) bin directories first; the Makefile exports it.
   worktree add|list|audit|prune  Private worktrees in <main>.worktrees; see
          worktree help.
 
@@ -54,6 +56,8 @@ func run() error {
 		return runProtect(args)
 	case "sync":
 		return runSync(args)
+	case "toolchain-path":
+		return runToolchainPath(args)
 	default:
 		return fmt.Errorf("unknown command %q; use help (the fixture, signoff, pre-push, generate-docs and gc moved to go run ./cmd/devenv)", verb)
 	}

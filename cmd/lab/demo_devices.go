@@ -21,6 +21,7 @@ import (
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/demolab"
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/labexec"
 	"lindm/internal/labhost"
 	"lindm/internal/vmlab"
@@ -150,7 +151,11 @@ func (r *demoRun) installScript(ctx context.Context, instructions *adminv1.GetEn
 		return "", err
 	}
 	output := nativeexec.NewBuffer(1 << 20)
-	if err := labexec.Run(ctx, labexec.Command{Path: "node", Args: []string{"web/acceptance/demo-install.mjs"}, Dir: r.options.build, Stdin: bytes.NewReader(input), Stdout: output, Stderr: r.stderr, Timeout: time.Minute}); err != nil {
+	node, environ, err := toolchain.Node(ctx, r.options.build, os.Environ())
+	if err != nil {
+		return "", err
+	}
+	if err := labexec.Run(ctx, labexec.Command{Path: node, Args: []string{"web/acceptance/demo-install.mjs"}, Env: environ, Dir: r.options.build, Stdin: bytes.NewReader(input), Stdout: output, Stderr: r.stderr, Timeout: time.Minute}); err != nil {
 		return "", fmt.Errorf("render customer enrollment installer: %w", err)
 	}
 	if output.Truncated() || output.Len() == 0 {

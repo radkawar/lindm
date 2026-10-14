@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/labexec"
 )
 
@@ -87,7 +88,11 @@ func startAssistanceBrowser(ctx context.Context, repository, private string, cfg
 	// Framework diagnostics can echo filled credentials, so raw stderr remains
 	// discarded. The bootstrap catches module-load failures before the runner's
 	// command loop and emits only bounded, allowlisted startup classifications.
-	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/assistance-bootstrap.mjs"), path}, Dir: repository, Stdin: childStdin, Stdout: childStdout})
+	node, environ, err := toolchain.Node(ctx, repository, os.Environ())
+	if err != nil {
+		return nil, errors.Join(err, childStdin.Close(), childStdout.Close(), stdin.Close(), stdout.Close())
+	}
+	process, err := labexec.Start(context.WithoutCancel(ctx), labexec.Command{Path: node, Args: []string{filepath.Join(repository, "web/acceptance/assistance-bootstrap.mjs"), path}, Env: environ, Dir: repository, Stdin: childStdin, Stdout: childStdout})
 	if closeErr := errors.Join(childStdin.Close(), childStdout.Close()); err != nil || closeErr != nil {
 		if err == nil {
 			err = errors.Join(closeErr, process.Close())

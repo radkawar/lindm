@@ -2984,7 +2984,12 @@ go) line, locate exactly those versions (`mise where`, else PATH candidates
 asked for their version, `go` with `GOTOOLCHAIN=local`), put their bin
 directories first on PATH for every subprocess and unset `GOROOT`. A pinned
 version that is not installed fails with the `mise install` command; no version
-check is relaxed (`internal/devlab/toolchain`). prints the landing marker first. `gate-commit` is the post-hoc full
+check is relaxed (`internal/devlab/toolchain`). The Makefile applies the same
+resolution to every recipe (it exports the PATH printed by `go run ./cmd/dev
+toolchain-path` and unexports `GOROOT`; a missing pinned version stops make),
+and every `cmd/lab` step that runs node (browser acceptance, console review,
+deploy browser, demo device installer, assistance browser) starts the pinned
+node binary with its directory first on PATH, needing no Go on the host. prints the landing marker first. `gate-commit` is the post-hoc full
 gate: it runs `make check` under the lock and commits the remaining change only
 when green. While a landing holds the tree writable, another process can write
 into it; neither command can commit such a write. `land` commits by explicit

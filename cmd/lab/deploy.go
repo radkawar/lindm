@@ -23,6 +23,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/custody"
 	"lindm/internal/deploylab"
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/labexec"
 	"lindm/internal/trust"
 	"lindm/internal/vmlab"
@@ -240,7 +241,11 @@ func deployBrowser(repository string) func(context.Context, deploylab.BrowserReq
 			return nil, err
 		}
 		clear(configuration)
-		runErr := labexec.Run(ctx, labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/deploy.mjs"), path}, Dir: repository, Timeout: 10 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
+		node, environ, err := toolchain.Node(ctx, repository, os.Environ())
+		if err != nil {
+			return nil, err
+		}
+		runErr := labexec.Run(ctx, labexec.Command{Path: node, Args: []string{filepath.Join(repository, "web/acceptance/deploy.mjs"), path}, Env: environ, Dir: repository, Timeout: 10 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
 		observed := new(deploylab.BrowserEvidence)
 		readErr := readConsoleBrowserJSON(request.ResultPath, observed)
 		return observed, errors.Join(runErr, readErr)

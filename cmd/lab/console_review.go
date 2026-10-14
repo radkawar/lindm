@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"lindm/internal/devlab"
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/loadlab"
 )
 
@@ -196,8 +197,12 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	if _, err := fmt.Fprintf(stdout, "Reviewing console at %s with %d demo devices; evidence: %s\n", fixture.ConsoleOrigin, len(demo.Devices), directory); err != nil {
 		return err
 	}
-	command := exec.CommandContext(ctx, "node", filepath.Join(checkout, "web/acceptance/review.mjs"), configPath)
-	command.Dir, command.WaitDelay = checkout, 45*time.Second
+	node, environ, err := toolchain.Node(ctx, checkout, os.Environ())
+	if err != nil {
+		return err
+	}
+	command := exec.CommandContext(ctx, node, filepath.Join(checkout, "web/acceptance/review.mjs"), configPath)
+	command.Dir, command.Env, command.WaitDelay = checkout, environ, 45*time.Second
 	command.Cancel = func() error { return command.Process.Signal(syscall.SIGTERM) }
 	// Framework diagnostics can echo filled credentials; the runner writes its
 	// own sanitized report instead.

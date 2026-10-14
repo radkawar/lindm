@@ -2,6 +2,16 @@
 .DEFAULT_GOAL := check
 
 export GOTOOLCHAIN := go1.26.9
+# Every recipe runs the pinned Node (.node-version) and Go (go.mod) first on
+# PATH, whatever the caller's shell puts first (a mise global Node 26 broke
+# the console review); a stale GOROOT would pair a go with another release's
+# standard library. A pinned version that is missing stops make here.
+TOOLCHAIN_PATH := $(shell env -u GOROOT go run ./cmd/dev toolchain-path)
+ifeq ($(strip $(TOOLCHAIN_PATH)),)
+$(error pinned toolchains unavailable; see the error above (go run ./cmd/dev toolchain-path))
+endif
+export PATH := $(TOOLCHAIN_PATH)
+unexport GOROOT
 TOOLS := $(CURDIR)/.tools/bin
 BUF := $(TOOLS)/buf
 SQLC := $(TOOLS)/sqlc

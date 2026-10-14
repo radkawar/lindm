@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"lindm/internal/devlab"
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/labexec"
 )
 
@@ -283,7 +284,11 @@ func runAcceptanceBrowser(ctx context.Context, repository, private string, cfg a
 	// Browser output can contain UI credentials in framework diagnostics, so it is
 	// discarded; the maintained runner writes sanitized failures and masked
 	// screenshots itself. Cancellation lets it close browsers before the group dies.
-	runErr := labexec.Run(ctx, labexec.Command{Path: "node", Args: []string{filepath.Join(repository, "web/acceptance/run.mjs"), path}, Dir: repository, Timeout: 8 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
+	node, environ, err := toolchain.Node(ctx, repository, os.Environ())
+	if err != nil {
+		return result, err
+	}
+	runErr := labexec.Run(ctx, labexec.Command{Path: node, Args: []string{filepath.Join(repository, "web/acceptance/run.mjs"), path}, Env: environ, Dir: repository, Timeout: 8 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
 	resultFile, readErr := os.Open(cfg.ResultPath)
 	var body []byte
 	if readErr == nil {

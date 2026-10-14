@@ -137,3 +137,21 @@ func TestApplyGovernsSubprocesses(t *testing.T) {
 		t.Fatal("GOROOT still set")
 	}
 }
+
+func TestNodeNeedsNoGo(t *testing.T) {
+	root := checkout(t, "24.21.0\n", "module m\n\ngo 1.26.9\n")
+	tools := t.TempDir()
+	global := fakeTool(t, filepath.Join(tools, "global"), "node", "26.1.0")
+	pinned := fakeTool(t, filepath.Join(tools, "pinned"), "node", "24.21.0")
+	path := global + string(os.PathListSeparator) + pinned // and no go anywhere
+	binary, env, err := Node(t.Context(), root, []string{"PATH=" + path, "HOME=/h"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if binary != filepath.Join(pinned, "node") || lookup(env, "PATH") != pinned+string(os.PathListSeparator)+path || lookup(env, "HOME") != "/h" {
+		t.Fatalf("node %q, env %v", binary, env)
+	}
+	if _, _, err := Node(t.Context(), root, []string{"PATH=" + global}); err == nil || !strings.Contains(err.Error(), "mise install node@24.21.0") {
+		t.Fatalf("missing pinned node: %v", err)
+	}
+}

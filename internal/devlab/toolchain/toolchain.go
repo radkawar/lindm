@@ -86,6 +86,25 @@ func Environ(ctx context.Context, root string, environ []string) ([]string, erro
 	return append(environ, "PATH="+strings.Join(append(dirs, path), string(os.PathListSeparator))), nil
 }
 
+// Node returns the checkout's pinned node binary and environ with its bin
+// directory first on PATH, for running node (and the npm, npx or node it
+// starts) on a host that need not have Go, such as a lab host. Pass the
+// returned binary as the command path: exec resolves a bare "node" against
+// this process's PATH, not the child's.
+func Node(ctx context.Context, root string, environ []string) (binary string, env []string, err error) {
+	pins, err := Pinned(root)
+	if err != nil {
+		return "", nil, err
+	}
+	path := lookup(environ, "PATH")
+	dir, err := locate(ctx, "node", pins.Node, path, environ)
+	if err != nil {
+		return "", nil, err
+	}
+	env = slices.DeleteFunc(slices.Clone(environ), func(entry string) bool { return strings.HasPrefix(entry, "PATH=") })
+	return filepath.Join(dir, "node"), append(env, "PATH="+dir+string(os.PathListSeparator)+path), nil
+}
+
 // Apply makes this process, and every subprocess it starts with an inherited
 // environment, use the checkout's pinned toolchains (see Environ).
 func Apply(ctx context.Context, root string) error {
