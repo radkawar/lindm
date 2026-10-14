@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { chromium } from "playwright";
 import { installProbes } from "./review-probes.mjs";
+import { permissionLabels } from "../src/lib/permissions.ts";
 
 // This suite exercises the production probe against rendered DOM, including
 // inline markup. It needs the same installed Chromium as ui-review.
@@ -32,6 +33,12 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
     assert.ok((await inspect("<button>Delete machine</button>")).includes('STE use "device"'));
     assert.deepEqual(await inspect("<p>Service drop-in</p>"), []);
     assert.ok((await inspect("<button>Drop device</button>")).includes('STE use "remove"'));
+    assert.ok(
+      (await inspect("<label>Delete assistance recordings</label>")).includes('STE use "remove"'),
+    );
+    const recordingPermission = "remote_assistance.recordings.delete";
+    assert.equal(permissionLabels[recordingPermission], "Remove assistance recordings");
+    assert.deepEqual(await inspect(`<label>${permissionLabels[recordingPermission]}</label>`), []);
     assert.deepEqual(
       await inspect(
         "<p>Review <span><code>Delete machine nativePackage</code></span> the device.</p>",

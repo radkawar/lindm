@@ -225,6 +225,7 @@ names, controls, notices and dialogs:
   for each meaning: **device**, not interchangeable machine, host or endpoint;
   **remove**, not delete, erase or drop. Keep **wipe** for the destructive action.
   Technical terms with different meanings, such as a database host, remain distinct.
+  Use **remove** in permission captions. Keep protocol permission keys unchanged.
 - Limit noun clusters to three words. Use a preposition to explain longer groups.
 - Limit paragraphs to six sentences. Remove duplicate explanations.
 - Do not hedge. State confirmed facts, unknown facts and prerequisites directly.

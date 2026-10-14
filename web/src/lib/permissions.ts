@@ -25,7 +25,7 @@ export const permissionLabels: Record<string, string> = {
   "remote_assistance.reconnect": "Reconnect assistance sessions",
   "remote_assistance.record": "Record assistance sessions",
   "remote_assistance.recordings.read": "Play assistance recordings",
-  "remote_assistance.recordings.delete": "Delete assistance recordings",
+  "remote_assistance.recordings.delete": "Remove assistance recordings",
   "remote_assistance.unattended": "Request unattended assistance",
   "remote_assistance.unattended.approve": "Approve unattended assistance",
   "remote_assistance.elevation_guidance": "Guide password prompts",
