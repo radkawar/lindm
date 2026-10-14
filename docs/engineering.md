@@ -4412,6 +4412,20 @@ installation, or the fresh-VM deployment lifecycle. The descriptor-replacement
 test retains an already opened final file; it does not claim a deterministic
 mid-traversal race barrier.
 
+Fresh `cold-release-attempt13.json` passed the literal production SDK build at
+integrated source `a7389d51f982fdf74e1a65c876c16c2876e2b64e`, including the
+sandbox-preserving native repository repair. A fresh no-swap Noble VM used an
+actual Git clone, pristine caches, pinned official SDKs and `make release-keys`,
+then produced authenticated, untouched versions `0.2.6` and `0.2.7`. Owned cleanup
+completed. Its record SHA-256 is
+`6053f69bc126f662fd093da60698419c1fa88352e00fd47f144da197fac6159c`.
+The independent release key ID is
+`d3534ad5885041aab4c2a601c16a3a5d4a59c405d91e0da342e7d404f68e5875`;
+the approved TUF root SHA-256 is
+`b113750b562b6d4b0ffc6d7570225056923f18a42710e2b4b92e4abc023f2b73`.
+This is production-cold-release-build-only evidence, not native lifecycle
+qualification; SDK12 and earlier failed installation observations remain scoped.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
