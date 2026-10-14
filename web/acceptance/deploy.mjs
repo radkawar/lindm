@@ -275,6 +275,31 @@ async function createIntegrationProof(ui) {
   await capture("encrypted-integration-created");
 }
 
+async function proveRepositoryReadiness() {
+  const response = driver.page.waitForResponse(
+    (reply) =>
+      new URL(reply.url()).pathname === "/lindm.admin.v1.AdminService/GetEnrollmentInstructions",
+    { timeout: 30_000 },
+  );
+  const [, reply] = await Promise.all([driver.goto(`${config.origin}/settings`), response]);
+  if (!reply.ok()) throw new Error("agent_repository_readiness_query_failed");
+  const body = await reply.json();
+  const platforms = (body.platforms ?? []).map(({ id, label, packageFamily, readiness }) => ({
+    id,
+    label,
+    packageFamily,
+    readiness,
+  }));
+  await writePrivateJSON(join(config.evidenceDirectory, "setup-agent-repository-readiness.json"), {
+    readiness: body.readiness,
+    platforms,
+  });
+  await capture("agent-repository-readiness");
+  if (platforms.find((platform) => platform.label === config.platform)?.readiness?.ready !== true)
+    throw new Error("agent_repository_not_ready");
+  result.agent_repository_ready = true;
+}
+
 try {
   config = await readPrivateJSON(process.argv[2]);
   if (
@@ -313,6 +338,7 @@ try {
     await writePrivateJSON(config.credentialPath, authenticated);
     result.password_and_passkey = true;
     await capture("password-passkey-signin");
+    await proveRepositoryReadiness();
   } else {
     await driver.goto(config.origin);
     await signIn(ui, config);

@@ -4321,6 +4321,32 @@ The failed older-source record remains scoped. The next native qualification
 requires fresh matching signed exports, not a patch to the frozen bundle or a
 legacy-label compatibility path.
 
+Fresh `cold-release-attempt12.json` passed the literal production SDK build at
+exact source `385fe89976732fba27d9888908ecd1440bae416f`, including the native-tool-free
+PostgreSQL policy repair. A fresh no-swap Noble VM cloned the exact source,
+used pristine caches and pinned official SDKs, then ran `make release-keys`
+and built authenticated versions `0.2.4` and `0.2.5`. Owned cleanup completed.
+The record SHA-256 is
+`51e22f32d2176c5961661755e1811b30f28d24119c77ec1506422c7c26209311`.
+Its scope is production-cold-release-build-only, not lifecycle qualification.
+The independent release key ID is
+`06d42692b741b9c4a359f32008cf451e7819a77c60f8051f4ef95fd989c7e327`;
+the approved TUF root SHA-256 is
+`a547bbb5ba8a2e0b4abb4a4264543c1d5cdf5c30c43f317b772cd5dff1b06f9b`.
+
+`native-ubuntu-attempt13.json` used that untouched `0.2.4`/`0.2.5` pair and passed
+installation, real-browser password and user-verifying passkey setup/sign-in, the
+runtime PLUS and privilege-denial probes, digest-bound off-server custody
+confirmation, and installed integration-ciphertext decryption. Enrollment stopped
+because the console reported that Ubuntu 24.04 LTS's agent repository was not
+ready. The record SHA-256 is
+`69ca7929f799a689b8d521790d9f6ccba73a393bf9d7693ce5ca1aa73c549100`.
+This remains failed, specific-source evidence, not lifecycle qualification.
+The maintained setup browser now checks the authenticated Settings repository
+response before admitting first-run success, retains only readiness fields in a
+private diagnostic, and seals bounded service journals to the lab operator on
+setup failure. It does not bypass browser authentication or repository admission.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

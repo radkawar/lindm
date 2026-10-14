@@ -70,6 +70,7 @@ type BrowserEvidence struct {
 	BrowserVersion           string          `json:"browser_version"`
 	Authenticator            string          `json:"authenticator"`
 	PasswordAndPasskey       bool            `json:"password_and_passkey"`
+	AgentRepositoryReady     bool            `json:"agent_repository_ready"`
 	CommandSHA256            string          `json:"command_sha256,omitempty"`
 	CommandSource            string          `json:"command_source,omitempty"`
 	DeviceID                 string          `json:"device_id,omitempty"`
@@ -96,8 +97,8 @@ func ValidateBrowserEvidence(request BrowserRequest, evidence *BrowserEvidence) 
 	}
 	switch request.Phase {
 	case "setup":
-		if !evidence.PasswordAndPasskey {
-			return errors.New("deploy: setup did not prove password and passkey sign-in")
+		if !evidence.PasswordAndPasskey || !evidence.AgentRepositoryReady {
+			return errors.New("deploy: setup did not prove password and passkey sign-in with a ready agent repository")
 		}
 	case "custody":
 		if request.CustodySHA256 == "" || evidence.CustodySHA256 != request.CustodySHA256 || !evidence.OwnerStepUp || !evidence.OwnerCustodyAttested {

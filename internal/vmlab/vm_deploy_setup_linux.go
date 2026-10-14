@@ -253,7 +253,7 @@ func runDeploySetupOwner(ctx context.Context, guest *guestVM, common VMDeployOpt
 			return errors.Join(err, deploylab.ValidateBrowserEvidence(*request, observed))
 		})
 	}); err != nil {
-		return err
+		return errors.Join(err, captureDeployServiceJournal(ctx, guest, common, "setup-readiness-journal"))
 	}
 	return observeDeploySetup(result, "real runtime SQL security gates", "harness", func() error {
 		var err error

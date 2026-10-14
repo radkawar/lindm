@@ -35,9 +35,18 @@ func TestSetupAndClipboardEvidenceAreIndependent(t *testing.T) {
 		t.Fatal("password-only setup qualified")
 	}
 	setup.PasswordAndPasskey = true
+	if err := ValidateBrowserEvidence(BrowserRequest{Phase: "setup"}, &setup); err == nil {
+		t.Fatal("password and passkey setup without a ready agent repository qualified")
+	}
+	setup.AgentRepositoryReady = true
 	if err := ValidateBrowserEvidence(BrowserRequest{Phase: "setup"}, &setup); err != nil {
 		t.Fatal(err)
 	}
+	setup.PasswordAndPasskey = false
+	if err := ValidateBrowserEvidence(BrowserRequest{Phase: "setup"}, &setup); err == nil {
+		t.Fatal("ready agent repository without password and passkey sign-in qualified")
+	}
+	setup.PasswordAndPasskey = true
 	copy := BrowserEvidence{Phase: "copy", Passed: true, BrowserVersion: "Chromium", Screenshots: []string{"masked.png"}, CommandSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", CommandSource: "response-field"}
 	if err := ValidateBrowserEvidence(BrowserRequest{Phase: "copy"}, &copy); err == nil {
 		t.Fatal("non-clipboard enrollment command qualified")

@@ -39,17 +39,22 @@ func executeDeployInstaller(ctx context.Context, guest *guestVM, options VMDeplo
 	if diagnosticErr != nil || diagnostic.ExitCode != 0 {
 		captureErr = errors.Join(captureErr, errors.New("lab database failure observer did not complete"))
 	}
-	journal, journalErr := guest.runResult(ctx, "sudo -n env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service", nil, deployInstallerDiagnosticLimit, time.Minute)
-	defer clear(journal.Stdout)
-	defer clear(journal.Stderr)
-	captureErr = errors.Join(captureErr, writeDeployInstallerDiagnostics(recipient, options.EvidenceDirectory, filepath.Base(destination)+"-journal", journal.Stdout, journal.Stderr))
-	if journalErr != nil || journal.ExitCode != 0 {
-		captureErr = errors.Join(captureErr, errors.New("lab private service journal observer did not complete"))
-	}
+	captureErr = errors.Join(captureErr, captureDeployServiceJournal(ctx, guest, options, filepath.Base(destination)+"-journal"))
 	if err != nil {
 		return errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
 	}
 	return errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
+}
+
+func captureDeployServiceJournal(ctx context.Context, guest *guestVM, options VMDeployOptions, label string) error {
+	journal, err := guest.runResult(ctx, "sudo -n env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service", nil, deployInstallerDiagnosticLimit, time.Minute)
+	defer clear(journal.Stdout)
+	defer clear(journal.Stderr)
+	captureErr := writeDeployInstallerDiagnostics(options.CustodyEscrowRecipientFile, options.EvidenceDirectory, label, journal.Stdout, journal.Stderr)
+	if err != nil || journal.ExitCode != 0 {
+		captureErr = errors.Join(captureErr, errors.New("lab private service journal observer did not complete"))
+	}
+	return captureErr
 }
 
 func writeDeployInstallerDiagnostics(recipient, directory, label string, stdout, stderr []byte) error {
