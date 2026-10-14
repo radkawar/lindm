@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -76,5 +77,26 @@ func TestMigrationsAheadRefusesStaleVersions(t *testing.T) {
 	}
 	if err := migrationsAhead(t.Context(), root, files[1:]); err != nil {
 		t.Fatalf("ordered additions refused: %v", err)
+	}
+}
+
+// CI's lint:web once failed on a console change the landing gate had only run
+// prettier on (a free-text input without data-freeform).
+func TestWebLintCoversTouchedConsoleSources(t *testing.T) {
+	for _, tc := range []struct {
+		files []string
+		want  [][]string
+	}{
+		{[]string{"cmd/dev/land.go", "docs/engineering.md", "web/acceptance/run.mjs"}, nil},
+		{[]string{"web/src/features/auth/accounts.tsx", "web/src/lib/time.ts", "web/src/index.html", "docs/x.md"},
+			[][]string{{"npx", "eslint", "--max-warnings=0", "--no-warn-ignored", "web/src/features/auth/accounts.tsx", "web/src/lib/time.ts"}}},
+		{[]string{"web/src/styles/app.css"}, [][]string{{"node", "web/eslint/scan-css-colours.mjs"}}},
+		{[]string{"web/src/app.tsx", "web/eslint/freeform-input.mjs"}, [][]string{{"npm", "run", "--silent", "lint:web"}}},
+		{[]string{"eslint.config.mjs"}, [][]string{{"npm", "run", "--silent", "lint:web"}}},
+		{[]string{"package.json"}, [][]string{{"npm", "run", "--silent", "lint:web"}}},
+	} {
+		if got := webLint(tc.files); !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("webLint(%q) = %q, want %q", tc.files, got, tc.want)
+		}
 	}
 }

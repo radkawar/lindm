@@ -3013,7 +3013,10 @@ concurrent `lab matrix` imports compose. A gate that changes any other file
 fails the landing, and that change is discarded with the rollback. It then
 runs the quick gate on the touched files in the shared tree (build, golangci-lint
 run for both tags and fmt on touched packages, buf when protos changed,
-prettier/markdownlint on touched docs and web files, a refusal of any added
+prettier/markdownlint on touched docs and web files, CI's `lint:web` scoped to
+the change (ESLint on touched `web/src` sources, the CSS colour scan when
+console stylesheets change, all of `lint:web` when `eslint.config.mjs`,
+`web/eslint/` or `package.json` change), a refusal of any added
 `db/migrations` file numbered at or below `main`'s highest (it names the number
 to rename to), `generate-docs -check`
 always, race tests of the touched packages plus every module package whose

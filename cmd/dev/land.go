@@ -286,6 +286,7 @@ func quickGate(ctx context.Context, root string, files []string) error {
 	if len(markdown) != 0 {
 		steps = append(steps, append([]string{"npx", "markdownlint"}, markdown...))
 	}
+	steps = append(steps, webLint(existing(files))...)
 	for _, step := range steps {
 		if err := stream(ctx, root, nil, step[0], step[1:]...); err != nil {
 			return err
@@ -314,6 +315,38 @@ func quickGate(ctx context.Context, root string, files []string) error {
 		return checkWeb(ctx, root)
 	}
 	return nil
+}
+
+// webLint is npm run lint:web (CI's console lint) scoped like the rest of the
+// gate: ESLint on the touched console sources, and the CSS colour scan when
+// stylesheets change. The rules are syntactic (no type-aware rules), so a
+// file's verdict does not depend on untouched files; a change to the rules or
+// their configuration relints the whole console instead.
+func webLint(files []string) [][]string {
+	var sources []string
+	stylesheets, rules := false, false
+	for _, file := range files {
+		switch {
+		case file == "eslint.config.mjs" || file == "package.json" || file == "package-lock.json" || strings.HasPrefix(file, "web/eslint/"):
+			rules = true
+		case !strings.HasPrefix(file, "web/src/"):
+		case filepath.Ext(file) == ".css":
+			stylesheets = true
+		case slices.Contains([]string{".ts", ".tsx", ".js", ".mjs"}, filepath.Ext(file)):
+			sources = append(sources, file)
+		}
+	}
+	if rules {
+		return [][]string{{"npm", "run", "--silent", "lint:web"}}
+	}
+	var steps [][]string
+	if len(sources) != 0 {
+		steps = append(steps, append([]string{"npx", "eslint", "--max-warnings=0", "--no-warn-ignored"}, sources...))
+	}
+	if stylesheets {
+		steps = append(steps, []string{"node", "web/eslint/scan-css-colours.mjs"})
+	}
+	return steps
 }
 
 // touchesConsole reports whether a landing changes the console or its
