@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/auth/v1/auth.proto.
  */
 export const file_lindm_auth_v1_auth: GenFile = /*@__PURE__*/
-  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEiowIKEFNlc3Npb25QcmluY2lwYWwSCgoCaWQYASABKAkSDgoGaXNzdWVyGAIgASgJEg8KB3N1YmplY3QYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEgwKBHJvbGUYBSABKAkSEgoKY3NyZl90b2tlbhgGIAEoCRITCgticmVha19nbGFzcxgHIAEoCBIXCg9pbmNpZGVudF9yZWFzb24YCCABKAkSEwoLcGVybWlzc2lvbnMYCSADKAkSFwoPc2VydmljZV9hY2NvdW50GAogASgIEiwKCGJpbmRpbmdzGAsgAygLMhoubGluZG0uYXV0aC52MS5Sb2xlQmluZGluZxIgChh1bnJlc3RyaWN0ZWRfcGVybWlzc2lvbnMYDCADKAkiWQoVQXV0aGVudGljYXRpb25PcHRpb25zEhYKDmV4dGVybmFsX2xvZ2luGAEgASgIEhMKC2xvY2FsX2xvZ2luGAIgASgIEhMKC2JyZWFrX2dsYXNzGAMgASgIIpkBChFMb2NhbExvZ2luUmVxdWVzdBI5Cgh1c2VybmFtZRgBIAEoCUInukgkciIQARhAMhxeW0EtWmEtejAtOV1bQS1aYS16MC05Ll8tXSokEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIEisKD2luY2lkZW50X3JlYXNvbhgDIAEoCUISukgPcg0YgAQogAgyBV4kfFxTIlIKFkxvY2FsRW5yb2xsbWVudFJlcXVlc3QSGgoGc2VjcmV0GAEgASgJQgq6SAdyBSABKIAIEhwKCHBhc3N3b3JkGAIgASgJQgq6SAdyBSAMKIAIIjIKEkxvY2FsU3RlcFVwUmVxdWVzdBIcCghwYXNzd29yZBgBIAEoCUIKukgHcgUgDCiACCJRChFXZWJBdXRobkNoYWxsZW5nZRIZCgV0b2tlbhgBIAEoCUIKukgHcgUgASiACBIhCgxvcHRpb25zX2pzb24YAiABKAlCC7pICHIGIAEogIAEIlgKFVdlYkF1dGhuRmluaXNoUmVxdWVzdBIZCgV0b2tlbhgBIAEoCUIKukgHcgUgASiACBIkCg9jcmVkZW50aWFsX2pzb24YAiABKAlCC7pICHIGIAEogIAEIp4BCgxMb2NhbEFjY291bnQSCgoCaWQYASABKAkSEAoIdXNlcm5hbWUYAiABKAkSDAoEcm9sZRgDIAEoCRIPCgdlbmFibGVkGAQgASgIEhMKC2JyZWFrX2dsYXNzGAUgASgIEhAKCGVucm9sbGVkGAYgASgIEioKBnNjb3BlcxgHIAMoCzIaLmxpbmRtLmF1dGgudjEuRGV2aWNlU2NvcGUiVAoUTGlzdEFjY291bnRzUmVzcG9uc2USLQoIYWNjb3VudHMYASADKAsyGy5saW5kbS5hdXRoLnYxLkxvY2FsQWNjb3VudBINCgVyb2xlcxgCIAMoCSLDAgoUQ3JlYXRlQWNjb3VudFJlcXVlc3QSOQoIdXNlcm5hbWUYASABKAlCJ7pIJHIiEAEYQDIcXltBLVphLXowLTldW0EtWmEtejAtOS5fLV0qJBIsCgRyb2xlGAIgASgJQh66SBtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQSEwoLYnJlYWtfZ2xhc3MYAyABKAgSNAoGc2NvcGVzGAQgAygLMhoubGluZG0uYXV0aC52MS5EZXZpY2VTY29wZUIIukgFkgECEGQ6d7pIdBpyCiBjcmVhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIrcCChRVcGRhdGVBY2NvdW50UmVxdWVzdBIcCgphY2NvdW50X2lkGAEgASgJQgi6SAVyA7ABARIPCgdlbmFibGVkGAIgASgIEiwKBHJvbGUYAyABKAlCHrpIG3IZEAEYQDITXlthLXpdW2EtejAtOV8uLV0qJBITCgticmVha19nbGFzcxgEIAEoCBI0CgZzY29wZXMYBSADKAsyGi5saW5kbS5hdXRoLnYxLkRldmljZVNjb3BlQgi6SAWSAQIQZDp3ukh0GnIKIHVwZGF0ZV9hY2NvdW50LmJyZWFrX2dsYXNzX293bmVyEiNicmVhay1nbGFzcyBhY2NvdW50cyBtdXN0IGJlIG93bmVycxopIXRoaXMuYnJlYWtfZ2xhc3MgfHwgdGhpcy5yb2xlID09ICdvd25lciciMwoTUmVzZXRBY2NvdW50UmVxdWVzdBIcCgphY2NvdW50X2lkGAEgASgJQgi6SAVyA7ABASJnChFBY2NvdW50RW5yb2xsbWVudBISCgphY2NvdW50X2lkGAEgASgJEg4KBnNlY3JldBgCIAEoCRIuCgpleHBpcmVzX2F0GAMgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCK9AgoQSWRlbnRpdHlTZXR0aW5ncxIWCg5wcmltYXJ5X3NvdXJjZRgBIAEoCRIOCgZpc3N1ZXIYAiABKAkSIAoYcmVmcmVzaF9pbnRlcnZhbF9zZWNvbmRzGAMgASgNEiAKGG1heF9zbmFwc2hvdF9hZ2Vfc2Vjb25kcxgEIAEoDRIUCgxzY2ltX2VuYWJsZWQYBSABKAgSFgoOYnJva2VyX2VuYWJsZWQYBiABKAgSGwoTYnJlYWtfZ2xhc3NfZW5hYmxlZBgHIAEoCBIXCg91cHN0cmVhbV9zb3VyY2UYCCABKAkSLwoLb2JzZXJ2ZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEg8KB2N1cnJlbnQYCiABKAgSFwoPbG9jYWxfYXV0aG9yaXR5GAsgASgIIlIKG1JvdGF0ZVNDSU1DcmVkZW50aWFsUmVxdWVzdBIzCgxjb25uZWN0b3JfaWQYASABKAlCHbpIGnIYEAEYQDISXlthLXpdW2EtejAtOV8tXSokIjwKDlNDSU1DcmVkZW50aWFsEhQKDGNvbm5lY3Rvcl9pZBgBIAEoCRIUCgxiZWFyZXJfdG9rZW4YAiABKAlCIFoebGluZG0vZ2VuL2xpbmRtL2F1dGgvdjE7YXV0aHYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_auth_v1_authorization]);
+  fileDesc("ChhsaW5kbS9hdXRoL3YxL2F1dGgucHJvdG8SDWxpbmRtLmF1dGgudjEiowIKEFNlc3Npb25QcmluY2lwYWwSCgoCaWQYASABKAkSDgoGaXNzdWVyGAIgASgJEg8KB3N1YmplY3QYAyABKAkSFAoMZGlzcGxheV9uYW1lGAQgASgJEgwKBHJvbGUYBSABKAkSEgoKY3NyZl90b2tlbhgGIAEoCRITCgticmVha19nbGFzcxgHIAEoCBIXCg9pbmNpZGVudF9yZWFzb24YCCABKAkSEwoLcGVybWlzc2lvbnMYCSADKAkSFwoPc2VydmljZV9hY2NvdW50GAogASgIEiwKCGJpbmRpbmdzGAsgAygLMhoubGluZG0uYXV0aC52MS5Sb2xlQmluZGluZxIgChh1bnJlc3RyaWN0ZWRfcGVybWlzc2lvbnMYDCADKAkicgoVQXV0aGVudGljYXRpb25PcHRpb25zEhYKDmV4dGVybmFsX2xvZ2luGAEgASgIEhMKC2xvY2FsX2xvZ2luGAIgASgIEhMKC2JyZWFrX2dsYXNzGAMgASgIEhcKD3NldHVwX2F2YWlsYWJsZRgEIAEoCCKZAQoRTG9jYWxMb2dpblJlcXVlc3QSOQoIdXNlcm5hbWUYASABKAlCJ7pIJHIiEAEYQDIcXltBLVphLXowLTldW0EtWmEtejAtOS5fLV0qJBIcCghwYXNzd29yZBgCIAEoCUIKukgHcgUgDCiACBIrCg9pbmNpZGVudF9yZWFzb24YAyABKAlCErpID3INGIAEKIAIMgVeJHxcUyJSChZMb2NhbEVucm9sbG1lbnRSZXF1ZXN0EhoKBnNlY3JldBgBIAEoCUIKukgHcgUgASiACBIcCghwYXNzd29yZBgCIAEoCUIKukgHcgUgDCiACCKcAQoURmlyc3RSdW5TZXR1cFJlcXVlc3QSKwoEY29kZRgBIAEoCUIdukgachgyE15bQS1aYS16MC05Xy1dezQzfSSYASsSOQoIdXNlcm5hbWUYAiABKAlCJ7pIJHIiEAEYQDIcXltBLVphLXowLTldW0EtWmEtejAtOS5fLV0qJBIcCghwYXNzd29yZBgDIAEoCUIKukgHcgUgDCiACCJ6ChJMb2NhbFN0ZXBVcFJlcXVlc3QSHAoIcGFzc3dvcmQYASABKAlCCrpIB3IFIAwogAgSRgokcmVjb3ZlcnlfY3VzdG9keV9jb25maXJtYXRpb25fZGlnZXN0GAIgASgJQhi6SBVyEzIRXihbMC05YS1mXXs2NH0pPyQiUQoRV2ViQXV0aG5DaGFsbGVuZ2USGQoFdG9rZW4YASABKAlCCrpIB3IFIAEogAgSIQoMb3B0aW9uc19qc29uGAIgASgJQgu6SAhyBiABKICABCJYChVXZWJBdXRobkZpbmlzaFJlcXVlc3QSGQoFdG9rZW4YASABKAlCCrpIB3IFIAEogAgSJAoPY3JlZGVudGlhbF9qc29uGAIgASgJQgu6SAhyBiABKICABCKeAQoMTG9jYWxBY2NvdW50EgoKAmlkGAEgASgJEhAKCHVzZXJuYW1lGAIgASgJEgwKBHJvbGUYAyABKAkSDwoHZW5hYmxlZBgEIAEoCBITCgticmVha19nbGFzcxgFIAEoCBIQCghlbnJvbGxlZBgGIAEoCBIqCgZzY29wZXMYByADKAsyGi5saW5kbS5hdXRoLnYxLkRldmljZVNjb3BlIlQKFExpc3RBY2NvdW50c1Jlc3BvbnNlEi0KCGFjY291bnRzGAEgAygLMhsubGluZG0uYXV0aC52MS5Mb2NhbEFjY291bnQSDQoFcm9sZXMYAiADKAkiwwIKFENyZWF0ZUFjY291bnRSZXF1ZXN0EjkKCHVzZXJuYW1lGAEgASgJQie6SCRyIhABGEAyHF5bQS1aYS16MC05XVtBLVphLXowLTkuXy1dKiQSLAoEcm9sZRgCIAEoCUIeukgbchkQARhAMhNeW2Etel1bYS16MC05Xy4tXSokEhMKC2JyZWFrX2dsYXNzGAMgASgIEjQKBnNjb3BlcxgEIAMoCzIaLmxpbmRtLmF1dGgudjEuRGV2aWNlU2NvcGVCCLpIBZIBAhBkOne6SHQacgogY3JlYXRlX2FjY291bnQuYnJlYWtfZ2xhc3Nfb3duZXISI2JyZWFrLWdsYXNzIGFjY291bnRzIG11c3QgYmUgb3duZXJzGikhdGhpcy5icmVha19nbGFzcyB8fCB0aGlzLnJvbGUgPT0gJ293bmVyJyK3AgoUVXBkYXRlQWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQESDwoHZW5hYmxlZBgCIAEoCBIsCgRyb2xlGAMgASgJQh66SBtyGRABGEAyE15bYS16XVthLXowLTlfLi1dKiQSEwoLYnJlYWtfZ2xhc3MYBCABKAgSNAoGc2NvcGVzGAUgAygLMhoubGluZG0uYXV0aC52MS5EZXZpY2VTY29wZUIIukgFkgECEGQ6d7pIdBpyCiB1cGRhdGVfYWNjb3VudC5icmVha19nbGFzc19vd25lchIjYnJlYWstZ2xhc3MgYWNjb3VudHMgbXVzdCBiZSBvd25lcnMaKSF0aGlzLmJyZWFrX2dsYXNzIHx8IHRoaXMucm9sZSA9PSAnb3duZXInIjMKE1Jlc2V0QWNjb3VudFJlcXVlc3QSHAoKYWNjb3VudF9pZBgBIAEoCUIIukgFcgOwAQEiZwoRQWNjb3VudEVucm9sbG1lbnQSEgoKYWNjb3VudF9pZBgBIAEoCRIOCgZzZWNyZXQYAiABKAkSLgoKZXhwaXJlc19hdBgDIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAivQIKEElkZW50aXR5U2V0dGluZ3MSFgoOcHJpbWFyeV9zb3VyY2UYASABKAkSDgoGaXNzdWVyGAIgASgJEiAKGHJlZnJlc2hfaW50ZXJ2YWxfc2Vjb25kcxgDIAEoDRIgChhtYXhfc25hcHNob3RfYWdlX3NlY29uZHMYBCABKA0SFAoMc2NpbV9lbmFibGVkGAUgASgIEhYKDmJyb2tlcl9lbmFibGVkGAYgASgIEhsKE2JyZWFrX2dsYXNzX2VuYWJsZWQYByABKAgSFwoPdXBzdHJlYW1fc291cmNlGAggASgJEi8KC29ic2VydmVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgdjdXJyZW50GAogASgIEhcKD2xvY2FsX2F1dGhvcml0eRgLIAEoCCJSChtSb3RhdGVTQ0lNQ3JlZGVudGlhbFJlcXVlc3QSMwoMY29ubmVjdG9yX2lkGAEgASgJQh26SBpyGBABGEAyEl5bYS16XVthLXowLTlfLV0qJCI8Cg5TQ0lNQ3JlZGVudGlhbBIUCgxjb25uZWN0b3JfaWQYASABKAkSFAoMYmVhcmVyX3Rva2VuGAIgASgJQiBaHmxpbmRtL2dlbi9saW5kbS9hdXRoL3YxO2F1dGh2MWIGcHJvdG8z", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_auth_v1_authorization]);
 
 /**
  * SessionPrincipal is returned as protobuf JSON by GET /auth/session. Browser
@@ -119,6 +119,13 @@ export type AuthenticationOptions = Message<"lindm.auth.v1.AuthenticationOptions
    * @generated from field: bool break_glass = 3;
    */
   breakGlass: boolean;
+
+  /**
+   * True only while an unexpired installer-issued code can finish first-run setup.
+   *
+   * @generated from field: bool setup_available = 4;
+   */
+  setupAvailable: boolean;
 };
 
 /**
@@ -180,6 +187,36 @@ export const LocalEnrollmentRequestSchema: GenMessage<LocalEnrollmentRequest> = 
   messageDesc(file_lindm_auth_v1_auth, 3);
 
 /**
+ * The installer code is never a URL, log, cache or persistent browser-storage value.
+ * The first accepted submission binds the username and password until completion.
+ *
+ * @generated from message lindm.auth.v1.FirstRunSetupRequest
+ */
+export type FirstRunSetupRequest = Message<"lindm.auth.v1.FirstRunSetupRequest"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+
+  /**
+   * @generated from field: string username = 2;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string password = 3;
+   */
+  password: string;
+};
+
+/**
+ * Describes the message lindm.auth.v1.FirstRunSetupRequest.
+ * Use `create(FirstRunSetupRequestSchema)` to create a new message.
+ */
+export const FirstRunSetupRequestSchema: GenMessage<FirstRunSetupRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_auth_v1_auth, 4);
+
+/**
  * Re-verifies the signed-in local account (password, then its passkey) for
  * actions that need recent verification. The session stays the same.
  *
@@ -190,6 +227,13 @@ export type LocalStepUpRequest = Message<"lindm.auth.v1.LocalStepUpRequest"> & {
    * @generated from field: string password = 1;
    */
   password: string;
+
+  /**
+   * Optional target for a new recovery-custody step-up; sign-in never sets it.
+   *
+   * @generated from field: string recovery_custody_confirmation_digest = 2;
+   */
+  recoveryCustodyConfirmationDigest: string;
 };
 
 /**
@@ -197,7 +241,7 @@ export type LocalStepUpRequest = Message<"lindm.auth.v1.LocalStepUpRequest"> & {
  * Use `create(LocalStepUpRequestSchema)` to create a new message.
  */
 export const LocalStepUpRequestSchema: GenMessage<LocalStepUpRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 4);
+  messageDesc(file_lindm_auth_v1_auth, 5);
 
 /**
  * options_json contains the WebAuthn publicKey options object.
@@ -221,7 +265,7 @@ export type WebAuthnChallenge = Message<"lindm.auth.v1.WebAuthnChallenge"> & {
  * Use `create(WebAuthnChallengeSchema)` to create a new message.
  */
 export const WebAuthnChallengeSchema: GenMessage<WebAuthnChallenge> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 5);
+  messageDesc(file_lindm_auth_v1_auth, 6);
 
 /**
  * @generated from message lindm.auth.v1.WebAuthnFinishRequest
@@ -243,7 +287,7 @@ export type WebAuthnFinishRequest = Message<"lindm.auth.v1.WebAuthnFinishRequest
  * Use `create(WebAuthnFinishRequestSchema)` to create a new message.
  */
 export const WebAuthnFinishRequestSchema: GenMessage<WebAuthnFinishRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 6);
+  messageDesc(file_lindm_auth_v1_auth, 7);
 
 /**
  * @generated from message lindm.auth.v1.LocalAccount
@@ -290,7 +334,7 @@ export type LocalAccount = Message<"lindm.auth.v1.LocalAccount"> & {
  * Use `create(LocalAccountSchema)` to create a new message.
  */
 export const LocalAccountSchema: GenMessage<LocalAccount> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 7);
+  messageDesc(file_lindm_auth_v1_auth, 8);
 
 /**
  * @generated from message lindm.auth.v1.ListAccountsResponse
@@ -312,7 +356,7 @@ export type ListAccountsResponse = Message<"lindm.auth.v1.ListAccountsResponse">
  * Use `create(ListAccountsResponseSchema)` to create a new message.
  */
 export const ListAccountsResponseSchema: GenMessage<ListAccountsResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 8);
+  messageDesc(file_lindm_auth_v1_auth, 9);
 
 /**
  * @generated from message lindm.auth.v1.CreateAccountRequest
@@ -344,7 +388,7 @@ export type CreateAccountRequest = Message<"lindm.auth.v1.CreateAccountRequest">
  * Use `create(CreateAccountRequestSchema)` to create a new message.
  */
 export const CreateAccountRequestSchema: GenMessage<CreateAccountRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 9);
+  messageDesc(file_lindm_auth_v1_auth, 10);
 
 /**
  * @generated from message lindm.auth.v1.UpdateAccountRequest
@@ -381,7 +425,7 @@ export type UpdateAccountRequest = Message<"lindm.auth.v1.UpdateAccountRequest">
  * Use `create(UpdateAccountRequestSchema)` to create a new message.
  */
 export const UpdateAccountRequestSchema: GenMessage<UpdateAccountRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 10);
+  messageDesc(file_lindm_auth_v1_auth, 11);
 
 /**
  * @generated from message lindm.auth.v1.ResetAccountRequest
@@ -398,7 +442,7 @@ export type ResetAccountRequest = Message<"lindm.auth.v1.ResetAccountRequest"> &
  * Use `create(ResetAccountRequestSchema)` to create a new message.
  */
 export const ResetAccountRequestSchema: GenMessage<ResetAccountRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 11);
+  messageDesc(file_lindm_auth_v1_auth, 12);
 
 /**
  * The one-time secret is held only in component memory, never cached or logged.
@@ -427,7 +471,7 @@ export type AccountEnrollment = Message<"lindm.auth.v1.AccountEnrollment"> & {
  * Use `create(AccountEnrollmentSchema)` to create a new message.
  */
 export const AccountEnrollmentSchema: GenMessage<AccountEnrollment> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 12);
+  messageDesc(file_lindm_auth_v1_auth, 13);
 
 /**
  * GET /auth/settings is read-only and requires unrestricted accounts.manage.
@@ -497,7 +541,7 @@ export type IdentitySettings = Message<"lindm.auth.v1.IdentitySettings"> & {
  * Use `create(IdentitySettingsSchema)` to create a new message.
  */
 export const IdentitySettingsSchema: GenMessage<IdentitySettings> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 13);
+  messageDesc(file_lindm_auth_v1_auth, 14);
 
 /**
  * @generated from message lindm.auth.v1.RotateSCIMCredentialRequest
@@ -514,7 +558,7 @@ export type RotateSCIMCredentialRequest = Message<"lindm.auth.v1.RotateSCIMCrede
  * Use `create(RotateSCIMCredentialRequestSchema)` to create a new message.
  */
 export const RotateSCIMCredentialRequestSchema: GenMessage<RotateSCIMCredentialRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 14);
+  messageDesc(file_lindm_auth_v1_auth, 15);
 
 /**
  * Returned once, no-store; the bearer token must never enter logs or query caches.
@@ -538,5 +582,5 @@ export type SCIMCredential = Message<"lindm.auth.v1.SCIMCredential"> & {
  * Use `create(SCIMCredentialSchema)` to create a new message.
  */
 export const SCIMCredentialSchema: GenMessage<SCIMCredential> = /*@__PURE__*/
-  messageDesc(file_lindm_auth_v1_auth, 15);
+  messageDesc(file_lindm_auth_v1_auth, 16);
 

@@ -52,12 +52,15 @@ export function SignIn({ notice, next }: { notice: string; next?: string }) {
               </Button>
             </RpcError>
           ) : null}
+          {options.data?.setupAvailable ? (
+            <Button render={<Link to="/setup" />}>Set up owner account</Button>
+          ) : null}
           {options.data?.externalLogin ? (
             <Button render={<a href={loginHref} onClick={() => rememberNextPath(next)} />}>
               Sign in with organization
             </Button>
           ) : null}
-          {options.data?.localLogin ? (
+          {options.data?.localLogin && !options.data.setupAvailable ? (
             <LocalForm
               emergency={options.data.breakGlass}
               onSuccess={async () => {
@@ -67,7 +70,7 @@ export function SignIn({ notice, next }: { notice: string; next?: string }) {
               }}
             />
           ) : null}
-          {options.data?.localLogin ? (
+          {options.data?.localLogin && !options.data.setupAvailable ? (
             <Link
               to="/enroll"
               className="text-center text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"

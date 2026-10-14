@@ -20,7 +20,13 @@ const failureText: Record<StepUpFailure, string> = {
 // In-page "Verify it's you": password, then passkey, on the current session.
 // After success it calls onVerified (the caller resubmits its same request) or,
 // without one, asks the administrator to submit again.
-export function StepUpVerify({ onVerified }: { onVerified?: () => void }) {
+export function StepUpVerify({
+  onVerified,
+  recoveryCustodyConfirmationDigest,
+}: {
+  onVerified?: () => void;
+  recoveryCustodyConfirmationDigest?: string;
+}) {
   const principal = useContext(PrincipalContext);
   const passwordId = useId();
   const [password, setPassword] = useState("");
@@ -37,7 +43,12 @@ export function StepUpVerify({ onVerified }: { onVerified?: () => void }) {
     setBusy(true);
     setFailure(null);
     try {
-      await stepUp(password, principal.csrfToken, controller.signal);
+      await stepUp(
+        password,
+        principal.csrfToken,
+        controller.signal,
+        recoveryCustodyConfirmationDigest,
+      );
       if (controller.signal.aborted) return;
       setVerified(true);
       onVerified?.();

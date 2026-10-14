@@ -17,8 +17,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ProtonMail/go-crypto/openpgp/armor"
 	pgped25519 "github.com/ProtonMail/go-crypto/openpgp/ed25519"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 )
 
 func TestNativeSignerExcludesActualSPKIRegardlessOfOpenPGPFingerprint(t *testing.T) {
@@ -63,5 +65,53 @@ func TestNativeSignerExcludesActualSPKIRegardlessOfOpenPGPFingerprint(t *testing
 				t.Fatal("native signer accepted mismatched exported primary key")
 			}
 		})
+	}
+}
+
+func TestNativePublicKeyRequiresExactSingleAdmittedAuthority(t *testing.T) {
+	key, err := openpgp.NewEntity("Native installer admission regression", "", "installer@example.test", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := openpgp.NewEntity("Unadmitted authority", "", "other@example.test", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encode := func(keys ...*openpgp.Entity) []byte {
+		var encoded bytes.Buffer
+		w, err := armor.Encode(&encoded, openpgp.PublicKeyType, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, key := range keys {
+			if err := key.Serialize(w); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return encoded.Bytes()
+	}
+	public := encode(key)
+	pin := strings.ToUpper(hex.EncodeToString(key.PrimaryKey.Fingerprint))
+	if err := ValidateNativePublicKey(public, pin); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string][]byte{
+		"additional_block":   append(append([]byte{}, public...), encode(other)...),
+		"additional_primary": encode(key, other),
+		"trailing_data":      append(append([]byte{}, public...), []byte("unadmitted data")...),
+		"private_armor":      []byte(strings.ReplaceAll(string(public), "PGP PUBLIC KEY BLOCK", "PGP PRIVATE KEY BLOCK")),
+	}
+	for name, encoded := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := ValidateNativePublicKey(encoded, pin); err == nil {
+				t.Fatal("unadmitted native authority accepted")
+			}
+		})
+	}
+	if err := ValidateNativePublicKey(public, strings.ToUpper(hex.EncodeToString(other.PrimaryKey.Fingerprint))); err == nil {
+		t.Fatal("armor self-keyid substituted for authenticated fingerprint")
 	}
 }

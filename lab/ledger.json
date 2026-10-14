@@ -12448,6 +12448,38 @@
       "verified": true,
       "scope": "connected: files, accounts, sysctl, definitions, password, firewall, secret-password, local-admin",
       "mainlineRevision": "eb0f1ca4d163ae0fb789a3989a4d3a03809ac35e"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/turnkey-deploy-release/baseline-ubuntu-attempt3.json",
+      "sha256": "0f1290ed64cb2ca158d708dd3902d0301a5eed0702a7173b50e98877d41adad1",
+      "recorded": "2026-10-13T22:20:08Z",
+      "revision": "22eec570d51c592d79863784abf2ebf9d65c3bb4-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "historical-install-audit",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "49220ad876b98c8d101b36bf8aede6d22ee74aee"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/turnkey-deploy-release/baseline-rhel-attempt3.json",
+      "sha256": "66cc93f01a1a73158a682168bd5a7203ca39fa6ad1453c7dc3d822841137fd3e",
+      "recorded": "2026-10-13T22:20:45Z",
+      "revision": "22eec570d51c592d79863784abf2ebf9d65c3bb4-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "historical-install-audit",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "49220ad876b98c8d101b36bf8aede6d22ee74aee"
     }
   ]
 }

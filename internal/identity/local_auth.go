@@ -14,6 +14,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	authv1 "lindm/gen/lindm/auth/v1"
 	"lindm/internal/auditkind"
@@ -110,7 +111,7 @@ func (s *Service) beginLocalLogin(ctx context.Context, request *authv1.LocalLogi
 		if err != nil {
 			return errUnauthenticated
 		}
-		challenge, err = s.persistCeremony(ctx, q, principal, "login", session, options.Response, "", request.GetIncidentReason(), nil, nil)
+		challenge, err = s.persistCeremony(ctx, q, principal, "login", session, options.Response, "", request.GetIncidentReason(), nil, nil, false, nil)
 		return err
 	})
 	if err != nil {
@@ -157,7 +158,7 @@ func (s *Service) beginLocalEnrollment(ctx context.Context, request *authv1.Loca
 		if err != nil {
 			return errUnauthenticated
 		}
-		challenge, err = s.persistCeremony(ctx, q, principal, "enroll", session, options.Response, password, "", digest, nil)
+		challenge, err = s.persistCeremony(ctx, q, principal, "enroll", session, options.Response, password, "", digest, nil, false, nil)
 		return err
 	})
 	return challenge, err
@@ -167,16 +168,18 @@ func (s *Service) beginLocalEnrollment(ctx context.Context, request *authv1.Loca
 // the secret itself. Registration may be restarted until a credential commits.
 type localCeremonySession struct {
 	webauthn.SessionData
-	EnrollmentSecretHash []byte `json:"enrollment_secret_hash,omitempty"`
+	EnrollmentSecretHash              []byte `json:"enrollment_secret_hash,omitempty"`
+	Setup                             bool   `json:"setup,omitempty"`
+	RecoveryCustodyConfirmationDigest []byte `json:"recovery_custody_confirmation_digest,omitempty"`
 }
 
-func (s *Service) persistCeremony(ctx context.Context, q *identitydb.Queries, principal identitydb.Principal, kind string, session *webauthn.SessionData, options any, password, reason string, enrollmentHash, boundSession []byte) (*authv1.WebAuthnChallenge, error) {
+func (s *Service) persistCeremony(ctx context.Context, q *identitydb.Queries, principal identitydb.Principal, kind string, session *webauthn.SessionData, options any, password, reason string, enrollmentHash, boundSession []byte, setup bool, custodyDigest []byte) (*authv1.WebAuthnChallenge, error) {
 	token, err := randomToken()
 	if err != nil {
 		return nil, err
 	}
 	redacted, digest := redactWebAuthnSession(*session)
-	data, err := json.Marshal(localCeremonySession{SessionData: redacted, EnrollmentSecretHash: enrollmentHash})
+	data, err := json.Marshal(localCeremonySession{SessionData: redacted, EnrollmentSecretHash: enrollmentHash, Setup: setup, RecoveryCustodyConfirmationDigest: custodyDigest})
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +235,17 @@ func (s *Service) finishCeremony(ctx context.Context, request *authv1.WebAuthnFi
 	}
 	var cookie string
 	denied := false
-	err = s.withTx(ctx, func(q *identitydb.Queries) error {
+	err = s.withTransaction(ctx, func(tx pgx.Tx, q *identitydb.Queries) error {
+		// Setup always locks deployment before principal, matching reservation/rotation.
+		if stored.Setup {
+			deployment, err := q.LockDeploymentIdentity(ctx)
+			if err != nil {
+				return s.dbErr(err)
+			}
+			if !s.localPrimary || deployment.InitializedAt.Valid || deployment.OwnerPrincipalID != nil {
+				return errUnauthenticated
+			}
+		}
 		principal, err := q.GetPrincipalForUpdate(ctx, ceremony.AccountID)
 		if err != nil {
 			return s.dbErr(err)
@@ -284,10 +297,22 @@ func (s *Service) finishCeremony(ctx context.Context, request *authv1.WebAuthnFi
 			return err
 		}
 		if kind == "enroll" {
-			return s.completeLocalEnrollment(ctx, q, ceremony, stored, account.ID, credential.ID, data)
+			if err = s.completeLocalEnrollment(ctx, q, ceremony, stored, account.ID, credential.ID, data, principal.AuthorizationDigest); err != nil {
+				return err
+			}
+			if stored.Setup {
+				if s.initialOwnerExecution != nil {
+					if err = s.initialOwnerExecution(ctx, tx, account.ID); err != nil {
+						return err
+					}
+				}
+				cookie, err = s.startLocalSession(ctx, q, ceremony, account.ID, credential.ID, data, now)
+				return err
+			}
+			return nil
 		}
 		if kind == "step_up" {
-			return s.completeStepUp(ctx, q, proof, account.ID, credential.ID, data)
+			return s.completeStepUp(ctx, q, proof, account.ID, credential.ID, data, stored.RecoveryCustodyConfirmationDigest)
 		}
 		cookie, err = s.startLocalSession(ctx, q, ceremony, account.ID, credential.ID, data, now)
 		return err
@@ -329,15 +354,39 @@ func restoreCeremony(ceremony identitydb.LocalCeremony, request *authv1.WebAuthn
 
 // completeLocalEnrollment consumes the one-time enrollment secret, then stores
 // the verified credential and the ceremony's password hash.
-func (s *Service) completeLocalEnrollment(ctx context.Context, q *identitydb.Queries, ceremony identitydb.LocalCeremony, stored localCeremonySession, accountID uuid.UUID, credentialID, credentialJSON []byte) error {
-	consumed, err := q.ConsumeLocalEnrollment(ctx, stored.EnrollmentSecretHash)
-	if err != nil || consumed != accountID {
-		return errUnauthenticated
+func (s *Service) completeLocalEnrollment(ctx context.Context, q *identitydb.Queries, ceremony identitydb.LocalCeremony, stored localCeremonySession, accountID uuid.UUID, credentialID, credentialJSON, authorizationDigest []byte) error {
+	if stored.Setup {
+		consumed, err := q.ConsumeSetupCode(ctx, identitydb.ConsumeSetupCodeParams{CodeHash: stored.EnrollmentSecretHash, AccountID: &accountID})
+		if err != nil || consumed == nil || *consumed != accountID {
+			return errUnauthenticated
+		}
+		pinned, err := q.PinOwnerRole(ctx, identitydb.PinOwnerRoleParams{ID: accountID, AuthorizationDigest: authorizationDigest})
+		if err != nil {
+			return s.dbErr(err)
+		}
+		if pinned != 1 {
+			return errUnauthenticated
+		}
+		marked, err := q.MarkDeploymentInitialized(ctx, &accountID)
+		if err != nil {
+			return s.dbErr(err)
+		}
+		if marked != 1 {
+			return errUnauthenticated
+		}
+		if err = s.insertSystemAudit(ctx, q, &accountID, auditkind.IdentityOwnerBootstrapped, principalResource(accountID), reasonInitialOwner); err != nil {
+			return err
+		}
+	} else {
+		consumed, err := q.ConsumeLocalEnrollment(ctx, stored.EnrollmentSecretHash)
+		if err != nil || consumed != accountID {
+			return errUnauthenticated
+		}
 	}
-	if err = q.InsertLocalCredential(ctx, identitydb.InsertLocalCredentialParams{CredentialID: credentialID, AccountID: accountID, CredentialJson: credentialJSON}); err != nil {
+	if err := q.InsertLocalCredential(ctx, identitydb.InsertLocalCredentialParams{CredentialID: credentialID, AccountID: accountID, CredentialJson: credentialJSON}); err != nil {
 		return s.dbErr(err)
 	}
-	if err = q.SetLocalPassword(ctx, identitydb.SetLocalPasswordParams{ID: accountID, PasswordHash: ceremony.PasswordHash}); err != nil {
+	if err := q.SetLocalPassword(ctx, identitydb.SetLocalPasswordParams{ID: accountID, PasswordHash: ceremony.PasswordHash}); err != nil {
 		return s.dbErr(err)
 	}
 	return s.insertAudit(ctx, q, &accountID, auditkind.IdentityLocalEnrolled, principalResource(accountID), "")

@@ -103,6 +103,96 @@ identity, metadata refresh, unregister and activation-key deletion independently
 interrupted cleanup requires exact owned-consumer reconciliation, not broad tenant
 deletion. Air-gap content authorization and mirrors require separate evidence.
 
+### Native air-gap server dependencies
+
+The dedicated `internal/serverdeps` RPM backend targets RHEL 9 x86_64, not
+openSUSE's `internal/vmlab/reposnapshot` format. Capture runs DNF4's real solver
+on an admitted disposable, authenticated vendor image after protected RHSM
+registration. It excludes the installed package sack, retains the complete
+requested dependency graph, and records the image digest, fresh baseline,
+solver versions, package NEVRAs, metadata hashes and native package signatures.
+The native prerequisites are `postgresql-server`, `postgresql`, `openssl`,
+`systemd`, `ca-certificates`, `rpm`, `cpio` and `policycoreutils`.
+The `/usr/bin/rpm2cpio` utility belongs to the signed `rpm` payload, not a
+separate RHEL package; replay records its actual native package owner.
+Backup encryption uses the maintained `filippo.io/age` v1.3.2 Go library
+compiled into the signed server executable and installer, not an external age
+binary. The closure retains the native PostgreSQL client dependencies used by
+`pg_dump` and `pg_restore`. No age RPM, EPEL, public mirror or preinstalled
+dependency fallback is admitted.
+
+BaseOS and AppStream acquisition keeps Red Hat's CA verification and entitlement
+client authentication enabled. Official metadata is authenticated by vendor
+TLS/RHSM, not a required `repomd.xml.asc`: the authenticated release manifest
+binds the exact acquired index and metadata bytes, whose native checksums bind
+each package. Offline installation independently verifies every RPM with an
+isolated keyring containing only exact-pinned
+[Red Hat product signing keys](https://access.redhat.com/security/team/key).
+On SELinux hosts, the newly created private parent takes the standard system
+root label from `/`, matching the existing disposable native-solver pattern.
+Its private keyring directory takes its label from the actual native RPM
+database path, bounded to `/var/lib/rpm` or `/usr/lib/sysimage/rpm`. Only these
+new private directories are relabeled; this changes no host database, keyring,
+policy or enforcement setting.
+It then invokes native DNF on local digest-checked RPMs, with repositories and
+plugins disabled, `localpkg_gpgcheck=1`, and an empty transaction network
+namespace. Missing dependency bytes fail; TLS, RPM signature verification and
+SELinux enforcement are not disabled.
+DNF's additional native signature check uses the operating system's existing
+vendor trust roots. The consumer does not import release or vendor keys into the
+host keyring. Replay records the actual pre-transaction native `gpg-pubkey`
+inventory; absent native vendor trust fails closed rather than bootstrapping a
+new host trust root.
+
+Failed capture reports only a closed acquisition-stage code, never native
+stderr, traceback, entitlement material or repository configuration. Private
+RPM database initialization may additionally classify permission, read-only
+filesystem, locked database, unsupported backend or timeout failures. Its
+native stderr stays in a nonblocking 4 KiB anonymous pipe and is discarded;
+unrecognized causes remain the generic initialization-stage failure. These
+codes are diagnosis, not successful acquisition or replay evidence.
+The pipe-size syscall command comes from Go's Linux constants, not
+`fcntl.F_SETPIPE_SZ` (which Python exposes only
+[since 3.10](https://docs.python.org/3.10/library/fcntl.html)). RHEL's native
+DNF interpreter is retained; no newer Python prerequisite is introduced.
+
+The privileged native installer owns a separate PostgreSQL 13-or-newer cluster
+at `/var/lib/pgsql/lindm`, loopback port 5432 and `/run/lindm-postgresql`.
+An existing port-5432 owner is a collision, not a cluster to adopt. Native
+`restorecon` applies the standard data labels; installation does not disable
+SELinux or create a custom high-port exception. Separate SCRAM runtime and
+migration roles use verify-full TLS under the deployment's database CA.
+The cluster config permits 64 connections and 256 MiB shared buffers; server
+device and console pools are 16 and 4 respectively. Protected setup and
+operations state live under `/var/lib/lindmd-operations`. RPM pre-transaction
+checks refuse unsigned native-upgrade bypasses; the signed air-gap path does
+not consult EPEL or a public registry.
+
+Native units use the distribution's systemd `LoadCredential=` support for distinct
+runtime and migrator URLs. Persistent URL files remain root:root mode 0600;
+neither role owns the at-rest secret. Restore republishes fresh target credentials
+to the original stable paths while keeping native SELinux/privilege gates intact.
+Actual owner/mode, both accounts' unreadability and native credential handoff are
+required deploy-lane assertions, not a source-only qualification claim. See the
+[root custody evidence boundary](../verification.md#turnkey-source-security-reinspection).
+
+The `internal/platform` registry's RHEL 9 server installation facts own the
+snapshot filename, required native packages and PostgreSQL data/bin/port layout.
+Consumers use the row's native package database and entitlement facts rather
+than comparing distribution IDs. The closure retains its canonical RHEL 9
+identity and actual base-image digest; captured guest evidence still records the
+observed point release. Server facts are not inherited by derivatives and
+deploy admission remains limited to RHEL 9 and Ubuntu 24.04 on x86_64.
+
+A complete publication also requires actual native replay on a second fresh
+image baseline with external VM egress denied. Capture alone is not qualification.
+Production snapshots require the customer's entitled private release custodian
+and approved content rights; `development-lab` custody never grants production
+redistribution rights. Tokens, activation credentials, client certificates and
+private keys are not release artifacts or evidence. Public hosting is not
+supported. See [verification](../verification.md) for actual native records;
+implementation alone is not an offline server installation verdict.
+
 ## Agent services and sandbox
 
 The root executor has AF_UNIX only, strict filesystem protection and private

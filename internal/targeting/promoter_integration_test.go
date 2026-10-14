@@ -19,12 +19,13 @@ import (
 	adminv1 "lindm/gen/lindm/admin/v1"
 	authv1 "lindm/gen/lindm/auth/v1"
 	policyv1 "lindm/gen/lindm/policy/v1"
+	"lindm/internal/devlab/webauthnlab"
 	"lindm/internal/identity"
 	"lindm/internal/targeting/targetingdb"
 )
 
-// This fixture exercises real local account authorization and PostgreSQL, not a
-// browser login ceremony. Native health comes from the current resource head.
+// This fixture exercises real protected LOCAL setup with a software lab
+// authenticator, account authorization and PostgreSQL, not browser qualification.
 func newPromoterFixture(t *testing.T) (*targetingFixture, *identity.Service, *Promoter, context.Context) {
 	t.Helper()
 	f := newTargetingFixture(t)
@@ -39,11 +40,19 @@ func newPromoterFixture(t *testing.T) (*targetingFixture, *identity.Service, *Pr
 			t.Error(err)
 		}
 	})
-	enrollment, err := auth.BootstrapLocalOwner(ctx, "rollout-owner")
+	code, err := identity.IssueSetupCode(ctx, f.pool)
 	if err != nil {
 		t.Fatal(err)
 	}
-	grant, err := auth.AuthorizeFresh(ctx, enrollment.AccountID, identity.PermissionAssignResources)
+	owner, err := webauthnlab.RegisterSetupOwner(ctx, auth.Handler(), "https://rollouts.example.test", code, "rollout-owner", "private rollout fixture password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID, err := uuid.Parse(owner.GetId())
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant, err := auth.AuthorizeFresh(ctx, ownerID, identity.PermissionAssignResources)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -722,8 +722,11 @@ type ExecutionBootstrapConfig struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RootFile      string                 `protobuf:"bytes,1,opt,name=root_file,json=rootFile,proto3" json:"root_file,omitempty"`
 	BootstrapFile string                 `protobuf:"bytes,2,opt,name=bootstrap_file,json=bootstrapFile,proto3" json:"bootstrap_file,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// Strict UpdateExecutionTrustRequest JSON. Its signed update is admitted only
+	// in the first owner's verified credential transaction, never at startup.
+	InitialDelegationFile *string `protobuf:"bytes,3,opt,name=initial_delegation_file,json=initialDelegationFile,proto3,oneof" json:"initial_delegation_file,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ExecutionBootstrapConfig) Reset() {
@@ -766,6 +769,13 @@ func (x *ExecutionBootstrapConfig) GetRootFile() string {
 func (x *ExecutionBootstrapConfig) GetBootstrapFile() string {
 	if x != nil {
 		return x.BootstrapFile
+	}
+	return ""
+}
+
+func (x *ExecutionBootstrapConfig) GetInitialDelegationFile() string {
+	if x != nil && x.InitialDelegationFile != nil {
+		return *x.InitialDelegationFile
 	}
 	return ""
 }
@@ -2112,7 +2122,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xf8\x1b\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xd6\x1d\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -2143,11 +2153,12 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
 	"assistance\x18\x18 \x01(\v2!.lindm.config.v1.AssistanceConfigR\n" +
 	"assistance\x12M\n" +
-	"\x0foffline_bundles\x18\x17 \x01(\v2$.lindm.config.v1.OfflineBundleConfigR\x0eofflineBundles:\x89\x0e\xbaH\x85\x0e\x1a\xb2\x01\n" +
+	"\x0foffline_bundles\x18\x17 \x01(\v2$.lindm.config.v1.OfflineBundleConfigR\x0eofflineBundles:\xe7\x0f\xbaH\xe3\x0f\x1a\xb2\x01\n" +
 	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x82\x02\n" +
 	"\x1bprofiling.distinct_listener\x12&profiling must use a separate listener\x1a\xba\x01!has(this.profiling) || ((!has(this.admin_listener) || this.profiling.listener != this.admin_listener) && (!has(this.device_listener) || this.profiling.listener != this.device_listener))\x1a\x8f\x01\n" +
 	"\x1bexecution_signing.bootstrap\x121execution signing requires an execution bootstrap\x1a=!has(this.execution_signing) || has(this.execution_bootstrap)\x1a\xa1\x01\n" +
-	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)\x1a\xb6\x04\n" +
+	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)\x1a\xdb\x01\n" +
+	"!execution_bootstrap.initial_owner\x12:initial execution delegation requires local authentication\x1az!has(this.execution_bootstrap) || !has(this.execution_bootstrap.initial_delegation_file) || has(this.authentication.local)\x1a\xb6\x04\n" +
 	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)\x1a\xe9\x01\n" +
 	"\"offline_bundles.release_repository\x12;offline bundle import requires a signing release repository\x1a\x85\x01!has(this.offline_bundles) || (has(this.release_repository) && has(this.release_repository.signing) && has(this.execution_bootstrap))\x1a\xed\x01\n" +
 	"\x1dconnectivity_probes.authority\x12]native connectivity confirmation requires configured signing and at least four approved peers\x1amthis.connectivity_probes.size() == 0 || (has(this.execution_signing) && this.connectivity_probes.size() >= 4)B\x19\n" +
@@ -2188,10 +2199,12 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x12transport_key_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x10transportKeyFile\x125\n" +
 	"\x11wrapping_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\x0fwrappingKeyFile\x128\n" +
 	"\x18reveal_approval_required\x18\x03 \x01(\bR\x16revealApprovalRequired:\x8d\x01\xbaH\x89\x01\x1a\x86\x01\n" +
-	"\x15escrow.distinct_files\x12:escrow transport and wrapping keys must use distinct files\x1a1this.transport_key_file != this.wrapping_key_file\"t\n" +
+	"\x15escrow.distinct_files\x12:escrow transport and wrapping keys must use distinct files\x1a1this.transport_key_file != this.wrapping_key_file\"\xd8\x01\n" +
 	"\x18ExecutionBootstrapConfig\x12&\n" +
 	"\troot_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\brootFile\x120\n" +
-	"\x0ebootstrap_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\"\x84\x02\n" +
+	"\x0ebootstrap_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\rbootstrapFile\x12F\n" +
+	"\x17initial_delegation_file\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x00R\x15initialDelegationFile\x88\x01\x01B\x1a\n" +
+	"\x18_initial_delegation_file\"\x84\x02\n" +
 	"\x16ExecutionSigningConfig\x12-\n" +
 	"\rplan_key_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\vplanKeyFile\x12/\n" +
 	"\x0estart_key_file\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\fstartKeyFile:\x89\x01\xbaH\x85\x01\x1a\x82\x01\n" +
@@ -2417,6 +2430,7 @@ func file_lindm_config_v1_config_proto_init() {
 	file_lindm_config_v1_config_proto_msgTypes[1].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[2].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[5].OneofWrappers = []any{}
+	file_lindm_config_v1_config_proto_msgTypes[8].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[12].OneofWrappers = []any{}
 	file_lindm_config_v1_config_proto_msgTypes[15].OneofWrappers = []any{
 		(*AuthenticationConfig_Local)(nil),

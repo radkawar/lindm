@@ -36,6 +36,8 @@ message AuthenticationOptions {
   bool external_login = 1;
   bool local_login = 2;
   bool break_glass = 3;
+  // True only while an unexpired installer-issued code can finish first-run setup.
+  bool setup_available = 4;
 }
 
 // Passwords and incident reasons must never be logged.
@@ -67,6 +69,24 @@ message LocalEnrollmentRequest {
   }];
 }
 
+// The installer code is never a URL, log, cache or persistent browser-storage value.
+// The first accepted submission binds the username and password until completion.
+message FirstRunSetupRequest {
+  string code = 1 [(buf.validate.field).string = {
+    len: 43
+    pattern: "^[A-Za-z0-9_-]{43}$"
+  }];
+  string username = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+  }];
+  string password = 3 [(buf.validate.field).string = {
+    min_bytes: 12
+    max_bytes: 1024
+  }];
+}
+
 // Re-verifies the signed-in local account (password, then its passkey) for
 // actions that need recent verification. The session stays the same.
 message LocalStepUpRequest {
@@ -74,6 +94,8 @@ message LocalStepUpRequest {
     min_bytes: 12
     max_bytes: 1024
   }];
+  // Optional target for a new recovery-custody step-up; sign-in never sets it.
+  string recovery_custody_confirmation_digest = 2 [(buf.validate.field).string.pattern = "^([0-9a-f]{64})?$"];
 }
 
 // options_json contains the WebAuthn publicKey options object.

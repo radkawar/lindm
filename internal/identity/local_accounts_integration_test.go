@@ -38,7 +38,7 @@ func authAccountRequest(t *testing.T, s *Service, method, path, cookie string, m
 }
 func TestLocalAccountManagementHTTP(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	owner, err := s.BootstrapLocalOwner(ctx, "owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

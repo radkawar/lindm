@@ -24,6 +24,7 @@ import "lindm/admin/v1/offline_enrollment.proto";
 import "lindm/admin/v1/profiles.proto";
 import "lindm/admin/v1/provisioning.proto";
 import "lindm/admin/v1/secrets.proto";
+import "lindm/admin/v1/server_status.proto";
 import "lindm/admin/v1/suggestions.proto";
 import "lindm/admin/v1/targeting.proto";
 import "lindm/agent/v1/execution_trust.proto";
@@ -37,6 +38,8 @@ option go_package = "lindm/gen/lindm/admin/v1;adminv1";
 
 service AdminService {
   rpc GetAuthorization(GetAuthorizationRequest) returns (GetAuthorizationResponse);
+  rpc GetServerStatus(GetServerStatusRequest) returns (GetServerStatusResponse);
+  rpc ConfirmRecoveryKeyCustody(ConfirmRecoveryKeyCustodyRequest) returns (ConfirmRecoveryKeyCustodyResponse);
   rpc UpdateAuthorization(UpdateAuthorizationRequest) returns (UpdateAuthorizationResponse);
   rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse);
   rpc GetFleetSummary(GetFleetSummaryRequest) returns (GetFleetSummaryResponse);

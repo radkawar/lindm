@@ -130,7 +130,7 @@ func TestLocalCustomRoleScopesPersistAndFence(t *testing.T) {
 		}
 	})
 	s := custom
-	owner, err := s.BootstrapLocalOwner(ctx, "owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

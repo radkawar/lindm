@@ -35,8 +35,10 @@ type ReleaseManifest struct {
 	AttestationKeyId string                 `protobuf:"bytes,6,opt,name=attestation_key_id,json=attestationKeyId,proto3" json:"attestation_key_id,omitempty"`
 	Custody          string                 `protobuf:"bytes,7,opt,name=custody,proto3" json:"custody,omitempty"`
 	Builds           []*BuildObservation    `protobuf:"bytes,8,rep,name=builds,proto3" json:"builds,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Signed server release discovery is distinct from agent TUF channels.
+	ServerNotice  *ServerReleaseNotice `protobuf:"bytes,9,opt,name=server_notice,json=serverNotice,proto3" json:"server_notice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ReleaseManifest) Reset() {
@@ -125,6 +127,83 @@ func (x *ReleaseManifest) GetBuilds() []*BuildObservation {
 	return nil
 }
 
+func (x *ReleaseManifest) GetServerNotice() *ServerReleaseNotice {
+	if x != nil {
+		return x.ServerNotice
+	}
+	return nil
+}
+
+// Offline bulletin carried inside the authenticated release manifest. Import
+// never treats absent or expired notice metadata as a current security feed.
+type ServerReleaseNotice struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SecurityUpdate bool                   `protobuf:"varint,1,opt,name=security_update,json=securityUpdate,proto3" json:"security_update,omitempty"`
+	AdvisoryIds    []string               `protobuf:"bytes,2,rep,name=advisory_ids,json=advisoryIds,proto3" json:"advisory_ids,omitempty"`
+	IssuedAt       int64                  `protobuf:"varint,3,opt,name=issued_at,json=issuedAt,proto3" json:"issued_at,omitempty"`
+	ExpiresAt      int64                  `protobuf:"varint,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ServerReleaseNotice) Reset() {
+	*x = ServerReleaseNotice{}
+	mi := &file_lindm_release_v1_release_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ServerReleaseNotice) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ServerReleaseNotice) ProtoMessage() {}
+
+func (x *ServerReleaseNotice) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_release_v1_release_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ServerReleaseNotice.ProtoReflect.Descriptor instead.
+func (*ServerReleaseNotice) Descriptor() ([]byte, []int) {
+	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ServerReleaseNotice) GetSecurityUpdate() bool {
+	if x != nil {
+		return x.SecurityUpdate
+	}
+	return false
+}
+
+func (x *ServerReleaseNotice) GetAdvisoryIds() []string {
+	if x != nil {
+		return x.AdvisoryIds
+	}
+	return nil
+}
+
+func (x *ServerReleaseNotice) GetIssuedAt() int64 {
+	if x != nil {
+		return x.IssuedAt
+	}
+	return 0
+}
+
+func (x *ServerReleaseNotice) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
 type ReleaseArtifact struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
 	Path                 string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
@@ -145,7 +224,7 @@ type ReleaseArtifact struct {
 
 func (x *ReleaseArtifact) Reset() {
 	*x = ReleaseArtifact{}
-	mi := &file_lindm_release_v1_release_proto_msgTypes[1]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -157,7 +236,7 @@ func (x *ReleaseArtifact) String() string {
 func (*ReleaseArtifact) ProtoMessage() {}
 
 func (x *ReleaseArtifact) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_release_v1_release_proto_msgTypes[1]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +249,7 @@ func (x *ReleaseArtifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseArtifact.ProtoReflect.Descriptor instead.
 func (*ReleaseArtifact) Descriptor() ([]byte, []int) {
-	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{1}
+	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ReleaseArtifact) GetPath() string {
@@ -273,7 +352,7 @@ type BuildObservation struct {
 
 func (x *BuildObservation) Reset() {
 	*x = BuildObservation{}
-	mi := &file_lindm_release_v1_release_proto_msgTypes[2]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -285,7 +364,7 @@ func (x *BuildObservation) String() string {
 func (*BuildObservation) ProtoMessage() {}
 
 func (x *BuildObservation) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_release_v1_release_proto_msgTypes[2]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -298,7 +377,7 @@ func (x *BuildObservation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BuildObservation.ProtoReflect.Descriptor instead.
 func (*BuildObservation) Descriptor() ([]byte, []int) {
-	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{2}
+	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BuildObservation) GetSourceSha256() string {
@@ -369,7 +448,7 @@ type ReleaseBuildFailure struct {
 
 func (x *ReleaseBuildFailure) Reset() {
 	*x = ReleaseBuildFailure{}
-	mi := &file_lindm_release_v1_release_proto_msgTypes[3]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -381,7 +460,7 @@ func (x *ReleaseBuildFailure) String() string {
 func (*ReleaseBuildFailure) ProtoMessage() {}
 
 func (x *ReleaseBuildFailure) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_release_v1_release_proto_msgTypes[3]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -394,7 +473,7 @@ func (x *ReleaseBuildFailure) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseBuildFailure.ProtoReflect.Descriptor instead.
 func (*ReleaseBuildFailure) Descriptor() ([]byte, []int) {
-	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{3}
+	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ReleaseBuildFailure) GetReason() string {
@@ -438,7 +517,7 @@ type SigningTrustInventory struct {
 
 func (x *SigningTrustInventory) Reset() {
 	*x = SigningTrustInventory{}
-	mi := &file_lindm_release_v1_release_proto_msgTypes[4]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +529,7 @@ func (x *SigningTrustInventory) String() string {
 func (*SigningTrustInventory) ProtoMessage() {}
 
 func (x *SigningTrustInventory) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_release_v1_release_proto_msgTypes[4]
+	mi := &file_lindm_release_v1_release_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +542,7 @@ func (x *SigningTrustInventory) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningTrustInventory.ProtoReflect.Descriptor instead.
 func (*SigningTrustInventory) Descriptor() ([]byte, []int) {
-	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{4}
+	return file_lindm_release_v1_release_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SigningTrustInventory) GetExecutionPublicKeysPem() []string {
@@ -512,7 +591,7 @@ var File_lindm_release_v1_release_proto protoreflect.FileDescriptor
 
 const file_lindm_release_v1_release_proto_rawDesc = "" +
 	"\n" +
-	"\x1elindm/release/v1/release.proto\x12\x10lindm.release.v1\x1a\x1bbuf/validate/validate.proto\"\xf9\x03\n" +
+	"\x1elindm/release/v1/release.proto\x12\x10lindm.release.v1\x1a\x1bbuf/validate/validate.proto\"\xc5\x04\n" +
 	"\x0fReleaseManifest\x129\n" +
 	"\aversion\x18\x01 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^[0-9]+\\.[0-9]+\\.[0-9]+$R\aversion\x12&\n" +
 	"\brevision\x18\x02 \x01(\tB\n" +
@@ -525,7 +604,15 @@ const file_lindm_release_v1_release_proto_rawDesc = "" +
 	"\acustody\x18\a \x01(\tB\x1e\xbaH\x1br\x19R\vdevelopmentR\n" +
 	"productionR\acustody\x12F\n" +
 	"\x06builds\x18\b \x03(\v2\".lindm.release.v1.BuildObservationB\n" +
-	"\xbaH\a\x92\x01\x04\b\x02\x10\x02R\x06builds\"\xf0\x06\n" +
+	"\xbaH\a\x92\x01\x04\b\x02\x10\x02R\x06builds\x12J\n" +
+	"\rserver_notice\x18\t \x01(\v2%.lindm.release.v1.ServerReleaseNoticeR\fserverNotice\"\xa2\x03\n" +
+	"\x13ServerReleaseNotice\x12'\n" +
+	"\x0fsecurity_update\x18\x01 \x01(\bR\x0esecurityUpdate\x12\x9e\x01\n" +
+	"\fadvisory_ids\x18\x02 \x03(\tB{\xbaHx\x92\x01u\x10@\"qro2m^(CVE-[0-9]{4}-[0-9]{4,}|GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4})$R\vadvisoryIds\x12$\n" +
+	"\tissued_at\x18\x03 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\bissuedAt\x12&\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\texpiresAt:s\xbaHp\x1an\n" +
+	"\x1eserver_release_notice.validity\x12*release notice expiry must follow issuance\x1a this.expires_at > this.issued_at\"\xf0\x06\n" +
 	"\x0fReleaseArtifact\x12\x1e\n" +
 	"\x04path\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x04path\x12>\n" +
@@ -592,31 +679,33 @@ func file_lindm_release_v1_release_proto_rawDescGZIP() []byte {
 	return file_lindm_release_v1_release_proto_rawDescData
 }
 
-var file_lindm_release_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_lindm_release_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_lindm_release_v1_release_proto_goTypes = []any{
 	(*ReleaseManifest)(nil),       // 0: lindm.release.v1.ReleaseManifest
-	(*ReleaseArtifact)(nil),       // 1: lindm.release.v1.ReleaseArtifact
-	(*BuildObservation)(nil),      // 2: lindm.release.v1.BuildObservation
-	(*ReleaseBuildFailure)(nil),   // 3: lindm.release.v1.ReleaseBuildFailure
-	(*SigningTrustInventory)(nil), // 4: lindm.release.v1.SigningTrustInventory
-	nil,                           // 5: lindm.release.v1.BuildObservation.ToolVersionsEntry
-	nil,                           // 6: lindm.release.v1.BuildObservation.UnsignedSha256Entry
-	nil,                           // 7: lindm.release.v1.BuildObservation.BinarySha256Entry
-	nil,                           // 8: lindm.release.v1.BuildObservation.ConsoleSha256Entry
+	(*ServerReleaseNotice)(nil),   // 1: lindm.release.v1.ServerReleaseNotice
+	(*ReleaseArtifact)(nil),       // 2: lindm.release.v1.ReleaseArtifact
+	(*BuildObservation)(nil),      // 3: lindm.release.v1.BuildObservation
+	(*ReleaseBuildFailure)(nil),   // 4: lindm.release.v1.ReleaseBuildFailure
+	(*SigningTrustInventory)(nil), // 5: lindm.release.v1.SigningTrustInventory
+	nil,                           // 6: lindm.release.v1.BuildObservation.ToolVersionsEntry
+	nil,                           // 7: lindm.release.v1.BuildObservation.UnsignedSha256Entry
+	nil,                           // 8: lindm.release.v1.BuildObservation.BinarySha256Entry
+	nil,                           // 9: lindm.release.v1.BuildObservation.ConsoleSha256Entry
 }
 var file_lindm_release_v1_release_proto_depIdxs = []int32{
-	1, // 0: lindm.release.v1.ReleaseManifest.artifacts:type_name -> lindm.release.v1.ReleaseArtifact
-	2, // 1: lindm.release.v1.ReleaseManifest.builds:type_name -> lindm.release.v1.BuildObservation
-	5, // 2: lindm.release.v1.BuildObservation.tool_versions:type_name -> lindm.release.v1.BuildObservation.ToolVersionsEntry
-	6, // 3: lindm.release.v1.BuildObservation.unsigned_sha256:type_name -> lindm.release.v1.BuildObservation.UnsignedSha256Entry
-	7, // 4: lindm.release.v1.BuildObservation.binary_sha256:type_name -> lindm.release.v1.BuildObservation.BinarySha256Entry
-	8, // 5: lindm.release.v1.BuildObservation.console_sha256:type_name -> lindm.release.v1.BuildObservation.ConsoleSha256Entry
-	2, // 6: lindm.release.v1.ReleaseBuildFailure.builds:type_name -> lindm.release.v1.BuildObservation
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	2, // 0: lindm.release.v1.ReleaseManifest.artifacts:type_name -> lindm.release.v1.ReleaseArtifact
+	3, // 1: lindm.release.v1.ReleaseManifest.builds:type_name -> lindm.release.v1.BuildObservation
+	1, // 2: lindm.release.v1.ReleaseManifest.server_notice:type_name -> lindm.release.v1.ServerReleaseNotice
+	6, // 3: lindm.release.v1.BuildObservation.tool_versions:type_name -> lindm.release.v1.BuildObservation.ToolVersionsEntry
+	7, // 4: lindm.release.v1.BuildObservation.unsigned_sha256:type_name -> lindm.release.v1.BuildObservation.UnsignedSha256Entry
+	8, // 5: lindm.release.v1.BuildObservation.binary_sha256:type_name -> lindm.release.v1.BuildObservation.BinarySha256Entry
+	9, // 6: lindm.release.v1.BuildObservation.console_sha256:type_name -> lindm.release.v1.BuildObservation.ConsoleSha256Entry
+	3, // 7: lindm.release.v1.ReleaseBuildFailure.builds:type_name -> lindm.release.v1.BuildObservation
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_lindm_release_v1_release_proto_init() }
@@ -630,7 +719,7 @@ func file_lindm_release_v1_release_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_release_v1_release_proto_rawDesc), len(file_lindm_release_v1_release_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

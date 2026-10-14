@@ -10,10 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -52,7 +53,7 @@ func (a *localAccount) accountRole() string {
 }
 
 // OpenLocalAuthorityFixture uses the existing isolated process/database lifecycle
-// but bootstraps two local owners through the CLI and real HTTPS ceremonies.
+// but claims the first local owner through protected setup and real HTTPS ceremonies.
 // It never reserves the shared console port or changes shared accounts.
 func OpenLocalAuthorityFixture(ctx context.Context, repository, binary string) (*AuthorityFixture, error) {
 	return openAuthorityFixture(ctx, repository, binary, authorityLocal)
@@ -66,42 +67,26 @@ func OpenDeviceActionAuthorityFixture(ctx context.Context, repository, binary st
 	return openAuthorityFixture(ctx, repository, binary, authorityDeviceActions)
 }
 
-type enrollmentOutput struct {
-	data [4096]byte
-	n    int
-}
-
-func (b *enrollmentOutput) Write(p []byte) (int, error) {
-	if len(p) > len(b.data)-b.n {
-		return 0, io.ErrShortBuffer
+func (f *AuthorityFixture) bootstrapLocalOwner(ctx context.Context) (_ string, resultErr error) {
+	path := filepath.Join(f.directory, "first-run-code")
+	if err := labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"setup-code", "-config", f.configPath(), "-output", path}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute}); err != nil {
+		return "", errors.New("issue local fixture setup code failed")
 	}
-	n := copy(b.data[b.n:], p)
-	b.n += n
-	return n, nil
-}
-
-func (f *AuthorityFixture) bootstrapLocalOwner(ctx context.Context) (string, error) {
-	var output enrollmentOutput
-	defer clear(output.data[:])
-	if err := labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"bootstrap-owner", "-config", f.configPath(), "-username", "owner"}, Stdout: &output, Stderr: f.log, Timeout: time.Minute}); err != nil {
-		return "", errors.New("bootstrap local fixture owner failed")
+	defer func() { resultErr = errors.Join(resultErr, os.Remove(path)) }()
+	code, err := os.ReadFile(path)
+	if err != nil {
+		return "", errors.New("read local fixture setup code failed")
 	}
-	lines := bytes.Split(bytes.TrimSpace(output.data[:output.n]), []byte("\n"))
-	if len(lines) != 4 || string(lines[0]) != "Enrollment URL: "+f.ConsoleOrigin+"/enroll" {
-		return "", errors.New("unexpected local bootstrap output")
+	defer clear(code)
+	if len(code) != 44 || code[43] != '\n' {
+		return "", errors.New("invalid local fixture setup code file")
 	}
-	secret, ok := bytes.CutPrefix(lines[1], []byte("Enrollment secret (shown once): "))
-	id, idOK := bytes.CutPrefix(lines[3], []byte("Account ID: "))
-	accountID, err := uuid.ParseBytes(id)
-	if !ok || !idOK || len(secret) == 0 || err != nil || accountID == uuid.Nil {
-		return "", errors.New("invalid local bootstrap enrollment")
-	}
-	owner, err := newLocalAccount(f.relyingPartyID(), "owner", accountID.String())
+	owner, err := newLocalAccount(f.relyingPartyID(), "owner", "")
 	if err != nil {
 		return "", err
 	}
 	f.local = &localAuthority{owner: owner}
-	return string(secret), nil
+	return string(code[:43]), nil
 }
 
 // relyingPartyID is the WebAuthn RP ID lindmd derives from its public_url host.
@@ -186,6 +171,9 @@ func (s *OwnerSession) localRequest(ctx context.Context, path string, request, r
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", s.origin)
+	if path == "/auth/setup/begin" {
+		req.Header.Set("X-Lindm-Setup", "1")
+	}
 	if s.csrf != "" {
 		req.Header.Set("X-CSRF-Token", s.csrf)
 	}
@@ -220,21 +208,39 @@ func (s *OwnerSession) localCeremonyRole(ctx context.Context, secret, role strin
 	if a.authenticator == nil || len(a.password) == 0 {
 		return errors.New("local fixture credential is closed")
 	}
-	kind := "login"
+	path := "/auth/local/login/begin"
 	var request proto.Message = &authv1.LocalLoginRequest{Username: a.username, Password: string(a.password)}
-	if secret != "" {
-		kind = "enroll"
+	setup := secret != "" && a.id == ""
+	if setup {
+		path = "/auth/setup/begin"
+		request = &authv1.FirstRunSetupRequest{Code: secret, Username: a.username, Password: string(a.password)}
+	} else if secret != "" {
+		path = "/auth/local/enroll/begin"
 		request = &authv1.LocalEnrollmentRequest{Secret: secret, Password: string(a.password)}
 	}
 	challenge := new(authv1.WebAuthnChallenge)
-	if err := s.localRequest(ctx, "/auth/local/"+kind+"/begin", request, challenge, http.StatusOK); err != nil {
+	if err := s.localRequest(ctx, path, request, challenge, http.StatusOK); err != nil {
 		return err
 	}
 	var options struct {
 		Challenge string `json:"challenge"`
+		User      struct {
+			ID string `json:"id"`
+		} `json:"user"`
 	}
 	if err := json.Unmarshal([]byte(challenge.GetOptionsJson()), &options); err != nil || options.Challenge == "" {
 		return errors.New("invalid fixture WebAuthn challenge")
+	}
+	if setup {
+		raw, err := base64.RawURLEncoding.DecodeString(options.User.ID)
+		if err != nil {
+			return errors.New("invalid fixture setup user handle")
+		}
+		id, err := uuid.FromBytes(raw)
+		if err != nil || id == uuid.Nil {
+			return errors.New("invalid fixture setup identity")
+		}
+		a.id, s.AccountID = id.String(), id.String()
 	}
 	if a.counter == ^uint32(0) {
 		return errors.New("fixture authenticator counter exhausted")

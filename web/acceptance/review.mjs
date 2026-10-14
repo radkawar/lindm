@@ -20,6 +20,8 @@ import {
 import { installProbes } from "./review-probes.mjs";
 import { contactSheet } from "./review-report.mjs";
 import { reviewEnrollmentFixtures } from "./review-enrollment.mjs";
+import { reviewServerStatus, statusSchema } from "./review-server-status.mjs";
+import { reviewRecoveryCustody } from "./review-recovery-custody.mjs";
 import { routeContracts, destructiveCoverage, listRoutes } from "./review-contracts.mjs";
 import { editManifest, editSheet, annotationTemplate } from "./review-edit-sheet.mjs";
 import { taskWalkthroughs, taskAuditSheet } from "./review-journeys.mjs";
@@ -741,16 +743,16 @@ async function main() {
     if (typeof config[key] !== "string" || !config[key])
       throw new Error("required_configuration_missing");
   for (const fixture of [config.enrollmentFixture, config.missingArtifactFixture])
-    for (const key of ["origin", "username", "password", "enrollmentSecret"])
+    for (const key of ["origin", "username", "password", "setupCode"])
       if (typeof fixture?.[key] !== "string" || !fixture[key])
         throw new Error("enrollment_fixture_required");
   secrets = [
     config.password,
     config.enrollmentSecret,
     config.enrollmentFixture.password,
-    config.enrollmentFixture.enrollmentSecret,
+    config.enrollmentFixture.setupCode,
     config.missingArtifactFixture.password,
-    config.missingArtifactFixture.enrollmentSecret,
+    config.missingArtifactFixture.setupCode,
   ];
   config.evidenceDirectory = resolve(config.evidenceDirectory);
   await privateDirectory(config.evidenceDirectory);
@@ -939,6 +941,35 @@ async function main() {
       },
     });
     for (const entry of enrollmentResults) {
+      summarize(entry);
+      report.results.push(entry);
+    }
+    const schema = await statusSchema(config.checkout);
+    const statusResults = await reviewServerStatus({
+      schema,
+      pages,
+      combos,
+      config,
+      screenshot,
+      axe,
+      probe,
+      settle,
+    });
+    for (const entry of statusResults) {
+      summarize(entry);
+      report.results.push(entry);
+    }
+    const custodyResults = await reviewRecoveryCustody({
+      schema,
+      pages,
+      combos,
+      config,
+      screenshot,
+      axe,
+      probe,
+      settle,
+    });
+    for (const entry of custodyResults) {
       summarize(entry);
       report.results.push(entry);
     }

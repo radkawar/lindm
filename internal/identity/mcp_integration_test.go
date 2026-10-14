@@ -27,7 +27,7 @@ import (
 func mcpFixture(t *testing.T) (*Service, context.Context, string, uuid.UUID) {
 	t.Helper()
 	s, ctx, _ := localIntegrationService(t)
-	owner, err := s.BootstrapLocalOwner(ctx, "mcp-owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "mcp-owner")
 	if err != nil {
 		t.Fatal(err)
 	}

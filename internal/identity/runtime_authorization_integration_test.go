@@ -22,7 +22,7 @@ import (
 func runtimeOwner(t *testing.T) (*Service, context.Context, string) {
 	t.Helper()
 	s, ctx, _ := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

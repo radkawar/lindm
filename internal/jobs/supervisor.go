@@ -91,6 +91,7 @@ type Supervisor struct {
 	heartbeat  time.Duration
 	minBackoff time.Duration
 	maxBackoff time.Duration
+	health     *jobHealth
 }
 
 type exclusiveJob struct {
@@ -118,17 +119,19 @@ func New(cfg Config) (*Supervisor, error) {
 		heartbeat:  valueOr(cfg.HeartbeatInterval, defaultHeartbeatInterval),
 		minBackoff: valueOr(cfg.MinimumBackoff, defaultMinimumBackoff),
 		maxBackoff: valueOr(cfg.MaximumBackoff, defaultMaximumBackoff),
+		health:     &jobHealth{states: make([]uint8, len(cfg.Jobs))},
 	}
 	if s.acquire < 0 || s.heartbeat < 0 || s.minBackoff < 0 || s.maxBackoff < s.minBackoff {
 		return nil, errors.New("jobs: intervals must be positive and backoff bounds ordered")
 	}
 	names := make(map[string]bool, len(cfg.Jobs))
 	keys := make(map[int64]bool, len(cfg.Jobs))
-	for _, job := range cfg.Jobs {
+	for index, job := range cfg.Jobs {
 		if job.Name == "" || len(job.Name) > 64 || names[job.Name] || job.Run == nil {
 			return nil, fmt.Errorf("jobs: job %q needs a unique bounded name and a run function", job.Name)
 		}
 		names[job.Name] = true
+		job.Run = s.health.supervise(index, job.Run)
 		switch job.Mode {
 		case Exclusive:
 			if job.Key == 0 || keys[job.Key] {

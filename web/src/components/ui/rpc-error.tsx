@@ -16,10 +16,12 @@ export function RpcError({
   title,
   onRetry,
   children,
+  recoveryCustodyConfirmationDigest,
 }: {
   failure: RpcFailure;
   title?: string;
   onRetry?: () => void;
+  recoveryCustodyConfirmationDigest?: string;
   children?: ReactNode;
 }) {
   const presentation = classifyRpcFailure(failure);
@@ -40,7 +42,12 @@ export function RpcError({
             : presentation.message}
         </p>
         <p>{presentation.action}</p>
-        {stepUp ? <StepUpVerify onVerified={onRetry} /> : null}
+        {stepUp ? (
+          <StepUpVerify
+            onVerified={onRetry}
+            recoveryCustodyConfirmationDigest={recoveryCustodyConfirmationDigest}
+          />
+        ) : null}
         <details data-slot="support-details" className="mt-2">
           <summary className="cursor-pointer">Details for support</summary>
           <dl className="mt-2 grid gap-1 break-words text-xs">

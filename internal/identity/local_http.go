@@ -21,9 +21,19 @@ import (
 
 func (s *Service) registerLocalHTTP(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/options", func(w http.ResponseWriter, r *http.Request) {
-		writeProto(w, &authv1.AuthenticationOptions{ExternalLogin: !s.localPrimary, LocalLogin: s.localPrimary || s.breakGlass != nil, BreakGlass: !s.localPrimary && s.breakGlass != nil})
+		available := false
+		if s.localPrimary {
+			var err error
+			available, err = identitydb.New(s.pool).SetupAvailable(r.Context())
+			if err != nil {
+				writeStatus(w, http.StatusServiceUnavailable)
+				return
+			}
+		}
+		writeProto(w, s.authenticationOptions(available))
 	})
 	mux.HandleFunc("POST /auth/local/login/begin", s.handleLocalLoginBegin)
+	mux.HandleFunc("POST /auth/setup/begin", s.handleSetupBegin)
 	mux.HandleFunc("POST /auth/local/login/finish", s.handleLocalLoginFinish)
 	mux.Handle("POST /auth/local/step-up/begin", s.RequireSession(http.HandlerFunc(s.handleLocalStepUpBegin)))
 	mux.Handle("POST /auth/local/step-up/finish", s.RequireSession(http.HandlerFunc(s.handleLocalStepUpFinish)))
@@ -33,6 +43,17 @@ func (s *Service) registerLocalHTTP(mux *http.ServeMux) {
 	mux.Handle("POST /auth/accounts/create", s.RequireSession(http.HandlerFunc(s.handleCreateAccount)))
 	mux.Handle("POST /auth/accounts/update", s.RequireSession(http.HandlerFunc(s.handleUpdateAccount)))
 	mux.Handle("POST /auth/accounts/reset", s.RequireSession(http.HandlerFunc(s.handleResetAccount)))
+}
+
+// authenticationOptions projects configured login modes and the already queried
+// setup availability; it does not decide whether setup may admit an owner.
+func (s *Service) authenticationOptions(setupAvailable bool) *authv1.AuthenticationOptions {
+	return &authv1.AuthenticationOptions{
+		ExternalLogin:  !s.localPrimary,
+		LocalLogin:     s.localPrimary || s.breakGlass != nil,
+		BreakGlass:     !s.localPrimary && s.breakGlass != nil,
+		SetupAvailable: setupAvailable,
+	}
 }
 
 func (s *Service) readAuthRequest(w http.ResponseWriter, r *http.Request, message proto.Message) bool {
@@ -136,11 +157,15 @@ func (s *Service) handleLocalEnrollFinish(w http.ResponseWriter, r *http.Request
 	if !s.readAuthRequest(w, r, request) {
 		return
 	}
-	_, err := s.finishLocalCeremony(r.Context(), request, "enroll", r.RemoteAddr)
+	cookie, err := s.finishLocalCeremony(r.Context(), request, "enroll", r.RemoteAddr)
 	if err != nil {
 		writeStatus(w, statusFor(err))
 		return
 	}
+	if cookie != "" {
+		setHostCookie(w, sessionCookie, cookie, sessionCookieMaxAge)
+	}
+	prepare(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 func (s *Service) handleLocalLoginFinish(w http.ResponseWriter, r *http.Request) {

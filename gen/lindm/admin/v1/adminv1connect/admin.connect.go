@@ -38,6 +38,12 @@ const (
 	// AdminServiceGetAuthorizationProcedure is the fully-qualified name of the AdminService's
 	// GetAuthorization RPC.
 	AdminServiceGetAuthorizationProcedure = "/lindm.admin.v1.AdminService/GetAuthorization"
+	// AdminServiceGetServerStatusProcedure is the fully-qualified name of the AdminService's
+	// GetServerStatus RPC.
+	AdminServiceGetServerStatusProcedure = "/lindm.admin.v1.AdminService/GetServerStatus"
+	// AdminServiceConfirmRecoveryKeyCustodyProcedure is the fully-qualified name of the AdminService's
+	// ConfirmRecoveryKeyCustody RPC.
+	AdminServiceConfirmRecoveryKeyCustodyProcedure = "/lindm.admin.v1.AdminService/ConfirmRecoveryKeyCustody"
 	// AdminServiceUpdateAuthorizationProcedure is the fully-qualified name of the AdminService's
 	// UpdateAuthorization RPC.
 	AdminServiceUpdateAuthorizationProcedure = "/lindm.admin.v1.AdminService/UpdateAuthorization"
@@ -328,6 +334,8 @@ const (
 // AdminServiceClient is a client for the lindm.admin.v1.AdminService service.
 type AdminServiceClient interface {
 	GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error)
+	GetServerStatus(context.Context, *connect.Request[v1.GetServerStatusRequest]) (*connect.Response[v1.GetServerStatusResponse], error)
+	ConfirmRecoveryKeyCustody(context.Context, *connect.Request[v1.ConfirmRecoveryKeyCustodyRequest]) (*connect.Response[v1.ConfirmRecoveryKeyCustodyResponse], error)
 	UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
@@ -448,6 +456,18 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			httpClient,
 			baseURL+AdminServiceGetAuthorizationProcedure,
 			connect.WithSchema(adminServiceMethods.ByName("GetAuthorization")),
+			connect.WithClientOptions(opts...),
+		),
+		getServerStatus: connect.NewClient[v1.GetServerStatusRequest, v1.GetServerStatusResponse](
+			httpClient,
+			baseURL+AdminServiceGetServerStatusProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetServerStatus")),
+			connect.WithClientOptions(opts...),
+		),
+		confirmRecoveryKeyCustody: connect.NewClient[v1.ConfirmRecoveryKeyCustodyRequest, v1.ConfirmRecoveryKeyCustodyResponse](
+			httpClient,
+			baseURL+AdminServiceConfirmRecoveryKeyCustodyProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ConfirmRecoveryKeyCustody")),
 			connect.WithClientOptions(opts...),
 		),
 		updateAuthorization: connect.NewClient[v1.UpdateAuthorizationRequest, v1.UpdateAuthorizationResponse](
@@ -1032,6 +1052,8 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 // adminServiceClient implements AdminServiceClient.
 type adminServiceClient struct {
 	getAuthorization                     *connect.Client[v1.GetAuthorizationRequest, v1.GetAuthorizationResponse]
+	getServerStatus                      *connect.Client[v1.GetServerStatusRequest, v1.GetServerStatusResponse]
+	confirmRecoveryKeyCustody            *connect.Client[v1.ConfirmRecoveryKeyCustodyRequest, v1.ConfirmRecoveryKeyCustodyResponse]
 	updateAuthorization                  *connect.Client[v1.UpdateAuthorizationRequest, v1.UpdateAuthorizationResponse]
 	listDevices                          *connect.Client[v1.ListDevicesRequest, v1.ListDevicesResponse]
 	getFleetSummary                      *connect.Client[v1.GetFleetSummaryRequest, v1.GetFleetSummaryResponse]
@@ -1133,6 +1155,16 @@ type adminServiceClient struct {
 // GetAuthorization calls lindm.admin.v1.AdminService.GetAuthorization.
 func (c *adminServiceClient) GetAuthorization(ctx context.Context, req *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error) {
 	return c.getAuthorization.CallUnary(ctx, req)
+}
+
+// GetServerStatus calls lindm.admin.v1.AdminService.GetServerStatus.
+func (c *adminServiceClient) GetServerStatus(ctx context.Context, req *connect.Request[v1.GetServerStatusRequest]) (*connect.Response[v1.GetServerStatusResponse], error) {
+	return c.getServerStatus.CallUnary(ctx, req)
+}
+
+// ConfirmRecoveryKeyCustody calls lindm.admin.v1.AdminService.ConfirmRecoveryKeyCustody.
+func (c *adminServiceClient) ConfirmRecoveryKeyCustody(ctx context.Context, req *connect.Request[v1.ConfirmRecoveryKeyCustodyRequest]) (*connect.Response[v1.ConfirmRecoveryKeyCustodyResponse], error) {
+	return c.confirmRecoveryKeyCustody.CallUnary(ctx, req)
 }
 
 // UpdateAuthorization calls lindm.admin.v1.AdminService.UpdateAuthorization.
@@ -1621,6 +1653,8 @@ func (c *adminServiceClient) ListApprovedReferences(ctx context.Context, req *co
 // AdminServiceHandler is an implementation of the lindm.admin.v1.AdminService service.
 type AdminServiceHandler interface {
 	GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error)
+	GetServerStatus(context.Context, *connect.Request[v1.GetServerStatusRequest]) (*connect.Response[v1.GetServerStatusResponse], error)
+	ConfirmRecoveryKeyCustody(context.Context, *connect.Request[v1.ConfirmRecoveryKeyCustodyRequest]) (*connect.Response[v1.ConfirmRecoveryKeyCustodyResponse], error)
 	UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error)
 	ListDevices(context.Context, *connect.Request[v1.ListDevicesRequest]) (*connect.Response[v1.ListDevicesResponse], error)
 	GetFleetSummary(context.Context, *connect.Request[v1.GetFleetSummaryRequest]) (*connect.Response[v1.GetFleetSummaryResponse], error)
@@ -1737,6 +1771,18 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		AdminServiceGetAuthorizationProcedure,
 		svc.GetAuthorization,
 		connect.WithSchema(adminServiceMethods.ByName("GetAuthorization")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetServerStatusHandler := connect.NewUnaryHandler(
+		AdminServiceGetServerStatusProcedure,
+		svc.GetServerStatus,
+		connect.WithSchema(adminServiceMethods.ByName("GetServerStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceConfirmRecoveryKeyCustodyHandler := connect.NewUnaryHandler(
+		AdminServiceConfirmRecoveryKeyCustodyProcedure,
+		svc.ConfirmRecoveryKeyCustody,
+		connect.WithSchema(adminServiceMethods.ByName("ConfirmRecoveryKeyCustody")),
 		connect.WithHandlerOptions(opts...),
 	)
 	adminServiceUpdateAuthorizationHandler := connect.NewUnaryHandler(
@@ -2319,6 +2365,10 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		switch r.URL.Path {
 		case AdminServiceGetAuthorizationProcedure:
 			adminServiceGetAuthorizationHandler.ServeHTTP(w, r)
+		case AdminServiceGetServerStatusProcedure:
+			adminServiceGetServerStatusHandler.ServeHTTP(w, r)
+		case AdminServiceConfirmRecoveryKeyCustodyProcedure:
+			adminServiceConfirmRecoveryKeyCustodyHandler.ServeHTTP(w, r)
 		case AdminServiceUpdateAuthorizationProcedure:
 			adminServiceUpdateAuthorizationHandler.ServeHTTP(w, r)
 		case AdminServiceListDevicesProcedure:
@@ -2522,6 +2572,14 @@ type UnimplementedAdminServiceHandler struct{}
 
 func (UnimplementedAdminServiceHandler) GetAuthorization(context.Context, *connect.Request[v1.GetAuthorizationRequest]) (*connect.Response[v1.GetAuthorizationResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAuthorization is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetServerStatus(context.Context, *connect.Request[v1.GetServerStatusRequest]) (*connect.Response[v1.GetServerStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetServerStatus is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ConfirmRecoveryKeyCustody(context.Context, *connect.Request[v1.ConfirmRecoveryKeyCustodyRequest]) (*connect.Response[v1.ConfirmRecoveryKeyCustodyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ConfirmRecoveryKeyCustody is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) UpdateAuthorization(context.Context, *connect.Request[v1.UpdateAuthorizationRequest]) (*connect.Response[v1.UpdateAuthorizationResponse], error) {

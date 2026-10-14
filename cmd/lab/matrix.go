@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/custody"
 	"lindm/internal/gendoc"
 	"lindm/internal/labhost"
 	"lindm/internal/labmatrix"
@@ -233,7 +234,7 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	}
 	path := expandHome(*evidence)
 	if info, statErr := os.Stat(path); statErr == nil {
-		sum, err := labmatrix.FileSHA256(path)
+		sum, err := matrixImportEvidenceSHA256(path, *cell, *scope)
 		if err != nil {
 			return err
 		}
@@ -245,6 +246,9 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	} else if errors.Is(statErr, os.ErrNotExist) || errors.Is(statErr, os.ErrPermission) {
 		if *digest == "" {
 			return fmt.Errorf("evidence %s is not readable here; -sha256 is required", path)
+		}
+		if *cell == "deploy" && *scope == "" {
+			return errors.New("unscoped deploy import requires readable evidence so first-run-only scope cannot be discarded")
 		}
 		entry.Sha256 = *digest
 	} else {
@@ -362,6 +366,8 @@ type matrixRun struct {
 	signer                                                                  *packaging.SigningKey
 	archArgs, secureBootArgs                                                map[string]*labv1.MatrixArgs
 	airgap                                                                  map[string][]string
+	deploy                                                                  *deployMatrixInputs
+	deployIdentityPassphrase                                                []byte
 	// lifecycle inputs per packaging architecture and format.
 	builds     map[string][2]string
 	apt        map[string]string
@@ -376,6 +382,7 @@ type matrixRun struct {
 // a private directory beside its record; SSH hosts return it, whereas a path
 // inside the remote run directory was deleted with the run.
 var laneInputs = map[string][]string{
+	"deploy":              {"repo", "lab", "deploy", "redhat-token-file", "evidence", "record"},
 	"inspect":             {"agent", "diagnostics", "record"},
 	"lifecycle":           {"repo", "build-repo", "packages", "redhat-token-file", "diagnostics", "record"},
 	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
@@ -410,6 +417,8 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key Secure Boot cells only (recovery, TPM unattended boots): package-owned noSB bootstrap NVRAM template on the selected host")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
+	deployInputsPath := flags.String("deploy-inputs", "", "protected mode0600 JSON references to private signed releases, independent trust, offline backup custody and matching owner CLI binaries")
+	deployPassphraseFD := flags.Int("deploy-backup-identity-passphrase-fd", -1, "protected anonymous pipe carrying one offline backup identity passphrase line; never serialized")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -451,6 +460,26 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		return err
 	}
 	for _, c := range cells {
+		if c.Spec.GetLane() == "deploy" && run.deploy == nil {
+			if *deployInputsPath == "" {
+				return errors.New("deploy matrix lane requires explicit -deploy-inputs; it never substitutes unsigned locally built packages")
+			}
+			run.deploy, err = readMatrixDeployInputs(*deployInputsPath)
+			if err != nil {
+				return err
+			}
+			if *deployPassphraseFD < 0 {
+				return errors.New("deploy matrix lane requires -deploy-backup-identity-passphrase-fd")
+			}
+			run.deployIdentityPassphrase, err = custody.ReadPassphraseFD(ctx, *deployPassphraseFD, false)
+			if err != nil {
+				return err
+			}
+			defer clear(run.deployIdentityPassphrase)
+			if err := syscall.Close(*deployPassphraseFD); err != nil {
+				return err
+			}
+		}
 		if inputs := laneInputs[c.Spec.GetLane()]; (slices.Contains(inputs, "console-browser") || slices.Contains(inputs, "provision-browser")) && run.consoleBrowsers == "" {
 			return fmt.Errorf("%s requires -console-browser-config-dir for actual clipboard capture and screenshots", c.Spec.GetLane())
 		}
@@ -678,6 +707,15 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	if slices.Contains(laneInputs[c.Spec.GetLane()], "evidence") {
 		record = filepath.Join(base, c.Spec.GetLane()+".json")
 	}
+	var identityPipe *os.File
+	if c.Spec.GetLane() == "deploy" {
+		identityPipe, err = protectedDeployPipe(r.deployIdentityPassphrase)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = identityPipe.Close() }()
+		args = append(args, "-backup-identity-passphrase-fd", "0")
+	}
 	log, err := os.OpenFile(base+".log", os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
@@ -685,6 +723,9 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	_, _ = fmt.Fprintf(stderr, "start %s: lab %s\n", name, strings.Join(args, " "))
 	cmd := exec.CommandContext(ctx, r.self, args...)
 	cmd.Stdout, cmd.Stderr = log, log
+	if identityPipe != nil {
+		cmd.Stdin = identityPipe
+	}
 	// Let the lane revoke authority and destroy its guests before exiting.
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 5 * time.Minute
@@ -852,6 +893,12 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 			args = append(args, "-lab", r.self)
 		case "lindmd":
 			args = append(args, "-lindmd", r.lindmd)
+		case "deploy":
+			if r.deploy == nil {
+				return nil, errors.New("missing explicit signed deployment inputs")
+			}
+			args = append(args, r.deploy.args()...)
+			args = append(args, "-work-dir", r.evidence)
 		case "airgap":
 			args = append(args, r.airgap[c.Release.Key+"/"+c.Architecture]...)
 			// "diagnostics" is its own input: a second -diagnostics flag here

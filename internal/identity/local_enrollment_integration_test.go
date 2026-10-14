@@ -14,7 +14,7 @@ import (
 
 func TestLocalEnrollmentCanRestartAfterAbandonedPrompt(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestLocalEnrollmentCanRestartAfterAbandonedPrompt(t *testing.T) {
 
 func TestLocalEnrollmentFailedVerificationPreservesSecret(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestLocalEnrollmentFailedVerificationPreservesSecret(t *testing.T) {
 
 func TestLocalEnrollmentSecretExpiryRecheckedAtFinish(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

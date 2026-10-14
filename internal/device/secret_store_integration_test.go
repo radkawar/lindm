@@ -21,6 +21,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -43,14 +44,16 @@ const (
 type secretFixture struct {
 	svc      *Service
 	pool     *pgxpool.Pool
+	conn     *pgx.Conn
 	stepUp   context.Context // real local password + WebAuthn browser session
 	owner    identity.Principal
 	ownerCtx context.Context // same principal without step-up proof
+	browser  *localBrowserFixture
 }
 
 func newSecretFixture(t *testing.T) *secretFixture {
 	t.Helper()
-	pool, _ := testdb.Open(t)
+	pool, conn := testdb.Open(t)
 	authority, err := identity.New(t.Context(), pool, identity.Config{Local: true, PublicURL: secretTestOrigin})
 	if err != nil {
 		t.Fatal(err)
@@ -66,16 +69,21 @@ func newSecretFixture(t *testing.T) *secretFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stepUp := localStepUp(t, authority)
-	owner, _ := identity.PrincipalFromContext(stepUp)
-	return &secretFixture{svc: svc, pool: pool, stepUp: stepUp, owner: owner, ownerCtx: identity.WithPrincipal(t.Context(), owner)}
+	browser := newLocalBrowserFixture(t, authority, pool)
+	owner, _ := identity.PrincipalFromContext(browser.context)
+	return &secretFixture{svc: svc, pool: pool, conn: conn, stepUp: browser.context, owner: owner, ownerCtx: identity.WithPrincipal(t.Context(), owner), browser: browser}
 }
 
-// localStepUp performs the production local enrollment and login ceremonies and
-// returns the context the session middleware hands to authenticated handlers.
-func localStepUp(t *testing.T, authority *identity.Service) context.Context {
+// The fixture uses real setup, password, UV passkey and session middleware.
+// Its scoped re-verification never fabricates a session stamp in SQL.
+type localBrowserFixture struct {
+	context  context.Context
+	reverify func(string) context.Context
+}
+
+func newLocalBrowserFixture(t *testing.T, authority *identity.Service, pool *pgxpool.Pool) *localBrowserFixture {
 	t.Helper()
-	enrollment, err := authority.BootstrapLocalOwner(t.Context(), "owner")
+	code, err := identity.IssueSetupCode(t.Context(), pool)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +92,8 @@ func localStepUp(t *testing.T, authority *identity.Service) context.Context {
 		t.Fatal(err)
 	}
 	handler := authority.Handler()
+	var cookies []*http.Cookie
+	var csrfToken string
 	post := func(path string, request proto.Message, result proto.Message, status int) []*http.Cookie {
 		t.Helper()
 		body, err := protojson.Marshal(request)
@@ -93,6 +103,15 @@ func localStepUp(t *testing.T, authority *identity.Service) context.Context {
 		req := httptest.NewRequest(http.MethodPost, secretTestOrigin+path, bytes.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Origin", secretTestOrigin)
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+		if csrfToken != "" {
+			req.Header.Set("X-CSRF-Token", csrfToken)
+		}
+		if path == "/auth/setup/begin" {
+			req.Header.Set("X-Lindm-Setup", "1")
+		}
 		recorder := httptest.NewRecorder()
 		handler.ServeHTTP(recorder, req)
 		if recorder.Code != status {
@@ -110,32 +129,53 @@ func localStepUp(t *testing.T, authority *identity.Service) context.Context {
 	ceremony := func(kind string, request proto.Message, counter uint32, status int, result proto.Message) []*http.Cookie {
 		t.Helper()
 		challenge := new(authv1.WebAuthnChallenge)
-		post("/auth/local/"+kind+"/begin", request, challenge, http.StatusOK)
+		beginPath, finishPath := "/auth/local/"+kind+"/begin", "/auth/local/"+kind+"/finish"
+		if kind == "setup" {
+			beginPath, finishPath = "/auth/setup/begin", "/auth/local/enroll/finish"
+		}
+		post(beginPath, request, challenge, http.StatusOK)
 		var options struct {
 			Challenge string `json:"challenge"`
 		}
 		if err := json.Unmarshal([]byte(challenge.GetOptionsJson()), &options); err != nil || options.Challenge == "" {
 			t.Fatalf("challenge: %v", err)
 		}
-		credential, _, err := authenticator.Response(options.Challenge, secretTestOrigin, kind == "enroll", true, counter)
+		credential, _, err := authenticator.Response(options.Challenge, secretTestOrigin, kind == "setup", true, counter)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return post("/auth/local/"+kind+"/finish", &authv1.WebAuthnFinishRequest{Token: challenge.GetToken(), CredentialJson: string(credential)}, result, status)
+		return post(finishPath, &authv1.WebAuthnFinishRequest{Token: challenge.GetToken(), CredentialJson: string(credential)}, result, status)
 	}
-	ceremony("enroll", &authv1.LocalEnrollmentRequest{Secret: enrollment.Secret, Password: secretTestPassword}, 0, http.StatusNoContent, nil)
-	login := ceremony("login", &authv1.LocalLoginRequest{Username: "owner", Password: secretTestPassword}, 1, http.StatusOK, new(authv1.SessionPrincipal))
-	var proof context.Context
-	req := httptest.NewRequest(http.MethodGet, secretTestOrigin+"/auth/session", nil)
-	for _, cookie := range login {
-		req.AddCookie(cookie)
+	ceremony("setup", &authv1.FirstRunSetupRequest{Code: code, Username: "owner", Password: secretTestPassword}, 0, http.StatusNoContent, nil)
+	cookies = ceremony("login", &authv1.LocalLoginRequest{Username: "owner", Password: secretTestPassword}, 1, http.StatusOK, new(authv1.SessionPrincipal))
+	contextForSession := func() context.Context {
+		t.Helper()
+		var proof context.Context
+		req := httptest.NewRequest(http.MethodGet, secretTestOrigin+"/auth/session", nil)
+		for _, cookie := range cookies {
+			req.AddCookie(cookie)
+		}
+		recorder := httptest.NewRecorder()
+		authority.RequireSession(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { proof = r.Context() })).ServeHTTP(recorder, req)
+		if proof == nil {
+			t.Fatalf("session middleware rejected browser proof: %d", recorder.Code)
+		}
+		principal, ok := identity.PrincipalFromContext(proof)
+		if !ok {
+			t.Fatal("browser principal absent")
+		}
+		csrfToken = principal.CSRFToken
+		return proof
 	}
-	recorder := httptest.NewRecorder()
-	authority.RequireSession(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { proof = r.Context() })).ServeHTTP(recorder, req)
-	if proof == nil {
-		t.Fatalf("session middleware rejected login: %d", recorder.Code)
+	fixture := &localBrowserFixture{context: contextForSession()}
+	counter := uint32(1)
+	fixture.reverify = func(digest string) context.Context {
+		counter++
+		ceremony("step-up", &authv1.LocalStepUpRequest{Password: secretTestPassword, RecoveryCustodyConfirmationDigest: digest}, counter, http.StatusNoContent, nil)
+		fixture.context = contextForSession()
+		return fixture.context
 	}
-	return proof
+	return fixture
 }
 
 func opaqueMaterial(value string) *agentv1.SecretMaterial {

@@ -89,6 +89,18 @@ var (
 // Written by the compliance_record_states database function.
 var ComplianceStateChanged = kind("compliance.state.changed")
 
+// An actual deployment owner's scoped attestation, not verified external storage.
+var RecoveryCustodyConfirmed = kind("recovery_custody.confirmed")
+
+// Deployment status transitions and bounded reminders, written by the status collector.
+var (
+	ServerStatusUnknown   = kind("server.status.unknown")
+	ServerStatusAttention = kind("server.status.attention")
+	ServerStatusFailed    = kind("server.status.failed")
+	ServerStatusRecovered = kind("server.status.recovered")
+	ServerStatusInactive  = kind("server.status.inactive")
+)
+
 // Device identity, lifecycle and groups.
 var (
 	DeviceActivate            = kind("device.activate")

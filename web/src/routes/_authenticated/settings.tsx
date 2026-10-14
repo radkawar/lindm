@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { RestrictedPage } from "@/components/layout/restricted-page";
 import { PageHeader } from "@/components/ui/page-header";
 import { MCPAccessSettingsSection } from "@/features/auth/mcp-access";
@@ -37,11 +37,19 @@ function SettingsRoute() {
     <div className="grid min-w-0 gap-6">
       <PageHeader
         title="Settings"
-        description="Check enrollment readiness. Set device attributes and agent permissions. Review assistant access."
+        description="Review server checks and enrollment readiness. Set device attributes and agent permissions. Review assistant access."
         onRefresh={() => void queryClient.refetchQueries({ type: "active" })}
         refreshing={fetching > 0}
       />
       {integrations ? <MCPAccessSettingsSection /> : null}
+      {integrations ? (
+        <section className="grid gap-2">
+          <h2 className="text-base font-semibold">Server maintenance</h2>
+          <Link to="/settings/status" className="w-fit text-sm underline underline-offset-4">
+            Review server status
+          </Link>
+        </section>
+      ) : null}
       {enrollment ? <RepositoryReadinessSection /> : null}
       <AttributeDefinitions />
       <DeviceCapabilitiesSettingsSection />

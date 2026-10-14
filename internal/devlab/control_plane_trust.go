@@ -379,6 +379,9 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		if err != nil {
 			return nil, err
 		}
+		if options.setupCodeOut != nil {
+			*options.setupCodeOut = enrollmentSecret
+		}
 	} else {
 		err = labexec.Run(ctx, labexec.Command{Path: f.binary, Args: []string{"bootstrap-owner", "-config", f.configPath(), "-issuer", issuer, "-subject", ownerSubject}, Stdout: f.log, Stderr: f.log, Timeout: time.Minute})
 		if err != nil {
@@ -398,7 +401,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	if err := f.start(ctx); err != nil {
 		return nil, err
 	}
-	if local {
+	if local && options.setupCodeOut == nil {
 		if err := f.enrollLocalOwners(ctx, enrollmentSecret, "approver"); err != nil {
 			return nil, err
 		}
@@ -407,6 +410,11 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 		if err := f.persistLocalAccounts(); err != nil {
 			return nil, err
 		}
+	}
+	if options.setupCodeOut != nil {
+		// No privileged release/account operation is possible before the browser
+		// has completed the owner ceremony. Publication was signed before start.
+		return f, nil
 	}
 	if err := f.RegisterRelease(ctx, ""); err != nil {
 		return nil, fmt.Errorf("register isolated server release: %w", err)

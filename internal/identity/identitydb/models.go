@@ -148,15 +148,17 @@ type ScimResource struct {
 }
 
 type Session struct {
-	TokenHash         []byte
-	PrincipalID       uuid.UUID
-	CreatedAt         pgtype.Timestamptz
-	LastSeenAt        pgtype.Timestamptz
-	IdleExpiresAt     pgtype.Timestamptz
-	AbsoluteExpiresAt pgtype.Timestamptz
-	RevokedAt         pgtype.Timestamptz
-	BreakGlass        bool
-	IncidentReason    string
-	Kind              string
-	SteppedUpAt       pgtype.Timestamptz
+	TokenHash                   []byte
+	PrincipalID                 uuid.UUID
+	CreatedAt                   pgtype.Timestamptz
+	LastSeenAt                  pgtype.Timestamptz
+	IdleExpiresAt               pgtype.Timestamptz
+	AbsoluteExpiresAt           pgtype.Timestamptz
+	RevokedAt                   pgtype.Timestamptz
+	BreakGlass                  bool
+	IncidentReason              string
+	Kind                        string
+	SteppedUpAt                 pgtype.Timestamptz
+	RecoveryCustodyStepUpDigest []byte
+	RecoveryCustodyStepUpAt     pgtype.Timestamptz
 }

@@ -80,11 +80,14 @@ type guestVM struct {
 	client             *ssh.Client
 	captureDiagnostics bool
 	diagnosticsDir     string
-	lastOperation      *guestOperationDiagnostic
-	hardware           VMHardwareOptions
-	firmware           *EncryptedFirmwareEvidence
-	tpm                *encryptedProcess
-	usingOfflineRTC    bool
+	// Set only by the baseline install audit. Fixed step names, never command
+	// text or private output, are recorded at each real operator invocation.
+	serverCommandObserver func(string, time.Time, time.Time, bool)
+	lastOperation         *guestOperationDiagnostic
+	hardware              VMHardwareOptions
+	firmware              *EncryptedFirmwareEvidence
+	tpm                   *encryptedProcess
+	usingOfflineRTC       bool
 	// Only configured UEFI guests defer a requested no-reboot policy until SSH.
 	// Manually assembled encrypted guests retain their existing reboot policy.
 	stopRebootAfterConnect bool

@@ -62,6 +62,9 @@ func runGuestProbe(ctx context.Context, args []string, stdout, _ io.Writer) erro
 	if args[0] == "redhat-ready" || args[0] == "redhat-register" || args[0] == "redhat-unregister" || args[0] == "redhat-identity" || args[0] == "redhat-repositories" {
 		return guestRedHat(ctx, args[0])
 	}
+	if args[0] == "serverdeps-rpm-capture" || args[0] == "serverdeps-rpm-replay" {
+		return runRPMServerDependenciesGuest(ctx, args[0], stdout)
+	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	switch args[0] {

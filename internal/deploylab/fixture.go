@@ -18,9 +18,11 @@ import (
 )
 
 // RestrictRuntimeMigrationMetadataSQL removes default DML/sequence grants from
-// Goose's bookkeeping after explicit migration in either isolated deployment
-// fixture. Runtime startup retains SELECT but cannot forge schema history.
+// Goose history, schema compatibility and restore holds after explicit migration.
+// Runtime retains SELECT but cannot forge history, widen the floor or clear a hold.
 const RestrictRuntimeMigrationMetadataSQL = `REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.goose_db_version FROM lindm_runtime;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.lindm_schema_compatibility FROM lindm_runtime;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.server_recovery_state FROM lindm_runtime;
 DO $$ DECLARE sequence_name text := pg_get_serial_sequence('public.goose_db_version', 'id');
 BEGIN IF sequence_name IS NOT NULL THEN
 EXECUTE 'REVOKE ALL ON SEQUENCE ' || sequence_name || ' FROM lindm_runtime';

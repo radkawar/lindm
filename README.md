@@ -93,7 +93,7 @@ This verifies the running checkout-owned PostgreSQL fixture over verified TLS an
 destroys **only `lindm`**, terminating its remaining connections. It recreates the
 initial database permissions, explicitly migrates as `lindm_migrator`, restores
 runtime migration-metadata restrictions and re-bootstraps the fixed Keycloak owner.
-Local mode instead prints the one-shot `bootstrap-owner` command. Other databases
+Local mode instead prints the protected `setup-code` command. Other databases
 (including `lindm_authority_*` and their test schemas), cluster roles, Keycloak,
 volumes, certificates and secrets are preserved. All schemas inside `lindm` are
 necessarily deleted with it; coordinate shared-schema tests first. There is no
@@ -101,18 +101,25 @@ database-name override. Unlike `reset`, this does not regenerate the fixture.
 
 ### Server packages and containers
 
-Native `lindmd` DEB/RPM packages share the signed agent build pipeline:
-`go run ./cmd/lab packages build-server` (use `-repo` or a prebuilt `-lindmd`).
-The embedded console is part of the server binary. The hardened runtime service
-and explicitly invoked migration unit use separate dedicated accounts; install
-never migrates or claims an owner. `deploy/server/` contains the digest-pinned,
-non-root OCI definition and PostgreSQL/TLS single-host Compose topology.
-Follow the [installation, upgrade and backup/restore runbooks](docs/security-and-operations.md#native-single-host-installation),
-not the development fixture, for production configuration/key custody.
+Start with [Install lindm](docs/install.md). The customer receives an authenticated
+signed release bundle, not a public package-hosting prerequisite. Its installer
+orchestrates native server packages, separate runtime and migration identities,
+PostgreSQL, TLS, explicit migrations and protected browser first-owner setup.
+The embedded console and signed agent repository belong to the server release.
 
-Maintained proofs: `lab vm server -manifest lab/images/ubuntu-noble-amd64.json`
-and `lab server compose`, each with `-record NEW_FILE`. See
-[engineering prerequisites and scope](docs/engineering.md#server-deployment-laboratory).
+The [operations runbooks](docs/security-and-operations.md#native-single-host-installation)
+describe external database and certificate choices, offline dependencies,
+encrypted backups, signed release-feed import, recovery and retention. Use those
+custody rules, not the development fixture, for production configuration.
+Container delivery must load authenticated bundled images without registry pulls
+and preserve the same secret, migration, setup and recovery boundaries.
+
+`lab deploy` maintains the fresh-host installation, browser setup, second-device
+enrollment, backup, upgrade and fresh restore journey for Ubuntu 24.04 and RHEL 9.
+Qualification claims require its recorded evidence; see
+[verification](docs/verification.md). The earlier `lab vm server` and
+`lab server compose` lanes cover their narrower native/container boundaries, not
+the complete turnkey recovery journey.
 
 ### Install and enroll a device
 
@@ -283,19 +290,24 @@ The development fixture defaults to Keycloak to preserve the real SSO and
 
 ```sh
 go run ./cmd/devenv up -authentication local
-go run ./cmd/lindmd bootstrap-owner -config .cache/dev/server.json -username owner
+go run ./cmd/lindmd setup-code -config .cache/dev/server.json -output .cache/dev/first-run-code
 go run ./cmd/lindmd serve -config .cache/dev/server.json
 ```
 
-Trust `.cache/dev/transport-ca.crt` in the browser, open the printed enrollment URL
-and enter the separately printed one-use secret. The URL never contains the secret.
-Set the local password and register a user-verifying WebAuthn authenticator;
-password acceptance alone cannot create an administrator session. The CLI prints
-the secret only once, with its expiry and account ID. A second owner claim fails.
-Keep the secret out of logs, browser storage and shell arguments.
+Trust `.cache/dev/transport-ca.crt` in the browser, open
+`https://localhost:18444/setup` and enter the code from the mode-0600
+`.cache/dev/first-run-code` file. Choose a username and password, then register a
+user-verifying passkey. Only successful passkey registration initializes the owner
+and opens an authenticated dashboard; password acceptance alone grants no session.
+The code expires after 24 hours. Interrupted registration can restart with the
+same code, username and password. Issuing a replacement code preserves that reserved
+identity and password. Completed setup rejects every further setup code.
+Keep the code out of logs, browser storage, URLs and shell arguments.
 
-Local `dev up` starts only PostgreSQL and prints the explicit bootstrap command;
-repeating it never reissues an enrollment secret. `dev check` checks only the
+This replaces the LOCAL `bootstrap-owner -username` path. External identity binding
+still uses `bootstrap-owner` with the configured issuer and immutable subject.
+Local `dev up` starts only PostgreSQL and prints the explicit setup-code command;
+repeating it never reissues a setup code. `dev check` checks only the
 selected mode's dependencies. `init` and `up` accept `-authentication keycloak`
 (the default) or `local`; existing fixtures cannot switch modes. Version-1 fixtures
 and changed configs fail validation. Preserve their data or use the explicitly

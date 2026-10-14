@@ -207,3 +207,13 @@ sql:
               import: github.com/google/uuid
               type: UUID
               pointer: true
+  - engine: postgresql
+    schema: db/migrations
+    queries: db/queries/server
+    gen:
+      go:
+        package: serverdb
+        out: internal/server/serverdb
+        sql_package: pgx/v5
+        emit_empty_slices: true
+        omit_unused_structs: true

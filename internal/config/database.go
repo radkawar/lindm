@@ -18,7 +18,14 @@ import (
 )
 
 func (d *Document) database(path string) (*pgxpool.Config, error) {
-	connection, err := readFile(reference(d.base, path), true)
+	var connection []byte
+	var err error
+	if d.databaseURLCredential != nil {
+		connection, err = d.databaseURLCredential.read()
+	} else {
+		connection, err = readFile(reference(d.base, path), true)
+	}
+	defer clear(connection)
 	if err != nil {
 		return nil, fmt.Errorf("read database credential: %w", err)
 	}

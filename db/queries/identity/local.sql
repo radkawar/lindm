@@ -123,7 +123,21 @@ SELECT EXISTS (
 );
 
 -- name: MarkSessionSteppedUp :execrows
-UPDATE sessions SET stepped_up_at = now()
+UPDATE sessions SET stepped_up_at = now(),
+  recovery_custody_step_up_digest = COALESCE(sqlc.arg(custody_digest)::bytea, ''::bytea),
+  recovery_custody_step_up_at = CASE
+    WHEN octet_length(COALESCE(sqlc.arg(custody_digest)::bytea, ''::bytea)) = 32 THEN now()
+    ELSE NULL END
 WHERE token_hash = sqlc.arg(token_hash) AND principal_id = sqlc.arg(principal_id)
   AND kind = 'browser' AND revoked_at IS NULL
   AND idle_expires_at > now() AND absolute_expires_at > now();
+
+-- name: ConsumeRecoveryCustodyStepUp :execrows
+UPDATE sessions SET recovery_custody_step_up_digest = ''::bytea,
+  recovery_custody_step_up_at = NULL
+WHERE token_hash = sqlc.arg(token_hash) AND principal_id = sqlc.arg(principal_id)
+  AND recovery_custody_step_up_digest = sqlc.arg(custody_digest)::bytea
+  AND recovery_custody_step_up_at IS NOT NULL
+  AND kind = 'browser' AND revoked_at IS NULL
+  AND recovery_custody_step_up_at > clock_timestamp() - interval '5 minutes'
+  AND recovery_custody_step_up_at <= clock_timestamp();

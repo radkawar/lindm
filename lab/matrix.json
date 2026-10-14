@@ -1,6 +1,13 @@
 {
   "cells": [
     {
+      "name": "deploy",
+      "title": "Turnkey server deploy",
+      "capabilities": ["lifecycle"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "deploy"
+    },
+    {
       "name": "inventory",
       "title": "Inventory",
       "capabilities": ["inventory"],

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -78,6 +79,7 @@ func TestNativeProductLayoutAndPermissions(t *testing.T) {
 						t.Fatalf("server package claims operator credential/config %s: %v", path, err)
 					}
 				}
+				assertServerDatabaseCredentialUnits(t, extract)
 			}
 			// A writable executable is a security failure even if all payload bytes,
 			// package identity and checksums still match the selected product.
@@ -242,5 +244,54 @@ func TestAPTPublicationSeparatesNativeArchitectures(t *testing.T) {
 	}
 	if len(snapshot.Packages) != 2 {
 		t.Fatal("rejection snapshot omitted another architecture's signed index")
+	}
+}
+
+func assertServerDatabaseCredentialUnits(t *testing.T, root string) {
+	t.Helper()
+	for _, item := range []struct {
+		unit, command, user, config, source string
+	}{
+		{"lindmd.service", "serve", "lindmd", "/etc/lindm/server.json", "/etc/lindm/database-url"},
+		{"lindmd-migrate.service", "migrate", "lindmd-migrate", "/etc/lindm/migrate/server.json", "/etc/lindm/migrate/database-url"},
+	} {
+		data, err := os.ReadFile(filepath.Join(root, "usr/lib/systemd/system", item.unit))
+		if err != nil {
+			t.Fatal(err)
+		}
+		service := false
+		properties := make(map[string]string)
+		for line := range strings.SplitSeq(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "[") {
+				service = line == "[Service]"
+				continue
+			}
+			if service {
+				key, value, ok := strings.Cut(line, "=")
+				if ok {
+					if _, duplicate := properties[key]; duplicate {
+						t.Fatalf("%s repeats service directive %s", item.unit, key)
+					}
+					properties[key] = value
+				}
+			}
+		}
+		for key, want := range map[string]string{
+			"User": item.user, "Group": item.user,
+			"LoadCredential":        "database-url:" + item.source,
+			"ExecStart":             "/usr/bin/lindmd " + item.command + " -config " + item.config + " -database-url-credential database-url",
+			"CapabilityBoundingSet": "", "AmbientCapabilities": "", "NoNewPrivileges": "yes",
+			"MemorySwapMax": "0", "LimitCORE": "0", "ProtectSystem": "strict",
+		} {
+			if got, present := properties[key]; !present || got != want {
+				t.Errorf("%s %s = %q, want %q", item.unit, key, got, want)
+			}
+		}
+		for _, forbidden := range []string{"Environment", "EnvironmentFile", "SetCredential", "SetCredentialEncrypted"} {
+			if _, present := properties[forbidden]; present {
+				t.Errorf("%s exposes an alternate credential channel %s", item.unit, forbidden)
+			}
+		}
 	}
 }

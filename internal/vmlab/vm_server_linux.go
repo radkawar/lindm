@@ -29,23 +29,22 @@ type VMServerOptions struct{ Repository, CacheDir, WorkDir string }
 
 // VMServerResult contains no credentials, database contents or enrollment secret.
 type VMServerResult struct {
-	ImageID               string                   `json:"image_id"`
-	ImageSHA256           string                   `json:"image_sha256"`
-	SourceSHA256          string                   `json:"source_snapshot_sha256"`
-	GuestOS               []string                 `json:"guest_os"`
-	Runtime               *vmRuntimeEvidence       `json:"runtime"`
-	Builds                []*packaging.BuildResult `json:"builds"`
-	SignerFingerprint     string                   `json:"signer_fingerprint"`
-	PostgreSQL            string                   `json:"postgresql"`
-	RowsSHA256            string                   `json:"owner_device_rows_sha256"`
-	ConfigInventorySHA256 string                   `json:"config_inventory_sha256"`
-	Steps                 []string                 `json:"steps"`
+	ImageID           string                   `json:"image_id"`
+	ImageSHA256       string                   `json:"image_sha256"`
+	SourceSHA256      string                   `json:"source_snapshot_sha256"`
+	GuestOS           []string                 `json:"guest_os"`
+	Runtime           *vmRuntimeEvidence       `json:"runtime"`
+	Builds            []*packaging.BuildResult `json:"builds"`
+	SignerFingerprint string                   `json:"signer_fingerprint"`
+	PostgreSQL        string                   `json:"postgresql"`
+	RowsSHA256        string                   `json:"owner_device_rows_sha256"`
+	Steps             []string                 `json:"steps"`
 }
 
-// ServerVM qualifies installation, explicit migration, LOCAL owner bootstrap,
-// restart, signed upgrade, PostgreSQL backup/restore and retained-data purge.
-// The pending device row is a backup fixture, not enrollment evidence. WebAuthn
-// login is deliberately not claimed: the protected RPC must remain unauthorized.
+// ServerVM qualifies low-level native package/configuration boundaries,
+// explicit migration, protected setup authority, confinement, restart, direct
+// upgrade refusal and retained-data purge. It is not browser/login/enrollment
+// or encrypted recovery proof; DeployVM owns the complete real workflow.
 func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServerOptions) (result *VMServerResult, err error) {
 	if err := validateManifest(manifest); err != nil {
 		return nil, err
@@ -160,24 +159,26 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 		return nil, err
 	}
 	result.Steps = append(result.Steps, "signed-install", "explicit-migration")
-	// Never expose the one-use enrollment output to logs or the evidence document.
-	bootstrap := "runuser -u lindmd -- /usr/bin/lindmd bootstrap-owner -config /etc/lindm/server.json -username owner"
-	output, err := serverGuestCommand(ctx, vm, "local owner bootstrap", bootstrap, nil)
-	if err != nil {
+	if _, err := serverGuestCommand(ctx, vm, "prepare protected setup output directory", "install -d -o root -g root -m 0755 /var/lib/lindmd-operations; install -d -o lindmd-migrate -g lindmd-migrate -m 0700 /var/lib/lindmd-operations/setup", nil); err != nil {
 		return nil, err
 	}
-	if !bytes.Contains(output, []byte("Enrollment secret (shown once): ")) {
-		return nil, errors.New("bootstrap did not issue enrollment")
+	// Keep first-run capability out of argv, journals and the evidence document.
+	bootstrap := "runuser -u lindmd-migrate -- /usr/bin/lindmd setup-code -config /etc/lindm/migrate/server.json -output /var/lib/lindmd-operations/setup/code"
+	if _, err := serverGuestCommand(ctx, vm, "protected first-run code issuance", bootstrap, nil); err != nil {
+		return nil, err
+	}
+	if _, err := serverGuestCommand(ctx, vm, "retain setup code under root custody", "chown root:root /var/lib/lindmd-operations/setup/code /var/lib/lindmd-operations/setup", nil); err != nil {
+		return nil, err
+	}
+	if _, err := serverGuestCommand(ctx, vm, "private first-run code custody", "test \"$(stat -c %a /var/lib/lindmd-operations/setup/code)\" = 600 && test \"$(stat -c %U /var/lib/lindmd-operations/setup/code)\" = root && test \"$(wc -c < /var/lib/lindmd-operations/setup/code)\" = 44 && ! runuser -u lindmd -- test -r /var/lib/lindmd-operations/setup/code && ! runuser -u lindmd-migrate -- test -r /var/lib/lindmd-operations/setup/code", nil); err != nil {
+		return nil, err
 	}
 	rejected, err := vm.runResult(ctx, "sudo -n sh -c "+nativeQuote(bootstrap), nil, 16384, time.Minute)
 	if err != nil {
 		return nil, err
 	}
-	if rejected.ExitCode == 0 || bytes.Contains(rejected.Stdout, []byte("Enrollment secret (shown once): ")) {
-		return nil, errors.New("local bootstrap was not one-shot")
-	}
-	if _, err := serverGuestCommand(ctx, vm, "seed backup-only device", "runuser -u postgres -- psql -X -v ON_ERROR_STOP=1 -d lindm", strings.NewReader("INSERT INTO devices(id,state,enrolled_at,hostname) VALUES ('b4077c77-e5e7-4694-9f3d-97289f94c9d8','pending',now(),'backup-fixture');\n")); err != nil {
-		return nil, err
+	if rejected.ExitCode == 0 {
+		return nil, errors.New("setup issuance overwrote an existing code file")
 	}
 	if _, err := serverGuestCommand(ctx, vm, "start service", "systemctl enable --now lindmd.service", nil); err != nil {
 		return nil, err
@@ -185,7 +186,7 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 	if err := probeServerGuest(ctx, vm); err != nil {
 		return nil, err
 	}
-	result.Steps = append(result.Steps, "local-bootstrap-one-shot", "tls-health-console-auth-options", "protected-rpc-401", "runtime-no-ddl-no-migrator-access")
+	result.Steps = append(result.Steps, "protected-setup-code-issuance", "tls-health-console-auth-options", "protected-rpc-401", "runtime-no-ddl-no-migrator-access")
 	before, err := serverRowsDigest(ctx, vm)
 	if err != nil {
 		return nil, err
@@ -197,13 +198,15 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 	if err := probeServerGuest(ctx, vm); err != nil {
 		return nil, err
 	}
-	if err := install("0.1.1"); err != nil {
+	rejectedUpgrade, err := vm.runResult(ctx, "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote("apt-get -q -y --no-install-recommends install lindmd=0.1.1"), nil, 1<<20, 10*time.Minute)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := serverGuestCommand(ctx, vm, "upgrade restart", "systemctl start lindmd-migrate.service && systemctl restart lindmd.service", nil); err != nil {
-		return nil, err
+	marker := []byte("lindmd upgrade requires the signed bundle installer and encrypted backup.")
+	if rejectedUpgrade.ExitCode == 0 || (!bytes.Contains(rejectedUpgrade.Stdout, marker) && !bytes.Contains(rejectedUpgrade.Stderr, marker)) {
+		return nil, errors.New("direct native server upgrade did not specifically require signed release installer authorization")
 	}
-	if err := probeServerGuest(ctx, vm); err != nil {
+	if _, err := serverGuestCommand(ctx, vm, "rejected upgrade retains old binary", "test \"$(/usr/bin/lindmd version)\" = 0.1.0", nil); err != nil {
 		return nil, err
 	}
 	after, err := serverRowsDigest(ctx, vm)
@@ -211,35 +214,15 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 		return nil, err
 	}
 	if before != after {
-		return nil, errors.New("restart/upgrade changed owner or device rows")
+		return nil, errors.New("restart or denied native upgrade changed owner/device rows")
 	}
-	result.Steps = append(result.Steps, "restart-retained-rows", "signed-upgrade-retained-rows")
-	inventory, err := serverGuestCommand(ctx, vm, "backup database and protected files", serverBackupCommand, nil)
-	if err != nil {
-		return nil, err
-	}
-	digest := sha256.Sum256(inventory)
-	result.ConfigInventorySHA256 = hex.EncodeToString(digest[:])
-	if _, err := serverGuestCommand(ctx, vm, "destroy and restore owned database", serverRestoreCommand, nil); err != nil {
-		return nil, err
-	}
-	if err := probeServerGuest(ctx, vm); err != nil {
-		return nil, err
-	}
-	restored, err := serverRowsDigest(ctx, vm)
-	if err != nil {
-		return nil, err
-	}
-	if restored != before {
-		return nil, errors.New("restored owner/device rows differ")
-	}
-	result.Steps = append(result.Steps, "pg-dump-config-inventory", "destroy-database", "pg-restore-identical-rows")
+	result.Steps = append(result.Steps, "restart-retained-rows", "direct-native-upgrade-denied-without-release-authorization")
 	version, err := serverGuestCommand(ctx, vm, "record PostgreSQL version", "runuser -u postgres -- psql -X -At -c 'SHOW server_version'", nil)
 	if err != nil {
 		return nil, err
 	}
 	result.PostgreSQL = strings.TrimSpace(string(version))
-	if _, err := serverGuestCommand(ctx, vm, "purge retains data", "apt-get -q -y purge lindmd && test ! -e /usr/bin/lindmd && test -f /etc/lindm/server.json && test -f /etc/lindm/server.key && cd /etc/lindm && sha256sum --check --status /var/backups/lindm/config.sha256", nil); err != nil {
+	if _, err := serverGuestCommand(ctx, vm, "purge retains data", "apt-get -q -y purge lindmd && test ! -e /usr/bin/lindmd && test -f /etc/lindm/server.json && test -f /etc/lindm/server.key", nil); err != nil {
 		return nil, err
 	}
 	retained, err := serverRowsDigest(ctx, vm)
@@ -253,7 +236,11 @@ func ServerVM(ctx context.Context, manifest *labv1.ImageManifest, options VMServ
 	return result, nil
 }
 
-func serverGuestCommand(ctx context.Context, vm *guestVM, step, command string, input io.Reader) ([]byte, error) {
+func serverGuestCommand(ctx context.Context, vm *guestVM, step, command string, input io.Reader) (data []byte, resultErr error) {
+	if observer := vm.serverCommandObserver; observer != nil {
+		started := time.Now().UTC()
+		defer func() { observer(step, started, time.Now().UTC(), resultErr == nil) }()
+	}
 	output, err := vm.runResult(ctx, "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), input, 1<<20, 10*time.Minute)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", step, err)
@@ -265,37 +252,14 @@ func serverGuestCommand(ctx context.Context, vm *guestVM, step, command string, 
 }
 
 func serverRowsDigest(ctx context.Context, vm *guestVM) (string, error) {
-	const query = "SELECT row_to_json(t) FROM (SELECT * FROM principals ORDER BY id) t; SELECT row_to_json(t) FROM (SELECT * FROM local_accounts ORDER BY id) t; SELECT row_to_json(t) FROM (SELECT * FROM devices ORDER BY id) t;"
-	rows, err := serverGuestCommand(ctx, vm, "compare owner/device rows", "runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d lindm", strings.NewReader(query))
+	const query = "SELECT row_to_json(t) FROM (SELECT * FROM first_run_setup ORDER BY id) t; SELECT row_to_json(t) FROM (SELECT * FROM principals ORDER BY id) t; SELECT row_to_json(t) FROM (SELECT * FROM local_accounts ORDER BY id) t; SELECT row_to_json(t) FROM (SELECT * FROM devices ORDER BY id) t;"
+	rows, err := serverGuestCommand(ctx, vm, "compare setup/account/device rows", "runuser -u postgres -- psql -X -At -v ON_ERROR_STOP=1 -d lindm", strings.NewReader(query))
 	if err != nil {
 		return "", err
 	}
-	if !bytes.Contains(rows, []byte("backup-fixture")) || !bytes.Contains(rows, []byte("owner")) {
-		return "", errors.New("backup comparison requires nonempty owner and device fixtures")
+	if !bytes.Contains(rows, []byte("backup-fixture")) || !bytes.Contains(rows, []byte("code_hash")) {
+		return "", errors.New("backup comparison requires nonempty protected setup and device fixtures")
 	}
 	digest := sha256.Sum256(rows)
 	return hex.EncodeToString(digest[:]), nil
 }
-
-const serverBackupCommand = `systemctl stop lindmd.service
-install -d -m 0700 /var/backups/lindm
-runuser -u postgres -- pg_dump -Fc lindm > /var/backups/lindm/database.dump
-chmod 0600 /var/backups/lindm/database.dump
-tar -C /etc -cpf /var/backups/lindm/config.tar lindm
-chmod 0600 /var/backups/lindm/config.tar
-cd /etc/lindm
-find . -type f -exec sha256sum {} + | sort > /var/backups/lindm/config.sha256
-find . -printf '%P %u %g %m\n' | sort > /var/backups/lindm/config.inventory
-cat /var/backups/lindm/config.inventory
-`
-
-const serverRestoreCommand = `runuser -u postgres -- dropdb lindm
-runuser -u postgres -- createdb -O lindm_migrator lindm
-cat /var/backups/lindm/database.dump | runuser -u postgres -- pg_restore --exit-on-error --dbname=lindm
-rm -rf /etc/lindm
-tar -C /etc -xpf /var/backups/lindm/config.tar
-cd /etc/lindm
-sha256sum --check --status /var/backups/lindm/config.sha256
-runuser -u lindmd -- /usr/bin/lindmd check-config -config /etc/lindm/server.json
-systemctl start lindmd.service
-`

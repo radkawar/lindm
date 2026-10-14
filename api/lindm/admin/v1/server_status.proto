@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// UNKNOWN is missing evidence, FAILED is an observed failure, ATTENTION is
+// expiring or stale evidence. OK confirms only the described check.
+enum ServerStatusState {
+  SERVER_STATUS_STATE_UNSPECIFIED = 0;
+  SERVER_STATUS_STATE_UNKNOWN = 1;
+  SERVER_STATUS_STATE_OK = 2;
+  SERVER_STATUS_STATE_ATTENTION = 3;
+  SERVER_STATUS_STATE_FAILED = 4;
+  SERVER_STATUS_STATE_INACTIVE = 5;
+}
+
+message GetServerStatusRequest {}
+
+message ServerStatusCheck {
+  // Closed server-owned component name, never a filesystem path or user input.
+  string component = 1;
+  ServerStatusState state = 2;
+  string summary = 3;
+  string next_action = 4;
+  google.protobuf.Timestamp observed_at = 5;
+  // Original evidence time. A refresh never advances this timestamp.
+  google.protobuf.Timestamp evidence_at = 6;
+  google.protobuf.Timestamp expires_at = 7;
+  string detail = 8;
+}
+
+message GetServerStatusResponse {
+  string version = 1;
+  google.protobuf.Timestamp observed_at = 2;
+  repeated ServerStatusCheck checks = 3;
+  RecoveryKeyCustody recovery_key_custody = 4;
+}
+
+// CONFIRMED is an owner's attestation, never proof of external storage or removal.
+enum RecoveryKeyCustodyState {
+  RECOVERY_KEY_CUSTODY_STATE_UNSPECIFIED = 0;
+  RECOVERY_KEY_CUSTODY_STATE_UNKNOWN = 1;
+  RECOVERY_KEY_CUSTODY_STATE_PENDING = 2;
+  RECOVERY_KEY_CUSTODY_STATE_CONFIRMED = 3;
+  RECOVERY_KEY_CUSTODY_STATE_EXTERNAL_RECIPIENTS = 4;
+}
+
+message RecoveryKeyCustody {
+  RecoveryKeyCustodyState state = 1;
+  bool can_confirm = 2;
+  // Digest of the canonical required-export set, not a file checksum.
+  string confirmation_digest = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+  repeated RecoveryKeyCustodyExport exports = 5;
+  google.protobuf.Timestamp recorded_at = 6;
+}
+
+enum RecoveryKeyCustodyExportKind {
+  RECOVERY_KEY_CUSTODY_EXPORT_KIND_UNSPECIFIED = 0;
+  RECOVERY_KEY_CUSTODY_EXPORT_KIND_CANONICAL_AUTHORITY = 1;
+  RECOVERY_KEY_CUSTODY_EXPORT_KIND_FRESH_DATABASE = 2;
+}
+
+message RecoveryKeyCustodyExport {
+  RecoveryKeyCustodyExportKind kind = 1;
+  string path = 2;
+  string sha256 = 3;
+  // Presence describes ciphertext only, not where recovery keys exist.
+  bool local_present = 4;
+}
+
+message ConfirmRecoveryKeyCustodyRequest {
+  string expected_confirmation_digest = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  bool confirm_off_server_custody = 2 [(buf.validate.field).bool.const = true];
+}
+
+message ConfirmRecoveryKeyCustodyResponse {
+  RecoveryKeyCustody custody = 1;
+}

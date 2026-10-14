@@ -51,6 +51,8 @@ type Request struct {
 	PackageSigner                         packaging.SigningKey
 	AttestationSigner                     AttestationKey
 	OCICABundle, OCICASHA256              string
+	Installer                             *InstallerInputs
+	ServerNotice                          *releasev1.ServerReleaseNotice
 }
 
 // exportArtifact copies one built package, and an Arch package's detached
@@ -164,23 +166,8 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 	// Native signing may vary between builds. Only after independently built
 	// unsigned agent archives agree can either server consume canonical bytes.
 	bundle := filepath.Join(work, "agent-repository")
-	if err := os.Mkdir(bundle, 0700); err != nil {
-		return nil, err
-	}
-	manifest, err = exportRelease(ctx, bundle, request, signer, sourceDigest, first, second, "", filepath.Join(source, "internal", "packaging", "assets"))
+	manifest, err = exportCanonicalAgentRepository(ctx, bundle, &request, signer, sourceDigest, first, second, filepath.Join(source, "internal", "packaging", "assets"))
 	if err != nil {
-		return nil, err
-	}
-	if err := publishAgentRepositories(ctx, bundle, request, manifest); err != nil {
-		return nil, err
-	}
-	if err := normalizeAgentRepository(bundle); err != nil {
-		return nil, err
-	}
-	if err := verifyRepositoryPayloads(bundle, manifest); err != nil {
-		return nil, err
-	}
-	if _, err := Verify(ctx, bundle, filepath.Join(bundle, "attestation.pub"), signer.id); err != nil {
 		return nil, err
 	}
 	exported := bundle
@@ -205,6 +192,14 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 		if err != nil {
 			return nil, err
 		}
+		if request.Installer != nil {
+			if err := ExportInstaller(ctx, source, work, exported, request, *request.Installer); err != nil {
+				return nil, err
+			}
+			if err := VerifyInstaller(ctx, exported, filepath.Join(exported, "attestation.pub"), signer.id); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if err := syncDirectory(exported); err != nil {
 		return nil, err
@@ -213,6 +208,29 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 		return nil, err
 	}
 	if err := syncDirectory(filepath.Dir(output)); err != nil {
+		return nil, err
+	}
+	return manifest, nil
+}
+
+func exportCanonicalAgentRepository(ctx context.Context, bundle string, request *Request, signer *releaseSigner, sourceDigest string, first, second *buildOutput, assetsDirectory string) (*releasev1.ReleaseManifest, error) {
+	if err := os.Mkdir(bundle, 0700); err != nil {
+		return nil, err
+	}
+	manifest, err := exportRelease(ctx, bundle, *request, signer, sourceDigest, first, second, "", assetsDirectory)
+	if err != nil {
+		return nil, err
+	}
+	if err := publishAgentRepositories(ctx, bundle, *request, manifest); err != nil {
+		return nil, err
+	}
+	if err := normalizeAgentRepository(bundle); err != nil {
+		return nil, err
+	}
+	if err := verifyRepositoryPayloads(bundle, manifest); err != nil {
+		return nil, err
+	}
+	if _, err := Verify(ctx, bundle, filepath.Join(bundle, "attestation.pub"), signer.id); err != nil {
 		return nil, err
 	}
 	return manifest, nil

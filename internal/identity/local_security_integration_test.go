@@ -21,7 +21,7 @@ import (
 
 func TestBreakGlassPolicyDenialsDoNotLockCredentials(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "emergency")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "emergency")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestBreakGlassPolicyDenialsDoNotLockCredentials(t *testing.T) {
 
 func TestLocalLockExpiryStartsFiveAttemptWindow(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestLocalLockExpiryStartsFiveAttemptWindow(t *testing.T) {
 
 func TestLocalSessionUsesDatabaseAuthorityDespiteProcessClockSkew(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestAuthenticationModeStartupPreservesOwnerLogin(t *testing.T) {
 	})
 	t.Run("local owner needs enrolled emergency designation", func(t *testing.T) {
 		s, ctx, pool := localIntegrationService(t)
-		enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+		enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 		if err != nil {
 			t.Fatal(err)
 		}

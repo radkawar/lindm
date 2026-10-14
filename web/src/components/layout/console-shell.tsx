@@ -120,7 +120,9 @@ export function ConsoleShell({
         : currentPage?.to === "/settings"
           ? pathname.endsWith("/assistant-access")
             ? "Assistant access"
-            : "Device capabilities"
+            : pathname.endsWith("/status")
+              ? "Server status"
+              : "Device capabilities"
           : pathname.endsWith("/new")
             ? "Create profile"
             : "Profile details";

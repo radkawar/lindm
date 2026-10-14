@@ -138,6 +138,7 @@ const (
 	LaneUnattended LabLane = "unattended"
 	LaneServices   LabLane = "services"
 	LaneServer     LabLane = "server"
+	LaneDeploy     LabLane = "deploy"
 	LaneAdvisories LabLane = "advisories"
 	// LaneAcceptance is the stock-image console acceptance lane and
 	// LaneEncryptedAcceptance its vendor-installer encrypted variant.
@@ -154,7 +155,7 @@ const (
 
 // LabLanes lists every lane whose recipes are tracked per release; a lane
 // outside this list needs no per-release recipe.
-var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole,
+var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneDeploy, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole,
 	LaneProvisionCloudInit, LaneProvisionAutoinstall, LaneProvisionKickstart, LaneProvisionAutoYaST}
 
 // ProvisionLane is the lab lane qualifying a provisioning format.
@@ -256,6 +257,9 @@ func (r *Release) LabLaneOn(l LabLane, architecture string) error {
 // LaneGateOn returns the registry's reason the lane cannot qualify the release
 // on the architecture (either spelling), or "" when it is not gated there.
 func (r *Release) LaneGateOn(l LabLane, architecture string) string {
+	if l == LaneDeploy && (kernelArchitecture(architecture) != "x86_64" || (r.Key != "ubuntu-24.04" && r.Key != "rhel-9")) {
+		return "The turnkey native server installer supports Ubuntu 24.04 and RHEL 9 on x86_64 only; device platform support is not server installation support."
+	}
 	gate, ok := r.Lab.LaneGates[l]
 	if !ok || (len(gate.Architectures) != 0 && !slices.Contains(gate.Architectures, kernelArchitecture(architecture))) {
 		return ""

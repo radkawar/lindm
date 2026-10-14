@@ -49,10 +49,18 @@ async function post(path: string, body: JsonValue, csrfToken: string, signal: Ab
 
 // Re-verifies the signed-in local account on this same session: password,
 // then a passkey assertion. Resolves once the server records the verification.
-export async function stepUp(password: string, csrfToken: string, signal: AbortSignal) {
+export async function stepUp(
+  password: string,
+  csrfToken: string,
+  signal: AbortSignal,
+  recoveryCustodyConfirmationDigest?: string,
+) {
   const begin = await post(
     "/auth/local/step-up/begin",
-    toJson(LocalStepUpRequestSchema, create(LocalStepUpRequestSchema, { password })),
+    toJson(
+      LocalStepUpRequestSchema,
+      create(LocalStepUpRequestSchema, { password, recoveryCustodyConfirmationDigest }),
+    ),
     csrfToken,
     signal,
   );

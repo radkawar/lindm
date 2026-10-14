@@ -38,6 +38,11 @@ message ServerConfig {
     expression: "!has(this.execution_bootstrap) || has(this.device_public_url)"
   };
   option (buf.validate.message).cel = {
+    id: "execution_bootstrap.initial_owner"
+    message: "initial execution delegation requires local authentication"
+    expression: "!has(this.execution_bootstrap) || !has(this.execution_bootstrap.initial_delegation_file) || has(this.authentication.local)"
+  };
+  option (buf.validate.message).cel = {
     id: "authorization.source"
     message: "directory mappings must match the selected authority source"
     expression: "!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)"
@@ -199,6 +204,9 @@ message EscrowConfig {
 message ExecutionBootstrapConfig {
   string root_file = 1 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   string bootstrap_file = 2 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
+  // Strict UpdateExecutionTrustRequest JSON. Its signed update is admitted only
+  // in the first owner's verified credential transaction, never at startup.
+  optional string initial_delegation_file = 3 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
 }
 
 // ExecutionSigningConfig names protected unencrypted PKCS#8 Ed25519 files for

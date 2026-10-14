@@ -14,6 +14,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	authv1 "lindm/gen/lindm/auth/v1"
@@ -40,6 +41,9 @@ type Config struct {
 	PublicURL                   string
 	Policy                      *authv1.AuthorizationPolicy
 	HTTPClient                  *http.Client
+	// InitialOwnerExecution admits the configured signed initial delegation in
+	// the same transaction as first-run owner/credential/session completion.
+	InitialOwnerExecution func(context.Context, pgx.Tx, uuid.UUID) error
 }
 
 // Principal is the authenticated admin stored in the request context.

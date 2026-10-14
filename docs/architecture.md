@@ -58,13 +58,48 @@ contract and tests; it is not the default topology. HTTP CONNECT passthrough pro
 are supported without weakening device authentication. Public bootstrap RPC is
 separate from the mTLS-required device service.
 
-Native server delivery and OCI use the same embedded-console executable and strict
-protobuf configuration. Native runtime and explicit migration units have separate
-unprivileged identities; OCI mounts the migration credential only into its explicit
-migration service. Neither package lifecycle hooks nor `serve` run DDL or bootstrap
-an owner. Configuration/key ownership is checked at resource loading, in addition
-to systemd/container sandboxing. PostgreSQL is external to the application package;
-purge retains operator configuration, keys and database. See the
+Native server delivery and OCI build artifacts use the same embedded-console
+executable and strict protobuf configuration. The supported turnkey installation
+path is the independently authenticated private native bundle on Ubuntu 24.04 or
+RHEL 9 x86-64. A root installer verifies release authority before transactions,
+installs dependencies through the host's normally authenticated distribution
+repositories, provisions a private PostgreSQL cluster and local PKI, invokes
+explicit migration/setup commands, and checks verified HTTPS readiness.
+Optional signed per-platform dependency add-ons enable `--airgap`; an absent
+platform add-on fails before mutation and never falls back to network access.
+Runtime and migrator remain distinct unprivileged identities; only the migrator
+owns database/schema
+DDL authority. Runtime cannot mutate migration, compatibility or restore-hold
+metadata. A successful first-owner WebAuthn transaction, not mere startup, admits
+the preconfigured quorum-signed initial online execution delegation.
+Persistent database URL credentials remain root:root mode 0600. Native units use
+systemd `LoadCredential=` to give each role only its ephemeral URL credential;
+checked selection never changes the normalized configuration or falls back to
+the persistent secret. Restore retains fresh target database identity and
+republishes these secrets to the same root-owned paths.
+Generated execution-quorum and transport/database CA private authority is sealed
+from locked, non-dumpable process memory directly into individual age ciphertexts;
+no plaintext offline private key is persisted. Distinct supplied recipients are
+separate from the backup recipient. Missing custodian identities are generated in
+memory and exported only inside a passphrase-encrypted, deployment/origin-bound
+ciphertext bundle. One such export concentrates custody rather than proving
+independent humans. Only ciphertext status hashing is runtime-readable; root
+transfer and owner step-up attestation have no browser artifact-download route.
+Encrypted server backups carry the inner ciphertexts, so a backup key alone
+cannot recover execution-quorum or generated CA private authority.
+
+Neither package lifecycle hooks nor `serve` run DDL or bootstrap an owner. Native
+upgrade pre-hooks reject transactions outside the authenticated installer's
+one-use process-bound authorization after successful encrypted backup/preflight.
+Reviewed expands preserve an online old runtime only within trusted exact-set
+compatibility policy; contracts fence traffic and below-floor rollback restores a
+protected backup rather than running Down. Configuration/key ownership remains
+checked at resource loading in addition to systemd sandboxing. PostgreSQL is
+external to the application package and purge retains operator keys/data/accounts.
+The existing Compose assets remain narrower laboratory topology, not equal-guarantee
+turnkey container delivery: no bundled independently signed database image,
+automatic protected PKI/database setup or protected native upgrade/restore gate is
+provided there. Public registry pulls are not an air-gap fallback. See the
 [installation and recovery runbooks](security-and-operations.md#native-single-host-installation).
 
 ## 2. API and compatibility
@@ -104,6 +139,39 @@ interfaces; do not force external standards into proprietary RPC envelopes.
 - Support current and previous two released minor agent series for at least 90 days.
   Deprecated compatibility has an announced end date. Unsupported agents may obtain
   a verified update but cannot receive plans they cannot safely execute.
+
+### Server schema compatibility
+
+`serve` never runs DDL. `lindmd schema-check -config MIGRATION_CONFIG` returns
+non-secret JSON: `compatible`, `online`, `current`, `target`, `floor` and `pending`.
+The command uses the checked migration credential file and a bounded database
+connection, not runtime keys. A fresh database has pending migrations and requires
+explicit migration before serving.
+
+The first schema-compatibility migration is a fenced cutover. Thereafter the
+migrator-owned `lindm_schema_compatibility` row records the minimum runtime schema
+and the exact applied migration set. Runtime credentials have SELECT only on this
+table and on Goose history; revoke default DML grants after every migration.
+Startup requires every embedded migration. A newer schema is accepted only if
+its recorded migration set exactly matches actual history and this binary's
+schema is at or above the recorded minimum. Missing migrations, modified history,
+an absent compatibility floor or a contract beyond that floor fail closed.
+
+A reviewed expand migration declares
+`-- lindm:online-compatible minimum-runtime=VERSION` and updates the compatibility
+record in the same transaction as its DDL. The declared floor must name an applied
+schema supported by the running release. Adding the comment alone is not a safety
+review: old readers, writers, workers and constraints must remain compatible.
+Use bounded lock acquisition and avoid blocking table rewrites. A contract
+migration has no online marker, advances the recorded floor to its own schema and
+requires fenced application. Preserve earlier migration files without modification.
+
+Package rollback never runs Goose Down. Check the previous package against the
+live database before restart. It can serve only within the recorded compatibility
+window. Beyond that window, restore the encrypted pre-upgrade database and files
+with ingress fenced, and complete the restore security reconciliation before
+reopening service. A pre-policy binary remains exact-schema-only; adding this
+policy cannot retroactively make it safe on newer schemas.
 
 ### Service responsibilities
 
@@ -1811,6 +1879,24 @@ Live snapshots bind their captured revision to retained admission/root evidence,
 including the root-only initial state; partial state restoration cannot lower
 admission floors. Current public state remains readable after ordinary expiry.
 
+For turnkey LOCAL setup, `execution_bootstrap.initial_delegation_file` optionally
+names strict `UpdateExecutionTrustRequest` JSON loaded through the checked owned
+file reader. Loading this public signed request never admits authority. After the
+first owner's password and user-verifying passkey ceremony, the identity service
+invokes the authority store under its principal fence in the same transaction as
+owner binding, credential storage, setup-code consumption and session creation.
+Signature, expiry, deployment, root-transition, rollback and key-separation
+checks remain those of ordinary quorum-authorized admission. Any rejection rolls
+back setup; there is no unsigned installation exception. The server captures the
+request once and never publishes it as a private-key resource. The optional field
+requires LOCAL authentication and does not replace external-identity owner
+bootstrap or later authorized trust rotations.
+Only the serving control plane arms this hook, and only while its verified store
+is root-only. Explicit external-owner bootstrap never arms it. `ApplyInitial`
+rechecks the authority row under the mutation lock and refuses any replay or
+successor after the first delegation. Later rotations remain on the normal
+freshly authorized administrative path.
+
 The agent's independent management loop fetches signed authority over eligible
 device/session-authenticated RPC, then submits it to the protected executor.
 Delivery hints and returned server counters are not authenticated applied/compliance
@@ -2238,6 +2324,68 @@ atomically publish the immutable digest, then reference it transactionally. Neve
 publish a partial object. Garbage collection has a grace period and cannot remove
 referenced release, recovery, legal-hold or restore objects. Do not store multi-GB
 packages in PostgreSQL or read them into a whole-memory byte slice.
+
+### Operational server status
+
+`internal/server` owns bounded per-replica operational sampling, immutable
+evidence snapshots and safe Prometheus projections. `GetServerStatus` remains
+on the single AdminService and uses unrestricted `integrations.manage` at entry
+and inside the existing fresh authorization transaction fence. The console
+`/settings/status` separates missing, failed, expiring and inactive checks;
+query failures retain their error instead of manufacturing healthy zeros.
+
+The monitor reuses checked runtime/configuration resources, installation readiness
+and the privileged backup provider's redacted completion record. It never reloads
+private keys, changes database ownership or grants runtime DDL. The job supervisor
+reports local loop lifetime, while persisted delivery/report backlog remains
+separate evidence; waiting for exclusive leadership never proves a peer is running.
+One-minute sampling and original evidence timestamps bound refresh semantics.
+Backup records require current deployment/origin/configuration binding before any
+completion or failure evidence enters this site's status. Root custody alone does
+not establish site identity; an unrelated or legacy unbound record remains unknown
+and contributes no foreign completion timestamp.
+The separate `server_release_feed` check consumes the privileged provider's
+authenticated offline release comparison and notice expiry. It never substitutes
+vendor advisory feeds or agent TUF for server release discovery. Missing imports,
+missing notice freshness and a comparison against an older installed binary remain
+unknown rather than globally up-to-date. Security-update availability names the
+upgrade decision without executing an upgrade.
+
+`GetServerStatus` separately reads the current protected recovery-custody creation
+record. Its pending owner task cannot become a healthy storage claim: only a
+durable attestation keyed by deployment and canonical required-export digest produces
+**Owner confirmation recorded**. Config/origin mismatch, unreadable metadata and
+absence remain unknown; externally supplied recipients require an explicit
+privileged record. The runtime never writes that record or serves an export.
+
+`ConfirmRecoveryKeyCustody` requires the initialized deployment owner's exact
+principal, pinned owner state, fresh unrestricted execution-trust authorization,
+and a new password-plus-UV passkey step-up for the canonical required-export set
+digest. This digest binds deployment/origins/configuration plus each ordered
+export's purpose, path and ciphertext SHA-256; it is not a file checksum.
+Source server identities and freshly generated target database identities remain
+separate required exports after restore, each with its own passphrase. The
+existing private session ceremony persists the 32-byte target and
+an independent scoped timestamp only after verification; sign-in, setup and
+generic step-up cannot supply it. Policy/principal/session fences, scoped-stamp
+consumption, attestation and its audit/outbox effect share the mutation transaction.
+Older attestations cannot clear added or replaced exports. This records an owner's
+statement, not machine proof of off-host storage or key removal.
+
+`server_status_alerts` stores the last notified state/time per opaque
+replica/component pair. Its conditional upsert and audit insert share one SQL
+statement and the existing integration outbox transaction. State changes and
+six-hour degradation reminders survive process restarts, and initial successful
+checks emit no recovery notification. Delivery payloads preserve the existing
+secret-free allowlist; no general telemetry collector or new transport is added.
+Distinct imported server security/release notices also change a stable notification
+fingerprint, so an existing attention state cannot conceal a new notice until its
+next six-hour reminder. The fingerprint stays internal; polling timestamps never
+change it and no secret/user data becomes an outbound label.
+Liveness/readiness remain minimal HTTP responses. Prometheus exposes only fixed
+component names and numeric states/timestamps, not operator or configuration data.
+The operational thresholds and limitations are in the
+[server checks runbook](security-and-operations.md#server-checks-readiness-and-alerts).
 
 ### Distro advisory findings
 

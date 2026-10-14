@@ -1,0 +1,13 @@
+[Unit]
+Description=Schedule Lindm encrypted server backups
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=30s
+RandomizedDelaySec=30s
+Persistent=true
+Unit=lindmd-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -14,13 +14,16 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"filippo.io/age"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/theupdateframework/go-tuf/v2/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -43,6 +46,8 @@ type ownerFixture struct {
 	plan        ed25519.PrivateKey
 	start       ed25519.PrivateKey
 	args        []string
+	identity    *age.X25519Identity
+	passphrase  []byte
 }
 
 func ownerTestKey(seed byte) ed25519.PrivateKey {
@@ -150,22 +155,103 @@ func newOwnerFixture(t *testing.T) ownerFixture {
 	ownerWrite(t, filepath.Join(f.dir, "bootstrap.dsse"), bootstrapEnvelope)
 	ownerWrite(t, filepath.Join(f.dir, "declaration.json"), ownerJSON(t, f.declaration))
 	f.args = []string{"delegation", "sign", "-root", filepath.Join(f.dir, "root.json"), "-bootstrap", filepath.Join(f.dir, "bootstrap.dsse"), "-declaration", filepath.Join(f.dir, "declaration.json"), "-previous-version", "7", "-minimum-recovery-epoch", "3", "-out", filepath.Join(f.dir, "delegation.dsse")}
+	f.prepareCustody(t)
 	for i, key := range keys {
-		der, err := x509.MarshalPKCS8PrivateKey(key)
-		if err != nil {
-			t.Fatal(err)
-		}
-		path := filepath.Join(f.dir, fmt.Sprintf("owner-%d.pem", i))
-		ownerWrite(t, path, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
-		f.args = append(f.args, "-signer", path)
+		path := filepath.Join(f.dir, fmt.Sprintf("owner-%d.age", i))
+		f.writeCustodyKey(t, path, key)
+		f.args = append(f.args, "-signer-custody", path)
 	}
 	return f
+}
+
+func ownerEncrypt(t *testing.T, path string, plaintext []byte, recipient age.Recipient) {
+	t.Helper()
+	var ciphertext bytes.Buffer
+	writer, err := age.Encrypt(&ciphertext, recipient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writer.Write(plaintext); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ownerWrite(t, path, ciphertext.Bytes())
+}
+
+func (f *ownerFixture) prepareCustody(t *testing.T) {
+	t.Helper()
+	var err error
+	f.identity, err = age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.passphrase = []byte("known development fixture identity passphrase")
+	recipient, err := age.NewScryptRecipient(string(f.passphrase))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// These nonsecret fixture keys use the real age format with a smaller KDF;
+	// production generated custody retains age's maintained default work factor.
+	recipient.SetWorkFactor(10)
+	plaintext := []byte(f.identity.String() + "\n")
+	defer clear(plaintext)
+	path := filepath.Join(f.dir, "custodian-identity.age")
+	ownerEncrypt(t, path, plaintext, recipient)
+	f.args = append(f.args, "-custodian-identity-file", path, "-custodian-identity-passphrase-fd", "0")
+	t.Cleanup(func() { clear(f.passphrase) })
+}
+
+func (f ownerFixture) writeCustodyKey(t *testing.T, path string, key ed25519.PrivateKey) {
+	t.Helper()
+	der, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(der)
+	plaintext := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	defer clear(plaintext)
+	ownerEncrypt(t, path, plaintext, f.identity.Recipient())
+}
+
+// invoke exercises the real parser, encrypted custody, signing, verifier and
+// publication stages. The executable's process-wide memory admission is proved
+// by the maintained native deploy lane, not replaced with a unit-test no-op.
+func (f ownerFixture) invoke(t *testing.T, stdout *bytes.Buffer) error {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := reader.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	_, writeErr := writer.Write(f.passphrase)
+	_, newlineErr := io.WriteString(writer, "\n")
+	closeErr := writer.Close()
+	if err := errors.Join(writeErr, newlineErr, closeErr); err != nil {
+		t.Fatal(err)
+	}
+	args := append([]string(nil), f.args...)
+	for i, argument := range args {
+		if argument == "-custodian-identity-passphrase-fd" {
+			args[i+1] = strconv.Itoa(int(reader.Fd()))
+		}
+	}
+	input, err := parseOwnerDelegation(args)
+	if err != nil {
+		return err
+	}
+	return signOwnerDelegation(t.Context(), &input, stdout, func() time.Time { return f.now })
 }
 
 func (f ownerFixture) run(t *testing.T) ([]byte, string) {
 	t.Helper()
 	var out bytes.Buffer
-	if err := runOwnerDelegation(t.Context(), f.args, &out, func() time.Time { return f.now }); err != nil {
+	if err := f.invoke(t, &out); err != nil {
 		t.Fatal(err)
 	}
 	envelope, err := os.ReadFile(filepath.Join(f.dir, "delegation.dsse"))
@@ -211,7 +297,7 @@ func TestOwnerDelegationProductionVerifier(t *testing.T) {
 	}
 	// A failed second publication cannot replace an already signed authority.
 	var second bytes.Buffer
-	if err := runOwnerDelegation(t.Context(), f.args, &second, func() time.Time { return f.now }); err == nil {
+	if err := f.invoke(t, &second); err == nil {
 		t.Fatal("replaced existing signed output")
 	}
 	after, err := os.ReadFile(filepath.Join(f.dir, "delegation.dsse"))
@@ -302,7 +388,7 @@ func TestOwnerDelegationRejectsInvalidAuthority(t *testing.T) {
 			tc.change(&f)
 			ownerWrite(t, filepath.Join(f.dir, "declaration.json"), ownerJSON(t, f.declaration))
 			var out bytes.Buffer
-			if err := runOwnerDelegation(t.Context(), f.args, &out, func() time.Time { return f.now }); err == nil {
+			if err := f.invoke(t, &out); err == nil {
 				t.Fatal("invalid authority was signed and published")
 			}
 			if out.Len() != 0 {
@@ -316,10 +402,10 @@ func TestOwnerDelegationRejectsInvalidAuthority(t *testing.T) {
 }
 
 func TestOwnerDelegationPrivateKeySafety(t *testing.T) {
-	for _, kind := range []string{"world readable", "symlink", "hardlink", "malformed", "extra PEM", "nonroot signer", "unknown declaration field", "malformed flag"} {
+	for _, kind := range []string{"world readable", "symlink", "hardlink", "malformed", "extra ciphertext", "nonroot signer", "unknown declaration field", "malformed flag"} {
 		t.Run(kind, func(t *testing.T) {
 			f := newOwnerFixture(t)
-			path := filepath.Join(f.dir, "owner-0.pem")
+			path := filepath.Join(f.dir, "owner-0.age")
 			secret, err := os.ReadFile(path)
 			if err != nil {
 				t.Fatal(err)
@@ -330,7 +416,7 @@ func TestOwnerDelegationPrivateKeySafety(t *testing.T) {
 					t.Fatal(err)
 				}
 			case "symlink", "hardlink":
-				alias := filepath.Join(f.dir, "alias.pem")
+				alias := filepath.Join(f.dir, "alias.age")
 				if kind == "symlink" {
 					err = os.Symlink(path, alias)
 				} else {
@@ -342,21 +428,17 @@ func TestOwnerDelegationPrivateKeySafety(t *testing.T) {
 				f.args[len(f.args)-3] = alias
 			case "malformed":
 				ownerWrite(t, path, append([]byte("private-key-material-do-not-log\n"), secret...))
-			case "extra PEM":
+			case "extra ciphertext":
 				ownerWrite(t, path, append(bytes.Clone(secret), secret...))
 			case "nonroot signer":
-				der, err := x509.MarshalPKCS8PrivateKey(f.plan)
-				if err != nil {
-					t.Fatal(err)
-				}
-				ownerWrite(t, path, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
+				f.writeCustodyKey(t, path, f.plan)
 			case "unknown declaration field":
 				ownerWrite(t, filepath.Join(f.dir, "declaration.json"), []byte(`{"private-key-material-do-not-log":"invalid"}`))
 			case "malformed flag":
 				f.args = append(f.args, "-previous-version", "private-key-material-do-not-log")
 			}
 			var out bytes.Buffer
-			err = runOwnerDelegation(t.Context(), f.args, &out, func() time.Time { return f.now })
+			err = f.invoke(t, &out)
 			if err == nil {
 				t.Fatal("unsafe owner input accepted")
 			}
@@ -384,7 +466,7 @@ func TestOwnerDelegationRequiresExplicitCounters(t *testing.T) {
 				}
 			}
 			var out bytes.Buffer
-			if err := runOwnerDelegation(t.Context(), f.args, &out, func() time.Time { return f.now }); err == nil {
+			if err := f.invoke(t, &out); err == nil {
 				t.Fatal("omitted rollback counter silently defaulted")
 			}
 			if _, err := os.Stat(filepath.Join(f.dir, "delegation.dsse")); !errors.Is(err, os.ErrNotExist) {
@@ -439,5 +521,20 @@ func TestOwnerDelegationRetainsExplicitSupportedCapabilities(t *testing.T) {
 				t.Fatal("successful publication disclosed an owner private key")
 			}
 		}
+	}
+}
+
+func TestOwnerDelegationRejectsPlaintextKeyFlags(t *testing.T) {
+	for _, flag := range []string{"-signer", "--signer", "-key-file", "--key-file"} {
+		t.Run(flag, func(t *testing.T) {
+			var output bytes.Buffer
+			err := runOwnerDelegation(t.Context(), []string{"delegation", "sign", flag, "/never-read/root-key.pem"}, &output, time.Now)
+			if err == nil || output.Len() != 0 {
+				t.Fatal("plaintext root-key flag must fail before memory admission or file access")
+			}
+			if strings.Contains(ownerDelegationUsage, "{-signer ") {
+				t.Fatal("usage still advertises plaintext root keys")
+			}
+		})
 	}
 }

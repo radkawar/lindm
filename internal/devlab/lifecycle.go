@@ -62,7 +62,7 @@ func migrateAndBootstrap(ctx context.Context, root string, local bool) error {
 		return fmt.Errorf("restrict runtime migration metadata access: %w", err)
 	}
 	if local {
-		_, err := fmt.Fprintf(os.Stdout, "Claim the local owner once: go run ./cmd/lindmd bootstrap-owner -config %s -username owner\n", config)
+		_, err := fmt.Fprintf(os.Stdout, "Issue a protected first-run code: go run ./cmd/lindmd setup-code -config %s -output NEW_PRIVATE_FILE; then open the console's /setup page. Keep the code private until your passkey completes setup.\n", config)
 		return err
 	}
 	return command(ctx, root, nil, "go", "run", "./cmd/lindmd", "bootstrap-owner", "-config", config, "-issuer", issuer, "-subject", ownerSubject)

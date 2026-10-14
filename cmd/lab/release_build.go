@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -35,6 +36,12 @@ func runReleaseBuild(ctx context.Context, args []string, stdout, stderr io.Write
 	caBundle := flags.String("oci-ca-bundle", "", "explicit maintained CA PEM bundle embedded in OCI images; never read from host defaults")
 	caSHA := flags.String("oci-ca-sha256", "", "independently pinned OCI CA bundle SHA256")
 	development := flags.Bool("development-key", false, "explicitly use conspicuously marked development package and attestation keys")
+	tufRoot := flags.String("tuf-root-file", "", "custodian-authenticated public TUF root for turnkey installer export")
+	tufSHA := flags.String("tuf-root-sha256", "", "independent SHA256 of custodian TUF root")
+	depsCache := flags.String("serverdeps-cache", "", "explicit authenticated native closure cache for optional offline add-ons")
+	ubuntuDeps := flags.String("ubuntu-serverdeps", "", "optional Ubuntu24.04 x86 offline dependency closure digest")
+	rhelDeps := flags.String("rhel-serverdeps", "", "optional entitled RHEL9 x86 offline dependency closure digest")
+	serverNotice := flags.String("server-notice-file", "", "signed-manifest server security notice protobuf JSON")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -50,7 +57,35 @@ func runReleaseBuild(ctx context.Context, args []string, stdout, stderr io.Write
 	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Hour)
 	defer cancel()
-	manifest, err := releasebuild.Build(ctx, releasebuild.Request{Repository: *repository, Output: *output, Version: *version, Revision: *revision, SourceDateEpoch: *epoch, OCICABundle: *caBundle, OCICASHA256: *caSHA, PackageSigner: packaging.SigningKey{Home: *home, Fingerprint: *fingerprint, Custody: packaging.Custody(custody), PassphraseFile: *passphrase}, AttestationSigner: releasebuild.AttestationKey{Path: *key, KeyID: *keyID, Custody: custody, TrustInventory: *inventory, TrustInventorySHA256: *inventorySHA}})
+	request := releasebuild.Request{Repository: *repository, Output: *output, Version: *version, Revision: *revision, SourceDateEpoch: *epoch, OCICABundle: *caBundle, OCICASHA256: *caSHA, PackageSigner: packaging.SigningKey{Home: *home, Fingerprint: *fingerprint, Custody: packaging.Custody(custody), PassphraseFile: *passphrase}, AttestationSigner: releasebuild.AttestationKey{Path: *key, KeyID: *keyID, Custody: custody, TrustInventory: *inventory, TrustInventorySHA256: *inventorySHA}}
+	if *serverNotice != "" {
+		if err := resolvePackagePaths(serverNotice); err != nil {
+			return err
+		}
+		notice, err := releasebuild.LoadServerNotice(*serverNotice)
+		if err != nil {
+			return err
+		}
+		request.ServerNotice = notice
+	}
+	if *tufRoot != "" || *tufSHA != "" || *depsCache != "" || *ubuntuDeps != "" || *rhelDeps != "" {
+		if *tufRoot == "" || *tufSHA == "" {
+			return errors.New("turnkey export requires a custodian TUF root and its independent digest")
+		}
+		if (*ubuntuDeps != "" || *rhelDeps != "") && *depsCache == "" {
+			return errors.New("requested offline installer add-ons require an explicit serverdeps cache")
+		}
+		if err := resolvePackagePaths(tufRoot); err != nil {
+			return err
+		}
+		if *depsCache != "" {
+			if err := resolvePackagePaths(depsCache); err != nil {
+				return err
+			}
+		}
+		request.Installer = &releasebuild.InstallerInputs{TUFRoot: *tufRoot, TUFRootSHA256: *tufSHA, SnapshotCache: *depsCache, UbuntuSnapshot: *ubuntuDeps, RHELSnapshot: *rhelDeps}
+	}
+	manifest, err := releasebuild.Build(ctx, request)
 	if err != nil {
 		return err
 	}
@@ -91,6 +126,16 @@ func runReleaseVerify(ctx context.Context, args []string, stdout, stderr io.Writ
 	manifest, err := releasebuild.Verify(ctx, *directory, *public, *id)
 	if err != nil {
 		return err
+	}
+	for _, name := range []string{"install.sh", "lindm-install", "installer.sha256", "installer.sha256.sig"} {
+		if _, err := os.Lstat(filepath.Join(*directory, name)); err == nil {
+			if err := releasebuild.VerifyInstaller(ctx, *directory, *public, *id); err != nil {
+				return err
+			}
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
 	}
 	_, err = fmt.Fprintf(stdout, "verified %s release %s: %d artifact hashes, DSSE signatures, SBOM/provenance bindings and unsigned digest comparisons\n", manifest.GetCustody(), manifest.GetVersion(), len(manifest.GetArtifacts()))
 	return err

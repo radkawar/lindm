@@ -298,8 +298,45 @@ FROM sessions
 WHERE token_hash = $1
 `
 
-func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (Session, error) {
+type GetSessionByTokenHashRow struct {
+	TokenHash         []byte
+	PrincipalID       uuid.UUID
+	CreatedAt         pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	AbsoluteExpiresAt pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	BreakGlass        bool
+	IncidentReason    string
+	Kind              string
+	SteppedUpAt       pgtype.Timestamptz
+}
+
+func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashRow, error) {
 	row := q.db.QueryRow(ctx, getSessionByTokenHash, tokenHash)
+	var i GetSessionByTokenHashRow
+	err := row.Scan(
+		&i.TokenHash,
+		&i.PrincipalID,
+		&i.CreatedAt,
+		&i.LastSeenAt,
+		&i.IdleExpiresAt,
+		&i.AbsoluteExpiresAt,
+		&i.RevokedAt,
+		&i.BreakGlass,
+		&i.IncidentReason,
+		&i.Kind,
+		&i.SteppedUpAt,
+	)
+	return i, err
+}
+
+const getSessionForUpdate = `-- name: GetSessionForUpdate :one
+SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at, break_glass, incident_reason, kind, stepped_up_at, recovery_custody_step_up_digest, recovery_custody_step_up_at FROM sessions WHERE token_hash = $1 FOR UPDATE
+`
+
+func (q *Queries) GetSessionForUpdate(ctx context.Context, tokenHash []byte) (Session, error) {
+	row := q.db.QueryRow(ctx, getSessionForUpdate, tokenHash)
 	var i Session
 	err := row.Scan(
 		&i.TokenHash,
@@ -313,6 +350,8 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash []byte) (
 		&i.IncidentReason,
 		&i.Kind,
 		&i.SteppedUpAt,
+		&i.RecoveryCustodyStepUpDigest,
+		&i.RecoveryCustodyStepUpAt,
 	)
 	return i, err
 }
@@ -731,9 +770,23 @@ RETURNING token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
   absolute_expires_at, revoked_at, break_glass, incident_reason, kind, stepped_up_at
 `
 
-func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (Session, error) {
+type TouchSessionRow struct {
+	TokenHash         []byte
+	PrincipalID       uuid.UUID
+	CreatedAt         pgtype.Timestamptz
+	LastSeenAt        pgtype.Timestamptz
+	IdleExpiresAt     pgtype.Timestamptz
+	AbsoluteExpiresAt pgtype.Timestamptz
+	RevokedAt         pgtype.Timestamptz
+	BreakGlass        bool
+	IncidentReason    string
+	Kind              string
+	SteppedUpAt       pgtype.Timestamptz
+}
+
+func (q *Queries) TouchSession(ctx context.Context, tokenHash []byte) (TouchSessionRow, error) {
 	row := q.db.QueryRow(ctx, touchSession, tokenHash)
-	var i Session
+	var i TouchSessionRow
 	err := row.Scan(
 		&i.TokenHash,
 		&i.PrincipalID,

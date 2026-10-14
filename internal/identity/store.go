@@ -53,6 +53,12 @@ type authWrite struct {
 }
 
 func (s *Service) withTx(ctx context.Context, fn func(*identitydb.Queries) error) error {
+	return s.withTransaction(ctx, func(_ pgx.Tx, q *identitydb.Queries) error {
+		return fn(q)
+	})
+}
+
+func (s *Service) withTransaction(ctx context.Context, fn func(pgx.Tx, *identitydb.Queries) error) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return s.dbErr(err)
@@ -62,7 +68,7 @@ func (s *Service) withTx(ctx context.Context, fn func(*identitydb.Queries) error
 	if err := s.lockPolicy(ctx, q); err != nil {
 		return err
 	}
-	if err := fn(q); err != nil {
+	if err := fn(tx, q); err != nil {
 		return err
 	}
 	if err := tx.Commit(ctx); err != nil {

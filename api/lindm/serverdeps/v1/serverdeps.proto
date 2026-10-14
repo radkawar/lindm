@@ -1,0 +1,162 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.serverdeps.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/serverdeps/v1;serverdepsv1";
+
+// Backend distinguishes native trust chains; APT does not have repomd.
+enum Backend {
+  BACKEND_UNSPECIFIED = 0;
+  BACKEND_DEB = 1;
+  BACKEND_RPM = 2;
+}
+
+enum FileKind {
+  FILE_KIND_UNSPECIFIED = 0;
+  FILE_KIND_PACKAGE = 1;
+  FILE_KIND_METADATA = 2;
+  FILE_KIND_KEY = 3;
+  FILE_KIND_EVIDENCE = 4;
+}
+
+// Manifest is a bounded fresh-server dependency closure, not a distro mirror.
+// Release custody authenticates this content address independently of vendor trust.
+message Manifest {
+  string distribution = 1 [(buf.validate.field).string = {
+    in: [
+      "ubuntu",
+      "rhel"
+    ]
+  }];
+  string version = 2 [(buf.validate.field).string = {
+    in: [
+      "24.04",
+      "9"
+    ]
+  }];
+  string architecture = 3 [(buf.validate.field).string.const = "amd64"];
+  Backend backend = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string base_image_sha256 = 5 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  repeated string requested_packages = 6 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 5000
+    unique: true
+    items: {
+      string: {
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9+_.:~^=\\-]*$"
+        max_len: 256
+      }
+    }
+  }];
+  repeated string base_packages = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 5000
+    items: {
+      string: {
+        min_len: 1
+        max_len: 512
+      }
+    }
+  }];
+  string solver_version = 8 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  repeated File files = 9 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 5256
+  }];
+  repeated Repository repositories = 10 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+  }];
+  uint64 max_bytes = 11 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 17179869184
+  }];
+  uint64 total_bytes = 12 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 17179869184
+  }];
+  uint32 max_packages = 13 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 5000
+  }];
+  uint32 package_count = 14 [(buf.validate.field).uint32 = {
+    gt: 0
+    lte: 5000
+  }];
+  string custody = 15 [(buf.validate.field).string = {
+    in: [
+      "development-lab",
+      "production-vendor",
+      "entitled-customer-private"
+    ]
+  }];
+  string capture_evidence_path = 16 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  string replay_evidence_path = 17 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  // SHA256 of deterministic protobuf with this field empty.
+  string manifest_sha256 = 18 [(buf.validate.field).string.pattern = "^([a-f0-9]{64})?$"];
+  string acquired_at = 19 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+}
+
+message File {
+  string path = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  string sha256 = 2 [(buf.validate.field).string.pattern = "^[a-f0-9]{64}$"];
+  uint64 size_bytes = 3 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 17179869184
+  }];
+  FileKind kind = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string vendor_sha256 = 5 [(buf.validate.field).string.pattern = "^([a-f0-9]{64})?$"];
+  string vendor_metadata_path = 6 [(buf.validate.field).string.max_len = 1024];
+  string package_identity = 7 [(buf.validate.field).string.max_len = 512];
+  string signer_fingerprint = 8 [(buf.validate.field).string.pattern = "^([A-F0-9]{40,64})?$"];
+}
+
+message Repository {
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  string source_url = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 2048
+  }];
+  // Native InRelease signature for APT; authenticated RHSM acquisition for RPM.
+  string authentication = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string metadata_path = 4 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  string signing_key_path = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 1024
+  }];
+  string signer_fingerprint = 6 [(buf.validate.field).string.pattern = "^[A-F0-9]{40,64}$"];
+}

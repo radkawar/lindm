@@ -20,7 +20,7 @@ import (
 
 func TestRecentStepUpRequiresVerifiedLocalBrowserSession(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	owner, err := s.BootstrapLocalOwner(ctx, "owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestRecentStepUpRejectsDirectoryAndServiceActors(t *testing.T) {
 		t.Fatalf("OIDC session issuance accepted as WebAuthn: %v", err)
 	}
 	s, ctx, pool := localIntegrationService(t)
-	owner, err := s.BootstrapLocalOwner(ctx, "owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestRecentStepUpRejectsDirectoryAndServiceActors(t *testing.T) {
 // on the session that began it, and a wrong password counts toward lockout.
 func TestInPageStepUpRenewsTheSameSession(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	owner, err := s.BootstrapLocalOwner(ctx, "owner")
+	owner, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

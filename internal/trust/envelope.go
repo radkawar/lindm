@@ -58,6 +58,7 @@ const (
 	OfflineResponseType                = "application/vnd.lindm.offline-enrollment-response.v1+protobuf"
 	DeviceEncryptionKeyType            = "application/vnd.lindm.device-encryption-key.v1+protobuf"
 	AgentCapabilityPolicyType          = "application/vnd.lindm.agent-capability-policy.v1+protobuf"
+	ServerRecoveryCheckpointType       = "application/vnd.lindm.server-recovery-checkpoint.v1+protobuf"
 	maxEnvelopeBytes                   = 512 << 10
 	maxSignatures                      = 16
 )
@@ -87,6 +88,7 @@ var authorityRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 		&enrollmentv1.ProvisioningRetrieval{},
 		&agentv1.OfflineEnrollmentAuthorization{}, &agentv1.OfflineEnrollmentRequestProof{}, &agentv1.OfflineEnrollmentResponse{},
 		&agentv1.DeviceEncryptionKeyAttestation{}, &agentv1.AgentCapabilityPolicy{},
+		&agentv1.ServerRecoveryCheckpoint{},
 	), protovalidate.WithDisableLazy())
 })
 
@@ -120,6 +122,8 @@ func payloadType(message proto.Message) (string, error) {
 		return ExecutionRootType, nil
 	case *agentv1.ExecutionDelegation:
 		return DelegationType, nil
+	case *agentv1.ServerRecoveryCheckpoint:
+		return ServerRecoveryCheckpointType, nil
 	case *agentv1.BootstrapBundle:
 		return BootstrapType, nil
 	case *agentv1.RenewalIntent:

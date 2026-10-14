@@ -36,10 +36,10 @@ type consoleReviewConfig struct {
 }
 
 type consoleReviewEnrollmentFixture struct {
-	Origin           string `json:"origin"`
-	Username         string `json:"username"`
-	Password         string `json:"password"`
-	EnrollmentSecret string `json:"enrollmentSecret"`
+	Origin    string `json:"origin"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+	SetupCode string `json:"setupCode"`
 }
 
 // consoleReviewReport is the subset of the runner's sanitized report.json that
@@ -137,26 +137,18 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 	}
 	// Build publication from the checkout under review, never from the separate
 	// directory that supplies development database/TLS trust.
-	enrollmentFixture, err := devlab.OpenEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64"}, "")
+	enrollmentFixture, setupCode, err := devlab.OpenSetupEnrollmentConsoleAuthorityFixture(ctx, *repo, checkout, *binary, []string{"amd64", "arm64"})
 	if err != nil {
 		return fmt.Errorf("open published enrollment review fixture: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, enrollmentFixture.Close()) }()
-	missingFixture, err := devlab.OpenMissingArtifactConsoleAuthorityFixture(ctx, *repo, *binary)
+	defer func() { setupCode = "" }()
+	missingFixture, missingSetupCode, err := devlab.OpenSetupMissingArtifactConsoleAuthorityFixture(ctx, *repo, *binary)
 	if err != nil {
 		return fmt.Errorf("open missing artifact review fixture: %w", err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, missingFixture.Close()) }()
-	missingEnrollment, err := missingFixture.CreateConsoleEnrollment(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { missingEnrollment.Secret = "" }()
-	publishedEnrollment, err := enrollmentFixture.CreateConsoleEnrollment(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { publishedEnrollment.Secret = "" }()
+	defer func() { missingSetupCode = "" }()
 	enrollment, err := fixture.CreateConsoleEnrollment(ctx)
 	if err != nil {
 		return err
@@ -171,22 +163,21 @@ func runConsoleReview(ctx context.Context, args []string, stdout, stderr io.Writ
 		Build:            map[string]string{"lindmdSHA256": serverDigest},
 		DirectoryFixture: directoryReviewConfig,
 		EnrollmentFixture: consoleReviewEnrollmentFixture{
-			Origin: enrollmentFixture.ConsoleOrigin, Username: "console-owner",
-			Password: hex.EncodeToString(password[:]), EnrollmentSecret: publishedEnrollment.GetSecret(),
+			Origin: enrollmentFixture.ConsoleOrigin, Username: "setup-owner",
+			Password: hex.EncodeToString(password[:]), SetupCode: setupCode,
 		},
 		MissingArtifactFixture: consoleReviewEnrollmentFixture{
 			Origin: missingFixture.ConsoleOrigin, Username: "console-owner",
-			Password: hex.EncodeToString(password[:]), EnrollmentSecret: missingEnrollment.GetSecret(),
+			Password: hex.EncodeToString(password[:]), SetupCode: missingSetupCode,
 		},
 	}
 	enrollment.Secret = ""
-	publishedEnrollment.Secret = ""
-	missingEnrollment.Secret = ""
+	setupCode, missingSetupCode = "", ""
 	clear(password[:])
 	encoded, err := json.Marshal(cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
-	cfg.EnrollmentFixture.Password, cfg.EnrollmentFixture.EnrollmentSecret = "", ""
-	cfg.MissingArtifactFixture.Password, cfg.MissingArtifactFixture.EnrollmentSecret = "", ""
+	cfg.EnrollmentFixture.Password, cfg.EnrollmentFixture.SetupCode = "", ""
+	cfg.MissingArtifactFixture.Password, cfg.MissingArtifactFixture.SetupCode = "", ""
 	if cfg.DirectoryFixture != nil {
 		cfg.DirectoryFixture.ReaderPassword = ""
 		for i := range cfg.DirectoryFixture.OwnerCookies {

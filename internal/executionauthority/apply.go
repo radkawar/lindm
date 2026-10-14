@@ -25,6 +25,17 @@ import (
 // commit: principal fence, authority, retained receipt and audit share one tx.
 // Lock order is principal -> authority -> device -> action.
 func (s *Store) Apply(ctx context.Context, tx pgx.Tx, request *agentv1.UpdateExecutionTrustRequest, actorID uuid.UUID, reason string) (*agentv1.UpdateExecutionTrustResponse, error) {
+	return s.apply(ctx, tx, request, actorID, reason, false)
+}
+
+// ApplyInitial admits only the root-only store's first signed delegation. The
+// caller holds the first owner's verified setup principal fence and commits this
+// with code consumption and credentials. It cannot replay or rotate authority.
+func (s *Store) ApplyInitial(ctx context.Context, tx pgx.Tx, request *agentv1.UpdateExecutionTrustRequest, actorID uuid.UUID, reason string) (*agentv1.UpdateExecutionTrustResponse, error) {
+	return s.apply(ctx, tx, request, actorID, reason, true)
+}
+
+func (s *Store) apply(ctx context.Context, tx pgx.Tx, request *agentv1.UpdateExecutionTrustRequest, actorID uuid.UUID, reason string, initialOnly bool) (*agentv1.UpdateExecutionTrustResponse, error) {
 	if tx == nil || actorID == uuid.Nil || !utf8.ValidString(reason) || utf8.RuneCountInString(reason) > 512 || strings.TrimSpace(reason) == "" {
 		return nil, ErrRejected
 	}
@@ -43,6 +54,9 @@ func (s *Store) Apply(ctx context.Context, tx pgx.Tx, request *agentv1.UpdateExe
 	}
 	if *row.DeploymentID != s.deploymentID || !bytes.Equal(row.TrustDomainDigest, s.domain[:]) {
 		return nil, ErrIncompatible
+	}
+	if initialOnly && (row.UpdateCount != 0 || row.RootCount != 1 || len(row.DelegationEnvelope) != 0) {
+		return nil, ErrRejected
 	}
 	// This lookup precedes clock, current authority, rollback and capacity
 	// checks. A historical retry never becomes a new admission after expiry.

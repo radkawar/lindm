@@ -70,6 +70,9 @@ func exportRelease(ctx context.Context, exported string, request Request, signer
 		}
 	}
 	manifest := &releasev1.ReleaseManifest{Version: request.Version, Revision: request.Revision, SourceSha256: sourceDigest, SourceDateEpoch: request.SourceDateEpoch, AttestationKeyId: signer.id, Custody: request.AttestationSigner.Custody, Builds: []*releasev1.BuildObservation{proto.CloneOf(first.observation), proto.CloneOf(second.observation)}}
+	if bundle != "" {
+		manifest.ServerNotice = proto.CloneOf(request.ServerNotice)
+	}
 	for _, built := range first.artifacts {
 		artifact := proto.CloneOf(built.artifact)
 		artifact.SecondUnsignedSha256 = second.observation.GetUnsignedSha256()[artifact.GetPath()]

@@ -40,6 +40,8 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 	return map[string]adminAuthorizationCase{
 		"GetAuthorization":                     {identity.PermissionManageAccounts, accounts, true},
 		"UpdateAuthorization":                  {identity.PermissionManageAccounts, accounts, true},
+		"GetServerStatus":                      {identity.PermissionManageIntegrations, admins, true},
+		"ConfirmRecoveryKeyCustody":            {identity.PermissionManageExecutionTrust, accounts, true},
 		"CreateProvisioningToken":              {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
 		"ListProvisioningTokens":               {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},
 		"RevokeProvisioningToken":              {identity.PermissionManageEnrollment, []string{"owner", "admin", "operator", "helpdesk"}, true},

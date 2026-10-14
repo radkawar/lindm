@@ -1184,6 +1184,28 @@ header and response visible while the replacement arrives. Generic screen
 settling does not establish that the requested search or sort response arrived;
 a readiness timeout fails the scenario instead of accepting stale evidence.
 
+Server status adds explicitly labelled **synthetic transport** captures for known,
+unknown, stale, failed-read and retained-evidence failed-read states on
+`/settings/status`, in all four theme/viewport appearances. These fixtures load
+the generated protobuf schema and intercept only the read-only status RPC. Their
+report scope and screenshot names distinguish presentation evidence from real
+server observations. They cannot qualify database readiness, certificate trust,
+backup completion, signed publication or integration delivery; those require
+the actual server/integration tests and maintained deployment lanes.
+
+Recovery custody adds separately labelled **synthetic transport** owner-eligible,
+admin-ineligible, scoped-step-up refusal, recorded-attestation, restored-export-set,
+unknown and external-recipient captures in all four appearances. Each set lists
+every individual file checksum separately from its composite confirmation digest. They reuse the
+same generated schema loader and intercept only status plus the explicit
+confirmation refusal. Their screenshots prove presentation only, not actual
+owner authorization, passkey verification, management effects or key transfer.
+The maintained native deployment lane must transfer every real required encrypted
+export through authenticated root/off-host custody before the actual owner's scoped
+password/UV browser attestation. After restore it retains the source export and
+separately transfers the fresh target database identity export; neither lane
+claims machine proof of storage or removal.
+
 Runtime authorization landings additionally run
 `make ui-review UI_REVIEW_FLAGS=-directory-authorization` with the real development
 Keycloak fixture available. This adds a disposable directory-primary server, an
@@ -1755,6 +1777,32 @@ live mirror address. Capture retains a bounded, native-solver-complete package
 set and the vendor-signed metadata, not a full repository mirror. Missing
 packages or an unavailable historical closure fail closed; a partial clone is
 not a qualified snapshot.
+
+Turnkey server prerequisites are a separate domain:
+`internal/serverdeps` and `lindm.serverdeps.v1.Manifest`. Do not route Ubuntu
+APT or entitled RHEL dependencies through the openSUSE/zypper snapshot above.
+The backend discriminator selects the native vendor trust chain; DEB metadata
+is original Ubuntu InRelease plus signed compressed indexes, not repomd or a
+locally generated unsigned package index. Capture records the exact authenticated
+base-image digest, native base package inventory, installer-requested packages,
+solver version, acquisition/custody, vendor signer/metadata provenance and every
+retained file's digest/size. Both package count and aggregate bytes are bounded.
+The native solver runs in an admitted disposable distro VM; its empty-status
+solve includes dependency runtime packages rather than treating application
+prerequisites as preinstalled. A separate fresh-baseline VM performs the offline
+native installation before publication, with original vendor authentication and
+external egress denied.
+
+The shared `Load`, `Export`, `Import`, `Publish` and `Install` APIs use a dedicated
+`server-dependencies/sha256` namespace. Transfers are length-framed manifest JSON
+plus exact sorted payload bytes, not untrusted archives. Descriptor-relative
+no-symlink reads, immutable metadata sealing, per-file streaming hashes and
+pre-publication native vendor validation bind custody to content. Release
+signatures authenticate the closure digest independently of vendor keys.
+`lab vm serverdeps` is the admitted capture/replay entrypoint;
+`lab serverdeps export|import|present|install` is the bounded station/site
+consumer. RHEL capture requires private entitlement or explicit development-lab
+custody; the package layer does not grant public redistribution rights.
 
 During ordinary/encrypted golden installation, dispatch and update lanes,
 `internal/vmlab/reposnapshot.Start` verifies the selected closure before opening
@@ -2581,9 +2629,10 @@ records the two-human revocation approval as nonsecret evidence.
 `devlab.OpenLocalAuthorityFixture` uses the same disposable database/process lifecycle
 with local-primary authentication and ephemeral loopback listeners; it never binds
 the shared admin port or resets the development fixture. It invokes the real
-`lindmd bootstrap-owner -config FILE -username owner` CLI, captures the one-time
-enrollment output only in bounded memory, and enrolls the owner through the real
-HTTPS password/WebAuthn endpoints. The owner creates a distinct second owner through
+`lindmd setup-code -config FILE -output FILE` CLI, reads its mode-0600 capability
+file into bounded memory and removes that fixture-owned file, then reserves and
+enrolls the owner through the real HTTPS setup/password/WebAuthn endpoints. The
+code never enters argv, subprocess output or evidence. The owner creates a distinct second owner through
 the account API, then that approver enrolls with an independent credential. Both
 expose the normal `OwnerSession` AdminService client. `StepUp` revokes the old session
 and performs fresh password plus verified WebAuthn login; account revocation uses
@@ -3312,6 +3361,8 @@ wrapper must never become Node's JavaScript input. Child tool lookup puts the re
 directories first. Each builder still owns separate HOME, Go and npm caches;
 mise shims do not run inside those isolated homes, and no ambient Go/npm or
 signing credentials enter the build.
+The two isolated native installer builds use this same pinned Go executable,
+read-only module graph and isolated builder environment.
 
 The `enroll-from-console` matrix cell targets Ubuntu 22.04/24.04/26.04, Debian 12/13,
 Fedora 43/44, Rocky Linux and AlmaLinux 9/10, Arch Linux x86_64 and Tumbleweed
@@ -3641,12 +3692,177 @@ separate design and qualification.
 
 ### Server deployment laboratory
 
-Build embedded console assets with `npm run build:web`, then run:
+Build embedded console assets with `npm run build:web` for the low-level package
+boundary lane or Compose lane, then run:
 
 ```sh
 go run ./cmd/lab vm server -manifest lab/images/ubuntu-noble-amd64.json -repo . -record /private/new-server-vm.json
 go run ./cmd/lab server compose -repo . -record /private/new-server-compose.json
 ```
+
+`vm server` is deliberately low-level: initial native install/configuration,
+explicit migration, protected setup issuance, runtime confinement, restart,
+mandatory refusal of a direct native upgrade without installer authorization,
+and retained-data purge. It no longer seeds a synthetic pending device or presents
+plaintext same-host `pg_dump`/row equality as encrypted recovery evidence.
+
+The maintained `lab deploy` lane instead consumes private signed release exports
+N and strictly newer N+1, independently pinned attestation/TUF trust and off-server
+age custody. It reserves **three** local native x86 guests together through normal
+FIFO admission (configured local ceiling remains four), not nested sublane leases:
+fresh server, second fresh managed device and third fresh restore server.
+Supported server hosts are Ubuntu 24.04 and entitled RHEL 9 only; the derived
+matrix gate explicitly distinguishes other device targets from supported servers.
+
+```sh
+go run ./cmd/lab deploy \
+  -host "$LOCAL_HOST_ID" -manifest "$PINNED_SERVER_IMAGE" \
+  -repo "$SOURCE" -cache "$VERIFIED_VENDOR_CACHE" -work-dir "$LAB_WORK" \
+  -first-release "$SIGNED_RELEASE_N" -upgrade-release "$SIGNED_RELEASE_N_PLUS_ONE" \
+  -release-public-key "$INDEPENDENT_RELEASE_PUBLIC_KEY" -release-key-id "$PINNED_RELEASE_KEY_ID" \
+  -tuf-root-file "$INDEPENDENT_TUF_ROOT" \
+  -backup-recipient-file "$OFFLINE_AGE_RECIPIENT" -backup-identity-file "$ENCRYPTED_OFFLINE_AGE_IDENTITY" \
+  -backup-identity-passphrase-fd "$PROTECTED_PRIVATE_PIPE_FD" \
+  -lindmd "$MATCHING_OFFLINE_LINDMD" -lindmctl "$MATCHING_OWNER_CLI" \
+  -redhat-token-file "$PROTECTED_RHEL_OFFLINE_TOKEN" \
+  -evidence "$NEW_PRIVATE_EVIDENCE_DIRECTORY" -record "$NEW_PRIVATE_RECORD"
+```
+
+For Ubuntu, omit the Red Hat input. It is required for RHEL and its content must
+never be printed. The lane records initial vendor-tool presence before installation,
+installs `install.sh` with a protected setup-code destination, then uses real
+Chromium and production visible controls for password plus user-verifying passkey
+setup/sign-in and the exact browser-clipboard enrollment command. A dedicated child
+NSS store trusts only this owned deployment's CA; TLS errors are never ignored.
+The authenticator is Chromium's CTAP2 user-verified virtual authenticator, not
+physical-authenticator qualification. No password, setup code, enrollment command,
+age identity or offline private signer enters the public record/screenshots.
+
+Deployment exercises the generated quick custody path with **zero supplied
+execution recipients**. Three age identities exist only in memory; execution roots
+are sealed individually and the generated identities leave only in one
+passphrase-encrypted recovery export. The root-protected encrypted export moves
+off-server via authenticated pinned SSH with a matching source/destination digest,
+not a public/browser artifact route. The real owner then uses digest-bound
+user-verifying step-up to confirm the persistent “Move your recovery keys off this
+server” task. This records owner attestation, never machine-verified storage.
+Both backup identities and recovery signing keys decrypt only in memory;
+the operator backup passphrase enters once through an owner-private anonymous
+PIPEFS descriptor (`-backup-identity-passphrase-fd N`), never arguments,
+environment values, logs or plaintext files. The lane generates its separate
+recovery-export passphrase in memory and confirms it twice through a root-owned
+anonymous guest pipe; independent offline quorum signing uses separate protected
+descriptors. On a workstation with a finite memory-lock allowance, authorized
+noninteractive `sudo prlimit` raises only this lab process's inherited allowance,
+not host configuration or another process. Offline cryptographic children retain
+the caller's private-file ownership, disable dumps and lock their address spaces;
+the gate is never bypassed if privilege is unavailable. The recovery export itself
+is not a scheduled backup input: backups retain only the inner sealed custody
+objects. Raw encrypted archives, the off-server encrypted custody export and
+independent public-root/signed-checkpoint evidence remain in the private evidence
+directory; temporary passkey/private working state and all owned guests are removed.
+The explicit off-server backup recipient also acts as this **lab-only operator
+fixture** recipient for two separate encrypted passphrase escrow objects (source
+authority and fresh database custody). They are written directly from memory to
+the private lab evidence directory, never server backup inputs, signed releases or
+support bundles. These fixture custodians are not claimed independent humans.
+Fresh restore preserves its own sealed database CA and identity export; the lane
+retains both source and fresh exports off-host and compares actual SSH transfer
+hashes against every file shown by the native public custody provider. The owner
+then records a new password/passkey step-up attestation for that composite export
+set; an old source acknowledgement cannot qualify the fresh database CA.
+
+The device stays alive across encrypted backup, offline full-archive drill,
+authorized signed upgrade and fresh-host fenced restore. An independently retained
+**current fenced full security snapshot** and higher-epoch root-quorum checkpoint/
+delegation reconcile the stale original backup; recovery truthfully advances data
+to the current authoritative checkpoint, not the original backup's old rows.
+All three management phases require a newly completed same-device refresh action
+and received fresh inventory through the real console. Runtime SQL probes require
+actual PostgreSQL `42501` denials for setup hash/expiry/mint/delete/truncate and DDL,
+while the browser exercises the permitted reserve/consume columns.
+
+The matrix `deploy` cell takes `-deploy-inputs PRIVATE_0600_JSON`. Its strict fields
+are `firstRelease`, `upgradeRelease`, `releasePublicKey`, `releaseKeyID`,
+`tufRootFile`, `backupRecipientFile`, `backupIdentityFile`, `lindmd` and `lindmctl`;
+all paths must be absolute. The matrix never silently replaces these authenticated
+exports with its ordinary locally built package fixtures.
+The separate `-deploy-backup-identity-passphrase-fd N` reads the passphrase once
+into memory and each admitted cell receives its own anonymous private pipe. No
+passphrase is a JSON field, artifact, environment value or echoed lane argument.
+
+`lab deploy setup` is a separate, **one-guest first-run observation**, suitable for
+measuring one newly produced private release without creating a newer release or
+an off-server private backup identity:
+
+```sh
+lab deploy setup \
+  -host "$LOCAL_HOST_ID" -manifest "$PINNED_SERVER_IMAGE" \
+  -repo "$SOURCE" -cache "$VERIFIED_VENDOR_CACHE" -work-dir "$LAB_WORK" \
+  -first-release "$SIGNED_RELEASE" \
+  -release-public-key "$INDEPENDENT_RELEASE_PUBLIC_KEY" \
+  -release-key-id "$INDEPENDENT_RELEASE_KEY_ID" \
+  -tuf-root-file "$INDEPENDENT_TUF_ROOT" \
+  -backup-recipient-file "$BACKUP_PUBLIC_RECIPIENT" \
+  -custody-escrow-recipient-file "$LAB_OPERATOR_PUBLIC_RECIPIENT" \
+  -evidence "$NEW_PRIVATE_EVIDENCE_DIRECTORY" -record "$NEW_PRIVATE_RECORD"
+```
+
+It uses the ordinary local native x86 KVM FIFO, actual signed installer,
+owned-PostgreSQL and root-only credential gates, independently CA-trusted browser
+and actual generated password/UV-passkey first owner. Quickstart custody
+passphrases are locked in memory before generation and encrypted directly to the
+explicit **lab-only public escrow recipient** in private evidence; the encrypted
+identity export is copied off the guest through authenticated SSH. No newer
+release, private backup identity, backup drill, enrollment, upgrade, restore or
+live-device qualification is performed. This observation also does **not**
+exercise the owner's subsequent off-server-custody step-up attestation.
+Owned VM/browser resources and any real RHEL registration are cleaned up.
+
+The result always records `scope: "first-run-install-only"` and
+`lifecycle_qualified: false`, including successful install/setup. Import readable
+records only with `matrix import -cell deploy -scope first-run-install-only`;
+the importer rejects their unscoped or incorrectly relabeled promotion. The
+ordinary `lab deploy` command still requires and reserves all three guests for
+the complete workflow above. Setup-only results never close that qualification.
+
+`lab deploy setup -airgap` runs the single server with external QEMU networking
+denied and passes `--airgap` to the signed installer. The host-platform offline
+add-on must be present and authenticated; do not provide an online RHEL token.
+The result records `airgap_server_install: true` but remains first-run-only.
+The full connected device-enrollment lane and its entitlement gates are unchanged.
+
+`lab deploy audit` separately measures the immutable pre-turnkey release's real
+native runbook on a pristine admitted guest, through actual password/passkey console
+sign-in. It requires `-baseline-release`, the same independent release trust,
+`-evidence`/`-record`, and explicit native metadata signer custody for Ubuntu
+(`-signer-home`, `-fingerprint`, protected production passphrase or explicitly
+`-development-key`). This historical mode requires an export without `install.sh`.
+The additional `-baseline-verifier` and independently pinned
+`-baseline-verifier-sha256` identify a private, caller-owned mode0700 regular
+`lab` executable independently built from exact baseline revision
+`5e3f89dba356b98fc9c07602323a32d56eaf3929`. Its opened descriptor, SHA-256,
+embedded module identity and stable file metadata are checked before invocation;
+the independently custodied executable digest is the source trust pin.
+That historical executable authenticates the signed manifest,
+artifact hashes, signatures, SBOM/provenance and isolated build observations;
+the current audit parses the stable original manifest only after verification.
+The verifier, release directory and independent public release key are opened
+through a root/operator-owned non-writable-by-others, no-symlink ancestor walk.
+The child receives pinned executable/directory/key descriptors, not mutable
+input paths. Selected server packages are bounded, exclusively copied into
+private read-only files and checked against the authenticated manifest's exact
+size/digest before repository signing or upload; the guest checks that same
+digest before native installation. Historical `package-signing.asc` was **not**
+bound by the old release manifest: RHEL audit therefore separately requires
+`-package-public-key-sha256` and `-fingerprint`, validates the snapshotted single
+native authority and checks its uploaded bytes before RPM import.
+This frozen input is **audit-only**: current release and installer verification
+still require the bundled agent repository and never fall back to historical
+verification or accept a baseline as a managed turnkey installation.
+It counts real observed terminal invocations and visible browser controls, records
+their individual outcomes and observed friction, and retains failures rather than
+turning seven high-level runbook headings into an invented manual-step count.
 
 Both `lab packages build` (agent) and `lab packages build-server` accept `-arch
 amd64` or `-arch arm64`; omitted means the build host. `-repo` source compilation
@@ -4040,6 +4256,17 @@ go run ./cmd/lab release build -repo . -output /private/release-export \
 go run ./cmd/lab release verify -directory /private/release-export \
   -public-key /private/trusted-attestation-public.pem -key-id PINNED_SPKI_ID
 ```
+
+For the complete native turnkey bundle, add `-tuf-root-file` and
+`-tuf-root-sha256` from independent update-root custody. The output directory then
+contains `install.sh`, its separately signed bootstrap inventory, native server
+packages and the matching signed agent repository. Connected installation is the
+default and needs no vendor snapshot input. Optional `-serverdeps-cache` plus
+`-ubuntu-serverdeps` and/or `-rhel-serverdeps` add only the selected platform's
+authenticated offline payload; `--airgap` refuses an absent host-platform add-on.
+`lab release verify` authenticates the supplemental installer assets when present,
+not just the application artifacts. Transfer this authenticated directory through
+the private customer channel; it is not an automatically created archive.
 
 Production attestation custody is operator-provisioned PKCS#8 mode `0600` with the
 purpose sidecar required by the tool. The strict protobuf `SigningTrustInventory`

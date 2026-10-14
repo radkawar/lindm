@@ -113,11 +113,11 @@ func loginLocal(t *testing.T, s *Service, ctx context.Context, user, reason stri
 }
 func TestLocalAuthenticationLifecycle(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.BootstrapLocalOwner(ctx, "owner"); !errors.Is(err, ErrOwnerInitialized) {
+	if _, err := bootstrapLocalOwner(t, s, ctx, "owner"); !errors.Is(err, ErrOwnerInitialized) {
 		t.Fatalf("second bootstrap: %v", err)
 	}
 	auth := localAuthenticator(t)
@@ -176,7 +176,7 @@ func TestLocalAuthenticationLifecycle(t *testing.T) {
 // stable reason the console turns into "Username or password is incorrect."
 func TestLocalLoginRefusalReasonIsUniform(t *testing.T) {
 	s, ctx, _ := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestLocalLoginRefusalReasonIsUniform(t *testing.T) {
 }
 func TestLocalEnrollmentExpiryAndLockout(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,7 +264,7 @@ func TestLocalEnrollmentExpiryAndLockout(t *testing.T) {
 }
 func TestBreakGlassAuthorityAndAudit(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "emergency")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "emergency")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestBreakGlassAuthorityAndAudit(t *testing.T) {
 // A slow store whose total exceeds the shared round wait must not fail it.
 func TestBreakGlassInboxObservationsEachGetTheirOwnTimeout(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "emergency")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "emergency")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +396,7 @@ func TestBreakGlassInboxObservationsEachGetTheirOwnTimeout(t *testing.T) {
 
 func TestLocalSessionCannotBecomeBreakGlass(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "owner")
 	if err != nil {
 		t.Fatal(err)
 	}

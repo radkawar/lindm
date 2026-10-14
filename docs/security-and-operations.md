@@ -321,11 +321,11 @@ loads development keys. Run it on the owner's isolated signing workstation with
 the real deployment's authenticated execution root, associated quorum-signed
 bootstrap, and sufficient distinct offline root signers. Private keys remain
 offline; do not copy them into the server, executor, lab, or command arguments.
-The software signer accepts one unencrypted Ed25519 PKCS#8 `PRIVATE KEY` PEM
-block per `-signer` file. It does not claim HSM custody.
+The software signer decrypts encrypted custody only in locked memory. It does not
+accept plaintext private-key files or claim HSM custody.
 
-All input files, including public root/bootstrap and the declaration, must be
-singly linked regular files owned by the invoking user with mode `0600`, in
+The public root/bootstrap and declaration inputs must be singly linked regular
+files owned by the invoking user with mode `0600`, in
 directories owned by that user with mode `0700`. Directory ancestry is checked
 without following symlinks; untrusted owners and non-sticky directories writable
 by other users are rejected. The output has the same protected-directory and
@@ -409,11 +409,23 @@ lindmctl execution delegation sign \
   -root /offline/lindm/execution-root.json \
   -bootstrap /offline/lindm/bootstrap.dsse.json \
   -declaration /offline/lindm/delegation.json \
-  -signer /offline/lindm/owner-a.pem \
-  -signer /offline/lindm/owner-b.pem \
+  -custodian-identity-file /offline/lindm/custodian-identities.age \
+  -custodian-identity-passphrase-fd 3 \
+  -signer-custody /offline/lindm/root-key-1.age \
+  -signer-custody /offline/lindm/root-key-2.age \
   -previous-version 7 -minimum-recovery-epoch 3 \
   -out /offline/lindm/delegation-v8.dsse.json
 ```
+
+Supply descriptor 3 as a private anonymous pipe containing the custodian
+passphrase, not an argument, environment value, regular file or named FIFO.
+Offline encrypted inputs must be singly linked, caller-owned mode-0600 files.
+The command locks current and future memory and disables dumps before decryption;
+grant the offline process sufficient memory-lock authority, never bypass it.
+Generated quick-start custody can instead use `-custody-export-file` with
+`-custody-passphrase-fd`; its encrypted export contains the root ciphertexts.
+Plaintext PKCS#8 signer flags are not supported. The root and bootstrap remain
+independently authenticated public inputs, not learned from the encrypted export.
 
 The command checks the typed declaration and supported capability set, signs using
 `trust.Authority`, then proves the result with the production DSSE execution
@@ -1483,13 +1495,252 @@ entries so that a full 24-entry list of the previous release still fits.
   apply reject retired names. `orgapply` names the replacement in its error
   rather than rewriting the operator's source document.
 
-After the upgrade has rewritten the persisted policy, an older server binary
-cannot read it; roll back only together with the database. Every retired name
-has a fixture of the persisted state of the release that used it under
-`internal/identity/testdata/upgrade/`, which `TestUpgradeFromEarlierReleaseState`
-starts the identity service on.
+These transitions predate the first turnkey release. The installer refuses
+pre-turnkey manual and lab deployments rather than adopting them.
+Historical fixtures in `internal/identity/testdata/upgrade/` cover these states
+through `TestUpgradeFromEarlierReleaseState`.
+Managed releases that change persisted authorization names must declare a
+contract migration. Never restore older authorization data for package rollback.
+
+### Fresh-host deployment laboratory
+
+`lab deploy` is the maintained single-host lifecycle proof for Ubuntu 24.04 and
+entitled RHEL 9 on fresh local x86 KVM guests. It reserves the original server,
+console-enrolled device and fresh restore server together through the ordinary
+four-slot FIFO; nested operations do not acquire a second reservation. Signed
+release N must be a managed turnkey installation and N+1 must be strictly newer.
+This does not adopt or upgrade an unmanaged historical installation.
+
+Supply independently pinned release attestation and TUF public inputs, protected
+age backup recipient/encrypted identity, a numeric anonymous-pipe identity
+passphrase descriptor, matching consolidated operator binaries and an explicit
+new private evidence directory. RHEL uses an available protected entitlement token
+path, never a token argument or printed token. No release artifact is publicly
+hosted and TLS browser trust is limited to the owned laboratory CA.
+
+Before reading or generating fixture passphrases, the admitted lab process raises
+only its own memory-lock allowance through authorized `sudo prlimit`, disables
+core dumps and locks current and future memory. A failed gate stops the lane;
+it never writes plaintext recovery passphrases to host swap or evidence.
+
+The lane runs actual generated first-run password/passkey setup, root-protected
+SSH recovery export transfer and scoped owner custody confirmation. Separate
+source and fresh database passphrases are encrypted directly from memory to the
+explicit lab operator recipient in private off-host evidence; these fixture
+custodians are not independent humans. After encrypted backup, signed upgrade,
+fencing and independently authorized higher-epoch recovery, the fresh database
+CA custody survives separately from canonical source authority. A new owner
+step-up acknowledges every current required ciphertext using the composite
+confirmation digest. This is an owner attestation, not machine verification of
+off-host storage. The original enrolled guest must then complete a fresh live
+inventory/manage action through the restored console.
+
+After installation, upgrade, fresh target provisioning and restore, the lane
+asserts both persistent database URL files are regular, singly linked,
+root:root mode 0600 and unreadable by either service account. It checks the native
+units' distinct `LoadCredential=` sources while the actual server is active.
+These filesystem/credential gates enter the private nonsecret workflow record;
+database passwords never enter browser configuration or published evidence.
+
+For a release producer's single-bundle install/first-owner timing, use the separate
+`lab deploy setup` subcommand. It reserves one fresh native guest, uses the same
+signed install, owned PostgreSQL, root-only database credential and CA-trusted
+password/passkey browser gates, and requires only independently pinned public
+release/TUF trust, a backup public recipient and explicit lab-only custody escrow
+public recipient. Its encrypted quickstart export and passphrase escrow remain
+private off-host lab evidence, not release, server-backup or support inputs.
+It does not attest custody or enroll, back up, upgrade, restore or manage a device.
+Even a successful result is scoped `first-run-install-only` with
+`lifecycle_qualified: false`; it cannot substitute for the full deployment proof.
+The default three-guest workflow and all four root-credential assertions above
+remain unchanged.
+
+For native air-gap **server installation**, add `-airgap` to `lab deploy setup`.
+The fresh server guest has external QEMU networking denied, and the real installer
+must consume the bundle's authenticated host-platform offline add-on. It receives
+no online RHEL entitlement token. An absent or invalid add-on fails rather than
+falling back to vendor repositories. The record identifies `airgap_server_install`
+and retains the first-run-only scope; this does not qualify an air-gap device
+enrollment or backup/upgrade/restore lifecycle.
+
+Use `lab deploy audit` with an immutable pre-feature signed release lacking
+`install.sh` to measure the historical native runbook separately. Its recorded
+terminal invocations and visible decisions are observed counts, not estimates
+from seven high-level headings. Raw failed records remain failures; use new
+record/evidence paths for corrected fresh-host attempts. Exact invocation and
+input contracts are in [engineering](engineering.md); qualification boundaries
+and observed friction are in [verification](verification.md).
 
 ### Native single-host installation
+
+The turnkey path is the customer's private signed release bundle on Ubuntu 24.04
+or RHEL 9 x86-64. After independently authenticating the bundle and release
+signer's SPKI SHA-256 through the release custodian, run `sudo ./install.sh`.
+The wrapper prompts for the independently supplied public-key file and pin,
+public console HTTPS origin, and offline backup custodian's age public-recipient
+file when flags are absent. A bundled public key is never its own authority.
+Host-maintained OpenSSL checks the signed installer asset inventory before any
+bundled executable runs; the Go verifier then checks full release DSSE,
+attestations, canonical bundled agent-repository provenance and exact package
+digests. Native RPM verification imports exactly one signed-fingerprint-approved
+public key into a disposable private database, never the host trust database.
+Only that same immutable, independently verified server RPM is installed without
+repeating its signature lookup; vendor dependency signature checks remain enabled.
+The wrapper snapshots bytes into root-only custody before these operations.
+
+Connected installation is the default. It installs PostgreSQL, OpenSSL and native
+prerequisites from the host's configured distribution repositories with package
+signature verification enabled. HTTPS repositories retain certificate and host
+verification. RHEL needs its normal Red Hat entitlement or an entitled repository.
+No external identity provider is needed.
+
+For `--airgap`, obtain the authenticated offline add-on for the host's platform.
+The installer imports only that retained vendor-authenticated dependency closure;
+it refuses a missing platform snapshot and digest before generating custody or
+changing services. It never falls back to a network repository. Both modes retain
+the exact signed agent repository inside `lindmd`. Release DSSE does not replace
+vendor or agent package signatures.
+
+The installer creates a private native PostgreSQL cluster, distinct restricted
+database-owner migrator and non-owner runtime roles, SCRAM credentials and
+verify-full database TLS. Ubuntu uses `/var/lib/postgresql/lindm` and loopback port
+15432; RHEL uses `/var/lib/pgsql/lindm`, standard SELinux labels and loopback port 5432. It never adopts an existing cluster or disables SELinux. A collision fails
+closed. Defaults are 64 database connections, 256 MiB shared buffers, 16 device
+pool connections plus the separate console pool, bounded statements and cgroup-v2
+swap/core-dump protection. Runtime credentials cannot create schemas or mutate
+Goose, schema-compatibility or server-recovery metadata.
+On Ubuntu, the installer preseeds `create_main_cluster = false` before the vendor
+PostgreSQL transaction and temporarily denies native service starts through
+`policy-rc.d`. It removes only its own unchanged temporary policy. Existing operator
+configuration is never overwritten: an existing cluster switch must already be
+disabled; an existing foreign service policy is refused rather than executed,
+replaced or assumed to deny every maintainer-script invocation. Vendor
+configuration preservation remains enabled; no default `16-main` cluster is
+created or started as a side effect.
+
+Server/device trust and deployment identity are generated automatically with
+maintained Go X.509 and existing signed execution-authority libraries. Execution
+quorum and generated transport/database CA private keys exist only in locked,
+non-dumpable process memory before encryption; no plaintext copy is written to
+disk. `/etc/lindm/offline` contains exactly the three individual execution-root
+`.age` artifacts and `sealed-pki-ca.age`, root:root 0600 under root-only ancestry.
+Online plan/start keys and the device issuer have separate identities.
+
+Supply up to three **distinct** age X25519 public-recipient files using repeated
+`--execution-root-recipient-file /ABSOLUTE/FILE`. None may equal the backup
+recipient. Each execution root is sealed to its assigned recipient; generated CA
+keys are sealed to the first PKI custodian. Missing recipients are generated in
+memory. When any identity is generated, the installer asks for a strong unique
+20–1024-byte passphrase twice on the private terminal and writes one encrypted
+export to `/var/lib/lindmd-operations/recovery-custody.age`. Automation may supply
+the two newline-terminated values through `--custody-passphrase-fd FD`, an
+owner-protected anonymous pipe, never a regular file, argument or environment
+variable. Private age identities and the passphrase are never persisted in
+plaintext. The export is root:lindmd 0640 solely to permit ciphertext-bound status
+checks; it has no browser download route. It contains the generated identities,
+public deployment/origin/root bindings and already encrypted custody artifacts.
+Its strict public digest-bound metadata is at
+`/var/lib/lindmd-operations/recovery-custody.json`.
+
+One passphrase-protected export **does not** create three independent human
+custodians. Transfer it through authenticated root SSH or private external media,
+authenticate its SHA-256 through the protected operator channel, and keep the
+passphrase separately off-host. For root-mounted, root-only approved external
+media, copy the ciphertext with `sudo install -o root -g root -m 0600 --
+/var/lib/lindmd-operations/recovery-custody.age "$PROTECTED_EXTERNAL_DIRECTORY/recovery-custody.age"`.
+The destination is supplied by the operator, not a browser or public host.
+The console retains the custody-transfer task until the owner confirms the current
+deployment and ciphertext digest with fresh user verification; this attestation
+does not prove storage or deletion. With three supplied custodians, transfer the
+individual ciphertexts and retain their private identities off-host instead.
+
+Encrypted backups contain only these inner custody ciphertexts, not plaintext
+root/CA keys or generated identities. **The backup decryption key alone cannot
+decrypt inner custody ciphertexts**; an operator who also holds the custody
+passphrase/identity may have root authority. After host loss, retain both the
+encrypted server backup and independently protected custody export/identities;
+fenced restore still requires recovery reconciliation and offline quorum approval.
+The signed initial delegation is admitted only in the first owner's successful
+password plus user-verifying WebAuthn transaction, never merely at daemon startup.
+No private release-signing or backup-decryption key enters the bundle or server.
+
+Runtime files are under `/etc/lindm`, with separate `/etc/lindm/migrate` credentials.
+Root stages only validated database resources to issue the protected setup code
+using the migrator database login. The final code is
+`/var/lib/lindmd-operations/setup/code`, root:root 0600 under root-only ancestry,
+and is shown only on the private terminal. `--setup-code-file /ABSOLUTE/NEW_FILE`
+provides a create-only root:root 0600 destination for automation, never secret
+stdout, argv, environment, journal or support output. The installer enables the
+native server and encrypted-backup timer, checks actual verified HTTPS readiness,
+and prints one console origin and the setup code. Runtime state is separate at
+`/var/lib/lindmd`; root operational metadata is at `/var/lib/lindmd-operations`.
+
+The automatically generated private console CA is not silently trusted by a
+remote browser. Transfer its displayed CA-file SHA-256 and certificate through
+the authenticated operator channel and use the approved workstation trust
+process; never bypass a certificate warning or disable HTTPS verification.
+Bring-own TLS is explicit: `--tls-cert-file`, `--tls-key-file`, and `--tls-ca-file`
+provide a protected key, chain covering both console/device names and independently
+approved roots. The listeners remain unprivileged (18444/18445 by default);
+`--admin-port`, `--device-port` and `--device-origin` are explicit overrides.
+An origin without an explicit port uses console port 18444; an explicit public
+proxy port is preserved. Console and device listener ports must remain distinct.
+
+For explicit ACME, use the maintained distro Certbot client on the certificate
+custodian, with its dependencies carried in the custodian's authenticated private
+OS closure. A connected HTTP-01 issuance is:
+
+```sh
+certbot certonly --standalone --preferred-challenges http \
+  --server "$ACME_DIRECTORY" --non-interactive --agree-tos \
+  --email "$ACME_EMAIL" --domain "$ADMIN_DNS" --domain "$DEVICE_DNS"
+```
+
+The custodian supplies those actual directory/account/DNS values and authorizes
+the terms; both names must resolve to its temporary port-80 challenge listener.
+Copy the resulting full chain and private key into root-owned non-symlink 0600
+files under root-only ancestry, and separately authenticate the issuer root file.
+Pass those files through the three bring-own TLS flags above. Never use Certbot's
+`live/` symlinks directly as installer inputs or download a replacement trust root
+from the unverified server. Renewal must preserve both names and the bootstrap's
+admitted root trust; validate `lindmd check-config` as the runtime identity before
+an explicit restart. The installer does not silently contact an ACME service.
+An isolated site uses its local PKI or an explicitly reachable internal ACME
+custodian; public ACME is not an air-gap fallback.
+
+External database mode uses `--database-url-file` plus `--migration-url-file`;
+`--database-url` is a **file-path alias**, never a password-bearing URL argument.
+Both inputs must be absolute protected root-owned regular files. For local and
+external databases, the persistent runtime and migration URL files are
+`/etc/lindm/database-url` and `/etc/lindm/migrate/database-url`, root:root mode 0600.
+Neither service account can read these files at rest. Native units use
+`LoadCredential=database-url:PATH`; `lindmd` reads the ephemeral credential from
+`$CREDENTIALS_DIRECTORY` only when its explicit credential option is present.
+Missing or unsafe credentials stop the command; there is no persistent-file
+fallback. The normalized configuration retains the original URL-file reference.
+The installer copies referenced database CA/client-certificate/key material into
+the appropriate service identity's custody and retains strict `sslmode=verify-full`.
+The migrator must own the intended database and public schema without superuser,
+CREATEDB, CREATEROLE or replication authority. Provision equivalent runtime
+CONNECT/USAGE/DML and migrator default grants before using an external database;
+the installer audits role separation and denies runtime schema ownership/CREATE.
+
+Release custodians enable the complete installer export with `lab release build`
+`-tuf-root-file` and independently supplied `-tuf-root-sha256`. The public TUF root
+is the actual custodian-signed update root, never an installer-generated substitute.
+The default connected export requires no vendor snapshots. To add Ubuntu air-gap
+support, supply `-serverdeps-cache` and `-ubuntu-serverdeps`; for RHEL, supply
+`-rhel-serverdeps` with that explicit cache. Either or both add-ons may be selected.
+Every supplied closure must bind platform, solver/base inventory, native vendor
+authentication and offline replay evidence. RHEL offline redistribution requires
+appropriate private customer entitlement and custody; lab development custody is
+not production legal authorization. A requested but absent or unauthenticated
+add-on fails export. Installer executables are compared across two isolated
+captured-source builds. All required bootstrap assets and each optional snapshot
+pair are signed and bound to the full `release.json`.
+
+The low-level native package contract below remains useful for independently
+managed deployments; it is not the turnkey installation procedure.
 
 The `lindmd` release DEB/RPM contains the embedded-console executable at
 `/usr/bin/lindmd`, the signed agent-repository payload at
@@ -1532,29 +1783,59 @@ signers generated by the lab are never production release keys.
 3. Make runtime configuration/key files `lindmd:lindmd` mode 0600 under
    root-owned non-writable directory ancestry. `/etc/lindm` may be root-owned 0755;
    secrets themselves must have no group/other permission bits. The checked loader
-   rejects symlinks, replaceable ancestry and unsafe file permissions. Store an
-   explicit PostgreSQL URL in `database-url`, including `sslmode=verify-full` and
-   `sslrootcert=/etc/lindm/transport-ca.crt`. Do not set `PG*` environment variables.
+   rejects unsafe ownership and file permissions. Store the explicit PostgreSQL
+   URL in `/etc/lindm/database-url`, **root:root mode 0600**, including
+   `sslmode=verify-full` and `sslrootcert=/etc/lindm/transport-ca.crt`.
+   Do not set `PG*` environment variables. The native unit supplies only this
+   runtime URL through systemd `LoadCredential=`.
 4. Put a separately validated config at `/etc/lindm/migrate/server.json`, with
-   `database.migration_url_file` pointing at the migrator URL, and its database TLS
-   trust/client material in the same directory. Own these mode-0600 files by
-   `lindmd-migrate`; keep the directory traversable only by root and that account.
+   `database.migration_url_file` pointing at `/etc/lindm/migrate/database-url`.
+   Own the config and database TLS trust/client material by `lindmd-migrate`
+   at mode 0600; keep the directory traversable only by root and that account.
+   Own the migration URL file by **root:root mode 0600**, not the migrator account.
+   The migration unit receives only this URL through `LoadCredential=`.
    The runtime service cannot access this directory. Migration resolves only its
    database resources; it does not require access to the server/device private keys.
 5. Run `systemctl start lindmd-migrate.service` explicitly and inspect its exit
    status/journal. Revoke runtime INSERT/UPDATE/DELETE and sequence privileges on
    migration bookkeeping (`public.goose_db_version`); retain SELECT for startup
-   schema checks. Run `runuser -u lindmd -- lindmd check-config -config
-/etc/lindm/server.json`. This checks configuration/resources, not DB connectivity.
-6. Run `runuser -u lindmd -- lindmd bootstrap-owner -config /etc/lindm/server.json
--username owner` in a private terminal. It prints a one-time enrollment secret;
-   do not capture it in a journal, command argument, URL or support bundle.
-   Bootstrap is one-shot, not a password-only login or a recovery bypass.
+   schema checks. Validate complete runtime configuration with a protected
+   transient credential, not `runuser` access to the persistent URL:
+
+   ```sh
+   sudo systemd-run --wait --collect --pipe \
+     -p User=lindmd -p Group=lindmd -p MemorySwapMax=0 -p LimitCORE=0 \
+     -p LoadCredential=database-url:/etc/lindm/database-url \
+     /usr/bin/lindmd check-config -config /etc/lindm/server.json \
+     -database-url-credential database-url
+   ```
+
+   This checks configuration/resources, not DB connectivity.
+
+6. Create `/var/lib/lindmd-operations/setup` owned by `lindmd-migrate` mode 0700
+   beneath root-owned `/var/lib/lindmd-operations`. Issue the code through a
+   protected transient migrator credential:
+
+   ```sh
+   sudo systemd-run --wait --collect --pipe \
+     -p User=lindmd-migrate -p Group=lindmd-migrate \
+     -p MemorySwapMax=0 -p LimitCORE=0 \
+     -p LoadCredential=database-url:/etc/lindm/migrate/database-url \
+     /usr/bin/lindmd setup-code -config /etc/lindm/migrate/server.json \
+     -database-url-credential database-url \
+     -output /var/lib/lindmd-operations/setup/code
+   ```
+
+   The issuer creates a mode-0600 file; the database stores only its hash. Transfer
+   file/directory ownership to root after issuance, or use the installer's
+   root-owned staged migration config to issue directly as root. Read the code
+   only in a private root terminal. Never put it in a journal, argument or URL.
+
 7. Run `systemctl enable --now lindmd.service`. Verify the actual TLS chain and
    `GET /healthz` and `/readyz` (204), embedded `/` (200), LOCAL `/auth/options`,
-   and unauthenticated admin RPC denial (401). Visit `/enroll`, enter the secret,
-   choose a password and register a user-verifying WebAuthn authenticator. The
-   password plus authenticator are required for subsequent login.
+   and unauthenticated admin RPC denial (401). Visit `/setup`, enter the setup code,
+   choose a username/password and register a user-verifying passkey. Successful
+   registration opens the dashboard; a password without a passkey grants no session.
 8. Open **Settings › Agent repository**. Confirm **Ready**, the expected agent
    version and the target OS/architecture. There is no repository configuration
    step. Copy and run the console enrollment command on the bare device, then
@@ -1570,7 +1851,8 @@ administrator (substitute the actual runtime role if different):
 
 ```sql
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
-ON public.goose_db_version FROM lindm_runtime;
+ON public.goose_db_version, public.lindm_schema_compatibility,
+   public.server_recovery_state FROM lindm_runtime;
 DO $$
 DECLARE sequence_name text := pg_get_serial_sequence('public.goose_db_version', 'id');
 BEGIN
@@ -1580,74 +1862,305 @@ BEGIN
 END $$;
 ```
 
-Retain table SELECT so `serve` can check the exact applied migration set. On a
-local PostgreSQL host, feed this SQL to `runuser -u postgres -- psql -X -v
-ON_ERROR_STOP=1 -d lindm`. Schema CREATE denial alone is insufficient: a runtime
-credential must not be able to forge migration history or advance its sequence.
+Retain SELECT so `serve` checks exact applied history and the trusted migrator-owned
+compatibility floor. On a local PostgreSQL host, feed this SQL to `runuser -u
+postgres -- psql -X -v ON_ERROR_STOP=1 -d lindm`. Schema CREATE denial alone is
+insufficient: a runtime credential must not forge migration or recovery metadata.
+
+#### Protected browser setup
+
+First-run setup requires the installer's cryptographically random 256-bit code.
+`setup-code` resolves only the migration database resources and never reads runtime
+signing keys. Its output must be a **new** file under owned, non-replaceable
+directory ancestry; it rejects existing files and symlinks instead of overwriting
+another secret. The file contains only the base64url code plus newline; stdout
+and structured logs do not contain the code.
+
+The migration identity owns the setup capability table. Migration 50 strips
+inherited non-owner table grants, preserving read access and only
+`UPDATE(account_id, consumed_at)` for existing writers. Runtime may reserve or
+consume a code; it cannot create a code, change its hash/expiry, or remove it.
+Code issuance therefore requires the dedicated migration database identity even
+when root invokes the staged issuer configuration.
+
+The code expires after 24 hours. The first correct code submission reserves one
+username and password hash, not administrator authority. Every restart requires
+that same code, username and password. Another holder cannot change the reserved
+identity or password. A failed, cancelled or interrupted passkey ceremony creates
+no session and consumes no owner capability; restart the form with those same
+values. A fresh ceremony replaces its predecessor, so old challenges cannot replay.
+Browser code/password/challenge values stay in component memory only, never in
+URLs, query caches, persistent storage or logs.
+
+After expiry, explicitly issue a replacement code to a new protected output file.
+Rotation invalidates old codes and in-flight challenges while preserving the
+reserved account and password. It is not a reset or account takeover mechanism.
+If the password is lost before setup completes, preserve the installation state
+and investigate through the protected server recovery procedure; the installer
+does not silently choose a different owner.
+
+Successful user-verifying registration consumes the code, pins/initializes the
+owner, saves its credential and creates its authenticated session atomically.
+Configured signed initial execution delegation admission joins that transaction;
+refusal rolls everything back and allows the same bound setup to resume.
+After initialization, issuance and setup are disabled. Remove the consumed code
+file as root; retained consumed copies grant no authority.
+
+Setup requests require the exact configured HTTPS Origin, JSON content type and
+the console's non-simple setup header, with an 8 KiB body limit. Durable admission
+allows ten attempts per client IP and sixty globally per minute, across replicas
+and restarts. Client addresses come from the actual connection, never forwarded
+headers. All authentication responses use `Cache-Control: no-store`.
 
 ### Upgrade, backup, restore and removal
 
-Before changing the binary, stop `lindmd`, fence inbound admin/device traffic and
-take a database **and** protected-file backup. Install the authenticated next
-package, explicitly run the migration unit, check configuration, start the runtime
-unit and verify HTTPS readiness plus authenticated administrator/device behavior.
-Package installation never runs DDL. Retain the old binary and backup: rolling back
-only the binary is safe only if its exact schema check accepts the current database.
-Current greenfield migrations are create-only; no deployed schema-upgrade promise
-is implied by a same-schema package upgrade.
+The first turnkey release, schema version 53 with minimum runtime floor 51, is the
+managed upgrade baseline. Pre-turnkey manual/lab installations are refused with a
+named unmanaged-installation error: no silent adoption, rekey or configuration
+overwrite occurs. Use a fresh turnkey instance and reenroll devices; no historical
+automatic migration or pre-baseline backup reader is offered.
+The new schema compatibility, first-run, recovery, status and custody migrations
+are versions 49–53. They follow the already-landed MCP migration 48 without
+renumbering existing history. Online status/custody expansions retain floor 51;
+rollback still obeys the declared floor, never an automatic down migration.
 
-Use standard PostgreSQL tools rather than a proprietary backup format. For a local
-database, as root with the runtime stopped:
+Run the next independently authenticated private bundle's `sudo ./install.sh`;
+it refuses same-version installation and unrequested downgrade. It checks the
+database version, exact migration history/compatibility policy and free disk
+(twice database size plus 4 GiB backup headroom), then requires a successful
+encrypted BackupCare snapshot **before** package replacement or migration.
+Unattended/direct native package upgrades cannot bypass this path: DEB preinst and
+RPM pretrans consume a root-only, version- and installer-process-bound one-use
+authorization. An ordinary APT/RPM transaction fails before replacing the server.
+The lifecycle lock and inherited operations lease serialize package replacement,
+backup, restore and release-feed updates. Timers cannot race the protected
+transaction; the installed old CLI makes the pre-upgrade snapshot, while the new
+CLI reconciles an already imported release feed after successful replacement.
+All entry points acquire the operations lease before the lifecycle lock. Protected
+update apply keeps the same lease across imported-release authentication,
+configuration staging and installation. The installer validates and reuses that
+same-process lease without closing its caller's ownership; timer restart occurs
+only after the lease is closed, including failure cleanup.
+
+`schema-check` distinguishes reviewed expand migrations from contract migrations.
+For `online=true`, the old runtime continues serving through the consistent backup,
+native binary replacement and bounded dedicated-identity expand migration. Its
+verified readiness is checked before restarting the new runtime and checking
+again. Contract migrations and the initial compatibility-policy cutover stop and
+fence runtime traffic before backup/migration. The current recovery-state contract
+raises the compatibility floor; an older binary lacking that security fence is
+not a permissible rollback. Never blanket-grant DML on existing metadata tables
+while the old runtime serves.
+
+Use the previous independently authenticated bundle with explicit `--rollback`
+only when its `schema-check` reports compatible with no pending migrations and
+its target is at or above the trusted compatibility floor. The installer still
+requires encrypted backup, never executes Down migrations, and performs native
+replacement plus verified readiness. Previous binary bytes are retained under
+`/var/lib/lindmd-operations/rollback/VERSION/lindmd`; this is not an independent
+signature substitute. Below-floor rollback requires fenced encrypted-backup
+restore with the recovery reconciliation/quorum gates, not a forced package
+downgrade. Keep the original signed bundles and offline backup identity separately.
+
+The signed native package contains the maintained `filippo.io/age` v1.3.2
+streaming encryption implementation. PostgreSQL snapshots and validation use
+the actual supported `pg_dump`/`pg_restore` clients, not a Go database substitute.
+No EPEL repository, external age executable or Internet feed is needed.
+Installer enablement of `lindmd-backup.timer` schedules a root-only encrypted
+backup every fifteen minutes, with a persistent timer and bounded execution.
+The backup includes the PostgreSQL custom archive, the original configuration,
+every configured resource reference, repositories and durable server state.
+Native migrator resources and PostgreSQL TLS configuration are inventoried
+without granting the runtime account access to them. Database roles/grants are
+recreated on the fresh host, not recovered by importing source superuser roles.
+
+#### Operator backup key custody
+
+Create the **operator backup identity on the offline operator workstation**,
+not on the server. `lindmd backup-keygen -identity-file FILE -recipient-file FILE
+-identity-passphrase-fd N` writes a passphrase-encrypted standard age identity
+and its public recipient. Passphrases must arrive through an owner-private
+anonymous pipe; creation consumes two identical LF-terminated lines.
+Decryption consumes one line. A numeric descriptor is not a secret. Never put
+passphrases in shell arguments, environment variables, plaintext files, terminal
+echo, journal output or a support capture. The maintained shared custody helper
+rejects regular files, named FIFOs, unsafe descriptors and missing confirmation,
+and cancels blocked reads with the command context. Offline private inputs and
+outputs require caller-owned mode-0700 directories and mode-0600 files; native
+server inputs retain strict root-protected, no-symlink ancestry.
+
+The secret-handling commands lock current memory and disable dumps before
+decryption. Grant the offline process sufficient `RLIMIT_MEMLOCK`; do not weaken
+that gate when a workstation limit is too low. Private identities/keys are
+decrypted only in memory. The server receives only the public recipient, checked
+by the installer and retained as `/etc/lindm/backup-recipient`.
+Keep the encrypted operator identity, its passphrase and immutable off-host
+backup copies under the organization's independent custody policy.
+
+The operator backup identity is **not** execution/PKI authority. Generated
+execution-root signing keys and generated CA keys are directly encrypted in
+memory to their custodians. The generated passphrase-encrypted custodian export
+and its encrypted authority objects are separate from the backup identity.
+Scheduled archives retain those ciphertext objects, never root-private keys,
+generated CA-private keys or plaintext custodian identities. A backup operator
+alone cannot decrypt the inner authority ciphertext. A custodian who possesses
+the applicable passphrase/export or recipient identity can; the three generated
+execution keys in one export do not constitute three independent humans.
+Supplied-custodian mode requires the operator to retain its encrypted CA/root
+key inputs separately as well.
+
+For an immediate native backup:
 
 ```sh
-umask 077
-install -d -m 0700 /var/backups/lindm
-runuser -u postgres -- pg_dump --format=custom lindm > /var/backups/lindm/database.dump
-tar -C /etc -cpf /var/backups/lindm/config.tar lindm
-find /etc/lindm -type f -exec sha256sum {} + > /var/backups/lindm/config.sha256
-find /etc/lindm -printf '%P %u %g %m\n' > /var/backups/lindm/config.inventory
+sudo lindmd backup -config /etc/lindm/server.json \
+  -recipient-file /etc/lindm/backup-recipient -output-dir /var/backups/lindm
 ```
 
-For a remote database, use an independently protected libpq connection/service
-file and `pg_dump` from a matching supported PostgreSQL client, with verify-full;
-never expose a password-bearing URL as a command argument. Database roles/grants,
-PostgreSQL TLS configuration, image/package digests and any separately configured
-artifact volumes are additional backup inventory. Encrypt backups before off-host
-storage, restrict custody, test decryption separately and retain an immutable copy.
+The command publishes only a complete authenticated encrypted archive at
+mode 0600 beneath the root-only backup directory. Plaintext custom-dump staging
+is private, size-bounded and removed before returning. PostgreSQL credentials
+remain in temporary private libpq service files: only nonsecret protected
+service-file paths enter subprocess environment; no credential URL is passed
+in argv and no subprocess diagnostics are relayed. Retain an immutable off-host
+copy. Timer files and backup retention consume storage: monitor capacity and
+apply the organization's retention policy rather than assuming automatic purge.
 
-Protected file inventory, including **every configured reference**, is:
+Backup completion metadata at
+`/var/lib/lindmd-operations/backup-health.json` is root-owned, public operational
+information bound to the original deployment, origins and normalized config.
+It records attempts, completion and encryption/archive completion, not proof of
+restoration. The service-owned state directory cannot replace this record.
+A failed attempt preserves a matching deployment's earlier completion; a
+different configuration does not inherit another deployment's success.
 
-| Material                                                                         | Required retention and custody                                              |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Runtime and migration JSON; deployment UUID/public origins                       | Restore exact identity, paths and listener policy                           |
-| Runtime/migrator database URL files, database CA and optional client cert/key    | Separate credentials; migrator never mounted into runtime                   |
-| Server TLS certificate/private key and device CA certificate/private key         | Preserve device trust; review expiry/revocation before reopening            |
-| Execution root/bootstrap documents; configured plan/start private keys           | Retain exact authority; offline root/release signing custody stays separate |
-| Optional OIDC and directory client secrets/trust roots                           | Reconcile with the real provider; LOCAL mode needs none                     |
-| PostgreSQL data/dump, roles/grants and TLS files; artifact volumes if configured | Consistent fenced snapshot, independently encrypted backup                  |
-| Package/repository signing trust and OCI digests                                 | Verify authentic recovery binaries without trusting the failed host         |
+#### Recovery authority and fresh-host restore
 
-Restore initially **without any device/admin ingress**. Provision the original
-database roles and dedicated service users, create a database owned by the migrator,
-then feed the custom dump to `pg_restore --exit-on-error --dbname=lindm` as the
-database administrator. Restore `/etc/lindm` preserving numeric ownership/modes (or
-map each recorded owner to the new host's dedicated account), validate its inventory
-and `lindmd check-config`, then start only on the fenced network. Do not automatically
-run migrations against an unknown backup. Validate migration identity, owner/device
-rows, certificates and current revocations before advancing.
+`lindmd restore-drill -archive FILE -identity-file FILE
+-identity-passphrase-fd N` is a nondisruptive offline archive check: it verifies
+age final-stream authentication, the closed manifest/schema/version inventory,
+every file digest, safe archive paths/modes, configuration and trust loading,
+and the actual PostgreSQL custom-archive parser. It does not claim live device
+management recovery, fresh security state or absence of later revocations.
 
-The maintained VM lane destroys only its disposable database and restores the
-same-epoch backup to prove binary/config/data recovery. This is **not** stale-backup
-dispatch recovery or revocation reconciliation. Before production ingress is
-reopened, invalidate restored sessions/challenges, reconcile independently retained
-security events and all outstanding work. The global restore-hold/recovery-epoch
-workflow described below is not yet qualified; keep a stale restore fenced rather
-than assuming the absence of destructive operations in an early build makes replay safe.
+Safe stale recovery requires a **separately authenticated complete current
+checkpoint**. While the source is available, externally fence every admin/device
+ingress and stop **every** runtime/HA replica, not merely the local systemd unit.
+Drain existing grants on every replica before capture; the persistent database
+hold is a startup fence, not a stop command for already-running processes.
+Capture with the native backup command plus `-confirm-fenced`. It drains the
+real thirty-second start-grant window plus admitted clock skew, fsyncs a source
+restore marker, then uses the separately protected migrator credential to
+durably commit `server_recovery_state.hold=true` before `pg_dump`. The checkpoint
+itself therefore contains the replica-authoritative hold, along with the exact
+schema, root digest and capture time. The source cannot be
+silently restarted: there is no unsigned clear-hold command. Ordinary scheduled
+backups are not complete fenced checkpoints and cannot mint freshness later.
+If the source has been lost, a stale archive or possession of signing keys alone
+cannot prove current revocations. Recover only from an independently retained
+complete checkpoint through the loss fence, or remain fenced and follow the
+organization's reprovision/re-enrollment recovery process.
 
-Removal/purge stops the service and removes package-owned binaries/units only.
-Operator `/etc/lindm` configuration/keys, PostgreSQL data, backups and dedicated
-accounts are retained deliberately. Their irreversible deletion is a separate
-operator retention decision; never delete them in package lifecycle hooks.
+On the offline custody workstation, `lindmd restore checkpoint-sign` takes
+`-archive`, `-security-archive`, `-identity-file`,
+`-identity-passphrase-fd`, an independently authenticated `-root-file`,
+`-recovery-epoch`, `-output` and `-confirm-fenced`. Generated authority is supplied
+using `-custody-export-file FILE -custody-passphrase-fd N`; external authority uses
+`-custodian-identity-file FILE -custodian-identity-passphrase-fd N` plus repeated
+`-key-custody FILE`. Signers attest the complete newer snapshot, original archive
+digest, exact deployment/origins/root, package version and newer epoch. The
+archive cannot select its own trusted root. Use the maintained offline
+`lindmctl execution delegation sign` command to create the same-root
+`UpdateExecutionTrustRequest` with a strictly newer quorum-approved recovery
+epoch; generated encrypted authority uses the corresponding custody-export
+and descriptor flags. No serving-key or unsigned epoch bypass is accepted.
+There is no plaintext root-key `-key-file` checkpoint-signing path: encrypted
+custody inputs must be mode 0600 even when the offline caller is root. Public
+root JSON and on-host status-readable ciphertext metadata retain their separate
+protected read policy; they are not private decryption inputs.
+
+Provision a fresh authenticated host/database on the checkpoint's exact
+compatible package/schema, with separate restricted runtime/migrator identities,
+verify-full TLS, matching public origins and empty management data. Keep
+all ingress and replicas externally fenced and the runtime stopped. Run:
+
+```sh
+sudo lindmd restore -config /etc/lindm/migrate/server.json \
+  -archive EARLIER_ARCHIVE -security-archive AUTHORITATIVE_CHECKPOINT_ARCHIVE \
+  -security-checkpoint SIGNED_CHECKPOINT -execution-update SIGNED_EPOCH_REQUEST \
+  -root-file INDEPENDENT_PUBLIC_ROOT -identity-file ENCRYPTED_OPERATOR_IDENTITY \
+  -identity-passphrase-fd N -confirm-fenced -reason 'Approved recovery drill'
+```
+
+Place the encrypted operator identity and public approval inputs under a
+root-protected temporary directory, then remove those transient inputs after
+the drill. Never copy custodian private keys to the fresh server.
+Restore first validates both archives, their bindings and the fresh target,
+then durably fences that target before database mutation. Partial failures stay
+held. It restores the **complete authoritative checkpoint**, not earlier data
+pretending to be current; report the checkpoint time and any externally accepted
+loss interval. Old certificates/revocations and device journals are retained
+from that snapshot. Fresh database credentials/TLS remain fresh; preserved URL
+files are republished to the target's original stable paths, root:root mode 0600,
+with references to preserved target TLS resources. Native credential units need
+no path change. Source application/device trust and configured runtime secrets
+are restored intact.
+Runtime metadata privileges are narrowed after `pg_restore --no-acl`: schema,
+migration and recovery state stay SELECT-only, and first-run state keeps only
+its existing account/consumption column updates.
+
+Restored browser/CLI sessions, challenges and setup codes are invalidated.
+Pending destructive/resource work and assistance are cancelled/blocked and
+require fresh authorization/consent. A quorum-verified same-root newer epoch is
+applied transactionally and checkpoint acceptance is audited. Only after exact
+schema/trust/config/target checks, authority invalidation, ciphertext custody
+publication and private staging cleanup succeed is the database/filesystem hold
+released. Validation, transactional reconciliation and protected-file publication
+are distinct fail-closed stages; none owns an early hold-release path. Then start the
+runtime, reconcile devices, obtain fresh owner authentication/approvals, and
+prove a newly authorized real managed action before removing the external fence.
+Archive validation alone is not this full maintained fresh-VM/device drill;
+record actual lane evidence in verification rather than claiming an unrun result.
+
+After restore, retain **both** the canonical source authority export and the
+fresh database CA export. `sudo lindmd custody-status -config
+/etc/lindm/server.json` reads the bound public provider record and prints each
+required ciphertext path/SHA plus `ConfirmationSHA256`, the composite required
+export-set digest. Copy each required ciphertext off-host and check its actual
+individual SHA before owner confirmation. A composite is not a file checksum.
+Source-only old confirmation cannot acknowledge the fresh database CA. Runtime
+status never decrypts authority exports or prints their private contents.
+
+#### Support, private offline updates and removal
+
+`sudo lindmd support -config /etc/lindm/server.json -output NEW_FILE` produces a
+root-only bounded tar of structured allowlisted platform/version, counts,
+configuration/schema/recovery and public backup/release facts, with an explicit
+omission manifest. It does not collect raw configuration, database rows,
+journals, free-text operator reasons, URLs, sessions/challenges/setup codes,
+passwords, keys, backup identities or backup contents.
+
+Server release discovery is distinct from agent TUF. Import a customer-delivered
+private signed release export with `sudo lindmd update import -bundle DIRECTORY
+-release-key-file INDEPENDENT_PUBLIC_KEY -release-key-id SPKI_SHA256`.
+The pinned signature authenticates the exact release bytes and optional typed
+server notice; imported exports cannot roll the discovered release backward.
+`sudo lindmd update check` re-verifies the retained signed bundle and records
+version/security notice validity. The enabled hourly release-check timer refreshes
+only an existing import, never contacts a public feed. Missing/expired notice
+metadata is not a current security feed. `sudo lindmd update apply` invokes the
+native installer with full and supplemental signature checks, stops the runtime,
+takes an encrypted pre-migration backup and retains the verified previous binary.
+One exclusive operations lease spans imported-bundle re-verification, config
+staging and the whole installer call. Lifecycle locks are acquired after that
+lease consistently, and stopped timers are restarted only after its final close.
+The backup identifies the running schema-compatible pre-upgrade release, not the
+new installer process. Old binaries cannot serve below the recovery schema floor.
+
+Removal/purge stops runtime/backup/release timers and removes package-owned
+binaries/units only. Operator `/etc/lindm` configuration/keys, PostgreSQL data,
+encrypted authority exports, independently protected operational state, backups
+and dedicated accounts are retained deliberately. Their irreversible deletion is
+a separate documented operator retention decision, never a package lifecycle hook.
 
 ### OCI and Docker Compose
 
@@ -1657,16 +2170,28 @@ binary; do not substitute a dev server or mount frontend source into production.
 Publish and verify the organization's signed image digest before installation.
 The checked-in base-image pin is not a signature on a locally built Lindm image.
 
-`deploy/server/compose.yml` is the production single-host topology: a
-digest-pinned PostgreSQL 18.6 with TLS and a named persistent data volume, separate
-explicit `migrate` and `bootstrap` operations, and an unprivileged read-only server
-with no capabilities. PostgreSQL has no published host port. Set `LINDM_IMAGE` to
-the released digest and `LINDM_CONFIG_DIR` to a protected absolute directory.
+`deploy/server/compose.yml` is a **laboratory single-host topology**, not a
+supported turnkey container installer. It has digest-pinned PostgreSQL 18.6 with
+TLS and a named persistent volume, separate explicit migration/setup operations
+and an unprivileged read-only server. PostgreSQL has no published host port.
+It does not provide the native installer's authenticated dependency/image import,
+automatic local PKI/role provisioning, protected upgrade backup/compatibility
+gates or full restore rehearsal. OCI release exports currently cover application
+images, not an independently signed PostgreSQL dependency image. The Dockerfile's
+public base-image pulls are build inputs, not an approved deployment download
+path. No container deployment may pull a public registry as an air-gap fallback.
+Equal-guarantee bundle-loaded Compose/Quadlet delivery is therefore not claimed.
+For the narrower lab topology, set `LINDM_IMAGE` to a locally loaded,
+independently authenticated released digest and `LINDM_CONFIG_DIR` to a protected
+absolute directory.
 Default runtime UID/GID is 65532; own its mode-0600 bind-mounted input files by
 that numeric identity. Configure public origins/listener addresses for the
 deployment (inside the container bind listeners to `0.0.0.0`). The runtime URL uses
 hostname `postgres` and `sslmode=verify-full` with the separately mounted CA.
 The runtime does not mount the migrator credential.
+Set `LINDM_SETUP_DIR` to a separate absolute mode-0700 output directory owned by
+the operation's numeric UID. Only `setup-code` mounts it writable; the runtime
+never mounts either that directory or the migration credential.
 
 Prepare the files listed by the Compose bind mounts, including separate runtime
 `server.json` and migration-only `migrate.json`, PostgreSQL TLS server certificate
@@ -1682,7 +2207,7 @@ docker compose -f deploy/server/compose.yml run --rm migrate
 docker compose -f deploy/server/compose.yml exec -T -u postgres postgres \
   psql -X -v ON_ERROR_STOP=1 -d lindm <<'SQL'
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
-ON public.goose_db_version FROM lindm_runtime;
+ON public.goose_db_version, public.lindm_schema_compatibility FROM lindm_runtime;
 DO $$
 DECLARE sequence_name text := pg_get_serial_sequence('public.goose_db_version', 'id');
 BEGIN
@@ -1691,14 +2216,15 @@ BEGIN
   END IF;
 END $$;
 SQL
-docker compose -f deploy/server/compose.yml run --rm bootstrap
+docker compose -f deploy/server/compose.yml run --rm setup-code
 docker compose -f deploy/server/compose.yml up -d lindmd
 ```
 
-Bootstrap output is intentionally not persisted by Docker's log driver; receive
-its one-time secret only in a private operator terminal. Explicitly choose
-`LINDM_BIND_IP` and firewall policy before exposing the admin/device ports (default
-bind is loopback). Verify the HTTPS chain and readiness from the real access path.
+Read `$LINDM_SETUP_DIR/code` only from a private operator terminal and complete
+`/setup` with your username, password and passkey. Remove the consumed code file
+after completion. Explicitly choose `LINDM_BIND_IP` and firewall policy before
+exposing the admin/device ports (default bind is loopback). Verify the HTTPS chain
+and readiness from the real access path.
 Upgrade by stopping `lindmd`, backing up, selecting the next immutable image,
 running the explicit migration and recreating `lindmd`. For Compose backup/restore,
 run the same PostgreSQL tools through `docker compose exec -T -u postgres postgres`
@@ -1800,16 +2326,138 @@ The holder is named `lindmd jobs HOST pid PID`; replica logs record
 `background job leadership acquired` and `released`. Job failures and database
 failover never stop the serving process.
 
-Rolling upgrade applies only to releases whose exact schema check accepts the
-running database (same-schema releases). A schema-changing release uses the fenced
-single-host upgrade above. For each replica in turn: `systemctl stop lindmd`
-(SIGTERM closes listeners, drains in-flight requests and releases job leadership),
-install and start the new package, then wait until **both** balancer backends report
-that replica UP and the public `/readyz` returns 204 before stopping the next one.
+Rolling schema application is permitted only when the dedicated migrator's
+`schema-check` reports `online=true` for every pending, reviewed expand migration
+and each participating/rollback binary remains at or above the trusted
+compatibility floor with the exact recorded applied history. Otherwise use the
+fenced single-host upgrade. The initial policy and recovery-security cutovers are
+contract changes, not online claims. For each replica in turn, drain/stop runtime,
+use the authenticated gated package installer and successful encrypted snapshot,
+then wait until both balancer backends report that replica UP and public
+`/readyz` returns 204 before replacing the next replica.
 Mixed N/N+1 replicas share the database, advisory keys and protocol during the roll.
 Devices reconnect through the balancer on connection loss; protocol state lives in
 PostgreSQL, an exact start-authorization retry returns the same grant and an exact
 result-report replay is accepted, so a lost reply never repeats an effect.
+
+### Server checks, readiness and alerts
+
+Open **Settings → Server status** with an unrestricted `integrations.manage`
+grant. Each row separates the latest check time from the original evidence time.
+Unknown means evidence is missing; failed means the check observed a failure;
+attention means expiry, stale evidence or an overdue backlog. A page refresh reads
+the latest operational observation, not a new probe; custody reads its current
+protected creation record separately. Every replica samples operational checks
+once per minute, under a 15-second probe deadline; observations older than two minutes
+become unknown without advancing their evidence timestamps.
+
+- **Database:** both runtime and console pools must answer over their already
+  verified TLS connections. The check does not certify query capacity, migration
+  ownership or application transactions; startup still enforces those gates.
+- **Certificates:** loaded HTTPS and device-CA certificates need renewal within
+  30 days of expiry. Renew under the PKI maintenance plan and restart the replica.
+  A valid date range alone does not certify external client trust or revocation.
+- **Backups:** read the root-owned redacted
+  `/var/lib/lindmd-operations/backup-health.json` record through the backup provider.
+  Its directory must remain root-owned and non-writable by the runtime account.
+  Records must bind this deployment, its public origins and canonical runtime
+  configuration. Missing/unreadable/unbound records remain unknown. A record for
+  another configuration supplies no completion timestamp or archive evidence for
+  this server; run a backup with this deployment's protected configuration.
+  A matching record's failed attempt remains failed. Archive completion requires encryption and
+  verification, never implies a restore drill, and needs attention after one
+  hour without completion against the 15-minute backup timer. Inspect
+  `lindmd-backup.service` and its timer before repeating a failed backup.
+- **Offline server release notices:** read the protected
+  `/var/lib/lindmd-operations/release-feed-health.json` record produced by signed
+  private-bundle import and release checking. Missing/unverified imports remain
+  unknown, expired notices need attention, and a comparison against a different
+  installed binary requires a fresh release check. A newer authenticated release
+  needs review and a fenced backed-up upgrade; security notices explicitly name
+  that decision. A signed bundle without an expiring notice can establish a newer
+  imported version, but never establishes current security-discovery coverage.
+  A confirmed comparison means only that this authenticated import offers no
+  newer release, not that the site is globally up to date. Keep importing signed
+  notices through the customer's private connected-to-offline transfer process.
+  Server releases describe the signed product globally rather than a site's
+  backup identity; installed-version comparison remains mandatory.
+- **Agent installation:** show the existing signed installation-readiness
+  contract and retain its startup verification time. The bundled repository needs
+  no separate public hosting or manual repository setup. Review platform coverage
+  in Settings; serving still verifies package hashes before returning bytes.
+- **Advisory feeds:** report configured acquisition failures, absent evidence
+  and expiry separately. Fresh acquisition is not proof of complete native
+  package coverage. Restore connectivity or import an authenticated offline bundle.
+- **Storage:** inspect the filesystem holding `/var/lib/lindmd`, not PostgreSQL
+  or an off-host backup destination. Less than 1 GiB, 10% available blocks or 5%
+  available file slots needs attention. Extend the volume or review retention;
+  never remove active data to clear a warning.
+- **Work:** inspect delivery dead letters, pending delivery age and due reports.
+  Ten minutes overdue needs attention. Local worker loop failures are failed;
+  waiting for exclusive leadership is not proof that a peer holds the lock.
+  Inspect leadership and the service journal using the HA procedure above.
+
+`GET /healthz` returns only process liveness (204). `GET /readyz` returns 204 only
+when both database pools answer within a shared two-second deadline, otherwise
+a generic 503. Neither exposes a database URL or operational diagnostic.
+`GET /metrics` is unauthenticated on the administrative TLS listener and returns
+Prometheus text gauges: `lindm_server_status_state`, `_observed_seconds`,
+`_evidence_seconds` and `_expiry_seconds`. The only label is a closed component
+name. State values are 1 unknown, 2 confirmed check, 3 attention, 4 failed and
+5 inactive; timestamp zero means unavailable, not an epoch observation.
+Restrict scraping through the site's network policy and trust the actual TLS
+chain. Alert on states 1/3/4 and on an observation older than two minutes rather
+than interpreting a successful HTTP scrape as a successful component check.
+
+When integrations are configured, degradation transitions insert audit events
+and delivery work atomically through the existing webhook/syslog outbox.
+Unchanged degradation sends at most one reminder every six hours per component
+and replica, including across restarts; recovery sends once, while an initial
+successful observation does not manufacture a recovery alert. Event actions
+identify unknown, attention, failed, recovered and inactive states. The public
+delivery projection contains only action, an opaque replica/component reference,
+event identity and timestamp, never diagnostic text, backup names or credentials.
+Use **Integrations** to confirm delivery, inspect dead letters and replay after
+fixing the receiver. A database outage can prevent the outbox write: pair these
+notifications with an independent availability/Prometheus monitor. No configured
+destination means no external alert delivery.
+
+Each distinct authenticated server release/security notice emits promptly even
+while the previous notice already needs attention. Its stable notification
+identity binds release versions, security indication and advisory references,
+never polling timestamps, and is not a public metric label.
+
+#### Move recovery keys off this server
+
+When installation or restore generates recovery identities, **Server status**
+keeps **Move your recovery keys off this server** visible until the actual
+deployment owner records an attestation for the complete required-export set.
+Inspect each protected export path and **File checksum** in **Details**. Transfer
+every passphrase-encrypted export through the site's authenticated root/off-host
+process, and check each file checksum at the destination. Keep each file's
+passphrase separately. The **Confirmation digest** binds the entire set; it is
+not an individual file checksum. The console never serves these files, and the
+runtime never writes privileged custody metadata.
+
+Choose **Confirm off-server custody**, then acknowledge every listed export.
+**Record my confirmation** requires a new local-account password and
+user-verified passkey ceremony for that exact set. Initial setup/sign-in,
+generic step-up, an invited owner-role account and service accounts cannot
+substitute for the actual deployment owner's scoped verification. The server
+checks current authorization and the live session inside the attestation
+transaction, then consumes the scoped verification stamp. Attestation, audit and
+configured integration delivery work commit together.
+
+**Owner confirmation recorded** means only that this owner made that assertion;
+it proves neither external storage nor removal. Refresh after an uncertain
+response before starting another confirmation. A changed required-export set
+restores the task and requires new scoped verification. Restore preserves the
+source server export and any newly generated target database identity export;
+an old source-only attestation cannot clear the target identity task. Each export
+has its own passphrase. Missing, unreadable or foreign deployment/origin/configuration
+metadata remains unknown. Explicit independently supplied recipients require no
+generated-identity attestation; absence never implies that mode. Moving ciphertext
+away retains immutable evidence and does not itself clear the task.
 
 ### Automatic rollout operations
 
@@ -1890,6 +2538,59 @@ promotion/HA qualification, not evidence of native device-health execution.
   software/advisory import, updates, backup/restore and audit export inside the site.
 - Distinguish an air-gapped site with internal networking from a device disconnected
   from that site. The latter cannot receive fresh policies or destructive authority.
+
+#### Native server prerequisite custody
+
+Server dependency snapshots use `lindm.serverdeps.v1.Manifest`, not the
+openSUSE-only rolling laboratory snapshot format. The native backend explicitly
+distinguishes DEB from RPM. Signed release custody authenticates the snapshot
+content address; it cannot substitute a lindm key for a distro package key.
+Every closure records distro/version/architecture, authenticated base-image
+digest and native installed inventory, installer-requested packages, solver
+version, acquisition time and custody, exact file sizes/hashes, vendor metadata,
+package provenance, and capture plus fresh-baseline offline replay transcripts.
+
+Ubuntu retains original signed `InRelease` and compressed vendor indexes.
+APT still verifies the pinned Ubuntu archive key, index/package digests and
+native metadata expiry during offline installation; no synthetic unsigned index
+or signature/expiry bypass is permitted. The bootstrap verifier is the distro's
+intrinsic APT/dpkg/gpgv runtime, not an assumed preinstalled application service.
+RHEL acquisition requires entitled vendor custody and its own RPM backend;
+Ubuntu support does not qualify RHEL or grant redistribution rights.
+APT uses native `--force-confdef`/`--force-confold` and
+`UCF_FORCE_CONFFOLD=1` to preserve existing operator configuration instead of
+silently replacing modified files. Those settings do not disable vendor
+authentication or stop/start existing services. The privileged installer owns
+any default-cluster suppression and service-start policy for its transaction;
+the dependency snapshot primitive does not change PostgreSQL host policy.
+Native APT configuration and source fragments must use owned empty directories
+and an owned empty main configuration file. A literal `-` configuration path
+resolves under ambient `/etc/apt/-`; it is not an isolation mechanism.
+
+`lab serverdeps export|import|present|install -cache STORE -sha256 DIGEST` uses
+bounded manifest framing followed by exact sorted file bytes. Transfers cannot
+express archive links or extra paths. Import rejects symlink traversal, missing
+or extra content, digest/count/byte mismatches and unsupported native backends,
+then verifies vendor authentication before atomic publication. Snapshot files
+are immutable and content-addressed. `install` requires root and denies external
+networking; it never configures or falls back to origin repositories.
+Development capture is explicitly labelled `development-lab`; production
+release export must apply the release's independent custody policy.
+Choose a new capture `-record` path under an existing directory. The evidence
+writer runs after native capture/replay publication and joined guest cleanup;
+a record-write failure is still a failed wrapper command, even when an
+authenticated immutable snapshot exists. Retain the manifest and its original
+capture/replay transcripts, distinguish those observations from wrapper status,
+and qualify the final integrated installer/helper independently.
+Use `lab vm serverdeps -replay-sha256 DIGEST` with the retained authenticated
+`-manifest`, `-snapshot-cache`, matching `-lab-binary` and `-lab-sha256`, and a
+separate new `-record` to qualify a newer consumer against existing Ubuntu
+closure bytes. The route refuses another image/backend or changed fresh
+baseline, validates vendor trust before transfer and again in the product
+helper, and installs under denied QEMU egress plus a network namespace.
+It preserves the original capture/replay evidence and observes actual owned
+guest cleanup before returning. RHEL acquisition remains a separate entitled
+backend; this Ubuntu consumer route neither registers RHSM nor qualifies RHEL.
 
 ### Offline bundle operations runbook
 

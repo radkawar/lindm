@@ -148,14 +148,32 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if clean[1] == "snapshot" || clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" || provisionInstallerLane(clean[1]) {
 		memory = 4096
 	}
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+		memory = 4096
+	}
 	cfg, err := labhost.Load()
 	if err != nil {
 		return err
 	}
 	requirements := &labhost.Requirements{Host: name, Architecture: arch, Vcpus: 2, MemoryMib: memory, RequireKVM: vmRequiresKVM(cfg, clean[1], labhost.FlagValue(clean, "accelerator"), arch)}
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+		requirements.RequireKVM = true
+	}
 	candidates, err := labhost.Select(cfg, requirements)
 	if err != nil {
 		return err
+	}
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+		local := candidates[:0]
+		for _, candidate := range candidates {
+			if candidate.Transport == "local" && candidate.Runtime == "native" {
+				local = append(local, candidate)
+			}
+		}
+		candidates = local
+		if len(candidates) == 0 {
+			return errors.New("deploy requires a configured local native x86 KVM host; remote and container fallbacks are forbidden")
+		}
 	}
 	chosen := candidates[0]
 	var failures []error
@@ -294,7 +312,7 @@ func vmHolds(args []string) bool {
 
 func vmHasHardwareFlags(command string) bool {
 	switch command {
-	case "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap",
+	case "serverdeps", "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap",
 		"provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
 		return true
 	default:
@@ -333,6 +351,9 @@ func vmRequiresKVM(cfg *labv1.LabConfig, command, accelerator, architecture stri
 // resource lane adds an independent probe-peer guest beside the device; every
 // guest holds its own capacity slot for the lane's whole lifetime.
 func vmGuestCount(lane string, args []string) uint32 {
+	if lane == "deploy" {
+		return 3
+	}
 	if lane == "resources" && slices.Contains(strings.Split(labhost.FlagValue(args, "kinds"), ","), "firewall") {
 		return 2
 	}
@@ -416,7 +437,7 @@ func runAdmittedHostExec(ctx context.Context, args []string, stdout, stderr io.W
 		}
 	}
 	args = labhost.SetFlag(args, "cache", persistentCache)
-	if lane == "snapshot" {
+	if lane == "snapshot" || lane == "serverdeps" {
 		args = labhost.SetFlag(args, "snapshot-cache", persistentCache)
 	}
 	if lane == "assistance" && vmHolds(args[1:]) && labhost.FlagValue(args, "advisory-cache") == "" {

@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
+	"lindm/internal/devlab/webauthnlab"
 	"lindm/internal/identity"
 	"lindm/internal/testdb"
 )
@@ -36,7 +37,15 @@ func reportFixture(t *testing.T) (*Service, context.Context, *pgxpool.Pool, uuid
 			t.Error(err)
 		}
 	})
-	enrollment, err := identities.BootstrapLocalOwner(ctx, "report-owner")
+	code, err := identity.IssueSetupCode(ctx, pool)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := webauthnlab.RegisterSetupOwner(ctx, identities.Handler(), "https://reports.example.test", code, "report-owner", "private report fixture password")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerID, err := uuid.Parse(owner.GetId())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,10 +57,10 @@ func reportFixture(t *testing.T) (*Service, context.Context, *pgxpool.Pool, uuid
 	if err != nil {
 		t.Fatal(err)
 	}
-	// This fixture covers RPC business authorization against real local identity
-	// and PostgreSQL; it does not claim a browser session/WebAuthn ceremony.
-	ctx = identity.WithPrincipal(ctx, identity.Principal{ID: enrollment.AccountID, Role: identity.RoleOwner})
-	return service, ctx, pool, enrollment.AccountID
+	// Real LOCAL setup uses a software lab authenticator, not a browser or physical
+	// authenticator qualification. RPC business authorization uses its owner.
+	ctx = identity.WithPrincipal(ctx, identity.Principal{ID: ownerID, Role: identity.RoleOwner})
+	return service, ctx, pool, ownerID
 }
 
 func downloadArtifact(t *testing.T, s *Service, ctx context.Context, id string) ([]byte, *integrationsv1.ReportSignedManifest) {

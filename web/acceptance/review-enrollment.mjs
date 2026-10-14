@@ -2,8 +2,8 @@
 
 // Real stock console scenarios and a deliberately absent signed artifact.
 // Missing repository configuration alone is not an installation failure.
-import { ChromiumDriver, UI } from "./drivers.mjs";
-import { enroll, signIn } from "./journey.mjs";
+import { ChromiumDriver } from "./drivers.mjs";
+import { reviewSetup } from "./review-setup.mjs";
 
 export async function reviewEnrollmentFixtures({
   driver,
@@ -52,9 +52,9 @@ export async function reviewEnrollmentFixtures({
       });
       await published.authenticator([]);
       await published.goto(fixture.origin);
-      const ui = new UI(published, 30_000);
-      await enroll(ui, fixture);
-      await signIn(ui, fixture);
+      results.push(
+        ...(await reviewSetup({ driver: published, fixture, publication, combos, ...helpers })),
+      );
       for (const { theme, viewport } of combos) {
         await published.page.setViewportSize({ width: viewport.width, height: viewport.height });
         await published.page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });

@@ -363,6 +363,22 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
   // An internal error carrying a familiar reason must remain a real failure.
   if (failure.code === Code.FailedPrecondition) {
     switch (failure.reason) {
+      case "recovery_custody_changed":
+        return {
+          tone: "warning",
+          title: "The recovery bundle changed",
+          message:
+            "This confirmation names a different recovery bundle. No confirmation took effect.",
+          action: "Refresh and review the current bundle before confirming.",
+        };
+      case "recovery_custody_unknown":
+        return {
+          tone: "warning",
+          title: "Recovery custody needs evidence",
+          message:
+            "The server lacks a matching protected custody record. No confirmation took effect.",
+          action: "Inspect the custody record and installation journal, then refresh.",
+        };
       case "assistance_unconfigured":
         return {
           tone: "neutral",
@@ -759,6 +775,15 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
     };
   }
   if (failure.code === Code.Unauthenticated) {
+    if (failure.reason === "setup_not_authorized") {
+      return {
+        tone: "warning",
+        title: "Check your setup details",
+        message: "The server did not accept these setup details.",
+        action:
+          "Check the setup code, username and password. Ask your server administrator for a fresh code if it expired.",
+      };
+    }
     if (failure.reason === "invalid_credentials") {
       return {
         tone: "warning",
@@ -772,6 +797,14 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Sign-in required",
       message: "Your session could not authorize this request.",
       action: "Sign in again to continue.",
+    };
+  }
+  if (failure.code === Code.ResourceExhausted && failure.reason === "setup_rate_limited") {
+    return {
+      tone: "warning",
+      title: "Wait before continuing setup",
+      message: "The server received too many setup attempts.",
+      action: "Wait one minute. Enter the same setup code, username and password.",
     };
   }
   if (failure.code === Code.ResourceExhausted && failure.reason === "assistance_command_capacity") {

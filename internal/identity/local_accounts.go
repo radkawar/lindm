@@ -69,63 +69,45 @@ func (s *Service) checkOwnerAuthenticationMode(ctx context.Context, q *identityd
 	return nil
 }
 
-// BootstrapLocalOwner claims an uninitialized deployment exactly once.
-func (s *Service) BootstrapLocalOwner(ctx context.Context, username string) (Enrollment, error) {
-	if !s.localPrimary {
-		return Enrollment{}, ErrIssuerMismatch
+func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries, request *authv1.CreateAccountRequest) (Enrollment, error) {
+	id, err := s.createLocalIdentity(ctx, q, request)
+	if err != nil {
+		return Enrollment{}, err
 	}
-	var enrollment Enrollment
-	err := s.withTx(ctx, func(q *identitydb.Queries) error {
-		deployment, err := q.LockDeploymentIdentity(ctx)
-		if err != nil {
-			return s.dbErr(err)
-		}
-		if deployment.InitializedAt.Valid || deployment.OwnerPrincipalID != nil {
-			return ErrOwnerInitialized
-		}
-		enrollment, err = s.createLocalAccount(ctx, q, &authv1.CreateAccountRequest{Username: username, Role: RoleOwner})
-		if err != nil {
-			return err
-		}
-		if _, err = q.MarkDeploymentInitialized(ctx, &enrollment.AccountID); err != nil {
-			return s.dbErr(err)
-		}
-		return s.insertSystemAudit(ctx, q, &enrollment.AccountID, auditkind.IdentityOwnerBootstrapped, principalResource(enrollment.AccountID), reasonInitialOwner)
-	})
-	return enrollment, err
+	return s.issueEnrollment(ctx, q, id)
 }
 
-func (s *Service) createLocalAccount(ctx context.Context, q *identitydb.Queries, request *authv1.CreateAccountRequest) (Enrollment, error) {
+func (s *Service) createLocalIdentity(ctx context.Context, q *identitydb.Queries, request *authv1.CreateAccountRequest) (uuid.UUID, error) {
 	if err := s.rules.Validate(request); err != nil {
-		return Enrollment{}, err
+		return uuid.Nil, err
 	}
 	username, role, breakGlass := request.GetUsername(), request.GetRole(), request.GetBreakGlass()
 	policy, err := s.currentPolicy(ctx, q)
 	if err != nil {
-		return Enrollment{}, err
+		return uuid.Nil, err
 	}
 	if policy.role(role) == nil {
-		return Enrollment{}, ErrAuthorizationDenied
+		return uuid.Nil, ErrAuthorizationDenied
 	}
 	scopeBinding, err := protojson.Marshal(&authv1.RoleBinding{Scopes: request.GetScopes()})
 	if err != nil {
-		return Enrollment{}, err
+		return uuid.Nil, err
 	}
 	id, err := uuid.NewRandom()
 	if err != nil {
-		return Enrollment{}, err
+		return uuid.Nil, err
 	}
 	_, err = q.UpsertPrincipal(ctx, identitydb.UpsertPrincipalParams{ID: id, Issuer: s.localIssuer, Subject: id.String(), DisplayName: username})
 	if err != nil {
-		return Enrollment{}, s.dbErr(err)
+		return uuid.Nil, s.dbErr(err)
 	}
 	if err = q.InsertLocalAccount(ctx, identitydb.InsertLocalAccountParams{ID: id, Username: username, Role: role, BreakGlass: breakGlass, ScopeBinding: scopeBinding}); err != nil {
-		return Enrollment{}, s.dbErr(err)
+		return uuid.Nil, s.dbErr(err)
 	}
 	if err = s.bumpLocalAuthorization(ctx, q, id, role); err != nil {
-		return Enrollment{}, s.dbErr(err)
+		return uuid.Nil, s.dbErr(err)
 	}
-	return s.issueEnrollment(ctx, q, id)
+	return id, nil
 }
 
 func (s *Service) issueEnrollment(ctx context.Context, q *identitydb.Queries, id uuid.UUID) (Enrollment, error) {

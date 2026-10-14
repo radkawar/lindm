@@ -95,6 +95,31 @@ func (q *Queries) ConsumeLocalEnrollment(ctx context.Context, secretHash []byte)
 	return account_id, err
 }
 
+const consumeRecoveryCustodyStepUp = `-- name: ConsumeRecoveryCustodyStepUp :execrows
+UPDATE sessions SET recovery_custody_step_up_digest = ''::bytea,
+  recovery_custody_step_up_at = NULL
+WHERE token_hash = $1 AND principal_id = $2
+  AND recovery_custody_step_up_digest = $3::bytea
+  AND recovery_custody_step_up_at IS NOT NULL
+  AND kind = 'browser' AND revoked_at IS NULL
+  AND recovery_custody_step_up_at > clock_timestamp() - interval '5 minutes'
+  AND recovery_custody_step_up_at <= clock_timestamp()
+`
+
+type ConsumeRecoveryCustodyStepUpParams struct {
+	TokenHash     []byte
+	PrincipalID   uuid.UUID
+	CustodyDigest []byte
+}
+
+func (q *Queries) ConsumeRecoveryCustodyStepUp(ctx context.Context, arg ConsumeRecoveryCustodyStepUpParams) (int64, error) {
+	result, err := q.db.Exec(ctx, consumeRecoveryCustodyStepUp, arg.TokenHash, arg.PrincipalID, arg.CustodyDigest)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteLocalCeremonies = `-- name: DeleteLocalCeremonies :exec
 DELETE FROM local_ceremonies WHERE account_id = $1
 `
@@ -438,19 +463,24 @@ func (q *Queries) ListLocalCredentials(ctx context.Context, accountID uuid.UUID)
 }
 
 const markSessionSteppedUp = `-- name: MarkSessionSteppedUp :execrows
-UPDATE sessions SET stepped_up_at = now()
-WHERE token_hash = $1 AND principal_id = $2
+UPDATE sessions SET stepped_up_at = now(),
+  recovery_custody_step_up_digest = COALESCE($1::bytea, ''::bytea),
+  recovery_custody_step_up_at = CASE
+    WHEN octet_length(COALESCE($1::bytea, ''::bytea)) = 32 THEN now()
+    ELSE NULL END
+WHERE token_hash = $2 AND principal_id = $3
   AND kind = 'browser' AND revoked_at IS NULL
   AND idle_expires_at > now() AND absolute_expires_at > now()
 `
 
 type MarkSessionSteppedUpParams struct {
-	TokenHash   []byte
-	PrincipalID uuid.UUID
+	CustodyDigest []byte
+	TokenHash     []byte
+	PrincipalID   uuid.UUID
 }
 
 func (q *Queries) MarkSessionSteppedUp(ctx context.Context, arg MarkSessionSteppedUpParams) (int64, error) {
-	result, err := q.db.Exec(ctx, markSessionSteppedUp, arg.TokenHash, arg.PrincipalID)
+	result, err := q.db.Exec(ctx, markSessionSteppedUp, arg.CustodyDigest, arg.TokenHash, arg.PrincipalID)
 	if err != nil {
 		return 0, err
 	}

@@ -64,9 +64,20 @@ func serverAPT(ctx context.Context, vm *guestVM, repo *packaging.APTRepository, 
 }
 
 func prepareServerGuest(ctx context.Context, vm *guestVM) error {
-	files, err := deploylab.CertificateFiles()
-	if err != nil {
-		return err
+	return prepareServerGuestOrigins(ctx, vm, "https://localhost:18444", "", nil)
+}
+
+func prepareServerGuestOrigins(ctx context.Context, vm *guestVM, origin, deviceOrigin string, files map[string][]byte) error {
+	var err error
+	if files == nil {
+		files, err = deploylab.CertificateFiles()
+		if err != nil {
+			return err
+		}
+	}
+	tlsDirectory := "/var/lib/postgresql/lindm-tls"
+	if vm.release != nil && vm.release.Native().Packages.Backend.DNF() {
+		tlsDirectory = "/var/lib/pgsql/lindm-tls"
 	}
 	runtimePassword, migratorPassword := rand.Text(), rand.Text()
 	dsn := func(role, password, root string) []byte {
@@ -75,7 +86,10 @@ func prepareServerGuest(ctx context.Context, vm *guestVM) error {
 		return []byte(u.String())
 	}
 	files["database-url"] = dsn("lindm_runtime", runtimePassword, "/etc/lindm/transport-ca.crt")
-	cfg := &configv1.ServerConfig{DeploymentId: uuid.NewString(), PublicUrl: "https://localhost:18444", AdminListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444}, DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445}, Database: &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 16}, Tls: &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"}, DeviceCa: &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"}, Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}, TrustedCaFile: "transport-ca.crt"}
+	cfg := &configv1.ServerConfig{DeploymentId: uuid.NewString(), PublicUrl: origin, AdminListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444}, DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445}, Database: &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 16}, Tls: &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"}, DeviceCa: &configv1.DeviceCAConfig{CertificateFile: "device-ca.crt", PrivateKeyFile: "device-ca.key"}, Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}}, TrustedCaFile: "transport-ca.crt"}
+	if deviceOrigin != "" {
+		cfg.DevicePublicUrl = proto.String(deviceOrigin)
+	}
 	files["server.json"], err = (protojson.MarshalOptions{Indent: "  "}).Marshal(cfg)
 	if err != nil {
 		return err
@@ -86,7 +100,7 @@ func prepareServerGuest(ctx context.Context, vm *guestVM) error {
 	if err != nil {
 		return err
 	}
-	if _, err := serverGuestCommand(ctx, vm, "prepare protected directories", "install -d -m 0755 /etc/lindm; install -d -o root -g lindmd-migrate -m 0750 /etc/lindm/migrate; install -d -o postgres -g postgres -m 0700 /var/lib/postgresql/lindm-tls", nil); err != nil {
+	if _, err := serverGuestCommand(ctx, vm, "prepare protected directories", "install -d -m 0755 /etc/lindm; install -d -o root -g lindmd-migrate -m 0750 /etc/lindm/migrate; install -d -o postgres -g postgres -m 0700 "+nativeQuote(tlsDirectory), nil); err != nil {
 		return err
 	}
 	upload := func(path, owner string, data []byte) error {
@@ -95,7 +109,7 @@ func prepareServerGuest(ctx context.Context, vm *guestVM) error {
 	}
 	for name, data := range files {
 		if strings.HasPrefix(name, "postgres.") {
-			if err := upload("/var/lib/postgresql/lindm-tls/"+name, "postgres:postgres", data); err != nil {
+			if err := upload(tlsDirectory+"/"+name, "postgres:postgres", data); err != nil {
 				return err
 			}
 		} else if err := upload("/etc/lindm/"+name, "lindmd:lindmd", data); err != nil {
@@ -111,7 +125,8 @@ func prepareServerGuest(ctx context.Context, vm *guestVM) error {
 	if err := upload("/etc/lindm/migrate/transport-ca.crt", "lindmd-migrate:lindmd-migrate", files["transport-ca.crt"]); err != nil {
 		return err
 	}
-	sql := fmt.Sprintf(`CREATE ROLE lindm_migrator LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+	sql := fmt.Sprintf(`SET password_encryption='scram-sha-256';
+CREATE ROLE lindm_migrator LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 CREATE ROLE lindm_runtime LOGIN PASSWORD '%s' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
 CREATE DATABASE lindm OWNER lindm_migrator;
 \connect lindm
@@ -126,10 +141,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE, S
 	if _, err := serverGuestCommand(ctx, vm, "create isolated database roles", "runuser -u postgres -- psql -X -v ON_ERROR_STOP=1", strings.NewReader(sql)); err != nil {
 		return err
 	}
-	const configure = `conf=$(runuser -u postgres -- psql -X -At -c 'SHOW config_file')
+	configure := `conf=$(runuser -u postgres -- psql -X -At -c 'SHOW config_file')
 hba=$(runuser -u postgres -- psql -X -At -c 'SHOW hba_file')
-printf "\nssl=on\nssl_cert_file='/var/lib/postgresql/lindm-tls/postgres.crt'\nssl_key_file='/var/lib/postgresql/lindm-tls/postgres.key'\nssl_min_protocol_version='TLSv1.3'\n" >> "$conf"
+printf "\nssl=on\nssl_cert_file='` + tlsDirectory + `/postgres.crt'\nssl_key_file='` + tlsDirectory + `/postgres.key'\nssl_min_protocol_version='TLSv1.3'\n" >> "$conf"
 printf 'local all postgres peer\nhostssl lindm lindm_runtime,lindm_migrator 127.0.0.1/32 scram-sha-256\nhostssl lindm lindm_runtime,lindm_migrator ::1/128 scram-sha-256\n' > "$hba"
+if command -v restorecon >/dev/null 2>&1; then restorecon -R ` + nativeQuote(tlsDirectory) + ` /etc/lindm; fi
 systemctl restart postgresql
 runuser -u lindmd -- /usr/bin/lindmd check-config -config /etc/lindm/server.json
 `
@@ -156,6 +172,8 @@ test "$(systemctl show lindmd.service -p LimitCORE --value)" = 0
 ! runuser -u lindmd -- test -r /etc/lindm/migrate/database-url
 test "$(runuser -u postgres -- psql -X -At -d lindm -c "SELECT has_schema_privilege('lindm_runtime','public','CREATE')")" = f
 test "$(runuser -u postgres -- psql -X -At -d lindm -c "SELECT has_table_privilege('lindm_runtime','public.goose_db_version','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR coalesce(has_sequence_privilege('lindm_runtime',pg_get_serial_sequence('public.goose_db_version','id'),'USAGE,SELECT,UPDATE'),false)")" = f
+test "$(runuser -u postgres -- psql -X -At -d lindm -c "SELECT has_table_privilege('lindm_runtime','public.lindm_schema_compatibility','SELECT') AND NOT has_table_privilege('lindm_runtime','public.lindm_schema_compatibility','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')")" = t
+test "$(runuser -u postgres -- psql -X -At -d lindm -c "SELECT has_table_privilege('lindm_runtime','public.server_recovery_state','SELECT') AND NOT has_table_privilege('lindm_runtime','public.server_recovery_state','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')")" = t
 `
 	output, err := serverGuestCommand(ctx, vm, "verify TLS, public and protected surfaces", command, nil)
 	if err != nil {
@@ -179,7 +197,10 @@ func checkServerLocalOptions(data []byte) error {
 func installServerPostgres(ctx context.Context, vm *guestVM) error {
 	// This runs before any secret is provisioned. Unlike later private SQL and
 	// bootstrap operations, vendor-package diagnostics contain no lab secrets.
-	const command = "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c 'apt-get update -q && apt-get install -q -y --no-install-recommends postgresql curl ca-certificates'"
+	command := "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c 'apt-get update -q && apt-get install -q -y --no-install-recommends postgresql curl ca-certificates'"
+	if vm.release != nil && vm.release.Native().Packages.Backend.DNF() {
+		command = "sudo -n env LC_ALL=C sh -eu -c 'dnf -y --setopt=gpgcheck=1 install postgresql-server curl ca-certificates; postgresql-setup --initdb; systemctl enable --now postgresql'"
+	}
 	result, err := vm.runResult(ctx, command, nil, 1<<20, 10*time.Minute)
 	if err != nil {
 		return err

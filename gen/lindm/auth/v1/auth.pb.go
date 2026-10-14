@@ -169,8 +169,10 @@ type AuthenticationOptions struct {
 	ExternalLogin bool                   `protobuf:"varint,1,opt,name=external_login,json=externalLogin,proto3" json:"external_login,omitempty"`
 	LocalLogin    bool                   `protobuf:"varint,2,opt,name=local_login,json=localLogin,proto3" json:"local_login,omitempty"`
 	BreakGlass    bool                   `protobuf:"varint,3,opt,name=break_glass,json=breakGlass,proto3" json:"break_glass,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// True only while an unexpired installer-issued code can finish first-run setup.
+	SetupAvailable bool `protobuf:"varint,4,opt,name=setup_available,json=setupAvailable,proto3" json:"setup_available,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AuthenticationOptions) Reset() {
@@ -220,6 +222,13 @@ func (x *AuthenticationOptions) GetLocalLogin() bool {
 func (x *AuthenticationOptions) GetBreakGlass() bool {
 	if x != nil {
 		return x.BreakGlass
+	}
+	return false
+}
+
+func (x *AuthenticationOptions) GetSetupAvailable() bool {
+	if x != nil {
+		return x.SetupAvailable
 	}
 	return false
 }
@@ -337,18 +346,82 @@ func (x *LocalEnrollmentRequest) GetPassword() string {
 	return ""
 }
 
-// Re-verifies the signed-in local account (password, then its passkey) for
-// actions that need recent verification. The session stays the same.
-type LocalStepUpRequest struct {
+// The installer code is never a URL, log, cache or persistent browser-storage value.
+// The first accepted submission binds the username and password until completion.
+type FirstRunSetupRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Password      string                 `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,3,opt,name=password,proto3" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
+func (x *FirstRunSetupRequest) Reset() {
+	*x = FirstRunSetupRequest{}
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FirstRunSetupRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FirstRunSetupRequest) ProtoMessage() {}
+
+func (x *FirstRunSetupRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FirstRunSetupRequest.ProtoReflect.Descriptor instead.
+func (*FirstRunSetupRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FirstRunSetupRequest) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *FirstRunSetupRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *FirstRunSetupRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+// Re-verifies the signed-in local account (password, then its passkey) for
+// actions that need recent verification. The session stays the same.
+type LocalStepUpRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Password string                 `protobuf:"bytes,1,opt,name=password,proto3" json:"password,omitempty"`
+	// Optional target for a new recovery-custody step-up; sign-in never sets it.
+	RecoveryCustodyConfirmationDigest string `protobuf:"bytes,2,opt,name=recovery_custody_confirmation_digest,json=recoveryCustodyConfirmationDigest,proto3" json:"recovery_custody_confirmation_digest,omitempty"`
+	unknownFields                     protoimpl.UnknownFields
+	sizeCache                         protoimpl.SizeCache
+}
+
 func (x *LocalStepUpRequest) Reset() {
 	*x = LocalStepUpRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -360,7 +433,7 @@ func (x *LocalStepUpRequest) String() string {
 func (*LocalStepUpRequest) ProtoMessage() {}
 
 func (x *LocalStepUpRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[4]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -373,12 +446,19 @@ func (x *LocalStepUpRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalStepUpRequest.ProtoReflect.Descriptor instead.
 func (*LocalStepUpRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{4}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *LocalStepUpRequest) GetPassword() string {
 	if x != nil {
 		return x.Password
+	}
+	return ""
+}
+
+func (x *LocalStepUpRequest) GetRecoveryCustodyConfirmationDigest() string {
+	if x != nil {
+		return x.RecoveryCustodyConfirmationDigest
 	}
 	return ""
 }
@@ -394,7 +474,7 @@ type WebAuthnChallenge struct {
 
 func (x *WebAuthnChallenge) Reset() {
 	*x = WebAuthnChallenge{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +486,7 @@ func (x *WebAuthnChallenge) String() string {
 func (*WebAuthnChallenge) ProtoMessage() {}
 
 func (x *WebAuthnChallenge) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[5]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +499,7 @@ func (x *WebAuthnChallenge) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebAuthnChallenge.ProtoReflect.Descriptor instead.
 func (*WebAuthnChallenge) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{5}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *WebAuthnChallenge) GetToken() string {
@@ -446,7 +526,7 @@ type WebAuthnFinishRequest struct {
 
 func (x *WebAuthnFinishRequest) Reset() {
 	*x = WebAuthnFinishRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -458,7 +538,7 @@ func (x *WebAuthnFinishRequest) String() string {
 func (*WebAuthnFinishRequest) ProtoMessage() {}
 
 func (x *WebAuthnFinishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[6]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -471,7 +551,7 @@ func (x *WebAuthnFinishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WebAuthnFinishRequest.ProtoReflect.Descriptor instead.
 func (*WebAuthnFinishRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{6}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *WebAuthnFinishRequest) GetToken() string {
@@ -503,7 +583,7 @@ type LocalAccount struct {
 
 func (x *LocalAccount) Reset() {
 	*x = LocalAccount{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -515,7 +595,7 @@ func (x *LocalAccount) String() string {
 func (*LocalAccount) ProtoMessage() {}
 
 func (x *LocalAccount) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[7]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -528,7 +608,7 @@ func (x *LocalAccount) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LocalAccount.ProtoReflect.Descriptor instead.
 func (*LocalAccount) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{7}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *LocalAccount) GetId() string {
@@ -590,7 +670,7 @@ type ListAccountsResponse struct {
 
 func (x *ListAccountsResponse) Reset() {
 	*x = ListAccountsResponse{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +682,7 @@ func (x *ListAccountsResponse) String() string {
 func (*ListAccountsResponse) ProtoMessage() {}
 
 func (x *ListAccountsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[8]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +695,7 @@ func (x *ListAccountsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccountsResponse.ProtoReflect.Descriptor instead.
 func (*ListAccountsResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{8}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListAccountsResponse) GetAccounts() []*LocalAccount {
@@ -644,7 +724,7 @@ type CreateAccountRequest struct {
 
 func (x *CreateAccountRequest) Reset() {
 	*x = CreateAccountRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +736,7 @@ func (x *CreateAccountRequest) String() string {
 func (*CreateAccountRequest) ProtoMessage() {}
 
 func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[9]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +749,7 @@ func (x *CreateAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccountRequest.ProtoReflect.Descriptor instead.
 func (*CreateAccountRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{9}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreateAccountRequest) GetUsername() string {
@@ -713,7 +793,7 @@ type UpdateAccountRequest struct {
 
 func (x *UpdateAccountRequest) Reset() {
 	*x = UpdateAccountRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +805,7 @@ func (x *UpdateAccountRequest) String() string {
 func (*UpdateAccountRequest) ProtoMessage() {}
 
 func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[10]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +818,7 @@ func (x *UpdateAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAccountRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAccountRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{10}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateAccountRequest) GetAccountId() string {
@@ -785,7 +865,7 @@ type ResetAccountRequest struct {
 
 func (x *ResetAccountRequest) Reset() {
 	*x = ResetAccountRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -797,7 +877,7 @@ func (x *ResetAccountRequest) String() string {
 func (*ResetAccountRequest) ProtoMessage() {}
 
 func (x *ResetAccountRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[11]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -810,7 +890,7 @@ func (x *ResetAccountRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetAccountRequest.ProtoReflect.Descriptor instead.
 func (*ResetAccountRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{11}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ResetAccountRequest) GetAccountId() string {
@@ -832,7 +912,7 @@ type AccountEnrollment struct {
 
 func (x *AccountEnrollment) Reset() {
 	*x = AccountEnrollment{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -844,7 +924,7 @@ func (x *AccountEnrollment) String() string {
 func (*AccountEnrollment) ProtoMessage() {}
 
 func (x *AccountEnrollment) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[12]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -857,7 +937,7 @@ func (x *AccountEnrollment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AccountEnrollment.ProtoReflect.Descriptor instead.
 func (*AccountEnrollment) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{12}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AccountEnrollment) GetAccountId() string {
@@ -902,7 +982,7 @@ type IdentitySettings struct {
 
 func (x *IdentitySettings) Reset() {
 	*x = IdentitySettings{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -914,7 +994,7 @@ func (x *IdentitySettings) String() string {
 func (*IdentitySettings) ProtoMessage() {}
 
 func (x *IdentitySettings) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[13]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -927,7 +1007,7 @@ func (x *IdentitySettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IdentitySettings.ProtoReflect.Descriptor instead.
 func (*IdentitySettings) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{13}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *IdentitySettings) GetPrimarySource() string {
@@ -1016,7 +1096,7 @@ type RotateSCIMCredentialRequest struct {
 
 func (x *RotateSCIMCredentialRequest) Reset() {
 	*x = RotateSCIMCredentialRequest{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1028,7 +1108,7 @@ func (x *RotateSCIMCredentialRequest) String() string {
 func (*RotateSCIMCredentialRequest) ProtoMessage() {}
 
 func (x *RotateSCIMCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[14]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1041,7 +1121,7 @@ func (x *RotateSCIMCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateSCIMCredentialRequest.ProtoReflect.Descriptor instead.
 func (*RotateSCIMCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{14}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RotateSCIMCredentialRequest) GetConnectorId() string {
@@ -1062,7 +1142,7 @@ type SCIMCredential struct {
 
 func (x *SCIMCredential) Reset() {
 	*x = SCIMCredential{}
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[15]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1074,7 +1154,7 @@ func (x *SCIMCredential) String() string {
 func (*SCIMCredential) ProtoMessage() {}
 
 func (x *SCIMCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_auth_v1_auth_proto_msgTypes[15]
+	mi := &file_lindm_auth_v1_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1087,7 +1167,7 @@ func (x *SCIMCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SCIMCredential.ProtoReflect.Descriptor instead.
 func (*SCIMCredential) Descriptor() ([]byte, []int) {
-	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{15}
+	return file_lindm_auth_v1_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SCIMCredential) GetConnectorId() string {
@@ -1124,13 +1204,14 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\x0fservice_account\x18\n" +
 	" \x01(\bR\x0eserviceAccount\x126\n" +
 	"\bbindings\x18\v \x03(\v2\x1a.lindm.auth.v1.RoleBindingR\bbindings\x129\n" +
-	"\x18unrestricted_permissions\x18\f \x03(\tR\x17unrestrictedPermissions\"\x80\x01\n" +
+	"\x18unrestricted_permissions\x18\f \x03(\tR\x17unrestrictedPermissions\"\xa9\x01\n" +
 	"\x15AuthenticationOptions\x12%\n" +
 	"\x0eexternal_login\x18\x01 \x01(\bR\rexternalLogin\x12\x1f\n" +
 	"\vlocal_login\x18\x02 \x01(\bR\n" +
 	"localLogin\x12\x1f\n" +
 	"\vbreak_glass\x18\x03 \x01(\bR\n" +
-	"breakGlass\"\xbd\x01\n" +
+	"breakGlass\x12'\n" +
+	"\x0fsetup_available\x18\x04 \x01(\bR\x0esetupAvailable\"\xbd\x01\n" +
 	"\x11LocalLoginRequest\x12C\n" +
 	"\busername\x18\x01 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x12&\n" +
 	"\bpassword\x18\x02 \x01(\tB\n" +
@@ -1140,10 +1221,16 @@ const file_lindm_auth_v1_auth_proto_rawDesc = "" +
 	"\x06secret\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\bR\x06secret\x12&\n" +
 	"\bpassword\x18\x02 \x01(\tB\n" +
-	"\xbaH\ar\x05 \f(\x80\bR\bpassword\"<\n" +
+	"\xbaH\ar\x05 \f(\x80\bR\bpassword\"\xb6\x01\n" +
+	"\x14FirstRunSetupRequest\x121\n" +
+	"\x04code\x18\x01 \x01(\tB\x1d\xbaH\x1ar\x182\x13^[A-Za-z0-9_-]{43}$\x98\x01+R\x04code\x12C\n" +
+	"\busername\x18\x02 \x01(\tB'\xbaH$r\"\x10\x01\x18@2\x1c^[A-Za-z0-9][A-Za-z0-9._-]*$R\busername\x12&\n" +
+	"\bpassword\x18\x03 \x01(\tB\n" +
+	"\xbaH\ar\x05 \f(\x80\bR\bpassword\"\xa7\x01\n" +
 	"\x12LocalStepUpRequest\x12&\n" +
 	"\bpassword\x18\x01 \x01(\tB\n" +
-	"\xbaH\ar\x05 \f(\x80\bR\bpassword\"e\n" +
+	"\xbaH\ar\x05 \f(\x80\bR\bpassword\x12i\n" +
+	"$recovery_custody_confirmation_digest\x18\x02 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R!recoveryCustodyConfirmationDigest\"e\n" +
 	"\x11WebAuthnChallenge\x12 \n" +
 	"\x05token\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05 \x01(\x80\bR\x05token\x12.\n" +
@@ -1221,36 +1308,37 @@ func file_lindm_auth_v1_auth_proto_rawDescGZIP() []byte {
 	return file_lindm_auth_v1_auth_proto_rawDescData
 }
 
-var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_lindm_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_lindm_auth_v1_auth_proto_goTypes = []any{
 	(*SessionPrincipal)(nil),            // 0: lindm.auth.v1.SessionPrincipal
 	(*AuthenticationOptions)(nil),       // 1: lindm.auth.v1.AuthenticationOptions
 	(*LocalLoginRequest)(nil),           // 2: lindm.auth.v1.LocalLoginRequest
 	(*LocalEnrollmentRequest)(nil),      // 3: lindm.auth.v1.LocalEnrollmentRequest
-	(*LocalStepUpRequest)(nil),          // 4: lindm.auth.v1.LocalStepUpRequest
-	(*WebAuthnChallenge)(nil),           // 5: lindm.auth.v1.WebAuthnChallenge
-	(*WebAuthnFinishRequest)(nil),       // 6: lindm.auth.v1.WebAuthnFinishRequest
-	(*LocalAccount)(nil),                // 7: lindm.auth.v1.LocalAccount
-	(*ListAccountsResponse)(nil),        // 8: lindm.auth.v1.ListAccountsResponse
-	(*CreateAccountRequest)(nil),        // 9: lindm.auth.v1.CreateAccountRequest
-	(*UpdateAccountRequest)(nil),        // 10: lindm.auth.v1.UpdateAccountRequest
-	(*ResetAccountRequest)(nil),         // 11: lindm.auth.v1.ResetAccountRequest
-	(*AccountEnrollment)(nil),           // 12: lindm.auth.v1.AccountEnrollment
-	(*IdentitySettings)(nil),            // 13: lindm.auth.v1.IdentitySettings
-	(*RotateSCIMCredentialRequest)(nil), // 14: lindm.auth.v1.RotateSCIMCredentialRequest
-	(*SCIMCredential)(nil),              // 15: lindm.auth.v1.SCIMCredential
-	(*RoleBinding)(nil),                 // 16: lindm.auth.v1.RoleBinding
-	(*DeviceScope)(nil),                 // 17: lindm.auth.v1.DeviceScope
-	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
+	(*FirstRunSetupRequest)(nil),        // 4: lindm.auth.v1.FirstRunSetupRequest
+	(*LocalStepUpRequest)(nil),          // 5: lindm.auth.v1.LocalStepUpRequest
+	(*WebAuthnChallenge)(nil),           // 6: lindm.auth.v1.WebAuthnChallenge
+	(*WebAuthnFinishRequest)(nil),       // 7: lindm.auth.v1.WebAuthnFinishRequest
+	(*LocalAccount)(nil),                // 8: lindm.auth.v1.LocalAccount
+	(*ListAccountsResponse)(nil),        // 9: lindm.auth.v1.ListAccountsResponse
+	(*CreateAccountRequest)(nil),        // 10: lindm.auth.v1.CreateAccountRequest
+	(*UpdateAccountRequest)(nil),        // 11: lindm.auth.v1.UpdateAccountRequest
+	(*ResetAccountRequest)(nil),         // 12: lindm.auth.v1.ResetAccountRequest
+	(*AccountEnrollment)(nil),           // 13: lindm.auth.v1.AccountEnrollment
+	(*IdentitySettings)(nil),            // 14: lindm.auth.v1.IdentitySettings
+	(*RotateSCIMCredentialRequest)(nil), // 15: lindm.auth.v1.RotateSCIMCredentialRequest
+	(*SCIMCredential)(nil),              // 16: lindm.auth.v1.SCIMCredential
+	(*RoleBinding)(nil),                 // 17: lindm.auth.v1.RoleBinding
+	(*DeviceScope)(nil),                 // 18: lindm.auth.v1.DeviceScope
+	(*timestamppb.Timestamp)(nil),       // 19: google.protobuf.Timestamp
 }
 var file_lindm_auth_v1_auth_proto_depIdxs = []int32{
-	16, // 0: lindm.auth.v1.SessionPrincipal.bindings:type_name -> lindm.auth.v1.RoleBinding
-	17, // 1: lindm.auth.v1.LocalAccount.scopes:type_name -> lindm.auth.v1.DeviceScope
-	7,  // 2: lindm.auth.v1.ListAccountsResponse.accounts:type_name -> lindm.auth.v1.LocalAccount
-	17, // 3: lindm.auth.v1.CreateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
-	17, // 4: lindm.auth.v1.UpdateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
-	18, // 5: lindm.auth.v1.AccountEnrollment.expires_at:type_name -> google.protobuf.Timestamp
-	18, // 6: lindm.auth.v1.IdentitySettings.observed_at:type_name -> google.protobuf.Timestamp
+	17, // 0: lindm.auth.v1.SessionPrincipal.bindings:type_name -> lindm.auth.v1.RoleBinding
+	18, // 1: lindm.auth.v1.LocalAccount.scopes:type_name -> lindm.auth.v1.DeviceScope
+	8,  // 2: lindm.auth.v1.ListAccountsResponse.accounts:type_name -> lindm.auth.v1.LocalAccount
+	18, // 3: lindm.auth.v1.CreateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
+	18, // 4: lindm.auth.v1.UpdateAccountRequest.scopes:type_name -> lindm.auth.v1.DeviceScope
+	19, // 5: lindm.auth.v1.AccountEnrollment.expires_at:type_name -> google.protobuf.Timestamp
+	19, // 6: lindm.auth.v1.IdentitySettings.observed_at:type_name -> google.protobuf.Timestamp
 	7,  // [7:7] is the sub-list for method output_type
 	7,  // [7:7] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
@@ -1270,7 +1358,7 @@ func file_lindm_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_auth_v1_auth_proto_rawDesc), len(file_lindm_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

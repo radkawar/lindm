@@ -39,6 +39,9 @@ type LoadAuthorityOptions struct {
 	PostgresCPUs          string
 	ServerCPUs            string
 	nativeReleasePackages *NativeReleasePackages
+	// setupCodeOut leaves the fresh owner ceremony for the real browser reviewer.
+	// Only the dedicated disposable setup fixture sets this private option.
+	setupCodeOut *string
 	// networkContainer joins dedicated PostgreSQL to that exact container's
 	// network namespace (shared by the caller) instead of publishing a port.
 	networkContainer    string

@@ -184,6 +184,6 @@ func restrictMigrationMetadata(ctx context.Context, dir string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, conn.Close(ctx)) }()
-	_, err = conn.Exec(ctx, "REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.goose_db_version FROM lindm_runtime")
+	_, err = conn.Exec(ctx, "REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.goose_db_version, public.lindm_schema_compatibility, public.server_recovery_state FROM lindm_runtime")
 	return err
 }

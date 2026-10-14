@@ -10,16 +10,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   LocalEnrollmentRequestSchema,
+  FirstRunSetupRequestSchema,
   LocalLoginRequestSchema,
 } from "../../../gen/lindm/auth/v1/auth_pb";
-import { beginEnrollment, beginLogin, finishAuthentication } from "./local-api";
+import { beginEnrollment, beginLogin, beginSetup, finishAuthentication } from "./local-api";
 
 export function LocalForm({
   enrollment = false,
+  setup = false,
   emergency = false,
   onSuccess,
 }: {
   enrollment?: boolean;
+  setup?: boolean;
   emergency?: boolean;
   onSuccess: () => Promise<void>;
 }) {
@@ -51,36 +54,42 @@ export function LocalForm({
         setNotice("Open the console over HTTPS in a current browser that supports security keys.");
         return;
       }
-      const challenge = enrollment
-        ? await beginEnrollment(
-            create(LocalEnrollmentRequestSchema, { secret, password }),
+      const challenge = setup
+        ? await beginSetup(
+            create(FirstRunSetupRequestSchema, { code: secret, username, password }),
             controller.signal,
           )
-        : await beginLogin(
-            create(LocalLoginRequestSchema, { username, password, incidentReason: reason }),
-            controller.signal,
-          );
+        : enrollment
+          ? await beginEnrollment(
+              create(LocalEnrollmentRequestSchema, { secret, password }),
+              controller.signal,
+            )
+          : await beginLogin(
+              create(LocalLoginRequestSchema, { username, password, incidentReason: reason }),
+              controller.signal,
+            );
       setPassword("");
       setSecret("");
-      const credential = enrollment
-        ? await navigator.credentials.create({
-            publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(
-              JSON.parse(challenge.optionsJson) as PublicKeyCredentialCreationOptionsJSON,
-            ),
-            signal: controller.signal,
-          })
-        : await navigator.credentials.get({
-            publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(
-              JSON.parse(challenge.optionsJson) as PublicKeyCredentialRequestOptionsJSON,
-            ),
-            signal: controller.signal,
-          });
+      const credential =
+        enrollment || setup
+          ? await navigator.credentials.create({
+              publicKey: PublicKeyCredential.parseCreationOptionsFromJSON(
+                JSON.parse(challenge.optionsJson) as PublicKeyCredentialCreationOptionsJSON,
+              ),
+              signal: controller.signal,
+            })
+          : await navigator.credentials.get({
+              publicKey: PublicKeyCredential.parseRequestOptionsFromJSON(
+                JSON.parse(challenge.optionsJson) as PublicKeyCredentialRequestOptionsJSON,
+              ),
+              signal: controller.signal,
+            });
       if (!(credential instanceof PublicKeyCredential))
         throw new Error("Your security key didn't respond. Try again.");
       await finishAuthentication(
         challenge.token,
         JSON.stringify(credential.toJSON()),
-        enrollment,
+        enrollment || setup,
         controller.signal,
       );
       controller.signal.throwIfAborted();
@@ -88,7 +97,11 @@ export function LocalForm({
     } catch (failure) {
       if (!controller.signal.aborted) {
         if (failure instanceof DOMException && failure.name === "NotAllowedError") {
-          setNotice("Authenticator verification did not finish. Retry when ready.");
+          setNotice(
+            setup
+              ? "Passkey setup did not finish. Enter the same setup code, username and password to continue."
+              : "Authenticator verification did not finish. Retry when ready.",
+          );
         } else {
           setError(toRpcFailure(failure));
         }
@@ -105,9 +118,11 @@ export function LocalForm({
 
   return (
     <form className="grid gap-3" aria-busy={busy} onSubmit={(event) => void submit(event)}>
-      {enrollment ? (
+      {enrollment || setup ? (
         <>
-          <Label htmlFor="account-secret">One-time enrollment secret</Label>
+          <Label htmlFor="account-secret">
+            {setup ? "Setup code" : "One-time enrollment secret"}
+          </Label>
           <Input
             id="account-secret"
             type="password"
@@ -118,12 +133,13 @@ export function LocalForm({
             onChange={(event) => setSecret(event.target.value)}
           />
         </>
-      ) : (
+      ) : null}
+      {!enrollment || setup ? (
         <>
           <Label htmlFor="local-username">Username</Label>
           <Input
             id="local-username"
-            data-freeform="sign-in username; accounts are never listed before sign-in"
+            data-freeform="administrator chooses a new setup username or enters a sign-in username"
             autoComplete="username"
             required
             value={username}
@@ -131,14 +147,14 @@ export function LocalForm({
             onChange={(event) => setUsername(event.target.value)}
           />
         </>
-      )}
+      ) : null}
       <Label htmlFor="local-password">
-        {enrollment ? "New password (at least 12 bytes)" : "Password"}
+        {setup ? "Password" : enrollment ? "New password (at least 12 bytes)" : "Password"}
       </Label>
       <Input
         id="local-password"
         type="password"
-        autoComplete={enrollment ? "new-password" : "current-password"}
+        autoComplete={enrollment || setup ? "new-password" : "current-password"}
         required
         value={password}
         disabled={busy}
@@ -160,10 +176,17 @@ export function LocalForm({
         </>
       ) : null}
       <p className="text-sm text-muted-foreground">
-        {enrollment
-          ? "Set a password. Register a security key or passkey. Then sign in."
-          : "Enter your password. Confirm with your security key or passkey."}
+        {setup
+          ? "Create the owner account, then register a passkey to open the dashboard."
+          : enrollment
+            ? "Set a password. Register a security key or passkey. Then sign in."
+            : "Enter your password. Confirm with your security key or passkey."}
       </p>
+      {setup ? (
+        <p className="text-sm text-muted-foreground">
+          If you stop, continue with the same setup code, username and password.
+        </p>
+      ) : null}
       {notice ? (
         <Alert>
           <AlertTitle>Security key needed</AlertTitle>
@@ -172,7 +195,13 @@ export function LocalForm({
       ) : null}
       {error ? <RpcError failure={error} /> : null}
       <Button type="submit" disabled={busy}>
-        {busy ? "Waiting for authenticator…" : enrollment ? "Enroll account" : "Sign in locally"}
+        {busy
+          ? "Waiting for authenticator…"
+          : setup
+            ? "Create owner account"
+            : enrollment
+              ? "Enroll account"
+              : "Sign in locally"}
       </Button>
       {busy ? (
         <Button

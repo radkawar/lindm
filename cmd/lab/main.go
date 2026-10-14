@@ -28,6 +28,15 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) > 0 && args[0] == "deploy" {
+		if len(args) > 1 && args[1] == "audit" {
+			return runScheduledVM(ctx, append([]string{"vm", "deploy-audit"}, args[2:]...), stdout, stderr)
+		}
+		if len(args) > 1 && args[1] == "setup" {
+			return runScheduledVM(ctx, append([]string{"vm", "deploy-setup"}, args[2:]...), stdout, stderr)
+		}
+		return runScheduledVM(ctx, append([]string{"vm", "deploy"}, args[1:]...), stdout, stderr)
+	}
 	if len(args) > 0 && args[0] == "demo" {
 		return runDemo(ctx, args[1:], stdout, stderr)
 	}
@@ -53,6 +62,12 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 }
 
 func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) >= 2 && args[0] == "serverdeps" {
+		return runServerDependenciesTransfer(ctx, args[1], args[2:], os.Stdin, stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "serverdeps" {
+		return runServerDependenciesCapture(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "images" && (args[1] == "snapshot-export" || args[1] == "snapshot-import" || args[1] == "snapshot-present") {
 		return runSnapshotTransfer(ctx, args[1], args[2:], os.Stdin, stdout, stderr)
 	}
@@ -115,6 +130,15 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	}
 	if len(args) == 2 && args[0] == "native" && args[1] == "install-snapshot-child" {
 		return vmlab.RunInstallSnapshotChild(ctx, stdout)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy-audit" {
+		return runDeployAuditAdmitted(ctx, args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy" {
+		return runDeployAdmitted(ctx, args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy-setup" {
+		return runDeploySetupAdmitted(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "server" {
 		return runVMServer(ctx, args[2:], stdout, stderr)
@@ -182,7 +206,7 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 		return runRedHatImages(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) < 2 || args[0] != "images" || (args[1] != "fetch" && args[1] != "verify") {
-		return errors.New("usage: lab demo -name NAME -spec FILE [-destroy]; lab matrix {plan|report|import|run} [flags]; lab acceptance -evidence NEW_DIRECTORY [-web-only|-skip-feeds] [flags]; lab hosts baseline-browser -record NEW_FILE [flags]; lab packages {keygen|build|build-server|build-cli|apt|rpm|arch|rejection-fixtures} [flags]; lab release {attestation-keygen|build|verify|repository} [flags]; lab auth {check|check-fresh|check-broker|check-entra} [-repo DIR] [-lindmd FILE] [-cleanup-prefix PREFIX]; lab cli check [-root DIR] [-lindmd FILE] [-record NEW_FILE]; lab load -lindmd FILE [-record NEW_FILE] [flags]; lab ha -lindmd FILE -upgrade-lindmd FILE [-record NEW_FILE] [flags]; lab console -lindmd FILE [-devices 300] [flags]; lab profiles check-catalog -lindmd FILE [flags]; lab native {check-install-projection|check-install-snapshot} [flags]; lab vm {inspect|lifecycle|services|dispatch|server|updates|encrypted|device-actions|assistance|advisories|enroll-unattended} [flags]; lab server compose [-repo DIR] [-record NEW_FILE]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab images snapshot -manifest FILE -snapshot-date YYYY-MM-DD -repomd-sha256 HEX -record NEW_FILE [flags]; lab images redhat {discover|fetch|inventory|cleanup} [flags]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
+		return errors.New("usage: lab deploy [audit|setup] -manifest FILE -evidence NEW_DIRECTORY -record NEW_FILE [private signed release and custody flags]; lab demo -name NAME -spec FILE [-destroy]; lab matrix {plan|report|import|run} [flags]; lab acceptance -evidence NEW_DIRECTORY [-web-only|-skip-feeds] [flags]; lab hosts baseline-browser -record NEW_FILE [flags]; lab packages {keygen|build|build-server|build-cli|apt|rpm|arch|rejection-fixtures} [flags]; lab release {attestation-keygen|build|verify|repository} [flags]; lab auth {check|check-fresh|check-broker|check-entra} [-repo DIR] [-lindmd FILE] [-cleanup-prefix PREFIX]; lab cli check [-root DIR] [-lindmd FILE] [-record NEW_FILE]; lab load -lindmd FILE [-record NEW_FILE] [flags]; lab ha -lindmd FILE -upgrade-lindmd FILE [-record NEW_FILE] [flags]; lab console -lindmd FILE [-devices 300] [flags]; lab profiles check-catalog -lindmd FILE [flags]; lab native {check-install-projection|check-install-snapshot} [flags]; lab vm {inspect|lifecycle|services|dispatch|server|updates|encrypted|device-actions|assistance|advisories|enroll-unattended} [flags]; lab server compose [-repo DIR] [-record NEW_FILE]; lab images {fetch|verify} -manifest FILE [-cache DIR]; lab images snapshot -manifest FILE -snapshot-date YYYY-MM-DD -repomd-sha256 HEX -record NEW_FILE [flags]; lab images redhat {discover|fetch|inventory|cleanup} [flags]; lab guest {bootstrap-interrupted|network-boundaries|executor-ready|connection-identity|services}")
 	}
 	flags := flag.NewFlagSet("images "+args[1], flag.ContinueOnError)
 	flags.SetOutput(stderr)

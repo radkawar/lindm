@@ -94,6 +94,8 @@ type Config struct {
 	ReleasePublisher             *releaseupdate.Publisher
 	RecoveryArtifacts            *releaseupdate.Client
 	EnrollmentInstructions       *adminv1.GetEnrollmentInstructionsResponse
+	ServerStatus                 func() *adminv1.GetServerStatusResponse
+	RecoveryKeyCustody           func() (*adminv1.RecoveryKeyCustody, error)
 	// Production composition always enables the release gate. Direct service
 	// fixtures must explicitly supply real build identity to exercise it.
 	RequireReleaseCompatibility bool
@@ -142,6 +144,8 @@ type Service struct {
 	ServerRelease          string
 	ServerProtocol         uint32
 	EnrollmentInstructions *adminv1.GetEnrollmentInstructionsResponse
+	ServerStatus           func() *adminv1.GetServerStatusResponse
+	RecoveryKeyCustody     func() (*adminv1.RecoveryKeyCustody, error)
 	Assistance             *assistrelay.Relay
 	AssistanceCeiling      *agentv1.AssistancePolicy
 }
@@ -232,6 +236,8 @@ func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, e
 		ServerRelease:          cfg.ServerRelease,
 		ServerProtocol:         cfg.ServerProtocol,
 		EnrollmentInstructions: instructions,
+		ServerStatus:           cfg.ServerStatus,
+		RecoveryKeyCustody:     cfg.RecoveryKeyCustody,
 		Assistance:             cfg.Assistance,
 		AssistanceCeiling:      proto.CloneOf(cfg.AssistancePolicyCeiling),
 	}, nil
@@ -405,6 +411,8 @@ func validatedMessages() []proto.Message {
 		&adminv1.CreateEnrollmentGrantRequest{},
 		&adminv1.ListEnrollmentGrantsRequest{},
 		&adminv1.GetEnrollmentInstructionsRequest{},
+		&adminv1.GetServerStatusRequest{},
+		&adminv1.ConfirmRecoveryKeyCustodyRequest{},
 		&adminv1.GetEnrollmentInstructionsResponse{},
 		&adminv1.RevokeEnrollmentGrantRequest{},
 		&adminv1.CreateProvisioningTokenRequest{}, &adminv1.ListProvisioningTokensRequest{},

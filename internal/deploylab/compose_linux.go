@@ -38,7 +38,7 @@ type ComposeResult struct {
 	ComposeVersion           string    `json:"compose_version"`
 	CgroupVersion            string    `json:"cgroup_version"`
 	ExplicitMigration        bool      `json:"explicit_migration"`
-	OwnerBootstrapped        bool      `json:"owner_bootstrapped"`
+	SetupCodeIssued          bool      `json:"setup_code_issued"`
 	HTTPSHealth              bool      `json:"https_health"`
 	HTTPSReady               bool      `json:"https_ready"`
 	EmbeddedConsole          bool      `json:"embedded_console"`
@@ -59,8 +59,8 @@ type composeRun struct {
 // RunCompose builds the executable with the checkout's already-built embedded
 // console and the pinned minimal image, then exercises the production manifest
 // against newly created LOCAL fixtures. It requires Linux, Go, built web assets
-// and a local Docker daemon with Compose v2. Subprocess output stays private:
-// bootstrap-owner emits a one-time enrollment secret, even on this lab path.
+// and a local Docker daemon with Compose v2. Setup stays a separate browser task;
+// this lane checks private capability issuance, not completed owner enrollment.
 func RunCompose(ctx context.Context, repo string) (result ComposeResult, err error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Minute)
 	defer cancel()
@@ -79,6 +79,15 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 	if uid == 0 {
 		uid, gid = 65532, 65532
 	}
+	setupDirectory := filepath.Join(dir, "setup")
+	if err := os.Mkdir(setupDirectory, 0700); err != nil {
+		return result, err
+	}
+	if os.Geteuid() == 0 {
+		if err := os.Chown(setupDirectory, uid, gid); err != nil {
+			return result, err
+		}
+	}
 	for _, entry := range os.Environ() {
 		name, _, _ := strings.Cut(entry, "=")
 		if strings.HasPrefix(name, "PG") || strings.HasPrefix(name, "LINDM_") || strings.HasPrefix(name, "COMPOSE_") {
@@ -89,7 +98,7 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 	run.env = append(run.env,
 		"COMPOSE_DISABLE_ENV_FILE=1", "LINDM_CONFIG_DIR="+dir,
 		"LINDM_IMAGE="+run.image, "LINDM_UID="+strconv.Itoa(uid), "LINDM_GID="+strconv.Itoa(gid),
-		"LINDM_BIND_IP=127.0.0.1", "LINDM_OWNER=owner", "CGO_ENABLED=0", "GOOS=linux", "GOTOOLCHAIN=go1.26.9",
+		"LINDM_BIND_IP=127.0.0.1", "LINDM_SETUP_DIR="+setupDirectory, "CGO_ENABLED=0", "GOOS=linux", "GOTOOLCHAIN=go1.26.9",
 		"GOARCH="+runtime.GOARCH,
 	)
 	var imageBuilt, composeStarted bool
@@ -201,10 +210,14 @@ func RunCompose(ctx context.Context, repo string) (result ComposeResult, err err
 	if err := run.compose(ctx, "restrict runtime migration metadata", nil, "exec", "-T", "--user", "postgres", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "lindm", "-c", RestrictRuntimeMigrationMetadataSQL); err != nil {
 		return result, err
 	}
-	if err := run.compose(ctx, "bootstrap LOCAL owner once", nil, "run", "--rm", "--no-deps", "-T", "bootstrap"); err != nil {
+	if err := run.compose(ctx, "issue protected LOCAL setup code", nil, "run", "--rm", "--no-deps", "-T", "setup-code"); err != nil {
 		return result, err
 	}
-	result.OwnerBootstrapped = true
+	codeInfo, err := os.Stat(filepath.Join(setupDirectory, "code"))
+	if err != nil || codeInfo.Mode().Perm() != 0600 || codeInfo.Size() != 44 {
+		return result, errors.New("setup code file is absent or violates private custody")
+	}
+	result.SetupCodeIssued = true
 	adminOpen, deviceOpen = false, false
 	if err := errors.Join(admin.Close(), device.Close()); err != nil {
 		return result, err

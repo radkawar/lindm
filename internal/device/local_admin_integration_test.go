@@ -54,7 +54,7 @@ func newLAPSFixture(t *testing.T, revealApproval bool) *lapsFixture {
 			t.Error(err)
 		}
 	})
-	f.stepUp = localStepUp(t, authority)
+	f.stepUp = newLocalBrowserFixture(t, authority, f.svc.Pool).context
 	f.svc = f.rebuild(t, authority, f.svc.Escrow, revealApproval)
 	return f
 }

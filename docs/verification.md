@@ -102,6 +102,262 @@ Independent static reviews found no remaining blocking migration-isolation or
 fixture-concurrency issue. This is integration test evidence, not native
 distribution or physical-device qualification.
 
+## Protected first-run owner setup review
+
+The LOCAL browser setup source replaces the CLI-only first-owner path. The
+installer capability reserves one username/password pair; only verified passkey
+registration atomically initializes that owner and creates its session. No
+browser, integration, native deployment or owner design approval is claimed by
+this source delivery. Final consolidated verification belongs to the maintained
+deployment lane and centralized console review, not parallel worker checks.
+
+Required design review, based on the submitted source:
+
+| Item      | Decision             | Basis and remaining evidence                                                                                                                                                                                                  |
+| --------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision  | Pass                 | One task: choose owner credentials, register a passkey, open the dashboard; account-wide authority warning stays visible.                                                                                                     |
+| Evidence  | Needs owner decision | Setup unavailable/error states stay distinct; completed dashboard access and repository Ready require real browser/deployment observations.                                                                                   |
+| Restraint | Pass                 | No metrics, card wall, record IDs, protocol vocabulary or success celebration; one credential task reuses the existing enrollment form and ceremony.                                                                          |
+| Safety    | Needs owner decision | Hash-only code, bounded durable admission, exact Origin/CSRF checks, immutable pending credentials, UV registration and atomic completion are implemented. Source review is closed; runtime attack/race verification remains. |
+| Craft     | Needs owner decision | Existing zero-radius cards, semantic alerts, inherited font, visible labels and narrow-screen layout are reused; rendered keyboard/light/dark/mobile inspection is not yet observed.                                          |
+| Editing   | Needs owner decision | Centralized before captures exist; after captures, `make ui-review` result and owner annotations remain unobserved, not approved.                                                                                             |
+
+The centralized enrollment-layout baseline is
+`$HOME/.cache/lindm-ste-20261013/before/screenshots/`, with
+`enroll-{light,dark}-{desktop,mobile}-full.png` observed. `/setup` is a new route,
+so it has no earlier route screenshot. The final editing task is to review
+before/after light/dark desktop/mobile captures for the auth entry, setup form,
+cancelled/passkey-refused state and completed dashboard. Acceptance requires no
+horizontal overflow, keyboard-operable controls, no secret in URL/storage/cache
+or technical error details, clear resumption with the original credentials, and
+repository readiness based on the authenticated server's actual publication.
+Automation is not owner design approval.
+
+### Turnkey source security reinspection
+
+Independent source reviews of the integrated installer and first-owner
+initialization at `35b05ae9` found no remaining findings. The reviewed ordering
+retains independent release pins, signed bootstrap verification before execution,
+managed-baseline refusal, the upgrade operations lease, and verification of the
+identical signed agent repository before either server bundle includes it.
+Subsequent reinspection at `6f178df1` found no native-admission widening from the
+central server-installation facts: only Ubuntu 24.04 and RHEL 9 x86 remain admitted,
+with unchanged snapshot identities, dependencies, PostgreSQL layouts and ports.
+The authentication-options projection still follows the real setup-state query;
+database failure remains an error, not a setup-available fallback.
+
+The encrypted-only owner signer cutover at `7d7a5af9` retains unconditional
+memory locking and dump prevention before decryption, anonymous-pipe passphrases,
+private singly-linked inputs, root quorum and version/epoch verification, and
+create-only output. Portable unit fixtures exercise the real typed parser and
+cryptographic stages; they do not replace the executable's memory-admission gate
+with a test bypass. The maintained native lane must exercise that actual gate.
+One low-severity stale plaintext-signer runbook instruction was removed in
+`a489dbb1` and independently reinspected. The remaining raw signer-flag references
+are negative rejection tests, not an accepted command interface.
+
+Two independent source reinspections of the composed root-URL cutover at
+`d5132b88` found no remaining installer/reader or care findings. Persistent runtime
+and migration URLs are root:root mode 0600; each native unit receives its own
+explicit systemd credential. The checked private reader does not mutate serialized
+configuration or fall back to a persistent file. Restore captures fresh target
+paths and local account ownership before source publication, excludes old source
+URLs, and republishes fresh URLs to the stable root-owned destinations.
+The isolated care child initially lacked the companion credential consume path;
+reinspection of the composed installer/reader closed that dependency finding.
+Installer configuration validation remains at its original pre-start ordering
+through a least-privilege transient credential. The maintained lane now asserts
+actual UID/GID/mode/link count, both accounts' unreadability and native credential
+sources at four lifecycle stages. Root-only Go regressions must run as root;
+unprivileged skips do not establish ownership. Those four native lifecycle
+assertions are not yet exercised evidence.
+
+These are source-review dispositions, not successful build, browser, native
+installation, restore, or owner design-approval evidence.
+
+The audit-only historical verifier repair at `15762f84` was independently
+reinspected with no remaining findings: helper, release directory and attestation
+key stay on protected descriptors; selected native package bytes are bounded,
+privately copied and checked against the authenticated manifest before use.
+The historical RPM public key has its own independent digest/fingerprint pins,
+not invented old-manifest coverage. Current customer release verification is
+unchanged. Separate source reviews of `58dcce7a` and `c56a9b71` found no remaining
+APT one-pass URI-admission or private-RPM-database label findings. Original signed
+indexes, exact native package digests and SELinux enforcement remain required.
+These reviews do not establish successful native acquisition or replay.
+
+The connected-default cutover `8a7c5133`, reviewed in composition at `d49f51d6`,
+had no independent source findings. Connected installations use configured native
+repositories with forced package-signature and HTTPS certificate checks. The
+bootstrap authenticates six unique mandatory assets before executing a bundled
+binary; optional offline assets must form signed per-platform snapshot/digest
+pairs. Missing or unsigned air-gap add-ons fail closed before custody or service
+mutation, without a network fallback. The existing installer and owner-CLI
+whole-process secret-memory gate remains unchanged.
+
+Separate source reviews closed the owned-empty APT configuration repair
+`6bbfee07` and bounded RPM diagnostic repair `5ca8bcb2`. Compatibility repair
+`f59a4499` passes the Linux pipe constant from Go to RHEL's native Python and
+separates diagnostic initialization from actual RPM database initialization.
+These reviews authorize further maintained native diagnosis; they do not turn
+the failed RHEL acquisitions or pending final consumer replays into passes.
+
+### Root database custody filesystem regressions
+
+The consolidated check at `c56a9b71` completed formatting, TypeScript, protobuf,
+documentation generation and Go lint with zero issues. Its race test stage failed
+only on cleanup of the intentionally mode-0500 credential fixture directory:
+`TempDir RemoveAll cleanup: .../database-url: permission denied`.
+Repair `7e0f48d4` restores mode 0700 only during fixture cleanup, after the
+read-only credential exercise; production permissions and validation are unchanged.
+The audit stage was not reached in that failed invocation.
+
+At `7e0f48d4`, race-enabled test binaries were built as the operator and executed
+with actual UID 0 through `sudo -n`. All seven targeted test functions passed,
+with no root skips: generated/external URL custody in `internal/install`,
+fresh stable-path restore publication and backup custody inventory in
+`internal/serverops`, and protected credential identity/fail-closed/selection
+cases in `internal/config`. Real fixture files were root:root mode 0600; foreign
+owners/groups, readable modes and unsafe credential inputs were rejected.
+The temporary executables were removed. This establishes actual privileged
+filesystem regressions, not systemd credential handoff or the four-phase VM lane.
+
+### Consolidated and real-PostgreSQL checks
+
+The complete `make check` at `3037950f` passed, including formatting, generated
+documentation, Go lint, race-enabled unit tests and dependency audits. This
+invocation reached the audit gate after the credential-fixture cleanup repair.
+It is not native installation or browser evidence.
+
+The maintained integration wrapper then ran `internal/identity` against the real
+PostgreSQL fixture at that source revision: the package passed in 210.5 seconds.
+The wrapper also exercised fresh directory authorization, denied group removal
+and disabled-user mutations with stale fences, and cleaned up only its owned
+user, group and schema. The private Go JSON stream is
+`$HOME/work/turnkey-identity-integration-3037950f.json`, SHA-256
+`e15234733853e253bb010925323b2408ddeeb75fe75fb40deef3fdbadb48ba03`.
+
+The subsequent `internal/serverops` real-PostgreSQL run failed in 40.9 seconds:
+`TestRecoveryMetadataRuntimeDenialAndAuthorityInvalidation` attempted to create
+a cluster-wide role with the deliberately restricted fixture account
+(`permission denied to create role`, SQLSTATE `42501`). Its private Go JSON stream
+is `$HOME/work/turnkey-serverops-integration-3037950f.json`, SHA-256
+`0abf8a169c223b07df3e5ea95f66d376cebf48be45a31659345929a1c4d88602`.
+No fixture or product role received additional privileges. The regression now
+uses the existing non-owner `pg_monitor` probe, as the migration ACL regression
+does, and grants only within the test's disposable schema. It no longer targets
+the shared `public` schema or creates/drops global roles. Its checks also cover
+table-level UPDATE, REFERENCES and TRIGGER denial.
+
+At repair revision `6a1f4df5`, the serialized real-PostgreSQL suites passed:
+
+- `internal/serverops`: 19.8 seconds. Private stream
+  `$HOME/work/turnkey-serverops-integration-6a1f4df5.json`, SHA-256
+  `0dcd11f6d268fc33ba42be46d2ff831f7e1b47137ece04678fd7c4a217cfd726`.
+- `internal/server`: 12.1 seconds. Private stream
+  `$HOME/work/turnkey-server-integration-6a1f4df5.json`, SHA-256
+  `fa7ae2cffd4207e19e17081580dcf69d54eb38e3e139d0d0ed521f42fe192919`.
+- `internal/executionauthority`: 30.2 seconds. Private stream
+  `$HOME/work/turnkey-executionauthority-integration-6a1f4df5.json`, SHA-256
+  `38f70379052563a4badf1c9750f78f13477bbab344f4ca3899792f810ef7566f`.
+
+These wrapper runs retained restricted fixture roles and independent, owned
+cleanup. Privileged filesystem tests remain the separate UID-0 evidence above;
+these package passes do not establish native systemd handoff, browser deployment
+or restored-device management.
+
+At the rebased composition `4ef2305c3`, the complete `make check` passed in
+307.04 seconds. This included generated-documentation freshness, TypeScript,
+formatting, lint, race-enabled Go tests, 48 input-lint cases, npm dependency
+audit (zero vulnerabilities), and govulncheck (zero reachable vulnerabilities).
+The new connected-default installer and setup-only lane regressions were included.
+Privileged filesystem checks and real-PostgreSQL integrations remain the separately
+observed runs above; this unprivileged gate is not fresh native VM evidence.
+
+Independent source review of the connected installer change `8a7c5133` in
+composition `d49f51d6` found no remaining findings. Signature and independent-key
+verification still precede execution, mandatory signed agent packages remain
+required, optional snapshot pairs are complete and authenticated, and missing
+air-gap add-ons fail before mutation. Independent review of the setup-only lane
+at `10cf0d80` also found no remaining findings: it uses a real browser and native
+guest, retains the existing memory and root-credential gates, and records
+`first-run-install-only` with `lifecycle_qualified=false`. Neither source review
+establishes a successful native deployment.
+
+### Frozen-server browser gate
+
+The initial direct `make check-web` invocation built the `4ef2305c3` console and
+server but failed before any browser started: its default private-worktree fixture
+had no development trust directory. The acceptance record contains zero browser
+results and is retained at
+`artifacts/acceptance-20261013T232256Z/acceptance.json`, SHA-256
+`d9fb76aad3a0f09ae42d2d15472c9953061008c7b91bf335a5030a83cf3f9214`.
+No product or browser pass is inferred from that prerequisite failure.
+
+The maintained `lab acceptance -web-only` journey then used explicit read-only
+shared fixture trust and the already-built frozen server. It passed in 518.23
+seconds with owned cleanup complete. Chromium and Firefox each completed eight
+real enrollment/password/passkey/sign-out steps. The installed WebKit engine did
+not expose WebAuthn; its two observed steps were the sign-in page and invalid
+same-origin authentication POST, not passkey enrollment. The record is
+`$HOME/work/turnkey-web-4ef2305c3-explicit-fixture/acceptance.json`, SHA-256
+`a429bd5053456f9da696cf471b5a4929b6ddec5cefe5caf63cf610ce7782e4a2`.
+The server digest is
+`7b0f56afefc1a0d2932c604aa60c22cb102cb12f87174e44c04cded199764700`.
+This web-only fixture run is not native first-run setup or full lifecycle evidence.
+
+The later full gate at `939926b2a` failed in 163.26 seconds on
+`TestNoDistroIDLiteralsOutsideRegistry`: the new existing-snapshot replay guard
+introduced a distribution literal outside `internal/platform`. The dependency
+audits were not reached. The guard now selects the central release row and checks
+its server facts, native dpkg backend and deploy-lane architecture admission.
+No registry exception or broader derivative support was added.
+
+Before that full gate, the focused race suites at `d7785f623` passed:
+`cmd/lab` in 10.729 seconds and `internal/vmlab` in 38.294 seconds (60.21 seconds
+wall time). Independent source reviews of the existing-digest replay `889a5b1a7`,
+server-only air-gap setup `d7785f623` and private RPM parent-label candidate
+`7f8ae6735` found no remaining findings. These checks are not native proof; the
+five preceding RHEL acquisition failures still establish no closure or replay.
+
+### Source-first composition and migration order
+
+The post-MCP composition keeps migration 48 and adds turnkey migrations 49–53:
+compatibility, first-run setup, server recovery, server status and recovery custody.
+The first managed baseline is schema 53 with runtime floor 51. There is no
+pre-turnkey adoption or legacy archive reader. Independent installer and
+first-owner/custody source reinspection at `3d529c1d` found no remaining findings.
+This is source review, not a native installation or release-bundle qualification.
+
+The full gate at `3d529c1d` stopped in 13.84 seconds at the newly landed SPDX
+policy. Required first-party source headers were added, with generated headers
+from the canonical postprocessor and no functional changes. The next gate at
+`0cc3f86d3` stopped in 15.94 seconds on the integrated console manifest's formatting;
+the three icon entries were reflowed without changing their content.
+At `e219618d9`, complete `make check` then passed in 389.64 seconds, including
+license/format/documentation checks, TypeScript, Go lint and race tests, browser
+unit suites, npm audit (zero vulnerabilities) and govulncheck (zero reachable
+vulnerabilities). This is not a fresh native VM pass.
+
+The maintained real-PostgreSQL wrapper then passed `lindm/db` in 29.3 seconds
+(43.45 seconds wall time), with independent owned authorization-fixture cleanup.
+Its private JSON stream is `$HOME/work/turnkey-db-53-e219618d9.json`, SHA-256
+`596a0b097f1b2a6d2e4d8a38ad9807eab5df486711a893419689c3a1df2087c8`.
+The subsequent identity integration compile stopped at a newly landed MCP test
+caller of the removed `BootstrapLocalOwner` API. That caller now uses the existing
+protected first-run owner fixture; no production bypass or compatibility API was
+restored. The failed invocation does not establish an identity integration pass.
+
+### Consolidated dependency-audit correction
+
+The consolidated check at `6f178df1` completed lint and race-enabled unit stages,
+but failed its dependency audit on
+[GO-2026-5320](https://vuln.go.dev/ID/GO-2026-5320.json) / CVE-2026-5160.
+The scan traced Goldmark HTML-link rendering from the embedded documentation
+handler. The dependency was updated from `v1.7.13` to the advisory's fixed
+`v1.7.17`; the audit gate was not waived or suppressed. This correction alone
+does not claim a successful consolidated check or native deployment.
+
 ## Restart, shutdown and inventory-refresh actions
 
 | Gate                             | Required evidence                                                                                                                                                                                                      | Current status                                                                               |
@@ -242,49 +498,50 @@ the dispatch lane's systemd service evidence.
 
 <!-- BEGIN GENERATED lab-matrix -->
 
-| Release             | Inventory                                                                              | Enroll from console                                                                                                             | Provision: cloud-init | Provision: Ubuntu autoinstall | Provision: Kickstart | Provision: AutoYaST | Air-gap bundle                  | Lifecycle                                                                               | Dispatch                                               | Resources                                                                                                | Services | Encryption                                                                                                      | TPM unattended boots                                                                      | TPM reference repair                                                                        | Wipe/loss/lock                                                                                                                          | Recovery sanitize                                                               | Self-update                                                        | Assistance                                                                                                                                                                             | Advisories                                                | OS update                                                          | Release upgrade |
-| ------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------- | -------------------- | ------------------- | ------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ | --------------- |
-| Ubuntu 22.04 LTS    | x86_64 [pass][r1]; aarch64 pass                                                        | pass                                                                                                                            | —                     | —                             | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r2]                                                         | x86_64 pass; aarch64 [pass][r2]                        | x86_64 pass; aarch64 [pass (six kinds; definitions gated)][r2]                                           | pass     | x86_64 [pass (golden)][r2]; aarch64 [pass (scenarios; TPM bind refused)][r2]                                    | pass                                                                                      | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | x86_64 pass; aarch64 gated                                                      | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
-| Ubuntu 24.04 LTS    | x86_64 [pass][r3]; aarch64 [pass (TCG)][r3]                                            | x86_64 pass; aarch64 [pass (Bare VM; exact console clipboard; signed own-server APT; real console Enrolled; owned cleanup)][r4] | pass                  | pass                          | gated                | gated               | x86_64 [pass][r5]; aarch64 pass | pass                                                                                    | pass                                                   | x86_64 [pass (seven kinds, no firewall)][r6]; aarch64 [pass (subset)][r7]                                | pass     | x86_64 pass; aarch64 [pass (full encryption; product TPM bind; unattended cold boot; Secure Boot enforced)][r8] | x86_64 [pass (matrix run at ae830412; ledger append refused by schema)][r9]; aarch64 pass | x86_64 pass; aarch64 —                                                                      | x86_64 [pass (selected phases)][r10]; aarch64 [pass (matrix lane arguments; vendor updaters quiesced before action prerequisites)][r11] | pass                                                                            | x86_64 [pass][r5]; aarch64 pass                                    | x86_64 [pass (GNOME; Tier 1 clipboard, keyboard, displays, messages)][r12]; aarch64 [pass (GNOME Wayland assistance; all five scenarios; split controller/dgx20; Secure Boot on)][r13] | pass (native feed matching; not complete device coverage) | x86_64 pass; aarch64 [pass][r14]                                   | [pass][r14]     |
-| Ubuntu 26.04 LTS    | [pass][r14]                                                                            | pass                                                                                                                            | pass                  | x86_64 pass; aarch64 fail     | gated                | gated               | pass                            | x86_64 [pass][r14]; aarch64 [pass (control-plane trust)][r14]                           | [pass][r14]                                            | [pass (eight kinds)][r14]                                                                                | pass     | [pass][r14]                                                                                                     | pass                                                                                      | gated                                                                                       | [pass][r14]                                                                                                                             | pass                                                                            | x86_64 [pass][r14]; aarch64 pass                                   | x86_64 [pass (GNOME)][r14]; aarch64 [pass (GNOME, split topology)][r14]                                                                                                                | pass (native feed matching; not complete device coverage) | [pass][r14]                                                        | gated           |
-| Debian 12           | x86_64 pass; aarch64 [pass][r1]                                                        | x86_64 pass; aarch64 [pass (matrix lane child record; parent run interrupted before its ledger append)][r15]                    | —                     | gated                         | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 [pass (golden)][r2]; aarch64 [pass (TPM absent denial)][r2]                                              | x86_64 pass; aarch64 gated                                                                | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | x86_64 pass; aarch64 gated                                                      | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | gated                                                              | gated           |
-| Debian 13           | x86_64 pass; aarch64 [pass][r1]                                                        | pass                                                                                                                            | —                     | gated                         | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 [pass (scenarios)][r2]; aarch64 [pass (scenarios, TPM absent)][r2]                                       | x86_64 pass; aarch64 gated                                                                | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | gated                                                              | gated           |
-| Fedora 43           | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                     | pass     | pass                                                                                                            | x86_64 pass; aarch64 gated                                                                | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 gated                                                      | pass                                                               | pass                                                                                                                                                                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
-| Fedora 44           | x86_64 [pass][r3]; aarch64 [pass][r1]                                                  | x86_64 pass; aarch64 [pass (Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup)][r4] | pass                  | gated                         | pass                 | gated               | pass                            | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r16]; aarch64 [pass][r7]                 | x86_64 pass; aarch64 [pass (subset)][r7]                                                                 | pass     | x86_64 [pass][r10]; aarch64 [pass (Secure Boot off)][r17]                                                       | x86_64 pass; aarch64 gated                                                                | gated                                                                                       | x86_64 [pass (selected phases)][r10]; aarch64 pass                                                                                      | x86_64 pass; aarch64 gated                                                      | x86_64 [pass][r5]; aarch64 pass                                    | x86_64 [fail (GNOME; Tier 1 (monitors: gnome-shell SIGSEGV on head unplug, upstream))][r12]; aarch64 [pass (GNOME, Secure Boot off)][r18]                                              | pass (native feed matching; not complete device coverage) | [pass][r19]                                                        | gated           |
-| RHEL 9              | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 pass; aarch64 [pass (eight kinds)][r6]                                                            | pass     | x86_64 [pass (golden: Secure Boot off, TPM2, prompted cold unlocks)][r20]; aarch64 pass                         | pass                                                                                      | x86_64 pass; aarch64 —                                                                      | x86_64 [pass (lock, release, account disable and quarantine; GDM Wayland; Secure Boot on)][r20]; aarch64 pass                           | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r20]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 [pass][r21]; aarch64 [pass (registered; 11 scenarios)][r19] | gated           |
-| RHEL 10             | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 pass; aarch64 [pass (registered; all eight resource kinds)][r22]                                  | pass     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r20]; aarch64 pass                                                | pass                                                                                      | gated                                                                                       | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r20]; aarch64 pass                                        | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r20]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 pass; aarch64 [pass (registered; 11 scenarios)][r19]        | gated           |
-| Rocky Linux 9       | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                      | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (partial-feed matching)                              | pass                                                               | gated           |
-| Rocky Linux 10      | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                      | gated                                                                                       | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                              | pass (partial-feed matching)                              | pass                                                               | gated           |
-| AlmaLinux 9         | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | [pass][r1]                                             | x86_64 pass; aarch64 [pass (eight kinds)][r6]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                      | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
-| AlmaLinux 10        | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | [pass][r1]                                                                              | [pass][r1]                                             | x86_64 pass; aarch64 [pass (all kinds)][r6]                                                              | pass     | x86_64 [pass (scenarios)][r2]; aarch64 [pass (TPM scenario)][r2]                                                | pass                                                                                      | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
-| Linux Mint 22.3     | [pass (golden recipe linuxmint-ubiquity-v3; 1905 packages; APT origins verified)][r2]  | —                                                                                                                               | gated                 | gated                         | gated                | gated               | —                               | [pass (signed DEB 0.7.0→0.7.1; control-plane trust; local authority)][r2]               | [pass (service scenarios, clock skew, revocation)][r2] | [pass (connected firewall with probe-peer guest)][r2]                                                    | —        | [pass (scenario all: inventory, escrow, reveal, rotation, TPM2 bind, cold-boot recovery)][r2]                   | [pass (30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff)][r2]     | [pass (legacy 1 of 4 TPM references repaired to 4 of 4; 30 cold boots; Secure Boot on)][r2] | [pass (scenario all: crypto-erase, report-loss, lock unverifiable (no LockedHint), release, quarantine)][r2]                            | [pass (Mint golden as original device; measured shim+GRUB; SATA overwrite)][r2] | [pass (signed agent self-update, interrupted unpack recovery)][r2] | gated                                                                                                                                                                                  | —                                                         | gated                                                              | gated           |
-| Pop!\_OS 24.04 LTS  | pass (distinst golden (generic build 28, COSMIC); 1754 packages; APT origins verified) | —                                                                                                                               | gated                 | gated                         | gated                | gated               | —                               | pass (signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation) | pass (service scenarios)                               | pass (connected: files, accounts, sysctl, definitions, password, firewall, secret-password, local-admin) | —        | pass (encryption compliance scenario; main 7158bb48)                                                            | gated                                                                                     | gated                                                                                       | pass (report-loss blocks the original device; main 7158bb48)                                                                            | gated                                                                           | pass (signed agent self-update)                                    | gated                                                                                                                                                                                  | —                                                         | gated                                                              | gated           |
-| Arch Linux          | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                     | pass     | pass                                                                                                            | pass                                                                                      | gated                                                                                       | pass                                                                                                                                    | pass                                                                            | pass                                                               | pass                                                                                                                                                                                   | pass (partial-feed matching)                              | pass                                                               | gated           |
-| Omarchy 4.0.4       | —                                                                                      | no lane                                                                                                                         | gated                 | gated                         | gated                | gated               | gated                           | —                                                                                       | —                                                      | —                                                                                                        | no lane  | —                                                                                                               | —                                                                                         | gated                                                                                       | —                                                                                                                                       | gated                                                                           | —                                                                  | gated                                                                                                                                                                                  | gated                                                     | gated                                                              | gated           |
-| openSUSE Tumbleweed | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | pass                | x86_64 —; aarch64 pass          | x86_64 —; aarch64 pass                                                                  | x86_64 —; aarch64 pass                                 | x86_64 pass; aarch64 fail                                                                                | pass     | pass                                                                                                            | pass                                                                                      | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 superseded by 9b4e6f5f                                     | x86_64 —; aarch64 pass                                             | pass                                                                                                                                                                                   | pass (partial-feed matching)                              | x86_64 pass; aarch64 —                                             | gated           |
+| Release             | Turnkey server deploy                                       | Inventory                                                                              | Enroll from console                                                                                                             | Provision: cloud-init | Provision: Ubuntu autoinstall | Provision: Kickstart | Provision: AutoYaST | Air-gap bundle                  | Lifecycle                                                                               | Dispatch                                               | Resources                                                                                                | Services | Encryption                                                                                                      | TPM unattended boots                                                                       | TPM reference repair                                                                        | Wipe/loss/lock                                                                                                                          | Recovery sanitize                                                               | Self-update                                                        | Assistance                                                                                                                                                                             | Advisories                                                | OS update                                                          | Release upgrade |
+| ------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ----------------------------- | -------------------- | ------------------- | ------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------ | --------------- |
+| Ubuntu 22.04 LTS    | gated                                                       | x86_64 [pass][r1]; aarch64 pass                                                        | pass                                                                                                                            | —                     | —                             | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r2]                                                         | x86_64 pass; aarch64 [pass][r2]                        | x86_64 pass; aarch64 [pass (six kinds; definitions gated)][r2]                                           | pass     | x86_64 [pass (golden)][r2]; aarch64 [pass (scenarios; TPM bind refused)][r2]                                    | pass                                                                                       | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | x86_64 pass; aarch64 gated                                                      | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
+| Ubuntu 24.04 LTS    | x86_64 [pass (historical-install-audit)][r3]; aarch64 gated | x86_64 [pass][r4]; aarch64 [pass (TCG)][r4]                                            | x86_64 pass; aarch64 [pass (Bare VM; exact console clipboard; signed own-server APT; real console Enrolled; owned cleanup)][r5] | pass                  | pass                          | gated                | gated               | x86_64 [pass][r6]; aarch64 pass | pass                                                                                    | pass                                                   | x86_64 [pass (seven kinds, no firewall)][r7]; aarch64 [pass (subset)][r8]                                | pass     | x86_64 pass; aarch64 [pass (full encryption; product TPM bind; unattended cold boot; Secure Boot enforced)][r9] | x86_64 [pass (matrix run at ae830412; ledger append refused by schema)][r10]; aarch64 pass | x86_64 pass; aarch64 —                                                                      | x86_64 [pass (selected phases)][r11]; aarch64 [pass (matrix lane arguments; vendor updaters quiesced before action prerequisites)][r12] | pass                                                                            | x86_64 [pass][r6]; aarch64 pass                                    | x86_64 [pass (GNOME; Tier 1 clipboard, keyboard, displays, messages)][r13]; aarch64 [pass (GNOME Wayland assistance; all five scenarios; split controller/dgx20; Secure Boot on)][r14] | pass (native feed matching; not complete device coverage) | x86_64 pass; aarch64 [pass][r15]                                   | [pass][r15]     |
+| Ubuntu 26.04 LTS    | gated                                                       | [pass][r15]                                                                            | pass                                                                                                                            | pass                  | x86_64 pass; aarch64 fail     | gated                | gated               | pass                            | x86_64 [pass][r15]; aarch64 [pass (control-plane trust)][r15]                           | [pass][r15]                                            | [pass (eight kinds)][r15]                                                                                | pass     | [pass][r15]                                                                                                     | pass                                                                                       | gated                                                                                       | [pass][r15]                                                                                                                             | pass                                                                            | x86_64 [pass][r15]; aarch64 pass                                   | x86_64 [pass (GNOME)][r15]; aarch64 [pass (GNOME, split topology)][r15]                                                                                                                | pass (native feed matching; not complete device coverage) | [pass][r15]                                                        | gated           |
+| Debian 12           | gated                                                       | x86_64 pass; aarch64 [pass][r1]                                                        | x86_64 pass; aarch64 [pass (matrix lane child record; parent run interrupted before its ledger append)][r16]                    | —                     | gated                         | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 [pass (golden)][r2]; aarch64 [pass (TPM absent denial)][r2]                                              | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | x86_64 pass; aarch64 gated                                                      | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | gated                                                              | gated           |
+| Debian 13           | gated                                                       | x86_64 pass; aarch64 [pass][r1]                                                        | pass                                                                                                                            | —                     | gated                         | gated                | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 [pass (scenarios)][r2]; aarch64 [pass (scenarios, TPM absent)][r2]                                       | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME, five scenarios)][r2]                                                                                                                                                     | pass (native feed matching; not complete device coverage) | gated                                                              | gated           |
+| Fedora 43           | gated                                                       | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                     | pass     | pass                                                                                                            | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 gated                                                      | pass                                                               | pass                                                                                                                                                                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
+| Fedora 44           | gated                                                       | x86_64 [pass][r4]; aarch64 [pass][r1]                                                  | x86_64 pass; aarch64 [pass (Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup)][r5] | pass                  | gated                         | pass                 | gated               | pass                            | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r17]; aarch64 [pass][r8]                 | x86_64 pass; aarch64 [pass (subset)][r8]                                                                 | pass     | x86_64 [pass][r11]; aarch64 [pass (Secure Boot off)][r18]                                                       | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | x86_64 [pass (selected phases)][r11]; aarch64 pass                                                                                      | x86_64 pass; aarch64 gated                                                      | x86_64 [pass][r6]; aarch64 pass                                    | x86_64 [fail (GNOME; Tier 1 (monitors: gnome-shell SIGSEGV on head unplug, upstream))][r13]; aarch64 [pass (GNOME, Secure Boot off)][r19]                                              | pass (native feed matching; not complete device coverage) | [pass][r20]                                                        | gated           |
+| RHEL 9              | x86_64 [pass (historical-install-audit)][r3]; aarch64 gated | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 pass; aarch64 [pass (eight kinds)][r7]                                                            | pass     | x86_64 [pass (golden: Secure Boot off, TPM2, prompted cold unlocks)][r21]; aarch64 pass                         | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 [pass (lock, release, account disable and quarantine; GDM Wayland; Secure Boot on)][r21]; aarch64 pass                           | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r21]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 [pass][r22]; aarch64 [pass (registered; 11 scenarios)][r20] | gated           |
+| RHEL 10             | gated                                                       | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 pass; aarch64 [pass (registered; all eight resource kinds)][r23]                                  | pass     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r21]; aarch64 pass                                                | pass                                                                                       | gated                                                                                       | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r21]; aarch64 pass                                        | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r21]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 pass; aarch64 [pass (registered; 11 scenarios)][r20]        | gated           |
+| Rocky Linux 9       | gated                                                       | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (partial-feed matching)                              | pass                                                               | gated           |
+| Rocky Linux 10      | gated                                                       | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                       | gated                                                                                       | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                              | pass (partial-feed matching)                              | pass                                                               | gated           |
+| AlmaLinux 9         | gated                                                       | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | [pass][r1]                                             | x86_64 pass; aarch64 [pass (eight kinds)][r7]                                                            | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
+| AlmaLinux 10        | gated                                                       | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | [pass][r1]                                                                              | [pass][r1]                                             | x86_64 pass; aarch64 [pass (all kinds)][r7]                                                              | pass     | x86_64 [pass (scenarios)][r2]; aarch64 [pass (TPM scenario)][r2]                                                | pass                                                                                       | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
+| Linux Mint 22.3     | gated                                                       | [pass (golden recipe linuxmint-ubiquity-v3; 1905 packages; APT origins verified)][r2]  | —                                                                                                                               | gated                 | gated                         | gated                | gated               | —                               | [pass (signed DEB 0.7.0→0.7.1; control-plane trust; local authority)][r2]               | [pass (service scenarios, clock skew, revocation)][r2] | [pass (connected firewall with probe-peer guest)][r2]                                                    | —        | [pass (scenario all: inventory, escrow, reveal, rotation, TPM2 bind, cold-boot recovery)][r2]                   | [pass (30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff)][r2]      | [pass (legacy 1 of 4 TPM references repaired to 4 of 4; 30 cold boots; Secure Boot on)][r2] | [pass (scenario all: crypto-erase, report-loss, lock unverifiable (no LockedHint), release, quarantine)][r2]                            | [pass (Mint golden as original device; measured shim+GRUB; SATA overwrite)][r2] | [pass (signed agent self-update, interrupted unpack recovery)][r2] | gated                                                                                                                                                                                  | —                                                         | gated                                                              | gated           |
+| Pop!\_OS 24.04 LTS  | gated                                                       | pass (distinst golden (generic build 28, COSMIC); 1754 packages; APT origins verified) | —                                                                                                                               | gated                 | gated                         | gated                | gated               | —                               | pass (signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation) | pass (service scenarios)                               | pass (connected: files, accounts, sysctl, definitions, password, firewall, secret-password, local-admin) | —        | pass (encryption compliance scenario; main 7158bb48)                                                            | gated                                                                                      | gated                                                                                       | pass (report-loss blocks the original device; main 7158bb48)                                                                            | gated                                                                           | pass (signed agent self-update)                                    | gated                                                                                                                                                                                  | —                                                         | gated                                                              | gated           |
+| Arch Linux          | gated                                                       | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                     | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | pass                                                                            | pass                                                               | pass                                                                                                                                                                                   | pass (partial-feed matching)                              | pass                                                               | gated           |
+| Omarchy 4.0.4       | gated                                                       | —                                                                                      | no lane                                                                                                                         | gated                 | gated                         | gated                | gated               | gated                           | —                                                                                       | —                                                      | —                                                                                                        | no lane  | —                                                                                                               | —                                                                                          | gated                                                                                       | —                                                                                                                                       | gated                                                                           | —                                                                  | gated                                                                                                                                                                                  | gated                                                     | gated                                                              | gated           |
+| openSUSE Tumbleweed | gated                                                       | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | pass                | x86_64 —; aarch64 pass          | x86_64 —; aarch64 pass                                                                  | x86_64 —; aarch64 pass                                 | x86_64 pass; aarch64 fail                                                                                | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 superseded by 9b4e6f5f                                     | x86_64 —; aarch64 pass                                             | pass                                                                                                                                                                                   | pass (partial-feed matching)                              | x86_64 pass; aarch64 —                                             | gated           |
 
 [r1]: #1-launch-platform-qualification
 [r2]: #tier-1-parity-records-2026-10-11
-[r3]: #inventory-hardware-observations-2026-10-10
-[r4]: #bare-machine-console-enrollment-2026-10-11
-[r5]: #3-acceptance-scenario-families
-[r6]: #all-resource-kinds-in-one-connected-lane
-[r7]: #generic-resource-executor-cutover-phase-2
-[r8]: #ubuntu-2404-aarch64-encryption-and-tpm
-[r9]: #tpm2-unseal-race-and-unattended-boot-regression
-[r10]: #encryption-and-imperative-action-evidence-l10-l13-l15
-[r11]: #ubuntu-24042604-matrix-completion-2026-10-12
-[r12]: #commercial-assistance-capability-qualification
-[r13]: #routed-split-topology-assistance
-[r14]: #ubuntu-26041-parity-records-2026-10-11
-[r15]: #debian-el-and-ubuntu-2204-matrix-completion-2026-10-12
-[r16]: #customer-journey-release-acceptance
-[r17]: #fedora-44-aarch64-encryption-and-tpm
-[r18]: #fedora-44-aarch64-gnome-assistance
-[r19]: #os-update-policy-patch-now-and-patch-status
-[r20]: #rhel-encrypted-device-actions-and-self-update
-[r21]: #rhel-matrix-completion-2026-10-12
-[r22]: #host-resource-providers-on-el-10
+[r3]: #control-plane-deployment-matrix
+[r4]: #inventory-hardware-observations-2026-10-10
+[r5]: #bare-machine-console-enrollment-2026-10-11
+[r6]: #3-acceptance-scenario-families
+[r7]: #all-resource-kinds-in-one-connected-lane
+[r8]: #generic-resource-executor-cutover-phase-2
+[r9]: #ubuntu-2404-aarch64-encryption-and-tpm
+[r10]: #tpm2-unseal-race-and-unattended-boot-regression
+[r11]: #encryption-and-imperative-action-evidence-l10-l13-l15
+[r12]: #ubuntu-24042604-matrix-completion-2026-10-12
+[r13]: #commercial-assistance-capability-qualification
+[r14]: #routed-split-topology-assistance
+[r15]: #ubuntu-26041-parity-records-2026-10-11
+[r16]: #debian-el-and-ubuntu-2204-matrix-completion-2026-10-12
+[r17]: #customer-journey-release-acceptance
+[r18]: #fedora-44-aarch64-encryption-and-tpm
+[r19]: #fedora-44-aarch64-gnome-assistance
+[r20]: #os-update-policy-patch-now-and-patch-status
+[r21]: #rhel-encrypted-device-actions-and-self-update
+[r22]: #rhel-matrix-completion-2026-10-12
+[r23]: #host-resource-providers-on-el-10
 
 <!-- END GENERATED lab-matrix -->
 
@@ -3309,17 +3566,164 @@ become supported server installation hosts.
 | Replicated API/workers + HA PostgreSQL + shared artifacts | L14 rolling upgrade/restore fences; L16 isolated HA topology; replicated L18 load/failover/queue fencing and artifact availability                           | Maintained `lab ha` passed 2026-10-11: replica crash mid-dispatch, synchronous-standby promotion and 0.1.0→0.1.1 rolling upgrade with zero duplicate or lost actions and single-leader jobs. Replicated L18 load passed 2026-10-12 at 20,000 devices with three replicas on two hosts and one non-HA PostgreSQL (see the L18 scale-out row). Shared artifacts, worker-only processes, partitions, restore, failover under load, HA PostgreSQL under load and 100k remain open |
 | Built-in assistance relay                                 | Local TURN and no-relay/direct variants, certificate/credential rotation and bandwidth limits; L09/L12/L16 consent/termination/relay-only behavior           | Embedded relay-only TURN in `lindmd`: single-host relayed consent/view/control/termination passed on emulated Ubuntu24 and Fedora44 GNOME/Wayland ([remote assistance](#built-in-graphical-remote-assistance-l09-l12)); relay rotation, bandwidth limits, multi-host/NAT, TLS-TURN, replicated and air-gapped L16 not qualified                                                                                                                                               |
 
-Maintained implementation: `lab vm server` selects the pinned Ubuntu 24.04 image
-and qualifies signed package installation, explicit migration, LOCAL one-shot owner
-bootstrap, verified HTTPS/public surfaces and protected RPC denial, restart,
-same-schema upgrade, `pg_dump`/config backup, database destruction/restore and
-retained-data purge. The device row in this restore proof is an explicit pending
-backup fixture, not enrollment or dispatch evidence. `lab server compose` separately
-proves image boot, explicit migration, TLS/role separation and actual non-root
-container confinement. Both write immutable new `-record` files; observed runs and
-remaining gates are in the [evidence ledger](implementation-plan.md#2-evidence-ledger).
-Neither lane substitutes for a browser WebAuthn ceremony, stale-backup security
-reconciliation, key rotation, measured capacity or full release certification.
+`lab vm server` is now only the low-level native install/configuration boundary:
+explicit migration and protected setup issuance, TLS/public surfaces and protected
+RPC denial, confinement, restart, direct-native-upgrade refusal without signed
+installer authorization and retained-data purge. Its former pending-row/plaintext
+same-host dump fixture is historical evidence, not the maintained recovery lane.
+`lab server compose` separately exercises image boot, explicit migration, TLS/role
+separation and actual non-root container confinement. Neither low-level lane
+substitutes for browser authentication or live managed-device recovery.
+
+The maintained end-to-end implementation is `lab deploy` and matrix cell `deploy`:
+Ubuntu 24.04 and entitled RHEL 9, local native x86/KVM, three fresh guests held
+under one normal FIFO reservation within the configured four-slot ceiling.
+It consumes first **turnkey** signed release N and strictly newer turnkey N+1;
+the separate `lab deploy audit` executes the immutable pre-feature manual install.
+No upgrade/adoption of a customer or unmanaged pre-feature installation is implied.
+The workflow uses real browser password/passkey setup and clipboard enrollment,
+encrypted backup plus offline drill, signed upgrade, independently fenced current
+security snapshot, quorum-approved higher-epoch reconciliation and fresh restore.
+Pass requires the original actual enrolled VM to complete a new same-device
+management action with received fresh inventory after restore, not a database row.
+It records actual initial vendor-tool presence, runtime SQL privilege denials,
+browser version and virtual CTAP2 authenticator type, screenshots and failures.
+TLS trusts only the owned deployment CA in an isolated child NSS store; there is
+no blanket browser certificate-error bypass.
+
+The recovery-key quick path must use generated encrypted custody, move the
+passphrase-encrypted identity export to protected off-server custody, and complete
+the visible owner task with user-verifying step-up. That acknowledgement is
+**owner-attested**, never machine-verified proof of storage location. The age
+identities and execution-root private keys must never be written plaintext.
+Actual raw records and observed counts—not implementation availability—determine
+the ledger verdict. Failed/blocked real runs remain failed/blocked; development
+custody and virtual hardware are labeled explicitly. Full release certification,
+physical authenticators, capacity and replicated HA require their own evidence.
+
+The first real pre-feature audits used immutable **release source** `5e3f89dba356b98fc9c07602323a32d56eaf3929`
+and independently pinned development package/attestation custody, release `0.1.0`.
+Both waited in the public four-slot FIFO and booted fresh native x86 KVM guests.
+Ubuntu 24.04 attempt 1 observed **2 terminal commands, 0 browser decisions and 1
+failed command**: vendor PostgreSQL prerequisites installed, then local signed APT
+publication failed because the audit had not created its protected output directory.
+No console success was reached or inferred. RHEL 9.8 attempt 1 observed **27
+terminal commands, 8 browser decisions and 0 failed command/control boundaries**,
+including protected real entitlement registration, signed RPM verification,
+separate TLS database roles, migration, manual administrator bootstrap, enrollment
+and sign-in. Its overall browser proof failed the harness's inappropriate resident
+credential check; resident credentials are not required by the production UV
+passkey contract. Neither initial attempt is a complete installation verdict.
+The retained RHEL `setup-failure.png` actually shows authenticated Dashboard and
+the generated account's Owner role, with observed SHA-256
+`1259a414428810a375762df177c34231afe8ffd72ac022b5da15bc51f30e04dd`.
+That visible console observation does not change the raw failed runner verdict.
+The initial preconsolidation audit runner's immutable revision/executable digest
+was not retained; it is not attributed to the immutable release revision.
+Raw private records are `/home/r/work/turnkey-deploy-release/baseline-ubuntu-attempt1.json`
+and `baseline-rhel-attempt1.json`, with matching private evidence directories.
+Their respective observed SHA-256 values are
+`01bcfcfff4eca1003d79608b9043a201c8749a1acf22e474ee5d6bbf45cffd14` and
+`23d748a0be4adffe39ddb4bc577291b9e70a908a4757773538f7c003800f47a2`.
+The private `baseline-audit-index.json` retains these bindings and custody labels.
+Both report owned cleanup complete; RHEL also records actual unregister and
+activation-key deletion. Observed install friction includes absent `install.sh`
+and dependency snapshot in the old signed export, manual listener/TLS setup,
+separate PostgreSQL runtime/migrator passwords and verify-full CA configuration.
+Fresh corrected audits and the turnkey lifecycle need their own evidence; these
+initial records do not establish either final OS ledger pass.
+
+Native air-gap closure acquisition is not yet a qualified snapshot. The admitted
+RHEL attempt used producer source `15ee0569` and executable SHA-256
+`b6378386d3539a2eb93f2021513756d3b79e031ae69ac834a48ff4af73abb896`.
+It failed a guest operation with exit status 1; the exact internal stage was
+unknown, so no solver, signature replay or closure success is inferred.
+The preserved private failure record is
+`$HOME/.cache/lindm-turnkey-rhel-serverdeps-20261013-failure.json`, SHA-256
+`b844eaf376c0bde5f27735c59233bd364165aad412bf458d785a671654e3720e`.
+The corrected producer uses the native DNF interpreter, portable cloud-init
+readiness and a closed stage-error vocabulary; raw vendor diagnostics stay
+suppressed. A subsequent acquisition and final integrated consumer replay require
+their own ordinary FIFO evidence.
+
+Noble acquisition also stopped on a genuine unused signed metadata declaration,
+`main/dep11/icons-128x128@2.tar.gz`. The parser now separates canonical declarative
+paths from the stricter retained-file I/O boundary; gpgv, package hashes,
+retained-byte bounds and no-symlink checks remain required. This parser correction
+does not establish a successful solve, offline replay or turnkey installation.
+
+Corrected historical attempts 2 used immutable runner source
+`84b174ca968fb0913b814db6983b23d56bfdd8e7`, actual executable SHA-256
+`604cfeb8b11039cdb1b326aa36bbfceff07ffe913637926ff41d01bf5be8d06f`,
+Go1.26.9 and pinned Node24.21.0. Both waited in the same public four-slot FIFO,
+then failed **before guest creation**, with zero terminal commands/decisions:
+current release verification correctly requires `agent-repository/release.json`,
+which the immutable old export does not contain. This is historical verifier
+incompatibility, not a fresh-host OS or browser result; current verification is
+not weakened to accommodate it. Raw `baseline-ubuntu-attempt2.json` and
+`baseline-rhel-attempt2.json` in the same private custody directory have observed
+SHA-256 values `2780d9ea50bacd4b1c3f7163653fdf78dded825170c0238c02b2310edd9d37aa`
+and `28b17033405955dbabe72666b8cb0efb37e22a68ecbb844baef7bf7512f5ac35`.
+The maintained audit now requires an independently pinned frozen verifier from
+exact baseline source `5e3f89dba356b98fc9c07602323a32d56eaf3929`, alongside the
+independent public release key pins. Its actual executable SHA-256 is
+`8a423318e109bb00a02d5a3df35511eae75c03766664cd85cd10c1b65a408f8c`.
+No final turnkey lifecycle result is inferred from those verifier inputs.
+
+Corrected historical attempt 3 **passed on both fresh hosts** on 2026-10-13,
+using audited immutable runner source `6c20790eccfc702d84dad066aac707a35491d188`
+and actual executable SHA-256
+`7a34e6da967b0cd72610ce1e4627ea5302280f0abad3b01bfb68f14a0bc9edb7`.
+Both waited in the configured four-slot FIFO, then booted real native x86 KVM
+guests (QEMU8.2.2, SeaBIOS1.16.3, virtio-blk, vendor cloud images). Ubuntu24.04
+observed **27 terminal invocations, 13 browser decisions, 0 failed operations**;
+entitled RHEL9.8 observed **28 terminal invocations, 13 browser decisions,
+0 failed operations**. These are actual instrumented operator boundaries,
+including protected transfers and explicit trust checks, not seven runbook
+headings or a count of every command inside an invocation. Both OS records cover
+**16 distinct terminal-boundary labels and 10 distinct browser-control labels**;
+each of the twelve protected resource uploads is counted individually. The 13 decisions
+include sign-out and a second password/user-verifying-passkey sign-in to prove
+fresh authentication. Chromium156.0.8078.4 used its explicit CTAP2 UV virtual
+authenticator; both retained screenshots visibly show authenticated Dashboard
+and the generated Owner account. Physical passkeys are not claimed.
+
+Raw `/home/r/work/turnkey-deploy-release/baseline-ubuntu-attempt3.json` and
+`baseline-rhel-attempt3.json` have respective SHA-256 values
+`0f1290ed64cb2ca158d708dd3902d0301a5eed0702a7173b50e98877d41adad1` and
+`66cc93f01a1a73158a682168bd5a7203ca39fa6ad1453c7dc3d822841137fd3e`.
+Their matching private evidence directories retain
+`setup-password-passkey-signin.png`, with respective hashes
+`383140e7637878dd76ec9632b3618d7b8880b8a2a9897d11a3aafcbfbf7a8bb9` and
+`11b039b1615a12b7e5cfb2b0a0902a3887235def3a70919f5660471d1d92bb6c`.
+Both record owned cleanup complete. RHEL records real entitlement registration,
+identity observation, vendor metadata refresh, unregister and activation-key
+deletion; no entitlement is fabricated or carried forward into another run.
+
+Observed friction on both completed audits: neither fresh image had PostgreSQL
+client/server prerequisites; the old signed export had no installer or dependency
+closure; the operator separately provisioned native package trust, twelve
+protected resources, listener origins/TLS, separate database identities and
+verify-full trust, schema migration and runtime metadata restrictions, then
+privately moved a one-use enrollment secret into the browser. Ubuntu additionally
+published and installed through an authenticated local APT repository; RHEL
+required real protected entitlement and separate RPM public-key custody. The old
+`package-signing.asc` was not bound by its signed manifest; the corrected audit
+used independent native fingerprint and exact SHA-256 pins, not fabricated
+historical signature coverage. Both guests verified uploaded package bytes
+against the exact authenticated release manifest before installation.
+
+The resulting turnkey remediation uses authenticated **connected vendor
+dependency provisioning by default**; independently authenticated per-platform
+offline add-ons are optional for connected installation and required only for
+that platform's requested airgap installation. Historical absence of an offline
+snapshot does not make one mandatory for the final connected lifecycle proof.
+
+These ledger records are scoped **historical-install-audit**, not full `deploy`
+qualification: they do not exercise turnkey generated custody, second-device
+enrollment, encrypted backup, signed upgrade, fresh restore, or post-restore live
+management. The full two-OS turnkey lifecycle requires its separate final-source
+artifacts and unscoped evidence.
 
 Both single-host rows need connected and air-gapped acceptance. Native
 dependencies/hardening/migration invocation cannot be inferred from container

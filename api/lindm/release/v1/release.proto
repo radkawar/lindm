@@ -32,6 +32,27 @@ message ReleaseManifest {
     min_items: 2
     max_items: 2
   }];
+  // Signed server release discovery is distinct from agent TUF channels.
+  ServerReleaseNotice server_notice = 9;
+}
+
+// Offline bulletin carried inside the authenticated release manifest. Import
+// never treats absent or expired notice metadata as a current security feed.
+message ServerReleaseNotice {
+  bool security_update = 1;
+  repeated string advisory_ids = 2 [(buf.validate.field).repeated = {
+    max_items: 64
+    items: {
+      string: {pattern: "^(CVE-[0-9]{4}-[0-9]{4,}|GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4})$"}
+    }
+  }];
+  int64 issued_at = 3 [(buf.validate.field).int64.gt = 0];
+  int64 expires_at = 4 [(buf.validate.field).int64.gt = 0];
+  option (buf.validate.message).cel = {
+    id: "server_release_notice.validity"
+    message: "release notice expiry must follow issuance"
+    expression: "this.expires_at > this.issued_at"
+  };
 }
 
 message ReleaseArtifact {

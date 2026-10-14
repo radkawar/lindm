@@ -17,6 +17,7 @@ import {
   LocalLoginRequestSchema,
   LocalEnrollmentRequestSchema,
   SessionPrincipalSchema,
+  FirstRunSetupRequestSchema,
   ListAccountsResponseSchema,
   CreateAccountRequestSchema,
   UpdateAccountRequestSchema,
@@ -24,6 +25,7 @@ import {
   AccountEnrollmentSchema,
   type LocalLoginRequest,
   type LocalEnrollmentRequest,
+  type FirstRunSetupRequest,
   type CreateAccountRequest,
   type UpdateAccountRequest,
 } from "../../../gen/lindm/auth/v1/auth_pb";
@@ -39,6 +41,7 @@ async function request(path: string, body?: JsonValue, csrfToken?: string, signa
       Accept: "application/json",
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       ...(csrfToken === undefined ? {} : { "X-CSRF-Token": csrfToken }),
+      ...(path === "/auth/setup/begin" ? { "X-Lindm-Setup": "1" } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
@@ -51,7 +54,11 @@ async function request(path: string, body?: JsonValue, csrfToken?: string, signa
         ? Code.Unauthenticated
         : response.status === 403
           ? Code.PermissionDenied
-          : Code.Unknown,
+          : response.status === 429
+            ? Code.ResourceExhausted
+            : response.status === 400
+              ? Code.InvalidArgument
+              : Code.Unknown,
       response.headers,
     );
   }
@@ -85,6 +92,18 @@ export async function beginLogin(value: LocalLoginRequest, signal: AbortSignal) 
     await request(
       "/auth/local/login/begin",
       toJson(LocalLoginRequestSchema, value),
+      undefined,
+      signal,
+    ),
+  );
+}
+
+export async function beginSetup(value: FirstRunSetupRequest, signal: AbortSignal) {
+  return decode(
+    WebAuthnChallengeSchema,
+    await request(
+      "/auth/setup/begin",
+      toJson(FirstRunSetupRequestSchema, value),
       undefined,
       signal,
     ),

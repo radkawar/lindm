@@ -34,13 +34,18 @@ import (
 	"lindm/internal/mcp"
 	"lindm/internal/offlinebundle"
 	"lindm/internal/reports"
+	"lindm/internal/serverops"
 	"lindm/internal/targeting"
 	"lindm/web"
 )
 
-// NewIdentity composes the configured primary identity source and independent
-// emergency policy for both serving and explicit owner bootstrap.
+// NewIdentity composes primary and emergency identity for explicit external-owner
+// bootstrap. Only the serving control plane can arm first-owner execution setup.
 func NewIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources) (*identity.Service, error) {
+	return newIdentity(ctx, pool, resources, nil)
+}
+
+func newIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Resources, execution *executionauthority.Store) (*identity.Service, error) {
 	authentication := resources.Proto.GetAuthentication()
 	keycloak := authentication.GetKeycloak()
 	cfg := identity.Config{
@@ -60,6 +65,18 @@ func NewIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Reso
 		SCIM:                        authentication.GetScim(),
 		Broker:                      keycloak.GetUpstream(),
 		BrokerDirectoryClientSecret: resources.BrokerDirectoryClientSecret,
+	}
+	if bootstrap := resources.ExecutionBootstrap; bootstrap != nil && bootstrap.InitialDelegation != nil && execution != nil {
+		if authentication.GetLocal() == nil {
+			return nil, errors.New("initial execution delegation requires local first-owner setup")
+		}
+		snapshot, err := execution.Get(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("read initial execution authority: %w", err)
+		}
+		if len(snapshot.DelegationEnvelope) == 0 {
+			cfg.InitialOwnerExecution = firstOwnerExecution(execution, bootstrap.InitialDelegation)
+		}
 	}
 	if entra := authentication.GetEntra(); entra != nil {
 		issuer, err := identity.EntraIssuer(entra.GetTenantId())
@@ -103,6 +120,9 @@ func Run(ctx context.Context, resources *config.Resources) error {
 	startup, cancelStartup := context.WithTimeout(ctx, 30*time.Second)
 	defer cancelStartup()
 	if err := db.Check(startup, pool); err != nil {
+		return err
+	}
+	if err := serverops.CheckRestoreHoldPool(startup, pool); err != nil {
 		return err
 	}
 	plane, err := newControlPlane(startup, pool, adminPool, resources)
@@ -204,18 +224,19 @@ type controlPlane struct {
 	relay              *assistrelay.Relay
 	supervisor         *jobs.Supervisor
 	console            http.Handler
+	status             *statusMonitor
 }
 
 // newControlPlane initializes every configured domain service against a checked
 // schema. It binds no listener.
 func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resources *config.Resources) (*controlPlane, error) {
-	auth, err := NewIdentity(ctx, adminPool, resources)
-	if err != nil {
-		return nil, fmt.Errorf("initialize identity service: %w", err)
-	}
 	execution, err := newExecutionAuthority(ctx, pool, resources)
 	if err != nil {
 		return nil, fmt.Errorf("initialize execution authority: %w", err)
+	}
+	auth, err := newIdentity(ctx, adminPool, resources, execution)
+	if err != nil {
+		return nil, fmt.Errorf("initialize identity service: %w", err)
 	}
 	advisories, err := advisory.New(ctx, pool, resources.Proto.GetAdvisories(), resources.HTTPClient)
 	if err != nil {
@@ -237,6 +258,14 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		}
 	}
 	native := loadNativeRepositories(ctx, resources)
+	instance, err := statusInstance(resources)
+	if err != nil {
+		return nil, err
+	}
+	status, err := newStatusMonitor(pool, instance, resources.Proto.GetIntegrations() != nil, operationalProbe(pool, adminPool, resources, native), time.Now)
+	if err != nil {
+		return nil, err
+	}
 	assistanceRuntime := assistance.NewRuntime()
 	deviceConfig := devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
@@ -255,6 +284,8 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
 		EnrollmentInstructions:       enrollmentInstructions(resources, native),
+		ServerStatus:                 status.snapshot,
+		RecoveryKeyCustody:           newRecoveryCustodyReader(resources),
 		Assistance:                   relay,
 		AssistancePolicyCeiling:      resources.Proto.GetAssistance().GetPolicyCeiling(),
 	}
@@ -276,10 +307,11 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 	if err != nil {
 		return nil, fmt.Errorf("initialize rollout promoter: %w", err)
 	}
-	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: backgroundJobs(devices, consoleDevices, advisories, deliveries, reporting, promoter)})
+	supervisor, err := jobs.New(jobs.Config{Connection: pool.Config().ConnConfig, Jobs: append(backgroundJobs(devices, consoleDevices, advisories, deliveries, reporting, promoter), jobs.Job{Name: "server-status", Mode: jobs.Replicated, Run: status.run})})
 	if err != nil {
 		return nil, fmt.Errorf("initialize background jobs: %w", err)
 	}
+	status.supervisor = supervisor
 	console, err := web.Handler()
 	if err != nil {
 		return nil, err
@@ -288,6 +320,7 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		auth: auth, devices: devices, consoleDevices: consoleDevices, deliveries: deliveries, reporting: reporting,
 		releaseHandler: releaseHandler, relay: relay, supervisor: supervisor, console: console,
 		nativeRepositories: native,
+		status:             status,
 	}, nil
 }
 
@@ -378,18 +411,7 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 	mux.Handle(path, handler)
 	path, handler = p.devices.RecoveryHandler()
 	mux.Handle(path, handler)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		probe, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-		if err := pool.Ping(probe); err != nil {
-			http.Error(w, "not ready", http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
+	registerOperationalHandlers(mux, pool, p.consoleDevices.Pool, p.status)
 	help, err := docs.Handler()
 	if err != nil {
 		return nil, fmt.Errorf("initialize documentation: %w", err)

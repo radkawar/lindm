@@ -67,6 +67,113 @@ same signed `SHA256SUMS` and key; both passed `lab images fetch` on 2026-10-12.
 A verified image is an input, not a successful installation, desktop, encryption or
 agent lifecycle result.
 
+### Offline native server dependencies
+
+`internal/serverdeps` owns the Ubuntu 24.04 amd64 server prerequisite closure,
+separately from the openSUSE-only rolling `reposnapshot` laboratory. Capture
+uses native APT with an empty installed-status database in a disposable admitted
+copy of the authenticated cloud image. It retains the original Ubuntu `InRelease`
+and `main/binary-amd64/Packages.gz` for Noble, updates and security, the image's
+archive keyring, exact native solver package files and capture/replay transcripts.
+File bounds apply to the retained closure. Original signed Release metadata
+also describes large `Contents` indexes and empty installer indexes; those
+unrequested files are not downloaded and do not turn this into a full mirror.
+Unused vendor declarations, such as HiDPI `@2` icon archives, are parsed as
+canonical relative metadata paths. Only retained files cross the stricter
+shared filesystem path and no-symlink boundary.
+The archive signer is pinned to
+`F6ECB3762474EDA9D21B7022871920D1991BC93C`; this is not the cloud-image signer
+or the lindm release signer.
+
+`lab vm serverdeps -manifest lab/images/ubuntu-noble-amd64.json -packages
+postgresql-16,postgresql-client-16,openssl,systemd,ca-certificates,gpgv,util-linux
+-record NEW_FILE` runs capture and a second fresh-baseline native installation.
+The replay denies QEMU origin networking and enters a network namespace with
+only original captured `file:` repositories. No unsigned generated package
+index, preinstalled PostgreSQL shortcut or signature/expiry override is used.
+The empty-status solver prints acquisition URIs with explicit native
+`Acquire::ForceHash=SHA256`. URI-escaped package filenames are decoded exactly
+once inside the admitted loopback origin, then the canonical relative filename,
+selected size and checksum must match the original signed package index before
+download. URI admission failures retain the bounded native solver output.
+Native configuration and source fragments point to owned empty directories,
+with an owned empty main configuration file. APT treats a `-` pathname as
+ambient `/etc/apt/-`, not as a disabled configuration directory.
+`lab serverdeps export|import|present|install -cache STORE -sha256 DIGEST` consumes
+that content-addressed snapshot; authenticate the digest through signed release
+custody before importing or installing. Ubuntu's intrinsic APT/dpkg/gpgv runtime
+is the bootstrap verifier, and the closure also carries gpgv and util-linux.
+The exact requested list comes from the installer; the example is not an
+independent install recipe. Native helper failure is a refusal, not an online
+fallback. Observed qualification remains in [verification](../verification.md);
+the implementation alone is not a passing deployment claim.
+
+The `internal/platform` release registry owns the turnkey snapshot filename,
+required native packages and owned PostgreSQL data/bin/port facts. Installer,
+release export and lab consumers select native package tooling from that row and
+retain the signed closure's exact distribution/version identity. These facts
+exist only on Ubuntu 24.04 and RHEL 9, are not inherited by derivatives, and do
+not broaden the deploy lane beyond x86_64.
+
+For an existing authenticated closure, `lab vm serverdeps -replay-sha256 DIGEST
+-manifest IMAGE -cache IMAGE_CACHE -snapshot-cache STORE -lab-binary HELPER
+-lab-sha256 HELPER_SHA256 -record NEW_FILE` uses one fresh admitted Ubuntu guest.
+It requires the exact retained image digest and installed baseline, streams the
+original snapshot through the matching product helper's vendor-validating import,
+then runs that helper's canonical `serverdeps install` under `unshare --net`.
+The helper's uploaded bytes must match the supplied SHA-256. This route never
+recaptures metadata, changes the original digest/transcripts or grants RHEL
+qualification; its separate record is written only after owned guest cleanup.
+
+**Observed dependency-only capture (2026-10-13).** Producer revision
+`08060332916596077bfad140dee76037863b3487` published development-lab snapshot
+`2869a3f33924cdd76a6b6a8ab5c95d6f896ab91ee5ff96c46f320e569c7de16e`
+under `/home/r/work/lindm-lab/serverdeps`. The manifest records acquisition at
+`2026-10-13T22:20:19Z`, the pinned Noble amd64 image
+`6a81c37564db9b1ee84e141922625e1d7c5b389b99bb3c572e0243607d5bb4d2`,
+664 baseline packages, 105 captured packages, 114 retained files and
+102,240,664 bytes. The native solver was APT 2.8.3 with dpkg 1.22.6 and
+gpgv 2.4.4. Immutable `repository/evidence/capture.txt` and
+`repository/evidence/replay.txt` record empty-status acquisition and the second
+exact-baseline, captured-file-only installation inside `unshare --net`.
+The replay inventory includes PostgreSQL server/client 16.15, OpenSSL
+3.0.13-0ubuntu3.16 and every requested runtime prerequisite.
+
+The capture API returned success, including its joined guest/staging cleanup.
+The outer command nevertheless exited **1** after publication because its
+requested `artifacts/ubuntu-serverdeps-20261013.json` parent did not exist;
+that is not a passing wrapper command. The observer ledger is
+`/home/r/work/lindm-lab/ubuntu-serverdeps-observed-20261013.json`, not output
+fabricated for the failed wrapper. Export/import into
+`/home/r/work/lindm-lab/ubuntu-serverdeps-import-proof` subsequently returned
+success with native vendor verification. This producer's transcript also
+records APT trying the absent ambient `/etc/apt/-` configuration directory.
+The owned-empty-directory/file correction does not change snapshot bytes;
+the final integrated parent helper still requires a fresh consumer replay.
+These observations do not qualify managed PostgreSQL, a signed installer
+release or a browser deployment lifecycle.
+
+The native installer initializes its own PostgreSQL 16 cluster under
+`/var/lib/postgresql/lindm`, listening on loopback port 15432 and the
+`/run/lindm-postgresql` socket. It leaves an existing/default distro PostgreSQL
+cluster untouched. Separate runtime and migrator SCRAM roles use `verify-full`
+with the deployment's database CA. PostgreSQL uses 64 connections and 256 MiB
+shared buffers; the application device and console pools reserve 16 and four
+connections. Configuration and root-protected resource references live under
+`/etc/lindm`; root-owned setup and operation state uses
+`/var/lib/lindmd-operations`. Unsigned native upgrades are refused before package
+installation. These installer contracts are distinct from closure capture and
+require the deployment lane's end-to-end evidence.
+
+The native units require the distribution's systemd credential support.
+Persistent runtime/migration URL files remain root:root mode 0600 under
+`/etc/lindm`; separate `LoadCredential=` sources supply ephemeral role credentials.
+Restore preserves fresh target database identity at those same root-owned paths,
+not service-owned URL copies. The maintained deploy lane asserts actual owner,
+mode and service-account unreadability across install, upgrade and restore.
+Source review is not native qualification; see the
+[root custody evidence boundary](../verification.md#turnkey-source-security-reinspection).
+
 ## Ubuntu 26.04.1 (Resolute Raccoon)
 
 Every Ubuntu 24.04 lane has a native 26.04.1 record (air-gap bundle and console

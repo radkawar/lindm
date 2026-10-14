@@ -464,6 +464,10 @@ var registry = []*Release{
 	{
 		Key: "ubuntu-24.04", Name: "Ubuntu 24.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("24.04"), Codename: "noble", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
+		Server: &ServerInstallation{
+			SnapshotName: "ubuntu24.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432",
+		},
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
 		// Archive facts observed on every 24.04 pocket (archive, security,
 		// ports and the Pop!_OS mirror) on 2026-10-11: Ubuntu Archive Automatic
@@ -480,8 +484,9 @@ var registry = []*Release{
 			Password: []PasswordPins{{Version: "24.04", Quality: "1.4.5", PAM: "1.5.3", Manager: "1.5.3"}}, RecoveryGRUB: debianGRUB},
 		ModuleBlocklist:    ModuleBlocklistTooling{Modprobe: "/usr/sbin/modprobe", InitramfsPattern: "/boot/initrd.img-%s", Rebuild: "/usr/sbin/update-initramfs", RebuildArgs: []string{"-u", "-k", "all"}, WritePaths: []string{"/boot"}, StateDirectory: "/var/lib/initramfs-tools"},
 		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
-		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
-			Installer: Subiquity,
+		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneDeploy, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
+			LaneArchitectures: map[LabLane][]string{LaneDeploy: {"x86_64"}},
+			Installer:         Subiquity,
 			Session: assistanceSession(withCapture(ubuntuSession, "libmutter-14-0"),
 				[]string{"python3-gi", "python3-gi-cairo", "gir1.2-gtk-3.0"}),
 			Guest: ubuntuGuest,
@@ -644,10 +649,14 @@ var registry = []*Release{
 	{
 		Key: "rhel-9", Name: "RHEL 9", Distribution: "RHEL", ID: "rhel", Version: Major("9"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "rhel9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory: Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:   withPins(elQuirks9, el9Pins),
-		Lab: Lab{Lanes: rhelLanes, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
+		Lab: Lab{Lanes: append([]LabLane{LaneDeploy}, rhelLanes...), LaneArchitectures: map[LabLane][]string{LaneDeploy: {"x86_64"}}, LaneGates: rhelLaneGates, Entitlement: true, MeasuredGRUBUnavailableOn: elARMUnmeasuredGRUB,
 			Installer: Anaconda, Session: rhelSession9, Guest: rhelGuest,
 			RPMMedia: &LabRPMMedia{Repositories: []string{"BaseOS", "AppStream"}, Key: "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"},
 			// EL 9's dracut 057 installs systemd-cryptsetup from crypt.

@@ -14,6 +14,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as EnrollRouteImport } from './routes/enroll'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthenticatedSplatRouteImport } from './routes/_authenticated/$'
 import { Route as AuthenticatedAccountsRouteImport } from './routes/_authenticated/accounts'
 import { Route as AuthenticatedAdvisoriesRouteImport } from './routes/_authenticated/advisories'
@@ -35,6 +36,7 @@ import { Route as AuthenticatedProfilesNewRouteImport } from './routes/_authenti
 import { Route as AuthenticatedSecretsSecretIdRouteImport } from './routes/_authenticated/secrets_.$secretId'
 import { Route as AuthenticatedSettingsAssistantAccessRouteImport } from './routes/_authenticated/settings_.assistant-access'
 import { Route as AuthenticatedSettingsCapabilitiesRouteImport } from './routes/_authenticated/settings_.capabilities'
+import { Route as AuthenticatedSettingsStatusRouteImport } from './routes/_authenticated/settings_.status'
 import { Route as AuthenticatedDevicesDeviceIdRecoveryEnrollmentRouteImport } from './routes/_authenticated/devices_.$deviceId_.recovery-enrollment'
 import { Route as AuthenticatedDevicesDeviceIdActionsActionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.actions.$actionId'
 import { Route as AuthenticatedDevicesDeviceIdAssistanceSessionIdRouteImport } from './routes/_authenticated/devices_.$deviceId_.assistance.$sessionId'
@@ -53,6 +55,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const EnrollRoute = EnrollRouteImport.update({
   id: '/enroll',
   path: '/enroll',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedSplatRoute = AuthenticatedSplatRouteImport.update({
@@ -168,6 +175,12 @@ const AuthenticatedSettingsCapabilitiesRoute =
     path: '/settings/capabilities',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsStatusRoute =
+  AuthenticatedSettingsStatusRouteImport.update({
+    id: '/settings_/status',
+    path: '/settings/status',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute =
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRouteImport.update({
     id: '/devices_/$deviceId_/recovery-enrollment',
@@ -202,6 +215,7 @@ const AuthenticatedDevicesDeviceIdActionsNewKindRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
+  '/setup': typeof SetupRoute
   '/$': typeof AuthenticatedSplatRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/advisories': typeof AuthenticatedAdvisoriesRoute
@@ -223,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/settings/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
+  '/settings/status': typeof AuthenticatedSettingsStatusRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/devices/$deviceId/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
@@ -232,6 +247,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/enroll': typeof EnrollRoute
+  '/setup': typeof SetupRoute
   '/$': typeof AuthenticatedSplatRoute
   '/accounts': typeof AuthenticatedAccountsRoute
   '/advisories': typeof AuthenticatedAdvisoriesRoute
@@ -253,6 +269,7 @@ export interface FileRoutesByTo {
   '/secrets/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/settings/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/settings/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
+  '/settings/status': typeof AuthenticatedSettingsStatusRoute
   '/devices/$deviceId/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/devices/$deviceId/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/devices/$deviceId/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
@@ -264,6 +281,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/enroll': typeof EnrollRoute
+  '/setup': typeof SetupRoute
   '/_authenticated/$': typeof AuthenticatedSplatRoute
   '/_authenticated/accounts': typeof AuthenticatedAccountsRoute
   '/_authenticated/advisories': typeof AuthenticatedAdvisoriesRoute
@@ -285,6 +303,7 @@ export interface FileRoutesById {
   '/_authenticated/secrets_/$secretId': typeof AuthenticatedSecretsSecretIdRoute
   '/_authenticated/settings_/assistant-access': typeof AuthenticatedSettingsAssistantAccessRoute
   '/_authenticated/settings_/capabilities': typeof AuthenticatedSettingsCapabilitiesRoute
+  '/_authenticated/settings_/status': typeof AuthenticatedSettingsStatusRoute
   '/_authenticated/devices_/$deviceId_/recovery-enrollment': typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   '/_authenticated/devices_/$deviceId_/actions/$actionId': typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   '/_authenticated/devices_/$deviceId_/assistance/$sessionId': typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
@@ -296,6 +315,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/enroll'
+    | '/setup'
     | '/$'
     | '/accounts'
     | '/advisories'
@@ -317,6 +337,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/settings/assistant-access'
     | '/settings/capabilities'
+    | '/settings/status'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
     | '/devices/$deviceId/assistance/$sessionId'
@@ -326,6 +347,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/enroll'
+    | '/setup'
     | '/$'
     | '/accounts'
     | '/advisories'
@@ -347,6 +369,7 @@ export interface FileRouteTypes {
     | '/secrets/$secretId'
     | '/settings/assistant-access'
     | '/settings/capabilities'
+    | '/settings/status'
     | '/devices/$deviceId/recovery-enrollment'
     | '/devices/$deviceId/actions/$actionId'
     | '/devices/$deviceId/assistance/$sessionId'
@@ -357,6 +380,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/enroll'
+    | '/setup'
     | '/_authenticated/$'
     | '/_authenticated/accounts'
     | '/_authenticated/advisories'
@@ -378,6 +402,7 @@ export interface FileRouteTypes {
     | '/_authenticated/secrets_/$secretId'
     | '/_authenticated/settings_/assistant-access'
     | '/_authenticated/settings_/capabilities'
+    | '/_authenticated/settings_/status'
     | '/_authenticated/devices_/$deviceId_/recovery-enrollment'
     | '/_authenticated/devices_/$deviceId_/actions/$actionId'
     | '/_authenticated/devices_/$deviceId_/assistance/$sessionId'
@@ -389,6 +414,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   EnrollRoute: typeof EnrollRoute
+  SetupRoute: typeof SetupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -412,6 +438,13 @@ declare module '@tanstack/react-router' {
       path: '/enroll'
       fullPath: '/enroll'
       preLoaderRoute: typeof EnrollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/$': {
@@ -561,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsCapabilitiesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/settings_/status': {
+      id: '/_authenticated/settings_/status'
+      path: '/settings/status'
+      fullPath: '/settings/status'
+      preLoaderRoute: typeof AuthenticatedSettingsStatusRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/devices_/$deviceId_/recovery-enrollment': {
       id: '/_authenticated/devices_/$deviceId_/recovery-enrollment'
       path: '/devices/$deviceId/recovery-enrollment'
@@ -621,6 +661,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSecretsSecretIdRoute: typeof AuthenticatedSecretsSecretIdRoute
   AuthenticatedSettingsAssistantAccessRoute: typeof AuthenticatedSettingsAssistantAccessRoute
   AuthenticatedSettingsCapabilitiesRoute: typeof AuthenticatedSettingsCapabilitiesRoute
+  AuthenticatedSettingsStatusRoute: typeof AuthenticatedSettingsStatusRoute
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute: typeof AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute
   AuthenticatedDevicesDeviceIdActionsActionIdRoute: typeof AuthenticatedDevicesDeviceIdActionsActionIdRoute
   AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute: typeof AuthenticatedDevicesDeviceIdAssistanceSessionIdRoute
@@ -652,6 +693,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedSettingsAssistantAccessRoute,
   AuthenticatedSettingsCapabilitiesRoute:
     AuthenticatedSettingsCapabilitiesRoute,
+  AuthenticatedSettingsStatusRoute: AuthenticatedSettingsStatusRoute,
   AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute:
     AuthenticatedDevicesDeviceIdRecoveryEnrollmentRoute,
   AuthenticatedDevicesDeviceIdActionsActionIdRoute:
@@ -672,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   EnrollRoute: EnrollRoute,
+  SetupRoute: SetupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -6,6 +6,7 @@ const structural = { mode: "structural", page: "", minimumMetrics: 0 };
 export const routeContracts = {
   "/": structural,
   "/enroll": structural,
+  "/setup": structural,
   "/accounts": structural,
   "/advisories": structural,
   "/approvals": structural,
@@ -25,6 +26,7 @@ export const routeContracts = {
   "/settings": structural,
   "/settings/capabilities": structural,
   "/settings/assistant-access": structural,
+  "/settings/status": structural,
   "/devices/$deviceId": { mode: "semantic", page: "device", minimumMetrics: 0 },
   "/devices/$deviceId/assistance/$sessionId": {
     mode: "semantic",

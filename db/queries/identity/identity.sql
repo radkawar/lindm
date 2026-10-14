@@ -189,6 +189,9 @@ SELECT token_hash, principal_id, created_at, last_seen_at, idle_expires_at,
 FROM sessions
 WHERE token_hash = sqlc.arg(token_hash);
 
+-- name: GetSessionForUpdate :one
+SELECT * FROM sessions WHERE token_hash = sqlc.arg(token_hash) FOR UPDATE;
+
 -- name: TouchSession :one
 UPDATE sessions
 SET last_seen_at = now(),

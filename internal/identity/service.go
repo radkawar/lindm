@@ -15,6 +15,7 @@ import (
 	"buf.build/go/protovalidate"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 
@@ -30,34 +31,35 @@ import (
 // Service authenticates browser sessions and resolves current source authority.
 // It does not run a background refresher.
 type Service struct {
-	pool          *pgxpool.Pool
-	issuer        string
-	entraTenant   uuid.UUID
-	okta          *configv1.OktaDirectory
-	google        *configv1.GoogleDirectory
-	broker        *brokerSource
-	scim          *scimService
-	clientID      string
-	publicOrigin  string
-	redirectURI   string
-	policy        *authorizationPolicy
-	runtimePolicy atomic.Pointer[authorizationPolicy]
-	policyBroker  *configv1.KeycloakBrokerUpstream
-	localIssuer   string
-	localPrimary  bool
-	breakGlass    *configv1.BreakGlassPolicy
-	webauthn      *webauthn.WebAuthn
-	dummyHash     string
-	passwordSlots chan struct{}
-	rules         protovalidate.Validator
-	httpClient    *http.Client
-	ownsClient    bool
-	oauth         *oauth2.Config
-	verifier      *oidc.IDTokenVerifier
-	directory     DirectorySource
-	flights       flightGroup
-	freshRounds   freshRoundGroup
-	now           func() time.Time
+	pool                  *pgxpool.Pool
+	issuer                string
+	entraTenant           uuid.UUID
+	okta                  *configv1.OktaDirectory
+	google                *configv1.GoogleDirectory
+	broker                *brokerSource
+	scim                  *scimService
+	clientID              string
+	publicOrigin          string
+	redirectURI           string
+	policy                *authorizationPolicy
+	runtimePolicy         atomic.Pointer[authorizationPolicy]
+	policyBroker          *configv1.KeycloakBrokerUpstream
+	localIssuer           string
+	localPrimary          bool
+	breakGlass            *configv1.BreakGlassPolicy
+	webauthn              *webauthn.WebAuthn
+	dummyHash             string
+	passwordSlots         chan struct{}
+	rules                 protovalidate.Validator
+	initialOwnerExecution func(context.Context, pgx.Tx, uuid.UUID) error
+	httpClient            *http.Client
+	ownsClient            bool
+	oauth                 *oauth2.Config
+	verifier              *oidc.IDTokenVerifier
+	directory             DirectorySource
+	flights               flightGroup
+	freshRounds           freshRoundGroup
+	now                   func() time.Time
 }
 
 type flight struct {
@@ -87,16 +89,7 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 	if err != nil {
 		return nil, err
 	}
-	rules, err := protovalidate.New(protovalidate.WithMessages(
-		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
-		&authv1.CLIAuthorizationRequest{}, &authv1.CLIExchangeRequest{},
-		&authv1.AuthorizationPolicy{}, &authv1.DeviceScope{},
-		&adminv1.UpdateAuthorizationRequest{},
-		&configv1.ServerConfig{},
-		&authv1.RotateSCIMCredentialRequest{}, &configv1.SCIMConfig{},
-		&authv1.UpdateMCPSettingsRequest{}, &authv1.IssueMCPTokenRequest{}, &authv1.RevokeMCPTokenRequest{}, &authv1.MCPAuditRecord{},
-		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.WithdrawApprovalRequest{}, &adminv1.ListApprovalsRequest{},
-		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
+	rules, err := newRequestValidator()
 	if err != nil {
 		return nil, err
 	}
@@ -116,6 +109,9 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		s.directory = &localSource{pool: pool}
 		s.passwordSlots = make(chan struct{}, 2)
 		if err := s.activate(ctx, cfg.SCIM); err != nil {
+			return nil, err
+		}
+		if err := s.armInitialOwnerExecution(ctx, cfg.InitialOwnerExecution); err != nil {
 			return nil, err
 		}
 		return s, nil
@@ -191,6 +187,34 @@ func newService(ctx context.Context, pool *pgxpool.Pool, cfg Config) (*Service, 
 		return nil, err
 	}
 	return s, nil
+}
+
+func newRequestValidator() (protovalidate.Validator, error) {
+	return protovalidate.New(protovalidate.WithMessages(
+		&authv1.LocalLoginRequest{}, &authv1.LocalEnrollmentRequest{}, &authv1.WebAuthnFinishRequest{},
+		&authv1.FirstRunSetupRequest{},
+		&authv1.CLIAuthorizationRequest{}, &authv1.CLIExchangeRequest{},
+		&authv1.AuthorizationPolicy{}, &authv1.DeviceScope{},
+		&adminv1.UpdateAuthorizationRequest{},
+		&configv1.ServerConfig{},
+		&authv1.RotateSCIMCredentialRequest{}, &configv1.SCIMConfig{},
+		&authv1.UpdateMCPSettingsRequest{}, &authv1.IssueMCPTokenRequest{}, &authv1.RevokeMCPTokenRequest{}, &authv1.MCPAuditRecord{},
+		&adminv1.CreateApprovalRequest{}, &adminv1.ApproveApprovalRequest{}, &adminv1.RejectApprovalRequest{}, &adminv1.WithdrawApprovalRequest{}, &adminv1.ListApprovalsRequest{},
+		&authv1.CreateAccountRequest{}, &authv1.UpdateAccountRequest{}, &authv1.ResetAccountRequest{}, &configv1.BreakGlassPolicy{}))
+}
+
+func (s *Service) armInitialOwnerExecution(ctx context.Context, hook func(context.Context, pgx.Tx, uuid.UUID) error) error {
+	if hook == nil {
+		return nil
+	}
+	_, _, initialized, err := s.InitializedOwner(ctx)
+	if err != nil {
+		return err
+	}
+	if !initialized {
+		s.initialOwnerExecution = hook
+	}
+	return nil
 }
 
 // configureDirectory connects the authoritative directory for the configured

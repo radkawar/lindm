@@ -1,0 +1,156 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/trust.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// Root-quorum signed security checkpoint for a fenced server recovery. The
+// custodian attests that this snapshot includes all security events through the
+// fence, including events newer than the restored backup. Encryption alone does
+// not make a snapshot an authenticated or complete security checkpoint.
+message ServerRecoveryCheckpoint {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp captured_at = 2 [(buf.validate.field).required = true];
+  bytes archive_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  uint64 recovery_epoch = 4 [(buf.validate.field).uint64.gt = 0];
+  string public_url = 5 [(buf.validate.field).string.uri = true];
+  bytes original_archive_sha256 = 6 [(buf.validate.field).bytes.len = 32];
+  string package_version = 7 [(buf.validate.field).string.pattern = "^[0-9]+\\.[0-9]+\\.[0-9]+$"];
+  string device_public_url = 8 [(buf.validate.field).string.uri = true];
+  bytes execution_root_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+}
+
+// Installer-owned public creation record. Runtime may only read this record and
+// acknowledge off-host custody in its database after owner user verification.
+message ServerRecoveryCustody {
+  option (buf.validate.message).cel = {
+    id: "custody_mode"
+    message: "external custody has no generated identity bundle"
+    expression: "this.external ? size(this.identity_bundle_sha256) == 0 : size(this.identity_bundle_sha256) == 32"
+  };
+  option (buf.validate.message).cel = {
+    id: "custody_public_metadata"
+    message: "custody creation metadata contains only artifact hashes"
+    expression: "this.artifacts.all(a, size(a.encrypted_data) == 0)"
+  };
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string public_url = 2 [(buf.validate.field).string.uri = true];
+  string device_public_url = 3 [(buf.validate.field).string.uri = true];
+  bytes config_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp created_at = 5 [(buf.validate.field).required = true];
+  bool external = 6;
+  bytes identity_bundle_sha256 = 7;
+  repeated ServerRecoveryCustodyArtifact artifacts = 8 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 4
+  }];
+  ServerRecoveryDatabaseCustody database_custody = 9;
+}
+
+message ServerRecoveryCustodianIdentity {
+  uint32 custodian_index = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3
+  }];
+  string public_recipient = 2 [(buf.validate.field).string = {
+    pattern: "^age1[0-9a-z]+$"
+    max_len: 256
+  }];
+  string private_identity = 3 [(buf.validate.field).string = {
+    pattern: "^AGE-SECRET-KEY-1[0-9A-Z]+$"
+    max_len: 256
+  }];
+}
+
+// These are ciphertexts, never PKCS8 or plaintext CA keys. The name and digest
+// bind the finite installer-owned inventory, not arbitrary offline directory data.
+message ServerRecoveryCustodyArtifact {
+  string name = 1 [(buf.validate.field).string.pattern = "^(root-key-[1-3]|sealed-pki-ca)\\.age$"];
+  uint32 custodian_index = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 3
+  }];
+  bytes sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bytes encrypted_data = 4 [(buf.validate.field).bytes.max_len = 1048576];
+}
+
+// Serialized only inside a passphrase-encrypted age envelope. The generated
+// identities exist in memory, never as plaintext disk exports. One bundle does
+// not provide independent human custody merely because it has three keys.
+message ServerRecoveryCustodyExport {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string public_url = 2 [(buf.validate.field).string.uri = true];
+  string device_public_url = 3 [(buf.validate.field).string.uri = true];
+  ExecutionRoot execution_root = 4 [(buf.validate.field).required = true];
+  repeated ServerRecoveryCustodianIdentity identities = 5 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 3
+  }];
+  repeated ServerRecoveryCustodyArtifact artifacts = 6 [(buf.validate.field).repeated = {
+    min_items: 4
+    max_items: 4
+  }];
+}
+
+// Sealed to the PKI custodian only. Supplied trust never imports its private CA
+// key. BYOT plus an external database legitimately has no generated private key.
+message ServerRecoveryPKIExport {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string public_url = 2 [(buf.validate.field).string.uri = true];
+  string device_public_url = 3 [(buf.validate.field).string.uri = true];
+  bytes transport_ca_pem = 4 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 1048576
+  }];
+  bytes transport_private_key_pem = 5 [(buf.validate.field).bytes.max_len = 16384];
+  bytes database_ca_pem = 6 [(buf.validate.field).bytes.max_len = 1048576];
+  bytes database_private_key_pem = 7 [(buf.validate.field).bytes.max_len = 16384];
+}
+
+// The restored server retains its fresh database CA, rather than substituting
+// the source cluster's trust. Both the sealed CA and any generated identities
+// therefore have distinct retained ciphertext custody.
+message ServerRecoveryDatabaseCustody {
+  option (buf.validate.message).cel = {
+    id: "database_custody_mode"
+    message: "only generated database custody needs an identity export"
+    expression: "this.external ? size(this.identity_bundle_sha256) == 0 && this.identity_bundle_path == '' : size(this.identity_bundle_sha256) == 32 && this.identity_bundle_path != ''"
+  };
+  bytes database_ca_sha256 = 1 [(buf.validate.field).bytes.len = 32];
+  string sealed_pki_path = 2 [(buf.validate.field).string.pattern = "^/var/lib/lindmd-operations/database-custody/[0-9a-f]{64}/sealed-pki-ca\\.age$"];
+  bytes sealed_pki_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  bool external = 4;
+  string identity_bundle_path = 5 [(buf.validate.field).string.pattern = "^(/var/lib/lindmd-operations/database-custody/[0-9a-f]{64}/identities\\.age)?$"];
+  bytes identity_bundle_sha256 = 6;
+}
+
+enum ServerRecoveryExportKind {
+  SERVER_RECOVERY_EXPORT_KIND_UNSPECIFIED = 0;
+  SERVER_RECOVERY_EXPORT_KIND_CANONICAL_AUTHORITY = 1;
+  SERVER_RECOVERY_EXPORT_KIND_FRESH_DATABASE = 2;
+}
+
+message ServerRecoveryRequiredExport {
+  ServerRecoveryExportKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: 0
+  }];
+  string path = 2 [(buf.validate.field).string.pattern = "^/var/lib/lindmd-operations/(recovery-custody\\.age|database-custody/[0-9a-f]{64}/identities\\.age)$"];
+  bytes sha256 = 3 [(buf.validate.field).bytes.len = 32];
+}
+
+// Deterministic protobuf bytes of this ordered (kind 1, then 2) set are hashed
+// for owner confirmation. This is not any individual encrypted file's checksum.
+message ServerRecoveryExportSet {
+  string deployment_id = 1 [(buf.validate.field).string.uuid = true];
+  string public_url = 2 [(buf.validate.field).string.uri = true];
+  string device_public_url = 3 [(buf.validate.field).string.uri = true];
+  bytes config_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  repeated ServerRecoveryRequiredExport exports = 5 [(buf.validate.field).repeated.max_items = 2];
+}

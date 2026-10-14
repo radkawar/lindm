@@ -37,10 +37,13 @@ type VMConsoleEnrollmentOptions struct {
 	// RedHatTokenFile registers an entitled (RHEL) guest, as a customer's
 	// subscribed host is, so the copied DNF command reaches its vendor
 	// repositories. Required for entitled releases, refused otherwise.
-	RedHatTokenFile  string
-	Hardware         *VMHardwareOptions
-	Ready            func() error
-	VerifyEnrollment func(context.Context, *VMConsoleEnrollmentResult) error
+	RedHatTokenFile string
+	Hardware        *VMHardwareOptions
+	// CompletionTimeout includes VerifyEnrollment while the real enrolled guest
+	// remains alive; deployments use their admitted whole-workflow deadline.
+	CompletionTimeout time.Duration
+	Ready             func() error
+	VerifyEnrollment  func(context.Context, *VMConsoleEnrollmentResult) error
 }
 
 // VMConsoleEnrollmentResult contains only independent native observations. A
@@ -89,7 +92,11 @@ func EnrollFromConsoleVM(ctx context.Context, manifest *labv1.ImageManifest, opt
 	if options.CommandFile == "" || options.LabBinary == "" || options.Ready == nil || options.VerifyEnrollment == nil {
 		return nil, errors.New("console enrollment requires private clipboard capture, matching guest lab binary and server-side enrollment verification")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Minute)
+	completionTimeout := options.CompletionTimeout
+	if completionTimeout <= 0 {
+		completionTimeout = 45 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, completionTimeout)
 	defer cancel()
 	hardware := VMHardwareOptions{StorageBus: "virtio-blk"}
 	if options.Hardware != nil {

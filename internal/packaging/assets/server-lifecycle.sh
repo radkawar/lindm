@@ -58,8 +58,8 @@ configure() {
 
 remove_services() {
 	if [ -d /run/systemd/system ]; then
-		systemctl stop lindmd.service lindmd-migrate.service || fail "systemctl stop failed"
-		systemctl disable lindmd.service || fail "systemctl disable failed"
+		systemctl stop lindmd.service lindmd-migrate.service lindmd-backup.timer lindmd-backup.service lindmd-release-check.timer lindmd-release-check.service || fail "systemctl stop failed"
+		systemctl disable lindmd.service lindmd-backup.timer lindmd-release-check.timer || fail "systemctl disable failed"
 	fi
 }
 

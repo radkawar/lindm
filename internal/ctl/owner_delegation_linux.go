@@ -3,12 +3,9 @@
 package ctl
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
@@ -22,47 +19,77 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/custody"
 	"lindm/internal/resource"
+	"lindm/internal/serverops"
 	"lindm/internal/trust"
 )
 
-const ownerDelegationUsage = "usage: lindmctl execution delegation sign -root FILE -bootstrap FILE -declaration FILE -signer FILE [-signer FILE ...] -previous-version N -minimum-recovery-epoch N -out NEW_FILE"
+const ownerDelegationUsage = "usage: lindmctl execution delegation sign -root FILE -bootstrap FILE -declaration FILE {-custody-export-file FILE -custody-passphrase-fd N [-signer-custody FILE ...] | -custodian-identity-file FILE -custodian-identity-passphrase-fd N -signer-custody FILE ...} -previous-version N -minimum-recovery-epoch N -out NEW_FILE"
+
+type ownerDelegationInput struct {
+	root, bootstrap, declaration, output string
+	previous, epoch                      uint64
+	custody                              serverops.CustodySigningOptions
+	custodyFD, identityFD                int
+}
 
 // runOwnerDelegation deliberately bypasses CLI login/configuration and networking.
 // The root is an authenticated owner input, never learned from the declaration.
 func runOwnerDelegation(ctx context.Context, args []string, stdout io.Writer, clock func() time.Time) error {
+	input, err := parseOwnerDelegation(args)
+	if err != nil {
+		return err
+	}
+	if err := custody.LockSecretMemory(); err != nil {
+		return err
+	}
+	return signOwnerDelegation(ctx, &input, stdout, clock)
+}
+
+func parseOwnerDelegation(args []string) (input ownerDelegationInput, err error) {
 	if len(args) < 2 || args[0] != "delegation" || args[1] != "sign" {
-		return errors.New(ownerDelegationUsage)
+		return input, errors.New(ownerDelegationUsage)
 	}
 	flags := flag.NewFlagSet("execution delegation sign", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	rootPath := flags.String("root", "", "protected pinned ExecutionRoot protobuf JSON")
-	bootstrapPath := flags.String("bootstrap", "", "protected root-quorum signed BootstrapBundle DSSE")
-	declarationPath := flags.String("declaration", "", "protected strict ExecutionDelegation protobuf JSON; exact roles and capabilities")
-	outPath := flags.String("out", "", "new DSSE envelope file; never replaces existing output")
-	previous := flags.Uint64("previous-version", 0, "last accepted deployment-global delegation version (explicitly 0 for first issuance)")
-	epoch := flags.Uint64("minimum-recovery-epoch", 0, "last accepted recovery epoch (explicitly 0 for first issuance)")
-	var signerPaths []string
-	flags.Func("signer", "protected offline owner Ed25519 PKCS#8 PEM; repeat for quorum", func(path string) error {
+	flags.StringVar(&input.root, "root", "", "protected pinned ExecutionRoot protobuf JSON")
+	flags.StringVar(&input.bootstrap, "bootstrap", "", "protected root-quorum signed BootstrapBundle DSSE")
+	flags.StringVar(&input.declaration, "declaration", "", "protected strict ExecutionDelegation protobuf JSON; exact roles and capabilities")
+	flags.StringVar(&input.output, "out", "", "new DSSE envelope file; never replaces existing output")
+	flags.Uint64Var(&input.previous, "previous-version", 0, "last accepted deployment-global delegation version (explicitly 0 for first issuance)")
+	flags.Uint64Var(&input.epoch, "minimum-recovery-epoch", 0, "last accepted recovery epoch (explicitly 0 for first issuance)")
+	flags.StringVar(&input.custody.ExportFile, "custody-export-file", "", "off-host passphrase-encrypted generated custodian export")
+	flags.IntVar(&input.custodyFD, "custody-passphrase-fd", -1, "owner-private anonymous passphrase pipe")
+	flags.StringVar(&input.custody.IdentityFile, "custodian-identity-file", "", "separately encrypted standard age custodian identity")
+	flags.IntVar(&input.identityFD, "custodian-identity-passphrase-fd", -1, "owner-private anonymous custodian passphrase pipe")
+	flags.Func("signer-custody", "encrypted root-key age object; repeat for external custodians or rotated keys", func(path string) error {
 		if path == "" {
-			return errors.New("missing signer file")
+			return errors.New("missing encrypted signer")
 		}
-		signerPaths = append(signerPaths, path)
+		input.custody.KeyFiles = append(input.custody.KeyFiles, path)
 		return nil
 	})
 	if err := flags.Parse(args[2:]); err != nil {
-		return errors.New("invalid offline owner flags; " + ownerDelegationUsage)
+		return input, errors.New("invalid offline owner flags; " + ownerDelegationUsage)
 	}
 	seen := make(map[string]bool)
 	flags.Visit(func(f *flag.Flag) { seen[f.Name] = true })
-	if flags.NArg() != 0 || *rootPath == "" || *bootstrapPath == "" || *declarationPath == "" || *outPath == "" || len(signerPaths) == 0 || !seen["previous-version"] || !seen["minimum-recovery-epoch"] {
-		return errors.New(ownerDelegationUsage)
+	if flags.NArg() != 0 || input.root == "" || input.bootstrap == "" || input.declaration == "" || input.output == "" ||
+		(input.custody.ExportFile == "") == (input.custody.IdentityFile == "") || (input.custody.IdentityFile != "" && len(input.custody.KeyFiles) == 0) ||
+		(input.custody.ExportFile != "" && input.custodyFD < 0) || (input.custody.IdentityFile != "" && input.identityFD < 0) ||
+		!seen["previous-version"] || !seen["minimum-recovery-epoch"] {
+		return input, errors.New(ownerDelegationUsage)
 	}
-	rootJSON, err := readOwnerDocument(*rootPath)
+	return input, nil
+}
+
+func signOwnerDelegation(ctx context.Context, input *ownerDelegationInput, stdout io.Writer, clock func() time.Time) error {
+	rootJSON, err := readOwnerDocument(input.root)
 	if err != nil {
 		return errors.New("read protected owner root failed")
 	}
-	bootstrapEnvelope, err := readOwnerDocument(*bootstrapPath)
+	bootstrapEnvelope, err := readOwnerDocument(input.bootstrap)
 	if err != nil {
 		return errors.New("read protected owner bootstrap failed")
 	}
@@ -79,7 +106,7 @@ func runOwnerDelegation(ctx context.Context, args []string, stdout io.Writer, cl
 	if err != nil {
 		return fmt.Errorf("initialize production execution verifier: %w", err)
 	}
-	data, err := readOwnerDocument(*declarationPath)
+	data, err := readOwnerDocument(input.declaration)
 	if err != nil {
 		return errors.New("read protected delegation declaration failed")
 	}
@@ -93,44 +120,22 @@ func runOwnerDelegation(ctx context.Context, args []string, stdout io.Writer, cl
 	if err := ownerCapabilities(declaration); err != nil {
 		return err
 	}
-	// Never read more keys than the authenticated root can possibly authorize.
-	if len(signerPaths) > len(bootstrap.Root.GetKeys()) {
-		return errors.New("too many owner signer files for the pinned root")
+	keys, err := loadOwnerDelegationKeys(ctx, bootstrap.Root, input.custody, input.custodyFD, input.identityFD)
+	if err != nil {
+		return err
 	}
-	keys := make([]ed25519.PrivateKey, 0, len(signerPaths))
 	defer func() {
 		for _, key := range keys {
 			clear(key)
 		}
 	}()
-	for _, path := range signerPaths {
-		key, err := readOwnerSigner(path)
-		if err != nil {
-			return err
-		}
-		keys = append(keys, key)
-		id, err := trust.KeyID(ed25519.PublicKey(key[ed25519.SeedSize:]))
-		if err != nil {
-			return errors.New("invalid owner signer public key")
-		}
-		found := false
-		for _, candidate := range bootstrap.Root.GetKeys() {
-			if candidate.GetKeyId() == id {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return errors.New("owner signer is not a member of the pinned execution root")
-		}
-	}
 	envelope, err := authority.Sign(ctx, declaration, keys...)
 	if err != nil {
 		return fmt.Errorf("sign owner delegation: %w", err)
 	}
 	// Prove quorum, domain separation, roles, identity, validity and rollback
 	// fences through the same verifier used by production before publishing.
-	verified, err := verifier.VerifyDelegation(ctx, bootstrap.Root, envelope, *previous, *epoch, now)
+	verified, err := verifier.VerifyDelegation(ctx, bootstrap.Root, envelope, input.previous, input.epoch, now)
 	if err != nil {
 		return fmt.Errorf("verify signed owner delegation: %w", err)
 	}
@@ -140,11 +145,31 @@ func runOwnerDelegation(ctx context.Context, args []string, stdout io.Writer, cl
 	if err := printOwnerDelegation(stdout, verified, envelope, bootstrap.Root.GetThreshold(), len(keys)); err != nil {
 		return err
 	}
-	if err := publishOwnerDelegation(*outPath, envelope); err != nil {
+	if err := publishOwnerDelegation(input.output, envelope); err != nil {
 		return fmt.Errorf("publish owner delegation without replacement: %w", err)
 	}
 	_, err = fmt.Fprintln(stdout, "Published verified DSSE delegation. No existing authority was changed or installed.")
 	return err
+}
+
+func loadOwnerDelegationKeys(ctx context.Context, root *agentv1.ExecutionRoot, options serverops.CustodySigningOptions, custodyFD, custodianFD int) ([]ed25519.PrivateKey, error) {
+	if options.ExportFile != "" {
+		passphrase, err := custody.ReadPassphraseFD(ctx, custodyFD, false)
+		if err != nil {
+			return nil, err
+		}
+		options.Passphrase = passphrase
+		defer clear(passphrase)
+	}
+	if options.IdentityFile != "" {
+		passphrase, err := custody.ReadPassphraseFD(ctx, custodianFD, false)
+		if err != nil {
+			return nil, err
+		}
+		options.IdentityPassphrase = passphrase
+		defer clear(passphrase)
+	}
+	return serverops.LoadCustodySigningKeys(ctx, options, root)
 }
 
 func ownerCapabilities(declaration *agentv1.ExecutionDelegation) error {
@@ -221,31 +246,6 @@ func readOwnerDocument(path string) (_ []byte, resultErr error) {
 		return nil, errors.New("read bounded owner file failed")
 	}
 	return data, nil
-}
-
-func readOwnerSigner(path string) (ed25519.PrivateKey, error) {
-	data, err := readOwnerDocument(path)
-	if err != nil {
-		return nil, errors.New("read protected owner signer failed")
-	}
-	defer clear(data)
-	block, rest := pem.Decode(data)
-	if block == nil {
-		return nil, errors.New("owner signer must be one Ed25519 PKCS#8 PRIVATE KEY PEM block")
-	}
-	defer clear(block.Bytes)
-	if !bytes.HasPrefix(data, []byte("-----BEGIN PRIVATE KEY-----")) || block.Type != "PRIVATE KEY" || len(block.Headers) != 0 || len(bytes.TrimSpace(rest)) != 0 {
-		return nil, errors.New("owner signer must be one Ed25519 PKCS#8 PRIVATE KEY PEM block")
-	}
-	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, errors.New("invalid owner signer PKCS#8 private key")
-	}
-	key, ok := parsed.(ed25519.PrivateKey)
-	if !ok {
-		return nil, errors.New("owner signer must use Ed25519")
-	}
-	return key, nil
 }
 
 func publishOwnerDelegation(path string, envelope []byte) (resultErr error) {

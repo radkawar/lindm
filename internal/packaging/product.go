@@ -47,7 +47,7 @@ func serverProduct() product {
 		name: ServerPackageName, binary: ServerBinaryPath, lifecycle: "/usr/libexec/lindmd/lifecycle", lifecycleAsset: "server-lifecycle.sh",
 		summary:     "Lindm control-plane server",
 		description: "Control-plane server with its embedded console. Configuration and keys are operator-owned.\nInstallation never starts services, migrates the database or bootstraps an owner.\nRemoval and purge retain operator configuration, keys, accounts and database.",
-		units:       []string{"lindmd.service", "lindmd-migrate.service"},
+		units:       []string{"lindmd.service", "lindmd-migrate.service", "lindmd-backup.service", "lindmd-backup.timer", "lindmd-release-check.service", "lindmd-release-check.timer"},
 		dirs:        []string{"usr/libexec/lindmd", "etc/lindm", "usr/share/doc/lindmd"},
 	}
 }
@@ -82,6 +82,10 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 		return []payloadFile{
 			{rel: "usr/lib/systemd/system/lindmd.service", mode: 0o644, name: "lindmd.service"},
 			{rel: "usr/lib/systemd/system/lindmd-migrate.service", mode: 0o644, name: "lindmd-migrate.service"},
+			{rel: "usr/lib/systemd/system/lindmd-backup.service", mode: 0o644, name: "lindmd-backup.service"},
+			{rel: "usr/lib/systemd/system/lindmd-backup.timer", mode: 0o644, name: "lindmd-backup.timer"},
+			{rel: "usr/lib/systemd/system/lindmd-release-check.service", mode: 0o644, name: "lindmd-release-check.service"},
+			{rel: "usr/lib/systemd/system/lindmd-release-check.timer", mode: 0o644, name: "lindmd-release-check.timer"},
 			{rel: "usr/lib/sysusers.d/lindmd.conf", mode: 0o644, name: "server-sysusers.conf"},
 			{rel: p.lifecycle[1:], mode: 0o755, name: p.lifecycleAsset},
 			{rel: "usr/share/doc/lindmd/copyright", mode: 0o644, name: "copyright"},

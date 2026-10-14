@@ -1,8 +1,9 @@
-# Explicit operations: up -d postgres; run --rm migrate; run --rm bootstrap;
-# then up -d lindmd. Ordinary server startup NEVER migrates or bootstraps.
-# LINDM_CONFIG_DIR is an absolute protected host directory. Server input files
-# must be mode 0600 and owned by LINDM_UID (default 65532). No directory mounts.
-# Use an immutable released LINDM_IMAGE digest in production.
+# Laboratory topology, not the protected turnkey container installation path.
+# Explicit operations provision PostgreSQL, migrate and issue a protected setup
+# code before runtime; ordinary startup never applies DDL or claims an owner.
+# LINDM_CONFIG_DIR is an absolute protected directory. Runtime inputs are 0600
+# owned by LINDM_UID (default65532). Load authenticated images locally; never use
+# public registry pulls as a deployment or air-gap fallback.
 x-hardening: &hardening
   cap_drop: [ALL]
   security_opt: ["no-new-privileges:true"]
@@ -83,14 +84,27 @@ services:
       driver: none
     networks: [database]
 
-  bootstrap:
-    <<: *runtime
+  setup-code:
+    <<: *hardening
+    image: ${LINDM_IMAGE}
+    user: "${LINDM_UID:-65532}:${LINDM_GID:-65532}"
     profiles: [operations]
     command:
-      ["bootstrap-owner", "-config", "/etc/lindm/server.json", "-username", "${LINDM_OWNER:-owner}"]
-    # Enrollment output is a one-time secret: never persist it in Docker logs.
+      [
+        "setup-code",
+        "-config",
+        "/etc/lindm/migrate.json",
+        "-output",
+        "/var/lib/lindmd-operations/setup/code",
+      ]
+    volumes:
+      - ${LINDM_CONFIG_DIR}/migrate.json:/etc/lindm/migrate.json:ro
+      - ${LINDM_CONFIG_DIR}/migration-database-url:/etc/lindm/migration-database-url:ro
+      - ${LINDM_CONFIG_DIR}/transport-ca.crt:/etc/lindm/transport-ca.crt:ro
+      - ${LINDM_SETUP_DIR:?set absolute issuer-owned 0700 setup output directory}:/var/lib/lindmd-operations/setup:rw
     logging:
       driver: none
+    networks: [database]
 
   lindmd:
     <<: *runtime

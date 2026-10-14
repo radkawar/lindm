@@ -498,6 +498,17 @@ const (
 	ProvisionNixOS Provisioning = "nixos"
 )
 
+// ServerInstallation describes the signed turnkey installer's native dependency
+// snapshot and owned PostgreSQL cluster. These facts apply only to the release
+// itself, never to a derivative through Native; admission also requires LaneDeploy.
+type ServerInstallation struct {
+	SnapshotName            string
+	RequiredPackages        []string
+	PostgreSQLDataDirectory string
+	PostgreSQLBinDirectory  string
+	PostgreSQLPort          string
+}
+
 // Release is one registry row.
 type Release struct {
 	Key  string // stable key, e.g. "ubuntu-24.04"; lab matrix and docs key
@@ -531,6 +542,7 @@ type Release struct {
 	Firewall        string
 	Advisory        Advisory
 	Quirks          Quirks
+	Server          *ServerInstallation
 	Lab             Lab
 	ModuleBlocklist ModuleBlocklistTooling
 	// VendorRepositories, StandardFileRoots and Accounts are the release's

@@ -55,6 +55,16 @@ func buildDEB(ctx context.Context, work, payload, version string, arch Architect
 			}
 		}
 	}
+	if p.name == ServerPackageName {
+		gate, err := asset("server-preinstall.sh")
+		if err != nil {
+			return Artifact{}, err
+		}
+		gate = []byte(strings.ReplaceAll(string(gate), "@LINDM_VERSION@", version))
+		if err := writeFile(filepath.Join(control, "preinst"), gate, 0o755, epoch); err != nil {
+			return Artifact{}, err
+		}
+	}
 	var conffiles strings.Builder
 	for _, file := range staged {
 		if file.Conf {

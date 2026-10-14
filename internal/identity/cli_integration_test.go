@@ -26,7 +26,7 @@ import (
 func cliBrowserFixture(t *testing.T) (*Service, context.Context, string) {
 	t.Helper()
 	s, ctx, _ := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "cli-owner")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "cli-owner")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +204,7 @@ func TestCLIExpiryAndAuthorityFences(t *testing.T) {
 
 func TestCLIBreakGlassRestrictionAndRevocation(t *testing.T) {
 	s, ctx, _ := localIntegrationService(t)
-	enrollment, err := s.BootstrapLocalOwner(ctx, "emergency-cli")
+	enrollment, err := bootstrapLocalOwner(t, s, ctx, "emergency-cli")
 	if err != nil {
 		t.Fatal(err)
 	}

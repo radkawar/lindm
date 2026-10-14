@@ -5,13 +5,18 @@
 package packaging
 
 import (
+	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/labexec"
@@ -112,6 +117,13 @@ if [ "$1" -eq 0 ] && [ -d /run/systemd/system ]; then
   /usr/bin/systemctl daemon-reload || :
 fi
 `, p.lifecycle, p.lifecycle)
+	}
+	if p.name == ServerPackageName {
+		gate, err := asset("server-preinstall.sh")
+		if err != nil {
+			return "", err
+		}
+		scriptlets = "\n%pretrans\n" + strings.ReplaceAll(strings.ReplaceAll(string(gate), "@LINDM_VERSION@", version), "%", "%%") + "\n" + scriptlets
 	}
 	for _, recommended := range p.rpmRecommends {
 		dependencies += "Recommends: " + recommended + "\n"
@@ -280,13 +292,41 @@ func verifyRPMSignature(ctx context.Context, work, rpmPath string, key SigningKe
 	if err := writeFile(armor, exported, 0o644, DefaultSourceDateEpoch); err != nil {
 		return err
 	}
-	if _, _, err := runTool(ctx, work, toolCmd{
+	return VerifyRPMSignature(ctx, db, rpmPath, armor, key.Fingerprint)
+}
+
+// VerifyRPMSignature authenticates the RPM with only an independently admitted
+// public key. The caller supplies a private database directory and is responsible
+// for authenticating the armor; no host-global key establishes release authority.
+func VerifyRPMSignature(ctx context.Context, db, rpmPath, armor, expectedFingerprint string) (err error) {
+	f, err := os.Open(armor)
+	if err != nil {
+		return err
+	}
+	info, statErr := f.Stat()
+	if statErr != nil {
+		return errors.Join(statErr, f.Close())
+	}
+	if !info.Mode().IsRegular() || info.Size() > 1<<20 {
+		return errors.Join(errors.New("native public key must be a bounded regular file"), f.Close())
+	}
+	encoded, readErr := io.ReadAll(io.LimitReader(f, (1<<20)+1))
+	if err := errors.Join(readErr, f.Close()); err != nil {
+		return err
+	}
+	if len(encoded) > 1<<20 {
+		return errors.New("native public key exceeds bound")
+	}
+	if err := ValidateNativePublicKey(encoded, expectedFingerprint); err != nil {
+		return err
+	}
+	if _, _, err := runTool(ctx, db, toolCmd{
 		Name: "rpmkeys",
 		Args: []string{"--dbpath", db, "--import", armor},
 	}); err != nil {
 		return fmt.Errorf("%w: private rpmdb key import failed", ErrArtifact)
 	}
-	check, _, err := runTool(ctx, work, toolCmd{
+	check, _, err := runTool(ctx, db, toolCmd{
 		Name: "rpm",
 		Args: []string{"--dbpath", db, "-K", rpmPath},
 	})
@@ -296,6 +336,35 @@ func verifyRPMSignature(ctx context.Context, work, rpmPath string, key SigningKe
 	status, prefixed := strings.CutPrefix(string(check), rpmPath+": ")
 	if !prefixed || strings.TrimSpace(status) != "digests signatures OK" {
 		return fmt.Errorf("%w: rpm signature was not verified", ErrArtifact)
+	}
+	return nil
+}
+
+// ValidateNativePublicKey requires one public primary authority with the exact
+// fingerprint admitted by signed/pinned metadata, not one inferred from armor.
+func ValidateNativePublicKey(encoded []byte, expectedFingerprint string) error {
+	fingerprint, err := normalizeFingerprint(expectedFingerprint)
+	if err != nil {
+		return err
+	}
+	const begin = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+	const end = "-----END PGP PUBLIC KEY BLOCK-----"
+	trimmed := bytes.TrimSpace(encoded)
+	if !bytes.HasPrefix(trimmed, []byte(begin)) || !bytes.HasSuffix(trimmed, []byte(end)) || bytes.Count(trimmed, []byte(begin)) != 1 || bytes.Count(trimmed, []byte(end)) != 1 {
+		return errors.New("native signer must be exactly one public armor block")
+	}
+	keys, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(trimmed))
+	if err != nil || len(keys) != 1 {
+		return errors.New("native signer must contain exactly one primary key")
+	}
+	key := keys[0]
+	if key.PrivateKey != nil || strings.ToUpper(hex.EncodeToString(key.PrimaryKey.Fingerprint)) != fingerprint {
+		return errors.New("native signer does not match authenticated fingerprint")
+	}
+	for _, subkey := range key.Subkeys {
+		if subkey.PrivateKey != nil {
+			return errors.New("native signer contains private material")
+		}
 	}
 	return nil
 }
