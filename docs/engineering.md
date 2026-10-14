@@ -530,6 +530,9 @@ request leaves the consent-wait state. Session history leads with the support
 reason, people and outcome instead of three separate time columns.
 **Return to device** opens its assistance tab directly, so the administrator can
 review history or request help again without finding the tab a second time.
+A confirmed stop also replaces that session in cached history pages before showing
+the ended record, after canceling older history reads. Returning immediately must
+not show the stopped request as waiting for consent until the next history poll.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;

@@ -12,6 +12,7 @@ import {
   AssistanceState,
   StopAssistanceSessionRequestSchema,
   type AssistanceSession,
+  type ListAssistanceSessionsResponse,
   type StopAssistanceSessionRequest,
 } from "../../../gen/lindm/admin/v1/assistance_pb";
 import {
@@ -526,15 +527,28 @@ function StopButton({ sessionId, deviceId }: { sessionId: string; deviceId: stri
             failureTitle: "Stop remote assistance",
             onSuccess: async (response) => {
               toast.success("Remote assistance stopped");
-              if (response.session?.id === sessionId && response.session.deviceId === deviceId) {
+              const historyKey = ["assistance-sessions", lifetime.generation, deviceId] as const;
+              const stopped = response.session;
+              if (stopped?.id === sessionId && stopped.deviceId === deviceId) {
                 const { queryKey } = assistanceSessionQueryOptions(lifetime, deviceId, sessionId);
-                // An older in-flight poll must not replace the confirmed ended record.
+                // Older reads must not replace the confirmed record or its history row.
+                await queryClient.cancelQueries({ queryKey: historyKey });
                 await queryClient.cancelQueries({ queryKey, exact: true });
-                queryClient.setQueryData(queryKey, response.session);
+                queryClient.setQueriesData<ListAssistanceSessionsResponse>(
+                  { queryKey: historyKey },
+                  (history) =>
+                    history
+                      ? {
+                          ...history,
+                          sessions: history.sessions.map((item) =>
+                            item.id === sessionId ? stopped : item,
+                          ),
+                        }
+                      : history,
+                );
+                queryClient.setQueryData(queryKey, stopped);
               }
-              await queryClient.invalidateQueries({
-                queryKey: ["assistance-sessions", lifetime.generation, deviceId],
-              });
+              await queryClient.invalidateQueries({ queryKey: historyKey });
             },
           })
         }

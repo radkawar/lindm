@@ -239,11 +239,18 @@ async function remoteHelp(ctx) {
     const recordLink = main.locator(`a[href=${JSON.stringify(sessionPath)}]`);
     await recordLink.waitFor();
     await main.getByText(reason, { exact: true }).waitFor();
+    const row = main.getByRole("row").filter({
+      has: page.locator(`a[href=${JSON.stringify(sessionPath)}]`),
+    });
+    requireState(
+      await row.getByText("Ended", { exact: true }).isVisible(),
+      "assistance_history_live_after_stop",
+    );
     await capture(
       ctx,
       "return-to-history",
       "Device assistance history",
-      "Return to device opens the assistance tab in one action, with this request's support reason and record link.",
+      "Return to device opens the assistance tab in one action. This request's row is already Ended with its support reason and record link, without waiting for a history refresh.",
     );
     await recordLink.click();
     await main.locator('[data-assistance-state="ended"]').waitFor();
