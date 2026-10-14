@@ -87,6 +87,37 @@ async function lostDevice(ctx) {
   requireState(route && offline, "lost_device_fixture_missing");
   const driver = new ChromiumDriver();
   try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const theme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await ctx.visit(`/devices/${route.ID}?tab=assistance`);
+      const selected = page.getByRole("tab", { name: "Remote assistance", exact: true });
+      await selected.waitFor();
+      await page.waitForFunction(() => {
+        const button = document.querySelector('[role="tab"][aria-selected="true"]');
+        if (!button) return false;
+        const bounds = button.getBoundingClientRect();
+        const strip = button.parentElement.getBoundingClientRect();
+        return bounds.left >= strip.left - 1 && bounds.right <= strip.right + 1;
+      });
+      requireState(
+        (await selected.getAttribute("aria-selected")) === "true",
+        "device_deep_link_tab_not_selected",
+      );
+      requireState(await page.evaluate(() => scrollY === 0), "device_tab_scroll_moved_page");
+      await capture(
+        ctx,
+        `device-tabs-${theme}-mobile`,
+        "A direct Remote assistance link exposes the selected mobile tab without moving focus or scrolling the page.",
+      );
+      await selected.focus();
+      await page.keyboard.press("End");
+      await page.getByRole("tab", { name: "Findings", exact: true, selected: true }).waitFor();
+      await page.keyboard.press("Home");
+      await page.getByRole("tab", { name: "Overview", exact: true, selected: true }).waitFor();
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
     // Hold the real read briefly; no response or recovery state is fabricated.
     const encryptionRead = "**/lindm.admin.v1.AdminService/GetDeviceEncryption";
     let releaseRead;

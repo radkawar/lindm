@@ -420,6 +420,9 @@ session names preserve each collection/field state. Inventory retains the full
 interface and session tables. The Actions tab lists each action as one collapsed
 line (what, by whom, when, outcome) that expands to the full result. Remote
 assistance has its own device tab with the request form and session history.
+The selected device tab stays visible in the narrow-screen tab strip, including
+direct tab links and keyboard selection. Selection moves only the strip, without
+moving focus on page load or scrolling the whole page.
 The route supplies a named account picker for owner editing. The Services tab's
 settings preview link carries the selected device into Rollouts; the
 administrator never copies its UUID.

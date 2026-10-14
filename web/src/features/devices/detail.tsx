@@ -4,7 +4,7 @@ import { Code } from "@connectrpc/connect";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, Plus, Shield } from "lucide-react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { DeviceState, type Device } from "../../../gen/lindm/admin/v1/admin_pb";
 import {
   CollectionStatus,
@@ -117,6 +117,17 @@ export function DeviceDetailView({
   const failure = detail.error ? toRpcFailure(detail.error) : null;
   const data = failure ? undefined : detail.data;
   const device = data?.device;
+  // A shared tab URL must expose its selected tab on narrow screens. Move only
+  // the strip; do not steal focus or scroll the administrator's page vertically.
+  useEffect(() => {
+    const button = tabButtons.current[detailTabs.findIndex((item) => item.id === activeTab)];
+    const strip = button?.parentElement;
+    if (!button || !strip) return;
+    const selected = button.getBoundingClientRect();
+    const viewport = strip.getBoundingClientRect();
+    if (selected.left < viewport.left) strip.scrollLeft += selected.left - viewport.left;
+    else if (selected.right > viewport.right) strip.scrollLeft += selected.right - viewport.right;
+  }, [activeTab, device?.id]);
   // The server answers NotFound alike for a missing device and one outside the
   // caller's scope; only a fleet-wide reader knows the device does not exist.
   const unavailable = failure?.code === Code.NotFound;
