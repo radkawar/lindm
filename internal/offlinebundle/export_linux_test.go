@@ -4,6 +4,7 @@ package offlinebundle
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,15 +13,20 @@ import (
 )
 
 // A server release embeds its attested agent repository subset
-// (agent-repository/), which releasebuild.Verify requires. The export copied
-// only release.json and artifact base names, so every bundle of a release
-// built after the embedding failed import with
-// "release/agent-repository/release.json: no such file or directory".
+// (agent-repository/), and every release signs its redistribution documents
+// (license_sha256); releasebuild.Verify requires both. The export copied only
+// release.json and artifact base names, so every bundle of a release built
+// after either change failed import ("release/agent-repository/release.json",
+// then "release/LICENSE": no such file or directory).
 func TestCopyReleaseKeepsTheServerReleaseAgentRepository(t *testing.T) {
 	artifact := func(product, name string) *releasev1.ReleaseArtifact {
 		return &releasev1.ReleaseArtifact{Product: product, Path: name, SbomPath: name + ".sbom", ProvenancePath: name + ".provenance", SignaturePath: name + ".signature"}
 	}
-	server := &releasev1.ReleaseManifest{Artifacts: []*releasev1.ReleaseArtifact{artifact("lindm-agent", "agent.deb"), artifact("lindmd", "lindmd.deb")}}
+	legal := map[string]string{"LICENSE": "license text", "NOTICE": "notice text", "THIRD-PARTY-LICENSES": "third-party text"}
+	server := &releasev1.ReleaseManifest{Artifacts: []*releasev1.ReleaseArtifact{artifact("lindm-agent", "agent.deb"), artifact("lindmd", "lindmd.deb")}, LicenseSha256: map[string]string{}}
+	for name, content := range legal {
+		server.LicenseSha256[name] = digestOf(content)
+	}
 	embedded := map[string]string{
 		"agent-repository/release.json":                         `{"version":"0.1.0"}`,
 		"agent-repository/attestation.pub":                      "public key bytes",
@@ -31,6 +37,7 @@ func TestCopyReleaseKeepsTheServerReleaseAgentRepository(t *testing.T) {
 		t.Helper()
 		directory := t.TempDir()
 		files := map[string]string{"release.json": `{"version":"0.1.0"}`, "release.json.dsse": "{}"}
+		maps.Copy(files, legal)
 		for _, a := range server.GetArtifacts() {
 			for _, name := range []string{a.GetPath(), a.GetSbomPath(), a.GetProvenancePath(), a.GetSignaturePath()} {
 				files[name] = name + " bytes"
@@ -56,7 +63,9 @@ func TestCopyReleaseKeepsTheServerReleaseAgentRepository(t *testing.T) {
 	if _, err := copyRelease(src, destination, server); err != nil {
 		t.Fatal(err)
 	}
-	for name, content := range embedded {
+	want := maps.Clone(embedded)
+	maps.Copy(want, legal)
+	for name, content := range want {
 		got, err := os.ReadFile(filepath.Join(destination, filepath.FromSlash(name)))
 		if err != nil || !bytes.Equal(got, []byte(content)) {
 			t.Fatalf("%s not exported byte for byte: %q, %v", name, got, err)
@@ -70,7 +79,7 @@ func TestCopyReleaseKeepsTheServerReleaseAgentRepository(t *testing.T) {
 	for _, f := range files {
 		listed[f.GetPath()] = true
 	}
-	for name := range embedded {
+	for name := range want {
 		if !listed["release/"+name] {
 			t.Fatalf("signed bundle file list omits release/%s", name)
 		}
@@ -82,6 +91,13 @@ func TestCopyReleaseKeepsTheServerReleaseAgentRepository(t *testing.T) {
 	agentOnly := &releasev1.ReleaseManifest{Artifacts: server.GetArtifacts()[:1]}
 	if _, err := copyRelease(source(t, nil), filepath.Join(t.TempDir(), "release"), agentOnly); err != nil {
 		t.Fatalf("agent-only release: %v", err)
+	}
+	unlicensed := source(t, embedded)
+	if err := os.Remove(filepath.Join(unlicensed, "NOTICE")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := copyRelease(unlicensed, filepath.Join(t.TempDir(), "release"), server); err == nil {
+		t.Fatal("exported a release without a signed redistribution document")
 	}
 
 	linked := source(t, embedded)

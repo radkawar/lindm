@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -167,9 +168,11 @@ func Export(ctx context.Context, request ExportRequest) (_ *bundlev1.OfflineBund
 }
 
 // copyRelease copies exactly the attested release files and returns the
-// SHA-256 of release.json. A server release also carries the attested agent
-// repository subset it embeds (agent-repository/), which release verification
-// requires, so import authenticates it rather than the bundle dropping it.
+// SHA-256 of release.json: the manifest, every artifact with its statements,
+// the signed redistribution documents (license_sha256) and, for a server
+// release, the attested agent repository subset it embeds (agent-repository/).
+// Release verification requires each of them, so import authenticates them
+// rather than the bundle dropping them.
 func copyRelease(source, destination string, release *releasev1.ReleaseManifest) (string, error) {
 	if err := os.Mkdir(destination, 0755); err != nil {
 		return "", err
@@ -183,6 +186,7 @@ func copyRelease(source, destination string, release *releasev1.ReleaseManifest)
 		}
 		server = server || artifact.GetProduct() == "lindmd"
 	}
+	names = append(names, slices.Sorted(maps.Keys(release.GetLicenseSha256()))...)
 	var manifestDigest string
 	for _, name := range names {
 		if filepath.Base(name) != name {
