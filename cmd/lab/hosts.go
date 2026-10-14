@@ -152,7 +152,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		memory = 4096
 	}
 	if clean[1] == "production-release-signing" {
-		memory = 8192
+		memory = vmlab.ProductionReleaseSigningMemoryMiB
 	}
 	cfg, err := labhost.Load()
 	if err != nil {

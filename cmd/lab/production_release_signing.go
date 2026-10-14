@@ -43,7 +43,7 @@ func runVMProductionReleaseSigning(ctx context.Context, args []string, stdout, s
 		}
 	}
 	selected := hardware.options()
-	selected.MemoryMiB, selected.CPUs = 8192, 2
+	selected.MemoryMiB, selected.CPUs = vmlab.ProductionReleaseSigningMemoryMiB, 2
 	result, runErr := vmlab.RunVMProductionReleaseSigning(ctx, manifest, vmlab.VMProductionReleaseSigningOptions{Repository: *repository, CacheDir: *cache, WorkDir: *work, LabBinary: binary, DiagnosticsDir: *diagnostics, Hardware: selected})
 	if result != nil {
 		runErr = errors.Join(runErr, writeLabEvidence(stdout, *record, result))

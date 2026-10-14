@@ -41,7 +41,7 @@ func TestProductionSigningHardwareRequiresMaintainedVendorGuest(t *testing.T) {
 		manifest.Architecture = architecture
 		options := &VMHardwareOptions{Accelerator: "tcg"}
 		hardware, err := productionSigningHardware(manifest, options)
-		if err != nil || hardware.MemoryMiB != 8192 || hardware.CPUs != 2 || !hardware.AllowNetwork || hardware.Accelerator != "tcg" {
+		if err != nil || hardware.MemoryMiB != ProductionReleaseSigningMemoryMiB || hardware.CPUs != 2 || !hardware.AllowNetwork || hardware.Accelerator != "tcg" {
 			t.Fatalf("maintained guest hardware=%+v error=%v", hardware, err)
 		}
 		if options.MemoryMiB != 0 || options.CPUs != 0 || options.AllowNetwork {

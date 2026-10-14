@@ -27,6 +27,10 @@ import (
 	"lindm/internal/platform"
 )
 
+// ProductionReleaseSigningMemoryMiB fits one default native-host admission slot.
+// CLI admission and actual guest allocation must use the same memory budget.
+const ProductionReleaseSigningMemoryMiB = 4096
+
 const productionSigningScope = "production-signing-tests-only"
 const productionSigningGuestRoot = "/home/lindm-lab/production-signing"
 const productionSigningLogLimit = 4 << 20
@@ -329,7 +333,7 @@ func productionSigningHardware(manifest *labv1.ImageManifest, options *VMHardwar
 		return hardware, errors.New("production signing tests require the official Ubuntu cloud-image signing fingerprint")
 	}
 	if hardware.MemoryMiB == 0 {
-		hardware.MemoryMiB = 8192
+		hardware.MemoryMiB = ProductionReleaseSigningMemoryMiB
 	}
 	if hardware.CPUs == 0 {
 		hardware.CPUs = 2
