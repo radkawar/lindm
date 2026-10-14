@@ -171,7 +171,6 @@ async function axePass(page, selector) {
       const run = await window.axe.run(context, {
         rules: { "color-contrast": { enabled: true } },
         resultTypes: ["violations"],
-        rules: { "color-contrast": { enabled: true } },
         runOnly: {
           type: "tag",
           values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"],

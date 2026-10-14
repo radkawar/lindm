@@ -22,6 +22,11 @@ export async function reviewShell({ page, prefix, desktop, probe, screenshot, ax
       shortcuts.includes(
         "Meta+b",
       ), "The collapse control has no announced Control/Command shortcut");
+    await toggle.hover();
+    const hint = page.locator('[data-slot="tooltip-content"][data-open]');
+    await hint.waitFor();
+    require((await hint.getAttribute("role")) ===
+      "tooltip", "The page navigation hint has no tooltip semantics");
     await toggle.click();
     require((await toggle.getAttribute("aria-expanded")) ===
       "false", "The page column does not collapse");

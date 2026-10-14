@@ -28,7 +28,7 @@ export function SignIn({ notice, next }: { notice: string; next?: string }) {
         <CardHeader>
           <BrandLogo stacked className="mx-auto mb-4" />
           <CardTitle>
-            <h1 className="text-2xl font-semibold tracking-tight">lindm console</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
           </CardTitle>
           <CardDescription>Sign in to review devices and pending work.</CardDescription>
         </CardHeader>

@@ -182,6 +182,9 @@ axe/focus behavior. Menu captures wait for the drawer to settle on screen.
 Preference checks run serially after the parallel route captures and cover live
 system theme changes plus stored light/dark overriding the opposite system preference.
 The obsolete sidebar primitive and its unused mobile hook are removed.
+Tooltip popups carry the `tooltip` role, including portalled hints outside page
+landmarks; shell review checks the collapse hint's semantics. Sign-in uses the
+brand lockup and a task heading, not a second product-name heading.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Explanations of how a feature works are not inline page text: keep at most one short
