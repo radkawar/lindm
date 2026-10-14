@@ -67,5 +67,12 @@ func runDeployColdGuest(ctx context.Context, args []string, stderr io.Writer) er
 	if flags.NArg() != 0 {
 		return errors.New("cold guest does not accept positional or secret inputs")
 	}
+	directory, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if err := prepareDeployCustodianMemory(ctx, directory); err != nil {
+		return err
+	}
 	return vmlab.RunDeployBuildGuest(ctx, *revision, *epoch, *first, *newer)
 }

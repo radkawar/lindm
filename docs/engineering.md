@@ -3965,6 +3965,13 @@ cells. Actual two-OS three-guest install/enroll/backup/upgrade/restore/live-mana
 proof remains a separate `lab deploy` invocation using its signed exports and
 independently recorded pins.
 
+The guest child raises only its own process's memlock allowance through authorized
+`sudo prlimit` before entering the unchanged secret-memory gate. Do not raise the
+allowance before `runuser`: its PAM session can reset the inherited limit. The
+2026-10-14 cold run at `334bf7400` captured that gate's refusal in encrypted
+lab-only stderr before any custody export or Make invocation; it was not a
+successful cold build or native lifecycle proof.
+
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated
 bundled `release-root.json`. It does not pass the unsupported installer flag

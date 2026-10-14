@@ -227,7 +227,7 @@ func buildColdReleaseGuest(ctx context.Context, guest *guestVM, result *VMDeploy
 	if _, err := coldReleaseCommand(ctx, guest, result, "matching-guest-lab-child", build, nil, 45*time.Minute); err != nil {
 		return err
 	}
-	child := "sudo -n prlimit --memlock=unlimited:unlimited -- runuser -u lindm-lab -- " + productionSigningEnvironment() + " " + nativeQuote(root+"/cold-lab") + " native cold-release-child -revision " + nativeQuote(options.Revision) + " -epoch " + nativeQuote(result.SourceDateEpoch) + " -first-version " + nativeQuote(options.FirstVersion) + " -newer-version " + nativeQuote(options.NewerVersion)
+	child := productionSigningEnvironment() + " " + nativeQuote(root+"/cold-lab") + " native cold-release-child -revision " + nativeQuote(options.Revision) + " -epoch " + nativeQuote(result.SourceDateEpoch) + " -first-version " + nativeQuote(options.FirstVersion) + " -newer-version " + nativeQuote(options.NewerVersion)
 	output, err := coldReleaseCommand(ctx, guest, result, "literal-make-release-keys-and-two-releases", child, nil, 3*time.Hour)
 	defer clear(output.Stdout)
 	defer clear(output.Stderr)
