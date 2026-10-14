@@ -65,7 +65,9 @@ func ObserveDeployIntegration(ctx context.Context, destination, digest string, c
 		connection := strings.TrimSpace(string(dsn))
 		address, addressErr := url.Parse(connection)
 		cfg, configErr := pgxpool.ParseConfig(connection)
-		if addressErr != nil || (address.Scheme != "postgresql" && address.Scheme != "postgres") || address.Query().Get("sslmode") != "verify-full" || configErr != nil || cfg.ConnConfig.User != "lindm_runtime" {
+		if addressErr != nil || (address.Scheme != "postgresql" && address.Scheme != "postgres") ||
+			address.Query().Get("sslmode") != "verify-full" || address.Query().Get("channel_binding") != "require" ||
+			address.Query().Get("require_auth") != "scram-sha-256" || configErr != nil || cfg.ConnConfig.User != "lindm_runtime" {
 			return nil, errors.New("deploy: integration_proof_database_config_invalid")
 		}
 		pool, connectErr := pgxpool.NewWithConfig(ctx, cfg)

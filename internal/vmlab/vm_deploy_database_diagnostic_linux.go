@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -94,16 +95,20 @@ func deployDatabaseErrorClassification(err error) (string, string) {
 	}
 	var postgres *pgconn.PgError
 	if errors.As(err, &postgres) {
+		category := "postgres"
+		if strings.Contains(postgres.Message, "channel binding") {
+			category = "postgres_channel_binding"
+		}
 		code := postgres.Code
 		if len(code) == 5 {
 			for _, c := range code {
 				if (c < '0' || c > '9') && (c < 'A' || c > 'Z') {
-					return "postgres", ""
+					return category, ""
 				}
 			}
-			return "postgres", code
+			return category, code
 		}
-		return "postgres", ""
+		return category, ""
 	}
 	var connection *pgconn.ConnectError
 	if errors.As(err, &connection) {

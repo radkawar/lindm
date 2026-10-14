@@ -31,6 +31,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Preserve authenticated public bundle modes inside the installer's private immutable snapshot without preserving source ownership or weakening provenance verification.
 - Budget 32 GiB source and restore server overlays for full signed turnkey bundles while preserving the installer's free-disk preflight and normal lab admission.
 - Retain secret-safe, encrypted lab database failure classifications before owned guest cleanup, without changing installer authorization gates.
+- Sign local PostgreSQL certificates with a constrained P-256/SHA-256 authority so SCRAM-PLUS succeeds without disabling TLS verification, channel binding or sealed PKI custody.
+- Require database channel binding by default, reject disabled binding, and require SCRAM-PLUS for local credentials; explicit pooler `prefer` choices remain visible in startup logs and server status.
 - Prepare checkout-owned development trust for container integration without a maintainer cache.
 - Preserve first-owner audit records when testing bounded exports, and release only each acquired test lease in concurrent capacity checks.
 - Add the committer's DCO sign-off to verified maintainer landings and gate commits.

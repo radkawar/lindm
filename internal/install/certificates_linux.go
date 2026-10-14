@@ -6,7 +6,10 @@ package install
 
 import (
 	"context"
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -121,11 +124,10 @@ func certificates(ctx context.Context, o Options, deployment string, uid, gid, p
 		}
 	}
 	if pguid != 0 {
-		ca, key, err := newCertificateAuthority("Lindm database CA " + deployment)
+		ca, key, err := newDatabaseCertificateAuthority("Lindm database CA " + deployment)
 		if err != nil {
 			return err
 		}
-		defer clear(key)
 		if err := writeCertificate("/etc/lindm/database-ca.crt", ca, uid, gid); err != nil {
 			return err
 		}
@@ -147,24 +149,42 @@ func newCertificateAuthority(name string) (*x509.Certificate, ed25519.PrivateKey
 	if err != nil {
 		return nil, nil, err
 	}
-	serial, err := certificateSerial()
-	if err != nil {
-		clear(key)
-		return nil, nil, err
-	}
-	now := time.Now().UTC()
-	template := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: name}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0), BasicConstraintsValid: true, IsCA: true, MaxPathLenZero: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, public, key)
-	if err != nil {
-		clear(key)
-		return nil, nil, err
-	}
-	cert, err := x509.ParseCertificate(der)
+	cert, err := createCertificateAuthority(name, public, key)
 	if err != nil {
 		clear(key)
 		return nil, nil, err
 	}
 	return cert, key, nil
+}
+
+// PostgreSQL SCRAM-PLUS binds authentication to the server certificate's hash.
+// Its issuer must use a hash-defined signature, unlike Ed25519.
+// Go owns the ECDSA key internals; the installer's whole-process locked,
+// non-dumpable memory gate protects them. Explicit PKCS8/PEM buffers are cleared.
+func newDatabaseCertificateAuthority(name string) (*x509.Certificate, *ecdsa.PrivateKey, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, nil, err
+	}
+	cert, err := createCertificateAuthority(name, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, err
+	}
+	return cert, key, nil
+}
+
+func createCertificateAuthority(name string, public crypto.PublicKey, key crypto.Signer) (*x509.Certificate, error) {
+	serial, err := certificateSerial()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	template := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: name}, NotBefore: now.Add(-time.Minute), NotAfter: now.AddDate(10, 0, 0), BasicConstraintsValid: true, IsCA: true, MaxPathLenZero: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, public, key)
+	if err != nil {
+		return nil, err
+	}
+	return x509.ParseCertificate(der)
 }
 
 func certificateSerial() (*big.Int, error) {
@@ -182,7 +202,7 @@ func writeCertificate(path string, cert *x509.Certificate, uid, gid int) error {
 	return newFile(path, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}), uid, gid, 0600)
 }
 
-func privateKeyPEM(key ed25519.PrivateKey) ([]byte, error) {
+func privateKeyPEM(key crypto.Signer) ([]byte, error) {
 	der, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		return nil, err
@@ -191,7 +211,7 @@ func privateKeyPEM(key ed25519.PrivateKey) ([]byte, error) {
 	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), nil
 }
 
-func issueServerCertificate(path, name string, hosts []string, ca *x509.Certificate, caKey ed25519.PrivateKey, uid, gid int) error {
+func issueServerCertificate(path, name string, hosts []string, ca *x509.Certificate, caKey crypto.Signer, uid, gid int) error {
 	public, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err

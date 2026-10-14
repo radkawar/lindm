@@ -112,6 +112,44 @@ func TestDatabaseFailoverTLS(t *testing.T) {
 	}
 }
 
+func TestDatabaseChannelBindingPolicy(t *testing.T) {
+	for _, test := range []struct {
+		name, query, want string
+		reject            bool
+	}{
+		{"default", "", "require", false},
+		{"empty", "&channel_binding=", "require", false},
+		{"required", "&channel_binding=require", "require", false},
+		{"pooler_explicit_prefer", "&channel_binding=prefer", "prefer", false},
+		{"disabled", "&channel_binding=disable", "", true},
+		{"unknown", "&channel_binding=never", "", true},
+		{"duplicate", "&channel_binding=prefer&channel_binding=require", "", true},
+		{"required_scram", "&channel_binding=require&require_auth=scram-sha-256", "require", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := databaseFixture(t)
+			writeCertificate(t, dir, "root", true, nil, nil)
+			writeFixtureFile(t, dir, "database-url", []byte("postgresql://runtime:fixture-secret@localhost/lindm?sslmode=verify-full&sslrootcert=root.crt"+test.query))
+			cfg, err := (&Document{base: dir}).database("database-url")
+			if test.reject {
+				if err == nil {
+					t.Fatal("unsafe channel-binding policy accepted")
+				}
+				if strings.Contains(err.Error(), "fixture-secret") {
+					t.Fatal("database policy error disclosed credentials")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.ConnConfig.ChannelBinding != test.want {
+				t.Fatalf("channel binding policy = %q, want %q", cfg.ConnConfig.ChannelBinding, test.want)
+			}
+		})
+	}
+}
+
 func TestDatabaseRejectsUnsafeFailoverURLs(t *testing.T) {
 	const base = "postgresql://user:fixture-secret@db1:5432,db2/database"
 	for _, test := range []struct {

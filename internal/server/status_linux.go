@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -44,10 +45,14 @@ func operationalProbe(pool, adminPool *pgxpool.Pool, resources *config.Resources
 	instructions := enrollmentInstructions(resources, native)
 	repositoryCheckedAt := time.Now()
 	backupIdentity, backupIdentityErr := serverops.NewBackupIdentity(resources.Proto)
+	// Keep only the public policy, not pool configuration copies or URL secrets.
+	databasePrefer := resources.Database.ConnConfig.ChannelBinding == "prefer"
+	adminDatabasePrefer := resources.AdminDatabase.ConnConfig.ChannelBinding == "prefer"
+	databasePing, adminDatabasePing := pool.Ping, adminPool.Ping
 	return func(ctx context.Context, now time.Time) []*adminv1.ServerStatusCheck {
 		checks := []*adminv1.ServerStatusCheck{
-			databaseStatus(ctx, pool, "database", now),
-			databaseStatus(ctx, adminPool, "admin_database", now),
+			databaseStatus(ctx, databasePing, "database", databasePrefer, now),
+			databaseStatus(ctx, adminDatabasePing, "admin_database", adminDatabasePrefer, now),
 			certificateStatus("https_certificate", resources.ServerCertificate.Leaf, now),
 			certificateStatus("device_ca", resources.DeviceCACertificate, now),
 			backupStatus(now, backupIdentity, func() (serverops.BackupHealth, error) {
@@ -80,16 +85,33 @@ func operationalProbe(pool, adminPool *pgxpool.Pool, resources *config.Resources
 	}
 }
 
-func databaseStatus(ctx context.Context, pool *pgxpool.Pool, component string, now time.Time) *adminv1.ServerStatusCheck {
+func warnDatabaseChannelBinding(logger *slog.Logger, resources *config.Resources) {
+	databasePrefer := resources.Database.ConnConfig.ChannelBinding == "prefer"
+	adminDatabasePrefer := resources.AdminDatabase.ConnConfig.ChannelBinding == "prefer"
+	if databasePrefer || adminDatabasePrefer {
+		logger.Warn("SCRAM-PLUS channel binding may downgrade",
+			"channel_binding", "prefer",
+			"database_downgrade_allowed", databasePrefer,
+			"admin_database_downgrade_allowed", adminDatabasePrefer,
+			"next_action", "Enable SCRAM-PLUS and set channel_binding=require; pooler prefer is an explicit operator choice.")
+	}
+}
+
+func databaseStatus(ctx context.Context, ping func(context.Context) error, component string, prefer bool, now time.Time) *adminv1.ServerStatusCheck {
 	check := statusCheck(component, statusOK, "The verified database connection answered.", "This connection needs no action.", now)
 	probe, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
-	if err := pool.Ping(probe); err != nil {
+	if err := ping(probe); err != nil {
 		check.State = statusFailed
 		check.Summary = "The database connection did not answer."
 		check.NextAction = "Check PostgreSQL availability and the server service journal."
 	} else {
 		check.EvidenceAt = timestamppb.New(now)
+		if prefer {
+			check.State = statusAttention
+			check.Summary = "The database answered, but SCRAM-PLUS channel binding may downgrade."
+			check.NextAction = "Enable SCRAM-PLUS and set channel_binding=require. Keep prefer only as an explicit choice for a pooler."
+		}
 	}
 	return check
 }

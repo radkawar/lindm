@@ -27,6 +27,7 @@ func TestDeployDatabaseFailureClassificationNeverExportsDriverMessages(t *testin
 		{"hostname", x509.HostnameError{Host: canary}, "tls_hostname", ""},
 		{"certificate", x509.CertificateInvalidError{}, "tls_certificate", ""},
 		{"sqlstate", &pgconn.PgError{Code: "28P01", Message: canary, Detail: canary}, "postgres", "28P01"},
+		{"channel_binding", &pgconn.PgError{Code: "28000", Message: "SCRAM channel binding negotiation error " + canary, Detail: canary}, "postgres_channel_binding", "28000"},
 		{"malformed_sqlstate", &pgconn.PgError{Code: canary, Message: canary}, "postgres", ""},
 		{"malformed_short_sqlstate", &pgconn.PgError{Code: "a?cde", Message: canary}, "postgres", ""},
 		{"unknown", errors.New(canary), "query", ""},

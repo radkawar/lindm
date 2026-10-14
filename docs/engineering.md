@@ -4067,6 +4067,22 @@ fixed error categories and validated five-character SQLSTATE values. It never
 returns driver messages, URLs, passwords or names from customer input. Diagnosis
 does not change roles or qualify a failed run. The observer is compiled into
 `lab`, not the product installer, `lindmd` or `lindmctl`.
+The runtime SQL proof requires both local URL authentication policies and sets
+libpq `PGCHANNELBINDING=require` explicitly. It records a
+`runtime SCRAM-SHA-256-PLUS handshake` gate with SQLSTATE `00000` only after a
+real verified-TLS query returns `1`; its denied-write probes run with the same
+binding requirement. Integration-secret proof also rejects an unbound URL.
+
+The fresh Ubuntu diagnostic against source `da970de98` observed PostgreSQL
+SQLSTATE `28000` with a fixed `postgres_channel_binding` classification. The
+migrator privilege query never ran; false unscanned privilege fields are not a
+role verdict. The Ed25519-signed local database certificate lacked the hash used
+by the pinned pgx SCRAM-PLUS implementation. Local database issuance now uses a
+P-256/SHA-256 CA, with unchanged TLS verification, restricted roles and sealed
+PKI custody. `diagnostic-ubuntu-attempt2.json` remains a failed, setup-only
+observation, not lifecycle qualification. Its secret-safe encrypted diagnosis
+plaintext SHA-256 is
+`b97d8310c34542011dafd486f356fca324e45c57b2c32a31640262e5bf924628`.
 
 #### Durable laboratory custody escrow
 

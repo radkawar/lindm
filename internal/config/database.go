@@ -51,6 +51,13 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 			return nil, errors.New("database URL contains unsupported connection options")
 		}
 	}
+	switch options.Get("channel_binding") {
+	case "":
+		options.Set("channel_binding", "require")
+	case "require", "prefer":
+	default:
+		return nil, errors.New("database channel_binding must be require or an explicit prefer; disable is not supported")
+	}
 	if options.Get("sslmode") != "verify-full" {
 		return nil, errors.New("all PostgreSQL connections require TLS with sslmode=verify-full")
 	}

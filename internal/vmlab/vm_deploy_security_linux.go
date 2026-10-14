@@ -48,9 +48,10 @@ func proveDeployDatabaseCredentials(ctx context.Context, guest *guestVM) error {
 	return err
 }
 
-// This is a real PostgreSQL runtime connection with unchanged verify-full
-// policy, not a permission query or a migration-user impersonation. Passwords
-// travel only over pinned SSH stdin and a short-lived runtime-owned PGPass file.
+// This is a real PostgreSQL runtime connection with unchanged verify-full and
+// required SCRAM-PLUS policy, not a permission query or a migration-user
+// impersonation. Passwords travel only over pinned SSH stdin and an ephemeral
+// runtime-owned PGPass file.
 func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []VMDeploySQLGate, err error) {
 	body, err := serverGuestCommand(ctx, guest, "read private runtime DSN for security proof", "cat /etc/lindm/database-url", nil)
 	if err != nil {
@@ -58,8 +59,10 @@ func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []
 	}
 	defer clear(body)
 	dsn, parseErr := url.Parse(strings.TrimSpace(string(body)))
-	if parseErr != nil || dsn.User == nil || (dsn.Scheme != "postgresql" && dsn.Scheme != "postgres") || dsn.Query().Get("sslmode") != "verify-full" || !filepath.IsAbs(dsn.Query().Get("sslrootcert")) {
-		return nil, errors.New("deploy runtime proof requires valid private verify-full PostgreSQL DSN")
+	if parseErr != nil || dsn.User == nil || (dsn.Scheme != "postgresql" && dsn.Scheme != "postgres") ||
+		dsn.Query().Get("sslmode") != "verify-full" || !filepath.IsAbs(dsn.Query().Get("sslrootcert")) ||
+		dsn.Query().Get("channel_binding") != "require" || dsn.Query().Get("require_auth") != "scram-sha-256" {
+		return nil, errors.New("deploy runtime proof requires valid private verify-full SCRAM-PLUS PostgreSQL DSN")
 	}
 	password, hasPassword := dsn.User.Password()
 	if !hasPassword || strings.ContainsAny(password, "\r\n\x00") {
@@ -83,7 +86,12 @@ func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []
 		_, removeErr := serverGuestCommand(context.WithoutCancel(ctx), guest, "remove ephemeral runtime PGPass", "rm -- "+privatePass, nil)
 		err = errors.Join(err, removeErr)
 	}()
-	command := "sudo -n runuser -u lindmd -- env LC_ALL=C PGPASSFILE=" + nativeQuote(privatePass) + " PGSSLMODE=verify-full PGSSLROOTCERT=" + nativeQuote(dsn.Query().Get("sslrootcert")) + " psql -X -v ON_ERROR_STOP=1 -h " + nativeQuote(dsn.Hostname()) + " -p " + nativeQuote(port) + " -U " + nativeQuote(dsn.User.Username()) + " -d " + nativeQuote(database)
+	command := "sudo -n runuser -u lindmd -- env LC_ALL=C PGCHANNELBINDING=require PGPASSFILE=" + nativeQuote(privatePass) + " PGSSLMODE=verify-full PGSSLROOTCERT=" + nativeQuote(dsn.Query().Get("sslrootcert")) + " psql -X -v ON_ERROR_STOP=1 -h " + nativeQuote(dsn.Hostname()) + " -p " + nativeQuote(port) + " -U " + nativeQuote(dsn.User.Username()) + " -d " + nativeQuote(database)
+	handshake, handshakeErr := guest.runResult(ctx, command+" -Atq", strings.NewReader("SELECT 1;\n"), 16<<10, time.Minute)
+	if handshakeErr != nil || handshake.ExitCode != 0 || strings.TrimSpace(string(handshake.Stdout)) != "1" || len(handshake.Stderr) != 0 {
+		return nil, errors.New("deploy runtime SCRAM-PLUS handshake and query did not complete")
+	}
+	gates = append(gates, VMDeploySQLGate{Name: "runtime SCRAM-SHA-256-PLUS handshake", SQLState: "00000"})
 	attempts := []struct{ name, sql string }{
 		{"setup code hash immutable", "UPDATE first_run_setup SET code_hash=code_hash WHERE false;"},
 		{"setup expiry immutable", "UPDATE first_run_setup SET expires_at=expires_at WHERE false;"},

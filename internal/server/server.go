@@ -105,6 +105,7 @@ func newIdentity(ctx context.Context, pool *pgxpool.Pool, resources *config.Reso
 // pool; startup and unexpected listener failures are returned to the supervisor.
 func Run(ctx context.Context, resources *config.Resources) error {
 	defer resources.HTTPClient.CloseIdleConnections()
+	warnDatabaseChannelBinding(slog.Default(), resources)
 	pool, err := pgxpool.NewWithConfig(ctx, resources.Database)
 	if err != nil {
 		return fmt.Errorf("initialize database pool: %w", err)

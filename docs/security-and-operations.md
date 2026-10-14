@@ -1766,6 +1766,22 @@ closed. Defaults are 64 database connections, 256 MiB shared buffers, 16 device
 pool connections plus the separate console pool, bounded statements and cgroup-v2
 swap/core-dump protection. Runtime credentials cannot create schemas or mutate
 Goose, schema-compatibility or server-recovery metadata.
+The local database CA uses ECDSA P-256/SHA-256 signatures so PostgreSQL
+SCRAM-PLUS can bind authentication to the server certificate. Device and console
+authorities remain separate. TLS verification and channel binding are not disabled
+to accommodate a certificate algorithm. The database CA private key is sealed
+directly to the PKI custodian, never saved as plaintext.
+Generated runtime and migrator URLs set `channel_binding=require` and
+`require_auth=scram-sha-256`. With the pinned pgx driver these together require
+SCRAM-SHA-256-PLUS; plain SCRAM, trust and other authentication methods cannot
+satisfy the local policy. An omitted or empty `channel_binding` also defaults to
+`require` for external URLs. `channel_binding=disable` is refused.
+An external pooler that cannot support PLUS, such as PgBouncer, requires an
+explicit `channel_binding=prefer` choice. This retains verified TLS but permits
+unbound SCRAM. Startup logs one redacted downgrade warning, and **Server status**
+keeps the database check at **Needs attention** while the connection is healthy.
+A connection failure still reports **Failed**. Prefer a PLUS-capable connection;
+do not use the pooler exception to work around a broken certificate.
 On Ubuntu, the installer preseeds `create_main_cluster = false` before the vendor
 PostgreSQL transaction and temporarily denies native service starts through
 `policy-rc.d`. It removes only its own unchanged temporary policy. Existing operator

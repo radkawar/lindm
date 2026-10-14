@@ -3,17 +3,178 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	adminv1 "lindm/gen/lindm/admin/v1"
+	"lindm/internal/config"
 	"lindm/internal/serverops"
 )
+
+func TestDatabaseStatusChannelBinding(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	for _, component := range []string{"database", "admin_database"} {
+		for _, tc := range []struct {
+			name   string
+			prefer bool
+			err    error
+			want   adminv1.ServerStatusState
+		}{
+			{"require", false, nil, statusOK},
+			{"prefer", true, nil, statusAttention},
+			{"require failed", false, errors.New("private-driver-message"), statusFailed},
+			{"prefer failed", true, errors.New("private-driver-message"), statusFailed},
+		} {
+			t.Run(component+"/"+tc.name, func(t *testing.T) {
+				calls := 0
+				check := databaseStatus(t.Context(), func(ctx context.Context) error {
+					calls++
+					deadline, ok := ctx.Deadline()
+					if !ok || time.Until(deadline) > 2*time.Second {
+						t.Fatal("database probe has no bounded deadline")
+					}
+					return tc.err
+				}, component, tc.prefer, now)
+				if calls != 1 || check.Component != component || check.State != tc.want || !check.ObservedAt.AsTime().Equal(now) {
+					t.Fatalf("incorrect database observation: %v", check)
+				}
+				if tc.err != nil {
+					if check.EvidenceAt != nil || check.Summary != "The database connection did not answer." || strings.Contains(check.NextAction, "prefer") {
+						t.Fatalf("binding warning concealed connection failure: %v", check)
+					}
+				} else {
+					if !check.EvidenceAt.AsTime().Equal(now) {
+						t.Fatal("successful connection lost its evidence time")
+					}
+					if tc.prefer {
+						if !strings.Contains(check.Summary, "SCRAM-PLUS channel binding may downgrade") ||
+							!strings.Contains(check.NextAction, "channel_binding=require") ||
+							!strings.Contains(check.NextAction, "explicit choice for a pooler") {
+							t.Fatalf("missing downgrade warning or operator action: %v", check)
+						}
+					} else if strings.Contains(check.Summary, "downgrade") || check.NextAction != "This connection needs no action." {
+						t.Fatalf("strict binding produced a warning: %v", check)
+					}
+				}
+				if strings.Contains(check.String(), "private-driver-message") {
+					t.Fatal("status exposed the driver error")
+				}
+			})
+		}
+	}
+}
+
+func TestDatabaseBindingWarningPreservesUnknownAndPersists(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	probe := func(ctx context.Context, at time.Time) []*adminv1.ServerStatusCheck {
+		checks := make([]*adminv1.ServerStatusCheck, 0, 2)
+		for _, component := range []string{"database", "admin_database"} {
+			checks = append(checks, databaseStatus(ctx, func(context.Context) error { return nil }, component, true, at))
+		}
+		return checks
+	}
+	monitor, err := newStatusMonitor(nil, "", false, probe, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertState := func(want adminv1.ServerStatusState) {
+		t.Helper()
+		for _, component := range []string{"database", "admin_database"} {
+			found := false
+			for _, check := range monitor.snapshot().Checks {
+				if check.Component == component {
+					found = true
+					if check.State != want {
+						t.Fatalf("%s: state %v, want %v", component, check.State, want)
+					}
+				}
+			}
+			if !found {
+				t.Fatalf("missing %s observation", component)
+			}
+		}
+	}
+	assertState(statusUnknown)
+	monitor.collect(t.Context())
+	assertState(statusAttention)
+	now = now.Add(time.Minute)
+	monitor.collect(t.Context())
+	assertState(statusAttention)
+	now = now.Add(3 * time.Minute)
+	assertState(statusUnknown)
+	monitor.collect(t.Context())
+	assertState(statusAttention)
+}
+
+func TestDatabaseChannelBindingStartupWarningIsSecretSafe(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		database      string
+		adminDatabase string
+	}{
+		{"strict", "require", "require"},
+		{"database prefer", "prefer", "require"},
+		{"admin database prefer", "require", "prefer"},
+		{"both prefer", "prefer", "prefer"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			databaseConfig := func(binding string) *pgxpool.Config {
+				t.Helper()
+				cfg, err := pgxpool.ParseConfig("postgresql://private-user:private-password@private-host/private-database?channel_binding=" + binding)
+				if err != nil {
+					t.Fatal("parse test database configuration")
+				}
+				return cfg
+			}
+			resources := &config.Resources{
+				Database:      databaseConfig(tc.database),
+				AdminDatabase: databaseConfig(tc.adminDatabase),
+			}
+			var buffer bytes.Buffer
+			logger := slog.New(slog.NewJSONHandler(&buffer, nil))
+			warnDatabaseChannelBinding(logger, resources)
+			wantDatabase := tc.database == "prefer"
+			wantAdminDatabase := tc.adminDatabase == "prefer"
+			if !wantDatabase && !wantAdminDatabase {
+				if buffer.Len() != 0 {
+					t.Fatal("strict binding emitted a startup warning")
+				}
+				return
+			}
+			logged := buffer.String()
+			if strings.Count(logged, "\n") != 1 {
+				t.Fatal("startup emitted more than one downgrade warning")
+			}
+			for _, forbidden := range []string{"private-", "postgresql://", "password", "sslkey"} {
+				if strings.Contains(logged, forbidden) {
+					t.Fatal("startup warning exposed database connection details")
+				}
+			}
+			var record map[string]any
+			if err := json.Unmarshal(buffer.Bytes(), &record); err != nil {
+				t.Fatal(err)
+			}
+			if len(record) != 7 || record["level"] != "WARN" ||
+				record["msg"] != "SCRAM-PLUS channel binding may downgrade" ||
+				record["channel_binding"] != "prefer" ||
+				record["database_downgrade_allowed"] != wantDatabase ||
+				record["admin_database_downgrade_allowed"] != wantAdminDatabase ||
+				record["next_action"] != "Enable SCRAM-PLUS and set channel_binding=require; pooler prefer is an explicit operator choice." {
+				t.Fatal("startup warning omitted the safe binding policy or operator action")
+			}
+		})
+	}
+}
 
 func TestStatusObservationMissingStaleAndIsolation(t *testing.T) {
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)

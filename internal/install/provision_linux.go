@@ -209,14 +209,21 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 	for i, item := range []struct {
 		role, path, ca string
 	}{{"lindm_runtime", "/etc/lindm/database-url", "/etc/lindm/database-ca.crt"}, {"lindm_migrator", "/etc/lindm/migrate/database-url", "/etc/lindm/migrate/database-ca.crt"}} {
-		u := &url.URL{Scheme: "postgresql", Host: "localhost:" + port, Path: "/lindm", User: url.UserPassword(item.role, passwords[i])}
-		q := url.Values{"sslmode": {"verify-full"}, "sslrootcert": {item.ca}}
-		u.RawQuery = q.Encode()
-		if err := newDatabaseURL(item.path, []byte(u.String()+"\n")); err != nil {
+		if err := newDatabaseURL(item.path, []byte(localDatabaseURL(item.role, passwords[i], port, item.ca))); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func localDatabaseURL(role, password, port, ca string) string {
+	u := &url.URL{Scheme: "postgresql", Host: "localhost:" + port, Path: "/lindm", User: url.UserPassword(role, password)}
+	q := url.Values{
+		"sslmode": {"verify-full"}, "sslrootcert": {ca},
+		"channel_binding": {"require"}, "require_auth": {"scram-sha-256"},
+	}
+	u.RawQuery = q.Encode()
+	return u.String() + "\n"
 }
 
 func sqlLocal(ctx context.Context, sql, database string) error {

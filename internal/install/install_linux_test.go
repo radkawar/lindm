@@ -6,8 +6,13 @@ package install
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,5 +156,87 @@ func TestGeneratedAuthorityKeysSeparateAndConstrained(t *testing.T) {
 	}
 	if _, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDatabaseAuthoritySupportsCertificateBoundSCRAM(t *testing.T) {
+	ca, key, err := newDatabaseCertificateAuthority("database authority")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if key.Curve != elliptic.P256() || ca.SignatureAlgorithm != x509.ECDSAWithSHA256 ||
+		!ca.IsCA || !ca.BasicConstraintsValid || !ca.MaxPathLenZero ||
+		ca.KeyUsage != x509.KeyUsageCertSign|x509.KeyUsageCRLSign {
+		t.Fatal("database authority must be constrained P-256 with SHA-256 signatures")
+	}
+	if err := ca.CheckSignatureFrom(ca); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := privateKeyPEM(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(encoded)
+	block, rest := pem.Decode(encoded)
+	if block == nil || block.Type != "PRIVATE KEY" || len(rest) != 0 {
+		t.Fatal("database custody must contain exact PKCS8 PEM")
+	}
+	defer clear(block.Bytes)
+	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recovered, ok := parsed.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatal("database custody lost the ECDSA key")
+	}
+	if !recovered.Equal(key) {
+		t.Fatal("database custody key does not match its authority")
+	}
+	path := filepath.Join(t.TempDir(), "postgresql")
+	if err := issueServerCertificate(path, "database server", []string{"localhost", "127.0.0.1", "::1"}, ca, key, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	pair, err := tls.LoadX509KeyPair(path+".crt", path+".key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafKey, ok := pair.PrivateKey.(ed25519.PrivateKey)
+	if !ok {
+		t.Fatal("database server private key unexpectedly changed")
+	}
+	defer clear(leafKey)
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leaf.SignatureAlgorithm != x509.ECDSAWithSHA256 {
+		t.Fatal("database server certificate lacks a SCRAM-PLUS-compatible hash")
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(ca)
+	for _, name := range []string{"localhost", "127.0.0.1", "::1"} {
+		if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: name}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestLocalDatabaseURLsRequireBoundSCRAMForBothRoles(t *testing.T) {
+	for _, role := range []string{"lindm_runtime", "lindm_migrator"} {
+		t.Run(role, func(t *testing.T) {
+			connection, err := url.Parse(strings.TrimSpace(localDatabaseURL(role, "fixture-password", "15432", "/fixture/database-ca.crt")))
+			if err != nil {
+				t.Fatal("generated database URL is invalid")
+			}
+			q := connection.Query()
+			if q.Get("channel_binding") != "require" || q.Get("require_auth") != "scram-sha-256" ||
+				q.Get("sslmode") != "verify-full" || q.Get("sslrootcert") != "/fixture/database-ca.crt" {
+				t.Fatal("generated local database URL permits unbound or unverified authentication")
+			}
+			if connection.User.Username() != role {
+				t.Fatal("generated URL changed its restricted role")
+			}
+		})
 	}
 }
