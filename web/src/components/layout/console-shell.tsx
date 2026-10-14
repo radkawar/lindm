@@ -14,7 +14,7 @@ import {
   PanelLeftOpenIcon,
   SettingsIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { SessionPrincipal } from "../../../gen/lindm/auth/v1/auth_pb";
 import { ThemeToggle } from "./theme-toggle";
 import { BreadcrumbTitleContext } from "./breadcrumb-title";
@@ -68,6 +68,7 @@ export function ConsoleShell({
   onLogout,
   children,
   commandPalette,
+  tooltipContainer,
 }: {
   userLabel: string;
   role: string;
@@ -76,6 +77,7 @@ export function ConsoleShell({
   onLogout: () => void;
   children: ReactNode;
   commandPalette: ReactNode;
+  tooltipContainer: RefObject<HTMLElement | null>;
 }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [recordTitle, setRecordTitle] = useState<string | null>(null);
@@ -236,7 +238,7 @@ export function ConsoleShell({
   );
 
   return (
-    <TooltipProvider>
+    <TooltipProvider container={tooltipContainer}>
       <div
         className="flex min-h-svh w-full bg-background"
         data-shell

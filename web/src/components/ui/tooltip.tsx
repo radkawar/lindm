@@ -6,10 +6,22 @@
 "use client";
 
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import { createContext, useContext } from "react";
 import { cn } from "cn";
 
-function TooltipProvider({ delay = 0, ...props }: TooltipPrimitive.Provider.Props) {
-  return <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />;
+const TooltipContainerContext =
+  createContext<TooltipPrimitive.Portal.Props["container"]>(undefined);
+
+function TooltipProvider({
+  delay = 0,
+  container,
+  ...props
+}: TooltipPrimitive.Provider.Props & Pick<TooltipPrimitive.Portal.Props, "container">) {
+  return (
+    <TooltipContainerContext value={container}>
+      <TooltipPrimitive.Provider data-slot="tooltip-provider" delay={delay} {...props} />
+    </TooltipContainerContext>
+  );
 }
 
 function Tooltip({ ...props }: TooltipPrimitive.Root.Props) {
@@ -30,8 +42,9 @@ function TooltipContent({
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<TooltipPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
+  const container = useContext(TooltipContainerContext);
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal container={container}>
       <TooltipPrimitive.Positioner
         align={align}
         alignOffset={alignOffset}

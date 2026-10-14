@@ -27,6 +27,9 @@ export async function reviewShell({ page, prefix, desktop, probe, screenshot, ax
     await hint.waitFor();
     require((await hint.getAttribute("role")) ===
       "tooltip", "The page navigation hint has no tooltip semantics");
+    require(await hint.evaluate(
+      (node) => node.closest("main") !== null,
+    ), "The page navigation hint is outside its page landmark");
     await toggle.click();
     require((await toggle.getAttribute("aria-expanded")) ===
       "false", "The page column does not collapse");

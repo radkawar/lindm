@@ -2,7 +2,7 @@
 
 import { createFileRoute, Outlet, redirect, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ConsoleShell } from "@/components/layout/console-shell";
 import { accountLabel } from "@/features/auth/session";
 import { logout, sessionIdentity, sessionQueryOptions } from "@/features/auth/queries";
@@ -41,6 +41,7 @@ function AuthenticatedLayout() {
   const lifetime = useSyncExternalStore(subscribeAuthLifetime, getAuthLifetime);
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<RpcFailure | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     // The background recheck found the session ended: sign in, then return here.
@@ -66,6 +67,7 @@ function AuthenticatedLayout() {
       role={principal.role}
       principal={principal}
       loggingOut={loggingOut}
+      tooltipContainer={mainRef}
       commandPalette={
         <CommandPalette key={lifetime.generation} principal={principal} lifetime={lifetime} />
       }
@@ -95,7 +97,7 @@ function AuthenticatedLayout() {
       {logoutError ? <RpcError failure={logoutError} title="Sign-out failed" /> : null}
       <AuthLifetimeContext key={lifetime.generation} value={lifetime}>
         <PrincipalContext value={principal}>
-          <main id="main" tabIndex={-1} className="min-w-0 outline-none">
+          <main ref={mainRef} id="main" tabIndex={-1} className="min-w-0 outline-none">
             <Outlet />
           </main>
           <Toaster />
