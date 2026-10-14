@@ -208,6 +208,9 @@ func TestLandCommitsPushesAndRollsBack(t *testing.T) {
 	if pushed := gitT(t, repo.Main, "--git-dir", remote, "log", "-1", "--format=%s", Trunk); pushed != "land the work" {
 		t.Fatalf("remote tip %q", pushed)
 	}
+	if signoff := gitT(t, repo.Main, "show", "-s", "--format=%(trailers:key=Signed-off-by,valueonly)", "HEAD"); signoff != "dev <dev@example.invalid>" {
+		t.Fatalf("landing DCO trailer %q", signoff)
+	}
 	if _, err := os.Stat(filepath.Join(repo.Main, "landed.txt")); err != nil {
 		t.Fatal(err)
 	}

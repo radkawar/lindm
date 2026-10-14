@@ -394,7 +394,7 @@ func (r *Repository) Land(ctx context.Context, change Change, message string, ga
 		return restore(fmt.Errorf("nothing to land: %s changes only derived content, and deriving it changed nothing on %s", change.Source, Trunk))
 	}
 	// The gate has just run; hooks would only repeat it.
-	if _, err := git(ctx, r.Main, "commit", "--quiet", "--no-verify", "-m", message); err != nil {
+	if _, err := git(ctx, r.Main, "commit", "--quiet", "--no-verify", "--signoff", "-m", message); err != nil {
 		return restore(err)
 	}
 	if _, err := git(ctx, r.Main, "push", "--quiet", "--no-verify", remote, "HEAD:refs/heads/"+remoteBranch); err != nil {

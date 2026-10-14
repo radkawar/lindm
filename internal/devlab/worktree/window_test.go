@@ -102,6 +102,9 @@ func TestGateCommitCommitsOnlyWhatTheGateVerified(t *testing.T) {
 	if err := repo.GateCommit(ctx, "verified", func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
+	if signoff := gitT(t, repo.Main, "show", "-s", "--format=%(trailers:key=Signed-off-by,valueonly)", "HEAD"); signoff != "dev <dev@example.invalid>" {
+		t.Fatalf("gate-commit DCO trailer %q", signoff)
+	}
 	if files := gitT(t, repo.Main, "show", "--name-only", "--format=", "HEAD"); files != "README\nnew.txt" {
 		t.Fatalf("committed %q", files)
 	}

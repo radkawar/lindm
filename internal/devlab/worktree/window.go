@@ -230,6 +230,6 @@ func (r *Repository) GateCommit(ctx context.Context, message string, gate func()
 		_, resetErr := git(ctx, r.Main, "reset", "--quiet")
 		return errors.Join(fmt.Errorf("staged %v, not the verified change %v; nothing committed", got, names), resetErr)
 	}
-	_, err = git(ctx, r.Main, "commit", "--quiet", "--no-verify", "-m", message)
+	_, err = git(ctx, r.Main, "commit", "--quiet", "--no-verify", "--signoff", "-m", message)
 	return err
 }

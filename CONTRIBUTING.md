@@ -123,6 +123,10 @@ required beyond the DCO. Preserve the licenses and notices of third-party materi
 DCO sign-off is different from `make signoff`. The latter is a maintainer verification
 command, not a way to add the DCO trailer.
 
+`cmd/dev land` and `cmd/dev gate-commit` add the configured committer's own DCO
+trailer. Before you use these commands, check that your Git identity can certify the
+change. They do not add trailers for recorded coauthors.
+
 ## Open a pull request
 
 Describe intent, user-visible behavior, threat and compatibility impact, affected
