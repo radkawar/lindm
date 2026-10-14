@@ -7868,9 +7868,12 @@ of exact installed distro builds. New qualification must collect those versions,
 distro patch correspondence and the actual Clipboard wire/grant behavior.
 
 Tier 1 is implemented and partially qualified: qualified on Ubuntu 24.04 x86_64
-(GNOME 46 Wayland) by `ubuntu24-tier1-27`; Fedora 44 x86_64 is blocked on `monitors`
-by a GNOME Shell crash; aarch64 reruns are blocked: lab hosts offline. The runs
-below used `lab vm assistance` with every maintained scenario. Records are under
+(GNOME 46 Wayland) by `ubuntu24-tier1-27`. The historical Fedora 44 x86_64 full
+record failed `monitors` because GNOME Shell crashed; the current
+[scoped native mitigation proof](#native-cursor-mitigation-and-source-removal-proof)
+passes that diagnostic but does not replace the full Tier 1 record. Aarch64
+reruns are blocked: lab hosts offline. The historical runs below used
+`lab vm assistance` with every maintained scenario. Records are under
 `$HOME/.cache/lindm-assistance-roadmap-20261011/`:
 
 | Record                                 | Source       | Platform             | Outcome                                                                                                                                                                                                                                                                                     | SHA-256                                                            |
@@ -7903,35 +7906,170 @@ equivalent Ubuntu run. Evidence is `fedora44-tier1-27` and
 `/home/r/.cache/lindm-assistance-roadmap-20261011/fedora44-monitors-fix-10/journal-coredump.txt`
 and `journal-kernel.txt` in that same directory. lindm fails closed: the session
 ends with no fallback. Monitor-selection qualification on Fedora 44 is blocked
-by this upstream defect. **Mitigation pending, landing separately:** lindm avoids
-the embedded-cursor path on GNOME 50 by selecting METADATA, with HIDDEN plus a
-viewer note as fallback; this is not yet qualified by these records.
+by this upstream defect in those historical records. The cursor-mode cutover
+uses HIDDEN on running GNOME Shell 50 and later, with the visible viewer notice
+**Cursor isn't shown on this desktop version**; GNOME 49 and earlier retains
+EMBEDDED. The historical crash records above do not qualify this mitigation.
 Fedora 44 x86_64 displays therefore stays implemented, and its clipboard, keyboard
 and message rows stay partial: they passed with independent witnesses in the same
 run, but Tier 1 qualification is per run, so they are passed, not qualified.
 The presented display-generation fence is not exercised by the maintained
 scenarios and stays not run on both platforms.
 
-| Capability / maintained scenario requirement | Ubuntu 24.04 x86_64, GNOME 46 Wayland               | Fedora 44 x86_64, GNOME 50 Wayland                                                                     | Required independent evidence                                                                                                                                                                                                     |
-| -------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Clipboard text round-trip                    | Qualified (`ubuntu24-tier1-27`)                     | Passed (`fedora44-tier1-27`)                                                                           | Fresh nonce copied in each direction into the actual opposite clipboard, policy/consent denial, bounds, withdrawal and session-end refusal                                                                                        |
-| Clipboard policy and permission boundaries   | Qualified (`ubuntu24-tier1-27`)                     | Passed (`fedora44-tier1-27`)                                                                           | Real restrictive device-policy mutation and separately authenticated missing-capability creator, exact denial audit, unchanged native clipboard and terminated authority where required                                           |
-| Special keys and keyboard layouts            | Qualified (`ubuntu24-tier1-27`)                     | Passed (`fedora44-tier1-27`)                                                                           | Guest-observed shortcut effect after Take control, differing layouts, canonical Euro/Cyrillic symbols, physical y/z, modifier release and no stuck keys                                                                           |
-| Full screen and scaling                      | Qualified (`ubuntu24-tier1-27`)                     | Passed (`fedora44-tier1-27`)                                                                           | Browser full screen, fit/actual size and correct guest input coordinates without expanding capture authority                                                                                                                      |
-| Monitor selection                            | Qualified (`ubuntu24-tier1-27`)                     | Failed: gnome-shell (mutter 50.0) SIGSEGV on selected-head unplug; upstream defect under investigation | Two-head virtio-gpu guest, distinct per-head markers, granted stream selection, pointer mapping and hot-unplug refusal                                                                                                            |
-| Presented display-generation fence           | Not run                                             | Not run                                                                                                | Actual emitted RTP identity and browser-presented metadata agree before input; reordered metadata/frame, timestamp wrap and stale-frame refusal regressions                                                                       |
-| Operator-to-user notifications               | Qualified (`ubuntu24-tier1-27`)                     | Passed (`fedora44-tier1-27`)                                                                           | Guest screenshot visibly containing message nonce and correct operator identity; wrong-session denial                                                                                                                             |
-| File transfer, admin-to-user                 | Not run                                             | Not run                                                                                                | Downloads file independently hashed, visible completion notification, locally accepted with all remote input paused, no overwrite/execute/traversal/symlink escape; size/type and cancellation tests; independent security review |
-| File transfer, user-to-admin                 | Not run                                             | Not run                                                                                                | Actual portal FileChooser selection/cancel with remote input paused, operator cannot approve/select, descriptor-bound regular file and received SHA-256; no arbitrary remote path; permission/size/type rejection                 |
-| Reconnect after reboot                       | Not run                                             | Not run                                                                                                | Real reboot, ended old grant, new device epoch/session and fresh consent; expiry/revocation and no pre-consent media/input                                                                                                        |
-| Reconnect after logout                       | Not run                                             | Not run                                                                                                | Real logout/login, changed-user isolation, fresh consent and rejected stale session/credentials                                                                                                                                   |
-| Recording                                    | Not run                                             | Not run                                                                                                | Visible recording disclosure, playable known screen changes, encrypted-at-rest evidence, retrieval denial, retention deletion, storage failure and termination boundary                                                           |
-| Unattended access                            | Not run; owner approved implementation after Tier 2 | Not run; owner approved implementation after Tier 2                                                    | Native persistent-grant capability, local opt-in, independent approval, banner/stop, expiry/revocation and lock/login-screen denial; independent security review before landing                                                   |
-| Elevation-prompt guidance                    | Not run                                             | Not run                                                                                                | Real polkit prompt with employee-only typing and remote input paused; no credential collection or bypass                                                                                                                          |
-| Pointer/annotation                           | Not run                                             | Not run                                                                                                | Native overlay permission, actual guest-visible marks, stream/scaling alignment, local input unaffected and clear/stop                                                                                                            |
-| Audio                                        | Not run                                             | Not run                                                                                                | Separate source consent, known tone received, microphone distinction, local mute and stop/revocation                                                                                                                              |
-| KDE Plasma qualification                     | Not run; owner approved qualification after Tier 2  | Not run; owner approved qualification after Tier 2                                                     | Pinned Plasma/KWin/portal-kde versions and independent consent/input/notification/lock plus each supported Tier 1/2 scenario                                                                                                      |
-| X11 qualification                            | Not run                                             | Not run                                                                                                | Explicit portal-backed capture/input and local stop, no silent X11 fallback, UID/seat/lock/logout isolation                                                                                                                       |
+##### GNOME cursor transport decision and deterministic review
+
+The owner-authorized HIDDEN fallback avoids claiming a cursor overlay that the
+existing external GStreamer pipeline cannot faithfully deliver. Fedora's pinned
+`pipewire-gstreamer=1.6.2-1.fc44` source
+[`src/gst/gstpipewiresrc.c`, lines 812–817](https://github.com/PipeWire/pipewire/blob/1.6.2/src/gst/gstpipewiresrc.c#L812-L817)
+turns `SPA_META_Cursor` into a zero-size position ROI, dropping bitmap/hotspot
+and producing no `GstVideoOverlayComposition`. Upstream source SHA-256:
+`46daf60966b2210ca3f0158a41a9d04e94dfd27ff990398b66c1d0640ec2db16`.
+Ubuntu's pinned `gstreamer1.0-pipewire=1.0.5-1ubuntu3.3` source
+[`src/gst/gstpipewiresrc.c`, lines 1055–1069](https://github.com/PipeWire/pipewire/blob/1.0.5/src/gst/gstpipewiresrc.c#L1055-L1069)
+negotiates header, crop and video-transformation metadata only; no cursor
+conversion is present. Upstream source SHA-256:
+`c3edb98be06d584a945ae68ba0356a29ccd0da7fe318c7360d780a538a74caaa`.
+The encoder transports no GStreamer cursor metadata records to the peer. This
+source research is not a native METADATA experiment or a claim that HIDDEN
+displays a cursor. Source record:
+`$HOME/.cache/lindm-assistance-roadmap-20261011/cursor-pipewiresrc-source-evidence.json`,
+SHA-256 `c1a39079184ea6ae32f43c3deb02afc3dd171f007e825f59b70765ccbbccce7d`.
+
+The first real HIDDEN experiment (`cursor-hidden-fedora44-monitors-05`) selected
+GNOME 50.0 `cursor_mode=1`, displayed the fixed notice and avoided the compositor
+SIGSEGV, but correctly **failed** the unplug scenario: the session stayed active
+and live `imagefreeze` replayed the removed source. That is not a mitigation pass.
+Pinned GStreamer
+[1.28.1 `gstimagefreeze.c`, lines 724–737](https://github.com/GStreamer/gstreamer/blob/1.28.1/subprojects/gst-plugins-good/gst/imagefreeze/gstimagefreeze.c#L724-L737)
+and
+[1.24.2, lines 631–643](https://github.com/GStreamer/gstreamer/blob/1.24.2/subprojects/gst-plugins-good/gst/imagefreeze/gstimagefreeze.c#L631-L643)
+drop input EOS once a frame exists; respective upstream source SHA-256 values are
+`9a16f68cbec291421bd1cf110d3524d783fa8f7ef1575637572c652dfad0379c` and
+`30f19d87bfd1e4351cd57ff9197dbf9bda9e06e8948f27bab50b5e875d8e79a2`.
+PipeWire 1.6.2 additionally
+[defaults to no disconnect action](https://github.com/PipeWire/pipewire/blob/1.6.2/src/gst/gstpipewiresrc.c#L51).
+The capture fix probes the actual plugin property and requests
+[`on-disconnect=error`](https://github.com/PipeWire/pipewire/blob/1.6.2/src/gst/gstpipewiresrc.c#L620-L675)
+when supported. A dedicated non-async fakesink forwarding bin before
+`imagefreeze` also observes source EOS independently of duplicated frames.
+Native lifecycle stdout is bounded and separated from RTP on inherited fd 4;
+loss or overflow ends capture, and no other monitor is selected.
+
+The legacy Ubuntu `cursor-embedded-ubuntu24-control-monitors-05` regression did
+pass control and hot-unplug with GNOME 46.0 `cursor_mode=2`. Its PipeWire 1.0.5
+source ended with `stream error: target not found` (`on_state_changed`, line 692)
+and `capture_exited`, despite imagefreeze; the later final-code record is separate.
+KDE's `layers-kde-fedora44-03` tuple also pins PipeWire 1.6.2 and KWin 6.6.4.
+The latter's
+[`outputscreencastsource.cpp`, lines 34–38](https://invent.kde.org/plasma/kwin/-/blob/v6.6.4/src/plugins/screencast/outputscreencastsource.cpp#L34-38)
+closes only the selected removed output. The source's `closed` signal reaches
+[`ScreenCastStream::close`, line 330 and lines 463–480](https://invent.kde.org/plasma/kwin/-/blob/v6.6.4/src/plugins/screencast/screencaststream.cpp#L330),
+then
+[`screencastmanager.cpp`, lines 172–178](https://invent.kde.org/plasma/kwin/-/blob/v6.6.4/src/plugins/screencast/screencastmanager.cpp#L172-178)
+deletes that stream; its
+[`screencaststream.cpp` destructor, lines 357–364](https://invent.kde.org/plasma/kwin/-/blob/v6.6.4/src/plugins/screencast/screencaststream.cpp#L357-364)
+destroys the PipeWire stream. Together with the disconnect-error property this
+provides the selected-source lifecycle observation without a global topology
+watch or a source-idle timeout. All three pinned sources and hashes are in the
+source record above. KDE's single-head six-scenario pass contains **no
+output-removal qualification**; no KDE unplug pass is inferred from source
+research or a GNOME witness. Damage-driven healthy idle desktops must not be
+mistaken for missing outputs.
+
+Deterministic checks passed: `make generate`; `go test -race
+./internal/agent/desktop ./internal/device/assistance`; scoped golangci-lint
+(zero issues); the assistance presentation Node suite (14 tests); web TypeScript,
+scoped ESLint and Prettier. Tests exercise actual private D-Bus SelectSources
+options for GNOME 46/49/50 and unreadable/malformed version fallbacks, protocol
+round-trip and persisted capability projection, consent-policy independence,
+the running-time encoder argument invariants and source-EOS lifecycle/channel
+bounds, and absence of a live limitation notice on ended records or older agents.
+The host GStreamer 1.24.2 finite-video pipeline test exercises real RTP on fd 4,
+source EOS stopping live imagefreeze, descriptor cleanup and observer/process
+reaping; it is not a portal/output-removal qualification.
+
+The self security review introduces no bitmap parser, unbounded allocation or
+new cursor channel: only a boolean on the existing authenticated capability
+report/projection. ShellVersion is read from the current unique D-Bus owner with
+the existing bounded property call; parsed/logged version strings are limited
+to 64 bytes. Unknown GNOME versions choose hidden, non-GNOME preserves existing
+selection, and non-absence owner lookup errors refuse capture. Fixed plain viewer
+text carries no device HTML, URLs or cursor pixels, and the scalar grants no
+input or command authority. The native lifecycle parser accepts only a fixed
+element/event and bounded uint32 sequence in a 4 KiB line; the property probe is
+limited to 64 KiB/10 seconds. RTP framing stays separate and limited to 1500 bytes.
+Channel loss stops only the owned capture process group, and Close joins its
+observer and closes its descriptors. Review record:
+`$HOME/.cache/lindm-assistance-roadmap-20261011/cursor-security-review.json`,
+SHA-256 `48d239e1c3f183e617940202196669a8f75601abefc9bea48df51c5e9f71a6a4`.
+This scoped review is not a general vulnerability certification.
+
+##### Native cursor mitigation and source-removal proof
+
+Source `053387596839f2aff1469016c750b8ae83f2e5bd` passed the required selected
+native diagnostics on cached encrypted x86_64 guests with OVMF Secure Boot:
+`lab vm assistance -hold -scenarios monitors` for Fedora 44 and
+`-hold -scenarios control,monitors` for Ubuntu 24.04. Both used the shared
+repository read-only as `-repo`, the cursor worktree as `-build-repo`, private
+0700 work directories and `-require-cached-golden`. Both reached the post-scenario
+hold and their owned processes were then stopped normally. `-hold` does not emit
+`assistance.json`; these are **scoped diagnostic passes**, not a composed full
+Tier 1 qualification or a claim about aarch64/KDE unplug.
+
+Evidence under `$HOME/.cache/lindm-assistance-roadmap-20261011/`:
+
+| Native diagnostic                              | Observed result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cursor-hidden-fedora44-monitors-06`           | GNOME 50.0 selected `cursor_mode=1` (HIDDEN), capability `cursor_hidden=true`, and `disconnect_errors=true`. Real distinct head markers and pointer clicks on both heads passed. On selected-head unplug the actual source posted **all buffers have been removed / PipeWire link to remote node was destroyed**; capture ended `unavailable/capture_exited`, the peer closed, open input channels became zero and control disappeared without fallback. The native GTK witness still reported Wayland session 5; shell PID 5524 logged nonfatal logical-monitor assertions but no post-unplug shutdown/restart, coredump journal had no entries and kernel journal had no SIGSEGV/ANOM_ABEND. |
+| `cursor-embedded-ubuntu24-control-monitors-06` | GNOME 46.0 selected `cursor_mode=2` (EMBEDDED) for both sessions, and `disconnect_errors=false` on the legacy plugin. Real control input and both-head pointer routing passed. Selected-head unplug posted **stream error: target not found**, ended `unavailable/capture_exited`, closed the peer/input channels and disabled control without fallback.                                                                                                                                                                                                                                                                                                                                       |
+
+`console-monitors-head-0.png` in the Fedora record visibly shows **Cursor isn't
+shown on this desktop version** alongside decoded real guest marker pixels;
+HIDDEN intentionally does not show a cursor. The corresponding Ubuntu screenshot
+shows the embedded guest cursor and no limitation notice. Screenshot capture
+temporarily scrolls the real page to the top and restores the original viewport
+so sticky navigation does not obscure the notice; no state, grants or pixels are
+mocked. Both records also retain head-1 and ended screenshots, GTK marker/pointer
+witnesses, hot-unplug boundaries and helper/compositor/coredump/kernel journals.
+
+The exact invocation parameters, pre-run lab/lindmd binary hashes and per-file
+evidence hashes are in `cursor-native-mitigation-proof.json`, SHA-256
+`49be5f9c6a450dbefb89e0f8939d861e8a3e5d5b17dae1c54cd5539140bb0729`.
+The subsequent SPDX-header and documentation changes do not alter the exercised
+cursor/capture behavior.
+
+Design review is scoped to those actual live desktop and ended screenshots:
+the notice is plain secondary text near the video, does not obstruct guest
+pixels or compete with Stop session/Release control, and disappears for ended
+records and embedded/older agents. The broader `cursor-hidden-ui-review-05`
+runner failed before capture on baseline owner-edit/selector assertions and is
+**not green**; the standalone stable reason-field selector migration `bce021f5`
+passed `make check-web`. **Editing — needs owner review** remains the broader UI
+review disposition, not inferred approval from a native diagnostic.
+
+##### Capability qualification matrix
+
+| Capability / maintained scenario requirement | Ubuntu 24.04 x86_64, GNOME 46 Wayland                                                                          | Fedora 44 x86_64, GNOME 50 Wayland                                                                                          | Required independent evidence                                                                                                                                                                                                     |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Clipboard text round-trip                    | Qualified (`ubuntu24-tier1-27`)                                                                                | Passed (`fedora44-tier1-27`)                                                                                                | Fresh nonce copied in each direction into the actual opposite clipboard, policy/consent denial, bounds, withdrawal and session-end refusal                                                                                        |
+| Clipboard policy and permission boundaries   | Qualified (`ubuntu24-tier1-27`)                                                                                | Passed (`fedora44-tier1-27`)                                                                                                | Real restrictive device-policy mutation and separately authenticated missing-capability creator, exact denial audit, unchanged native clipboard and terminated authority where required                                           |
+| Special keys and keyboard layouts            | Qualified (`ubuntu24-tier1-27`)                                                                                | Passed (`fedora44-tier1-27`)                                                                                                | Guest-observed shortcut effect after Take control, differing layouts, canonical Euro/Cyrillic symbols, physical y/z, modifier release and no stuck keys                                                                           |
+| Full screen and scaling                      | Qualified (`ubuntu24-tier1-27`)                                                                                | Passed (`fedora44-tier1-27`)                                                                                                | Browser full screen, fit/actual size and correct guest input coordinates without expanding capture authority                                                                                                                      |
+| Monitor selection                            | Qualified (`ubuntu24-tier1-27`); final-code diagnostic passed (`cursor-embedded-ubuntu24-control-monitors-06`) | Mitigated; scoped final-code diagnostic passed (`cursor-hidden-fedora44-monitors-06`), not a replacement full Tier 1 record | Two-head virtio-gpu guest, distinct per-head markers, granted stream selection, pointer mapping and hot-unplug refusal                                                                                                            |
+| Presented display-generation fence           | Not run                                                                                                        | Not run                                                                                                                     | Actual emitted RTP identity and browser-presented metadata agree before input; reordered metadata/frame, timestamp wrap and stale-frame refusal regressions                                                                       |
+| Operator-to-user notifications               | Qualified (`ubuntu24-tier1-27`)                                                                                | Passed (`fedora44-tier1-27`)                                                                                                | Guest screenshot visibly containing message nonce and correct operator identity; wrong-session denial                                                                                                                             |
+| File transfer, admin-to-user                 | Not run                                                                                                        | Not run                                                                                                                     | Downloads file independently hashed, visible completion notification, locally accepted with all remote input paused, no overwrite/execute/traversal/symlink escape; size/type and cancellation tests; independent security review |
+| File transfer, user-to-admin                 | Not run                                                                                                        | Not run                                                                                                                     | Actual portal FileChooser selection/cancel with remote input paused, operator cannot approve/select, descriptor-bound regular file and received SHA-256; no arbitrary remote path; permission/size/type rejection                 |
+| Reconnect after reboot                       | Not run                                                                                                        | Not run                                                                                                                     | Real reboot, ended old grant, new device epoch/session and fresh consent; expiry/revocation and no pre-consent media/input                                                                                                        |
+| Reconnect after logout                       | Not run                                                                                                        | Not run                                                                                                                     | Real logout/login, changed-user isolation, fresh consent and rejected stale session/credentials                                                                                                                                   |
+| Recording                                    | Not run                                                                                                        | Not run                                                                                                                     | Visible recording disclosure, playable known screen changes, encrypted-at-rest evidence, retrieval denial, retention deletion, storage failure and termination boundary                                                           |
+| Unattended access                            | Not run; owner approved implementation after Tier 2                                                            | Not run; owner approved implementation after Tier 2                                                                         | Native persistent-grant capability, local opt-in, independent approval, banner/stop, expiry/revocation and lock/login-screen denial; independent security review before landing                                                   |
+| Elevation-prompt guidance                    | Not run                                                                                                        | Not run                                                                                                                     | Real polkit prompt with employee-only typing and remote input paused; no credential collection or bypass                                                                                                                          |
+| Pointer/annotation                           | Not run                                                                                                        | Not run                                                                                                                     | Native overlay permission, actual guest-visible marks, stream/scaling alignment, local input unaffected and clear/stop                                                                                                            |
+| Audio                                        | Not run                                                                                                        | Not run                                                                                                                     | Separate source consent, known tone received, microphone distinction, local mute and stop/revocation                                                                                                                              |
+| KDE Plasma qualification                     | Not run; owner approved qualification after Tier 2                                                             | Not run; owner approved qualification after Tier 2                                                                          | Pinned Plasma/KWin/portal-kde versions and independent consent/input/notification/lock plus each supported Tier 1/2 scenario                                                                                                      |
+| X11 qualification                            | Not run                                                                                                        | Not run                                                                                                                     | Explicit portal-backed capture/input and local stop, no silent X11 fallback, UID/seat/lock/logout isolation                                                                                                                       |
 
 Other architectures, Ubuntu 26.04, Fedora 43, derivatives and physical hardware
 remain **not run** for these added capabilities unless a later exact-platform

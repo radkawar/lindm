@@ -2880,6 +2880,53 @@ Each side sends its complete current state, never a stream of events:
      portal has forwarded the clipboard owner announcement that follows Start,
      which portal 1.21.1 would otherwise deadlock on
      ([Fedora](platforms/fedora.md#desktop-session-helper-and-remote-assistance)).
+     Source lifetime is observed separately from duplicated video: a zero-copy
+     tee before `imagefreeze` feeds a dedicated forwarding bin with one
+     `fakesink` (`sync=false`, `async=false`, `enable-last-sample=false`).
+     It holds no extra samples. With no seeks or async messages, its forwarded
+     event means source EOS. The fixed native-tool bus event is
+     parsed on stdout with a 4 KiB line bound; RTP stays separate on inherited
+     fd 4 with its existing 1500-byte frame bound. EOS, loss or overflow of the
+     lifecycle channel cancels the encoder group; Close reaps it, closes the
+     RTP descriptor and joins the observer. This avoids
+     [`imagefreeze` consuming upstream EOS after a buffer](https://github.com/GStreamer/gstreamer/blob/1.28.1/subprojects/gst-plugins-good/gst/imagefreeze/gstimagefreeze.c#L724-L737).
+     A bounded `gst-inspect` property probe (64 KiB, 10 seconds) selects
+     `pipewiresrc on-disconnect=error` when supported, independently of the
+     compositor. PipeWire 1.6.2 otherwise defaults to `none`; its
+     [selected-source buffer-removal error](https://github.com/PipeWire/pipewire/blob/1.6.2/src/gst/gstpipewiresrc.c#L620-L675)
+     stops capture rather than replaying a disappeared output. Older plugins
+     keep their source-error/EOS and portal Closed paths. No unrelated
+     compositor-wide topology change revokes the session, and no fallback
+     monitor is selected.
+   - Cursor selection probes the running `org.gnome.Shell` owner's
+     `ShellVersion` property over the bounded session-bus call. GNOME ≤49
+     keeps `EMBEDDED` when advertised. GNOME ≥50 (or an unreadable version
+     from a running GNOME Shell) uses `HIDDEN`, never embedded: Mutter 50's
+     embedded hardware-cursor inhibitor crashes when a cast monitor is removed.
+     Other desktops keep their existing advertised-mode selection.
+     The owner-authorized hidden fallback is necessary because
+     [PipeWire 1.6.2 `gstpipewiresrc.c`, lines 812–817](https://github.com/PipeWire/pipewire/blob/1.6.2/src/gst/gstpipewiresrc.c#L812-L817)
+     translates `SPA_META_Cursor` to a zero-size cursor-position ROI, discarding
+     bitmap and hotspot; it does not produce `GstVideoOverlayComposition`.
+     The inspected source SHA-256 is
+     `46daf60966b2210ca3f0158a41a9d04e94dfd27ff990398b66c1d0640ec2db16`;
+     the source record is
+     `$HOME/.cache/lindm-assistance-roadmap-20261011/cursor-pipewiresrc-source-evidence.json`.
+     Fedora's pinned `pipewire-gstreamer=1.6.2-1.fc44` is built from that source.
+     Ubuntu's pinned `gstreamer1.0-pipewire=1.0.5-1ubuntu3.3` uses
+     [PipeWire 1.0.5 `gstpipewiresrc.c`, lines 1055–1069](https://github.com/PipeWire/pipewire/blob/1.0.5/src/gst/gstpipewiresrc.c#L1055-L1069):
+     only header, crop and video-transformation metadata are requested, with
+     no cursor conversion. Its upstream source SHA-256 is
+     `c3edb98be06d584a945ae68ba0356a29ccd0da7fe318c7360d780a538a74caaa`.
+     Only encoded RTP reaches the peer; this pipeline cannot transport a faithful
+     frame-synchronized cursor to the browser. The separate native lifecycle
+     observer carries no cursor data. No synthetic pointer overlay or new cursor
+     data channel is introduced.
+     `AssistanceCapabilities.cursor_hidden` carries this capture limitation
+     through the existing authenticated report/projection path, independently
+     of all input authority. A live viewer displays
+     **Cursor isn't shown on this desktop version**. Ended records do not
+     retain a live limitation notice.
    - The helper offers, non-trickle and relay-only, and the browser answers. A
      data channel exists only for granted control. Its bounded JSON input events
      (at most 256 bytes and 240 per second) become portal

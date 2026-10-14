@@ -115,16 +115,17 @@ func (n *fakeNotifier) next(t *testing.T, summary string) *fakeNotice {
 }
 
 type fakeGrant struct {
-	control   bool
-	closed    chan struct{}
-	mu        sync.Mutex
-	injected  []InputEvent
-	closes    int
-	streams   []Stream
-	clipboard bool
-	text      string
-	writes    int
-	selected  string
+	control      bool
+	closed       chan struct{}
+	mu           sync.Mutex
+	injected     []InputEvent
+	closes       int
+	streams      []Stream
+	clipboard    bool
+	text         string
+	writes       int
+	selected     string
+	cursorHidden bool
 }
 
 func (g *fakeGrant) Streams() []Stream {
@@ -139,6 +140,7 @@ func (g *fakeGrant) SelectStream(id string) error {
 	g.selected = id
 	return nil
 }
+func (g *fakeGrant) CursorHidden() bool      { return g.cursorHidden }
 func (g *fakeGrant) ClipboardGranted() bool  { return g.clipboard }
 func (g *fakeGrant) ClipboardReason() string { return "" }
 func (g *fakeGrant) KeyboardGranted() bool   { return g.control }

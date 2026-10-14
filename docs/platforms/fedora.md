@@ -849,7 +849,8 @@ installs stay lean:
 - `gstreamer1`, which provides `gst-launch-1.0` (installed under `/usr/sbin` on
   Fedora 44; the helper resolves it through `PATH`).
 
-The helper checks all eight elements with `gst-inspect-1.0`. If any is missing it
+The helper checks the required capture elements, including the source-lifecycle
+`tee`, forwarding `bin` and `fakesink`, with `gst-inspect-1.0`. If any is missing it
 ends the session as `UNAVAILABLE` with detail `gst_element_missing:<name>`. There
 is no X11 or screenshot fallback.
 
@@ -963,15 +964,28 @@ monitor is unplugged during a RemoteDesktop + ScreenCast portal session using
 `meta_cursor_renderer_native_update_cursor` ←
 `meta_monitor_manager_notify_monitors_changed` ← `on_kms_resources_changed`.
 The same unchecked code is present through Mutter 50.3; GNOME 46 is unaffected.
-See [`fedora44-tier1-27`](../verification.md#commercial-assistance-capability-qualification)
-and `/home/r/.cache/lindm-assistance-roadmap-20261011/fedora44-monitors-fix-10/journal-coredump.txt`
-and `journal-kernel.txt` in that directory. lindm fails closed (the session ends;
-no fallback), so Fedora 44 monitor-selection qualification is blocked by this
-upstream defect.
+The original [`fedora44-tier1-27`](../verification.md#commercial-assistance-capability-qualification)
+and `fedora44-monitors-fix-10` journals preserve the crash, not a product pass.
 
-**Mitigation pending, landing separately:** lindm avoids the embedded-cursor path
-on GNOME 50 using METADATA, with HIDDEN plus a viewer note as fallback. The crash
-records above do not qualify that mitigation.
+**Mitigated:** lindm probes the current GNOME Shell version and requests HIDDEN
+on GNOME 50 or newer; GNOME 49 and older retain EMBEDDED. The pinned `pipewiresrc`
+cannot deliver the cursor bitmap and hotspot to this external encoder, so the
+console visibly states **Cursor isn't shown on this desktop version** rather than
+drawing a fake cursor. Capture also requests `on-disconnect=error` when the actual
+plugin supports it and observes source EOS before live `imagefreeze`; selected
+source removal ends capture without silently replaying it or selecting another
+monitor. Unrelated topology changes and healthy damage-driven idle are not
+revocation triggers.
+
+The OVMF Secure Boot, cached encrypted Fedora 44 x86_64 diagnostic
+`cursor-hidden-fedora44-monitors-06` passed real two-head selection, pointer
+routing and selected-head unplug: the session ended `unavailable/capture_exited`,
+media/input closed, and GNOME 50 survived with no coredump or kernel SIGSEGV.
+Its live console screenshot shows the notice alongside the actual head marker.
+The matching Ubuntu 24.04 `control,monitors` regression retained GNOME 46
+EMBEDDED. See the [scoped native proof](../verification.md#native-cursor-mitigation-and-source-removal-proof)
+for hashes and limits: these `-hold` diagnostics are not a replacement for a
+complete Tier 1 qualification record or an aarch64 rerun.
 
 ## Advisory feeds
 

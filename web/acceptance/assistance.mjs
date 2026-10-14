@@ -638,7 +638,15 @@ const commands = {
   async screenshot(args) {
     if (!/^[a-z0-9-]{1,80}\.png$/.test(args.name ?? "")) throw new Error("invalid_screenshot_name");
     const path = join(config.evidenceDirectory, args.name);
-    await writePrivate(path, await driver.screenshot());
+    // Full-page captures otherwise paint the sticky header over the scrolled
+    // video's cursor notice. Restore the viewport without changing session state.
+    const viewport = await driver.page.evaluate(() => [window.scrollX, window.scrollY]);
+    await driver.page.evaluate(() => window.scrollTo(0, 0));
+    try {
+      await writePrivate(path, await driver.screenshot());
+    } finally {
+      await driver.page.evaluate(([x, y]) => window.scrollTo(x, y), viewport);
+    }
     return { path: args.name };
   },
   async leave(args) {

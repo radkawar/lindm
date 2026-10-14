@@ -88,6 +88,8 @@ var ErrPortalCancelled = errors.New("portal_cancelled")
 type Grant interface {
 	// Streams contains only monitors returned by the local portal picker.
 	Streams() []Stream
+	// CursorHidden reports an intentional capture limitation, not input authority.
+	CursorHidden() bool
 	// SelectStream changes pointer mapping to a granted monitor.
 	SelectStream(id string) error
 	// ClipboardGranted requires RequestClipboard and clipboard_enabled at Start.

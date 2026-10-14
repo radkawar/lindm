@@ -49,7 +49,11 @@ import { policyMode, type CapabilityField } from "./capabilities";
 import { AssistanceControls } from "./controls";
 import { useAssistanceCommand } from "./commands";
 import { InputCapture, videoFramePoint, type KeyboardMode } from "./input";
-import { DisplayPresentationFence, parseDisplayFrameMarker } from "./presentation";
+import {
+  cursorVisibilityNote,
+  DisplayPresentationFence,
+  parseDisplayFrameMarker,
+} from "./presentation";
 import { assistanceSessionQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
 
@@ -539,6 +543,7 @@ function AssistanceConnection({
   const sessionId = session.id;
   const controlRequested = session.mode === AssistanceMode.CONTROL;
   const ended = session.state === AssistanceState.ENDED;
+  const cursorNote = cursorVisibilityNote(ended, session.grantedCapabilities?.cursorHidden);
   const waitingForUser =
     session.state === AssistanceState.REQUESTED || session.state === AssistanceState.PROMPTED;
   const [attempt, setAttempt] = useState(0);
@@ -1067,6 +1072,11 @@ function AssistanceConnection({
             </p>
           ) : null}
           {waitingForUser ? <UserSidePreview session={session} /> : null}
+          {cursorNote ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {cursorNote}
+            </p>
+          ) : null}
           <div className="relative" hidden={waitingForUser}>
             <div
               ref={surfaceRef}

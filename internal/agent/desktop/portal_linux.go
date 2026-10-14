@@ -232,12 +232,15 @@ func (p *DesktopPortal) configureSession(ctx context.Context, request PortalRequ
 		"multiple":     dbus.MakeVariant(request.Policy.GetDisplay() == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON),
 		"persist_mode": dbus.MakeVariant(persistNone),
 	}
-	switch {
-	case cursorModes&cursorEmbedded != 0:
-		sources["cursor_mode"] = dbus.MakeVariant(cursorEmbedded)
-	case cursorModes&cursorHidden != 0:
-		sources["cursor_mode"] = dbus.MakeVariant(cursorHidden)
+	cursorMode, err := p.captureCursorMode(ctx, cursorModes)
+	if err != nil {
+		return err
 	}
+	if cursorMode != 0 {
+		sources["cursor_mode"] = dbus.MakeVariant(cursorMode)
+	}
+	grant.cursorHidden = cursorMode == cursorHidden || cursorMode == 0
+	p.logger.Info("portal cursor mode selected", "cursor_mode", cursorMode)
 	if _, err := p.request(ctx, grant.owner, sender, screenCastIface+".SelectSources", []any{grant.handle}, sources); err != nil {
 		return err
 	}
@@ -437,6 +440,7 @@ type portalGrant struct {
 	stream          Stream
 	control         bool
 	keyboard        bool
+	cursorHidden    bool
 	watch           *busWatch
 	closed          chan struct{}
 	closedOnce      sync.Once
@@ -447,7 +451,8 @@ type portalGrant struct {
 
 var _ Grant = (*portalGrant)(nil)
 
-func (g *portalGrant) Streams() []Stream { return g.streams }
+func (g *portalGrant) Streams() []Stream  { return g.streams }
+func (g *portalGrant) CursorHidden() bool { return g.cursorHidden }
 
 func (g *portalGrant) SelectStream(id string) error {
 	for _, stream := range g.streams {

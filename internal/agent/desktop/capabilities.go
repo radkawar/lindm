@@ -30,7 +30,7 @@ func consentedPolicy(invitation *agentv1.AssistanceInvitation) *agentv1.Assistan
 
 func grantedCapabilities(policy *agentv1.AssistancePolicy, grant Grant) *agentv1.AssistanceCapabilities {
 	p := &agentv1.AssistancePolicy{Clipboard: policy.GetClipboard(), Keyboard: policy.GetKeyboard(), Display: policy.GetDisplay(), Messages: policy.GetMessages()}
-	out := &agentv1.AssistanceCapabilities{Policy: p}
+	out := &agentv1.AssistanceCapabilities{Policy: p, CursorHidden: grant.CursorHidden()}
 	if !policyEnabled(p.Clipboard) {
 		out.ClipboardReason = "not_requested_or_allowed"
 	} else if !grant.ClipboardGranted() {

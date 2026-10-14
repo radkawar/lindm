@@ -51,10 +51,13 @@ func TestAssistanceCommandsRequireActualConsentedCapability(t *testing.T) {
 	if assistanceCommandAllowed(row, command) {
 		t.Fatal("requested capability substituted for local grant")
 	}
-	projection := &agentv1.AssistanceReport{GrantedCapabilities: &agentv1.AssistanceCapabilities{Policy: &agentv1.AssistancePolicy{Clipboard: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED}, KeyboardReason: "unsupported"}}
+	projection := &agentv1.AssistanceReport{GrantedCapabilities: &agentv1.AssistanceCapabilities{Policy: &agentv1.AssistancePolicy{Clipboard: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED}, KeyboardReason: "unsupported", CursorHidden: true}}
 	row.CapabilityProjection, err = proto.Marshal(projection)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !assistanceProjection(row).GetGrantedCapabilities().GetCursorHidden() {
+		t.Fatal("capture cursor limitation lost in persisted viewer projection")
 	}
 	if !assistanceCommandAllowed(row, command) {
 		t.Fatal("limited clipboard should allow operator to user")

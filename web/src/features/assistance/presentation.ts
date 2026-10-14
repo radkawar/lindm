@@ -92,3 +92,9 @@ export class DisplayPresentationFence {
     );
   }
 }
+
+// An ended record or an older agent without a cursor report is not a live
+// cursor limitation. The device reports this independently of input authority.
+export function cursorVisibilityNote(ended: boolean, hidden: boolean | undefined): string | null {
+  return !ended && hidden === true ? "Cursor isn't shown on this desktop version" : null;
+}

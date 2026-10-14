@@ -273,6 +273,9 @@ message AssistanceCapabilities {
     max_len: 64
     pattern: "^[a-z0-9_]*$"
   }];
+  // Capture intentionally omits the cursor on desktop versions where the
+  // embedded cursor path is unsafe and bitmap metadata cannot be transported.
+  bool cursor_hidden = 6;
 }
 
 // Only locally consented portal streams may appear here.

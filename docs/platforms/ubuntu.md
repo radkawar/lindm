@@ -1164,7 +1164,8 @@ stay lean:
   `rtpvp8pay` and `rtpstreampay`.
 - `gstreamer1.0-tools`, which provides `gst-launch-1.0`.
 
-The helper checks all eight elements with `gst-inspect-1.0`. If any is missing it
+The helper checks the required capture elements, including the source-lifecycle
+`tee`, forwarding `bin` and `fakesink`, with `gst-inspect-1.0`. If any is missing it
 ends the session as `UNAVAILABLE` with detail `gst_element_missing:<name>`. There
 is no X11 or screenshot fallback.
 
@@ -1179,6 +1180,17 @@ The 24.04 desktop golden used for qualification had these components:
 New assistance records also capture `mutter-common` and, on 24.04, the
 `libmutter-14-0` ABI package version, so the compositor, portal and capture-stack
 tuple is explicit.
+
+The final-code OVMF Secure Boot, cached encrypted x86_64 regression
+`cursor-embedded-ubuntu24-control-monitors-06` passed real control input,
+two-head selection/pointer routing and selected-head unplug without fallback.
+The runtime GNOME 46.0 probe retained EMBEDDED (`cursor_mode=2`), visible in the
+live console screenshot; no hidden-cursor note is shown. The legacy PipeWire
+source ended on its native **target not found** error and media/input closed as
+`unavailable/capture_exited`, despite the encoder's live imagefreeze keepalive.
+GNOME 50 or newer instead uses the [documented HIDDEN mitigation](fedora.md#assistance-known-issues).
+See the [scoped native proof](../verification.md#native-cursor-mitigation-and-source-removal-proof)
+for hashes and the explicit `-hold` diagnostic/full-qualification distinction.
 
 In the RemoteDesktop dialog, keyboard and pointer access is the **Allow Remote
 Interaction** switch, which is off by default. Sharing without it grants view only.

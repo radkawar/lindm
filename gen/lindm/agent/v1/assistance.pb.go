@@ -1250,8 +1250,11 @@ type AssistanceCapabilities struct {
 	KeyboardReason  string                 `protobuf:"bytes,3,opt,name=keyboard_reason,json=keyboardReason,proto3" json:"keyboard_reason,omitempty"`
 	DisplayReason   string                 `protobuf:"bytes,4,opt,name=display_reason,json=displayReason,proto3" json:"display_reason,omitempty"`
 	MessagesReason  string                 `protobuf:"bytes,5,opt,name=messages_reason,json=messagesReason,proto3" json:"messages_reason,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Capture intentionally omits the cursor on desktop versions where the
+	// embedded cursor path is unsafe and bitmap metadata cannot be transported.
+	CursorHidden  bool `protobuf:"varint,6,opt,name=cursor_hidden,json=cursorHidden,proto3" json:"cursor_hidden,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AssistanceCapabilities) Reset() {
@@ -1317,6 +1320,13 @@ func (x *AssistanceCapabilities) GetMessagesReason() string {
 		return x.MessagesReason
 	}
 	return ""
+}
+
+func (x *AssistanceCapabilities) GetCursorHidden() bool {
+	if x != nil {
+		return x.CursorHidden
+	}
+	return false
 }
 
 // Only locally consented portal streams may appear here.
@@ -1709,13 +1719,14 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\tclipboard\x18\x01 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\tclipboard\x12J\n" +
 	"\bkeyboard\x18\x02 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bkeyboard\x12H\n" +
 	"\adisplay\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\adisplay\x12J\n" +
-	"\bmessages\x18\x04 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmessages\"\xd2\x02\n" +
+	"\bmessages\x18\x04 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmessages\"\xf7\x02\n" +
 	"\x16AssistanceCapabilities\x128\n" +
 	"\x06policy\x18\x01 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x06policy\x12@\n" +
 	"\x10clipboard_reason\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0fclipboardReason\x12>\n" +
 	"\x0fkeyboard_reason\x18\x03 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0ekeyboardReason\x12<\n" +
 	"\x0edisplay_reason\x18\x04 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\rdisplayReason\x12>\n" +
-	"\x0fmessages_reason\x18\x05 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0emessagesReason\"\xab\x01\n" +
+	"\x0fmessages_reason\x18\x05 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0emessagesReason\x12#\n" +
+	"\rcursor_hidden\x18\x06 \x01(\bR\fcursorHidden\"\xab\x01\n" +
 	"\x11AssistanceDisplay\x12,\n" +
 	"\x02id\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01(@2\x11^[A-Za-z0-9_.-]+$R\x02id\x12 \n" +
 	"\x05label\x18\x02 \x01(\tB\n" +

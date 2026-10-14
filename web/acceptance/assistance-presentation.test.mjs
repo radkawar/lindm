@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  cursorVisibilityNote,
   DisplayPresentationFence,
   parseDisplayFrameMarker,
   rtpAtOrAfter,
@@ -144,4 +145,11 @@ test("default typed session marker values never establish readiness", () => {
   fence.select(marker.display, 0);
   fence.receive({ ...marker, generation: 0 });
   assert.equal(fence.ready, false);
+});
+
+test("cursor omission is explicit only for a reported live capture limitation", () => {
+  assert.equal(cursorVisibilityNote(false, true), "Cursor isn't shown on this desktop version");
+  assert.equal(cursorVisibilityNote(false, false), null);
+  assert.equal(cursorVisibilityNote(false, undefined), null);
+  assert.equal(cursorVisibilityNote(true, true), null);
 });
