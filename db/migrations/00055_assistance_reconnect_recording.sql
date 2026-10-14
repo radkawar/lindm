@@ -120,9 +120,9 @@ SET migration_versions = (
 );
 
 -- +goose Down
-DROP TABLE assistance_recording_deletions;
-DROP TABLE assistance_recording_retrievals;
-DROP TABLE assistance_recording_segments;
-DROP TABLE assistance_recordings;
-ALTER TABLE assistance_sessions DROP COLUMN reconnect_of, DROP COLUMN reconnect_workflow_id;
-DROP TABLE assistance_reconnect_workflows;
+-- Recording ciphertext, receipts and reconnect history are retained evidence.
+-- +goose StatementBegin
+DO $$ BEGIN
+  RAISE EXCEPTION 'assistance recording and reconnect evidence requires an explicitly reviewed fenced backup restore';
+END $$;
+-- +goose StatementEnd

@@ -2136,12 +2136,25 @@ The new schema compatibility, first-run, recovery, status and custody migrations
 are versions 49–53. They follow the already-landed MCP migration 48 without
 renumbering existing history. Online status/custody expansions retain floor 51;
 rollback still obeys the declared floor, never an automatic down migration.
-Migrations 51–53 are deliberately **one-way**, including on an empty deployment:
-their Down commands refuse to discard recovery fences, retained status audit
-state or recovery-key custody attestations. Compatible package rollback keeps
-those migrations applied. Historical migration tests create a fresh owned schema
-at the predecessor version and migrate forward; they do not undo these security
-records to arrange test data.
+Migrations 51–53 and 55–56 are deliberately **one-way**, including on an empty
+deployment: their Down commands refuse to discard recovery fences, retained status
+audit state, recovery-key custody attestations, assistance recording/reconnect
+evidence or unattended authorization records. Removing these schemas requires an
+explicitly reviewed fenced encrypted-backup restore. Compatible package rollback
+keeps those migrations applied. Reversible Downs remove their version from the
+compatibility set in the same transaction and never lower a contract floor.
+Migration 54 refuses retained file-transfer evidence; migration 57 refuses retained
+dependency edges of resource kinds 21–24 rather than deleting them.
+Historical migration tests create a fresh owned schema at the predecessor version
+and migrate forward; they do not undo security records to arrange test data.
+
+Schema preflight reads migration history, table existence and the compatibility
+record on one connection in a read-only REPEATABLE READ transaction, so an online
+migration cannot mix two committed schema states. Migration 49's introduction makes
+the compatibility record mandatory: restoring only business tables and Goose
+history fails closed. Only pre-49 history may omit it while reporting the pending
+fenced policy cutover. Forward migration 57 widens profile dependency kinds to
+match the 1–24 resource registry on fresh and already-migrated databases.
 
 Run the next independently authenticated private bundle's `sudo ./install.sh`;
 it refuses same-version installation and unrequested downgrade. It checks the

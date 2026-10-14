@@ -57,7 +57,19 @@ SET migration_versions = (
 );
 
 -- +goose Down
+LOCK TABLE assistance_file_transfers IN ACCESS EXCLUSIVE MODE;
+-- +goose StatementBegin
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM assistance_file_transfers)
+     OR EXISTS (SELECT 1 FROM lindm_schema_compatibility WHERE minimum_runtime_version > 51) THEN
+    RAISE EXCEPTION 'retained assistance file evidence or compatibility floor requires a fenced backup restore';
+  END IF;
+END $$;
+-- +goose StatementEnd
 DROP TABLE assistance_file_transfers;
 ALTER TABLE assistance_sessions DROP COLUMN input_epoch, DROP COLUMN input_paused;
 -- Do not discard policy metadata on rollback. The bounded wider columns remain
 -- readable by the prior version, whose absent file capability fails closed.
+UPDATE lindm_schema_compatibility
+SET minimum_runtime_version = LEAST(minimum_runtime_version, 51),
+    migration_versions = array_remove(migration_versions, 54::bigint);

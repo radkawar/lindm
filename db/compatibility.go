@@ -4,6 +4,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -35,7 +37,7 @@ type compatibilityPolicy struct {
 }
 
 // Preflight checks the exact applied history and migration-owner compatibility
-// record without executing DDL. Pending migrations are reported, not applied.
+// record in one read-only snapshot. Pending migrations are reported, not applied.
 func Preflight(ctx context.Context, pool *pgxpool.Pool) (status SchemaStatus, err error) {
 	sqlDB := stdlib.OpenDBFromPool(pool)
 	defer func() { err = errors.Join(err, sqlDB.Close()) }()
@@ -47,8 +49,17 @@ func Preflight(ctx context.Context, pool *pgxpool.Pool) (status SchemaStatus, er
 	if err != nil {
 		return status, fmt.Errorf("read embedded migrations: %w", err)
 	}
+	tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	if err != nil {
+		return status, fmt.Errorf("begin schema snapshot: %w", err)
+	}
+	defer func() {
+		if rollbackErr := tx.Rollback(); !errors.Is(rollbackErr, sql.ErrTxDone) {
+			err = errors.Join(err, rollbackErr)
+		}
+	}()
 	var historyExists bool
-	if err := pool.QueryRow(ctx, "SELECT to_regclass('goose_db_version') IS NOT NULL").Scan(&historyExists); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT to_regclass('goose_db_version') IS NOT NULL").Scan(&historyExists); err != nil {
 		return status, fmt.Errorf("inspect migration history: %w", err)
 	}
 	applied := make(map[int64]bool)
@@ -57,7 +68,7 @@ func Preflight(ctx context.Context, pool *pgxpool.Pool) (status SchemaStatus, er
 		if err != nil {
 			return status, err
 		}
-		rows, err := store.ListMigrations(ctx, sqlDB)
+		rows, err := store.ListMigrations(ctx, tx)
 		if err != nil {
 			return status, fmt.Errorf("read schema versions: %w", err)
 		}
@@ -69,15 +80,18 @@ func Preflight(ctx context.Context, pool *pgxpool.Pool) (status SchemaStatus, er
 		delete(applied, 0)
 	}
 	var policyExists bool
-	if err := pool.QueryRow(ctx, "SELECT to_regclass('lindm_schema_compatibility') IS NOT NULL").Scan(&policyExists); err != nil {
+	if err := tx.QueryRowContext(ctx, "SELECT to_regclass('lindm_schema_compatibility') IS NOT NULL").Scan(&policyExists); err != nil {
 		return status, fmt.Errorf("inspect schema compatibility: %w", err)
 	}
 	var policy *compatibilityPolicy
 	if policyExists {
 		policy = &compatibilityPolicy{}
-		if err := pool.QueryRow(ctx, "SELECT minimum_runtime_version, migration_versions FROM lindm_schema_compatibility WHERE singleton").Scan(&policy.floor, &policy.versions); err != nil {
+		if err := tx.QueryRowContext(ctx, "SELECT minimum_runtime_version, migration_versions FROM lindm_schema_compatibility WHERE singleton").Scan(&policy.floor, pgtype.NewMap().SQLScanner(&policy.versions)); err != nil {
 			return status, fmt.Errorf("read schema compatibility: %w", err)
 		}
+	}
+	if err := tx.Commit(); err != nil {
+		return status, fmt.Errorf("close schema snapshot: %w", err)
 	}
 	var expected []int64
 	for _, source := range provider.ListSources() {
@@ -119,6 +133,11 @@ func evaluateSchema(expected []int64, history map[int64]bool, policy *compatibil
 		}
 	}
 	status.Floor = status.Current
+	// Migration 49 introduces the owner-written compatibility contract. Missing
+	// metadata after that cutover is corruption, not a legacy admission path.
+	if policy == nil && history[49] {
+		return status, errors.New("schema compatibility record is missing after migration 49")
+	}
 	if policy != nil {
 		if policy.floor <= 0 || !history[policy.floor] || !slices.IsSorted(policy.versions) || !slices.Equal(applied, policy.versions) {
 			return status, errors.New("schema compatibility record does not match exact applied migration history")

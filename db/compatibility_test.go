@@ -23,6 +23,8 @@ func TestSchemaCompatibilityRequiresReviewedExactHistory(t *testing.T) {
 		{"legacy unknown below maximum", []int64{1, 3}, map[int64]bool{1: true, 2: true, 3: true}, nil, nil, false, false, true},
 		{"policy unknown below maximum", []int64{1, 3}, map[int64]bool{1: true, 2: true, 3: true}, &compatibilityPolicy{1, []int64{1, 2, 3}}, nil, false, false, true},
 		{"initial policy fenced", []int64{1, 2}, map[int64]bool{1: true}, nil, nil, false, false, false},
+		{"pre-policy cutover fenced", []int64{48, 49, 50}, map[int64]bool{48: true}, nil, map[int64]int64{50: 49}, false, false, false},
+		{"introduced policy missing", []int64{48, 49, 50}, map[int64]bool{48: true, 49: true, 50: true}, nil, nil, false, false, true},
 		{"reviewed rollback", []int64{1, 2}, map[int64]bool{1: true, 2: true, 3: true}, &compatibilityPolicy{2, []int64{1, 2, 3}}, nil, true, true, false},
 		{"contract rejects rollback", []int64{1, 2}, map[int64]bool{1: true, 2: true, 3: true}, &compatibilityPolicy{3, []int64{1, 2, 3}}, nil, false, false, false},
 		{"missing embedded migration", []int64{1, 2}, map[int64]bool{1: true, 3: true}, &compatibilityPolicy{1, []int64{1, 3}}, nil, false, false, false},

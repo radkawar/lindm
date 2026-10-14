@@ -102,26 +102,9 @@ SET migration_versions = (
 );
 
 -- +goose Down
-ALTER TABLE assistance_sessions DROP COLUMN unattended_enrollment_id, DROP COLUMN unattended_grant_id;
-DROP TABLE assistance_unattended_enrollments;
-DROP TABLE assistance_unattended_grants;
-DELETE FROM approval_requests WHERE action = 'assistance.unattended';
-ALTER TABLE approval_requests DROP CONSTRAINT approval_requests_action_permission;
-ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_action_permission CHECK (
-    (action IN ('device.revoke', 'resources.assign', 'execution_trust.manage') AND permission = action)
-    OR (action = 'device.action' AND permission IN ('encryption.manage', 'actions.lock', 'actions.release-lock', 'actions.quarantine', 'destructive.execute', 'remote_execution.run', 'inventory.manage'))
-    OR (action = 'resources.activate_preview' AND permission = 'resources.assign')
-    OR (action = 'resources.rollout' AND permission = 'resources.assign' AND device_id IS NULL)
-    OR (action = 'recovery_key.reveal' AND permission = 'recovery_keys.read')
-    OR (action = 'device.recover' AND permission = 'device.revoke')
-    OR (action = 'enrollment.approve' AND permission = 'enrollment.manage')
-    OR (action IN ('secret.reveal', 'local_admin.reveal') AND permission = 'secrets.reveal')
-    OR (action = 'advisory_exception.accept' AND permission = 'advisory_exceptions.manage')
-);
-ALTER TABLE approval_requests DROP CONSTRAINT approval_requests_action_known;
-ALTER TABLE approval_requests ADD CONSTRAINT approval_requests_action_known CHECK (action IN ('device.revoke', 'device.recover', 'enrollment.approve', 'resources.assign', 'resources.activate_preview', 'resources.rollout', 'execution_trust.manage', 'device.action', 'recovery_key.reveal', 'secret.reveal', 'local_admin.reveal', 'advisory_exception.accept'));
-DELETE FROM assistance_commands WHERE kind > 5;
-ALTER TABLE assistance_commands
-    DROP COLUMN annotation_enabled,
-    DROP CONSTRAINT assistance_commands_kind_check,
-    ADD CONSTRAINT assistance_commands_kind_check CHECK (kind BETWEEN 1 AND 5);
+-- Unattended grants, approvals and command records are authorization evidence.
+-- +goose StatementBegin
+DO $$ BEGIN
+  RAISE EXCEPTION 'unattended assistance authorization evidence requires an explicitly reviewed fenced backup restore';
+END $$;
+-- +goose StatementEnd

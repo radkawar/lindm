@@ -63,7 +63,13 @@ SET migration_versions = (
 -- +goose Down
 -- +goose StatementBegin
 DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM lindm_schema_compatibility WHERE minimum_runtime_version > 49) THEN
+    RAISE EXCEPTION 'first-run setup compatibility floor requires a fenced backup restore';
+  END IF;
   DROP TABLE first_run_attempts;
   DROP TABLE first_run_setup;
 END $$;
 -- +goose StatementEnd
+UPDATE lindm_schema_compatibility
+SET minimum_runtime_version = LEAST(minimum_runtime_version, 49),
+    migration_versions = array_remove(migration_versions, 50::bigint);
