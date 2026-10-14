@@ -61,6 +61,7 @@ function AuthenticatedLayout() {
 
   return (
     <ConsoleShell
+      key={JSON.stringify([principal.issuer, principal.subject])}
       userLabel={accountLabel(principal)}
       role={principal.role}
       principal={principal}

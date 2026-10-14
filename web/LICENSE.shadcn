@@ -1,7 +1,7 @@
-Portions of src/components/ui, src/hooks/use-mobile.ts, src/styles/shadcn.css
-and the block-derived console layout originate from shadcn/ui
-(https://github.com/shadcn-ui/ui), using the official base-nova registry,
-sidebar-07 block and shadcn 4.21.4 stylesheet. On 2026-10-10, preset b1Q5GC
+Portions of src/components/ui and src/styles/shadcn.css originate from shadcn/ui
+(https://github.com/shadcn-ui/ui), using the official base-nova registry and
+shadcn 4.21.4 stylesheet. The console shell composes the retained menu, sheet
+and tooltip primitives. On 2026-10-10, preset b1Q5GC
 was decoded with shadcn 4.21.4 and applied in an isolated Vite scratch copy:
 Nova / Base UI, neutral base, blue theme, radius none, IBM Plex Sans,
 Lucide, default (solid) menus, subtle menu accent, neutral charts, inherited

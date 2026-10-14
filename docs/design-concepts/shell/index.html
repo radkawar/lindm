@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>lindm shell concepts</title>
+    <style>
+      body {
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        max-width: 1400px;
+        margin: 32px auto;
+        padding: 0 24px;
+        color: #172131;
+        background: #f4f6f8;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      h2 {
+        font-size: 18px;
+      }
+      section {
+        margin: 32px 0;
+      }
+      a {
+        color: #1759b5;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      img {
+        width: 100%;
+        border: 1px solid #cbd3de;
+      }
+      .mobile {
+        display: flex;
+        gap: 16px;
+      }
+      .mobile img {
+        width: 195px;
+      }
+      figure {
+        margin: 0;
+      }
+      figcaption {
+        margin: 6px 0 14px;
+      }
+      .recommend {
+        border-left: 3px solid #1759b5;
+        padding: 12px 18px;
+        background: #e3edfc;
+      }
+      @media (max-width: 700px) {
+        .grid {
+          display: block;
+        }
+        .mobile {
+          flex-wrap: wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>lindm shell concepts</h1>
+    <p>Owner selection only. Real HTML/CSS browser renders. All device data is illustrative.</p>
+    <p class="recommend">
+      <strong>Recommend C: Two-level workbench.</strong> Stable location, fewer visible pages, and
+      an optional wider table container.
+      <a href="recommendation.md">Read recommendation and trade-offs.</a>
+    </p>
+    <section>
+      <h2>A · Focus rail</h2>
+      <p>
+        Slim labelled work-area rail; the current area opens in a flyout.
+        <a href="focus-rail.html">Open HTML specimen</a>
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="focus-rail-light-desktop.png"
+            ><img src="focus-rail-light-desktop.png" alt="A · Focus rail, light desktop"
+          /></a>
+          <figcaption>light desktop · 1440×900</figcaption>
+        </figure>
+        <figure>
+          <a href="focus-rail-dark-desktop.png"
+            ><img src="focus-rail-dark-desktop.png" alt="A · Focus rail, dark desktop"
+          /></a>
+          <figcaption>dark desktop · 1440×900</figcaption>
+        </figure>
+      </div>
+      <div class="mobile">
+        <figure>
+          <a href="focus-rail-light-mobile.png"
+            ><img src="focus-rail-light-mobile.png" alt="A · Focus rail, light mobile content"
+          /></a>
+          <figcaption>light mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="focus-rail-light-mobile-navigation.png"
+            ><img
+              src="focus-rail-light-mobile-navigation.png"
+              alt="A · Focus rail, light mobile navigation"
+          /></a>
+          <figcaption>light mobile navigation</figcaption>
+        </figure>
+        <figure>
+          <a href="focus-rail-dark-mobile.png"
+            ><img src="focus-rail-dark-mobile.png" alt="A · Focus rail, dark mobile content"
+          /></a>
+          <figcaption>dark mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="focus-rail-dark-mobile-navigation.png"
+            ><img
+              src="focus-rail-dark-mobile-navigation.png"
+              alt="A · Focus rail, dark mobile navigation"
+          /></a>
+          <figcaption>dark mobile navigation</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section>
+      <h2>B · Top workbench</h2>
+      <p>
+        Top work-area bar; grouped mega-menus leave the most table width.
+        <a href="top-workbench.html">Open HTML specimen</a>
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="top-workbench-light-desktop.png"
+            ><img src="top-workbench-light-desktop.png" alt="B · Top workbench, light desktop"
+          /></a>
+          <figcaption>light desktop · 1440×900</figcaption>
+        </figure>
+        <figure>
+          <a href="top-workbench-dark-desktop.png"
+            ><img src="top-workbench-dark-desktop.png" alt="B · Top workbench, dark desktop"
+          /></a>
+          <figcaption>dark desktop · 1440×900</figcaption>
+        </figure>
+      </div>
+      <div class="mobile">
+        <figure>
+          <a href="top-workbench-light-mobile.png"
+            ><img
+              src="top-workbench-light-mobile.png"
+              alt="B · Top workbench, light mobile content"
+          /></a>
+          <figcaption>light mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="top-workbench-light-mobile-navigation.png"
+            ><img
+              src="top-workbench-light-mobile-navigation.png"
+              alt="B · Top workbench, light mobile navigation"
+          /></a>
+          <figcaption>light mobile navigation</figcaption>
+        </figure>
+        <figure>
+          <a href="top-workbench-dark-mobile.png"
+            ><img src="top-workbench-dark-mobile.png" alt="B · Top workbench, dark mobile content"
+          /></a>
+          <figcaption>dark mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="top-workbench-dark-mobile-navigation.png"
+            ><img
+              src="top-workbench-dark-mobile-navigation.png"
+              alt="B · Top workbench, dark mobile navigation"
+          /></a>
+          <figcaption>dark mobile navigation</figcaption>
+        </figure>
+      </div>
+    </section>
+    <section>
+      <h2>C · Two-level workbench</h2>
+      <p>
+        Stable work-area rail plus contextual pages; hide the second level for wide tables.
+        <a href="two-level-workbench.html">Open HTML specimen</a>
+      </p>
+      <div class="grid">
+        <figure>
+          <a href="two-level-workbench-light-desktop.png"
+            ><img
+              src="two-level-workbench-light-desktop.png"
+              alt="C · Two-level workbench, light desktop"
+          /></a>
+          <figcaption>light desktop · 1440×900</figcaption>
+        </figure>
+        <figure>
+          <a href="two-level-workbench-dark-desktop.png"
+            ><img
+              src="two-level-workbench-dark-desktop.png"
+              alt="C · Two-level workbench, dark desktop"
+          /></a>
+          <figcaption>dark desktop · 1440×900</figcaption>
+        </figure>
+      </div>
+      <div class="mobile">
+        <figure>
+          <a href="two-level-workbench-light-mobile.png"
+            ><img
+              src="two-level-workbench-light-mobile.png"
+              alt="C · Two-level workbench, light mobile content"
+          /></a>
+          <figcaption>light mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="two-level-workbench-light-mobile-navigation.png"
+            ><img
+              src="two-level-workbench-light-mobile-navigation.png"
+              alt="C · Two-level workbench, light mobile navigation"
+          /></a>
+          <figcaption>light mobile navigation</figcaption>
+        </figure>
+        <figure>
+          <a href="two-level-workbench-dark-mobile.png"
+            ><img
+              src="two-level-workbench-dark-mobile.png"
+              alt="C · Two-level workbench, dark mobile content"
+          /></a>
+          <figcaption>dark mobile content</figcaption>
+        </figure>
+        <figure>
+          <a href="two-level-workbench-dark-mobile-navigation.png"
+            ><img
+              src="two-level-workbench-dark-mobile-navigation.png"
+              alt="C · Two-level workbench, dark mobile navigation"
+          /></a>
+          <figcaption>dark mobile navigation</figcaption>
+        </figure>
+      </div>
+      <p>
+        Collapsed contextual navigation:
+        <a href="two-level-workbench-light-desktop-collapsed.png">Light</a> ·
+        <a href="two-level-workbench-dark-desktop-collapsed.png">Dark</a>
+      </p>
+    </section>
+    <p>The owner selected C on 2026-10-13. These drawings remain the original selection record.</p>
+  </body>
+</html>

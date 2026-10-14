@@ -127,7 +127,7 @@ export function CommandPalette({
       <Button
         variant="outline"
         size="sm"
-        className="gap-2 text-muted-foreground"
+        className="h-9 gap-2 text-muted-foreground md:min-w-56 md:justify-start"
         onClick={(event) => {
           returnFocus.current = event.currentTarget;
           changeOpen(true);
@@ -136,8 +136,9 @@ export function CommandPalette({
         aria-haspopup="dialog"
       >
         <SearchIcon />
-        <span className="hidden sm:inline">Search console</span>
-        <kbd className="hidden border px-1 text-[10px] md:inline">⌘ K</kbd>
+        <span className="sm:hidden">Find</span>
+        <span className="hidden sm:inline">Find a page or device</span>
+        <kbd className="ml-auto hidden border px-1 text-xs md:inline">⌘ K</kbd>
       </Button>
       <CommandDialog
         open={open}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { openNavigationPage } from "./review-navigation.mjs";
 
 // Whole-job UI evidence for the synthetic console fixture, not native qualification.
 // Only this module's explicit UI requests mutate state. Never reveal a key, wipe,
@@ -33,11 +34,7 @@ async function shot(ctx, name, screen, taskShaped, generic, remedy, outcome) {
 }
 
 async function navigate(ctx, label) {
-  const navigation = ctx.page.getByRole("navigation", { name: "Main navigation" });
-  if (!(await navigation.isVisible())) {
-    await ctx.page.getByRole("button", { name: "Toggle Sidebar", exact: true }).click();
-  }
-  await navigation.getByRole("link", { name: label, exact: true }).click();
+  await openNavigationPage(ctx.page, label);
 }
 
 async function start(ctx, job, destination) {

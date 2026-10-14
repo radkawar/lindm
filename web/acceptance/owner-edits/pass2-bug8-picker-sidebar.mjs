@@ -1,35 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Owner pass 2, bug 8: choosing a profile in the New rollout form collapsed the
-// sidebar's Fleet navigation group. The check drives the Profile picker with
-// real pointer and keyboard input on the scrolled rollouts page (the form opens
-// below the lists) and asserts that every navigation group keeps its state,
-// the Fleet links stay visible, and no pointer or key event from the picker
-// reaches the main navigation. The only path found that toggles a group without
-// its visible header: collapsed to icons, each group's invisible label covered
-// the previous group's last icon, so the check also hit-tests every icon.
-// Read-only: the form is closed without review and the sidebar is re-expanded.
+// The rollout profile picker must not change the selected work area or page
+// column state. Exercise pointer and keyboard input on a scrolled page, then
+// hit-test every persistent rail link with the page column collapsed.
+// Read-only: the form closes without review and navigation returns to its initial state.
 export const task = {
   name: "Rollout profile picker leaves navigation alone",
   screenId: "owner-pass2-bug8-picker-sidebar",
   route: "/rollouts",
   priority: "normal",
   acceptance:
-    "Opening the New rollout dialog's Profile picker and choosing a profile by pointer and by keyboard leaves the sidebar's Fleet group (and every other group) expanded; nothing in the navigation receives the picker's events; collapsed to icons, every navigation icon receives its own clicks.",
+    "Choosing a profile by pointer and keyboard preserves the Changes page column and selected area; the picker sends no events to navigation; every collapsed rail link receives its own clicks.",
 };
 
 const timeout = 30_000;
-const FLEET_LINKS = ["Dashboard", "Devices", "Profiles", "Rollouts", "Enrollment"];
-const NAV = 'nav[aria-label="Main navigation"]';
+const CURRENT_LINKS = ["Profiles", "Rollouts", "Approvals"];
+const NAV = "[data-shell-rail], [data-shell-pages]";
 
 function groups(page) {
-  return page.evaluate(
-    (nav) =>
-      [...document.querySelectorAll(`${nav} button[aria-expanded]`)].map(
-        (button) => `${button.textContent.trim()}=${button.getAttribute("aria-expanded")}`,
-      ),
-    NAV,
-  );
+  return page.evaluate(() => [
+    document.querySelector("[data-shell]")?.getAttribute("data-pages-state"),
+    document.querySelector("[data-shell-rail] [aria-current]")?.getAttribute("data-work-area"),
+  ]);
 }
 
 // Records pointer, click and key events whose target is inside the navigation.
@@ -66,10 +58,11 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await visit("/rollouts");
   await main.getByRole("heading", { name: "Rollouts", exact: true }).waitFor({ timeout });
   await settle();
+  const toggle = page.getByRole("button", { name: "Toggle page navigation", exact: true });
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
   const initial = await groups(page);
-  require(initial.some((group) =>
-    /^fleet=true$/i.test(group),
-  ), `The Fleet group is not expanded on load (${initial.join(", ")})`);
+  require(initial.join() ===
+    "expanded,Changes", `Changes navigation is not expanded (${initial.join(", ")})`);
   // Open the dialog from a scrolled page: the original fault toggled the
   // sidebar group under a picker opened below the fold.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -101,10 +94,10 @@ export async function check({ page, visit, settle, require, capture, step }) {
       initial.join(), `After ${how} the navigation groups changed from ${initial.join(", ")} to ${now.join(", ")}`);
     // The modal dialog hides the page from assistive technology while open,
     // so look the links up including hidden roles and check their layout.
-    for (const name of FLEET_LINKS)
+    for (const name of CURRENT_LINKS)
       require(await nav
         .getByRole("link", { name, exact: true, includeHidden: true })
-        .isVisible(), `After ${how} the Fleet link "${name}" is hidden`);
+        .isVisible(), `After ${how} the Changes link "${name}" is hidden`);
     const events = await page.evaluate(() => window.__ownerNavEvents.splice(0));
     require(events.length === 0, `After ${how} the navigation received ${events.join("; ")}`);
   };
@@ -153,12 +146,9 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await form.waitFor({ state: "hidden", timeout });
   await verify("closing the form");
 
-  // Collapsed to icons, each group's label is invisible over the previous
-  // group's last icon; a click there must reach the icon, never toggle a group.
-  step("icon sidebar hit targets");
-  const toggle = page.locator("header").getByRole("button", { name: "Toggle navigation" });
+  step("collapsed rail hit targets");
   await pointerClick(page, toggle);
-  await page.locator('[data-slot="sidebar"][data-state="collapsed"]').waitFor({ timeout });
+  await page.locator('[data-shell][data-pages-state="collapsed"]').waitFor({ timeout });
   try {
     // Wait for the collapse transition only: an infinite animation (a loading
     // skeleton's pulse under load) never finishes and would stall the review.
@@ -182,13 +172,13 @@ export async function check({ page, visit, settle, require, capture, step }) {
             return !hit || !link.contains(hit);
           })
           .map((link) => link.getAttribute("href")),
-      NAV,
+      "[data-shell-rail] nav",
     );
     require(blocked.length ===
-      0, `With the sidebar collapsed to icons, clicks on ${blocked.join(", ")} land on something else`);
+      0, `With the page column collapsed, clicks on ${blocked.join(", ")} land on something else`);
   } finally {
     await pointerClick(page, toggle);
-    await page.locator('[data-slot="sidebar"][data-state="expanded"]').waitFor({ timeout });
+    await page.locator('[data-shell][data-pages-state="expanded"]').waitFor({ timeout });
   }
-  await verify("collapsing and expanding the sidebar");
+  await verify("collapsing and expanding page navigation");
 }

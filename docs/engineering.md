@@ -131,12 +131,24 @@ IBM Plex Sans is an exact-pinned Fontsource package bundled by Vite, not a runti
 CDN fetch; its redistribution notice is `web/LICENSE.fonts`. No Next.js, pnpm,
 remote fonts, analytics, or runtime registry requests are introduced.
 
-The sidebar-07-derived shell groups authorized pages under Fleet, Security and
-Administration, with explicit device/profile breadcrumbs and a closable mobile drawer.
-Groups covers both account and device groups. The shell has collapsible navigation,
-a role/break-glass account menu, keyboard skip link, and a locally persisted
-light/dark toggle. Control/Command-K opens the official command palette: pages,
-actions and devices found by server-side hostname prefix search. Actions
+The owner selected the two-level workbench shell on 2026-10-13. A 76px labelled
+rail groups authorized destinations under Fleet, Security, Changes and Admin;
+Settings and the role/break-glass account menu remain at the bottom. A 208px page
+column shows the current area's pages and authorized Related work links.
+Groups still covers account and device groups; Fleet links to that shared page.
+Denied routes retain their requested area/page labels; breadcrumbs do not link
+to a destination excluded by the same navigation permission filter.
+The icon control and Control/Command-B fold the page column away, retain the rail,
+announce the change and return focus before hiding a focused link. The preference
+is local and keyed by public issuer/subject identity, never by a session token.
+The shortcut does not intercept typing, modal dialogs or fullscreen assistance.
+Mobile uses one closable drawer: current pages, Related work, other areas, account.
+The shell preserves the skip link, area/page/record breadcrumbs and light/dark toggle.
+The toggle stores a theme only after an explicit user choice. With no stored choice,
+the shell follows system changes; stored light or dark takes precedence across reload.
+Content uses a flat, full-width container capped at 1600px with 28px desktop gutters.
+Control/Command-K opens Find: pages, actions and devices found by server-side
+hostname prefix search. Actions
 (`web/src/app/palette-actions.ts`) open the page or dialog where the job is done and
 are shown only when the session holds the permission that destination checks.
 Device actions (Wipe device…, Restart device…, Refresh inventory…, Request remote
@@ -152,12 +164,15 @@ errors and ambiguous same-request-ID recovery remain authoritative; no mutation
 retry behavior changes.
 Sonner's stylesheet is bundled from `globals.css`: the console CSP (`style-src 'self'`)
 blocks the runtime-injected `<style>` it would otherwise add, which left toasts unstyled.
-The sidebar's in-flow gap carries the sidebar surface, so the column reaches the
-bottom of long pages. Full-page captures must start at scroll position zero: like any
-fixed or sticky element, the sidebar and header otherwise render at the scroll offset.
-In icon mode, the shell removes the header's horizontal padding and centers the
-logo in the navigation column. The dashboard UI review captures collapsed mode
-in both themes and checks the logo's center within one CSS pixel.
+The in-flow rail column carries its surface to the bottom of long pages; its
+controls stay sticky. Full-page captures start at scroll position zero.
+Dashboard UI review captures expanded, collapsed and mobile navigation in both
+themes, checks the logo within one CSS pixel of the rail center, checks collapse
+across reload, both keyboard shortcuts, focus recovery and the mobile drawer's
+axe/focus behavior. Menu captures wait for the drawer to settle on screen.
+Preference checks run serially after the parallel route captures and cover live
+system theme changes plus stored light/dark overriding the opposite system preference.
+The obsolete sidebar primitive and its unused mobile hook are removed.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Explanations of how a feature works are not inline page text: keep at most one short

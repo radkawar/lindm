@@ -454,44 +454,42 @@ export function installProbes(rules) {
         }
       }
       if (desktop) {
-        const collapsed = document.querySelector(
-          '[data-slot="sidebar"][data-state="collapsed"] [data-slot="sidebar-inner"]',
-        );
-        if (collapsed && rendered(collapsed)) {
-          const logo = collapsed.querySelector("[data-sidebar-logo]");
+        const railElement = document.querySelector("[data-shell-rail]");
+        if (railElement && rendered(railElement)) {
+          const logo = railElement.querySelector("[data-sidebar-logo]");
           if (!logo || !rendered(logo)) {
             findings.push({
               check: "sidebar-logo-centered",
-              message: "Collapsed navigation has no visible logo",
-              elements: [describe(collapsed)],
+              message: "Navigation rail has no visible logo",
+              elements: [describe(railElement)],
             });
           } else {
-            const rail = collapsed.getBoundingClientRect();
+            const rail = railElement.getBoundingClientRect();
             const mark = logo.getBoundingClientRect();
             const offset = Math.abs(mark.left + mark.width / 2 - (rail.left + rail.width / 2));
             if (offset > 1 || mark.left < rail.left || mark.right > rail.right) {
               findings.push({
                 check: "sidebar-logo-centered",
-                message: `Collapsed navigation logo is ${offset.toFixed(1)}px off center`,
+                message: `Navigation rail logo is ${offset.toFixed(1)}px off center`,
                 elements: [describe(logo)],
               });
             }
           }
         }
-        const gap = document.querySelector('[data-slot="sidebar-gap"]');
-        if (gap && rendered(gap.parentElement)) {
-          const rect = gap.getBoundingClientRect();
+        const column = document.querySelector("[data-shell-rail-column]");
+        if (column && rendered(column)) {
+          const rect = column.getBoundingClientRect();
           const bottom = rect.bottom + scrollY;
-          const background = getComputedStyle(gap).backgroundColor;
+          const background = getComputedStyle(column).backgroundColor;
           if (
             bottom < scroller.scrollHeight - 1 ||
             rect.top + scrollY > 1 ||
             transparent(background)
           ) {
             findings.push({
-              check: "sidebar-height",
-              message: `Sidebar column covers ${Math.round(rect.top + scrollY)}..${Math.round(bottom)}px of a ${scroller.scrollHeight}px document (background ${background})`,
-              elements: [describe(gap)],
+              check: "rail-height",
+              message: `Navigation rail column covers ${Math.round(rect.top + scrollY)}..${Math.round(bottom)}px of a ${scroller.scrollHeight}px document (background ${background})`,
+              elements: [describe(column)],
             });
           }
         }
@@ -837,8 +835,6 @@ export function installProbes(rules) {
         '[aria-haspopup="dialog"]:not([role="menuitem"])',
         '[data-slot$="dialog-trigger"]',
         '[data-slot="sheet-trigger"]',
-        // Below the md breakpoint the sidebar trigger opens the navigation sheet.
-        ...(matchMedia("(max-width: 767px)").matches ? ['[data-slot="sidebar-trigger"]'] : []),
       ].join(",");
       return [...document.querySelectorAll(selector)]
         .filter((node) => isTabbable(node) && !node.closest('[role="dialog"]'))

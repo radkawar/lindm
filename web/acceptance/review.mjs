@@ -34,6 +34,7 @@ import { reviewOwnerEdits } from "./review-owner-edits.mjs";
 import { reviewRoleWalkthroughs } from "./review-roles.mjs";
 import { popupStability } from "./review-popups.mjs";
 import { captureHelpDocument } from "./review-help.mjs";
+import { reviewShell, reviewTheme } from "./review-shell.mjs";
 import { reviewContrast } from "./review-contrast.mjs";
 
 process.umask(0o077);
@@ -166,6 +167,7 @@ async function axePass(page, selector) {
     async ({ selector }) => {
       const context = selector ? document.querySelector(selector) : document;
       const run = await window.axe.run(context, {
+        rules: { "color-contrast": { enabled: true } },
         resultTypes: ["violations"],
         rules: { "color-contrast": { enabled: true } },
         runOnly: {
@@ -633,20 +635,6 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
   entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
   entry.screenshots.full = await screenshot(page, `${prefix}-full.png`, true);
   entry.checks.layout = { findings: await probe(page, "layout", viewport.name === "desktop") };
-  if (route.path === "/dashboard" && viewport.name === "desktop") {
-    const toggle = page.locator("header").getByRole("button", { name: "Toggle navigation" });
-    await toggle.click();
-    await page.locator('[data-slot="sidebar"][data-state="collapsed"]').waitFor();
-    try {
-      await settleAnimations(page);
-      entry.screenshots.collapsed = await screenshot(page, `${prefix}-collapsed.png`, false);
-      entry.checks.collapsedLayout = { findings: await probe(page, "layout", true) };
-    } finally {
-      await toggle.click();
-      await page.locator('[data-slot="sidebar"][data-state="expanded"]').waitFor();
-      await settleAnimations(page);
-    }
-  }
   entry.checks.contrast = await reviewContrast(page, theme);
   const violations = await axe(page, null);
   entry.checks.axe = {
@@ -844,14 +832,6 @@ async function main() {
     for (let index = 1; index < themes.length * viewports.length; index += 1)
       pages.push(await driver.context.newPage());
     for (const page of pages) page.setDefaultTimeout(30_000);
-    // Theme follows the emulated color scheme; the toggle's stored choice is cleared.
-    await driver.context.addInitScript(() => {
-      try {
-        localStorage.removeItem("lindm-theme");
-      } catch {
-        /* Storage disabled: system preference applies. */
-      }
-    });
     const publicRoutes = report.routes.filter((route) => !route.authenticated);
     const privateRoutes = report.routes.filter((route) => route.authenticated);
     await Promise.all(
@@ -887,6 +867,35 @@ async function main() {
       }),
     );
     report.sessions = sessions;
+    // Collapse and theme preferences belong to one user. Review them serially,
+    // after parallel route captures, so one page cannot change another's reload state.
+    for (const [index, { theme, viewport }] of combos.entries()) {
+      const page = pages[index];
+      await visit(page, "/dashboard");
+      const entry = report.results.find(
+        (result) =>
+          result.route === "/dashboard" &&
+          result.theme === theme &&
+          result.viewport === viewport.name,
+      );
+      if (!entry) throw new Error("dashboard_shell_review_entry_missing");
+      const shell = await reviewShell({
+        page,
+        prefix: `dashboard-${theme}-${viewport.name}`,
+        desktop: viewport.name === "desktop",
+        probe,
+        screenshot,
+        axe,
+      });
+      entry.checks.shell = { findings: shell.findings };
+      Object.assign(entry.screenshots, shell.screenshots);
+      entry.passed = entry.passed && shell.findings.length === 0;
+      for (const finding of shell.findings)
+        report.failures.push(`/dashboard ${theme} ${viewport.name} shell: ${finding.message}`);
+    }
+    report.shellTheme = await reviewTheme({ page: pages[0], origin: config.origin });
+    for (const finding of report.shellTheme.findings)
+      report.failures.push(`shell theme: ${finding.message}`);
     // Owner edit acceptance reads the seeded fleet before enrollment fixtures and
     // task walkthroughs add requests, sessions and approvals of their own.
     report.ownerEdits = await reviewOwnerEdits({

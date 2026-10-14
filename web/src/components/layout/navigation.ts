@@ -44,14 +44,14 @@ export const navigation = [
     label: "Profiles",
     icon: LayersIcon,
     access: [{ permission: "fleet.read", unrestricted: true }],
-    group: "Fleet",
+    group: "Changes",
   },
   {
     to: "/rollouts",
     label: "Rollouts",
     icon: RocketIcon,
     access: [{ permission: "resources.assign" }],
-    group: "Fleet",
+    group: "Changes",
   },
   {
     to: "/enrollment",
@@ -79,7 +79,7 @@ export const navigation = [
     label: "Approvals",
     icon: ClipboardCheckIcon,
     access: "approvals",
-    group: "Security",
+    group: "Changes",
   },
   {
     to: "/audit",
@@ -93,14 +93,14 @@ export const navigation = [
     label: "Accounts",
     icon: UserRoundCogIcon,
     access: [{ permission: "accounts.manage", unrestricted: true }],
-    group: "Administration",
+    group: "Admin",
   },
   {
     to: "/authorization",
     label: "Authorization",
     icon: ShieldUserIcon,
     access: [{ permission: "accounts.manage", unrestricted: true }],
-    group: "Administration",
+    group: "Admin",
   },
   {
     to: "/groups",
@@ -110,14 +110,14 @@ export const navigation = [
       { permission: "accounts.manage", unrestricted: true },
       { permission: "inventory.manage", unrestricted: true },
     ],
-    group: "Administration",
+    group: "Admin",
   },
   {
     to: "/integrations",
     label: "Integrations",
     icon: BlocksIcon,
     access: [{ permission: "integrations.manage", unrestricted: true }],
-    group: "Administration",
+    group: "Admin",
   },
   {
     to: "/settings",
@@ -129,15 +129,34 @@ export const navigation = [
       { permission: "execution_trust.manage", unrestricted: true },
       { permission: "integrations.manage", unrestricted: true },
     ],
-    group: "Administration",
+    group: "Settings",
   },
 ] as const satisfies readonly {
   to: string;
   label: string;
   icon: typeof LayoutDashboardIcon;
-  group: "Fleet" | "Security" | "Administration";
+  group: "Fleet" | "Security" | "Changes" | "Admin" | "Settings";
   access: Access | "approvals";
 }[];
+
+export type NavigationArea = (typeof navigation)[number]["group"];
+
+export const navigationAreas = [
+  { label: "Fleet", icon: MonitorIcon },
+  { label: "Security", icon: ShieldAlertIcon },
+  { label: "Changes", icon: RocketIcon },
+  { label: "Admin", icon: UsersIcon },
+  { label: "Settings", icon: SettingsIcon },
+] as const;
+
+// Related links reuse the same authorized destinations as the rail and palette.
+export const relatedNavigation: Record<NavigationArea, readonly string[]> = {
+  Fleet: ["/rollouts", "/advisories", "/groups"],
+  Security: ["/approvals", "/devices"],
+  Changes: ["/devices", "/advisories", "/audit"],
+  Admin: ["/enrollment", "/settings"],
+  Settings: ["/enrollment", "/authorization", "/integrations"],
+};
 
 // The shell and the command palette share this one decision.
 export function visibleNavigation(principal: SessionPrincipal) {

@@ -12,7 +12,7 @@ export const task = {
   route: "/rollouts",
   priority: "high",
   acceptance:
-    "No 'not proof of device execution' disclaimer or 'Saving records this assignment only'; no rollout is titled by its stage list; pausing is a secondary button with its own dialog; New rollout opens a dialog whose Target picker lists no type names, whose Profile picker leaves the sidebar groups alone, whose final stage stays at 100%, and whose impact summary is one line that never calls an excluded device 'Settings would change'.",
+    "No 'not proof of device execution' disclaimer or 'Saving records this assignment only'; no rollout is titled by its stage list; pausing is a secondary button with its own dialog; New rollout opens a dialog whose Target picker lists no type names, whose Profile picker leaves page navigation alone, whose final stage stays at 100%, and whose impact summary is one line that never calls an excluded device 'Settings would change'.",
 };
 
 const timeout = 30_000;
@@ -22,11 +22,11 @@ const STAGE_LIST = /^[A-Za-z0-9_.-]+(, [A-Za-z0-9_.-]+)*$/;
 const SUMMARY =
   /^(At least )?\d+ devices? will change( · \d+ unchanged)?( · \d+ not targeted)?( · \d+ unknown)?$/;
 
-// Expanded state of every sidebar group toggle, in order.
-function navGroups(page) {
+// The persistent page column must not change state when the picker opens.
+function navigationState(page) {
   return page
-    .locator('[data-sidebar="group-label"][aria-expanded], [data-slot="sidebar-group-label"]')
-    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-expanded")));
+    .locator("[data-shell]")
+    .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-pages-state")));
 }
 
 // Choose the first named option of a SearchPicker whose label is `label`.
@@ -95,17 +95,17 @@ export async function check({ page, visit, settle, require, capture, step }) {
   await dialog.waitFor({ timeout });
   require(await dialog.isVisible(), "New rollout does not open a dialog");
 
-  step("profile picker leaves the sidebar alone");
-  const before = await navGroups(page);
+  step("profile picker leaves navigation alone");
+  const before = await navigationState(page);
   await dialog.getByRole("button", { name: /^Profile / }).click();
   await page.getByRole("combobox", { name: "Search profile", exact: true }).waitFor({ timeout });
-  const during = await navGroups(page);
+  const during = await navigationState(page);
   await page.keyboard.press("Escape");
   require(before.length > 0 &&
     JSON.stringify(before) ===
       JSON.stringify(
         during,
-      ), `Opening the Profile picker changed the sidebar groups (${before} → ${during})`);
+      ), `Opening the Profile picker changed page navigation (${before} → ${during})`);
   const profiles = await chooseFirst(page, dialog, "Profile");
   require(profiles.length > 0, "The Profile picker offers no profile");
 

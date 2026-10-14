@@ -72,9 +72,23 @@ async function deviceIds(page) {
 }
 
 async function navigationPaths(page) {
-  return page
-    .locator('nav[aria-label="Main navigation"] a[href]')
-    .evaluateAll((links) => links.map((link) => new URL(link.href).pathname));
+  const toggle = page.getByRole("button", { name: "Toggle page navigation", exact: true });
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const paths = new Set();
+  const rail = page.locator("[data-shell-rail]");
+  const areas = await rail
+    .locator("[data-work-area]")
+    .evaluateAll((links) => links.map((link) => link.getAttribute("data-work-area")));
+  for (const area of areas) {
+    await rail.locator(`[data-work-area="${area}"]`).click();
+    const pages = page.getByRole("navigation", { name: `${area} pages`, exact: true });
+    await pages.waitFor({ state: "attached" });
+    for (const path of await pages
+      .locator("a[href]")
+      .evaluateAll((links) => links.map((link) => new URL(link.href).pathname)))
+      paths.add(path);
+  }
+  return [...paths].sort();
 }
 
 async function mainText(page) {

@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>B · Top workbench | lindm shell concept</title>
+    <link rel="stylesheet" href="shell.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="specimen">B · Top workbench · Owner selection only · Not a production screen</div>
+    <div class="topconcept">
+      <header class="mobilebar">
+        <div class="brand"><span class="logo" aria-hidden="true">l</span>lindm</div>
+        <div class="tools">
+          <button aria-label="Open command palette">Find</button
+          ><button aria-label="Account menu for Alex Morgan">AM</button>
+        </div>
+      </header>
+      <details class="mobile-menu">
+        <summary>Menu</summary>
+        <nav class="drawer" aria-label="Mobile navigation">
+          <p class="drawer-group">Fleet</p>
+          <a class="drawer-link" href="#dashboard">Dashboard</a
+          ><a class="drawer-link active" href="#main" aria-current="page">Devices</a
+          ><a class="drawer-link" href="#enrollment">Enrollment</a
+          ><a class="drawer-link" href="#groups">Device groups</a>
+          <p class="drawer-group">Other work areas</p>
+          <details>
+            <summary>Security</summary>
+            <a class="drawer-link" href="#advisories">Advisories</a
+            ><a class="drawer-link" href="#secrets">Secrets</a
+            ><a class="drawer-link" href="#audit-log">Audit log</a>
+          </details>
+          <details>
+            <summary>Changes</summary>
+            <a class="drawer-link" href="#profiles">Profiles</a
+            ><a class="drawer-link" href="#rollouts">Rollouts</a
+            ><a class="drawer-link" href="#approvals">Approvals</a>
+          </details>
+          <details>
+            <summary>Admin</summary>
+            <a class="drawer-link" href="#accounts">Accounts</a
+            ><a class="drawer-link" href="#authorization">Authorization</a
+            ><a class="drawer-link" href="#account-groups">Account groups</a
+            ><a class="drawer-link" href="#integrations">Integrations</a>
+          </details>
+          <details>
+            <summary>Settings</summary>
+            <a class="drawer-link" href="#server-settings">Server settings</a
+            ><a class="drawer-link" href="#device-capabilities">Device capabilities</a>
+          </details>
+          <div class="drawer-account">
+            Alex Morgan · Owner<br /><a class="drawer-link" href="#account">Account menu</a>
+          </div>
+        </nav>
+      </details>
+      <header class="topbar">
+        <a class="brand" href="#main"><span class="logo">l</span>lindm</a>
+        <nav class="topnav" aria-label="Work areas">
+          <details open>
+            <summary>Fleet</summary>
+            <div class="mega" id="fleet">
+              <div>
+                <h2>Devices and enrollment</h2>
+                <a href="#dashboard">Dashboard</a
+                ><a class="active" href="#main" aria-current="page"
+                  >Devices <span aria-hidden="true">→</span></a
+                ><a href="#enrollment">Enrollment</a><a href="#groups">Device groups</a>
+              </div>
+              <div>
+                <h2>Other work areas</h2>
+                <a href="#changes">Changes →</a><a href="#security">Security →</a>
+                <p>Profiles and rollouts are in Changes.<br />Advisories are in Security.</p>
+              </div>
+            </div>
+          </details>
+          <details>
+            <summary>Security</summary>
+            <div class="mega">
+              <div>
+                <h2>Security</h2>
+                <a href="#advisories">Advisories</a><a href="#secrets">Secrets</a
+                ><a href="#audit-log">Audit log</a>
+              </div>
+            </div>
+          </details>
+          <details>
+            <summary>Changes</summary>
+            <div class="mega">
+              <div>
+                <h2>Changes</h2>
+                <a href="#profiles">Profiles</a><a href="#rollouts">Rollouts</a
+                ><a href="#approvals">Approvals</a>
+              </div>
+            </div>
+          </details>
+          <details>
+            <summary>Admin</summary>
+            <div class="mega">
+              <div>
+                <h2>Admin</h2>
+                <a href="#accounts">Accounts</a><a href="#authorization">Authorization</a
+                ><a href="#account-groups">Account groups</a
+                ><a href="#integrations">Integrations</a>
+              </div>
+            </div>
+          </details>
+          <a href="#settings">Settings</a>
+        </nav>
+        <div class="tools">
+          <button class="search" aria-label="Open command palette">
+            Find a page or device <span class="key">⌘ K</span></button
+          ><button class="account" aria-label="Account menu for Alex Morgan">
+            <span class="avatar">AM</span><span>Alex Morgan<small>Owner</small></span
+            ><span aria-hidden="true">⌄</span>
+          </button>
+        </div>
+      </header>
+      <div class="mega-space">Fleet menu is open. Close it to recover this space.</div>
+      <header class="topline">
+        <div class="location">
+          <span>Fleet</span><span aria-hidden="true">/</span><strong>Devices</strong>
+        </div>
+        <div class="tools">
+          <button class="search" aria-label="Open command palette">
+            Find a page or device <span class="key">⌘ K</span></button
+          ><button class="account" aria-label="Account menu for Alex Morgan">
+            <span class="avatar">AM</span><span>Alex Morgan<small>Owner</small></span
+            ><span aria-hidden="true">⌄</span>
+          </button>
+        </div>
+      </header>
+      <main id="main" class="content" tabindex="-1">
+        <p class="eyebrow">Fleet / Devices</p>
+        <div class="title-row">
+          <h1>Devices</h1>
+          <button class="primary">Enroll device</button>
+        </div>
+        <section class="decision" aria-labelledby="needs-review">
+          <div>
+            <h2 id="needs-review">3 devices need inventory</h2>
+            <p>These devices have no current inventory. Their update state is unknown.</p>
+          </div>
+          <button>Review devices →</button>
+        </section>
+        <nav class="tabs" aria-label="Device views">
+          <a class="active" aria-current="page" href="#main">All devices</a
+          ><a href="#attention">Needs attention</a><a href="#groups">Groups</a>
+        </nav>
+        <div class="filters">
+          <button class="filter-search" aria-label="Search devices by name">
+            Search devices by name</button
+          ><button>All platforms <span aria-hidden="true">⌄</span></button
+          ><button>Filters <span aria-hidden="true">⌄</span></button
+          ><span class="scope">Illustrative data · 6 devices</span>
+        </div>
+        <div class="tablebox">
+          <table>
+            <caption style="position: absolute; width: 1px; height: 1px; overflow: hidden">
+              Illustrative devices and inventory observations
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Device</th>
+                <th scope="col">Platform</th>
+                <th scope="col">Inventory received</th>
+                <th scope="col">Next step</th>
+                <th scope="col"><span aria-label="Device details">Details</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <a class="device" href="#device">design-laptop-04</a
+                  ><small>Sam Patel · Design</small>
+                </td>
+                <td class="platform">Ubuntu 24.04</td>
+                <td class="observation">12 minutes ago</td>
+                <td class="condition">Review 2 updates</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <a class="device" href="#device">finance-laptop-12</a
+                  ><small>Jo Chen · Finance</small>
+                </td>
+                <td class="platform">Fedora 44</td>
+                <td class="observation">3 days ago</td>
+                <td class="condition">Request inventory</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <a class="device" href="#device">build-server-02</a><small>Build services</small>
+                </td>
+                <td class="platform">Debian 13</td>
+                <td class="observation">18 minutes ago</td>
+                <td class="muted">No action in this view</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <a class="device" href="#device">support-laptop-09</a
+                  ><small>Rae Lewis · Support</small>
+                </td>
+                <td class="platform">Rocky Linux 9</td>
+                <td class="observation">Not received</td>
+                <td class="condition">Request inventory</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <a class="device" href="#device">design-laptop-07</a
+                  ><small>Morgan Lee · Design</small>
+                </td>
+                <td class="platform">Ubuntu 24.04</td>
+                <td class="observation">15 minutes ago</td>
+                <td class="muted">No action in this view</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+              <tr>
+                <td>
+                  <a class="device" href="#device">archive-server-01</a
+                  ><small>Archive services</small>
+                </td>
+                <td class="platform">Debian 13</td>
+                <td class="observation">5 days ago</td>
+                <td class="condition">Request inventory</td>
+                <td><a class="rowlink" href="#device">Open →</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span>6 devices · No devices selected</span>
+          <div><button disabled>Previous</button> <button disabled>Next</button></div>
+        </div>
+        <footer class="note">
+          <strong>Owner-selection concept</strong
+          ><span
+            >Names, times and outcomes are illustrative.<span class="density-note">
+              Navigation changes do not send device actions.</span
+            ></span
+          >
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

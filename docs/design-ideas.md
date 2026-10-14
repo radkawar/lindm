@@ -93,6 +93,27 @@ still apply. Unknown drain or health keeps a server blocked, not tentatively saf
 **Owner question:** does negotiated desktop disruption warrant this extra mechanism,
 or is a policy-defined deadline with ordinary deferrals sufficient?
 
+## App shell: owner selection, 2026-10-13
+
+The owner requested a new navigation and page-container design. Compare three
+[HTML/CSS shell concepts](design-concepts/shell/index.html), with light/dark
+desktop/mobile screenshots and separate mobile navigation views:
+
+- **Focus rail:** a slim labelled work-area rail with a contextual flyout.
+- **Top workbench:** grouped top navigation with a mega-menu.
+- **Two-level workbench:** a stable work-area rail with contextual pages.
+
+[Recommendation and trade-offs](design-concepts/shell/recommendation.md):
+choose Two-level workbench for stable location and task-shaped navigation, with
+the second level collapsible for wide tables. The proposed Changes area groups
+Profiles, Rollouts and Approvals; it does not add routes or permissions.
+These are static specimens with illustrative data, not implemented product UI.
+Owner selection precedes production shell changes.
+The owner selected **Two-level workbench** on 2026-10-13. The production shell
+uses the persistent rail and current-area page column, with a remembered,
+keyboard-accessible collapse control and one mobile navigation drawer.
+The drawings remain illustrative selection records, not production screenshots.
+
 ## Selection and implementation boundary
 
 Choose **one** mechanism to explore first, or reject all four. Suggested selection

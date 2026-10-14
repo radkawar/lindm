@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { openNavigationPage } from "./review-navigation.mjs";
 
 import { randomUUID } from "node:crypto";
 
@@ -25,23 +26,7 @@ async function shot(ctx, name, screen, taskShaped, generic, remedy, outcome) {
 
 async function navigate(ctx, label, heading) {
   const { page } = ctx;
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
-  if (!(await nav.isVisible())) {
-    await page.getByRole("button", { name: "Toggle navigation", exact: true }).click();
-    await shot(
-      ctx,
-      `navigation-${label.toLowerCase()}`,
-      "Main navigation",
-      "partly",
-      "The mobile drawer exposes domain destinations rather than the current job's next step.",
-      "Keep the current task and selected group/device context visible across destinations.",
-      `The administrator opens navigation to ${label}.`,
-    );
-  }
-  await nav.getByRole("link", { name: label, exact: true }).click();
-  // Close the mobile navigation drawer so subsequent captures show the task.
-  const drawer = page.getByRole("dialog").filter({ has: nav });
-  if (await drawer.isVisible()) await page.keyboard.press("Escape");
+  await openNavigationPage(page, label);
   await visible(page.getByRole("heading", { name: heading, exact: true }));
 }
 

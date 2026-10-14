@@ -121,7 +121,7 @@ function layout(overlaySlot) {
       html.offsetHeight,
       html.clientHeight,
     ),
-    sidebar: box(document.querySelector('[data-slot="sidebar-container"]')),
+    sidebar: box(document.querySelector("[data-shell-rail]")),
     header: box(document.querySelector("header")),
     // Main content: a widened layout re-wraps text, which moves and resizes these.
     main: box(document.querySelector("main")),
