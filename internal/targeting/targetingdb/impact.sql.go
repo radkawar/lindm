@@ -36,19 +36,23 @@ func (q *Queries) GetImpactReport(ctx context.Context, arg GetImpactReportParams
 }
 
 const impactDevicesVisible = `-- name: ImpactDevicesVisible :one
-SELECT NOT EXISTS(SELECT 1 FROM target_assignment_impact_devices r WHERE r.report_id=$1
- AND device_scope_matches(r.device_id,$2::boolean,$3::jsonb) IS NOT TRUE)::boolean
+SELECT CASE WHEN $1::boolean THEN true ELSE
+ NOT EXISTS(SELECT 1 FROM target_assignment_impact_devices r WHERE r.report_id=$2
+  AND device_scope_matches(r.device_id,false,$3::jsonb) IS NOT TRUE)
+END::boolean
 `
 
 type ImpactDevicesVisibleParams struct {
-	ReportID     uuid.UUID
 	Unrestricted bool
+	ReportID     uuid.UUID
 	Scopes       []byte
 }
 
-func (q *Queries) ImpactDevicesVisible(ctx context.Context, arg ImpactDevicesVisibleParams) (pgtype.Bool, error) {
-	row := q.db.QueryRow(ctx, impactDevicesVisible, arg.ReportID, arg.Unrestricted, arg.Scopes)
-	var column_1 pgtype.Bool
+// An unrestricted grant already covers every retained row. Keep the full
+// current-scope check for scoped grants, including rows outside this page.
+func (q *Queries) ImpactDevicesVisible(ctx context.Context, arg ImpactDevicesVisibleParams) (bool, error) {
+	row := q.db.QueryRow(ctx, impactDevicesVisible, arg.Unrestricted, arg.ReportID, arg.Scopes)
+	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
 }

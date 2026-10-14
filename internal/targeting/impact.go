@@ -121,7 +121,7 @@ func impactPage(ctx context.Context, q *targetingdb.Queries, p identity.Principa
 		return nil, err
 	}
 	// Do not disclose retained rows or aggregate counts after scope revocation.
-	if !visible.Valid || !visible.Bool {
+	if !visible {
 		return nil, ErrNotFound
 	}
 	cursor := uuid.Nil

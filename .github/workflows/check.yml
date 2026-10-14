@@ -78,8 +78,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install native package test tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync
+      - name: Install native package and TPM test tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync swtpm
       - run: make bootstrap
       - run: make test audit
 
@@ -103,8 +103,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install native enrollment artifact tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync
+      - name: Install native enrollment and TPM test tools
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync swtpm
       - name: Require Docker Compose
         run: docker compose version
       - run: make bootstrap

@@ -283,10 +283,52 @@ func TestImpactAuthorityAndActorBoundPages(t *testing.T) {
 	}
 	f.actor = owner
 	f.actor.Bindings = []*authv1.RoleBinding{{Permissions: []string{string(identity.PermissionAssignResources)}}, {Permissions: []string{string(identity.PermissionReadFleet)}, Scopes: []*authv1.DeviceScope{{DeviceIds: []string{uuid.NewString()}}}}}
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error { _, err := f.store.Impact(t.Context(), tx, f.actor, r, emptyImpact); return err }); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("revoked read scope disclosed retained report: %v", err)
+	}
+	f.actor.Bindings[1].Scopes[0].DeviceIds = []string{f.device.String()}
+	continued := f.impact(t, r)
+	if continued.CandidateCount != report.CandidateCount || len(continued.Devices) != 1 || continued.Devices[0].DeviceId != f.device.String() {
+		t.Fatal("current scoped grant could not read its retained report")
+	}
+	f.actor.Bindings[1].Scopes[0].DeviceIds = []string{uuid.NewString()}
 	r.PreviewId = nil
 	hidden := f.impact(t, r)
 	if hidden.Complete || len(hidden.Devices) != 0 || hidden.TargetCount != 0 || hidden.CandidateCount != 0 {
 		t.Fatalf("hidden devices leaked through aggregate/report: %v", hidden)
+	}
+}
+
+func TestImpactPagesRecheckScopeOutsideTheCurrentPage(t *testing.T) {
+	f := newTargetingFixture(t)
+	group := f.impactGroup(t, 3)
+	r := f.impactRequest(impactGroup(group))
+	r.PageSize = 1
+	first := f.impact(t, r)
+	if first.CandidateCount != 3 || len(first.Devices) != 1 || first.NextAfterDeviceId == nil {
+		t.Fatal("expected a retained three-device report with bounded pages")
+	}
+	r.PreviewId, r.AfterDeviceId = &first.PreviewId, first.NextAfterDeviceId
+	f.actor.Bindings = []*authv1.RoleBinding{
+		{Permissions: []string{string(identity.PermissionAssignResources)}},
+		{Permissions: []string{string(identity.PermissionReadFleet)}, Scopes: []*authv1.DeviceScope{{GroupIds: []string{group.String()}}}},
+	}
+	next := f.impact(t, r)
+	if len(next.Devices) != 1 || next.NextAfterDeviceId == nil {
+		t.Fatal("current scoped grant did not permit the next bounded page")
+	}
+	// Revoke the last retained device, not the device on the requested page.
+	// Aggregate counts still cover that last device and must not be disclosed.
+	if _, err := f.pool.Exec(t.Context(), `DELETE FROM device_group_memberships
+ WHERE group_id=$1 AND device_id=(SELECT device_id FROM device_group_memberships
+ WHERE group_id=$1 ORDER BY device_id DESC LIMIT 1)`, group); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.impactTransaction(t, func(tx pgx.Tx) error {
+		_, err := f.store.Impact(t.Context(), tx, f.actor, r, emptyImpact)
+		return err
+	}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("out-of-page scope revocation disclosed retained aggregates: %v", err)
 	}
 }
 

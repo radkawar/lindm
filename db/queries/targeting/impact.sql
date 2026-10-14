@@ -59,8 +59,12 @@ SELECT device_id,document FROM target_assignment_impact_devices
 WHERE report_id=$1 AND device_id>sqlc.arg(after_id)::uuid ORDER BY device_id LIMIT sqlc.arg(row_limit)::int;
 
 -- name: ImpactDevicesVisible :one
-SELECT NOT EXISTS(SELECT 1 FROM target_assignment_impact_devices r WHERE r.report_id=sqlc.arg(report_id)
- AND device_scope_matches(r.device_id,sqlc.arg(unrestricted)::boolean,sqlc.arg(scopes)::jsonb) IS NOT TRUE)::boolean;
+-- An unrestricted grant already covers every retained row. Keep the full
+-- current-scope check for scoped grants, including rows outside this page.
+SELECT CASE WHEN sqlc.arg(unrestricted)::boolean THEN true ELSE
+ NOT EXISTS(SELECT 1 FROM target_assignment_impact_devices r WHERE r.report_id=sqlc.arg(report_id)
+  AND device_scope_matches(r.device_id,false,sqlc.arg(scopes)::jsonb) IS NOT TRUE)
+END::boolean;
 
 -- name: PruneImpactReports :exec
 DELETE FROM target_assignment_impact_reports WHERE id IN (

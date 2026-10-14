@@ -2609,6 +2609,33 @@ Measurements are retained at
 cohort is a server regression gate, not native-provider or full active-fleet
 latency qualification.
 
+The 2026-10-14 dependency-upgrade CI run
+[`38596974767`](https://github.com/radkawar/lindm/actions/runs/38596974767)
+spent 111.178 seconds traversing the retained report before the unchanged outer
+test budget expired during save. Extending the existing argument-free query
+tracer to distinguish pages from save identified redundant visibility work:
+every unrestricted page scanned all 10,000 retained devices, for five million
+scope-function evaluations across 500 pages. A focused real-PostgreSQL race run
+measured build / pages / save at 4.789 / 58.277 / 2.791 seconds, with 27.324 seconds
+inside `ImpactDevicesVisible`. The query now returns directly for an unrestricted
+grant; scoped grants still revalidate all retained rows against current visibility,
+including devices outside the requested page. Real integration regressions cover
+both legitimate scoped continuations and read-scope revocation without disclosing
+retained aggregates.
+
+After the query change, `make check` and the full 118-package integration run
+passed against the same protected fixture without restarting it. Under the full
+suite's concurrent load, build / pages / save measured 3.274 / 73.396 / 3.778 seconds;
+the visibility query total was 105.753 milliseconds. These focused and full-suite
+wall times have different concurrent workloads, not a like-for-like latency
+comparison. The 15-second RPC bound, outer test budget, 10,000 retained rows,
+500 pages, frozen membership and 1 MiB response bounds are unchanged. Raw events
+are retained in the dependency-upgrade worktree's
+`artifacts/impact-pages-before-20261014.json` and
+`artifacts/integration-impact-pages-after-20261014.json`. Hosted CI also installs
+the actual `swtpm` executable needed by its native TPM lifecycle regression;
+missing host prerequisites are not replaced with skips or mocked tools.
+
 On 2026-10-10 the landed tree passed `make generate`, `go build ./...`,
 `go vet ./...`, `npm run build:web`, `npm run typecheck:web`, and unit race
 tests for resource, policy, targeting, device, identity, ctl, loadlab and devlab.

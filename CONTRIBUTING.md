@@ -27,13 +27,13 @@ run `docker info` and `docker compose version`. Docker access grants broad host
 privileges. Use a disposable development machine if that access is not appropriate.
 The supported commands below use Docker, not Podman Compose.
 
-On Ubuntu 24.04, install the native package and fixture tools:
+On Ubuntu 24.04, install the native package, fixture and software TPM test tools:
 
 ```sh
 sudo apt-get update
 sudo apt-get install --no-install-recommends --yes \
   build-essential git make gnupg gpgv cloud-image-utils apt-utils dpkg-dev \
-  rpm rpm2cpio cpio createrepo-c systemd rsync
+  rpm rpm2cpio cpio createrepo-c systemd rsync swtpm
 make bootstrap
 ```
 

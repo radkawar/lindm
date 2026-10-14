@@ -16,6 +16,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Install the real software TPM for hosted integration tests and retain separate query-cost diagnostics for 10,000-device impact report pages and rollout saves, without changing deadlines or assertions.
+- Avoid scanning all retained impact devices on every unrestricted report page; scoped grants still recheck the complete report against current device visibility before exposing rows or totals.
 - Preserve existing disabled PostgreSQL cluster policies spelled `off`, `false`, `no` or `0`, while refusing enabled, empty or invalid values.
 - Validate protected PostgreSQL cluster policies before installing native tools, so fresh external-database hosts do not need a manual `postgresql-common` prerequisite. Reject ambiguous directives before package changes.
 - Run every pushed-main CI workflow independently so a later push cannot replace a pending verification; continue canceling obsolete pull-request runs.

@@ -137,7 +137,7 @@ func TestProposedImpactCanonicalAssignmentReplacement(t *testing.T) {
 // and native readiness; only the enrolled fixture has a fresh named observation.
 func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	f := newDispatchFixture(t)
-	startTrace := traceImpactSave(t, f)
+	startTrace := traceImpact(t, f)
 	if _, err := f.service.ReportHostObservation(f.deviceCtx, connect.NewRequest(hostObservation(f.principal.GenerationID.String(), 1, "finance-canary"))); err != nil {
 		t.Fatal(err)
 	}
@@ -168,6 +168,7 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	page := review
 	seen := make(map[string]bool, 10000)
 	maxProto, maxJSON, pages := 0, 0, 0
+	startTrace("pages")
 	pageStart := time.Now()
 	for {
 		pages++
@@ -216,7 +217,7 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 		t.Fatalf("unbounded persisted report: rows=%d bytes=%d", persistedRows, persistedBytes)
 	}
 	t.Logf("10k impact before start: build=%s pages=%s", buildDuration, pageDuration)
-	startTrace()
+	startTrace("save")
 	saveStart := time.Now()
 	saveCtx, cancelSave := context.WithTimeout(f.adminCtx, 30*time.Second)
 	defer cancelSave()
@@ -239,9 +240,9 @@ func TestTargetAssignmentImpactTenThousandRealReportPagesAndSave(t *testing.T) {
 	t.Logf("10k impact build=%s pages=%s save=%s max_protobuf=%d max_json=%d persisted_rows=%d persisted_bytes=%d", buildDuration, pageDuration, saveDuration, maxProto, maxJSON, persistedRows, persistedBytes)
 }
 
-// Trace only the real save, without statement arguments or changes to its
-// authority, transaction isolation, input locks or transport/runtime deadlines.
-func traceImpactSave(t *testing.T, f *dispatchFixture) func() {
+// Trace the real page traversal and save, without statement arguments or changes
+// to authority, transaction isolation, input locks or transport/runtime deadlines.
+func traceImpact(t *testing.T, f *dispatchFixture) func(string) {
 	t.Helper()
 	trace := &impactSaveTrace{t: t, active: make(map[impactSaveTraceKey]impactSaveOperation), totals: make(map[string]time.Duration)}
 	cfg := f.pool.Config()
@@ -255,12 +256,12 @@ func traceImpactSave(t *testing.T, f *dispatchFixture) func() {
 		f.service.Pool = f.pool
 		pool.Close()
 		for operation, duration := range trace.totals {
-			t.Logf("10k save operation=%s total=%s", operation, duration)
+			t.Logf("10k operation=%s total=%s", operation, duration)
 		}
 	})
-	return func() {
+	return func(phase string) {
 		trace.mu.Lock()
-		trace.enabled = true
+		trace.phase = phase
 		trace.mu.Unlock()
 	}
 }
@@ -276,20 +277,20 @@ type impactSaveOperation struct {
 }
 
 type impactSaveTrace struct {
-	t       *testing.T
-	mu      sync.Mutex
-	enabled bool
-	active  map[impactSaveTraceKey]impactSaveOperation
-	totals  map[string]time.Duration
+	t      *testing.T
+	mu     sync.Mutex
+	phase  string
+	active map[impactSaveTraceKey]impactSaveOperation
+	totals map[string]time.Duration
 }
 
 func (trace *impactSaveTrace) start(conn *pgx.Conn, copy bool, name string) {
 	trace.mu.Lock()
 	defer trace.mu.Unlock()
-	if !trace.enabled {
+	if trace.phase == "" {
 		return
 	}
-	trace.active[impactSaveTraceKey{conn, copy}] = impactSaveOperation{name, time.Now()}
+	trace.active[impactSaveTraceKey{conn, copy}] = impactSaveOperation{trace.phase + " " + name, time.Now()}
 }
 
 func (trace *impactSaveTrace) end(conn *pgx.Conn, copy bool, err error) {
@@ -304,7 +305,7 @@ func (trace *impactSaveTrace) end(conn *pgx.Conn, copy bool, err error) {
 	duration := time.Since(operation.started)
 	trace.totals[operation.name] += duration
 	if err != nil || duration > 250*time.Millisecond {
-		trace.t.Logf("10k save operation=%s duration=%s error=%v", operation.name, duration, err)
+		trace.t.Logf("10k operation=%s duration=%s error=%v", operation.name, duration, err)
 	}
 }
 
