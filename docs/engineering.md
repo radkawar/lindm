@@ -192,6 +192,15 @@ the viewport offset; it must not apply the same scroll twice. Existing popup
 stability checks cover long profile pages as well as the top-bar command palette
 and mobile menu. Page contracts scope headings and actions to `main`, not the
 contextual navigation; in-app journeys follow visible work-area and page controls.
+Review captures explicitly encode PNG and restore native scrollbar rendering
+before the next geometry baseline. Chromium capture can leave scrollbars hidden;
+their later restoration must not be mistaken for popup reflow. The capture helper
+renders a temporary CSSOM `scrollbar-width` rule, removes its own stylesheet, then
+waits for the original scrollbar styles to render. It preserves the viewport and
+the app's stylesheet list. A real-browser regression checks viewport width,
+horizontal table scrollbar height and following content before and after full-page
+and viewport captures. Product table overflow and popup stability criteria remain
+unchanged.
 Forms compose the official shadcn Select rather than native dropdowns; controlled
 enum conversions, disabled state, and named uncontrolled form values are preserved.
 Explanations of how a feature works are not inline page text: keep at most one short

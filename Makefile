@@ -150,7 +150,7 @@ acceptance: acceptance-build
 	artifacts/bin/lab acceptance -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
 
 ui-review: acceptance-build
-	node --test web/acceptance/review-ste.test.mjs web/acceptance/review-help.test.mjs web/acceptance/review-contrast.test.mjs
+	node --test web/acceptance/review-ste.test.mjs web/acceptance/review-help.test.mjs web/acceptance/review-contrast.test.mjs web/acceptance/review-capture.test.mjs
 	artifacts/bin/lab console review -repo "$(UI_REVIEW_REPO)" -lindmd artifacts/bin/lindmd -evidence "$(UI_REVIEW_EVIDENCE)" $(UI_REVIEW_FLAGS)
 
 # Local CI (basecamp/gh-signoff): cmd/devenv signoff refuses an unpushed HEAD,

@@ -10,6 +10,7 @@ import { resolve, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createRequire } from "node:module";
 import { ChromiumDriver, UI } from "./drivers.mjs";
+import { captureReviewPNG } from "./review-capture.mjs";
 import { enroll, signIn } from "./journey.mjs";
 import {
   privateDirectory,
@@ -230,7 +231,7 @@ async function screenshot(page, file, fullPage) {
   ];
   await writePrivate(
     path,
-    await page.screenshot({ fullPage, animations: "disabled", mask, timeout: 30_000 }),
+    await captureReviewPNG(page, { fullPage, animations: "disabled", mask, timeout: 30_000 }),
   );
   operation = previousOperation;
   return `screenshots/${file}`;
