@@ -17,13 +17,10 @@ func TestProductionImportRefusesUnsafeHostSwapBeforeParsing(t *testing.T) {
 		// Production success is exercised by the dedicated VM integration lane.
 		return
 	}
-	if !strings.Contains(guardErr.Error(), "production native signing refuses unencrypted swap") {
-		t.Fatal(guardErr)
-	}
 	directory := t.TempDir()
 	// Refusal precedes secret parsing, mappings, and native key import.
 	key, cleanup, err := ImportProductionSigner(t.Context(), directory, []byte("unused public key sentinel"), []byte("unused public passphrase sentinel"))
-	if key != nil || cleanup != nil || err == nil || !strings.Contains(err.Error(), "production native signing refuses unencrypted swap") {
+	if key != nil || cleanup != nil || err == nil || !strings.Contains(err.Error(), guardErr.Error()) {
 		t.Fatalf("native import bypassed swap guard: %v", err)
 	}
 	entries, err := os.ReadDir(directory)

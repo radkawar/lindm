@@ -29,7 +29,13 @@ func TestNativeSigningSwapPolicyNeverOffersProcessLockBypass(t *testing.T) {
 func TestProtectNativeSigningRefusesActualUnsafeHostSwap(t *testing.T) {
 	unsafe, err := unprotectedSwaps("/proc/swaps", "/sys")
 	if err != nil {
-		t.Fatal(err)
+		// Containers can expose host /proc/swaps without the backing filesystem.
+		// Uninspectable topology must refuse, never be mistaken for safe swap.
+		refusal := ProtectNativeSigningSecrets()
+		if refusal == nil || !strings.Contains(refusal.Error(), err.Error()) {
+			t.Fatalf("uninspectable swap did not fail closed: %v (inspection: %v)", refusal, err)
+		}
+		return
 	}
 	if len(unsafe) == 0 {
 		if err := ProtectNativeSigningSecrets(); err != nil {
