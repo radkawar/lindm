@@ -33,6 +33,7 @@ type VMDeployOptions struct {
 	Repository, CacheDir, WorkDir, EvidenceDirectory, LabBinary  string
 	FirstRelease, UpgradeRelease, ReleasePublicKey, ReleaseKeyID string
 	BackupRecipientFile, BackupIdentityFile, TUFRootFile         string
+	CustodyEscrowRecipientFile                                   string
 	RedHatTokenFile                                              string
 	BackupIdentityPassphrase                                     []byte `json:"-"`
 	Browser                                                      func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error)
@@ -65,6 +66,9 @@ type VMDeployResult struct {
 	EvidenceFiles                    []string                     `json:"evidence_files"`
 	RuntimeSQLGates                  []VMDeploySQLGate            `json:"runtime_sql_gates"`
 	DatabaseCredentialGates          []string                     `json:"database_credential_gates"`
+	IntegrationDestinationID         string                       `json:"integration_destination_id,omitempty"`
+	IntegrationSecretSHA256          string                       `json:"integration_secret_sha256,omitempty"`
+	IntegrationSecretGates           []string                     `json:"integration_secret_gates"`
 	InitialPrerequisites             []string                     `json:"initial_prerequisites"`
 	RestorePrerequisites             []string                     `json:"restore_initial_prerequisites"`
 	FreshDatabaseCustodySHA256       string                       `json:"fresh_database_custody_sha256,omitempty"`
@@ -141,7 +145,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	}
 	custodyPassphrase := []byte(rand.Text() + rand.Text())
 	defer clear(custodyPassphrase)
-	if err := escrowDeployPassphrase(options.BackupRecipientFile, filepath.Join(options.EvidenceDirectory, "source-custody-passphrase.age"), custodyPassphrase); err != nil {
+	if err := encryptDeployEvidence(options.CustodyEscrowRecipientFile, filepath.Join(options.EvidenceDirectory, "source-custody-passphrase.age"), custodyPassphrase); err != nil {
 		return result, err
 	}
 	result.CustodianIdentity = "development lab operator fixture; not independent human custodians"
@@ -179,6 +183,10 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			if observed != nil {
 				result.Browser = append(result.Browser, observed)
 				result.Operations = append(result.Operations, observed.Operations...)
+				if phase == "integration" {
+					result.IntegrationDestinationID = observed.IntegrationDestinationID
+					result.IntegrationSecretSHA256 = observed.IntegrationSecretSHA256
+				}
 			}
 			return errors.Join(runErr, deploylab.ValidateBrowserEvidence(request, observed))
 		})
@@ -261,6 +269,19 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	if err := browser("custody", ""); err != nil {
 		return result, err
 	}
+	if err := browser("integration", ""); err != nil {
+		return result, err
+	}
+	var integrationProof *DeployIntegrationProof
+	if err := op("prove browser-created encrypted integration secret", "harness", func() error {
+		var proofErr error
+		integrationProof, proofErr = observeGuestDeployIntegration(ctx, server, result.IntegrationDestinationID, result.IntegrationSecretSHA256, nil, false)
+		return proofErr
+	}); err != nil {
+		return result, err
+	}
+	defer clear(integrationProof.Ciphertext)
+	result.IntegrationSecretGates = append(result.IntegrationSecretGates, "installed")
 	request.CommandPath = filepath.Join(private, "console-command")
 	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
 		result.DeviceID = enrolled.DeviceID
@@ -292,6 +313,19 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return err
 		}
 		result.DatabaseCredentialGates = append(result.DatabaseCredentialGates, "upgraded")
+		if err := op("prove upgrade retained integration key and ciphertext", "harness", func() error {
+			proof, proofErr := observeGuestDeployIntegration(ctx, server, result.IntegrationDestinationID, result.IntegrationSecretSHA256, integrationProof.Ciphertext, false)
+			if proofErr != nil {
+				return proofErr
+			}
+			if proof.EncryptionKeySHA256 != integrationProof.EncryptionKeySHA256 {
+				return errors.New("upgrade replaced the integration encryption key")
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		result.IntegrationSecretGates = append(result.IntegrationSecretGates, "upgraded")
 		admin.activate(server)
 		device.activate(server)
 		if err := browser("manage", enrolled.DeviceID); err != nil {
@@ -361,7 +395,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		}
 		freshCustodyPassphrase := []byte(rand.Text() + rand.Text())
 		defer clear(freshCustodyPassphrase)
-		if runErr := escrowDeployPassphrase(options.BackupRecipientFile, filepath.Join(options.EvidenceDirectory, "fresh-database-custody-passphrase.age"), freshCustodyPassphrase); runErr != nil {
+		if runErr := encryptDeployEvidence(options.CustodyEscrowRecipientFile, filepath.Join(options.EvidenceDirectory, "fresh-database-custody-passphrase.age"), freshCustodyPassphrase); runErr != nil {
 			return runErr
 		}
 		result.EvidenceFiles = append(result.EvidenceFiles, "fresh-database-custody-passphrase.age")
@@ -376,6 +410,19 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return runErr
 		}
 		result.DatabaseCredentialGates = append(result.DatabaseCredentialGates, "fresh_destination")
+		if runErr := op("prove fresh key cannot decrypt original integration secret", "harness", func() error {
+			proof, proofErr := observeGuestDeployIntegration(ctx, restored, result.IntegrationDestinationID, result.IntegrationSecretSHA256, integrationProof.Ciphertext, true)
+			if proofErr != nil {
+				return proofErr
+			}
+			if proof.EncryptionKeySHA256 == integrationProof.EncryptionKeySHA256 {
+				return errors.New("fresh restore destination reused source integration key")
+			}
+			return nil
+		}); runErr != nil {
+			return runErr
+		}
+		result.IntegrationSecretGates = append(result.IntegrationSecretGates, "fresh_key_rejected")
 		if runErr := copyDeployRecoveryCustody(ctx, restored, "/var/lib/lindmd-operations/recovery-custody.age", filepath.Join(private, "fresh-database-recovery-custody.age"), &result.FreshDatabaseCustodySHA256); runErr != nil {
 			return runErr
 		}
@@ -402,6 +449,19 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return runErr
 		}
 		result.DatabaseCredentialGates = append(result.DatabaseCredentialGates, "restored")
+		if runErr := op("prove restored original integration key decrypts original destination", "harness", func() error {
+			proof, proofErr := observeGuestDeployIntegration(ctx, restored, result.IntegrationDestinationID, result.IntegrationSecretSHA256, integrationProof.Ciphertext, false)
+			if proofErr != nil {
+				return proofErr
+			}
+			if proof.EncryptionKeySHA256 != integrationProof.EncryptionKeySHA256 {
+				return errors.New("restore did not recover original integration key")
+			}
+			return nil
+		}); runErr != nil {
+			return runErr
+		}
+		result.IntegrationSecretGates = append(result.IntegrationSecretGates, "restored")
 		restoreCustody, runErr := readDeployCustodyStatus(ctx, restored, origin, deviceOrigin, map[string]string{"canonical_authority": result.RecoveryCustodySHA256, "fresh_database": result.FreshDatabaseCustodySHA256})
 		if runErr != nil {
 			return runErr
@@ -463,7 +523,7 @@ func prepareDeployInputs(ctx context.Context, guest *guestVM, options VMDeployOp
 			return err
 		}
 	}
-	for name, path := range map[string]string{"release-key": options.ReleasePublicKey, "backup-recipient": options.BackupRecipientFile, "tuf-root": options.TUFRootFile} {
+	for name, path := range map[string]string{"release-key": options.ReleasePublicKey, "backup-recipient": options.BackupRecipientFile, "tuf-root": options.TUFRootFile, "lab-helper": options.LabBinary} {
 		if err := uploadDeployPath(ctx, guest, path, "/root/lindm-deploy-input/"+name); err != nil {
 			return err
 		}
@@ -486,8 +546,7 @@ func installDeployRelease(ctx context.Context, guest *guestVM, options VMDeployO
 	}
 	command := deployInstallerCommand(options, destination, origin, deviceOrigin, version, airgap)
 	input := io.MultiReader(bytes.NewReader(passphrase), strings.NewReader("\n"), bytes.NewReader(passphrase), strings.NewReader("\n"))
-	_, err := serverGuestCommand(ctx, guest, "execute signed turnkey installer", command, input)
-	return err
+	return executeDeployInstaller(ctx, guest, options, destination, command, input)
 }
 
 func deployInstallerCommand(options VMDeployOptions, destination, origin, deviceOrigin, version string, airgap bool) string {

@@ -29,11 +29,23 @@ func main() {
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	if len(args) > 0 && args[0] == "deploy" {
+		if len(args) > 1 && args[1] == "integrations-proof" {
+			return runDeployIntegrationProof(ctx, args[2:], stdout, stderr)
+		}
+		if len(args) > 1 && args[1] == "operator-init" {
+			return runDeployOperatorInit(ctx, args[2:], stdout, stderr)
+		}
+		if len(args) > 1 && args[1] == "operator-verify" {
+			return runDeployOperatorVerify(ctx, args[2:], stdout, stderr)
+		}
 		if len(args) > 1 && args[1] == "audit" {
 			return runScheduledVM(ctx, append([]string{"vm", "deploy-audit"}, args[2:]...), stdout, stderr)
 		}
 		if len(args) > 1 && args[1] == "setup" {
 			return runScheduledVM(ctx, append([]string{"vm", "deploy-setup"}, args[2:]...), stdout, stderr)
+		}
+		if len(args) > 1 && args[1] == "build" {
+			return runScheduledVM(ctx, append([]string{"vm", "deploy-build"}, args[2:]...), stdout, stderr)
 		}
 		return runScheduledVM(ctx, append([]string{"vm", "deploy"}, args[1:]...), stdout, stderr)
 	}
@@ -130,6 +142,12 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	}
 	if len(args) == 2 && args[0] == "native" && args[1] == "install-snapshot-child" {
 		return vmlab.RunInstallSnapshotChild(ctx, stdout)
+	}
+	if len(args) >= 2 && args[0] == "native" && args[1] == "cold-release-child" {
+		return runDeployColdGuest(ctx, args[2:], stderr)
+	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy-build" {
+		return runDeployBuildAdmitted(ctx, args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy-audit" {
 		return runDeployAuditAdmitted(ctx, args[2:], stdout, stderr)

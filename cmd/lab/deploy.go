@@ -46,8 +46,11 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags.StringVar(&options.ReleaseKeyID, "release-key-id", "", "independently pinned release attestation key ID")
 	flags.StringVar(&options.TUFRootFile, "tuf-root-file", "", "independently authenticated signed release-update root")
 	flags.StringVar(&options.BackupRecipientFile, "backup-recipient-file", "", "protected age recipient public input")
+	flags.StringVar(&options.CustodyEscrowRecipientFile, "custody-escrow-recipient-file", "", "dedicated durable LAB-ONLY public age escrow recipient; never a server backup recipient")
 	flags.StringVar(&options.BackupIdentityFile, "backup-identity-file", "", "passphrase-encrypted age backup identity kept off the online server")
 	identityPassphraseFD := flags.Int("backup-identity-passphrase-fd", -1, "protected anonymous private pipe carrying one backup identity passphrase line; numeric descriptor only")
+	identityPassphraseEscrow := flags.String("backup-identity-passphrase-escrow", "", "durable age-encrypted off-server lab backup unlock phrase instead of a secret FD")
+	labEscrowIdentity := flags.String("lab-escrow-identity-file", "", "dedicated protected LAB-ONLY private escrow identity; never uploaded or bundled")
 	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected available Red Hat offline-token input; never print contents")
 	lindmd := flags.String("lindmd", "", "matching consolidated prebuilt lindmd for offline backup drill/checkpoint signing")
 	lindmctl := flags.String("lindmctl", "", "matching prebuilt owner CLI for offline higher-epoch delegation")
@@ -55,11 +58,11 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
-	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || options.EvidenceDirectory == "" || *lindmd == "" || *lindmctl == "" {
+	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || options.EvidenceDirectory == "" || *lindmd == "" || *lindmctl == "" || options.CustodyEscrowRecipientFile == "" {
 		return errors.New("deploy requires -manifest, -first-release, -upgrade-release, explicit trust and backup inputs, -lindmd, -lindmctl, -evidence and -record; no positional arguments")
 	}
-	if *identityPassphraseFD < 0 {
-		return errors.New("deploy requires -backup-identity-passphrase-fd; no plaintext identity/passphrase fallback")
+	if *identityPassphraseFD < 0 && (*identityPassphraseEscrow == "" || *labEscrowIdentity == "") {
+		return errors.New("deploy requires protected backup passphrase FD or durable encrypted lab unlock escrow with dedicated operator identity")
 	}
 	if err := prepareDeployCustodianMemory(ctx, options.Repository); err != nil {
 		return err
@@ -68,14 +71,11 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 		return err
 	}
 	var err error
-	options.BackupIdentityPassphrase, err = custody.ReadPassphraseFD(ctx, *identityPassphraseFD, false)
+	options.BackupIdentityPassphrase, err = readDeployBackupUnlock(ctx, *identityPassphraseFD, *identityPassphraseEscrow, *labEscrowIdentity)
 	if err != nil {
 		return err
 	}
 	defer clear(options.BackupIdentityPassphrase)
-	if err := syscall.Close(*identityPassphraseFD); err != nil {
-		return err
-	}
 	if options.LabBinary == "" {
 		var err error
 		options.LabBinary, err = os.Executable()
@@ -83,7 +83,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 			return err
 		}
 	}
-	if err := resolvePackagePaths(&options.Repository, &options.CacheDir, &options.WorkDir, &options.EvidenceDirectory, &options.LabBinary, &options.FirstRelease, &options.UpgradeRelease, &options.ReleasePublicKey, &options.TUFRootFile, &options.BackupRecipientFile, &options.BackupIdentityFile, &options.RedHatTokenFile, lindmd, lindmctl, record); err != nil {
+	if err := resolvePackagePaths(&options.Repository, &options.CacheDir, &options.WorkDir, &options.EvidenceDirectory, &options.LabBinary, &options.FirstRelease, &options.UpgradeRelease, &options.ReleasePublicKey, &options.TUFRootFile, &options.BackupRecipientFile, &options.CustodyEscrowRecipientFile, &options.BackupIdentityFile, &options.RedHatTokenFile, lindmd, lindmctl, record); err != nil {
 		return err
 	}
 	if err := os.Mkdir(options.EvidenceDirectory, 0700); err != nil {

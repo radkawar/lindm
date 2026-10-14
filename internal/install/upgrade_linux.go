@@ -76,6 +76,9 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 		}
 	}
 	binary := filepath.Join(tmp, "usr/bin/lindmd")
+	if err := integrationCredentialPreflight(ctx, binary); err != nil {
+		return err
+	}
 	preflight, err := command(ctx, nil, binary, "schema-check", "-config", "/etc/lindm/migrate/server.json")
 	if err != nil {
 		return err
@@ -110,6 +113,9 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 		return err
 	}
 	if _, err := command(ctx, nil, "systemctl", "stop", "lindmd-backup.timer", "lindmd-release-check.timer", "lindmd-release-check.service"); err != nil {
+		return err
+	}
+	if err := prepareNativeIntegrationUpgrade(ctx, binary); err != nil {
 		return err
 	}
 	if err := lease.Backup(ctx, serverops.BackupOptions{Config: "/etc/lindm/server.json", RecipientFile: "/etc/lindm/backup-recipient", OutputDirectory: "/var/backups/lindm"}); err != nil {

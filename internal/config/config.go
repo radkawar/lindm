@@ -25,9 +25,10 @@ const maxFileBytes = 1 << 20
 // Document holds the validated contract and its reference directory. Resource
 // resolution is explicit so a migration process need not read device signing keys.
 type Document struct {
-	Proto                 *configv1.ServerConfig
-	base                  string
-	databaseURLCredential *databaseURLCredential
+	Proto                              *configv1.ServerConfig
+	base                               string
+	databaseURLCredential              *systemdCredential
+	integrationEncryptionKeyCredential *systemdCredential
 }
 
 // Load decodes and validates configuration before accessing referenced resources.

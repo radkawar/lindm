@@ -74,7 +74,7 @@ func TestNativeProductLayoutAndPermissions(t *testing.T) {
 				}
 			}
 			if p.name == ServerPackageName {
-				for _, path := range []string{"DEBIAN/conffiles", ServerConfigPath[1:], ServerMigrationConfigPath[1:], "etc/lindm/agent.json", "etc/lindm/executor.json"} {
+				for _, path := range []string{"DEBIAN/conffiles", ServerConfigPath[1:], ServerMigrationConfigPath[1:], "etc/lindm/integrations.key", "etc/lindm/agent.json", "etc/lindm/executor.json"} {
 					if _, err := os.Stat(filepath.Join(extract, path)); !errors.Is(err, os.ErrNotExist) {
 						t.Fatalf("server package claims operator credential/config %s: %v", path, err)
 					}
@@ -276,17 +276,26 @@ func assertServerDatabaseCredentialUnits(t *testing.T, root string) {
 			if service {
 				key, value, ok := strings.Cut(line, "=")
 				if ok {
-					if _, duplicate := properties[key]; duplicate {
-						t.Fatalf("%s repeats service directive %s", item.unit, key)
+					if previous, duplicate := properties[key]; duplicate {
+						if key != "LoadCredential" {
+							t.Fatalf("%s repeats service directive %s", item.unit, key)
+						}
+						value = previous + "\n" + value
 					}
 					properties[key] = value
 				}
 			}
 		}
+		credentials := "database-url:" + item.source
+		start := "/usr/bin/lindmd " + item.command + " -config " + item.config + " -database-url-credential database-url"
+		if item.command == "serve" {
+			credentials += "\nintegrations-key:/etc/lindm/integrations.key"
+			start += " -integrations-key-credential integrations-key"
+		}
 		for key, want := range map[string]string{
 			"User": item.user, "Group": item.user,
-			"LoadCredential":        "database-url:" + item.source,
-			"ExecStart":             "/usr/bin/lindmd " + item.command + " -config " + item.config + " -database-url-credential database-url",
+			"LoadCredential":        credentials,
+			"ExecStart":             start,
 			"CapabilityBoundingSet": "", "AmbientCapabilities": "", "NoNewPrivileges": "yes",
 			"MemorySwapMax": "0", "LimitCORE": "0", "ProtectSystem": "strict",
 		} {

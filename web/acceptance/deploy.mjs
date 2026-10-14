@@ -227,10 +227,55 @@ async function confirmOffServerCustody(ui) {
   await capture("owner-custody-confirmation-recorded");
 }
 
+async function createIntegrationProof(ui) {
+  await driver.goto(`${config.origin}/integrations`);
+  await ui.wait({ role: "button", text: "Add destination" });
+  await ui.click({ role: "button", text: "Add destination" });
+  await ui.fill({ label: "Name" }, "Restore key proof");
+  await ui.fill({ label: "Address" }, "https://restore-check.invalid/events");
+  await ui.click({ role: "button", text: "Generate" });
+  result.integration_secret_sha256 = await driver.observe(async () => {
+    const field = document.getElementById("new-secret");
+    if (!field || field.value.length !== 48)
+      throw new Error("integration_secret_generation_failed");
+    const bytes = new TextEncoder().encode(field.value);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    bytes.fill(0);
+    return [...digest].map((value) => value.toString(16).padStart(2, "0")).join("");
+  });
+  // Keep this cryptographic restore fixture local: no outbound attempt targets
+  // the reserved invalid domain, and no receiver/signing secret is exported.
+  await ui.click({ role: "checkbox", text: "Send events" });
+  await ui.fill({ label: "Reason" }, "Prove encrypted destination recovery");
+  await ui.click({ role: "button", text: "Create destination" });
+  await ui.wait({ role: "button", text: "Add destination" });
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    result.integration_destination_id = await driver.observe(() => {
+      const row = [...document.querySelectorAll("tr")].find((node) =>
+        node.textContent.includes("Restore key proof"),
+      );
+      const label =
+        row &&
+        [...row.querySelectorAll("dt")].find(
+          (node) => node.textContent.trim() === "Destination ID:",
+        );
+      return label?.nextElementSibling?.textContent?.trim() ?? "";
+    });
+    if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(result.integration_destination_id))
+      break;
+    await delay(250);
+  }
+  if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(result.integration_destination_id))
+    throw new Error("integration_creation_not_observed");
+  result.integration_created = true;
+  await capture("encrypted-integration-created");
+}
+
 try {
   config = await readPrivateJSON(process.argv[2]);
   if (
-    !["setup", "custody", "copy", "manage"].includes(config.phase) ||
+    !["setup", "custody", "copy", "manage", "integration"].includes(config.phase) ||
     new URL(config.origin).protocol !== "https:"
   )
     throw new Error("invalid_deployment_browser_configuration");
@@ -282,6 +327,7 @@ try {
       for (const key of Object.keys(grant.commands)) grant.commands[key] = "";
       await capture("console-command-copied");
     } else if (config.phase === "custody") await confirmOffServerCustody(ui);
+    else if (config.phase === "integration") await createIntegrationProof(ui);
     else await managedRefresh(ui);
     await writePrivateJSON(config.credentialPath, await driver.credentials());
   }

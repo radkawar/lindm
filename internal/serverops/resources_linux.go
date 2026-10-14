@@ -66,6 +66,40 @@ func newResources(path, stage string) (*resourceSet, error) {
 	return r, nil
 }
 
+func (r *resourceSet) integrationKeyPath() string {
+	path := r.config.GetIntegrations().GetEncryptionKeyFile()
+	if path == "" {
+		return ""
+	}
+	return r.reference(path)
+}
+
+func (r *resourceSet) validateArchivedIntegrationKey(manifest archiveManifest) error {
+	path := r.integrationKeyPath()
+	if path == "" {
+		// Older custom deployments intentionally had no integrations service.
+		return nil
+	}
+	for _, entry := range manifest.Files {
+		if entry.Path != path {
+			continue
+		}
+		if entry.Owner != "root" || entry.Group != "root" || entry.Mode != 0600 || entry.Size != 32 {
+			return errors.New("operations: unsafe_archived_integration_key")
+		}
+		data, err := r.read(path, 32)
+		defer clear(data)
+		if err != nil {
+			return err
+		}
+		if len(data) != 32 {
+			return errors.New("operations: invalid_archived_integration_key")
+		}
+		return nil
+	}
+	return errors.New("operations: archived_integration_key_missing")
+}
+
 // open pins every ancestor without following symlinks. A configured service
 // owner is admitted only here for root's backup; runtime loader policy is unchanged.
 func (r *resourceSet) open(path string) (*os.File, error) {
@@ -105,6 +139,9 @@ func (r *resourceSet) open(path string) (*os.File, error) {
 		if r.databaseCredentials[path] && (stat.Uid != 0 || (i == len(parts)-1 && (stat.Gid != 0 || stat.Mode&07777 != 0600))) {
 			return nil, errors.Join(errors.New("operations: root_private_database_credential_required"), unix.Close(fd))
 		}
+		if path == r.integrationKeyPath() && (stat.Uid != 0 || (i == len(parts)-1 && (stat.Gid != 0 || stat.Mode&07777 != 0600 || stat.Nlink != 1 || stat.Size != 32))) {
+			return nil, errors.Join(errors.New("operations: root_private_32_byte_integration_key_required"), unix.Close(fd))
+		}
 		if i == len(parts)-1 && stat.Mode&unix.S_IFMT != unix.S_IFREG {
 			return nil, errors.Join(errors.New("operations: regular resource required"), unix.Close(fd))
 		}
@@ -113,6 +150,7 @@ func (r *resourceSet) open(path string) (*os.File, error) {
 }
 
 func (r *resourceSet) read(path string, limit int64) (_ []byte, err error) {
+	integrationKey := path == r.integrationKeyPath()
 	if staged, ok := r.files[path]; ok {
 		path = staged
 	} else if r.archived {
@@ -123,6 +161,16 @@ func (r *resourceSet) read(path string, limit int64) (_ []byte, err error) {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, file.Close()) }()
+	if integrationKey {
+		info, statErr := file.Stat()
+		if statErr != nil {
+			return nil, statErr
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok || !info.Mode().IsRegular() || stat.Mode&07777 != 0600 || stat.Nlink != 1 || stat.Size != 32 || stat.Uid != uint32(os.Geteuid()) || stat.Gid != uint32(os.Getegid()) {
+			return nil, errors.New("operations: unsafe_staged_integration_key")
+		}
+	}
 	data, err := io.ReadAll(io.LimitReader(file, limit+1))
 	if err != nil {
 		return nil, err

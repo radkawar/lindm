@@ -69,6 +69,10 @@ func run(ctx context.Context, args []string) error {
 	if command == "serve" || command == "migrate" || command == "check-config" {
 		flags.StringVar(&databaseCredential, "database-url-credential", "", "systemd credential name in CREDENTIALS_DIRECTORY (no persistent-file fallback)")
 	}
+	var integrationCredential string
+	if command == "serve" || command == "check-config" {
+		flags.StringVar(&integrationCredential, "integrations-key-credential", "", "systemd credential name in CREDENTIALS_DIRECTORY (no persistent-file fallback)")
+	}
 	var issuer, subject, tenantID, objectID string
 	if command == "bootstrap-owner" {
 		flags.StringVar(&issuer, "issuer", "", "exact configured issuer")
@@ -91,6 +95,9 @@ func run(ctx context.Context, args []string) error {
 	}
 	if command == "migrate" {
 		return migrate(ctx, document)
+	}
+	if err := useIntegrationEncryptionKeyCredential(document, flags, integrationCredential); err != nil {
+		return err
 	}
 	resources, err := document.Resolve()
 	if err != nil {
@@ -187,4 +194,17 @@ func useDatabaseURLCredential(document *config.Document, flags *flag.FlagSet, na
 		return nil
 	}
 	return document.UseDatabaseURLCredential(name, os.Getenv("CREDENTIALS_DIRECTORY"))
+}
+
+func useIntegrationEncryptionKeyCredential(document *config.Document, flags *flag.FlagSet, name string) error {
+	var requested bool
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "integrations-key-credential" {
+			requested = true
+		}
+	})
+	if !requested {
+		return nil
+	}
+	return document.UseIntegrationEncryptionKeyCredential(name, os.Getenv("CREDENTIALS_DIRECTORY"))
 }

@@ -42,6 +42,9 @@ func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error
 		if record.Scope == productionSigningScope {
 			return "", errors.New("production signing tests-only evidence cannot qualify deploy or lifecycle")
 		}
+		if record.Scope == "production-cold-release-build-only" || record.Scope == "lab-operator-custody-fixture-only" {
+			return "", errors.New("cold release build or lab custody fixture evidence cannot qualify deploy or lifecycle")
+		}
 		if cell == "deploy" && record.Scope == deploylab.FirstRunInstallScope && scope != deploylab.FirstRunInstallScope {
 			return "", errors.New("first-run setup evidence requires -scope first-run-install-only; it cannot qualify the full deploy cell")
 		}

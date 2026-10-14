@@ -30,7 +30,7 @@ func TestDeployPassphraseEscrowEncryptsOnlyToOffhostOperator(t *testing.T) {
 	}
 	destination := filepath.Join(directory, "source-passphrase.age")
 	passphrase := []byte("a fixture secret that must never be written plaintext")
-	if err := escrowDeployPassphrase(recipient, destination, passphrase); err != nil {
+	if err := encryptDeployEvidence(recipient, destination, passphrase); err != nil {
 		t.Fatal(err)
 	}
 	ciphertext, err := os.ReadFile(destination)
@@ -59,7 +59,7 @@ func TestDeployPassphraseEscrowEncryptsOnlyToOffhostOperator(t *testing.T) {
 	if info.Mode().Perm() != 0600 {
 		t.Fatal("escrow is not private")
 	}
-	if err := escrowDeployPassphrase(recipient, destination, []byte("replacement")); err == nil {
+	if err := encryptDeployEvidence(recipient, destination, []byte("replacement")); err == nil {
 		t.Fatal("existing escrow was replaced")
 	}
 	unchanged, err := os.ReadFile(destination)
@@ -78,7 +78,7 @@ func TestDeployPassphraseEscrowRejectsNonOperatorRecipient(t *testing.T) {
 	if err := os.WriteFile(recipient, []byte("not-an-age-public-recipient"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := escrowDeployPassphrase(recipient, destination, []byte("in-memory secret")); err == nil {
+	if err := encryptDeployEvidence(recipient, destination, []byte("in-memory secret")); err == nil {
 		t.Fatal("untrusted recipient accepted")
 	}
 	if _, err := os.Stat(destination); !os.IsNotExist(err) {
@@ -145,6 +145,11 @@ func TestDeployDatabaseCredentialGateRequiresRootOwnerAndNativeHandoff(t *testin
 		`if runuser -u "$account" -- test -r "$path"; then exit 1; fi`,
 		"database-url:/etc/lindm/database-url",
 		"database-url:/etc/lindm/migrate/database-url",
+		"/etc/lindm/integrations.key",
+		`test "$(stat -c %s /etc/lindm/integrations.key)" = 32`,
+		"integrations-key:/etc/lindm/integrations.key",
+		`test "$database_credential" = true`,
+		`test "$integration_credential" = true`,
 		"systemctl is-active --quiet lindmd.service",
 	} {
 		if !strings.Contains(deployDatabaseCredentialsCommand, guard) {

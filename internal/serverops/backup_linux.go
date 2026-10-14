@@ -299,6 +299,9 @@ func (r *resourceSet) inventory(message protoreflect.Message) error {
 		if field.Kind() == protoreflect.StringKind && value.String() != "" && (field.Name() == "directory" || strings.HasSuffix(string(field.Name()), "_directory")) {
 			failure = r.tree(r.reference(value.String()))
 		}
+		if field.Kind() == protoreflect.StringKind && value.String() != "" && strings.HasSuffix(string(field.Name()), "_file") {
+			failure = r.copy(r.reference(value.String()))
+		}
 		return failure == nil
 	})
 	return failure
@@ -363,6 +366,9 @@ func (r *resourceSet) manifest(configPath, dump string) (archiveManifest, error)
 		// from the source host. The archive records account names, never numeric IDs.
 		if r.databaseCredentials[path] && (stat.Uid != 0 || stat.Gid != 0 || stat.Mode&07777 != 0600) {
 			return manifest, errors.New("operations: root_private_database_credential_required")
+		}
+		if path == r.integrationKeyPath() && (stat.Uid != 0 || stat.Gid != 0 || stat.Mode&07777 != 0600 || stat.Nlink != 1 || info.Size() != 32) {
+			return manifest, errors.New("operations: root_private_32_byte_integration_key_required")
 		}
 		owner, err := user.LookupId(strconv.FormatUint(uint64(stat.Uid), 10))
 		if err != nil {

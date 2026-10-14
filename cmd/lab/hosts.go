@@ -151,6 +151,9 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
 		memory = 4096
 	}
+	if clean[1] == "deploy-build" {
+		memory = vmlab.DeployBuildMemoryMiB
+	}
 	if clean[1] == "production-release-signing" {
 		memory = vmlab.ProductionReleaseSigningMemoryMiB
 	}
@@ -159,14 +162,14 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		return err
 	}
 	requirements := &labhost.Requirements{Host: name, Architecture: arch, Vcpus: 2, MemoryMib: memory, RequireKVM: vmRequiresKVM(cfg, clean[1], labhost.FlagValue(clean, "accelerator"), arch)}
-	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "deploy-build" || clean[1] == "production-release-signing" {
 		requirements.RequireKVM = true
 	}
 	candidates, err := labhost.Select(cfg, requirements)
 	if err != nil {
 		return err
 	}
-	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "deploy-build" || clean[1] == "production-release-signing" {
 		local := candidates[:0]
 		for _, candidate := range candidates {
 			if candidate.Transport == "local" && candidate.Runtime == "native" {

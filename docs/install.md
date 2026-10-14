@@ -36,8 +36,8 @@ console URL and a one-time setup code. Keep the code private.
 Connected installation uses the server's configured, signed distribution
 repositories. For RHEL, keep its entitlement available.
 The root-only file `/var/lib/lindmd-operations/setup/code` also holds the code.
-Database URL files stay root-owned and private. Native services receive temporary
-systemd credentials, not ownership of those files.
+Database URLs and the integrations encryption key stay root-owned and private.
+Native services receive temporary systemd credentials, not ownership of those files.
 
 To use an existing PostgreSQL database, provide protected runtime and migration
 URL files. Each connection must verify the database certificate. See the
@@ -67,20 +67,14 @@ Never disable TLS or package verification to complete enrollment.
 
 ## Set up integrations and reports
 
-The turnkey installer does not enable integrations by default. **Integrations**
-shows **Integrations are not set up** until the server administrator:
+Native installation enables integrations and reports. The installer creates the
+encryption key. You do not need to make or configure a key.
+After setup, add a webhook or TLS syslog destination in **Integrations**.
+Configure report schedules in the console.
 
-1. Creates a cryptographically random encryption key containing exactly 32 raw
-   bytes (not hexadecimal or base64), in a protected file readable by `lindmd`.
-2. Sets `integrations.encryptionKeyFile` to that file's path in
-   `/etc/lindm/server.json`.
-3. Backs up the key securely with the deployment's recovery material, then
-   restarts `lindmd`.
-
-This enables destinations, delivery history and signed reports together. Never
-replace a deployed key to resolve a setup problem: existing destination
-credentials depend on it. After setup, add a webhook or TLS syslog destination
-and configure report schedules in the console.
+Encrypted backups include the key. Restore uses the original key with the
+restored database. Never replace the key to clear a setup warning.
+Managed upgrades create a key only when integrations have no configured key.
 
 ## Keep the service recoverable
 

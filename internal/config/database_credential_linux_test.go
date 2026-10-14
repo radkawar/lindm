@@ -13,6 +13,8 @@ import (
 	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+
+	configv1 "lindm/gen/lindm/config/v1"
 )
 
 func credentialDirectory(t *testing.T, connection []byte) string {
@@ -38,6 +40,7 @@ func TestDatabaseCredentialPreservesLoadedContractAndTLSBase(t *testing.T) {
 	cfg.Authentication = localAuthentication()
 	cfg.Database.UrlFile = "/etc/lindm/database-url"
 	cfg.Database.MigrationUrlFile = proto.String("/etc/lindm/migrate/database-url")
+	cfg.Integrations = &configv1.IntegrationsConfig{EncryptionKeyFile: "/etc/lindm/integrations.key"}
 	encoded, err := protojson.Marshal(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -48,6 +51,10 @@ func TestDatabaseCredentialPreservesLoadedContractAndTLSBase(t *testing.T) {
 		t.Fatal(err)
 	}
 	credential := credentialDirectory(t, []byte("postgresql://runtime:fresh-secret@localhost/lindm?sslmode=verify-full&sslrootcert=root.crt&sslcert=client.crt&sslkey=client.key"))
+	key := bytes.Repeat([]byte{0x61}, 32)
+	if err := os.WriteFile(filepath.Join(credential, "integrations-key"), key, 0400); err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		if err := os.Chmod(credential, 0700); err != nil {
 			t.Error(err)
@@ -59,11 +66,17 @@ func TestDatabaseCredentialPreservesLoadedContractAndTLSBase(t *testing.T) {
 	if err := document.UseDatabaseURLCredential("database-url", credential); err != nil {
 		t.Fatal(err)
 	}
+	if err := document.UseIntegrationEncryptionKeyCredential("integrations-key", credential); err != nil {
+		t.Fatal(err)
+	}
 	resources, err := document.Resolve()
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resources.HTTPClient.CloseIdleConnections()
+	if !bytes.Equal(resources.IntegrationEncryptionKey, key) {
+		t.Fatal("runtime did not receive the exact explicit integration credential")
+	}
 	for _, database := range []string{resources.Database.ConnConfig.User, resources.AdminDatabase.ConnConfig.User} {
 		if database != "runtime" {
 			t.Fatal("runtime pools did not use the explicit credential")

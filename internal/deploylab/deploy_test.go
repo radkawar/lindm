@@ -78,3 +78,26 @@ func TestCustodyRequiresDigestBoundNewOwnerStepUp(t *testing.T) {
 		}
 	}
 }
+
+func TestIntegrationProofRequiresBrowserCreatedSecretDigest(t *testing.T) {
+	request := BrowserRequest{Phase: "integration"}
+	complete := BrowserEvidence{Phase: "integration", Passed: true, BrowserVersion: "Chromium", Screenshots: []string{"masked.png"}, IntegrationCreated: true, IntegrationDestinationID: "2f879d29-1836-45d7-8f92-5d3d8d08c244", IntegrationSecretSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+	if err := ValidateBrowserEvidence(request, &complete); err != nil {
+		t.Fatal(err)
+	}
+	for _, mutate := range []func(*BrowserEvidence){
+		func(e *BrowserEvidence) { e.IntegrationCreated = false },
+		func(e *BrowserEvidence) { e.IntegrationDestinationID = "" },
+		func(e *BrowserEvidence) { e.IntegrationDestinationID = "not-a-real-destination" },
+		func(e *BrowserEvidence) { e.IntegrationSecretSHA256 = "" },
+		func(e *BrowserEvidence) {
+			e.IntegrationSecretSHA256 = "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+		},
+	} {
+		evidence := complete
+		mutate(&evidence)
+		if err := ValidateBrowserEvidence(request, &evidence); err == nil {
+			t.Fatal("uncreated or unbound integration evidence qualified")
+		}
+	}
+}

@@ -164,14 +164,9 @@ func (d *Document) Resolve() (*Resources, error) {
 	if err != nil {
 		return nil, err
 	}
-	if integration := cfg.GetIntegrations(); integration != nil {
-		result.IntegrationEncryptionKey, err = readFile(reference(base, integration.GetEncryptionKeyFile()), true)
-		if err != nil {
-			return nil, fmt.Errorf("read integrations.encryption_key_file: %w", err)
-		}
-		if len(result.IntegrationEncryptionKey) != 32 {
-			return nil, errors.New("integrations.encryption_key_file must contain exactly 32 raw bytes")
-		}
+	result.IntegrationEncryptionKey, err = d.integrationEncryptionKey()
+	if err != nil {
+		return nil, err
 	}
 	result.Escrow, err = d.escrowCustody()
 	if err != nil {
@@ -212,6 +207,28 @@ func (d *Document) Resolve() (*Resources, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+func (d *Document) integrationEncryptionKey() ([]byte, error) {
+	integration := d.Proto.GetIntegrations()
+	if integration == nil {
+		return nil, nil
+	}
+	var key []byte
+	var err error
+	if d.integrationEncryptionKeyCredential != nil {
+		key, err = d.integrationEncryptionKeyCredential.read()
+	} else {
+		key, err = readFile(reference(d.base, integration.GetEncryptionKeyFile()), true)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read integrations.encryption_key_file: %w", err)
+	}
+	if len(key) != 32 {
+		clear(key)
+		return nil, errors.New("integrations.encryption_key_file must contain exactly 32 raw bytes")
+	}
+	return key, nil
 }
 
 // outboundHTTPClient trusts the system roots plus trusted_ca_file, requires TLS

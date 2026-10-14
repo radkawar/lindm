@@ -7,6 +7,8 @@ package deploylab
 import (
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // FirstRunInstallScope never qualifies the full backup/upgrade/restore lifecycle.
@@ -62,25 +64,28 @@ type BrowserRequest struct {
 // managed action qualifies only after its own completed row appears for this
 // exact device and a subsequently collected inventory is visible.
 type BrowserEvidence struct {
-	Phase                  string          `json:"phase"`
-	Passed                 bool            `json:"passed"`
-	Failure                string          `json:"failure,omitempty"`
-	BrowserVersion         string          `json:"browser_version"`
-	Authenticator          string          `json:"authenticator"`
-	PasswordAndPasskey     bool            `json:"password_and_passkey"`
-	CommandSHA256          string          `json:"command_sha256,omitempty"`
-	CommandSource          string          `json:"command_source,omitempty"`
-	DeviceID               string          `json:"device_id,omitempty"`
-	ActionID               string          `json:"action_id,omitempty"`
-	ActionCompleted        bool            `json:"action_completed"`
-	ActionFinishedAt       time.Time       `json:"action_finished_at,omitempty"`
-	FreshInventoryReceived bool            `json:"fresh_inventory_received"`
-	Screenshots            []string        `json:"screenshots"`
-	Operations             []Operation     `json:"operations"`
-	OwnerStepUp            bool            `json:"owner_step_up"`
-	OwnerCustodyAttested   bool            `json:"owner_custody_attested"`
-	CustodySHA256          string          `json:"custody_sha256,omitempty"`
-	CustodyExports         []CustodyExport `json:"custody_exports,omitempty"`
+	Phase                    string          `json:"phase"`
+	Passed                   bool            `json:"passed"`
+	Failure                  string          `json:"failure,omitempty"`
+	BrowserVersion           string          `json:"browser_version"`
+	Authenticator            string          `json:"authenticator"`
+	PasswordAndPasskey       bool            `json:"password_and_passkey"`
+	CommandSHA256            string          `json:"command_sha256,omitempty"`
+	CommandSource            string          `json:"command_source,omitempty"`
+	DeviceID                 string          `json:"device_id,omitempty"`
+	IntegrationDestinationID string          `json:"integration_destination_id,omitempty"`
+	IntegrationSecretSHA256  string          `json:"integration_secret_sha256,omitempty"`
+	IntegrationCreated       bool            `json:"integration_created"`
+	ActionID                 string          `json:"action_id,omitempty"`
+	ActionCompleted          bool            `json:"action_completed"`
+	ActionFinishedAt         time.Time       `json:"action_finished_at,omitempty"`
+	FreshInventoryReceived   bool            `json:"fresh_inventory_received"`
+	Screenshots              []string        `json:"screenshots"`
+	Operations               []Operation     `json:"operations"`
+	OwnerStepUp              bool            `json:"owner_step_up"`
+	OwnerCustodyAttested     bool            `json:"owner_custody_attested"`
+	CustodySHA256            string          `json:"custody_sha256,omitempty"`
+	CustodyExports           []CustodyExport `json:"custody_exports,omitempty"`
 }
 
 // ValidateBrowserEvidence prevents a green browser exit or a database-only
@@ -104,6 +109,16 @@ func ValidateBrowserEvidence(request BrowserRequest, evidence *BrowserEvidence) 
 		for index, expected := range request.CustodyExports {
 			if evidence.CustodyExports[index] != expected {
 				return errors.New("deploy: custody file transfer does not match the displayed export set")
+			}
+		}
+	case "integration":
+		id, err := uuid.Parse(evidence.IntegrationDestinationID)
+		if !evidence.IntegrationCreated || err != nil || id.String() != evidence.IntegrationDestinationID || len(evidence.IntegrationSecretSHA256) != 64 {
+			return errors.New("deploy: browser did not create the encrypted integration destination")
+		}
+		for _, digit := range evidence.IntegrationSecretSHA256 {
+			if (digit < '0' || digit > '9') && (digit < 'a' || digit > 'f') {
+				return errors.New("deploy: integration secret digest is not SHA256")
 			}
 		}
 	case "copy":

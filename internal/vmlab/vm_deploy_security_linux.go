@@ -20,7 +20,7 @@ type VMDeploySQLGate struct {
 
 // Run on the actual installed guest after install, upgrade and restore. Native
 // services may read their systemd credential, never the persistent URL secret.
-const deployDatabaseCredentialsCommand = `for path in /etc/lindm/database-url /etc/lindm/migrate/database-url; do
+const deployDatabaseCredentialsCommand = `for path in /etc/lindm/database-url /etc/lindm/migrate/database-url /etc/lindm/integrations.key; do
 test ! -L "$path"
 test -f "$path"
 test "$(stat -c %u:%g:%a:%h "$path")" = 0:0:600:1
@@ -28,12 +28,23 @@ for account in lindmd lindmd-migrate; do
 if runuser -u "$account" -- test -r "$path"; then exit 1; fi
 done
 done
-test "$(systemctl show --value -p LoadCredential lindmd.service)" = database-url:/etc/lindm/database-url
+test "$(stat -c %s /etc/lindm/integrations.key)" = 32
+database_credential=false
+integration_credential=false
+for credential in $(systemctl show --value -p LoadCredential lindmd.service); do
+case "$credential" in
+database-url:/etc/lindm/database-url) database_credential=true ;;
+integrations-key:/etc/lindm/integrations.key) integration_credential=true ;;
+*) exit 1 ;;
+esac
+done
+test "$database_credential" = true
+test "$integration_credential" = true
 test "$(systemctl show --value -p LoadCredential lindmd-migrate.service)" = database-url:/etc/lindm/migrate/database-url
 systemctl is-active --quiet lindmd.service`
 
 func proveDeployDatabaseCredentials(ctx context.Context, guest *guestVM) error {
-	_, err := serverGuestCommand(ctx, guest, "prove root-only persistent database URLs and native credential handoff", deployDatabaseCredentialsCommand, nil)
+	_, err := serverGuestCommand(ctx, guest, "prove root-only persistent DB and integration secrets and native credential handoff", deployDatabaseCredentialsCommand, nil)
 	return err
 }
 

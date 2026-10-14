@@ -174,6 +174,9 @@ func archivedConfiguration(manifest archiveManifest, directory string) (*resourc
 	if r.config.GetDeploymentId() != manifest.DeploymentID || r.config.GetPublicUrl() != manifest.PublicURL || r.config.GetDevicePublicUrl() != manifest.DevicePublicURL {
 		return nil, nil, errors.New("operations: archive_identity_mismatch")
 	}
+	if err = r.validateArchivedIntegrationKey(manifest); err != nil {
+		return nil, nil, err
+	}
 	document, err := r.validate(manifest.ConfigPath)
 	return r, document, err
 }

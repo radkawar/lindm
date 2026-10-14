@@ -22,13 +22,21 @@ import (
 // runTool never relays subprocess diagnostics: PostgreSQL and archive tools can
 // include URLs, row values and private paths in their error output.
 func runTool(ctx context.Context, tool string, args []string, env []string, stdin io.Reader, stdout io.Writer) error {
+	return runToolWithStderr(ctx, tool, args, env, stdin, stdout, io.Discard)
+}
+
+// The diagnostic sink is internal; product callers always discard raw stderr.
+func runToolWithStderr(ctx context.Context, tool string, args []string, env []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	command := exec.CommandContext(ctx, tool, args...)
 	command.Env = env
 	command.Stdin = stdin
 	command.Stdout = stdout
-	command.Stderr = io.Discard
+	command.Stderr = stderr
 	command.WaitDelay = 5 * time.Second
 	if err := command.Run(); err != nil {
+		if cause := ctx.Err(); cause != nil {
+			return fmt.Errorf("operations: %s_failed: %w", filepath.Base(tool), cause)
+		}
 		return fmt.Errorf("operations: %s_failed", filepath.Base(tool))
 	}
 	return nil

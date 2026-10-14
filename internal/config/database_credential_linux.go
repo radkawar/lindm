@@ -4,6 +4,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,9 +13,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type databaseURLCredential struct {
+type systemdCredential struct {
 	directory string
 	name      string
+	kind      string
 }
 
 // UseDatabaseURLCredential selects an explicit systemd credential for database
@@ -22,25 +24,45 @@ type databaseURLCredential struct {
 // remain unchanged. Callers must supply CREDENTIALS_DIRECTORY, never a persistent
 // URL path; an unavailable or unsafe credential has no fallback.
 func (d *Document) UseDatabaseURLCredential(name, directory string) error {
+	credential, err := selectSystemdCredential(name, directory, "database")
+	if err != nil {
+		return err
+	}
+	d.databaseURLCredential = credential
+	return nil
+}
+
+// UseIntegrationEncryptionKeyCredential selects an explicit systemd credential
+// without changing the persistent integrations.encryption_key_file reference.
+// Unsafe or unavailable credentials never fall back to that persistent source.
+func (d *Document) UseIntegrationEncryptionKeyCredential(name, directory string) error {
+	credential, err := selectSystemdCredential(name, directory, "integration encryption key")
+	if err != nil {
+		return err
+	}
+	d.integrationEncryptionKeyCredential = credential
+	return nil
+}
+
+func selectSystemdCredential(name, directory, kind string) (*systemdCredential, error) {
 	if name == "" || name == "." || name == ".." || len(name) > 255 {
-		return errors.New("database credential requires a valid credential name")
+		return nil, fmt.Errorf("%s credential requires a valid credential name", kind)
 	}
 	for _, c := range name {
 		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' && c != '.' {
-			return errors.New("database credential requires a valid credential name")
+			return nil, fmt.Errorf("%s credential requires a valid credential name", kind)
 		}
 	}
 	if !filepath.IsAbs(directory) || filepath.Clean(directory) != directory || directory == "/" || strings.ContainsRune(directory, 0) {
-		return errors.New("database credential requires a clean absolute CREDENTIALS_DIRECTORY")
+		return nil, fmt.Errorf("%s credential requires a clean absolute CREDENTIALS_DIRECTORY", kind)
 	}
-	d.databaseURLCredential = &databaseURLCredential{directory: directory, name: name}
-	return nil
+	return &systemdCredential{directory: directory, name: name, kind: kind}, nil
 }
 
 // Pin the private directory and open its single named leaf without following a
 // symlink. Unlike persistent resource gates, this boundary admits systemd's
 // read-only 0400 file and 0500 directory, still owned by root or the service UID.
-func (c *databaseURLCredential) read() (_ []byte, err error) {
+func (c *systemdCredential) read() (_ []byte, err error) {
 	fd, err := c.openDirectory()
 	if err != nil {
 		return nil, err
@@ -57,7 +79,7 @@ func (c *databaseURLCredential) read() (_ []byte, err error) {
 		return nil, err
 	}
 	if before.Mode&unix.S_IFMT != unix.S_IFREG || before.Nlink != 1 || (before.Uid != 0 && before.Uid != uint32(os.Geteuid())) || (before.Mode&07777 != 0400 && before.Mode&07777 != 0600) || before.Size < 0 || before.Size > maxFileBytes {
-		return nil, errors.New("database credential must be a bounded private regular file owned by root or the service user")
+		return nil, fmt.Errorf("%s credential must be a bounded private regular file owned by root or the service user", c.kind)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxFileBytes+1))
 	if err != nil {
@@ -71,12 +93,12 @@ func (c *databaseURLCredential) read() (_ []byte, err error) {
 	}
 	if len(data) > maxFileBytes || before.Dev != after.Dev || before.Ino != after.Ino || before.Mode != after.Mode || before.Uid != after.Uid || before.Gid != after.Gid || before.Nlink != after.Nlink || before.Size != after.Size || before.Mtim != after.Mtim || before.Ctim != after.Ctim {
 		clear(data)
-		return nil, errors.New("database credential changed while being read or exceeds 1 MiB")
+		return nil, fmt.Errorf("%s credential changed while being read or exceeds 1 MiB", c.kind)
 	}
 	return data, nil
 }
 
-func (c *databaseURLCredential) openDirectory() (fd int, err error) {
+func (c *systemdCredential) openDirectory() (fd int, err error) {
 	fd, err = unix.Open("/", unix.O_PATH|unix.O_DIRECTORY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return -1, err
@@ -91,7 +113,7 @@ func (c *databaseURLCredential) openDirectory() (fd int, err error) {
 		return fd, err
 	}
 	if root.Uid != 0 || root.Mode&0022 != 0 {
-		return fd, errors.New("database credential directory has replaceable root ancestry")
+		return fd, fmt.Errorf("%s credential directory has replaceable root ancestry", c.kind)
 	}
 	parts := strings.Split(c.directory[1:], "/")
 	for i, part := range parts {
@@ -113,10 +135,10 @@ func (c *databaseURLCredential) openDirectory() (fd int, err error) {
 			return fd, err
 		}
 		if (stat.Uid != 0 && stat.Uid != uint32(os.Geteuid())) || (stat.Mode&0022 != 0 && (stat.Uid != 0 || stat.Mode&unix.S_ISVTX == 0)) {
-			return fd, errors.New("database credential directory ancestry must be owned and non-replaceable")
+			return fd, fmt.Errorf("%s credential directory ancestry must be owned and non-replaceable", c.kind)
 		}
 		if i == len(parts)-1 && stat.Mode&07777 != 0500 && stat.Mode&07777 != 0700 {
-			return fd, errors.New("database credential directory must be private")
+			return fd, fmt.Errorf("%s credential directory must be private", c.kind)
 		}
 	}
 	return fd, nil

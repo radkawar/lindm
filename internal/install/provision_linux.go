@@ -85,6 +85,9 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 			return err
 		}
 	}
+	if err := ensureIntegrationKey(nativeIntegrationKey, ""); err != nil {
+		return err
+	}
 	deviceOrigin := o.DeviceOrigin
 	cfg := &configv1.ServerConfig{DeploymentId: deployment, PublicUrl: o.Origin, DevicePublicUrl: &deviceOrigin,
 		AdminListener: &configv1.ListenerConfig{Address: "0.0.0.0", Port: uint32(o.AdminPort)}, DeviceListener: &configv1.ListenerConfig{Address: "0.0.0.0", Port: uint32(o.DevicePort)},
@@ -92,11 +95,13 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 		Tls:      &configv1.TLSConfig{CertificateFile: "/etc/lindm/server.crt", PrivateKeyFile: "/etc/lindm/server.key"}, DeviceCa: &configv1.DeviceCAConfig{CertificateFile: "/etc/lindm/device-ca.crt", PrivateKeyFile: "/etc/lindm/device-ca.key"},
 		Authentication:     &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}},
 		ExecutionBootstrap: &configv1.ExecutionBootstrapConfig{RootFile: "/etc/lindm/execution-root.json", BootstrapFile: "/etc/lindm/bootstrap.dsse.json", InitialDelegationFile: proto.String("/etc/lindm/execution-delegation.json")},
+		Integrations:       &configv1.IntegrationsConfig{EncryptionKeyFile: nativeIntegrationKey},
 		ExecutionSigning:   &configv1.ExecutionSigningConfig{PlanKeyFile: "/etc/lindm/plan.key", StartKeyFile: "/etc/lindm/start.key"}}
 	if err := writeConfig("/etc/lindm/server.json", cfg, uid, gid); err != nil {
 		return err
 	}
 	migration := proto.CloneOf(cfg)
+	migration.Integrations = nil
 	migration.Database.UrlFile = "/etc/lindm/migrate/database-url"
 	migrationURL := "/etc/lindm/migrate/database-url"
 	migration.Database.MigrationUrlFile = &migrationURL

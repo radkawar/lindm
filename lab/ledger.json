@@ -12699,6 +12699,38 @@
       "scope": "signed PACKAGES; entitled git; console unregister gate; same-policy registration retry",
       "reference": "#registry-package-source-native-parity",
       "mainlineRevision": "e423ed9cd810aa373692027ff6a1d5ece5fbe9b5"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-deploy-release/connected-ubuntu-4ef-attempt1.json",
+      "sha256": "223c960674ac68b14caaf84ef92ea88bbc4384f42185c0fd617687887bf5ee15",
+      "recorded": "2026-10-14T02:08:00.343272792Z",
+      "revision": "0fa5a14194b5a8c48ef3dcde59cdf26daf92b25f",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-4ef2305c3",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "5c23613c2e472cce13267ba086b221d3329aed97"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-deploy-release/connected-rhel-4ef-attempt1.json",
+      "sha256": "2cbd99f046dc71025cb5754438723a95b31242d18b0e0ef2e3b5f4551cabd559",
+      "recorded": "2026-10-14T02:06:32.237616950Z",
+      "revision": "0fa5a14194b5a8c48ef3dcde59cdf26daf92b25f-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-4ef2305c3",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "5c23613c2e472cce13267ba086b221d3329aed97"
     }
   ]
 }

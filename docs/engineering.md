@@ -3761,7 +3761,9 @@ go run ./cmd/lab deploy \
   -release-public-key "$INDEPENDENT_RELEASE_PUBLIC_KEY" -release-key-id "$PINNED_RELEASE_KEY_ID" \
   -tuf-root-file "$INDEPENDENT_TUF_ROOT" \
   -backup-recipient-file "$OFFLINE_AGE_RECIPIENT" -backup-identity-file "$ENCRYPTED_OFFLINE_AGE_IDENTITY" \
-  -backup-identity-passphrase-fd "$PROTECTED_PRIVATE_PIPE_FD" \
+  -custody-escrow-recipient-file "$DEDICATED_LAB_ESCROW_PUBLIC_RECIPIENT" \
+  -backup-identity-passphrase-escrow "$ENCRYPTED_LAB_BACKUP_UNLOCK_ESCROW" \
+  -lab-escrow-identity-file "$DEDICATED_PRIVATE_LAB_ESCROW_IDENTITY" \
   -lindmd "$MATCHING_OFFLINE_LINDMD" -lindmctl "$MATCHING_OWNER_CLI" \
   -redhat-token-file "$PROTECTED_RHEL_OFFLINE_TOKEN" \
   -evidence "$NEW_PRIVATE_EVIDENCE_DIRECTORY" -record "$NEW_PRIVATE_RECORD"
@@ -3785,10 +3787,16 @@ off-server via authenticated pinned SSH with a matching source/destination diges
 not a public/browser artifact route. The real owner then uses digest-bound
 user-verifying step-up to confirm the persistent “Move your recovery keys off this
 server” task. This records owner attestation, never machine-verified storage.
-Both backup identities and recovery signing keys decrypt only in memory;
-the operator backup passphrase enters once through an owner-private anonymous
-PIPEFS descriptor (`-backup-identity-passphrase-fd N`), never arguments,
-environment values, logs or plaintext files. The lane generates its separate
+Both backup identities and recovery signing keys decrypt only in memory.
+The lab backup unlock phrase reloads from durable age ciphertext using the
+dedicated protected off-server lab escrow identity; it is not retained only in an
+interpreter kernel variable. An owner-private anonymous PIPEFS descriptor
+(`-backup-identity-passphrase-fd N`) remains an alternative protected input,
+mutually exclusive with the encrypted escrow pair. Neither option passes
+plaintext via arguments, environment values, logs or phrase files. The lane
+encrypts source/fresh-database quick-start phrases and installer diagnostics to
+the separate dedicated durable lab escrow public recipient, never to the server
+backup recipient. The lane generates its separate
 recovery-export passphrase in memory and confirms it twice through a root-owned
 anonymous guest pipe; independent offline quorum signing uses separate protected
 descriptors. On a workstation with a finite memory-lock allowance, authorized
@@ -3821,9 +3829,44 @@ and received fresh inventory through the real console. Runtime SQL probes requir
 actual PostgreSQL `42501` denials for setup hash/expiry/mint/delete/truncate and DDL,
 while the browser exercises the permitted reserve/consume columns.
 
+The native workflow also creates a disabled webhook destination through visible
+console controls. Its random signing secret stays in browser memory; evidence
+retains only the destination UUID and SHA-256 digest. A matching guest lab helper
+reads the real encrypted PostgreSQL row and the root-only integrations key under
+the unchanged locked-memory gate. It authenticates the destination UUID during
+standard AES-GCM decryption and compares the plaintext digest, never exports the
+plaintext. After upgrade the original key and ciphertext must still match. Before
+restore, the fresh host's different key must fail to decrypt that source
+ciphertext. After full native database restore, the archived original key must
+decrypt the unchanged destination row again. These checks are required workflow
+gates, not a substitute for original-device management or independent production
+delivery tests. The four credential stages also enforce root:root 0600 single-link
+custody and the runtime's explicit integrations `LoadCredential` handoff.
+
+`TestIntegrationSecretsSurviveEncryptedArchivePublication` runs as UID 0 with
+the protected real PostgreSQL fixture and matching native clients. It creates a
+real destination, encrypts and extracts the archive, publishes the original key,
+and checks an authenticated delivery's HMAC. For a private failure investigation,
+set `LINDM_TEST_PG_DUMP_DIAGNOSTIC` to a new file beneath a protected private
+directory. The test writes that file mode 0600 with client/server versions, role,
+TCP/socket transport, duration, cancellation cause and raw native stderr. Do not
+publish it or put it in a support bundle. Product callers still discard raw
+stderr. The test uses the same production subprocess runner and never substitutes
+a fabricated dump or raises the deadline to obtain a pass.
+
+The source-specific UID 0 regression passed on 2026-10-14 at `423fd8a3f`
+in 9.19 seconds with PostgreSQL 18.6 and its matching native client. Evidence:
+`~/work/turnkey-integration-key-tests-e2307c651/root-key-checks-attempt4.json`,
+SHA-256 `d619d037400a95ba45933ed98ba01bcf6531b64ca3439b85625856288267ffbb`.
+This proves the real encrypted archive/key publication and restored-key delivery
+HMAC, including the wrong-fresh-key control. It is not full-host database restore,
+native package installation, browser enrollment or original-device qualification.
+Earlier failed attempts remain in the same private evidence directory.
+
 The matrix `deploy` cell takes `-deploy-inputs PRIVATE_0600_JSON`. Its strict fields
 are `firstRelease`, `upgradeRelease`, `releasePublicKey`, `releaseKeyID`,
-`tufRootFile`, `backupRecipientFile`, `backupIdentityFile`, `lindmd` and `lindmctl`;
+`tufRootFile`, `backupRecipientFile`, `custodyEscrowRecipientFile`,
+`backupIdentityFile`, `lindmd` and `lindmctl`;
 all paths must be absolute. The matrix never silently replaces these authenticated
 exports with its ordinary locally built package fixtures.
 The separate `-deploy-backup-identity-passphrase-fd N` reads the passphrase once
@@ -3870,6 +3913,98 @@ denied and passes `--airgap` to the signed installer. The host-platform offline
 add-on must be present and authenticated; do not provide an online RHEL token.
 The result records `airgap_server_install: true` but remains first-run-only.
 The full connected device-enrollment lane and its entitlement gates are unchanged.
+
+`lab deploy build` is a separate, one-slot **cold production release build**,
+not an installation or lifecycle qualification:
+
+```sh
+lab deploy build \
+  -host "$LOCAL_HOST_ID" -manifest "$PINNED_UBUNTU_SERVER_IMAGE" \
+  -repo "$ACTUAL_INTEGRATED_GIT_CHECKOUT" -revision "$FULL_COMMIT_SHA" \
+  -cache "$VERIFIED_VENDOR_CACHE" -work-dir "$LAB_WORK" \
+  -operator-recipient-file "$OFF_SERVER_OPERATOR_PUBLIC_RECIPIENT" \
+  -first-version "$INITIAL_RELEASE_VERSION" \
+  -newer-version "$STRICTLY_NEWER_RELEASE_VERSION" \
+  -evidence "$NEW_PRIVATE_COLD_EVIDENCE_DIRECTORY" -record "$NEW_BUILD_RECORD"
+```
+
+The configured local native FIFO admits one 8192-MiB/two-vCPU x86 KVM guest.
+The maintained production-signing SDK recipes supply vendor-authenticated Ubuntu
+prerequisites and HTTPS-checked Go 1.26.9 / Node 24.21.0; this command does not
+reuse that tests-only lane's nongit source archive. It transfers a private Git
+bundle from the exact committed checkout, verifies its digest, performs actual
+`git clone`, and checks out that exact revision with real `.git` metadata.
+An independently empty guest HOME and compiler/npm caches are used.
+
+After the no-swap and locked-memory gates, a matching lab child compiled inside
+the guest generates its custody passphrase in RAM. It invokes literal
+`make release-keys`, then `make release` twice, providing confirmations/unlock
+only through anonymous stdin pipes. No host private signing key, plaintext
+identity or passphrase crosses SSH. The production encrypted custody kit, its
+independent public pins, authenticated signed first/newer bundles, and bounded
+age-encrypted Make logs are copied to the private evidence directory; the
+guest-generated unlock phrase has a separate age ciphertext to the explicit lab
+operator's public recipient. Failure logs are encrypted before guest cleanup.
+Custodians are operator fixtures, **not independent human custodians**.
+Result scope is `production-cold-release-build-only` and
+`lifecycle_qualified: false`; these records cannot qualify deploy/lifecycle matrix
+cells. Actual two-OS three-guest install/enroll/backup/upgrade/restore/live-manage
+proof remains a separate `lab deploy` invocation using its signed exports and
+independently recorded pins.
+
+The shared maintained installer caller retains independent release-key/key-ID
+verification and compares the supplied public TUF root with the authenticated
+bundled `release-root.json`. It does not pass the unsupported installer flag
+`--tuf-root-file`. Failed native installer stdout/stderr may contain credentials:
+the observer keeps only bounded streams in protected memory and writes separate
+`lindm-release-*-stdout.age` / `lindm-release-*-stderr.age` lab-only ciphertexts
+before cleanup, never plaintext diagnostics or product/support artifacts.
+
+#### Durable laboratory custody escrow
+
+This is an explicitly authorized **lab-only fixture**, not product custody and
+not independent human custodians. A dedicated X25519 operator identity is generated
+once with `age-keygen`, stored at `~/work/lindm-lab-escrow/identity.txt` (0600,
+directory 0700), with its public `recipient.txt` and lab-only README beside it.
+The private identity is the deliberate laboratory-only durable decrypt input.
+It must never enter a guest, product, release bundle, server backup or support
+bundle. Product identities remain encrypted on disk; this narrow lab exception
+does not change any product signing, installer or recovery gate.
+
+```sh
+lab deploy operator-init -repo "$SOURCE" \
+  -output "$NEW_PRIVATE_OFF_SERVER_OPERATOR_FIXTURE" \
+  -escrow-recipient-file "$HOME/work/lindm-lab-escrow/recipient.txt" \
+  -lab-escrow-identity-file "$HOME/work/lindm-lab-escrow/identity.txt" \
+  -record "$NEW_PRIVATE_OPERATOR_FIXTURE_RECORD"
+
+lab deploy operator-verify -repo "$SOURCE" \
+  -input "$NEW_PRIVATE_OFF_SERVER_OPERATOR_FIXTURE" \
+  -lab-escrow-identity-file "$HOME/work/lindm-lab-escrow/identity.txt" \
+  -record "$NEW_PRIVATE_INDEPENDENT_RELOAD_RECORD"
+```
+
+No VM slot is acquired by this local fixture initialization. Before generating
+the unlock phrase or reading the private lab identity, the maintained command
+disables dumps and locks custodian memory. It reuses the real encrypted backup
+key writer, age-encrypts the backup unlock phrase directly from RAM to a separate
+`backup-identity-unlock.age`, then reloads that durable escrow and proves it
+decrypts `backup-identity.age` to the same separate public `backup-recipient.txt`.
+All output files are private, exclusive, synced and off-server. No private value
+is printed. Its evidence scope is `lab-operator-custody-fixture-only`,
+`lifecycle_qualified: false`, and cannot qualify a deploy/lifecycle matrix cell.
+The full lane consumes the encrypted unlock path and lab identity path directly,
+so interpreter runtime loss cannot strand this fixture again.
+Run `operator-verify` in a new process after `operator-init` exits: it reads only
+the durable encrypted objects and dedicated private lab input, verifies their
+identity/public-recipient match, and records independent-process reload without
+generating a new key. The initially prescribed `~/.config/lindm/lab-escrow` failed
+the unchanged descriptor-walk gate because `~/.config` was mode 0775. That failed
+attempt remains failed; broader configuration permissions were not changed.
+Use protected ancestry rather than relaxing the gate or silently chmodding an
+unrelated operator directory.
+
+#### Historical native install-path audit
 
 `lab deploy audit` separately measures the immutable pre-turnkey release's real
 native runbook on a pristine admitted guest, through actual password/passkey console

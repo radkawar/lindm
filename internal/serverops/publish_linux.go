@@ -119,6 +119,9 @@ func publishPrivate(path string, input io.Reader, uid, gid int, mode uint32) (er
 }
 
 func publishRestoredFiles(manifest archiveManifest, r *resourceSet, migrationTarget, runtimeTarget *stagedDatabase) (err error) {
+	if err = r.validateArchivedIntegrationKey(manifest); err != nil {
+		return err
+	}
 	if r.base == "/etc/lindm" && r.files[RecoveryCustodyBundlePath] == "" {
 		// Its distinct fresh database export was preserved before this point.
 		// Do not misidentify the discarded target authority bundle as the source.
@@ -167,15 +170,19 @@ func publishRestoredFiles(manifest archiveManifest, r *resourceSet, migrationTar
 		if (directory == "/etc/lindm" || directory == "/etc/lindm/migrate") && (name == "database-url" || name == "database-ca.crt" || name == "external-database-ca.crt" || name == "external-database-client.crt" || name == "external-database-client.key") {
 			continue
 		}
-		uid, gid, err := ownerIDs(entry.Owner, entry.Group)
+		uid, gid, mode := 0, 0, uint32(0600)
+		if entry.Path != r.integrationKeyPath() {
+			uid, gid, err = ownerIDs(entry.Owner, entry.Group)
+			if err != nil {
+				return err
+			}
+			mode = entry.Mode
+		}
+		file, err := r.open(r.files[entry.Path])
 		if err != nil {
 			return err
 		}
-		file, err := os.Open(r.files[entry.Path])
-		if err != nil {
-			return err
-		}
-		publishErr := publishPrivate(entry.Path, file, uid, gid, entry.Mode)
+		publishErr := publishPrivate(entry.Path, file, uid, gid, mode)
 		if err = errors.Join(publishErr, file.Close()); err != nil {
 			return err
 		}
@@ -245,6 +252,7 @@ func preserveTargetDatabases(migrationTarget, runtimeTarget *stagedDatabase, ori
 	migration := proto.CloneOf(original)
 	migration.Database.UrlFile = migrationTarget.urlFile
 	migration.Database.MigrationUrlFile = &migrationTarget.urlFile
+	migration.Integrations = nil
 	data, err = protojson.Marshal(migration)
 	if err != nil {
 		return err

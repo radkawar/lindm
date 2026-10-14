@@ -19,6 +19,7 @@ func TestDeployMatrixInputsRequirePrivateIndependentArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := deployMatrixInputs{FirstRelease: "/private/N", UpgradeRelease: "/private/N-plus-one", ReleasePublicKey: "/custody/attestation.pub", ReleaseKeyID: strings.Repeat("1", 64), TUFRootFile: "/custody/release-root.json", BackupRecipientFile: "/custody/backup-recipient", BackupIdentityFile: "/custody/backup-identity", Lindmd: "/private/bin/lindmd", Lindmctl: "/private/bin/lindmctl"}
+	input.CustodyEscrowRecipientFile = "/protected-lab-escrow/recipient.txt"
 	path := filepath.Join(directory, "inputs.json")
 	put := func() {
 		t.Helper()
@@ -36,7 +37,7 @@ func TestDeployMatrixInputsRequirePrivateIndependentArtifacts(t *testing.T) {
 		t.Fatal(err)
 	}
 	args := read.args()
-	for _, flag := range []string{"-first-release", "-upgrade-release", "-release-public-key", "-release-key-id", "-tuf-root-file", "-backup-recipient-file", "-backup-identity-file", "-lindmd", "-lindmctl"} {
+	for _, flag := range []string{"-first-release", "-upgrade-release", "-release-public-key", "-release-key-id", "-tuf-root-file", "-backup-recipient-file", "-custody-escrow-recipient-file", "-backup-identity-file", "-lindmd", "-lindmctl"} {
 		if !slices.Contains(args, flag) {
 			t.Errorf("missing required signed lifecycle input %s", flag)
 		}

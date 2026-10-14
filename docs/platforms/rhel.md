@@ -203,6 +203,66 @@ private keys are not release artifacts or evidence. Public hosting is not
 supported. See [verification](../verification.md) for actual native records;
 implementation alone is not an offline server installation verdict.
 
+#### Actual acquisition evidence: blocked, not qualified
+
+As of 2026-10-14, seven real fresh RHEL 9.8 x86_64 native acquisition attempts
+failed. They used the vendor-authenticated raw image SHA-256
+`b99091f1b4489111004d449398d9cc6aa024cb48b02c72fa99e6ca1fc48a7e4e`,
+the eight prerequisites above and `development-lab` custody. No closure digest,
+second fresh offline replay, common-store publication or air-gap installer
+qualification resulted.
+
+1. Producer source `15ee0569`; helper SHA-256
+   `b6378386d3539a2eb93f2021513756d3b79e031ae69ac834a48ff4af73abb896`.
+   Observed failure: guest exit 1; stage not classified.
+2. Producer source `1ba3546b`; helper SHA-256
+   `6eb0eca780434fc989b11908ea67b045f5861aba70eed449d8579bdec6c71895`.
+   Observed failure: `native-keyring-initialization`.
+3. Producer source `d1e74cd5`; helper SHA-256
+   `37c54949731f1b400596e3168f07010e4a73e0df01d5f36b9afd689bd2cb07e1`.
+   Observed failure: `native-keyring-database-init`; database label stage passed.
+4. Producer source `8df8b36d`; helper SHA-256
+   `e32a524b07f6b3632e73e97ebe1ce1341a6f32f9a3b30f251df358bedf22b33e`.
+   Observed failure: `native-keyring-database-init`; cause unclassified.
+5. Producer source `61127d6f`; helper SHA-256
+   `7e0ceeaf0c35d1c882650437dde8dabba8f22ba37d505f931d085edef9362a6f`.
+   Observed failure: `native-keyring-database-init-permission-denied`; denial
+   mechanism not established.
+6. Producer source `7f8ae6735`; helper SHA-256
+   `d03de1d5173248a63ae82dc85a583d9d1d8ac38cfcf7a96dab998bea10eb1f51`.
+   Observed failure: `vendor-key-import`; native database initialization passed,
+   failed key not distinguished.
+7. Producer source `c53bfab3a`; helper SHA-256
+   `7c24c007980ebba9bc9991a85b9c660d560dd1ed474e6299b622c8211ccd87d6`.
+   Observed failure: `vendor-key-import-release4-unsupported-key-version`;
+   native database initialization and release-key-2 import passed.
+
+A queued producer-7 request was separately canceled before its observed FIFO
+admission for owner-demo priority; it is not an eighth native failure. The
+same immutable producer was requeued only after both owner-demo workers were
+admitted. No owner-demo process or unrelated guest was stopped.
+
+Secret-free failure and source records are retained with mode `0600` outside
+the repository under the private
+`lindm-turnkey-rhel-serverdeps-20261013` cache prefix. Raw native diagnostics,
+registration receipts and credentials are not published. The capture wrapper
+defers bounded owned RHSM unregistration/activation-key deletion, exact owned
+VM teardown and private staging removal, joining cleanup errors into the
+failure. Attempt 7 returned only its capture-stage failure, with no additional
+cleanup error; its private closure store was observed empty afterwards.
+Failure-run RHSM boolean receipts and a separate VM-teardown receipt were not
+retained, so independently recorded cleanup success is not asserted.
+
+The remaining prerequisite is a vendor-supported RHEL 9 native key-verification
+path that can import and verify the exact admitted release-key-4 bytes without
+weakening signatures, crypto policy, TLS, SELinux or host trust.
+[Red Hat documents V6-key compatibility symptoms on RHEL 9.7](https://access.redhat.com/solutions/7139122),
+but that is not a verified remediation for this RPM import failure. Both
+admitted vendor keys remain required; unsupported imports are not silently
+omitted. The later native version-6 signer-ID correction (`f0f440110`, landed
+as `c6591fbdd`) fixes identifier matching only: it does not repair this import
+failure or establish capture/replay success.
+
 ## Agent services and sandbox
 
 The root executor has AF_UNIX only, strict filesystem protection and private

@@ -14,11 +14,11 @@ import (
 	"filippo.io/age"
 )
 
-// escrowDeployPassphrase is deliberately confined to maintained lab fixtures.
-// It encrypts directly from memory to the explicit off-server operator recipient
-// and never places a recovery-export passphrase into a server/release/support
-// archive. Development fixture custodians are not independent human custodians.
-func escrowDeployPassphrase(recipientFile, destination string, passphrase []byte) (err error) {
+// encryptDeployEvidence is deliberately confined to maintained lab fixtures.
+// It encrypts directly from protected memory to the explicit off-server operator
+// recipient. Plaintext custody passphrases and credential-bearing diagnostics
+// never enter server/release/support archives. Fixture custodians are not humans.
+func encryptDeployEvidence(recipientFile, destination string, plaintext []byte) (err error) {
 	body, err := os.ReadFile(recipientFile)
 	if err != nil {
 		return err
@@ -41,6 +41,6 @@ func escrowDeployPassphrase(recipientFile, destination string, passphrase []byte
 	if err != nil {
 		return err
 	}
-	_, writeErr := io.Copy(encrypted, bytes.NewReader(passphrase))
-	return errors.Join(writeErr, encrypted.Close())
+	_, writeErr := io.Copy(encrypted, bytes.NewReader(plaintext))
+	return errors.Join(writeErr, encrypted.Close(), file.Sync())
 }

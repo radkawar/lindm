@@ -87,7 +87,7 @@ func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options V
 	defer func() { request.Password, request.SetupCode = "", "" }()
 	passphrase := []byte(rand.Text() + rand.Text())
 	defer clear(passphrase)
-	if err := escrowDeployPassphrase(options.CustodyEscrowRecipientFile, filepath.Join(options.EvidenceDirectory, "source-custody-passphrase.age"), passphrase); err != nil {
+	if err := encryptDeployEvidence(options.CustodyEscrowRecipientFile, filepath.Join(options.EvidenceDirectory, "source-custody-passphrase.age"), passphrase); err != nil {
 		return result, err
 	}
 	result.EvidenceFiles = []string{"source-custody-passphrase.age"}
@@ -116,6 +116,7 @@ func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options V
 		return result, err
 	}
 	common := VMDeployOptions{Repository: options.Repository, CacheDir: options.CacheDir, WorkDir: options.WorkDir, EvidenceDirectory: options.EvidenceDirectory, LabBinary: options.LabBinary, FirstRelease: options.FirstRelease, ReleasePublicKey: options.ReleasePublicKey, ReleaseKeyID: options.ReleaseKeyID, TUFRootFile: options.TUFRootFile, BackupRecipientFile: options.BackupRecipientFile, RedHatTokenFile: options.RedHatTokenFile}
+	common.CustodyEscrowRecipientFile = options.CustodyEscrowRecipientFile
 	if !options.Airgap {
 		registration, err := prepareDeployEntitlement(ctx, guest, common, &result.RedHat)
 		if err != nil {

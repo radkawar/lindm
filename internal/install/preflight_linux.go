@@ -7,25 +7,60 @@ package install
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
+	"strings"
 
 	"golang.org/x/sys/unix"
 )
 
 // Preserve the full least-privilege resource gate before native service startup.
-// PID 1 alone opens the persistent root URL, handing the checker the same
-// ephemeral credential as serve. command withholds all child diagnostics.
+// PID 1 alone opens the persistent root secrets, handing the checker the same
+// ephemeral credentials as serve. command withholds all child diagnostics.
 func checkRuntimeConfig(ctx context.Context) error {
-	_, err := command(ctx, nil, "systemd-run",
+	return checkRuntimeConfigBinary(ctx, "/usr/bin/lindmd")
+}
+
+func checkRuntimeConfigBinary(ctx context.Context, binary string) error {
+	_, err := command(ctx, nil, "systemd-run", runtimeConfigArguments(binary)...)
+	return err
+}
+
+func runtimeConfigArguments(binary string) []string {
+	return []string{
 		"--quiet", "--wait", "--collect", "--pipe",
 		"--property=User=lindmd", "--property=Group=lindmd",
 		"--property=LoadCredential=database-url:/etc/lindm/database-url",
+		"--property=LoadCredential=integrations-key:" + nativeIntegrationKey,
 		"--property=UMask=0077", "--property=MemorySwapMax=0", "--property=LimitCORE=0",
 		"--property=NoNewPrivileges=yes", "--property=CapabilityBoundingSet=", "--property=AmbientCapabilities=",
 		"--property=ProtectSystem=strict", "--property=ProtectHome=yes",
 		"--property=PrivateTmp=yes", "--property=PrivateDevices=yes",
 		"--property=InaccessiblePaths=-/etc/lindm/migrate",
-		"/usr/bin/lindmd", "check-config", "-config", "/etc/lindm/server.json", "-database-url-credential", "database-url")
-	return err
+		binary, "check-config", "-config", "/etc/lindm/server.json", "-database-url-credential", "database-url",
+		"-integrations-key-credential", "integrations-key",
+	}
+}
+
+// Read only the authenticated target's public flag help before changing any
+// package or secret state. Older binaries must not be installed with a unit
+// whose explicit credential selection they cannot accept.
+func integrationCredentialPreflight(ctx context.Context, binary string) error {
+	cmd := exec.CommandContext(ctx, binary, "check-config", "-help")
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/", "LANG=C", "LC_ALL=C"}
+	var output boundedOutput
+	cmd.Stdout, cmd.Stderr = &output, &output
+	err := cmd.Run()
+	var exit *exec.ExitError
+	if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 1) {
+		return fmt.Errorf("target runtime credential capability preflight failed: %w", err)
+	}
+	for line := range strings.SplitSeq(output.data.String(), "\n") {
+		if strings.TrimSpace(line) == "-integrations-key-credential string" {
+			return nil
+		}
+	}
+	return errors.New("target binary cannot explicitly select the native integration credential; package and secret state retained")
 }
 
 func databasePreflight(ctx context.Context) error {
