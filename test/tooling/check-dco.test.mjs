@@ -18,7 +18,7 @@ function fixture(t) {
       env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" },
     }).trim();
   git(["init", "--quiet", "--initial-branch=main"]);
-  const commit = (message) => {
+  const commit = (message, author = "Author <author@example.invalid>") => {
     git(
       [
         "-c",
@@ -30,7 +30,7 @@ function fixture(t) {
         "commit",
         "--quiet",
         "--allow-empty",
-        "--author=Author <author@example.invalid>",
+        `--author=${author}`,
         "--file=-",
       ],
       message,
@@ -65,6 +65,30 @@ test("DCO checks real author trailers and rejects unsigned or unrelated signers"
       ),
     ),
     ["author@example.invalid"],
+  );
+});
+
+test("DCO exempts only the canonical Dependabot author, not human coauthors or lookalikes", (t) => {
+  const { repository, commit } = fixture(t);
+  const bot = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>";
+  assert.deepEqual(missingSignoffs(repository, commit("Bot update\n", bot)), []);
+  assert.deepEqual(
+    missingSignoffs(
+      repository,
+      commit("Bot update\n\nCo-authored-by: Other <other@example.invalid>\n", bot),
+    ),
+    ["other@example.invalid"],
+  );
+  assert.deepEqual(
+    missingSignoffs(repository, commit("Unsigned\n", "dependabot[bot] <author@example.invalid>")),
+    ["author@example.invalid"],
+  );
+  assert.deepEqual(
+    missingSignoffs(
+      repository,
+      commit("Unsigned\n", "Other <49699333+dependabot[bot]@users.noreply.github.com>"),
+    ),
+    ["49699333+dependabot[bot]@users.noreply.github.com"],
   );
 });
 

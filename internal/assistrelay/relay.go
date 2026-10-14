@@ -26,7 +26,7 @@ import (
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	configv1 "lindm/gen/lindm/config/v1"
@@ -206,12 +206,13 @@ func (r *Relay) Ended(session uuid.UUID) bool {
 }
 
 // authenticate implements turn.AuthHandler for TURN REST credentials.
-func (r *Relay) authenticate(name, realm string, _ net.Addr) ([]byte, bool) {
+func (r *Relay) authenticate(request *turn.RequestAttributes) (string, []byte, bool) {
+	name, realm := request.Username, request.Realm
 	cred, err := parseUsername(name)
 	if err != nil || realm != r.realm || !r.clock().Before(cred.expires) || r.Ended(cred.session) {
-		return nil, false
+		return "", nil, false
 	}
-	return turn.GenerateAuthKey(name, realm, password(r.secret, name)), true
+	return name, turn.GenerateAuthKey(name, realm, password(r.secret, name)), true
 }
 
 // quota implements turn.QuotaHandler.
@@ -391,11 +392,11 @@ func (g *relayGenerator) Validate() error {
 	return g.inner.Validate()
 }
 
-func (g *relayGenerator) AllocatePacketConn(network string, requestedPort int) (net.PacketConn, net.Addr, error) {
-	if requestedPort != 0 && (requestedPort < int(g.relay.minPort) || requestedPort > int(g.relay.maxPort)) {
+func (g *relayGenerator) AllocatePacketConn(config turn.AllocateListenerConfig) (net.PacketConn, net.Addr, error) {
+	if config.RequestedPort != 0 && (config.RequestedPort < int(g.relay.minPort) || config.RequestedPort > int(g.relay.maxPort)) {
 		return nil, nil, errors.New("assistrelay: requested port is outside the relay range")
 	}
-	conn, addr, err := g.inner.AllocatePacketConn(network, requestedPort)
+	conn, addr, err := g.inner.AllocatePacketConn(config)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -406,8 +407,12 @@ func (g *relayGenerator) AllocatePacketConn(network string, requestedPort int) (
 	return wrapped, addr, nil
 }
 
-func (g *relayGenerator) AllocateConn(string, int) (net.Conn, net.Addr, error) {
+func (g *relayGenerator) AllocateListener(turn.AllocateListenerConfig) (net.Listener, net.Addr, error) {
 	return nil, nil, errors.New("assistrelay: TCP relay allocations are not supported")
+}
+
+func (g *relayGenerator) AllocateConn(turn.AllocateConnConfig) (net.Conn, error) {
+	return nil, errors.New("assistrelay: TCP relay allocations are not supported")
 }
 
 // relayConn is one allocation's relay socket. It only exchanges datagrams

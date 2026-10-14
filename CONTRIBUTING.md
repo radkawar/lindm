@@ -127,6 +127,11 @@ command, not a way to add the DCO trailer.
 trailer. Before you use these commands, check that your Git identity can certify the
 change. They do not add trailers for recorded coauthors.
 
+Hosted DCO checks exempt only commits authored by `dependabot[bot]` with its
+canonical GitHub noreply address. Human coauthors and every other commit in the
+same pull request still require their own trailers. Dependency pull requests keep
+all lint, unit, audit, integration and browser checks.
+
 ## Open a pull request
 
 Describe intent, user-visible behavior, threat and compatibility impact, affected

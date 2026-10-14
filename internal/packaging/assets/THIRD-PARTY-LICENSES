@@ -1438,7 +1438,7 @@ SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc
 
 
 ========================================================================
-Go module connectrpc.com/connect@v1.21.0
+Go module connectrpc.com/connect@v1.21.1
 Source: https://connectrpc.com/connect
 Original file: LICENSE
 SHA-256 (UTF-8 text): 595c92e7a9bc933c07da143f527d199e2fc3010e2afd8a8c0654c1f43bfa076c
@@ -1647,7 +1647,216 @@ SHA-256 (UTF-8 text): 595c92e7a9bc933c07da143f527d199e2fc3010e2afd8a8c0654c1f43b
 
 
 ========================================================================
-Go module connectrpc.com/validate@v0.7.0
+Go module connectrpc.com/connect/v2@v2.0.1
+Source: https://connectrpc.com/connect/v2
+Original file: LICENSE
+SHA-256 (UTF-8 text): 595c92e7a9bc933c07da143f527d199e2fc3010e2afd8a8c0654c1f43bfa076c
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright 2021-2025 The Connect Authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+
+========================================================================
+Go module connectrpc.com/validate@v0.9.0
 Source: https://connectrpc.com/validate
 Original file: LICENSE
 SHA-256 (UTF-8 text): c5d3ed9aa1ae68dc98a2e6fc4bf8f3c4aa3a1b57dbf9cceb2d3016454fb15e44
@@ -2030,7 +2239,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Go module github.com/cloudflare/circl@v1.6.3
+Go module github.com/cloudflare/circl@v1.6.5
 Source: https://github.com/cloudflare/circl
 Original file: ecc/p384/LICENSE
 SHA-256 (UTF-8 text): 18951c084f68bce792efa2037685466628ebc1c67f4bff8b7147f3d5050e50a4
@@ -2064,7 +2273,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/cloudflare/circl@v1.6.3
+Go module github.com/cloudflare/circl@v1.6.5
 Source: https://github.com/cloudflare/circl
 Original file: LICENSE
 SHA-256 (UTF-8 text): b0da1764fe4d13d610b695536fc3f2ebc362482d053a1cd258e36975bc6b97a7
@@ -2352,7 +2561,7 @@ This product includes software developed at CoreOS, Inc.
 
 
 ========================================================================
-Go module github.com/dustin/go-humanize@v1.0.1
+Go module github.com/dustin/go-humanize@v1.1.0
 Source: https://github.com/dustin/go-humanize
 Original file: LICENSE
 SHA-256 (UTF-8 text): a973b4498c13eb74baa2a8e5c351426a6826f2fcdd909916dbe53ee2e755fd71
@@ -2381,7 +2590,7 @@ SOFTWARE.
 
 
 ========================================================================
-Go module github.com/foxboron/go-uefi@v0.0.0-20251010190908-d29549a44f29
+Go module github.com/foxboron/go-uefi@v0.0.0-20261004203234-c7f1f57bdc6e
 Source: https://github.com/foxboron/go-uefi
 Original file: LICENSE
 SHA-256 (UTF-8 text): 2a25268817a16fb577cdd6bf7ec9c907a5c7c431dd896acc28355498151c24f1
@@ -2409,7 +2618,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Go module github.com/fxamacker/cbor/v2@v2.9.4
+Go module github.com/fxamacker/cbor/v2@v2.9.6
 Source: https://github.com/fxamacker/cbor/v2
 Original file: LICENSE
 SHA-256 (UTF-8 text): 78cad457d5ea7318230f3d969d4cdf29cef45524a1fc8ca3a97646da1ad7a841
@@ -2437,7 +2646,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-Go module github.com/go-jose/go-jose/v4@v4.1.4
+Go module github.com/go-jose/go-jose/v4@v4.1.5
 Source: https://github.com/go-jose/go-jose/v4
 Original file: json/LICENSE
 SHA-256 (UTF-8 text): dd26a7abddd02e2d0aba97805b31f248ef7835d9e10da289b22e3b8ab78b324d
@@ -2472,7 +2681,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/go-jose/go-jose/v4@v4.1.4
+Go module github.com/go-jose/go-jose/v4@v4.1.5
 Source: https://github.com/go-jose/go-jose/v4
 Original file: LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -2829,7 +3038,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/godbus/dbus/v5@v5.2.2
+Go module github.com/godbus/dbus/v5@v5.2.4
 Source: https://github.com/godbus/dbus/v5
 Original file: LICENSE
 SHA-256 (UTF-8 text): e4646a82a976369d7ae8f6ed5c11d35dc0af18433a8ccc24c85b459ad8b95128
@@ -2879,7 +3088,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/google/go-containerregistry@v0.20.7
+Go module github.com/google/go-containerregistry@v0.22.1
 Source: https://github.com/google/go-containerregistry
 Original file: LICENSE
 SHA-256 (UTF-8 text): 58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd
@@ -3689,7 +3898,7 @@ func (src *NoticeResponse) Encode(dst []byte) ([]byte, error) {
 
 
 ========================================================================
-Go module github.com/jackc/puddle/v2@v2.2.2
+Go module github.com/jackc/puddle/v2@v2.2.3
 Source: https://github.com/jackc/puddle/v2
 Original file: LICENSE
 SHA-256 (UTF-8 text): 2d50e98a4900b4d6457a38d39c1432fdc156fc2f7b365f2e33ec9344acbb0057
@@ -3719,7 +3928,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: gzhttp/LICENSE
 SHA-256 (UTF-8 text): 2252a5b1e2b1d3663b53ea77051b8ed065cb9270a3d1174d5d6ead8a2de051b6
@@ -3928,7 +4137,7 @@ SHA-256 (UTF-8 text): 2252a5b1e2b1d3663b53ea77051b8ed065cb9270a3d1174d5d6ead8a2d
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: internal/lz4ref/LICENSE
 SHA-256 (UTF-8 text): 6a358d2540ca14048f02d366f23787c0a480157e58f058113f0e27168dd4e447
@@ -3964,7 +4173,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: internal/snapref/LICENSE
 SHA-256 (UTF-8 text): f69f157b0be75da373605dbc8bbf142e8924ee82d8f44f11bcaf351335bf98cf
@@ -3999,7 +4208,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0d9e582ee4bff57bf1189c9e514e6da7ce277f9cd3bc2d488b22fbb39a6d87cf
@@ -4311,7 +4520,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: s2/cmd/internal/filepathx/LICENSE
 SHA-256 (UTF-8 text): 8582c87d9a6baa28f7827c5205b7d16c3179bc794ebd4c7cc287c49a89b7eaa1
@@ -4326,7 +4535,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: s2/cmd/internal/readahead/LICENSE
 SHA-256 (UTF-8 text): 10fa24a602fde465db603cd5d546e37e33642a73cd24ddf5910be81724fec8b2
@@ -4356,7 +4565,7 @@ SOFTWARE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: s2/LICENSE
 SHA-256 (UTF-8 text): 08683b14bda8ae3538abf19e1879e853a39e3b8276a8d673363b529d15a61c1a
@@ -4392,7 +4601,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: snappy/xerial/LICENSE
 SHA-256 (UTF-8 text): d4ff111fa30ac75e28dca3868de957a3b73ff50b76bc4b8fe5c3a1f008d26703
@@ -4422,7 +4631,7 @@ SOFTWARE.
 
 
 ========================================================================
-Go module github.com/klauspost/compress@v1.20.1
+Go module github.com/klauspost/compress@v1.20.3
 Source: https://github.com/klauspost/compress
 Original file: zstd/internal/xxhash/LICENSE.txt
 SHA-256 (UTF-8 text): f566a9f97bacdaf00d9f21dd991e81dc11201c4e016c86b470799429a1c9a79c
@@ -4452,14 +4661,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Go module github.com/mdlayher/netlink@v1.8.1-0.20251028132421-dcc6cab9a6eb
+Go module github.com/mdlayher/netlink@v1.11.2
 Source: https://github.com/mdlayher/netlink
 Original file: LICENSE.md
-SHA-256 (UTF-8 text): fc7c6fc520ba7d8bded1f601c13ed3918709b13e8b45c37820fdeddaecc9992a
+SHA-256 (UTF-8 text): 756eb71e459f59a9d187b8f6d09181157f8a5fb2b1d30ca359e1d7f35f91cb9d
 
 # MIT License
 
-Copyright (C) 2016-2022 Matt Layher
+Copyright (C) 2016-2026 Matt Layher
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -4469,7 +4678,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/mdlayher/socket@v0.5.1
+Go module github.com/mdlayher/socket@v0.8.0
 Source: https://github.com/mdlayher/socket
 Original file: LICENSE.md
 SHA-256 (UTF-8 text): 7ac20f598f63dfd35c7c6c3844073af0bebfa436cfe58b91af9ac17cd727ea42
@@ -5500,7 +5709,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/pion/dtls/v3@v3.1.10
+Go module github.com/pion/dtls/v3@v3.1.12
 Source: https://github.com/pion/dtls/v3
 Original file: LICENSE
 SHA-256 (UTF-8 text): 6483daf6c8aa2c8192528e60be098aa82dd18f6d7b96dc8246f4f7c3333fbf3f
@@ -5711,42 +5920,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 
 ========================================================================
-Go module github.com/pion/stun/v3@v3.1.5
-Source: https://github.com/pion/stun/v3
-Original file: LICENSE
-SHA-256 (UTF-8 text): 6483daf6c8aa2c8192528e60be098aa82dd18f6d7b96dc8246f4f7c3333fbf3f
-
-MIT License
-
-Copyright (c) 2026 The Pion community <https://pion.ly>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-========================================================================
 Go module github.com/pion/stun/v4@v4.0.1
 Source: https://github.com/pion/stun/v4
-Original file: LICENSE
-SHA-256 (UTF-8 text): 6483daf6c8aa2c8192528e60be098aa82dd18f6d7b96dc8246f4f7c3333fbf3f
-
-MIT License
-
-Copyright (c) 2026 The Pion community <https://pion.ly>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-========================================================================
-Go module github.com/pion/transport/v4@v4.0.2
-Source: https://github.com/pion/transport/v4
 Original file: LICENSE
 SHA-256 (UTF-8 text): 6483daf6c8aa2c8192528e60be098aa82dd18f6d7b96dc8246f4f7c3333fbf3f
 
@@ -5770,23 +5945,6 @@ SHA-256 (UTF-8 text): 6483daf6c8aa2c8192528e60be098aa82dd18f6d7b96dc8246f4f7c333
 MIT License
 
 Copyright (c) 2026 The Pion community <https://pion.ly>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-
-========================================================================
-Go module github.com/pion/turn/v4@v4.1.4
-Source: https://github.com/pion/turn/v4
-Original file: LICENSE
-SHA-256 (UTF-8 text): 87272dba8c4fcf57101a3195f4f53f7b010b6e153b9b0977bb1a3f91acddf691
-
-MIT License
-
-Copyright (c) 2023 The Pion community <https://pion.ly>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
@@ -5906,7 +6064,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/pressly/goose/v3@v3.28.0
+Go module github.com/pressly/goose/v3@v3.29.0
 Source: https://github.com/pressly/goose/v3
 Original file: LICENSE
 SHA-256 (UTF-8 text): f23985556a879c0e68bb4e136ee4b88a550d26fa33db77a65d76b721c93093ef
@@ -6297,7 +6455,7 @@ SOFTWARE.
 
 
 ========================================================================
-Go module github.com/sethvargo/go-retry@v0.4.0
+Go module github.com/sethvargo/go-retry@v0.5.0
 Source: https://github.com/sethvargo/go-retry
 Original file: LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -6507,7 +6665,7 @@ SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc
 
 
 ========================================================================
-Go module github.com/sigstore/protobuf-specs@v0.5.0
+Go module github.com/sigstore/protobuf-specs@v0.5.2
 Source: https://github.com/sigstore/protobuf-specs
 Original file: COPYRIGHT.txt
 SHA-256 (UTF-8 text): 193753bc913f7c55b3d762214e5cbb63eb7ec5de44f3987f84f3822f7bdea64e
@@ -6529,7 +6687,7 @@ limitations under the License.
 
 
 ========================================================================
-Go module github.com/sigstore/protobuf-specs@v0.5.0
+Go module github.com/sigstore/protobuf-specs@v0.5.2
 Source: https://github.com/sigstore/protobuf-specs
 Original file: gen/pb-python/LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -6739,7 +6897,7 @@ SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc
 
 
 ========================================================================
-Go module github.com/sigstore/protobuf-specs@v0.5.0
+Go module github.com/sigstore/protobuf-specs@v0.5.2
 Source: https://github.com/sigstore/protobuf-specs
 Original file: gen/pb-typescript/LICENSE
 SHA-256 (UTF-8 text): 364a130d2ca340bd56eb1e6d045fc6929bb0f9d0aa018f2c1949b29517e1cdd0
@@ -6949,7 +7107,7 @@ SHA-256 (UTF-8 text): 364a130d2ca340bd56eb1e6d045fc6929bb0f9d0aa018f2c1949b29517
 
 
 ========================================================================
-Go module github.com/sigstore/protobuf-specs@v0.5.0
+Go module github.com/sigstore/protobuf-specs@v0.5.2
 Source: https://github.com/sigstore/protobuf-specs
 Original file: gen/pb-typescript/src/index.ts (leading notice)
 SHA-256 (UTF-8 text): 5e1bcabf6885b4a8740ae1cbab339504634318e86905d63b5ff3e190965afc84
@@ -6971,7 +7129,7 @@ limitations under the License.
 */
 
 ========================================================================
-Go module github.com/sigstore/protobuf-specs@v0.5.0
+Go module github.com/sigstore/protobuf-specs@v0.5.2
 Source: https://github.com/sigstore/protobuf-specs
 Original file: gen/pb-typescript/src/rekor/v2/index.ts (leading notice)
 SHA-256 (UTF-8 text): f7f6e738f68a9bac708f6f5acc8ad1240c9a97f5f78634e51639bf8aa0fcc944
@@ -6993,7 +7151,7 @@ limitations under the License.
 */
 
 ========================================================================
-Go module github.com/sigstore/sigstore@v1.10.6
+Go module github.com/sigstore/sigstore@v1.10.11
 Source: https://github.com/sigstore/sigstore
 Original file: COPYRIGHT.txt
 SHA-256 (UTF-8 text): 6622d1d495e7d3a0e574c65e872f823cecbe585e25708d2223a28db016229119
@@ -7015,7 +7173,7 @@ limitations under the License.
 
 
 ========================================================================
-Go module github.com/sigstore/sigstore@v1.10.6
+Go module github.com/sigstore/sigstore@v1.10.11
 Source: https://github.com/sigstore/sigstore
 Original file: LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -7225,7 +7383,7 @@ SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc
 
 
 ========================================================================
-Go module github.com/spf13/afero@v1.9.3
+Go module github.com/spf13/afero@v1.15.0
 Source: https://github.com/spf13/afero
 Original file: LICENSE.txt
 SHA-256 (UTF-8 text): 5e3400b93bbb099e83e52bab885e7441750673c21f97988ca3f1240639b63283
@@ -7632,7 +7790,7 @@ SPDX-License-Identifier: Apache-2.0
 
 
 ========================================================================
-Go module github.com/tinylib/msgp@v1.6.4
+Go module github.com/tinylib/msgp@v1.6.5
 Source: https://github.com/tinylib/msgp
 Original file: LICENSE
 SHA-256 (UTF-8 text): 17df22e31ef6a84f70909eed5185f41443a03dd05b14e8dec319d5c2bd7d7b3b
@@ -7746,7 +7904,35 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module github.com/yuin/goldmark@v1.7.17
+Go module github.com/youmark/pkcs8@v0.0.0-20240726163527-a2c0da244d78
+Source: https://github.com/youmark/pkcs8
+Original file: LICENSE
+SHA-256 (UTF-8 text): 6d13d89b6c33df37f92553cc95cec278d8770ddc78c9de84620cc16dfb48cef6
+
+The MIT License (MIT)
+
+Copyright (c) 2014 youmark
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+========================================================================
+Go module github.com/yuin/goldmark@v1.8.6
 Source: https://github.com/yuin/goldmark
 Original file: LICENSE
 SHA-256 (UTF-8 text): c1d6f653c38c80294dc7994647ba0dcc508ce64a86996303c804efa2f7982bff
@@ -7881,7 +8067,7 @@ limitations under the License.
 
 
 ========================================================================
-Go module golang.org/x/crypto@v0.57.0
+Go module golang.org/x/crypto@v0.58.0
 Source: https://golang.org/x/crypto
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -7916,7 +8102,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/exp@v0.0.0-20260824195058-e88cd73687aa
+Go module golang.org/x/exp@v0.0.0-20261013213113-2ab7f3cbc5fb
 Source: https://golang.org/x/exp
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -7951,7 +8137,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/mod@v0.41.0
+Go module golang.org/x/mod@v0.42.0
 Source: https://golang.org/x/mod
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -7986,7 +8172,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/net@v0.60.0
+Go module golang.org/x/net@v0.61.0
 Source: https://golang.org/x/net
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8056,7 +8242,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/sync@v0.23.0
+Go module golang.org/x/sync@v0.24.0
 Source: https://golang.org/x/sync
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8091,7 +8277,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/sys@v0.48.0
+Go module golang.org/x/sys@v0.49.0
 Source: https://golang.org/x/sys
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8126,7 +8312,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/term@v0.46.0
+Go module golang.org/x/term@v0.47.0
 Source: https://golang.org/x/term
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8161,7 +8347,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/text@v0.42.0
+Go module golang.org/x/text@v0.43.0
 Source: https://golang.org/x/text
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8196,7 +8382,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module golang.org/x/time@v0.15.0
+Go module golang.org/x/time@v0.16.0
 Source: https://golang.org/x/time
 Original file: LICENSE
 SHA-256 (UTF-8 text): 911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad
@@ -8231,7 +8417,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module google.golang.org/genproto/googleapis/api@v0.0.0-20260819154853-08b0e4226688
+Go module google.golang.org/genproto/googleapis/api@v0.0.0-20261012220534-4341edf3f941
 Source: https://google.golang.org/genproto/googleapis/api
 Original file: LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -8441,7 +8627,7 @@ SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc
 
 
 ========================================================================
-Go module google.golang.org/genproto/googleapis/rpc@v0.0.0-20260831171406-18b4a7587f8a
+Go module google.golang.org/genproto/googleapis/rpc@v0.0.0-20261012220534-4341edf3f941
 Source: https://google.golang.org/genproto/googleapis/rpc
 Original file: LICENSE
 SHA-256 (UTF-8 text): cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
@@ -8686,7 +8872,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module modernc.org/libc@v1.77.1
+Go module modernc.org/libc@v1.78.0
 Source: https://modernc.org/libc
 Original file: LICENSE
 SHA-256 (UTF-8 text): 95ff867eb55a56935fa7492406cfa953fb7c13ca73f4c0a86ae05756b4605600
@@ -8721,7 +8907,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ========================================================================
-Go module modernc.org/libc@v1.77.1
+Go module modernc.org/libc@v1.78.0
 Source: https://modernc.org/libc
 Original file: LICENSE-3RD-PARTY.md
 SHA-256 (UTF-8 text): f597097efe3d97021f89170746bd3a0fb9a8b6fb26b82043ed68a4e0283bee6c
@@ -9034,7 +9220,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-Go module modernc.org/libc@v1.77.1
+Go module modernc.org/libc@v1.78.0
 Source: https://modernc.org/libc
 Original file: testdata/nsz.repo.hu/libc-test/COPYRIGHT
 SHA-256 (UTF-8 text): 41b8f2e2706012eb534f89e72ff547308cb81dcb9acf077c40a9058a7c06088d
@@ -9071,7 +9257,7 @@ and src/math/crlibm/* for details
 
 
 ========================================================================
-Go module modernc.org/libc@v1.77.1
+Go module modernc.org/libc@v1.78.0
 Source: https://modernc.org/libc
 Original file: testdata/nsz.repo.hu/libc-test/src/math/crlibm/COPYING
 SHA-256 (UTF-8 text): dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa
@@ -11384,8 +11570,8 @@ shall terminate as of the date such litigation is filed.
 
 
 ========================================================================
-npm package @babel/runtime@7.29.10
-Source: https://registry.npmjs.org/@babel/runtime/-/runtime-7.29.10.tgz
+npm package @babel/runtime@8.0.7
+Source: https://registry.npmjs.org/@babel/runtime/-/runtime-8.0.7.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 117da2af0d4ce0fe1c8e19b5cff9dcd806adf973d328d27b11d4448c4ff24f76
 
@@ -11414,8 +11600,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 ========================================================================
-npm package @base-ui/react@1.8.0
-Source: https://registry.npmjs.org/@base-ui/react/-/react-1.8.0.tgz
+npm package @base-ui/react@1.9.0
+Source: https://registry.npmjs.org/@base-ui/react/-/react-1.9.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a
 
@@ -11443,8 +11629,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @base-ui/utils@0.4.0
-Source: https://registry.npmjs.org/@base-ui/utils/-/utils-0.4.0.tgz
+npm package @base-ui/utils@0.5.0
+Source: https://registry.npmjs.org/@base-ui/utils/-/utils-0.5.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 07fc1b39d69d14bc7d40482a628f47226258eb01265db68ae684944b916beb2a
 
@@ -13250,8 +13436,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 ========================================================================
-npm package @radix-ui/primitive@1.1.7
-Source: https://registry.npmjs.org/@radix-ui/primitive/-/primitive-1.1.7.tgz
+npm package @radix-ui/primitive@1.2.0
+Source: https://registry.npmjs.org/@radix-ui/primitive/-/primitive-1.2.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13308,8 +13494,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-context@1.2.2
-Source: https://registry.npmjs.org/@radix-ui/react-context/-/react-context-1.2.2.tgz
+npm package @radix-ui/react-context@1.3.0
+Source: https://registry.npmjs.org/@radix-ui/react-context/-/react-context-1.3.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13337,8 +13523,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-dialog@1.2.0
-Source: https://registry.npmjs.org/@radix-ui/react-dialog/-/react-dialog-1.2.0.tgz
+npm package @radix-ui/react-dialog@1.3.1
+Source: https://registry.npmjs.org/@radix-ui/react-dialog/-/react-dialog-1.3.1.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13366,8 +13552,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-dismissable-layer@1.1.20
-Source: https://registry.npmjs.org/@radix-ui/react-dismissable-layer/-/react-dismissable-layer-1.1.20.tgz
+npm package @radix-ui/react-dismissable-layer@1.2.1
+Source: https://registry.npmjs.org/@radix-ui/react-dismissable-layer/-/react-dismissable-layer-1.2.1.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13395,8 +13581,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-focus-guards@1.1.6
-Source: https://registry.npmjs.org/@radix-ui/react-focus-guards/-/react-focus-guards-1.1.6.tgz
+npm package @radix-ui/react-focus-guards@1.2.0
+Source: https://registry.npmjs.org/@radix-ui/react-focus-guards/-/react-focus-guards-1.2.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13424,8 +13610,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-focus-scope@1.2.0
-Source: https://registry.npmjs.org/@radix-ui/react-focus-scope/-/react-focus-scope-1.2.0.tgz
+npm package @radix-ui/react-focus-scope@1.3.1
+Source: https://registry.npmjs.org/@radix-ui/react-focus-scope/-/react-focus-scope-1.3.1.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13482,8 +13668,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-portal@1.1.18
-Source: https://registry.npmjs.org/@radix-ui/react-portal/-/react-portal-1.1.18.tgz
+npm package @radix-ui/react-portal@1.2.0
+Source: https://registry.npmjs.org/@radix-ui/react-portal/-/react-portal-1.2.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13540,8 +13726,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-primitive@2.1.11
-Source: https://registry.npmjs.org/@radix-ui/react-primitive/-/react-primitive-2.1.11.tgz
+npm package @radix-ui/react-primitive@2.2.0
+Source: https://registry.npmjs.org/@radix-ui/react-primitive/-/react-primitive-2.2.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13569,8 +13755,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-slot@1.4.0
-Source: https://registry.npmjs.org/@radix-ui/react-slot/-/react-slot-1.4.0.tgz
+npm package @radix-ui/react-slot@1.5.0
+Source: https://registry.npmjs.org/@radix-ui/react-slot/-/react-slot-1.5.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13598,8 +13784,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-use-callback-ref@1.1.4
-Source: https://registry.npmjs.org/@radix-ui/react-use-callback-ref/-/react-use-callback-ref-1.1.4.tgz
+npm package @radix-ui/react-use-callback-ref@1.1.5
+Source: https://registry.npmjs.org/@radix-ui/react-use-callback-ref/-/react-use-callback-ref-1.1.5.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13627,8 +13813,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @radix-ui/react-use-controllable-state@1.2.6
-Source: https://registry.npmjs.org/@radix-ui/react-use-controllable-state/-/react-use-controllable-state-1.2.6.tgz
+npm package @radix-ui/react-use-controllable-state@1.3.0
+Source: https://registry.npmjs.org/@radix-ui/react-use-controllable-state/-/react-use-controllable-state-1.3.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 0e80a2d229d2fd4fc7e8636142ec5d0ff0bc031f14c15b682e2ac01dfd5b5138
 
@@ -13799,8 +13985,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ========================================================================
-npm package @tanstack/history@1.162.4
-Source: https://registry.npmjs.org/@tanstack/history/-/history-1.162.4.tgz
+npm package @tanstack/history@1.162.5
+Source: https://registry.npmjs.org/@tanstack/history/-/history-1.162.5.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7
 
@@ -13828,8 +14014,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @tanstack/query-core@5.104.1
-Source: https://registry.npmjs.org/@tanstack/query-core/-/query-core-5.104.1.tgz
+npm package @tanstack/query-core@5.104.2
+Source: https://registry.npmjs.org/@tanstack/query-core/-/query-core-5.104.2.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7
 
@@ -13857,8 +14043,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @tanstack/react-query@5.104.1
-Source: https://registry.npmjs.org/@tanstack/react-query/-/react-query-5.104.1.tgz
+npm package @tanstack/react-query@5.104.2
+Source: https://registry.npmjs.org/@tanstack/react-query/-/react-query-5.104.2.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7
 
@@ -13886,8 +14072,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @tanstack/react-router@1.170.41
-Source: https://registry.npmjs.org/@tanstack/react-router/-/react-router-1.170.41.tgz
+npm package @tanstack/react-router@1.170.44
+Source: https://registry.npmjs.org/@tanstack/react-router/-/react-router-1.170.44.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7
 
@@ -13944,8 +14130,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package @tanstack/router-core@1.171.34
-Source: https://registry.npmjs.org/@tanstack/router-core/-/router-core-1.171.34.tgz
+npm package @tanstack/router-core@1.171.37
+Source: https://registry.npmjs.org/@tanstack/router-core/-/router-core-1.171.37.tgz
 Original file: dist/esm/qss.d.ts (leading notice)
 SHA-256 (UTF-8 text): 31409cfe200a4937e1dfe085cd4a973d63b0c941bf82249880b441398aebece4
 
@@ -13963,8 +14149,8 @@ SHA-256 (UTF-8 text): 31409cfe200a4937e1dfe085cd4a973d63b0c941bf82249880b441398a
  */
 
 ========================================================================
-npm package @tanstack/router-core@1.171.34
-Source: https://registry.npmjs.org/@tanstack/router-core/-/router-core-1.171.34.tgz
+npm package @tanstack/router-core@1.171.37
+Source: https://registry.npmjs.org/@tanstack/router-core/-/router-core-1.171.37.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): a405ee70c632bb938acb7ac5f210e814409b3760ea9d2329d8ed8ffcfd11a0e7
 
@@ -15402,13 +15588,13 @@ For more information, please refer to <http://unlicense.org/>
 
 
 ========================================================================
-npm package lucide-react@1.52.0
-Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.52.0.tgz
+npm package lucide-react@1.57.0
+Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.57.0.tgz
 Original file: dist/esm/icons/copyright.mjs
-SHA-256 (UTF-8 text): 966ad640b59e33433533d1447dc31cec998302b333328fd9113bbe71e2857632
+SHA-256 (UTF-8 text): f0a743f6140bc583e621111e5c2dc2236481fb71746dcfd1765dc769284b949f
 
 /**
- * @license lucide-react v1.52.0 - ISC
+ * @license lucide-react v1.57.0 - ISC
  *
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
@@ -15432,16 +15618,16 @@ export { __iconData, Copyright as default };
 
 
 ========================================================================
-npm package lucide-react@1.52.0
-Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.52.0.tgz
+npm package lucide-react@1.57.0
+Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.57.0.tgz
 Original file: dist/esm/icons/copyright.mjs.map
 SHA-256 (UTF-8 text): e76a3007f3232ceab27c936e80a40031141d8969b53e3db1da647f8fb2ecd436
 
 {"version":3,"file":"copyright.mjs","sources":["../../../src/icons/copyright.ts"],"sourcesContent":["import createLucideIcon from '../createLucideIcon';\nimport type { LucideIconNode, LucideIconData } from '../types';\n\nexport const __iconData: LucideIconData = {\n  name: 'copyright',\n  size: 24,\n  node: [\n    ['circle', { cx: '12', cy: '12', r: '10', key: '1mglay' }],\n    ['path', { d: 'M14.83 14.83a4 4 0 1 1 0-5.66', key: '1i56pz' }],\n  ],\n};\n\n/**\n * @deprecated Access `__iconData` instead.\n */\nexport const __iconNode: LucideIconNode[] = __iconData.node;\n\n/**\n * @component @name Copyright\n * @description Lucide SVG icon component, renders SVG Element with children.\n *\n * @preview ![img](data:image/svg+xml;base64,PHN2ZyAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogIHdpZHRoPSIyNCIKICBoZWlnaHQ9IjI0IgogIHZpZXdCb3g9IjAgMCAyNCAyNCIKICBmaWxsPSJub25lIgogIHN0cm9rZT0iIzAwMCIgc3R5bGU9ImJhY2tncm91bmQtY29sb3I6ICNmZmY7IGJvcmRlci1yYWRpdXM6IDJweCIKICBzdHJva2Utd2lkdGg9IjIiCiAgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIgogIHN0cm9rZS1saW5lam9pbj0icm91bmQiCj4KICA8Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIgLz4KICA8cGF0aCBkPSJNMTQuODMgMTQuODNhNCA0IDAgMSAxIDAtNS42NiIgLz4KPC9zdmc+Cg==) - https://lucide.dev/icons/copyright\n * @see https://lucide.dev/guide/packages/lucide-react - Documentation\n *\n * @param {Object} props - Lucide icons props and any valid SVG attribute\n * @returns {JSX.Element} JSX Element\n *\n */\nconst Copyright = createLucideIcon(__iconData);\n\nexport default Copyright;\n"],"names":[],"mappings":";;;;;;;;;AAGO,CAAA,CAAA,CAAA,CAAA,CAAA,CAAM,UAAA,CAAA,CAAA,CAA6B;AAAA,CAAA,CACxC,CAAA,CAAA,CAAA,CAAA,EAAM,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA;AAAA,CAAA,CACN,CAAA,CAAA,CAAA,CAAA,EAAM,CAAA,CAAA;AAAA,CAAA,CACN,IAAA,CAAA,CAAM;AAAA,CAAA,CAAA,CAAA,CACJ,CAAC,QAAA,CAAA,CAAU,CAAA,CAAE,EAAA,CAAA,CAAI,CAAA,CAAA,CAAA,CAAA,EAAM,CAAA,CAAA,CAAA,CAAI,IAAA,CAAA,CAAM,CAAA,EAAG,CAAA,CAAA,CAAA,CAAA,CAAA,CAAM,GAAA,CAAA,CAAK,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,EAAU,CAAA;AAAA,CAAA,CAAA,CAAA,CACzD,CAAC,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAQ,CAAA,CAAE,GAAG,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAiC,CAAA,CAAA,CAAA,CAAA,CAAK,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,GAAU;AAAA,CAAA,CAAA;AAElE,CAAA;AAK4C,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAW,CAAA,CAAA,CAAA,CAAA;AAavD,CAAA,CAAA,CAAA,CAAA,CAAA,CAAM,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAY,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,EAAiB,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAA,CAAU,CAAA;;"}
 
 ========================================================================
-npm package lucide-react@1.52.0
-Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.52.0.tgz
+npm package lucide-react@1.57.0
+Source: https://registry.npmjs.org/lucide-react/-/lucide-react-1.57.0.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57
 
@@ -16666,8 +16852,8 @@ SOFTWARE.
 
 
 ========================================================================
-npm package seroval-plugins@1.6.8
-Source: https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.8.tgz
+npm package seroval-plugins@1.6.9
+Source: https://registry.npmjs.org/seroval-plugins/-/seroval-plugins-1.6.9.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 2bd8a2c61751fc47dcd214f864b6fcdbcb518995fbf497c81a06c3bfe8d1d9d4
 
@@ -16680,8 +16866,8 @@ The above copyright notice and this permission notice (including the next paragr
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ========================================================================
-npm package seroval@1.6.8
-Source: https://registry.npmjs.org/seroval/-/seroval-1.6.8.tgz
+npm package seroval@1.6.9
+Source: https://registry.npmjs.org/seroval/-/seroval-1.6.9.tgz
 Original file: LICENSE
 SHA-256 (UTF-8 text): 2bd8a2c61751fc47dcd214f864b6fcdbcb518995fbf497c81a06c3bfe8d1d9d4
 

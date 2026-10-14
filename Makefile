@@ -52,7 +52,7 @@ $(GOLANGCI): Makefile
 	@touch "$@"
 
 $(GOVULNCHECK): Makefile
-	GOBIN="$(TOOLS)" go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+	GOBIN="$(TOOLS)" go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
 	@touch "$@"
 
 $(TOOLS)/protoc-gen-go: Makefile
@@ -60,7 +60,7 @@ $(TOOLS)/protoc-gen-go: Makefile
 	@touch "$@"
 
 $(TOOLS)/protoc-gen-connect-go: Makefile
-	GOBIN="$(TOOLS)" go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.21.0
+	GOBIN="$(TOOLS)" go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.21.1
 	@touch "$@"
 
 bootstrap: tools

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 
 	configv1 "lindm/gen/lindm/config/v1"
 )
@@ -63,20 +63,20 @@ func TestCredentialsVerifyOnlyLiveUnendedSessions(t *testing.T) {
 	if len(server.GetUrls()) != 2 || !strings.HasSuffix(server.GetUsername(), ":"+session.String()+":device") {
 		t.Fatalf("unexpected ICE server %+v", server)
 	}
-	key, ok := relay.authenticate(server.GetUsername(), testRealm, nil)
-	if !ok || !bytes.Equal(key, turn.GenerateAuthKey(server.GetUsername(), testRealm, server.GetCredential())) {
+	userID, key, ok := relay.authenticate(&turn.RequestAttributes{Username: server.GetUsername(), Realm: testRealm})
+	if userID != server.GetUsername() || !ok || !bytes.Equal(key, turn.GenerateAuthKey(server.GetUsername(), testRealm, server.GetCredential())) {
 		t.Fatal("minted credential rejected or key differs from the presented password")
 	}
-	if _, ok := relay.authenticate(server.GetUsername(), "other.realm", nil); ok {
+	if _, _, ok := relay.authenticate(&turn.RequestAttributes{Username: server.GetUsername(), Realm: "other.realm"}); ok {
 		t.Fatal("foreign realm accepted")
 	}
 	forged := strings.Replace(server.GetUsername(), ":device", ":console", 1)
-	key, ok = relay.authenticate(forged, testRealm, nil)
+	_, key, ok = relay.authenticate(&turn.RequestAttributes{Username: forged, Realm: testRealm})
 	if ok && bytes.Equal(key, turn.GenerateAuthKey(forged, testRealm, server.GetCredential())) {
 		t.Fatal("role change kept the device password valid")
 	}
 	for _, name := range []string{"", "1:2:3", "x:" + session.String() + ":device", "1800000060:" + session.String() + ":admin", "1800000060:" + strings.ToUpper(session.String()) + ":device"} {
-		if _, ok := relay.authenticate(name, testRealm, nil); ok {
+		if _, _, ok := relay.authenticate(&turn.RequestAttributes{Username: name, Realm: testRealm}); ok {
 			t.Fatalf("malformed username %q accepted", name)
 		}
 	}
@@ -87,17 +87,17 @@ func TestCredentialsVerifyOnlyLiveUnendedSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherKey, _ := other.authenticate(server.GetUsername(), testRealm, nil)
+	_, otherKey, _ := other.authenticate(&turn.RequestAttributes{Username: server.GetUsername(), Realm: testRealm})
 	if bytes.Equal(otherKey, turn.GenerateAuthKey(server.GetUsername(), testRealm, server.GetCredential())) {
 		t.Fatal("credential verified under another process secret")
 	}
 	now = now.Add(time.Minute)
-	if _, ok := relay.authenticate(server.GetUsername(), testRealm, nil); ok {
+	if _, _, ok := relay.authenticate(&turn.RequestAttributes{Username: server.GetUsername(), Realm: testRealm}); ok {
 		t.Fatal("expired credential accepted")
 	}
 	now = now.Add(-30 * time.Second)
 	relay.End(session, now.Add(30*time.Second))
-	if _, ok := relay.authenticate(server.GetUsername(), testRealm, nil); ok {
+	if _, _, ok := relay.authenticate(&turn.RequestAttributes{Username: server.GetUsername(), Realm: testRealm}); ok {
 		t.Fatal("ended session accepted")
 	}
 	if _, err := relay.ICEServer(uuid.Nil, RoleDevice, now); err == nil {
@@ -122,6 +122,22 @@ func TestPermissionHandlerAdmitsOnlyRelayAddress(t *testing.T) {
 	outside := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(relay.maxPort) + 1}
 	if !relay.relayPeer(inside) || relay.relayPeer(outside) || relay.relayPeer(&net.TCPAddr{IP: inside.IP, Port: inside.Port}) {
 		t.Fatal("relay peer filter admitted a non-relay endpoint")
+	}
+}
+
+func TestRelayGeneratorRefusesTCPAndOutOfRangePorts(t *testing.T) {
+	relay := testRelay(t, time.Now)
+	generator := &relayGenerator{relay: relay}
+	for _, port := range []int{int(relay.minPort) - 1, int(relay.maxPort) + 1} {
+		if _, _, err := generator.AllocatePacketConn(turn.AllocateListenerConfig{Network: "udp4", RequestedPort: port}); err == nil {
+			t.Fatalf("out-of-range port %d admitted", port)
+		}
+	}
+	if _, _, err := generator.AllocateListener(turn.AllocateListenerConfig{Network: "tcp4"}); err == nil {
+		t.Fatal("TCP relay listener admitted")
+	}
+	if _, err := generator.AllocateConn(turn.AllocateConnConfig{Network: "tcp4"}); err == nil {
+		t.Fatal("TCP peer relay connection admitted")
 	}
 }
 

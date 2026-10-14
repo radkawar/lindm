@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pion/ice/v4"
-	"github.com/pion/turn/v4"
+	"github.com/pion/turn/v5"
 	"github.com/pion/webrtc/v4"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -33,11 +33,11 @@ func startTURN(t *testing.T) string {
 	}
 	server, err := turn.NewServer(turn.ServerConfig{
 		Realm: turnRealm,
-		AuthHandler: func(username, realm string, _ net.Addr) ([]byte, bool) {
-			if username != turnUser {
-				return nil, false
+		AuthHandler: func(request *turn.RequestAttributes) (string, []byte, bool) {
+			if request.Username != turnUser {
+				return "", nil, false
 			}
-			return turn.GenerateAuthKey(username, realm, turnPassword), true
+			return request.Username, turn.GenerateAuthKey(request.Username, request.Realm, turnPassword), true
 		},
 		PacketConnConfigs: []turn.PacketConnConfig{{
 			PacketConn:            conn,

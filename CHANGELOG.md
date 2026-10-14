@@ -16,6 +16,9 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Upgrade Go and npm dependencies and pinned GitHub Actions, regenerate Connect code and bundled dependency notices, and migrate the TURN relay to v5 without enabling TCP relay allocations.
+- Exempt only Dependabot's canonical commit author from DCO trailers; human coauthors and all other required checks remain enforced.
+- Retain Go 1.26.9 and Node 24.21.0 at their latest patch releases. Hold TypeScript at 6.0.3 for the ESLint parser's supported peer range and Sigstore at its Go-1.26-compatible v1.10.11 maintenance release.
 - Bound golden-schema initialization queueing by the calling test and start the unchanged migration/snapshot deadline after lock admission, so waiting packages retain their actual work budget.
 - Serialize golden integration-schema migration, PostgreSQL snapshot and removal across package processes to avoid exhausting shared relation locks, without serializing normal test cases or restarting the fixture.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.

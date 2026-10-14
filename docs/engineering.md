@@ -5381,11 +5381,11 @@ patched braces release available during setup. Run the maintained dependency-aud
 command when updating the lock; do not silence advisories or apply unreviewed forced
 downgrades. These are development dependencies, not an application security claim.
 
-Go is pinned to 1.26.9 in `go.mod` and Make, and `golang.org/x/net` to v0.60.0.
+Go is pinned to 1.26.9 in `go.mod` and Make, and `golang.org/x/net` to v0.61.0.
 These replace the versions rejected by the audit for newly published HTTP/TLS
 advisories, including [GO-2026-6617](https://pkg.go.dev/vuln/GO-2026-6617) and
 [GO-2026-6607](https://pkg.go.dev/vuln/GO-2026-6607). The required dependency updates
-also select `x/crypto` v0.57.0, retaining the fixes for SSH advisories
+also select `x/crypto` v0.58.0, retaining the fixes for SSH advisories
 [GO-2026-6354](https://pkg.go.dev/vuln/GO-2026-6354) and
 [GO-2026-6355](https://pkg.go.dev/vuln/GO-2026-6355). The patched build passed the
 full quality/integration run and real SSO login against the restarted server.
@@ -5395,6 +5395,39 @@ module-level
 OpenPGP package; do not import it. Vendor-image signatures use isolated GnuPG `gpgv`,
 not that package. Audit output is evidence of known reachability, not proof of
 absence of vulnerabilities.
+
+The 2026-10-14 dependency refresh retains Go 1.26.9 and Node 24.21.0, the latest
+patch releases on their pinned lines. Sigstore stays on v1.10.11: its
+[v1.11 release notes](https://github.com/sigstore/sigstore/releases/tag/v1.11.0)
+require Go 1.27 and explicitly designate v1.10.11 for older supported toolchains.
+TypeScript stays on 6.0.3 because typescript-eslint 8.71.2 requires `<6.1.0`;
+its native TypeScript 7 replacement is not a supported parser peer. ICE v5 remains
+a release candidate; use stable v4.4.7 with WebRTC v4. The existing nftables
+pseudo-version is newer than its latest v0.3.0 tag and is not downgraded.
+Connect stays on the maintained v1.21.1 line.
+[Connect v2](https://github.com/connectrpc/connect-go/releases/tag/v2.0.0) removes
+request/response wrappers and replaces service handler registration, requiring a
+separate migration of every RPC service, client, interceptor and generated contract.
+Its wire protocol is unchanged; this dependency refresh does not rewrite the RPC
+surface. Validate v0.9.0 explicitly preserves the v1 interceptor API while bringing
+the latest v2.0.1 library into the transitive graph.
+
+Actions retain immutable upstream commit pins. Reviewed
+[checkout v7](https://github.com/actions/checkout/releases/tag/v7.0.0) refuses
+unsafe fork checkout in `pull_request_target` and `workflow_run` by default;
+our `pull_request`/`push` workflow does not opt out. Checkout,
+[setup-node v7](https://github.com/actions/setup-node/releases/tag/v7.0.0) and
+[setup-go v7](https://github.com/actions/setup-go/releases/tag/v7.0.0) migrate to
+ES modules; setup-node also removes its dummy `NODE_AUTH_TOKEN`, which our
+workflow does not use. Their Node 24 action runtime works on the existing hosted
+Ubuntu runner.
+[Goldmark 1.8](https://github.com/yuin/goldmark/releases/tag/v1.8.0) adds positions
+and link-reference AST nodes; lindm has no handwritten Goldmark AST consumer.
+[TURN v5](https://github.com/pion/turn/releases/tag/v5.0.0) changes authentication
+and allocation callbacks. The relay returns the exact credential username as
+the authenticated user ID, retaining per-credential quotas and session revocation;
+both TCP relay allocation methods remain refused. UDP allocations still use the
+bounded port-range generator and peer-filtered, registered sockets.
 
 Pre-commit operates on the staged snapshot and runs fast formatting/lint checks.
 It must not silently reformat unrelated files or require booting VMs. Pre-push and CI

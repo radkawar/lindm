@@ -8,12 +8,23 @@ function git(repository, args, input) {
 }
 
 export function missingSignoffs(repository, commit) {
-  const [author, message] = git(repository, ["show", "-s", "--format=%ae%x00%B", commit]).split(
-    "\0",
-  );
+  const [name, author, message] = git(repository, [
+    "show",
+    "-s",
+    "--format=%an%x00%ae%x00%B",
+    commit,
+  ]).split("\0");
   const trailers = git(repository, ["interpret-trailers", "--parse"], message).split("\n");
   const signed = new Set();
   const authors = new Set([author.toLowerCase()]);
+  // Exempt only Dependabot's canonical commit author, never its human coauthors
+  // or other commits in the same pull request.
+  if (
+    name === "dependabot[bot]" &&
+    author === "49699333+dependabot[bot]@users.noreply.github.com"
+  ) {
+    authors.delete(author);
+  }
   for (const trailer of trailers) {
     const match = /^(Signed-off-by|Co-authored-by):\s+.+\s+<([^<>\s]+)>$/i.exec(trailer);
     if (!match) continue;
@@ -48,5 +59,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error(`DCO: ${commit} needs Signed-off-by trailers for ${missing.join(", ")}`);
   }
   if (failed) process.exitCode = 1;
-  else console.log(`DCO: ${commits.length} commits have author and coauthor sign-offs.`);
+  else console.log(`DCO: ${commits.length} commits satisfy author and coauthor sign-off policy.`);
 }
