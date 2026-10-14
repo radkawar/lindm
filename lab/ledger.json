@@ -13353,6 +13353,66 @@
       "scope": "specific-source-281123aa7",
       "reference": "#control-plane-deployment-matrix",
       "mainlineRevision": "a40df34f6a129b5c25a22deaa52e8658d5959910"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-ux-audit-20261014/first-device/native-enroll-02/ubuntu-24.04/enroll-from-console-x86_64.log",
+      "sha256": "f0ae725530a59822f5796e4c33a983efa9d586383807057932e837208a4b9abd",
+      "recorded": "2026-10-14T15:54:58.640374512Z",
+      "revision": "281123aa744c7e6192e1d6506f962d4ab46bc161-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "281123aa744c7e6192e1d6506f962d4ab46bc161"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-ux-audit-20261014/first-device/native-enroll-03/ubuntu-24.04/enroll-from-console-x86_64.log",
+      "sha256": "cdb9e6db436e69d3d5d04bc41fdd5e260474db185655c82bccc15b99fc5e444c",
+      "recorded": "2026-10-14T15:55:57.256790632Z",
+      "revision": "281123aa744c7e6192e1d6506f962d4ab46bc161-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "281123aa744c7e6192e1d6506f962d4ab46bc161"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-ux-audit-20261014/first-device/native-enroll-04/ubuntu-24.04/enroll-from-console-x86_64.log",
+      "sha256": "8786f0459bcf1d15ed1b4625891bb7747cbac0616e3fce363551628c81477982",
+      "recorded": "2026-10-14T15:57:28.002880218Z",
+      "revision": "281123aa744c7e6192e1d6506f962d4ab46bc161-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "281123aa744c7e6192e1d6506f962d4ab46bc161"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "enroll-from-console",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-ux-audit-20261014/first-device/native-enroll-05/ubuntu-24.04/enroll-from-console-x86_64.json",
+      "sha256": "7382eb514bf261f93a4c335ee3471fac7f49170508092cd5ff055f0880c99a39",
+      "recorded": "2026-10-14T16:00:56.953349506Z",
+      "revision": "281123aa744c7e6192e1d6506f962d4ab46bc161-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "281123aa744c7e6192e1d6506f962d4ab46bc161"
     }
   ]
 }

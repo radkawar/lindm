@@ -133,7 +133,7 @@ export async function openSignIn(ui, origin) {
 }
 
 async function credentialDetails(ui) {
-  await ui.click({ css: "summary", text: "Credential details and safe delivery", dialog: true });
+  await ui.click({ css: "summary", text: "Details", dialog: true });
   const details = await ui.driver.observe(() => {
     const dialog = [...document.querySelectorAll('[role="dialog"]')].find(
       (node) => node.getClientRects().length,
@@ -151,7 +151,7 @@ async function credentialDetails(ui) {
     };
   });
   if (!details.id) throw new Error("credential_id_missing");
-  await ui.click({ css: "summary", text: "Credential details and safe delivery", dialog: true });
+  await ui.click({ css: "summary", text: "Details", dialog: true });
   return details;
 }
 

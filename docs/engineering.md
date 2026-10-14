@@ -370,6 +370,16 @@ issuance. Install snippets use the server's configured repository/signing trust
 and exact CLI commands; missing setup stays explicit, never guessed. Downloading
 an execution root does not authenticate it. Offline enrollment stays a separate
 disclosure below the main enrollment methods.
+The enrollment result keeps expiry and its close action visible while the body
+scrolls on mobile. Copy precedes the command preview; one Details disclosure
+holds trust and recovery instructions. Batch input names first-boot timing and
+requires merging with the complete installer configuration before use. After
+installation, refresh Enrollment and follow the used code's device link or the
+approval inbox. Inventory receipt and findings assessment remain separate evidence.
+The `first-device` task walkthrough checks both OS commands, exact clipboard
+copy, cloud-init and Ubuntu autoinstall, then reads a clearly identified seeded
+device's inventory and findings. It records the missing native-device prerequisite;
+the `enroll-from-console` matrix lane supplies real bare-device enrollment proof.
 Device action forms use dialogs for short operations and dedicated pages for
 storage, encryption and recovery workflows. Keep one concise warning at confirmation;
 put policy explanations in Details. Preserve typed confirmation, independent approval,

@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { journeys as administration } from "./review-journeys-admin.mjs";
+import { journeys as enrollment } from "./review-journeys-enrollment.mjs";
 import { journeys as lostDevice } from "./review-journeys-lost-device.mjs";
 import { journeys as provisioning } from "./review-journeys-provision.mjs";
 import { journeys as security } from "./review-journeys-security.mjs";
 
 const order = [
-  "onboard",
   "baseline",
-  "lost-laptop",
   "critical-cve",
-  "remote-help",
+  "first-device",
   "helpdesk",
+  "lost-laptop",
+  "onboard",
   "recovery-audit",
+  "remote-help",
   "run-organisation",
 ];
 const escape = (value) =>
@@ -26,7 +28,13 @@ const escape = (value) =>
 // device qualification. A prerequisite or product blocker remains a recorded
 // blocker; a screenshot never turns a request into an observed device effect.
 export async function taskWalkthroughs({ page, config, visit, settle, screenshot }) {
-  const definitions = [...administration, ...lostDevice, ...provisioning, ...security];
+  const definitions = [
+    ...administration,
+    ...enrollment,
+    ...lostDevice,
+    ...provisioning,
+    ...security,
+  ];
   if (
     definitions.length !== order.length ||
     new Set(definitions.map((item) => item.id)).size !== order.length ||

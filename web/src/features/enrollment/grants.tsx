@@ -57,7 +57,10 @@ export function EnrollmentGrants() {
   const historyCount = active.data?.inactiveCount;
   return (
     <section className="grid gap-4" aria-label="One-time enrollment grants">
-      <p className="text-sm text-muted-foreground">Codes that can still enroll a device.</p>
+      <p className="text-sm text-muted-foreground">
+        After you run the install command, refresh this page. Open Show used and expired to find the
+        enrolled device. Enrollment does not confirm that inventory or findings have arrived.
+      </p>
       <GrantList
         list={active}
         pageToken={activePage}
@@ -227,6 +230,9 @@ function GrantRow({ grant }: { grant: EnrollmentGrant }) {
           >
             {grant.consumedDeviceHostname || "Device name unavailable"}
           </Link>
+          <span className="block text-muted-foreground">
+            Open the device to review its inventory and findings.
+          </span>
         </p>
       ) : null}
       <TechnicalDetails

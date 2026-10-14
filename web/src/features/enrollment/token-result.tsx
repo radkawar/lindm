@@ -211,8 +211,8 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
         if (!next) dismiss();
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="p-4 pr-12">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {unavailable
@@ -221,228 +221,235 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
                 ? "Reusable token for automatic enrollment. Copy it now. The console shows it only once."
                 : "Single-use code to enroll one device. Copy it now. The console shows it only once."}
           </DialogDescription>
+          <p className="text-sm">Expires: {formatTimestamp(credential.expiresAt).local}</p>
         </DialogHeader>
-        {unavailable ? (
-          <div className="grid gap-2">
-            <StatusBadge status="destructive" className="w-fit">
-              {credential.deliveryUnknown ? "Secret not shown" : "Secret unavailable"}
-            </StatusBadge>
-            <p className="text-sm">
-              Revoke this {provisioning ? "token" : "code"} in the list. Create a new one.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-3">
-            <p className="text-sm text-muted-foreground">
-              Copy it before closing. It's forgotten when you close this dialog.
-            </p>
-            <Label htmlFor="enrollment-secret">{title}</Label>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                id="enrollment-secret"
-                data-sensitive="true"
-                className="min-w-0 flex-1 font-mono"
-                readOnly
-                value={secret ?? ""}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <Button variant="outline" onClick={() => void copy(secret ?? "", title)}>
-                Copy {provisioning ? "token" : "code"}
-              </Button>
+        <div className="grid min-h-0 gap-4 overflow-y-auto px-4 pb-4">
+          {unavailable ? (
+            <div className="grid gap-2">
+              <StatusBadge status="destructive" className="w-fit">
+                {credential.deliveryUnknown ? "Secret not shown" : "Secret unavailable"}
+              </StatusBadge>
+              <p className="text-sm">
+                Revoke this {provisioning ? "token" : "code"} in the list. Create a new one.
+              </p>
             </div>
-            {provisioning ? (
-              <div className="grid gap-1.5">
-                <Label htmlFor="provisioning-format">Installer format</Label>
-                <SelectField
-                  id="provisioning-format"
-                  value={format}
-                  options={provisioningFormats}
-                  onValueChange={(value) => setFormat(value as ProvisioningFormat)}
+          ) : (
+            <div className="grid gap-3">
+              <Label htmlFor="enrollment-secret">{title}</Label>
+              <div className="flex flex-wrap gap-2">
+                <Input
+                  id="enrollment-secret"
+                  data-sensitive="true"
+                  className="min-w-0 flex-1 font-mono"
+                  readOnly
+                  value={secret ?? ""}
+                  autoComplete="off"
+                  spellCheck={false}
                 />
-              </div>
-            ) : null}
-            {platforms.length ? (
-              <div className="grid gap-1.5">
-                <Label htmlFor="enrollment-platform">Operating system</Label>
-                <SelectField
-                  id="enrollment-platform"
-                  value={platform?.id ?? ""}
-                  placeholder="Choose an OS"
-                  options={platforms.map((item) => ({ value: item.id, label: item.label }))}
-                  onValueChange={setPlatformId}
-                />
-              </div>
-            ) : null}
-            {instructions.isError ? (
-              <div className="grid gap-2">
-                <RpcError failure={toRpcFailure(instructions.error)} />
-                <Button
-                  variant="outline"
-                  className="w-fit"
-                  disabled={instructions.isFetching}
-                  onClick={() => void instructions.refetch()}
-                >
-                  Try again
+                <Button variant="outline" onClick={() => void copy(secret ?? "", title)}>
+                  Copy {provisioning ? "token" : "code"}
                 </Button>
               </div>
-            ) : null}
-            {instructions.isPending ? (
-              <p className="text-sm text-muted-foreground">Loading install command…</p>
-            ) : instructions.isError ? (
-              <p className="text-sm text-muted-foreground">
-                Couldn't load install instructions. Try again before copying.
-              </p>
-            ) : snippet ? (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  {provisioning
-                    ? "The installer installs the signed agent from this server. The device enrolls on its first boot."
-                    : "The command installs the signed agent from this server. It enrolls this device."}
-                </p>
-                <p className="text-sm">
-                  {provisioning
-                    ? "This installer input contains a reusable secret. Keep it out of images and logs."
-                    : "Run on the intended device with sudo access and shell history disabled. This command contains a single-use secret."}
-                </p>
-                <Textarea
-                  data-sensitive="true"
-                  aria-label={
-                    provisioning
-                      ? `${formatLabel} provisioning snippet`
-                      : "Install and enroll command"
-                  }
-                  readOnly
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="field-sizing-fixed h-48 min-h-48 font-mono text-xs"
-                  value={snippet}
-                />
-                <div className="flex flex-wrap gap-2">
+              {provisioning ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="provisioning-format">Installer format</Label>
+                  <SelectField
+                    id="provisioning-format"
+                    value={format}
+                    options={provisioningFormats}
+                    onValueChange={(value) => setFormat(value as ProvisioningFormat)}
+                  />
+                </div>
+              ) : null}
+              {platforms.length ? (
+                <div className="grid gap-1.5">
+                  <Label htmlFor="enrollment-platform">Operating system</Label>
+                  <SelectField
+                    id="enrollment-platform"
+                    value={platform?.id ?? ""}
+                    placeholder="Choose an OS"
+                    options={platforms.map((item) => ({ value: item.id, label: item.label }))}
+                    onValueChange={setPlatformId}
+                  />
+                </div>
+              ) : null}
+              {instructions.isError ? (
+                <div className="grid gap-2">
+                  <RpcError failure={toRpcFailure(instructions.error)} />
                   <Button
-                    variant="default"
-                    onClick={() =>
-                      void copy(
-                        snippet,
-                        provisioning ? `${formatLabel} snippet` : "Install command",
-                      )
-                    }
+                    variant="outline"
+                    className="w-fit"
+                    disabled={instructions.isFetching}
+                    onClick={() => void instructions.refetch()}
                   >
-                    Copy {provisioning ? `${formatLabel} snippet` : "install command"}
+                    Try again
                   </Button>
                 </div>
-              </>
-            ) : !platforms.length ? (
-              <p className="text-sm">No supported operating system uses this installer format.</p>
-            ) : platform ? (
-              <UnavailableInstall platform={platform} />
-            ) : null}
+              ) : null}
+              {instructions.isPending ? (
+                <p className="text-sm text-muted-foreground">Loading install command…</p>
+              ) : instructions.isError ? (
+                <p className="text-sm text-muted-foreground">
+                  Couldn't load install instructions. Try again before copying.
+                </p>
+              ) : snippet ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {provisioning
+                      ? installsInInstaller
+                        ? "The installer installs the signed agent. The device enrolls on its first boot."
+                        : "On its first boot, the device installs the signed agent and enrolls."
+                      : "The command installs the signed agent from this server and starts enrollment."}
+                  </p>
+                  <p className="text-sm">
+                    {provisioning
+                      ? "This installer input contains a reusable secret. Keep it out of images and logs."
+                      : "Run on the intended device with sudo access and shell history disabled. This command contains a single-use secret."}
+                  </p>
+                  {provisioning ? (
+                    <p className="text-sm">
+                      Merge this snippet into your complete installer configuration. It does not
+                      replace that configuration.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="default"
+                      onClick={() =>
+                        void copy(
+                          snippet,
+                          provisioning ? `${formatLabel} snippet` : "Install command",
+                        )
+                      }
+                    >
+                      Copy {provisioning ? `${formatLabel} snippet` : "install command"}
+                    </Button>
+                  </div>
+                  <Textarea
+                    data-sensitive="true"
+                    aria-label={
+                      provisioning
+                        ? `${formatLabel} provisioning snippet`
+                        : "Install and enroll command"
+                    }
+                    readOnly
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="field-sizing-fixed h-48 min-h-48 font-mono text-xs"
+                    value={snippet}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    After you run it, close this dialog and refresh Enrollment. If approval is
+                    required, review the device waiting for approval. A copied command does not
+                    confirm enrollment.
+                  </p>
+                </>
+              ) : !platforms.length ? (
+                <p className="text-sm">No supported operating system uses this installer format.</p>
+              ) : platform ? (
+                <UnavailableInstall platform={platform} />
+              ) : null}
 
-            {copyStatus ? (
-              <p role={copyFailed ? "alert" : "status"} className="text-sm text-muted-foreground">
-                {copyStatus}
-              </p>
-            ) : null}
-          </div>
-        )}
-        {snippet && !(provisioning && format === "nixos") ? (
+              {copyStatus ? (
+                <p role={copyFailed ? "alert" : "status"} className="text-sm text-muted-foreground">
+                  {copyStatus}
+                </p>
+              ) : null}
+            </div>
+          )}
           <details className="text-sm">
             <summary className="cursor-pointer">Details</summary>
-            <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
-              <li>Checks the selected operating system and available package architecture.</li>
-              <li>
-                {installsInInstaller
-                  ? "Inside the installer, before the first boot: installs package tools from the device's distribution sources."
-                  : "Installs package tools from the device's existing distribution sources."}
-                {instructions.data?.tlsCaPem
-                  ? " The command verifies the private HTTPS CA fingerprint. It adds the CA to system trust."
-                  : " Uses the device's system HTTPS trust."}
-              </li>
-              <li>
-                The command authenticates the package signing key. It adds only this server&apos;s
-                signed agent repository. It installs lindm-agent.
-              </li>
-              <li>
-                The command verifies the execution root fingerprint. It downloads the signed
-                bootstrap bundle.
-              </li>
-              <li>
-                The agent enrolls with this {provisioning ? "token on first boot" : "code"}. The
-                enrollment policy determines whether enrollment needs approval. The command stops
-                waiting after one hour. This timeout does not confirm enrollment.
-              </li>
-            </ol>
-          </details>
-        ) : null}
-        <details className="text-sm">
-          <summary className="cursor-pointer">Credential details and safe delivery</summary>
-          <div className="mt-2 grid gap-2 text-muted-foreground">
-            <dl className="grid gap-1 break-all">
-              <div>
-                <dt className="inline font-medium">{provisioning ? "Token" : "Grant"} ID: </dt>
-                <dd className="inline">{credential.id}</dd>
-              </div>
-              <div>
-                <dt className="inline font-medium">Expires: </dt>
-                <dd className="inline">{formatTimestamp(credential.expiresAt).local}</dd>
-              </div>
-            </dl>
-            {!unavailable ? (
-              <>
-                <p>
-                  Keep the secret out of command lines, logs, URLs and images. Remove copies after
-                  use.
-                </p>
-                {!(provisioning && format === "nixos") ? (
-                  <p>
-                    The command pins the HTTPS CA when needed, the package signer and the execution
-                    root. Downloading a file alone does not authenticate it.
-                  </p>
-                ) : null}
-                {instructions.data?.executionRootUrl ? (
-                  <a
-                    className="underline"
-                    href={instructions.data.executionRootUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Download execution root
-                  </a>
-                ) : null}
-                {instructions.data?.bootstrapBundleUrl ? (
-                  <a
-                    className="underline"
-                    href={instructions.data.bootstrapBundleUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Download signed bootstrap bundle
-                  </a>
-                ) : null}
-                {instructions.data?.executionRootSha256 ? (
-                  <p className="break-all">
-                    Execution root SHA-256: {instructions.data.executionRootSha256}
-                  </p>
-                ) : null}
-                <p>
-                  If enrollment times out, run /usr/libexec/lindm/lindm-agent resume -wait-seconds
-                  3600 as root on the same device. Don't reinstall to retry.
-                </p>
-                {provisioning ? (
-                  <p>
-                    Merge the snippet into your complete installer configuration. It does not
-                    replace that configuration. Remove installer and seed copies after enrollment.
-                  </p>
-                ) : (
-                  <p>
-                    When enrollment finishes, remove /run/lindm-enrollment/grant from the device.
-                  </p>
-                )}
-              </>
+            {snippet && !(provisioning && format === "nixos") ? (
+              <ol className="mt-2 list-decimal space-y-2 pl-5 text-muted-foreground">
+                <li>Checks the selected operating system and available package architecture.</li>
+                <li>
+                  {installsInInstaller
+                    ? "Inside the installer, before the first boot: installs package tools from the device's distribution sources."
+                    : "Installs package tools from the device's existing distribution sources."}
+                  {instructions.data?.tlsCaPem
+                    ? " The command verifies the private HTTPS CA fingerprint. It adds the CA to system trust."
+                    : " Uses the device's system HTTPS trust."}
+                </li>
+                <li>
+                  The command authenticates the package signing key. It adds only this server&apos;s
+                  signed agent repository. It installs lindm-agent.
+                </li>
+                <li>
+                  The command verifies the execution root fingerprint. It downloads the signed
+                  bootstrap bundle.
+                </li>
+                <li>
+                  The agent enrolls with this {provisioning ? "token on first boot" : "code"}. The
+                  enrollment policy determines whether enrollment needs approval. The command stops
+                  waiting after one hour. This timeout does not confirm enrollment.
+                </li>
+              </ol>
             ) : null}
-          </div>
-        </details>
-        <DialogFooter>
+            <div className="mt-2 grid gap-2 text-muted-foreground">
+              <dl className="grid gap-1 break-all">
+                <div>
+                  <dt className="inline font-medium">{provisioning ? "Token" : "Grant"} ID: </dt>
+                  <dd className="inline">{credential.id}</dd>
+                </div>
+                <div>
+                  <dt className="inline font-medium">Expires: </dt>
+                  <dd className="inline">{formatTimestamp(credential.expiresAt).local}</dd>
+                </div>
+              </dl>
+              {!unavailable ? (
+                <>
+                  <p>
+                    Keep the secret out of command lines, logs, URLs and images. Remove copies after
+                    use.
+                  </p>
+                  {!(provisioning && format === "nixos") ? (
+                    <p>
+                      The command pins the HTTPS CA when needed, the package signer and the
+                      execution root. Downloading a file alone does not authenticate it.
+                    </p>
+                  ) : null}
+                  {instructions.data?.executionRootUrl ? (
+                    <a
+                      className="underline"
+                      href={instructions.data.executionRootUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download execution root
+                    </a>
+                  ) : null}
+                  {instructions.data?.bootstrapBundleUrl ? (
+                    <a
+                      className="underline"
+                      href={instructions.data.bootstrapBundleUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download signed bootstrap bundle
+                    </a>
+                  ) : null}
+                  {instructions.data?.executionRootSha256 ? (
+                    <p className="break-all">
+                      Execution root SHA-256: {instructions.data.executionRootSha256}
+                    </p>
+                  ) : null}
+                  <p>
+                    If enrollment times out, run /usr/libexec/lindm/lindm-agent resume -wait-seconds
+                    3600 as root on the same device. Don't reinstall to retry.
+                  </p>
+                  {provisioning ? (
+                    <p>Remove installer and seed copies after enrollment.</p>
+                  ) : (
+                    <p>
+                      When enrollment finishes, remove /run/lindm-enrollment/grant from the device.
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
+          </details>
+        </div>
+        <DialogFooter className="border-t p-4">
           <Button variant="outline" onClick={dismiss}>
             {unavailable ? "Close" : "Done, forget secret"}
           </Button>
