@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -78,7 +79,9 @@ func (c *systemdCredential) read() (_ []byte, err error) {
 	if err := unix.Fstat(leaf, &before); err != nil {
 		return nil, err
 	}
-	if before.Mode&unix.S_IFMT != unix.S_IFREG || before.Nlink != 1 || (before.Uid != 0 && before.Uid != uint32(os.Geteuid())) || (before.Mode&07777 != 0400 && before.Mode&07777 != 0600) || before.Size < 0 || before.Size > maxFileBytes {
+	privateMode := before.Mode&07777 == 0400 || before.Mode&07777 == 0600
+	privateACL := before.Uid == 0 && before.Mode&07777 == 0440 && privateSystemdCredentialACL(leaf, 4)
+	if before.Mode&unix.S_IFMT != unix.S_IFREG || before.Nlink != 1 || (before.Uid != 0 && before.Uid != uint32(os.Geteuid())) || (!privateMode && !privateACL) || before.Size < 0 || before.Size > maxFileBytes {
 		return nil, fmt.Errorf("%s credential must be a bounded private regular file owned by root or the service user", c.kind)
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxFileBytes+1))
@@ -137,9 +140,44 @@ func (c *systemdCredential) openDirectory() (fd int, err error) {
 		if (stat.Uid != 0 && stat.Uid != uint32(os.Geteuid())) || (stat.Mode&0022 != 0 && (stat.Uid != 0 || stat.Mode&unix.S_ISVTX == 0)) {
 			return fd, fmt.Errorf("%s credential directory ancestry must be owned and non-replaceable", c.kind)
 		}
-		if i == len(parts)-1 && stat.Mode&07777 != 0500 && stat.Mode&07777 != 0700 {
-			return fd, fmt.Errorf("%s credential directory must be private", c.kind)
+		if i == len(parts)-1 {
+			privateMode := stat.Mode&07777 == 0500 || stat.Mode&07777 == 0700
+			privateACL := stat.Uid == 0 && stat.Mode&07777 == 0550 && privateSystemdCredentialACL(fd, 5)
+			if !privateMode && !privateACL {
+				return fd, fmt.Errorf("%s credential directory must be private", c.kind)
+			}
 		}
 	}
 	return fd, nil
+}
+
+// systemd keeps credential ownership at root and grants only the service UID
+// access through a named ACL. stat reports the ACL mask as group bits (0550 for
+// directories, 0440 for files), not an actual grant to the owning group. Accept
+// exactly that canonical ACL, never ordinary group-readable modes or additional
+// users/groups. This is only the ephemeral credential boundary.
+func privateSystemdCredentialACL(fd int, permissions uint16) bool {
+	var acl [44]byte
+	n, err := unix.Fgetxattr(fd, "system.posix_acl_access", acl[:])
+	if err != nil || n != len(acl) || binary.LittleEndian.Uint32(acl[:4]) != 2 {
+		return false
+	}
+	entries := [5]struct {
+		tag         uint16
+		permissions uint16
+		id          uint32
+	}{
+		{1, permissions, ^uint32(0)},           // ACL_USER_OBJ
+		{2, permissions, uint32(os.Geteuid())}, // ACL_USER
+		{4, 0, ^uint32(0)},                     // ACL_GROUP_OBJ
+		{16, permissions, ^uint32(0)},          // ACL_MASK
+		{32, 0, ^uint32(0)},                    // ACL_OTHER
+	}
+	for i, expected := range entries {
+		entry := acl[4+i*8 : 12+i*8]
+		if binary.LittleEndian.Uint16(entry[:2]) != expected.tag || binary.LittleEndian.Uint16(entry[2:4]) != expected.permissions || binary.LittleEndian.Uint32(entry[4:]) != expected.id {
+			return false
+		}
+	}
+	return true
 }

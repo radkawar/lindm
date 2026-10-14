@@ -4135,6 +4135,17 @@ journal entries directly to the lab operator before closing its owned guest.
 Journal output is never printed, written as plaintext, placed in product
 artifacts, or treated as lifecycle qualification.
 
+The sealed single-slot follow-up, `diagnostic-ubuntu-attempt3.json`, remains
+failed setup-only evidence. Its journal identifies the exact fixed
+`read database credential: database credential directory must be private`
+failure. [Systemd's credential implementation](https://github.com/systemd/systemd/blob/main/src/core/exec-credential.c)
+grants the service UID a named read/search directory ACL and a named file read
+ACL while retaining root ownership; the ACL mask appears in stat's group bits.
+The ephemeral reader now verifies that complete, canonical ACL rather than
+mistaking `0550`/`0440` for ordinary group access. Kernel-backed regression cases
+reject ordinary group modes, a different or extra reader, group/other access,
+and a write mask. At-rest credentials and restore retain root:root `0600`.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

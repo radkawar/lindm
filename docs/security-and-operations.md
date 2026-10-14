@@ -1891,6 +1891,14 @@ Neither service account can read these files at rest. Native units use
 `$CREDENTIALS_DIRECTORY` only when its explicit credential option is present.
 Missing or unsafe credentials stop the command; there is no persistent-file
 fallback. The normalized configuration retains the original URL-file reference.
+Systemd may keep ephemeral credentials root-owned and grant only the service UID
+access through a named POSIX ACL. The resulting stat masks are `0550` for the
+directory and `0440` for a file, although the owning group has no access.
+The credential reader admits only the exact canonical root/service-UID ACL:
+no owning-group or other access, no additional readers, and no write grant.
+Ordinary group-readable modes are refused. This exception applies only to
+`$CREDENTIALS_DIRECTORY`; persistent secrets remain root:root mode `0600`, and
+restore preserves that ownership.
 The installer copies referenced database CA/client-certificate/key material into
 the appropriate service identity's custody and retains strict `sslmode=verify-full`.
 The migrator must own the intended database and public schema without superuser,

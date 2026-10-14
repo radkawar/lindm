@@ -5,6 +5,7 @@ package config
 import (
 	"bytes"
 	"crypto/x509"
+	"encoding/binary"
 	"os"
 	"path/filepath"
 	"strings"
@@ -178,4 +179,103 @@ func TestDatabaseCredentialRejectsAmbiguousSelection(t *testing.T) {
 			t.Fatalf("accepted invalid credentials directory %q", directory)
 		}
 	}
+}
+
+func TestSystemdCredentialCanonicalServiceACL(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("real root-owned systemd ACL fixture requires root")
+	}
+	for _, mutation := range []string{"canonical", "ordinary group mode", "other user", "owning group", "other access", "write mask", "extra reader"} {
+		t.Run(mutation, func(t *testing.T) {
+			directory := t.TempDir()
+			if err := os.Chmod(directory, 0700); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(directory, "credential")
+			want := []byte("private credential canary")
+			if err := os.WriteFile(path, want, 0400); err != nil {
+				t.Fatal(err)
+			}
+			fileACL := systemdACLFixture(4)
+			directoryACL := systemdACLFixture(5)
+			switch mutation {
+			case "other user":
+				binary.LittleEndian.PutUint32(fileACL[16:20], uint32(os.Geteuid())+1)
+			case "owning group":
+				binary.LittleEndian.PutUint16(fileACL[22:24], 4)
+			case "other access":
+				binary.LittleEndian.PutUint16(directoryACL[38:40], 5)
+			case "write mask":
+				binary.LittleEndian.PutUint16(fileACL[30:32], 6)
+			case "extra reader":
+				extra := make([]byte, len(fileACL)+8)
+				copy(extra, fileACL[:20])
+				binary.LittleEndian.PutUint16(extra[20:22], 2)
+				binary.LittleEndian.PutUint16(extra[22:24], 4)
+				binary.LittleEndian.PutUint32(extra[24:28], uint32(os.Geteuid())+1)
+				copy(extra[28:], fileACL[20:])
+				fileACL = extra
+			}
+			if mutation == "ordinary group mode" {
+				if err := os.Chmod(path, 0440); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Chmod(directory, 0550); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := unix.Setxattr(path, "system.posix_acl_access", fileACL, 0); err != nil {
+					t.Fatal(err)
+				}
+				if err := unix.Setxattr(directory, "system.posix_acl_access", directoryACL, 0); err != nil {
+					t.Fatal(err)
+				}
+			}
+			t.Cleanup(func() {
+				if err := os.Chmod(directory, 0700); err != nil {
+					t.Error(err)
+				}
+			})
+			credential := &systemdCredential{directory: directory, name: "credential", kind: "database"}
+			got, err := credential.read()
+			defer clear(got)
+			if mutation == "canonical" {
+				if err != nil || !bytes.Equal(got, want) {
+					t.Fatalf("canonical systemd ACL rejected: %v", err)
+				}
+				file, err := os.Stat(path)
+				if err != nil || file.Mode().Perm() != 0440 {
+					t.Fatal("canonical file ACL mask fixture is not 0440")
+				}
+				dir, err := os.Stat(directory)
+				if err != nil || dir.Mode().Perm() != 0550 {
+					t.Fatal("canonical directory ACL mask fixture is not 0550")
+				}
+			} else if err == nil || len(got) != 0 {
+				t.Fatal("broadened or absent credential ACL was accepted")
+			}
+		})
+	}
+}
+
+func systemdACLFixture(permissions uint16) []byte {
+	acl := make([]byte, 44)
+	binary.LittleEndian.PutUint32(acl[:4], 2)
+	for i, entry := range [5]struct {
+		tag         uint16
+		permissions uint16
+		id          uint32
+	}{
+		{1, permissions, ^uint32(0)},
+		{2, permissions, uint32(os.Geteuid())},
+		{4, 0, ^uint32(0)},
+		{16, permissions, ^uint32(0)},
+		{32, 0, ^uint32(0)},
+	} {
+		offset := 4 + i*8
+		binary.LittleEndian.PutUint16(acl[offset:offset+2], entry.tag)
+		binary.LittleEndian.PutUint16(acl[offset+2:offset+4], entry.permissions)
+		binary.LittleEndian.PutUint32(acl[offset+4:offset+8], entry.id)
+	}
+	return acl
 }
