@@ -142,7 +142,7 @@ func (f *assistanceFixture) mustHelper(uid uint32, reports ...*agentv1.SessionAs
 }
 
 func report(id string, phase agentv1.AssistancePhase) *agentv1.SessionAssistanceReport {
-	r := &agentv1.SessionAssistanceReport{SessionId: id, Phase: phase}
+	r := &agentv1.SessionAssistanceReport{SessionId: id, Phase: phase, InputState: &agentv1.AssistanceInputState{Epoch: 1}}
 	if phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE {
 		r.OfferSdp = testOffer
 	}
@@ -230,6 +230,26 @@ func TestAssistanceBrokerDoesNotReadoptLiveHelperSession(t *testing.T) {
 		t.Fatalf("helper directive = %v, want terminate", got)
 	}
 	wantEnded(t, f.network(directive)[id], agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED)
+}
+
+// An unattended helper needs no consent and can offer before its next sync,
+// so its first report for a delivered invitation is already OFFERED
+// (layers-ubuntu24-tier3-27); another session's helper still cannot claim it.
+func TestAssistanceBrokerClaimsOfferForDeliveredInvitation(t *testing.T) {
+	f := newAssistanceFixture(t, true)
+	directive := &agentv1.AssistanceDirective{Invitation: f.invitation(agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, "")}
+	id := directive.GetInvitation().GetSessionId()
+	f.network(directive)
+	if _, ok := f.mustHelper(1000)[id]; !ok {
+		t.Fatal("eligible helper did not receive the invitation")
+	}
+	if got := f.mustHelper(1000, report(id, agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED))[id]; got.GetTerminate() {
+		t.Fatalf("helper directive = %v, want the live invitation", got)
+	}
+	got := f.network(directive)[id]
+	if got.GetPhase() != agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || got.GetOfferSdp() != testOffer || got.GetLocalSession().GetUid() != 1000 {
+		t.Fatalf("report = %v, want OFFERED by uid 1000", got)
+	}
 }
 
 func TestAssistanceBrokerLockEndsSession(t *testing.T) {

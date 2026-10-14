@@ -9,8 +9,14 @@ import { enumDesc, fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
-import type { AssistanceCapabilities, AssistanceCommand, AssistanceCommandResult, AssistanceDisplay, AssistanceDisplayFrame, AssistanceEnablement, AssistanceEndCause, AssistanceIceServer, AssistanceLocalSession, AssistanceMode, AssistancePolicy } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceUnattendedConnection } from "./assistance_unattended_pb.js";
+import { file_lindm_admin_v1_assistance_unattended } from "./assistance_unattended_pb.js";
+import type { AssistanceCapabilities, AssistanceCommand, AssistanceCommandResult, AssistanceDisplay, AssistanceDisplayFrame, AssistanceEnablement, AssistanceEndCause, AssistanceIceServer, AssistanceInputState, AssistanceLocalSession, AssistanceMode, AssistancePolicy, AssistancePolicyMode } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceFileReport, AssistanceFileRequest } from "../../agent/v1/assistance_files_pb.js";
+import { file_lindm_agent_v1_assistance_files } from "../../agent/v1/assistance_files_pb.js";
+import type { AssistanceAnnotationReport, AssistanceAudioReport } from "../../agent/v1/assistance_guidance_pb.js";
+import { file_lindm_agent_v1_assistance_guidance } from "../../agent/v1/assistance_guidance_pb.js";
 import { file_lindm_validation_v1_string_rules } from "../../validation/v1/string_rules_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
@@ -18,7 +24,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file lindm/admin/v1/assistance.proto.
  */
 export const file_lindm_admin_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSKiCwoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCRJAChZyZXF1ZXN0ZWRfY2FwYWJpbGl0aWVzGBUgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJAChZlZmZlY3RpdmVfY2FwYWJpbGl0aWVzGBYgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJEChRncmFudGVkX2NhcGFiaWxpdGllcxgXIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDYXBhYmlsaXRpZXMSMwoIZGlzcGxheXMYGCADKAsyIS5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRGlzcGxheRIbChNzZWxlY3RlZF9kaXNwbGF5X2lkGBkgASgJEhoKEmRpc3BsYXlfZ2VuZXJhdGlvbhgaIAEoDRI9Cg1kaXNwbGF5X2ZyYW1lGBsgASgLMiYubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpc3BsYXlGcmFtZTrDArpIvwIavAIKIGFzc2lzdGFuY2Vfc2Vzc2lvbi5kaXNwbGF5X2ZyYW1lEkBmcmFtZSBpZGVudGl0eSBtdXN0IG5hbWUgdGhlIGN1cnJlbnRseSBzaGFyZWQgZGlzcGxheSBnZW5lcmF0aW9uGtUBIWhhcyh0aGlzLmRpc3BsYXlfZnJhbWUpIHx8ICh0aGlzLmRpc3BsYXlfZnJhbWUuZGlzcGxheV9pZCA9PSB0aGlzLnNlbGVjdGVkX2Rpc3BsYXlfaWQgJiYgdGhpcy5kaXNwbGF5X2ZyYW1lLmdlbmVyYXRpb24gPT0gdGhpcy5kaXNwbGF5X2dlbmVyYXRpb24gJiYgdGhpcy5kaXNwbGF5cy5leGlzdHMoZCwgZC5pZCA9PSB0aGlzLmRpc3BsYXlfZnJhbWUuZGlzcGxheV9pZCkpIq8DCh5DcmVhdGVBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARJBCglkZXZpY2VfaWQYAiABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESOAoEbW9kZRgDIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlQgq6SAeCAQQQASAAEhkKBnJlYXNvbhgEIAEoCUIJukgGcgSYtRgBEisKFG1heF9kdXJhdGlvbl9zZWNvbmRzGAUgASgNQg26SArYAQEqBRiIDig8EkIKD3RhcmdldF91c2VybmFtZRgGIAEoCUIpukgmciQyIl4oW2EtekEtWl9dW2EtekEtWjAtOV8uLV17MCwzMX0pPyQSQAoWcmVxdWVzdGVkX2NhcGFiaWxpdGllcxgHIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kiVQofQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24idgodTGlzdEFzc2lzdGFuY2VTZXNzaW9uc1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABARIaCglwYWdlX3NpemUYAiABKA1CB7pIBCoCGGQSHAoKcGFnZV90b2tlbhgDIAEoCUIIukgFcgMYgAQibgoeTGlzdEFzc2lzdGFuY2VTZXNzaW9uc1Jlc3BvbnNlEjMKCHNlc3Npb25zGAEgAygLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24SFwoPbmV4dF9wYWdlX3Rva2VuGAIgASgJIjsKG0dldEFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASJSChxHZXRBc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbiI8ChxKb2luQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBIqABCh1Kb2luQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24SEQoJb2ZmZXJfc2RwGAIgASgJEjgKC2ljZV9zZXJ2ZXJzGAMgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUljZVNlcnZlciJfCh5BbnN3ZXJBc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESHwoKYW5zd2VyX3NkcBgCIAEoCUILukgIcgYQASiAgAEiVQofQW5zd2VyQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iPAocU3RvcEFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABASJTCh1TdG9wQXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24iOQoaR2V0QXNzaXN0YW5jZVBvbGljeVJlcXVlc3QSGwoJZGV2aWNlX2lkGAEgASgJQgi6SAVyA7ABASKCAQobR2V0QXNzaXN0YW5jZVBvbGljeVJlc3BvbnNlEjAKBnBvbGljeRgBIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSMQoHY2VpbGluZxgCIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kiugEKHVVwZGF0ZUFzc2lzdGFuY2VQb2xpY3lSZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESGwoJZGV2aWNlX2lkGAIgASgJQgi6SAVyA7ABARI4CgZwb2xpY3kYAyABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5Qga6SAPIAQEihQEKHlVwZGF0ZUFzc2lzdGFuY2VQb2xpY3lSZXNwb25zZRIwCgZwb2xpY3kYASABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5EjEKB2NlaWxpbmcYAiABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5IokCChtSdW5Bc3Npc3RhbmNlQ29tbWFuZFJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESOgoHY29tbWFuZBgCIAEoCzIhLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDb21tYW5kQga6SAPIAQE6jwG6SIsBGogBCh9ydW5fYXNzaXN0YW5jZV9jb21tYW5kLmRlYWRsaW5lEjJ0aGUgc2VydmVyLCBub3QgdGhlIGNhbGxlciwgc2V0cyBjb21tYW5kIGRlYWRsaW5lcxoxIWhhcyh0aGlzLmNvbW1hbmQpIHx8ICFoYXModGhpcy5jb21tYW5kLmRlYWRsaW5lKSL3AQocUnVuQXNzaXN0YW5jZUNvbW1hbmRSZXNwb25zZRI3CgZyZXN1bHQYASABKAsyJy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ29tbWFuZFJlc3VsdDqdAbpImQEalgEKLXJ1bl9hc3Npc3RhbmNlX2NvbW1hbmRfcmVzcG9uc2UubWV0YWRhdGFfb25seRI4Y2xpcGJvYXJkIHRleHQgaXMgZGlzY2xvc2VkIG9ubHkgYnkgR2V0QXNzaXN0YW5jZUNvbW1hbmQaKyFoYXModGhpcy5yZXN1bHQpIHx8IHRoaXMucmVzdWx0LnRleHQgPT0gJyciWQobR2V0QXNzaXN0YW5jZUNvbW1hbmRSZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEhwKCnJlcXVlc3RfaWQYAiABKAlCCLpIBXIDsAEBIlcKHEdldEFzc2lzdGFuY2VDb21tYW5kUmVzcG9uc2USNwoGcmVzdWx0GAEgASgLMicubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUNvbW1hbmRSZXN1bHQivgIKE0Fzc2lzdGFuY2VSZWFkaW5lc3MSNwoFc3RhdGUYASABKA4yKC5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzU3RhdGUSNAoGcG9saWN5GAIgASgOMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUVuYWJsZW1lbnQSMgoHZGVza3RvcBgDIAEoDjIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VEZXNrdG9wEjkKFWludmVudG9yeV9vYnNlcnZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9vcGVuX3Nlc3Npb25faWQYBiABKAkiYgodR2V0QXNzaXN0YW5jZVJlYWRpbmVzc1JlcXVlc3QSQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBIlgKHkdldEFzc2lzdGFuY2VSZWFkaW5lc3NSZXNwb25zZRI2CglyZWFkaW5lc3MYASABKAsyIy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBirnAgoYQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEioKJkFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfUkVBRFkQARIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9VTkNPTkZJR1VSRUQQAhIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9OT1RfRU5ST0xMRUQQAxInCiNBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9ESVNBQkxFRBAEEikKJUFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX05PX0RFU0tUT1AQBRImCiJBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9PRkZMSU5FEAYSIwofQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfQlVTWRAHKnYKEUFzc2lzdGFuY2VEZXNrdG9wEiIKHkFTU0lTVEFOQ0VfREVTS1RPUF9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfREVTS1RPUF9QUkVTRU5UEAESHQoZQVNTSVNUQU5DRV9ERVNLVE9QX0FCU0VOVBACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_agent_v1_assistance, file_lindm_validation_v1_string_rules]);
+  fileDesc("Ch9saW5kbS9hZG1pbi92MS9hc3Npc3RhbmNlLnByb3RvEg5saW5kbS5hZG1pbi52MSLHDgoRQXNzaXN0YW5jZVNlc3Npb24SCgoCaWQYASABKAkSEQoJZGV2aWNlX2lkGAIgASgJEhMKC29wZXJhdG9yX2lkGAMgASgJEhgKEG9wZXJhdG9yX2Rpc3BsYXkYBCABKAkSLAoEbW9kZRgFIAEoDjIeLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VNb2RlEg4KBnJlYXNvbhgGIAEoCRIuCgVzdGF0ZRgHIAEoDjIfLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTdGF0ZRIuCgpjcmVhdGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI0ChBjb25zZW50X2RlYWRsaW5lGAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIrCgdlbmRzX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxjb25zZW50ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnN0YXJ0ZWRfYXQYDCABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEiwKCGVuZGVkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBI1CgllbmRfY2F1c2UYDiABKA4yIi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRW5kQ2F1c2USEgoKZW5kX2RldGFpbBgPIAEoCRIXCg9jb250cm9sX2dyYW50ZWQYECABKAgSPQoNbG9jYWxfc2Vzc2lvbhgRIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VMb2NhbFNlc3Npb24SGQoRb2ZmZXJfZmluZ2VycHJpbnQYEiABKAkSGgoSYW5zd2VyX2ZpbmdlcnByaW50GBMgASgJEhcKD3RhcmdldF91c2VybmFtZRgUIAEoCRJAChZyZXF1ZXN0ZWRfY2FwYWJpbGl0aWVzGBUgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJAChZlZmZlY3RpdmVfY2FwYWJpbGl0aWVzGBYgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRJEChRncmFudGVkX2NhcGFiaWxpdGllcxgXIAEoCzImLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDYXBhYmlsaXRpZXMSMwoIZGlzcGxheXMYGCADKAsyIS5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlRGlzcGxheRIbChNzZWxlY3RlZF9kaXNwbGF5X2lkGBkgASgJEhoKEmRpc3BsYXlfZ2VuZXJhdGlvbhgaIAEoDRI9Cg1kaXNwbGF5X2ZyYW1lGBsgASgLMiYubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpc3BsYXlGcmFtZRI5CgtpbnB1dF9zdGF0ZRgdIAEoCzIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VJbnB1dFN0YXRlEhQKDHJlY29ubmVjdF9vZhgeIAEoCRI+CglyZWNvbm5lY3QYHyABKAsyKy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVjb25uZWN0V29ya2Zsb3cSNgoJcmVjb3JkaW5nGCAgASgLMiMubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVJlY29yZGluZxJCCgp1bmF0dGVuZGVkGCEgASgLMi4ubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVVuYXR0ZW5kZWRDb25uZWN0aW9uEiAKGHVuYXR0ZW5kZWRfZW5yb2xsbWVudF9pZBgiIAEoCRI0CgVhdWRpbxgjIAEoCzIlLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VBdWRpb1JlcG9ydBI+Cgphbm5vdGF0aW9uGCQgASgLMioubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUFubm90YXRpb25SZXBvcnQ6wwK6SL8CGrwCCiBhc3Npc3RhbmNlX3Nlc3Npb24uZGlzcGxheV9mcmFtZRJAZnJhbWUgaWRlbnRpdHkgbXVzdCBuYW1lIHRoZSBjdXJyZW50bHkgc2hhcmVkIGRpc3BsYXkgZ2VuZXJhdGlvbhrVASFoYXModGhpcy5kaXNwbGF5X2ZyYW1lKSB8fCAodGhpcy5kaXNwbGF5X2ZyYW1lLmRpc3BsYXlfaWQgPT0gdGhpcy5zZWxlY3RlZF9kaXNwbGF5X2lkICYmIHRoaXMuZGlzcGxheV9mcmFtZS5nZW5lcmF0aW9uID09IHRoaXMuZGlzcGxheV9nZW5lcmF0aW9uICYmIHRoaXMuZGlzcGxheXMuZXhpc3RzKGQsIGQuaWQgPT0gdGhpcy5kaXNwbGF5X2ZyYW1lLmRpc3BsYXlfaWQpKSK+BQoeQ3JlYXRlQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESQQoJZGV2aWNlX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEjgKBG1vZGUYAyABKA4yHi5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlTW9kZUIKukgHggEEEAEgABIZCgZyZWFzb24YBCABKAlCCbpIBnIEmLUYARIrChRtYXhfZHVyYXRpb25fc2Vjb25kcxgFIAEoDUINukgK2AEBKgUYiA4oPBJCCg90YXJnZXRfdXNlcm5hbWUYBiABKAlCKbpIJnIkMiJeKFthLXpBLVpfXVthLXpBLVowLTlfLi1dezAsMzF9KT8kEkAKFnJlcXVlc3RlZF9jYXBhYmlsaXRpZXMYByABKAsyIC5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlUG9saWN5EigKE3VuYXR0ZW5kZWRfZ3JhbnRfaWQYCCABKAlCC7pICNgBAXIDsAEBOuIBukjeARrbAQokY3JlYXRlX2Fzc2lzdGFuY2Vfc2Vzc2lvbi51bmF0dGVuZGVkEkBhbiB1bmF0dGVuZGVkIGNvbm5lY3Rpb24gY2Fubm90IGFsc28gb2ZmZXIgdW5hdHRlbmRlZCBlbnJvbGxtZW50GnF0aGlzLnVuYXR0ZW5kZWRfZ3JhbnRfaWQgPT0gJycgfHwgIWhhcyh0aGlzLnJlcXVlc3RlZF9jYXBhYmlsaXRpZXMpIHx8IHRoaXMucmVxdWVzdGVkX2NhcGFiaWxpdGllcy51bmF0dGVuZGVkIDwgMiJVCh9DcmVhdGVBc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbiJ2Ch1MaXN0QXNzaXN0YW5jZVNlc3Npb25zUmVxdWVzdBIbCglkZXZpY2VfaWQYASABKAlCCLpIBXIDsAEBEhoKCXBhZ2Vfc2l6ZRgCIAEoDUIHukgEKgIYZBIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiABCJuCh5MaXN0QXNzaXN0YW5jZVNlc3Npb25zUmVzcG9uc2USMwoIc2Vzc2lvbnMYASADKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbhIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiOwobR2V0QXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBIlIKHEdldEFzc2lzdGFuY2VTZXNzaW9uUmVzcG9uc2USMgoHc2Vzc2lvbhgBIAEoCzIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VTZXNzaW9uIjwKHEpvaW5Bc3Npc3RhbmNlU2Vzc2lvblJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQEioAEKHUpvaW5Bc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbhIRCglvZmZlcl9zZHAYAiABKAkSOAoLaWNlX3NlcnZlcnMYAyADKAsyIy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlSWNlU2VydmVyIl8KHkFuc3dlckFzc2lzdGFuY2VTZXNzaW9uUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABARIfCgphbnN3ZXJfc2RwGAIgASgJQgu6SAhyBhABKICAASJVCh9BbnN3ZXJBc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbiI8ChxTdG9wQXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBIlMKHVN0b3BBc3Npc3RhbmNlU2Vzc2lvblJlc3BvbnNlEjIKB3Nlc3Npb24YASABKAsyIS5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlU2Vzc2lvbiI5ChpHZXRBc3Npc3RhbmNlUG9saWN5UmVxdWVzdBIbCglkZXZpY2VfaWQYASABKAlCCLpIBXIDsAEBIoIBChtHZXRBc3Npc3RhbmNlUG9saWN5UmVzcG9uc2USMAoGcG9saWN5GAEgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeRIxCgdjZWlsaW5nGAIgASgLMiAubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZVBvbGljeSK6AQodVXBkYXRlQXNzaXN0YW5jZVBvbGljeVJlcXVlc3QSQgoKcmVxdWVzdF9pZBgBIAEoCUIuukgrcilaJDAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMLABARIbCglkZXZpY2VfaWQYAiABKAlCCLpIBXIDsAEBEjgKBnBvbGljeRgDIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3lCBrpIA8gBASKFAQoeVXBkYXRlQXNzaXN0YW5jZVBvbGljeVJlc3BvbnNlEjAKBnBvbGljeRgBIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kSMQoHY2VpbGluZxgCIAEoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3kiiQIKG1J1bkFzc2lzdGFuY2VDb21tYW5kUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABARI6Cgdjb21tYW5kGAIgASgLMiEubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUNvbW1hbmRCBrpIA8gBATqPAbpIiwEaiAEKH3J1bl9hc3Npc3RhbmNlX2NvbW1hbmQuZGVhZGxpbmUSMnRoZSBzZXJ2ZXIsIG5vdCB0aGUgY2FsbGVyLCBzZXRzIGNvbW1hbmQgZGVhZGxpbmVzGjEhaGFzKHRoaXMuY29tbWFuZCkgfHwgIWhhcyh0aGlzLmNvbW1hbmQuZGVhZGxpbmUpIvcBChxSdW5Bc3Npc3RhbmNlQ29tbWFuZFJlc3BvbnNlEjcKBnJlc3VsdBgBIAEoCzInLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VDb21tYW5kUmVzdWx0Op0BukiZARqWAQotcnVuX2Fzc2lzdGFuY2VfY29tbWFuZF9yZXNwb25zZS5tZXRhZGF0YV9vbmx5EjhjbGlwYm9hcmQgdGV4dCBpcyBkaXNjbG9zZWQgb25seSBieSBHZXRBc3Npc3RhbmNlQ29tbWFuZBorIWhhcyh0aGlzLnJlc3VsdCkgfHwgdGhpcy5yZXN1bHQudGV4dCA9PSAnJyJZChtHZXRBc3Npc3RhbmNlQ29tbWFuZFJlcXVlc3QSHAoKc2Vzc2lvbl9pZBgBIAEoCUIIukgFcgOwAQESHAoKcmVxdWVzdF9pZBgCIAEoCUIIukgFcgOwAQEiVwocR2V0QXNzaXN0YW5jZUNvbW1hbmRSZXNwb25zZRI3CgZyZXN1bHQYASABKAsyJy5saW5kbS5hZ2VudC52MS5Bc3Npc3RhbmNlQ29tbWFuZFJlc3VsdCLQAgoiU3RhcnRBc3Npc3RhbmNlRmlsZVRyYW5zZmVyUmVxdWVzdBIcCgpzZXNzaW9uX2lkGAEgASgJQgi6SAVyA7ABARI/Cgh0cmFuc2ZlchgCIAEoCzIlLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VGaWxlUmVxdWVzdEIGukgDyAEBOsoBukjGARrDAQooc3RhcnRfYXNzaXN0YW5jZV9maWxlX3RyYW5zZmVyLmF1dGhvcml0eRJCb25seSB0aGUgc2VydmVyIHNldHMgYSBmaWxlIHRyYW5zZmVyIGRlYWRsaW5lIGFuZCBlZmZlY3RpdmUgcG9saWN5GlMhaGFzKHRoaXMudHJhbnNmZXIpIHx8ICghaGFzKHRoaXMudHJhbnNmZXIuZGVhZGxpbmUpICYmICFoYXModGhpcy50cmFuc2Zlci5wb2xpY3kpKSJdCiNTdGFydEFzc2lzdGFuY2VGaWxlVHJhbnNmZXJSZXNwb25zZRI2Cgh0cmFuc2ZlchgBIAEoCzIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VGaWxlUmVwb3J0Il4KIEdldEFzc2lzdGFuY2VGaWxlVHJhbnNmZXJSZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEhwKCnJlcXVlc3RfaWQYAiABKAlCCLpIBXIDsAEBIlsKIUdldEFzc2lzdGFuY2VGaWxlVHJhbnNmZXJSZXNwb25zZRI2Cgh0cmFuc2ZlchgBIAEoCzIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VGaWxlUmVwb3J0ImEKI0NhbmNlbEFzc2lzdGFuY2VGaWxlVHJhbnNmZXJSZXF1ZXN0EhwKCnNlc3Npb25faWQYASABKAlCCLpIBXIDsAEBEhwKCnJlcXVlc3RfaWQYAiABKAlCCLpIBXIDsAEBIl4KJENhbmNlbEFzc2lzdGFuY2VGaWxlVHJhbnNmZXJSZXNwb25zZRI2Cgh0cmFuc2ZlchgBIAEoCzIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VGaWxlUmVwb3J0IuoCChtBc3Npc3RhbmNlUmVjb25uZWN0V29ya2Zsb3cSCgoCaWQYASABKAkSNwoFc3RhdGUYAiABKA4yKC5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVjb25uZWN0U3RhdGUSMgoEbW9kZRgDIAEoDjIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VQb2xpY3lNb2RlEhkKEW9yaWdpbl9zZXNzaW9uX2lkGAQgASgJEhkKEWxhdGVzdF9zZXNzaW9uX2lkGAUgASgJEhIKCnJlY29ubmVjdHMYBiABKA0SFgoObWF4X3JlY29ubmVjdHMYByABKA0SLgoKZXhwaXJlc19hdBgIIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoIZW5kZWRfYXQYCSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhIKCmVuZF9yZWFzb24YCiABKAkiywQKE0Fzc2lzdGFuY2VSZWNvcmRpbmcSCgoCaWQYASABKAkSEgoKc2Vzc2lvbl9pZBgCIAEoCRIRCglkZXZpY2VfaWQYAyABKAkSEwoLb3BlcmF0b3JfaWQYBCABKAkSEAoIcmVxdWlyZWQYBSABKAgSPgoFc3RhdGUYBiABKA4yLy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVjb3JkaW5nQXJjaGl2ZVN0YXRlEhQKDHN0b3JlZF9ieXRlcxgHIAEoBBIQCghzZWdtZW50cxgIIAEoDRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgpzdGFydGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIwCgxmaW5hbGl6ZWRfYXQYCyABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjAKDHJldGFpbl91bnRpbBgMIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKZGVsZXRlZF9hdBgNIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASGQoRY2lwaGVydGV4dF9zaGEyNTYYDiABKAkSGAoQZHVyYXRpb25fc2Vjb25kcxgPIAEoDRIOCgZyZWFzb24YECABKAkSDgoGa2V5X2lkGBEgASgJEhYKDnJldGVudGlvbl9kYXlzGBIgASgNEhEKCW1heF9ieXRlcxgTIAEoBCKFAQohUmVjb25uZWN0QXNzaXN0YW5jZVNlc3Npb25SZXF1ZXN0EkIKCnJlcXVlc3RfaWQYASABKAlCLrpIK3IpWiQwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDCwAQESHAoKc2Vzc2lvbl9pZBgCIAEoCUIIukgFcgOwAQEiWAoiUmVjb25uZWN0QXNzaXN0YW5jZVNlc3Npb25SZXNwb25zZRIyCgdzZXNzaW9uGAEgASgLMiEubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVNlc3Npb24ieAofTGlzdEFzc2lzdGFuY2VSZWNvcmRpbmdzUmVxdWVzdBIbCglkZXZpY2VfaWQYASABKAlCCLpIBXIDsAEBEhoKCXBhZ2Vfc2l6ZRgCIAEoDUIHukgEKgIYZBIcCgpwYWdlX3Rva2VuGAMgASgJQgi6SAVyAxiABCJ0CiBMaXN0QXNzaXN0YW5jZVJlY29yZGluZ3NSZXNwb25zZRI3CgpyZWNvcmRpbmdzGAEgAygLMiMubGluZG0uYWRtaW4udjEuQXNzaXN0YW5jZVJlY29yZGluZxIXCg9uZXh0X3BhZ2VfdG9rZW4YAiABKAkiWwoeT3BlbkFzc2lzdGFuY2VSZWNvcmRpbmdSZXF1ZXN0Eh4KDHJlY29yZGluZ19pZBgBIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAIgASgJQgm6SAZyBJi1GAEiswEKH09wZW5Bc3Npc3RhbmNlUmVjb3JkaW5nUmVzcG9uc2USFAoMcmV0cmlldmFsX2lkGAEgASgJEi4KCmV4cGlyZXNfYXQYAiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEjYKCXJlY29yZGluZxgDIAEoCzIjLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VSZWNvcmRpbmcSEgoKbWVkaWFfdHlwZRgEIAEoCSJdCh5SZWFkQXNzaXN0YW5jZVJlY29yZGluZ1JlcXVlc3QSHgoMcmV0cmlldmFsX2lkGAEgASgJQgi6SAVyA7ABARIbCghzZXF1ZW5jZRgCIAEoDUIJukgGKgQY//8DImEKH1JlYWRBc3Npc3RhbmNlUmVjb3JkaW5nUmVzcG9uc2USDAoEZGF0YRgBIAEoDBIQCghzZXF1ZW5jZRgCIAEoDRIMCgRsYXN0GAMgASgIEhAKCGNvbXBsZXRlGAQgASgIIqEBCiBEZWxldGVBc3Npc3RhbmNlUmVjb3JkaW5nUmVxdWVzdBJCCgpyZXF1ZXN0X2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEh4KDHJlY29yZGluZ19pZBgCIAEoCUIIukgFcgOwAQESGQoGcmVhc29uGAMgASgJQgm6SAZyBJi1GAEiWwohRGVsZXRlQXNzaXN0YW5jZVJlY29yZGluZ1Jlc3BvbnNlEjYKCXJlY29yZGluZxgBIAEoCzIjLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VSZWNvcmRpbmcivgIKE0Fzc2lzdGFuY2VSZWFkaW5lc3MSNwoFc3RhdGUYASABKA4yKC5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzU3RhdGUSNAoGcG9saWN5GAIgASgOMiQubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZUVuYWJsZW1lbnQSMgoHZGVza3RvcBgDIAEoDjIhLmxpbmRtLmFkbWluLnYxLkFzc2lzdGFuY2VEZXNrdG9wEjkKFWludmVudG9yeV9vYnNlcnZlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMbGFzdF9zZWVuX2F0GAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIXCg9vcGVuX3Nlc3Npb25faWQYBiABKAkiYgodR2V0QXNzaXN0YW5jZVJlYWRpbmVzc1JlcXVlc3QSQQoJZGV2aWNlX2lkGAEgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBIlgKHkdldEFzc2lzdGFuY2VSZWFkaW5lc3NSZXNwb25zZRI2CglyZWFkaW5lc3MYASABKAsyIy5saW5kbS5hZG1pbi52MS5Bc3Npc3RhbmNlUmVhZGluZXNzKugBCg9Bc3Npc3RhbmNlU3RhdGUSIAocQVNTSVNUQU5DRV9TVEFURV9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfU1RBVEVfUkVRVUVTVEVEEAESHQoZQVNTSVNUQU5DRV9TVEFURV9QUk9NUFRFRBACEhwKGEFTU0lTVEFOQ0VfU1RBVEVfT0ZGRVJFRBADEh0KGUFTU0lTVEFOQ0VfU1RBVEVfQU5TV0VSRUQQBBIbChdBU1NJU1RBTkNFX1NUQVRFX0FDVElWRRAFEhoKFkFTU0lTVEFOQ0VfU1RBVEVfRU5ERUQQBirjAQoYQXNzaXN0YW5jZVJlY29ubmVjdFN0YXRlEioKJkFTU0lTVEFOQ0VfUkVDT05ORUNUX1NUQVRFX1VOU1BFQ0lGSUVEEAASJQohQVNTSVNUQU5DRV9SRUNPTk5FQ1RfU1RBVEVfQUNUSVZFEAESJgoiQVNTSVNUQU5DRV9SRUNPTk5FQ1RfU1RBVEVfV0FJVElORxACEiQKIEFTU0lTVEFOQ0VfUkVDT05ORUNUX1NUQVRFX0VOREVEEAMSJgoiQVNTSVNUQU5DRV9SRUNPTk5FQ1RfU1RBVEVfRVhQSVJFRBAEKqsDCh9Bc3Npc3RhbmNlUmVjb3JkaW5nQXJjaGl2ZVN0YXRlEjIKLkFTU0lTVEFOQ0VfUkVDT1JESU5HX0FSQ0hJVkVfU1RBVEVfVU5TUEVDSUZJRUQQABIuCipBU1NJU1RBTkNFX1JFQ09SRElOR19BUkNISVZFX1NUQVRFX1BFTkRJTkcQARIwCixBU1NJU1RBTkNFX1JFQ09SRElOR19BUkNISVZFX1NUQVRFX1JFQ09SRElORxACEi8KK0FTU0lTVEFOQ0VfUkVDT1JESU5HX0FSQ0hJVkVfU1RBVEVfQ09NUExFVEUQAxIxCi1BU1NJU1RBTkNFX1JFQ09SRElOR19BUkNISVZFX1NUQVRFX0lOQ09NUExFVEUQBBItCilBU1NJU1RBTkNFX1JFQ09SRElOR19BUkNISVZFX1NUQVRFX0ZBSUxFRBAFEi8KK0FTU0lTVEFOQ0VfUkVDT1JESU5HX0FSQ0hJVkVfU1RBVEVfREVDTElORUQQBhIuCipBU1NJU1RBTkNFX1JFQ09SRElOR19BUkNISVZFX1NUQVRFX0RFTEVURUQQByrnAgoYQXNzaXN0YW5jZVJlYWRpbmVzc1N0YXRlEioKJkFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX1VOU1BFQ0lGSUVEEAASJAogQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfUkVBRFkQARIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9VTkNPTkZJR1VSRUQQAhIrCidBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9OT1RfRU5ST0xMRUQQAxInCiNBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9ESVNBQkxFRBAEEikKJUFTU0lTVEFOQ0VfUkVBRElORVNTX1NUQVRFX05PX0RFU0tUT1AQBRImCiJBU1NJU1RBTkNFX1JFQURJTkVTU19TVEFURV9PRkZMSU5FEAYSIwofQVNTSVNUQU5DRV9SRUFESU5FU1NfU1RBVEVfQlVTWRAHKnYKEUFzc2lzdGFuY2VEZXNrdG9wEiIKHkFTU0lTVEFOQ0VfREVTS1RPUF9VTlNQRUNJRklFRBAAEh4KGkFTU0lTVEFOQ0VfREVTS1RPUF9QUkVTRU5UEAESHQoZQVNTSVNUQU5DRV9ERVNLVE9QX0FCU0VOVBACQiJaIGxpbmRtL2dlbi9saW5kbS9hZG1pbi92MTthZG1pbnYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_lindm_admin_v1_assistance_unattended, file_lindm_agent_v1_assistance, file_lindm_agent_v1_assistance_files, file_lindm_agent_v1_assistance_guidance, file_lindm_validation_v1_string_rules]);
 
 /**
  * @generated from message lindm.admin.v1.AssistanceSession
@@ -162,6 +168,52 @@ export type AssistanceSession = Message<"lindm.admin.v1.AssistanceSession"> & {
    * @generated from field: lindm.agent.v1.AssistanceDisplayFrame display_frame = 27;
    */
   displayFrame?: AssistanceDisplayFrame | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceInputState input_state = 29;
+   */
+  inputState?: AssistanceInputState | undefined;
+
+  /**
+   * The ended session this one continues; empty for an original invitation.
+   *
+   * @generated from field: string reconnect_of = 30;
+   */
+  reconnectOf: string;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceReconnectWorkflow reconnect = 31;
+   */
+  reconnect?: AssistanceReconnectWorkflow | undefined;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceRecording recording = 32;
+   */
+  recording?: AssistanceRecording | undefined;
+
+  /**
+   * Present exactly on an unattended connection.
+   *
+   * @generated from field: lindm.admin.v1.AssistanceUnattendedConnection unattended = 33;
+   */
+  unattended?: AssistanceUnattendedConnection | undefined;
+
+  /**
+   * The opt-in this attended session offered, if any.
+   *
+   * @generated from field: string unattended_enrollment_id = 34;
+   */
+  unattendedEnrollmentId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceAudioReport audio = 35;
+   */
+  audio?: AssistanceAudioReport | undefined;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceAnnotationReport annotation = 36;
+   */
+  annotation?: AssistanceAnnotationReport | undefined;
 };
 
 /**
@@ -213,6 +265,14 @@ export type CreateAssistanceSessionRequest = Message<"lindm.admin.v1.CreateAssis
    * @generated from field: lindm.agent.v1.AssistancePolicy requested_capabilities = 7;
    */
   requestedCapabilities?: AssistancePolicy | undefined;
+
+  /**
+   * Starts an unattended connection under this caller's in-force,
+   * independently approved grant. The target is the grant's opted-in user.
+   *
+   * @generated from field: string unattended_grant_id = 8;
+   */
+  unattendedGrantId: string;
 };
 
 /**
@@ -612,6 +672,554 @@ export const GetAssistanceCommandResponseSchema: GenMessage<GetAssistanceCommand
   messageDesc(file_lindm_admin_v1_assistance, 20);
 
 /**
+ * @generated from message lindm.admin.v1.StartAssistanceFileTransferRequest
+ */
+export type StartAssistanceFileTransferRequest = Message<"lindm.admin.v1.StartAssistanceFileTransferRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceFileRequest transfer = 2;
+   */
+  transfer?: AssistanceFileRequest | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.StartAssistanceFileTransferRequest.
+ * Use `create(StartAssistanceFileTransferRequestSchema)` to create a new message.
+ */
+export const StartAssistanceFileTransferRequestSchema: GenMessage<StartAssistanceFileTransferRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 21);
+
+/**
+ * @generated from message lindm.admin.v1.StartAssistanceFileTransferResponse
+ */
+export type StartAssistanceFileTransferResponse = Message<"lindm.admin.v1.StartAssistanceFileTransferResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceFileReport transfer = 1;
+   */
+  transfer?: AssistanceFileReport | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.StartAssistanceFileTransferResponse.
+ * Use `create(StartAssistanceFileTransferResponseSchema)` to create a new message.
+ */
+export const StartAssistanceFileTransferResponseSchema: GenMessage<StartAssistanceFileTransferResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 22);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceFileTransferRequest
+ */
+export type GetAssistanceFileTransferRequest = Message<"lindm.admin.v1.GetAssistanceFileTransferRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceFileTransferRequest.
+ * Use `create(GetAssistanceFileTransferRequestSchema)` to create a new message.
+ */
+export const GetAssistanceFileTransferRequestSchema: GenMessage<GetAssistanceFileTransferRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 23);
+
+/**
+ * @generated from message lindm.admin.v1.GetAssistanceFileTransferResponse
+ */
+export type GetAssistanceFileTransferResponse = Message<"lindm.admin.v1.GetAssistanceFileTransferResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceFileReport transfer = 1;
+   */
+  transfer?: AssistanceFileReport | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.GetAssistanceFileTransferResponse.
+ * Use `create(GetAssistanceFileTransferResponseSchema)` to create a new message.
+ */
+export const GetAssistanceFileTransferResponseSchema: GenMessage<GetAssistanceFileTransferResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 24);
+
+/**
+ * @generated from message lindm.admin.v1.CancelAssistanceFileTransferRequest
+ */
+export type CancelAssistanceFileTransferRequest = Message<"lindm.admin.v1.CancelAssistanceFileTransferRequest"> & {
+  /**
+   * @generated from field: string session_id = 1;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string request_id = 2;
+   */
+  requestId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.CancelAssistanceFileTransferRequest.
+ * Use `create(CancelAssistanceFileTransferRequestSchema)` to create a new message.
+ */
+export const CancelAssistanceFileTransferRequestSchema: GenMessage<CancelAssistanceFileTransferRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 25);
+
+/**
+ * @generated from message lindm.admin.v1.CancelAssistanceFileTransferResponse
+ */
+export type CancelAssistanceFileTransferResponse = Message<"lindm.admin.v1.CancelAssistanceFileTransferResponse"> & {
+  /**
+   * @generated from field: lindm.agent.v1.AssistanceFileReport transfer = 1;
+   */
+  transfer?: AssistanceFileReport | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.CancelAssistanceFileTransferResponse.
+ * Use `create(CancelAssistanceFileTransferResponseSchema)` to create a new message.
+ */
+export const CancelAssistanceFileTransferResponseSchema: GenMessage<CancelAssistanceFileTransferResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 26);
+
+/**
+ * AssistanceReconnectWorkflow is bounded workflow metadata. It never holds a
+ * grant, portal token, relay credential or DTLS identity.
+ *
+ * @generated from message lindm.admin.v1.AssistanceReconnectWorkflow
+ */
+export type AssistanceReconnectWorkflow = Message<"lindm.admin.v1.AssistanceReconnectWorkflow"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceReconnectState state = 2;
+   */
+  state: AssistanceReconnectState;
+
+  /**
+   * LIMITED: operator-issued reconnect only. ON: automatic re-invitation.
+   *
+   * @generated from field: lindm.agent.v1.AssistancePolicyMode mode = 3;
+   */
+  mode: AssistancePolicyMode;
+
+  /**
+   * @generated from field: string origin_session_id = 4;
+   */
+  originSessionId: string;
+
+  /**
+   * @generated from field: string latest_session_id = 5;
+   */
+  latestSessionId: string;
+
+  /**
+   * @generated from field: uint32 reconnects = 6;
+   */
+  reconnects: number;
+
+  /**
+   * @generated from field: uint32 max_reconnects = 7;
+   */
+  maxReconnects: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 8;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp ended_at = 9;
+   */
+  endedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: string end_reason = 10;
+   */
+  endReason: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.AssistanceReconnectWorkflow.
+ * Use `create(AssistanceReconnectWorkflowSchema)` to create a new message.
+ */
+export const AssistanceReconnectWorkflowSchema: GenMessage<AssistanceReconnectWorkflow> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 27);
+
+/**
+ * AssistanceRecording is archive metadata. Content requires a separate
+ * OpenAssistanceRecording retrieval with remote_assistance.recordings.read.
+ *
+ * @generated from message lindm.admin.v1.AssistanceRecording
+ */
+export type AssistanceRecording = Message<"lindm.admin.v1.AssistanceRecording"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: string device_id = 3;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: string operator_id = 4;
+   */
+  operatorId: string;
+
+  /**
+   * @generated from field: bool required = 5;
+   */
+  required: boolean;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceRecordingArchiveState state = 6;
+   */
+  state: AssistanceRecordingArchiveState;
+
+  /**
+   * @generated from field: uint64 stored_bytes = 7;
+   */
+  storedBytes: bigint;
+
+  /**
+   * @generated from field: uint32 segments = 8;
+   */
+  segments: number;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp created_at = 9;
+   */
+  createdAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp started_at = 10;
+   */
+  startedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp finalized_at = 11;
+   */
+  finalizedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp retain_until = 12;
+   */
+  retainUntil?: Timestamp | undefined;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp deleted_at = 13;
+   */
+  deletedAt?: Timestamp | undefined;
+
+  /**
+   * Lowercase hex SHA-256 of the stored ciphertext stream, once finalized.
+   *
+   * @generated from field: string ciphertext_sha256 = 14;
+   */
+  ciphertextSha256: string;
+
+  /**
+   * @generated from field: uint32 duration_seconds = 15;
+   */
+  durationSeconds: number;
+
+  /**
+   * @generated from field: string reason = 16;
+   */
+  reason: string;
+
+  /**
+   * @generated from field: string key_id = 17;
+   */
+  keyId: string;
+
+  /**
+   * @generated from field: uint32 retention_days = 18;
+   */
+  retentionDays: number;
+
+  /**
+   * @generated from field: uint64 max_bytes = 19;
+   */
+  maxBytes: bigint;
+};
+
+/**
+ * Describes the message lindm.admin.v1.AssistanceRecording.
+ * Use `create(AssistanceRecordingSchema)` to create a new message.
+ */
+export const AssistanceRecordingSchema: GenMessage<AssistanceRecording> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 28);
+
+/**
+ * ReconnectAssistanceSession issues a fresh linked invitation for an ended
+ * session of a waiting workflow. Every authority check of Create is repeated
+ * and the local user must consent again.
+ *
+ * @generated from message lindm.admin.v1.ReconnectAssistanceSessionRequest
+ */
+export type ReconnectAssistanceSessionRequest = Message<"lindm.admin.v1.ReconnectAssistanceSessionRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ReconnectAssistanceSessionRequest.
+ * Use `create(ReconnectAssistanceSessionRequestSchema)` to create a new message.
+ */
+export const ReconnectAssistanceSessionRequestSchema: GenMessage<ReconnectAssistanceSessionRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 29);
+
+/**
+ * @generated from message lindm.admin.v1.ReconnectAssistanceSessionResponse
+ */
+export type ReconnectAssistanceSessionResponse = Message<"lindm.admin.v1.ReconnectAssistanceSessionResponse"> & {
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceSession session = 1;
+   */
+  session?: AssistanceSession | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ReconnectAssistanceSessionResponse.
+ * Use `create(ReconnectAssistanceSessionResponseSchema)` to create a new message.
+ */
+export const ReconnectAssistanceSessionResponseSchema: GenMessage<ReconnectAssistanceSessionResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 30);
+
+/**
+ * @generated from message lindm.admin.v1.ListAssistanceRecordingsRequest
+ */
+export type ListAssistanceRecordingsRequest = Message<"lindm.admin.v1.ListAssistanceRecordingsRequest"> & {
+  /**
+   * @generated from field: string device_id = 1;
+   */
+  deviceId: string;
+
+  /**
+   * @generated from field: uint32 page_size = 2;
+   */
+  pageSize: number;
+
+  /**
+   * @generated from field: string page_token = 3;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListAssistanceRecordingsRequest.
+ * Use `create(ListAssistanceRecordingsRequestSchema)` to create a new message.
+ */
+export const ListAssistanceRecordingsRequestSchema: GenMessage<ListAssistanceRecordingsRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 31);
+
+/**
+ * @generated from message lindm.admin.v1.ListAssistanceRecordingsResponse
+ */
+export type ListAssistanceRecordingsResponse = Message<"lindm.admin.v1.ListAssistanceRecordingsResponse"> & {
+  /**
+   * @generated from field: repeated lindm.admin.v1.AssistanceRecording recordings = 1;
+   */
+  recordings: AssistanceRecording[];
+
+  /**
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ListAssistanceRecordingsResponse.
+ * Use `create(ListAssistanceRecordingsResponseSchema)` to create a new message.
+ */
+export const ListAssistanceRecordingsResponseSchema: GenMessage<ListAssistanceRecordingsResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 32);
+
+/**
+ * OpenAssistanceRecording audits and starts one expiring retrieval.
+ *
+ * @generated from message lindm.admin.v1.OpenAssistanceRecordingRequest
+ */
+export type OpenAssistanceRecordingRequest = Message<"lindm.admin.v1.OpenAssistanceRecordingRequest"> & {
+  /**
+   * @generated from field: string recording_id = 1;
+   */
+  recordingId: string;
+
+  /**
+   * @generated from field: string reason = 2;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.OpenAssistanceRecordingRequest.
+ * Use `create(OpenAssistanceRecordingRequestSchema)` to create a new message.
+ */
+export const OpenAssistanceRecordingRequestSchema: GenMessage<OpenAssistanceRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 33);
+
+/**
+ * @generated from message lindm.admin.v1.OpenAssistanceRecordingResponse
+ */
+export type OpenAssistanceRecordingResponse = Message<"lindm.admin.v1.OpenAssistanceRecordingResponse"> & {
+  /**
+   * @generated from field: string retrieval_id = 1;
+   */
+  retrievalId: string;
+
+  /**
+   * @generated from field: google.protobuf.Timestamp expires_at = 2;
+   */
+  expiresAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceRecording recording = 3;
+   */
+  recording?: AssistanceRecording | undefined;
+
+  /**
+   * @generated from field: string media_type = 4;
+   */
+  mediaType: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.OpenAssistanceRecordingResponse.
+ * Use `create(OpenAssistanceRecordingResponseSchema)` to create a new message.
+ */
+export const OpenAssistanceRecordingResponseSchema: GenMessage<OpenAssistanceRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 34);
+
+/**
+ * ReadAssistanceRecording returns one decrypted segment of an open retrieval.
+ * Plaintext is streamed from memory and never written to server storage.
+ *
+ * @generated from message lindm.admin.v1.ReadAssistanceRecordingRequest
+ */
+export type ReadAssistanceRecordingRequest = Message<"lindm.admin.v1.ReadAssistanceRecordingRequest"> & {
+  /**
+   * @generated from field: string retrieval_id = 1;
+   */
+  retrievalId: string;
+
+  /**
+   * @generated from field: uint32 sequence = 2;
+   */
+  sequence: number;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ReadAssistanceRecordingRequest.
+ * Use `create(ReadAssistanceRecordingRequestSchema)` to create a new message.
+ */
+export const ReadAssistanceRecordingRequestSchema: GenMessage<ReadAssistanceRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 35);
+
+/**
+ * @generated from message lindm.admin.v1.ReadAssistanceRecordingResponse
+ */
+export type ReadAssistanceRecordingResponse = Message<"lindm.admin.v1.ReadAssistanceRecordingResponse"> & {
+  /**
+   * @generated from field: bytes data = 1;
+   */
+  data: Uint8Array;
+
+  /**
+   * @generated from field: uint32 sequence = 2;
+   */
+  sequence: number;
+
+  /**
+   * True for the last stored segment; complete distinguishes an authenticated
+   * final segment from a retained incomplete prefix.
+   *
+   * @generated from field: bool last = 3;
+   */
+  last: boolean;
+
+  /**
+   * @generated from field: bool complete = 4;
+   */
+  complete: boolean;
+};
+
+/**
+ * Describes the message lindm.admin.v1.ReadAssistanceRecordingResponse.
+ * Use `create(ReadAssistanceRecordingResponseSchema)` to create a new message.
+ */
+export const ReadAssistanceRecordingResponseSchema: GenMessage<ReadAssistanceRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 36);
+
+/**
+ * @generated from message lindm.admin.v1.DeleteAssistanceRecordingRequest
+ */
+export type DeleteAssistanceRecordingRequest = Message<"lindm.admin.v1.DeleteAssistanceRecordingRequest"> & {
+  /**
+   * @generated from field: string request_id = 1;
+   */
+  requestId: string;
+
+  /**
+   * @generated from field: string recording_id = 2;
+   */
+  recordingId: string;
+
+  /**
+   * @generated from field: string reason = 3;
+   */
+  reason: string;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DeleteAssistanceRecordingRequest.
+ * Use `create(DeleteAssistanceRecordingRequestSchema)` to create a new message.
+ */
+export const DeleteAssistanceRecordingRequestSchema: GenMessage<DeleteAssistanceRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 37);
+
+/**
+ * @generated from message lindm.admin.v1.DeleteAssistanceRecordingResponse
+ */
+export type DeleteAssistanceRecordingResponse = Message<"lindm.admin.v1.DeleteAssistanceRecordingResponse"> & {
+  /**
+   * @generated from field: lindm.admin.v1.AssistanceRecording recording = 1;
+   */
+  recording?: AssistanceRecording | undefined;
+};
+
+/**
+ * Describes the message lindm.admin.v1.DeleteAssistanceRecordingResponse.
+ * Use `create(DeleteAssistanceRecordingResponseSchema)` to create a new message.
+ */
+export const DeleteAssistanceRecordingResponseSchema: GenMessage<DeleteAssistanceRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_admin_v1_assistance, 38);
+
+/**
  * @generated from message lindm.admin.v1.AssistanceReadiness
  */
 export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> & {
@@ -657,7 +1265,7 @@ export type AssistanceReadiness = Message<"lindm.admin.v1.AssistanceReadiness"> 
  * Use `create(AssistanceReadinessSchema)` to create a new message.
  */
 export const AssistanceReadinessSchema: GenMessage<AssistanceReadiness> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 21);
+  messageDesc(file_lindm_admin_v1_assistance, 39);
 
 /**
  * @generated from message lindm.admin.v1.GetAssistanceReadinessRequest
@@ -674,7 +1282,7 @@ export type GetAssistanceReadinessRequest = Message<"lindm.admin.v1.GetAssistanc
  * Use `create(GetAssistanceReadinessRequestSchema)` to create a new message.
  */
 export const GetAssistanceReadinessRequestSchema: GenMessage<GetAssistanceReadinessRequest> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 22);
+  messageDesc(file_lindm_admin_v1_assistance, 40);
 
 /**
  * @generated from message lindm.admin.v1.GetAssistanceReadinessResponse
@@ -691,7 +1299,7 @@ export type GetAssistanceReadinessResponse = Message<"lindm.admin.v1.GetAssistan
  * Use `create(GetAssistanceReadinessResponseSchema)` to create a new message.
  */
 export const GetAssistanceReadinessResponseSchema: GenMessage<GetAssistanceReadinessResponse> = /*@__PURE__*/
-  messageDesc(file_lindm_admin_v1_assistance, 23);
+  messageDesc(file_lindm_admin_v1_assistance, 41);
 
 /**
  * AssistanceState is the server lifecycle of one support invitation.
@@ -748,6 +1356,106 @@ export enum AssistanceState {
  */
 export const AssistanceStateSchema: GenEnum<AssistanceState> = /*@__PURE__*/
   enumDesc(file_lindm_admin_v1_assistance, 0);
+
+/**
+ * @generated from enum lindm.admin.v1.AssistanceReconnectState
+ */
+export enum AssistanceReconnectState {
+  /**
+   * @generated from enum value: ASSISTANCE_RECONNECT_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * A linked session is open; the workflow waits for its end.
+   *
+   * @generated from enum value: ASSISTANCE_RECONNECT_STATE_ACTIVE = 1;
+   */
+  ACTIVE = 1,
+
+  /**
+   * The latest session ended by logout, reboot, lock or lost connection; a
+   * fresh linked invitation may be issued until expires_at.
+   *
+   * @generated from enum value: ASSISTANCE_RECONNECT_STATE_WAITING = 2;
+   */
+  WAITING = 2,
+
+  /**
+   * @generated from enum value: ASSISTANCE_RECONNECT_STATE_ENDED = 3;
+   */
+  ENDED = 3,
+
+  /**
+   * @generated from enum value: ASSISTANCE_RECONNECT_STATE_EXPIRED = 4;
+   */
+  EXPIRED = 4,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.AssistanceReconnectState.
+ */
+export const AssistanceReconnectStateSchema: GenEnum<AssistanceReconnectState> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_assistance, 1);
+
+/**
+ * @generated from enum lindm.admin.v1.AssistanceRecordingArchiveState
+ */
+export enum AssistanceRecordingArchiveState {
+  /**
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * Authorized; the local user has not yet approved capture.
+   *
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING = 1;
+   */
+  PENDING = 1,
+
+  /**
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING = 2;
+   */
+  RECORDING = 2,
+
+  /**
+   * The final authenticated segment was stored.
+   *
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE = 3;
+   */
+  COMPLETE = 3,
+
+  /**
+   * Capture ended without a final segment; the stored prefix is retained.
+   *
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE = 4;
+   */
+  INCOMPLETE = 4,
+
+  /**
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED = 5;
+   */
+  FAILED = 5,
+
+  /**
+   * The local user did not approve optional recording; nothing was stored.
+   *
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED = 6;
+   */
+  DECLINED = 6,
+
+  /**
+   * @generated from enum value: ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED = 7;
+   */
+  DELETED = 7,
+}
+
+/**
+ * Describes the enum lindm.admin.v1.AssistanceRecordingArchiveState.
+ */
+export const AssistanceRecordingArchiveStateSchema: GenEnum<AssistanceRecordingArchiveState> = /*@__PURE__*/
+  enumDesc(file_lindm_admin_v1_assistance, 2);
 
 /**
  * AssistanceReadinessState is the server's answer to "can a new request reach
@@ -816,7 +1524,7 @@ export enum AssistanceReadinessState {
  * Describes the enum lindm.admin.v1.AssistanceReadinessState.
  */
 export const AssistanceReadinessStateSchema: GenEnum<AssistanceReadinessState> = /*@__PURE__*/
-  enumDesc(file_lindm_admin_v1_assistance, 1);
+  enumDesc(file_lindm_admin_v1_assistance, 3);
 
 /**
  * AssistanceDesktop is the session-inventory evidence for a local desktop.
@@ -848,5 +1556,5 @@ export enum AssistanceDesktop {
  * Describes the enum lindm.admin.v1.AssistanceDesktop.
  */
 export const AssistanceDesktopSchema: GenEnum<AssistanceDesktop> = /*@__PURE__*/
-  enumDesc(file_lindm_admin_v1_assistance, 2);
+  enumDesc(file_lindm_admin_v1_assistance, 4);
 

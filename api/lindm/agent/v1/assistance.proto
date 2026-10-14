@@ -6,6 +6,10 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/assistance_files.proto";
+import "lindm/agent/v1/assistance_guidance.proto";
+import "lindm/agent/v1/assistance_recording.proto";
+import "lindm/agent/v1/assistance_unattended.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
@@ -59,6 +63,9 @@ enum AssistanceEndCause {
   ASSISTANCE_END_CAUSE_CONNECTION_FAILED = 12;
   // Device policy does not enable remote assistance.
   ASSISTANCE_END_CAUSE_DISABLED = 13;
+  // Required recording could not be disclosed, stored or continued. A session
+  // whose policy requires recording never continues unrecorded.
+  ASSISTANCE_END_CAUSE_RECORDING_FAILED = 14;
 }
 
 message AssistanceIceServer {
@@ -107,6 +114,23 @@ message AssistanceInvitation {
   }];
   AssistancePolicy requested_capabilities = 9;
   AssistancePolicy effective_capabilities = 10;
+  // The ended session this invitation continues in a reconnect workflow. It is
+  // disclosure only: no grant, portal token or media credential is reused.
+  string reconnect_of = 11 [(buf.validate.field).string.pattern = "^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$"];
+  // Present exactly when this session may be recorded. The consent prompt
+  // discloses it before capture.
+  AssistanceRecordingAuthority recording = 12;
+  // Present only on an attended invitation that may ask the local user to opt
+  // in to later unattended access.
+  AssistanceUnattendedEnrollmentOffer unattended_enrollment = 13;
+  // Present exactly on an unattended connection; there is no consent prompt,
+  // only the persistent banner naming the operator with Stop.
+  AssistanceUnattendedAuthority unattended = 14;
+  option (buf.validate.message).cel = {
+    id: "assistance_invitation.unattended"
+    message: "an unattended connection neither offers enrollment nor reconnects"
+    expression: "!has(this.unattended) || (!has(this.unattended_enrollment) && this.reconnect_of == '' && this.target_username != '')"
+  };
 }
 
 // AssistanceDirective is the authority's complete desired state for one
@@ -119,6 +143,7 @@ message AssistanceDirective {
   AssistanceCommand command = 5;
   // Absolute fresh operator authority bound; polling never extends it.
   google.protobuf.Timestamp authorized_until = 6;
+  AssistanceFileDirective file_transfer = 7;
   option (buf.validate.message).cel = {
     id: "assistance_directive.operator_deadline"
     message: "live directives require fresh operator authority"
@@ -177,6 +202,12 @@ message AssistanceReport {
   AssistancePolicy requested_capabilities = 13;
   AssistancePolicy effective_capabilities = 14;
   AssistanceDisplayFrame display_frame = 15;
+  AssistanceFileReport file_transfer = 16;
+  AssistanceInputState input_state = 17;
+  AssistanceRecordingReport recording = 18;
+  AssistanceAudioReport audio = 19;
+  AssistanceAnnotationReport annotation = 20;
+  AssistanceUnattendedReport unattended = 21;
   option (buf.validate.message).cel = {
     id: "assistance_report.offer"
     message: "offer_sdp is required from OFFERED and absent before it"
@@ -253,6 +284,64 @@ message AssistancePolicy {
   AssistancePolicyMode keyboard = 2 [(buf.validate.field).enum.defined_only = true];
   AssistancePolicyMode display = 3 [(buf.validate.field).enum.defined_only = true];
   AssistancePolicyMode messages = 4 [(buf.validate.field).enum.defined_only = true];
+  AssistancePolicyMode files = 5 [(buf.validate.field).enum.defined_only = true];
+  AssistanceFilePolicy file_limits = 6;
+  // LIMITED: the operator may send a fresh linked invitation after the user
+  // reboots or logs out. ON: the server additionally re-invites automatically
+  // within the bounded window. Every invitation needs fresh consent.
+  AssistancePolicyMode reconnect = 7 [(buf.validate.field).enum.defined_only = true];
+  // LIMITED: the local user may opt in to recording per session. ON: a
+  // session requested with required recording ends unless it is recorded.
+  AssistancePolicyMode recording = 8 [(buf.validate.field).enum.defined_only = true];
+  AssistanceReconnectPolicy reconnect_limits = 9;
+  AssistanceRecordingPolicy recording_limits = 10;
+  // LIMITED: one independently approved, time-bounded window per device. ON:
+  // additionally a bounded approved weekly schedule. Both need prior local
+  // opt-in and only reach an already-unlocked session of the opted-in user.
+  AssistancePolicyMode unattended = 11 [(buf.validate.field).enum.defined_only = true];
+  // OFF hides elevation guidance. LIMITED and ON show guidance and pause all
+  // remote injection until the employee resumes locally.
+  AssistancePolicyMode elevation = 12 [(buf.validate.field).enum.defined_only = true];
+  // LIMITED: an ephemeral pointer. ON: additionally bounded annotations.
+  AssistancePolicyMode annotation = 13 [(buf.validate.field).enum.defined_only = true];
+  // LIMITED: explicitly selected output audio. ON: additionally separately
+  // consented microphone audio.
+  AssistancePolicyMode audio = 14 [(buf.validate.field).enum.defined_only = true];
+  AssistanceUnattendedPolicy unattended_limits = 15;
+  // Tier 3 desktop admission gates. They come only from device policy and
+  // the configured ceiling; an operator never requests a desktop. OFF refuses
+  // sessions on that desktop before consent. LIMITED admits VIEW with only the
+  // individually qualified non-input capabilities (displays, messages,
+  // reconnect, recording); CONTROL is refused, never downgraded. ON also
+  // admits CONTROL and the individually qualified input capabilities
+  // (keyboard, clipboard, files). The helper's per-desktop qualification
+  // table narrows both further: GNOME parity is never assumed. GNOME and
+  // COSMIC Wayland sessions are not gated.
+  AssistancePolicyMode kde_plasma = 20 [(buf.validate.field).enum.defined_only = true];
+  // Applies to every logind x11 session, whatever its desktop. A
+  // portal-backed session and the persistent local stop remain mandatory;
+  // there is no Xlib/XTest/xclip fallback.
+  AssistancePolicyMode x11 = 21 [(buf.validate.field).enum.defined_only = true];
+  option (buf.validate.message).cel = {
+    id: "assistance_policy.file_limits"
+    message: "enabled file transfer requires explicit size and type limits"
+    expression: "this.files < 2 || has(this.file_limits)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_policy.reconnect_limits"
+    message: "enabled reconnect requires an explicit bounded window"
+    expression: "this.reconnect < 2 || has(this.reconnect_limits)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_policy.recording_limits"
+    message: "enabled recording requires explicit retention and size limits"
+    expression: "this.recording < 2 || has(this.recording_limits)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_policy.unattended_limits"
+    message: "enabled unattended access requires explicit approval, enrollment and session bounds"
+    expression: "this.unattended < 2 || has(this.unattended_limits)"
+  };
 }
 
 message AssistanceCapabilities {
@@ -276,6 +365,46 @@ message AssistanceCapabilities {
   // Capture intentionally omits the cursor on desktop versions where the
   // embedded cursor path is unsafe and bitmap metadata cannot be transported.
   bool cursor_hidden = 6;
+  string files_reason = 13 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string reconnect_reason = 7 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string recording_reason = 8 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string unattended_reason = 9 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string elevation_reason = 10 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string annotation_reason = 11 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  string audio_reason = 12 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  // The helper's qualification profile that admitted the session, e.g.
+  // "kde_plasma_wayland" or "gnome_x11".
+  string desktop_profile = 20 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  // Portal frontend interface versions observed for the grant, e.g.
+  // "screencast_5_remote_desktop_2_clipboard_1". Audit data only.
+  string portal_versions = 21 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
 }
 
 // Only locally consented portal streams may appear here.
@@ -318,6 +447,11 @@ enum AssistanceCommandKind {
   ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS = 3;
   ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY = 4;
   ASSISTANCE_COMMAND_KIND_MESSAGE = 5;
+  // Shows the operator's elevation guidance and pauses all remote injection
+  // until the employee resumes locally. It never carries credentials.
+  ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE = 6;
+  // Enables or disables the operator's pointer/annotation overlay.
+  ASSISTANCE_COMMAND_KIND_ANNOTATION = 7;
 }
 
 enum AssistanceSpecialKey {
@@ -346,10 +480,11 @@ message AssistanceCommand {
     max_len: 64
     pattern: "^[A-Za-z0-9_.-]*$"
   }];
+  bool annotation_enabled = 7;
   option (buf.validate.message).cel = {
     id: "assistance_command.payload"
     message: "payload must match the command kind"
-    expression: "((this.kind == 1 || this.kind == 5) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048))"
+    expression: "((this.kind == 1 || this.kind == 5 || this.kind == 6) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048)) && (this.kind != 6 || size(bytes(this.text)) <= 512) && (this.kind == 7 || !this.annotation_enabled)"
   };
 }
 
@@ -390,7 +525,13 @@ message AssistanceCommandResult {
       "command_unsupported",
       "command_failed",
       "command_state_lost",
-      "command_expired"
+      "command_expired",
+      "local_file_dialog",
+      "local_elevation_pause",
+      "elevation_paused",
+      "annotation_enabled",
+      "annotation_disabled",
+      "annotation_hidden_locally"
     ]
   }];
   string text = 5 [(buf.validate.field).string.max_bytes = 16384];
@@ -399,5 +540,18 @@ message AssistanceCommandResult {
     id: "assistance_command_result.content"
     message: "only a successful clipboard read may carry content; terminal results require completion time"
     expression: "(this.text == '' || (this.kind == 2 && this.status == 2)) && ((this.status != 1) == has(this.completed_at))"
+  };
+}
+
+// Input epochs fence queued events across local-only approval and chooser UI.
+// A resumed epoch never accepts input generated before the pause.
+message AssistanceInputState {
+  uint32 epoch = 1 [(buf.validate.field).uint32.gte = 1];
+  bool paused = 2;
+  AssistanceInputPause pause = 3 [(buf.validate.field).enum.defined_only = true];
+  option (buf.validate.message).cel = {
+    id: "assistance_input_state.pause"
+    message: "a pause reason is present only while paused"
+    expression: "this.pause == 0 || this.paused"
   };
 }

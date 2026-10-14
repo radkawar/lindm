@@ -81,3 +81,21 @@ func TestGStreamerSourceEOSEndsLiveCapture(t *testing.T) {
 		t.Fatalf("second close: %v", err)
 	}
 }
+
+// The sound pipeline streams RTP on stdout with no separate descriptor or
+// lifecycle bus; closing it crashed the helper on local Mute
+// (layers-ubuntu24-tier3-25).
+func TestStdoutCaptureClosesWithoutVideoLifecycle(t *testing.T) {
+	process, err := nativeexec.Start(t.Context(), nativeexec.Command{Path: "/bin/sleep", Args: []string{"30"}, Timeout: 10 * time.Second, StderrLimit: gstStderrTail})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capture := &gstCapture{process: process, reader: newRTPStreamReader(process.Stdout()), logger: slog.New(slog.DiscardHandler)}
+	done := make(chan error, 1)
+	go func() { done <- capture.Close() }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("closing a stdout capture waited for a lifecycle bus it does not have")
+	}
+}

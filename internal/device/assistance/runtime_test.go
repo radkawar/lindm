@@ -21,6 +21,9 @@ func TestAssistanceRequiresCoreAndRuntime(t *testing.T) {
 	if service, err := New(&core.Service{}, nil); err == nil || service != nil {
 		t.Fatal("missing runtime admitted")
 	}
+	if service, err := New(&core.Service{}, &Runtime{}); err == nil || service != nil {
+		t.Fatal("uninitialized runtime admitted")
+	}
 }
 
 func TestAssistanceRuntimeSharedLifetime(t *testing.T) {
@@ -36,6 +39,12 @@ func TestAssistanceRuntimeSharedLifetime(t *testing.T) {
 		runtime := NewRuntime()
 		admin, device := newService(runtime), newService(runtime)
 		isolated := newService(NewRuntime())
+		if runtime.assistanceInstance == uuid.Nil || admin.runtime.assistanceInstance != device.runtime.assistanceInstance {
+			t.Fatal("services do not share one process incarnation")
+		}
+		if isolated.runtime.assistanceInstance == runtime.assistanceInstance {
+			t.Fatal("fresh runtime reused the process incarnation")
+		}
 		id := uuid.New()
 		remember := func(service *Service, lifetime time.Duration) *assistanceCommandMemory {
 			t.Helper()

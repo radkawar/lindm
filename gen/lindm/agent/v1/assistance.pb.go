@@ -169,6 +169,9 @@ const (
 	AssistanceEndCause_ASSISTANCE_END_CAUSE_CONNECTION_FAILED AssistanceEndCause = 12
 	// Device policy does not enable remote assistance.
 	AssistanceEndCause_ASSISTANCE_END_CAUSE_DISABLED AssistanceEndCause = 13
+	// Required recording could not be disclosed, stored or continued. A session
+	// whose policy requires recording never continues unrecorded.
+	AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED AssistanceEndCause = 14
 )
 
 // Enum value maps for AssistanceEndCause.
@@ -188,6 +191,7 @@ var (
 		11: "ASSISTANCE_END_CAUSE_UNAVAILABLE",
 		12: "ASSISTANCE_END_CAUSE_CONNECTION_FAILED",
 		13: "ASSISTANCE_END_CAUSE_DISABLED",
+		14: "ASSISTANCE_END_CAUSE_RECORDING_FAILED",
 	}
 	AssistanceEndCause_value = map[string]int32{
 		"ASSISTANCE_END_CAUSE_UNSPECIFIED":         0,
@@ -204,6 +208,7 @@ var (
 		"ASSISTANCE_END_CAUSE_UNAVAILABLE":         11,
 		"ASSISTANCE_END_CAUSE_CONNECTION_FAILED":   12,
 		"ASSISTANCE_END_CAUSE_DISABLED":            13,
+		"ASSISTANCE_END_CAUSE_RECORDING_FAILED":    14,
 	}
 )
 
@@ -348,6 +353,11 @@ const (
 	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS    AssistanceCommandKind = 3
 	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY  AssistanceCommandKind = 4
 	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_MESSAGE         AssistanceCommandKind = 5
+	// Shows the operator's elevation guidance and pauses all remote injection
+	// until the employee resumes locally. It never carries credentials.
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE AssistanceCommandKind = 6
+	// Enables or disables the operator's pointer/annotation overlay.
+	AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ANNOTATION AssistanceCommandKind = 7
 )
 
 // Enum value maps for AssistanceCommandKind.
@@ -359,14 +369,18 @@ var (
 		3: "ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS",
 		4: "ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY",
 		5: "ASSISTANCE_COMMAND_KIND_MESSAGE",
+		6: "ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE",
+		7: "ASSISTANCE_COMMAND_KIND_ANNOTATION",
 	}
 	AssistanceCommandKind_value = map[string]int32{
-		"ASSISTANCE_COMMAND_KIND_UNSPECIFIED":     0,
-		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE": 1,
-		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ":  2,
-		"ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS":    3,
-		"ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY":  4,
-		"ASSISTANCE_COMMAND_KIND_MESSAGE":         5,
+		"ASSISTANCE_COMMAND_KIND_UNSPECIFIED":        0,
+		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE":    1,
+		"ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ":     2,
+		"ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS":       3,
+		"ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY":     4,
+		"ASSISTANCE_COMMAND_KIND_MESSAGE":            5,
+		"ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE": 6,
+		"ASSISTANCE_COMMAND_KIND_ANNOTATION":         7,
 	}
 )
 
@@ -587,8 +601,20 @@ type AssistanceInvitation struct {
 	IceServers            []*AssistanceIceServer `protobuf:"bytes,8,rep,name=ice_servers,json=iceServers,proto3" json:"ice_servers,omitempty"`
 	RequestedCapabilities *AssistancePolicy      `protobuf:"bytes,9,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
 	EffectiveCapabilities *AssistancePolicy      `protobuf:"bytes,10,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// The ended session this invitation continues in a reconnect workflow. It is
+	// disclosure only: no grant, portal token or media credential is reused.
+	ReconnectOf string `protobuf:"bytes,11,opt,name=reconnect_of,json=reconnectOf,proto3" json:"reconnect_of,omitempty"`
+	// Present exactly when this session may be recorded. The consent prompt
+	// discloses it before capture.
+	Recording *AssistanceRecordingAuthority `protobuf:"bytes,12,opt,name=recording,proto3" json:"recording,omitempty"`
+	// Present only on an attended invitation that may ask the local user to opt
+	// in to later unattended access.
+	UnattendedEnrollment *AssistanceUnattendedEnrollmentOffer `protobuf:"bytes,13,opt,name=unattended_enrollment,json=unattendedEnrollment,proto3" json:"unattended_enrollment,omitempty"`
+	// Present exactly on an unattended connection; there is no consent prompt,
+	// only the persistent banner naming the operator with Stop.
+	Unattended    *AssistanceUnattendedAuthority `protobuf:"bytes,14,opt,name=unattended,proto3" json:"unattended,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AssistanceInvitation) Reset() {
@@ -691,6 +717,34 @@ func (x *AssistanceInvitation) GetEffectiveCapabilities() *AssistancePolicy {
 	return nil
 }
 
+func (x *AssistanceInvitation) GetReconnectOf() string {
+	if x != nil {
+		return x.ReconnectOf
+	}
+	return ""
+}
+
+func (x *AssistanceInvitation) GetRecording() *AssistanceRecordingAuthority {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+func (x *AssistanceInvitation) GetUnattendedEnrollment() *AssistanceUnattendedEnrollmentOffer {
+	if x != nil {
+		return x.UnattendedEnrollment
+	}
+	return nil
+}
+
+func (x *AssistanceInvitation) GetUnattended() *AssistanceUnattendedAuthority {
+	if x != nil {
+		return x.Unattended
+	}
+	return nil
+}
+
 // AssistanceDirective is the authority's complete desired state for one
 // session. Receivers apply it idempotently.
 type AssistanceDirective struct {
@@ -701,7 +755,8 @@ type AssistanceDirective struct {
 	TerminateCause AssistanceEndCause     `protobuf:"varint,4,opt,name=terminate_cause,json=terminateCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"terminate_cause,omitempty"`
 	Command        *AssistanceCommand     `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
 	// Absolute fresh operator authority bound; polling never extends it.
-	AuthorizedUntil *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=authorized_until,json=authorizedUntil,proto3" json:"authorized_until,omitempty"`
+	AuthorizedUntil *timestamppb.Timestamp   `protobuf:"bytes,6,opt,name=authorized_until,json=authorizedUntil,proto3" json:"authorized_until,omitempty"`
+	FileTransfer    *AssistanceFileDirective `protobuf:"bytes,7,opt,name=file_transfer,json=fileTransfer,proto3" json:"file_transfer,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -774,6 +829,13 @@ func (x *AssistanceDirective) GetCommand() *AssistanceCommand {
 func (x *AssistanceDirective) GetAuthorizedUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AuthorizedUntil
+	}
+	return nil
+}
+
+func (x *AssistanceDirective) GetFileTransfer() *AssistanceFileDirective {
+	if x != nil {
+		return x.FileTransfer
 	}
 	return nil
 }
@@ -859,22 +921,28 @@ func (x *AssistanceLocalSession) GetDesktop() string {
 
 // AssistanceReport is the device's complete observed state for one session.
 type AssistanceReport struct {
-	state                 protoimpl.MessageState   `protogen:"open.v1"`
-	SessionId             string                   `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Phase                 AssistancePhase          `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
-	OfferSdp              string                   `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
-	ControlGranted        bool                     `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
-	EndCause              AssistanceEndCause       `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
-	EndDetail             string                   `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
-	LocalSession          *AssistanceLocalSession  `protobuf:"bytes,7,opt,name=local_session,json=localSession,proto3" json:"local_session,omitempty"`
-	GrantedCapabilities   *AssistanceCapabilities  `protobuf:"bytes,8,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
-	Displays              []*AssistanceDisplay     `protobuf:"bytes,9,rep,name=displays,proto3" json:"displays,omitempty"`
-	SelectedDisplayId     string                   `protobuf:"bytes,10,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
-	CommandResult         *AssistanceCommandResult `protobuf:"bytes,11,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
-	DisplayGeneration     uint32                   `protobuf:"varint,12,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
-	RequestedCapabilities *AssistancePolicy        `protobuf:"bytes,13,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
-	EffectiveCapabilities *AssistancePolicy        `protobuf:"bytes,14,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
-	DisplayFrame          *AssistanceDisplayFrame  `protobuf:"bytes,15,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	state                 protoimpl.MessageState      `protogen:"open.v1"`
+	SessionId             string                      `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Phase                 AssistancePhase             `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
+	OfferSdp              string                      `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
+	ControlGranted        bool                        `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
+	EndCause              AssistanceEndCause          `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
+	EndDetail             string                      `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
+	LocalSession          *AssistanceLocalSession     `protobuf:"bytes,7,opt,name=local_session,json=localSession,proto3" json:"local_session,omitempty"`
+	GrantedCapabilities   *AssistanceCapabilities     `protobuf:"bytes,8,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
+	Displays              []*AssistanceDisplay        `protobuf:"bytes,9,rep,name=displays,proto3" json:"displays,omitempty"`
+	SelectedDisplayId     string                      `protobuf:"bytes,10,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
+	CommandResult         *AssistanceCommandResult    `protobuf:"bytes,11,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
+	DisplayGeneration     uint32                      `protobuf:"varint,12,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
+	RequestedCapabilities *AssistancePolicy           `protobuf:"bytes,13,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
+	EffectiveCapabilities *AssistancePolicy           `protobuf:"bytes,14,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
+	DisplayFrame          *AssistanceDisplayFrame     `protobuf:"bytes,15,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	FileTransfer          *AssistanceFileReport       `protobuf:"bytes,16,opt,name=file_transfer,json=fileTransfer,proto3" json:"file_transfer,omitempty"`
+	InputState            *AssistanceInputState       `protobuf:"bytes,17,opt,name=input_state,json=inputState,proto3" json:"input_state,omitempty"`
+	Recording             *AssistanceRecordingReport  `protobuf:"bytes,18,opt,name=recording,proto3" json:"recording,omitempty"`
+	Audio                 *AssistanceAudioReport      `protobuf:"bytes,19,opt,name=audio,proto3" json:"audio,omitempty"`
+	Annotation            *AssistanceAnnotationReport `protobuf:"bytes,20,opt,name=annotation,proto3" json:"annotation,omitempty"`
+	Unattended            *AssistanceUnattendedReport `protobuf:"bytes,21,opt,name=unattended,proto3" json:"unattended,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -1010,6 +1078,48 @@ func (x *AssistanceReport) GetEffectiveCapabilities() *AssistancePolicy {
 func (x *AssistanceReport) GetDisplayFrame() *AssistanceDisplayFrame {
 	if x != nil {
 		return x.DisplayFrame
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetFileTransfer() *AssistanceFileReport {
+	if x != nil {
+		return x.FileTransfer
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetInputState() *AssistanceInputState {
+	if x != nil {
+		return x.InputState
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetRecording() *AssistanceRecordingReport {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetAudio() *AssistanceAudioReport {
+	if x != nil {
+		return x.Audio
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetAnnotation() *AssistanceAnnotationReport {
+	if x != nil {
+		return x.Annotation
+	}
+	return nil
+}
+
+func (x *AssistanceReport) GetUnattended() *AssistanceUnattendedReport {
+	if x != nil {
+		return x.Unattended
 	}
 	return nil
 }
@@ -1176,11 +1286,49 @@ func (x *RemoteAssistanceConfig) GetPolicyCeiling() *AssistancePolicy {
 }
 
 type AssistancePolicy struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Clipboard     AssistancePolicyMode   `protobuf:"varint,1,opt,name=clipboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"clipboard,omitempty"`
-	Keyboard      AssistancePolicyMode   `protobuf:"varint,2,opt,name=keyboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"keyboard,omitempty"`
-	Display       AssistancePolicyMode   `protobuf:"varint,3,opt,name=display,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"display,omitempty"`
-	Messages      AssistancePolicyMode   `protobuf:"varint,4,opt,name=messages,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"messages,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Clipboard  AssistancePolicyMode   `protobuf:"varint,1,opt,name=clipboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"clipboard,omitempty"`
+	Keyboard   AssistancePolicyMode   `protobuf:"varint,2,opt,name=keyboard,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"keyboard,omitempty"`
+	Display    AssistancePolicyMode   `protobuf:"varint,3,opt,name=display,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"display,omitempty"`
+	Messages   AssistancePolicyMode   `protobuf:"varint,4,opt,name=messages,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"messages,omitempty"`
+	Files      AssistancePolicyMode   `protobuf:"varint,5,opt,name=files,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"files,omitempty"`
+	FileLimits *AssistanceFilePolicy  `protobuf:"bytes,6,opt,name=file_limits,json=fileLimits,proto3" json:"file_limits,omitempty"`
+	// LIMITED: the operator may send a fresh linked invitation after the user
+	// reboots or logs out. ON: the server additionally re-invites automatically
+	// within the bounded window. Every invitation needs fresh consent.
+	Reconnect AssistancePolicyMode `protobuf:"varint,7,opt,name=reconnect,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"reconnect,omitempty"`
+	// LIMITED: the local user may opt in to recording per session. ON: a
+	// session requested with required recording ends unless it is recorded.
+	Recording       AssistancePolicyMode       `protobuf:"varint,8,opt,name=recording,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"recording,omitempty"`
+	ReconnectLimits *AssistanceReconnectPolicy `protobuf:"bytes,9,opt,name=reconnect_limits,json=reconnectLimits,proto3" json:"reconnect_limits,omitempty"`
+	RecordingLimits *AssistanceRecordingPolicy `protobuf:"bytes,10,opt,name=recording_limits,json=recordingLimits,proto3" json:"recording_limits,omitempty"`
+	// LIMITED: one independently approved, time-bounded window per device. ON:
+	// additionally a bounded approved weekly schedule. Both need prior local
+	// opt-in and only reach an already-unlocked session of the opted-in user.
+	Unattended AssistancePolicyMode `protobuf:"varint,11,opt,name=unattended,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"unattended,omitempty"`
+	// OFF hides elevation guidance. LIMITED and ON show guidance and pause all
+	// remote injection until the employee resumes locally.
+	Elevation AssistancePolicyMode `protobuf:"varint,12,opt,name=elevation,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"elevation,omitempty"`
+	// LIMITED: an ephemeral pointer. ON: additionally bounded annotations.
+	Annotation AssistancePolicyMode `protobuf:"varint,13,opt,name=annotation,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"annotation,omitempty"`
+	// LIMITED: explicitly selected output audio. ON: additionally separately
+	// consented microphone audio.
+	Audio            AssistancePolicyMode        `protobuf:"varint,14,opt,name=audio,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"audio,omitempty"`
+	UnattendedLimits *AssistanceUnattendedPolicy `protobuf:"bytes,15,opt,name=unattended_limits,json=unattendedLimits,proto3" json:"unattended_limits,omitempty"`
+	// Tier 3 desktop admission gates. They come only from device policy and
+	// the configured ceiling; an operator never requests a desktop. OFF refuses
+	// sessions on that desktop before consent. LIMITED admits VIEW with only the
+	// individually qualified non-input capabilities (displays, messages,
+	// reconnect, recording); CONTROL is refused, never downgraded. ON also
+	// admits CONTROL and the individually qualified input capabilities
+	// (keyboard, clipboard, files). The helper's per-desktop qualification
+	// table narrows both further: GNOME parity is never assumed. GNOME and
+	// COSMIC Wayland sessions are not gated.
+	KdePlasma AssistancePolicyMode `protobuf:"varint,20,opt,name=kde_plasma,json=kdePlasma,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"kde_plasma,omitempty"`
+	// Applies to every logind x11 session, whatever its desktop. A
+	// portal-backed session and the persistent local stop remain mandatory;
+	// there is no Xlib/XTest/xclip fallback.
+	X11           AssistancePolicyMode `protobuf:"varint,21,opt,name=x11,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"x11,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1243,6 +1391,97 @@ func (x *AssistancePolicy) GetMessages() AssistancePolicyMode {
 	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
 }
 
+func (x *AssistancePolicy) GetFiles() AssistancePolicyMode {
+	if x != nil {
+		return x.Files
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetFileLimits() *AssistanceFilePolicy {
+	if x != nil {
+		return x.FileLimits
+	}
+	return nil
+}
+
+func (x *AssistancePolicy) GetReconnect() AssistancePolicyMode {
+	if x != nil {
+		return x.Reconnect
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetRecording() AssistancePolicyMode {
+	if x != nil {
+		return x.Recording
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetReconnectLimits() *AssistanceReconnectPolicy {
+	if x != nil {
+		return x.ReconnectLimits
+	}
+	return nil
+}
+
+func (x *AssistancePolicy) GetRecordingLimits() *AssistanceRecordingPolicy {
+	if x != nil {
+		return x.RecordingLimits
+	}
+	return nil
+}
+
+func (x *AssistancePolicy) GetUnattended() AssistancePolicyMode {
+	if x != nil {
+		return x.Unattended
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetElevation() AssistancePolicyMode {
+	if x != nil {
+		return x.Elevation
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetAnnotation() AssistancePolicyMode {
+	if x != nil {
+		return x.Annotation
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetAudio() AssistancePolicyMode {
+	if x != nil {
+		return x.Audio
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetUnattendedLimits() *AssistanceUnattendedPolicy {
+	if x != nil {
+		return x.UnattendedLimits
+	}
+	return nil
+}
+
+func (x *AssistancePolicy) GetKdePlasma() AssistancePolicyMode {
+	if x != nil {
+		return x.KdePlasma
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
+func (x *AssistancePolicy) GetX11() AssistancePolicyMode {
+	if x != nil {
+		return x.X11
+	}
+	return AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
+}
+
 type AssistanceCapabilities struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Policy          *AssistancePolicy      `protobuf:"bytes,1,opt,name=policy,proto3" json:"policy,omitempty"`
@@ -1252,9 +1491,22 @@ type AssistanceCapabilities struct {
 	MessagesReason  string                 `protobuf:"bytes,5,opt,name=messages_reason,json=messagesReason,proto3" json:"messages_reason,omitempty"`
 	// Capture intentionally omits the cursor on desktop versions where the
 	// embedded cursor path is unsafe and bitmap metadata cannot be transported.
-	CursorHidden  bool `protobuf:"varint,6,opt,name=cursor_hidden,json=cursorHidden,proto3" json:"cursor_hidden,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	CursorHidden     bool   `protobuf:"varint,6,opt,name=cursor_hidden,json=cursorHidden,proto3" json:"cursor_hidden,omitempty"`
+	FilesReason      string `protobuf:"bytes,13,opt,name=files_reason,json=filesReason,proto3" json:"files_reason,omitempty"`
+	ReconnectReason  string `protobuf:"bytes,7,opt,name=reconnect_reason,json=reconnectReason,proto3" json:"reconnect_reason,omitempty"`
+	RecordingReason  string `protobuf:"bytes,8,opt,name=recording_reason,json=recordingReason,proto3" json:"recording_reason,omitempty"`
+	UnattendedReason string `protobuf:"bytes,9,opt,name=unattended_reason,json=unattendedReason,proto3" json:"unattended_reason,omitempty"`
+	ElevationReason  string `protobuf:"bytes,10,opt,name=elevation_reason,json=elevationReason,proto3" json:"elevation_reason,omitempty"`
+	AnnotationReason string `protobuf:"bytes,11,opt,name=annotation_reason,json=annotationReason,proto3" json:"annotation_reason,omitempty"`
+	AudioReason      string `protobuf:"bytes,12,opt,name=audio_reason,json=audioReason,proto3" json:"audio_reason,omitempty"`
+	// The helper's qualification profile that admitted the session, e.g.
+	// "kde_plasma_wayland" or "gnome_x11".
+	DesktopProfile string `protobuf:"bytes,20,opt,name=desktop_profile,json=desktopProfile,proto3" json:"desktop_profile,omitempty"`
+	// Portal frontend interface versions observed for the grant, e.g.
+	// "screencast_5_remote_desktop_2_clipboard_1". Audit data only.
+	PortalVersions string `protobuf:"bytes,21,opt,name=portal_versions,json=portalVersions,proto3" json:"portal_versions,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AssistanceCapabilities) Reset() {
@@ -1327,6 +1579,69 @@ func (x *AssistanceCapabilities) GetCursorHidden() bool {
 		return x.CursorHidden
 	}
 	return false
+}
+
+func (x *AssistanceCapabilities) GetFilesReason() string {
+	if x != nil {
+		return x.FilesReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetReconnectReason() string {
+	if x != nil {
+		return x.ReconnectReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetRecordingReason() string {
+	if x != nil {
+		return x.RecordingReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetUnattendedReason() string {
+	if x != nil {
+		return x.UnattendedReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetElevationReason() string {
+	if x != nil {
+		return x.ElevationReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetAnnotationReason() string {
+	if x != nil {
+		return x.AnnotationReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetAudioReason() string {
+	if x != nil {
+		return x.AudioReason
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetDesktopProfile() string {
+	if x != nil {
+		return x.DesktopProfile
+	}
+	return ""
+}
+
+func (x *AssistanceCapabilities) GetPortalVersions() string {
+	if x != nil {
+		return x.PortalVersions
+	}
+	return ""
 }
 
 // Only locally consented portal streams may appear here.
@@ -1466,12 +1781,13 @@ type AssistanceCommand struct {
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
 	Kind      AssistanceCommandKind  `protobuf:"varint,2,opt,name=kind,proto3,enum=lindm.agent.v1.AssistanceCommandKind" json:"kind,omitempty"`
 	// Omitted by admin callers; stamped by the server before delivery.
-	Deadline      *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	Text          string                 `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
-	SpecialKey    AssistanceSpecialKey   `protobuf:"varint,5,opt,name=special_key,json=specialKey,proto3,enum=lindm.agent.v1.AssistanceSpecialKey" json:"special_key,omitempty"`
-	DisplayId     string                 `protobuf:"bytes,6,opt,name=display_id,json=displayId,proto3" json:"display_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Deadline          *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	Text              string                 `protobuf:"bytes,4,opt,name=text,proto3" json:"text,omitempty"`
+	SpecialKey        AssistanceSpecialKey   `protobuf:"varint,5,opt,name=special_key,json=specialKey,proto3,enum=lindm.agent.v1.AssistanceSpecialKey" json:"special_key,omitempty"`
+	DisplayId         string                 `protobuf:"bytes,6,opt,name=display_id,json=displayId,proto3" json:"display_id,omitempty"`
+	AnnotationEnabled bool                   `protobuf:"varint,7,opt,name=annotation_enabled,json=annotationEnabled,proto3" json:"annotation_enabled,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AssistanceCommand) Reset() {
@@ -1544,6 +1860,13 @@ func (x *AssistanceCommand) GetDisplayId() string {
 		return x.DisplayId
 	}
 	return ""
+}
+
+func (x *AssistanceCommand) GetAnnotationEnabled() bool {
+	if x != nil {
+		return x.AnnotationEnabled
+	}
+	return false
 }
 
 type AssistanceCommandResult struct {
@@ -1630,11 +1953,73 @@ func (x *AssistanceCommandResult) GetCompletedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+// Input epochs fence queued events across local-only approval and chooser UI.
+// A resumed epoch never accepts input generated before the pause.
+type AssistanceInputState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Epoch         uint32                 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	Paused        bool                   `protobuf:"varint,2,opt,name=paused,proto3" json:"paused,omitempty"`
+	Pause         AssistanceInputPause   `protobuf:"varint,3,opt,name=pause,proto3,enum=lindm.agent.v1.AssistanceInputPause" json:"pause,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssistanceInputState) Reset() {
+	*x = AssistanceInputState{}
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceInputState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceInputState) ProtoMessage() {}
+
+func (x *AssistanceInputState) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_agent_v1_assistance_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceInputState.ProtoReflect.Descriptor instead.
+func (*AssistanceInputState) Descriptor() ([]byte, []int) {
+	return file_lindm_agent_v1_assistance_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AssistanceInputState) GetEpoch() uint32 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *AssistanceInputState) GetPaused() bool {
+	if x != nil {
+		return x.Paused
+	}
+	return false
+}
+
+func (x *AssistanceInputState) GetPause() AssistanceInputPause {
+	if x != nil {
+		return x.Pause
+	}
+	return AssistanceInputPause_ASSISTANCE_INPUT_PAUSE_UNSPECIFIED
+}
+
 var File_lindm_agent_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\n" +
-	"\x1flindm/agent/v1/assistance.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa1\x01\n" +
+	"\x1flindm/agent/v1/assistance.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%lindm/agent/v1/assistance_files.proto\x1a(lindm/agent/v1/assistance_guidance.proto\x1a)lindm/agent/v1/assistance_recording.proto\x1a*lindm/agent/v1/assistance_unattended.proto\x1a&lindm/validation/v1/string_rules.proto\"\xa1\x01\n" +
 	"\x13AssistanceIceServer\x126\n" +
 	"\x04urls\x18\x01 \x03(\tB\"\xbaH\x1f\x92\x01\x1c\b\x01\x10\x04\"\x16r\x14\x18\x80\x022\x0f^turns?:[^\\s]+$R\x04urls\x12&\n" +
 	"\busername\x18\x02 \x01(\tB\n" +
@@ -1642,7 +2027,8 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"credential\x18\x03 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\n" +
-	"credential\"\xbd\x05\n" +
+	"credential\"\x94\n" +
+	"\n" +
 	"\x14AssistanceInvitation\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12>\n" +
@@ -1659,7 +2045,14 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"iceServers\x12W\n" +
 	"\x16requested_capabilities\x18\t \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
 	"\x16effective_capabilities\x18\n" +
-	" \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\"\xad\x05\n" +
+	" \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\x12k\n" +
+	"\freconnect_of\x18\v \x01(\tBH\xbaHErC2A^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$R\vreconnectOf\x12J\n" +
+	"\trecording\x18\f \x01(\v2,.lindm.agent.v1.AssistanceRecordingAuthorityR\trecording\x12h\n" +
+	"\x15unattended_enrollment\x18\r \x01(\v23.lindm.agent.v1.AssistanceUnattendedEnrollmentOfferR\x14unattendedEnrollment\x12M\n" +
+	"\n" +
+	"unattended\x18\x0e \x01(\v2-.lindm.agent.v1.AssistanceUnattendedAuthorityR\n" +
+	"unattended:\xe2\x01\xbaH\xde\x01\x1a\xdb\x01\n" +
+	" assistance_invitation.unattended\x12Aan unattended connection neither offers enrollment nor reconnects\x1at!has(this.unattended) || (!has(this.unattended_enrollment) && this.reconnect_of == '' && this.target_username != '')\"\xfb\x05\n" +
 	"\x13AssistanceDirective\x12L\n" +
 	"\n" +
 	"invitation\x18\x01 \x01(\v2$.lindm.agent.v1.AssistanceInvitationB\x06\xbaH\x03\xc8\x01\x01R\n" +
@@ -1669,7 +2062,8 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\tterminate\x18\x03 \x01(\bR\tterminate\x12U\n" +
 	"\x0fterminate_cause\x18\x04 \x01(\x0e2\".lindm.agent.v1.AssistanceEndCauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0eterminateCause\x12;\n" +
 	"\acommand\x18\x05 \x01(\v2!.lindm.agent.v1.AssistanceCommandR\acommand\x12E\n" +
-	"\x10authorized_until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0fauthorizedUntil:\xa4\x02\xbaH\xa0\x02\x1a\x88\x01\n" +
+	"\x10authorized_until\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x0fauthorizedUntil\x12L\n" +
+	"\rfile_transfer\x18\a \x01(\v2'.lindm.agent.v1.AssistanceFileDirectiveR\ffileTransfer:\xa4\x02\xbaH\xa0\x02\x1a\x88\x01\n" +
 	"&assistance_directive.operator_deadline\x120live directives require fresh operator authority\x1a,this.terminate || has(this.authorized_until)\x1a\x92\x01\n" +
 	"%assistance_directive.command_deadline\x127a delivered command requires its server-issued deadline\x1a0!has(this.command) || has(this.command.deadline)\"\x9d\x02\n" +
 	"\x16AssistanceLocalSession\x12B\n" +
@@ -1677,7 +2071,7 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x03uid\x18\x02 \x01(\rR\x03uid\x12H\n" +
 	"\x11logind_session_id\x18\x03 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18@2\x11^[A-Za-z0-9_.-]+$R\x0flogindSessionId\x126\n" +
 	"\fsession_type\x18\x04 \x01(\tB\x13\xbaH\x10r\x0eR\awaylandR\x03x11R\vsessionType\x12+\n" +
-	"\adesktop\x18\x05 \x01(\tB\x11\xbaH\x0er\f\x18@2\b^[ -~]*$R\adesktop\"\xf8\x0e\n" +
+	"\adesktop\x18\x05 \x01(\tB\x11\xbaH\x0er\f\x18@2\b^[ -~]*$R\adesktop\"\xa8\x12\n" +
 	"\x10AssistanceReport\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12A\n" +
@@ -1697,7 +2091,18 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x12display_generation\x18\f \x01(\rR\x11displayGeneration\x12W\n" +
 	"\x16requested_capabilities\x18\r \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
 	"\x16effective_capabilities\x18\x0e \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\x12K\n" +
-	"\rdisplay_frame\x18\x0f \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame:\x80\a\xbaH\xfc\x06\x1a\xc1\x01\n" +
+	"\rdisplay_frame\x18\x0f \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame\x12I\n" +
+	"\rfile_transfer\x18\x10 \x01(\v2$.lindm.agent.v1.AssistanceFileReportR\ffileTransfer\x12E\n" +
+	"\vinput_state\x18\x11 \x01(\v2$.lindm.agent.v1.AssistanceInputStateR\n" +
+	"inputState\x12G\n" +
+	"\trecording\x18\x12 \x01(\v2).lindm.agent.v1.AssistanceRecordingReportR\trecording\x12;\n" +
+	"\x05audio\x18\x13 \x01(\v2%.lindm.agent.v1.AssistanceAudioReportR\x05audio\x12J\n" +
+	"\n" +
+	"annotation\x18\x14 \x01(\v2*.lindm.agent.v1.AssistanceAnnotationReportR\n" +
+	"annotation\x12J\n" +
+	"\n" +
+	"unattended\x18\x15 \x01(\v2*.lindm.agent.v1.AssistanceUnattendedReportR\n" +
+	"unattended:\x80\a\xbaH\xfc\x06\x1a\xc1\x01\n" +
 	"\x17assistance_report.offer\x127offer_sdp is required from OFFERED and absent before it\x1am(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)\x1am\n" +
 	"\x15assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\x1a\xe0\x01\n" +
 	" assistance_report.command_result\x12Ecommand reports are terminal and ended sessions cannot retain content\x1au!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))\x1a\xe3\x02\n" +
@@ -1714,19 +2119,53 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x16RemoteAssistanceConfig\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12H\n" +
 	"\x19session_runtime_directory\x18\x02 \x01(\tB\f\xbaH\t\xd8\x01\x01r\x04\x90\xb5\x18\x01R\x17sessionRuntimeDirectory\x12G\n" +
-	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\"\xc2\x02\n" +
+	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\"\x9e\x0f\n" +
 	"\x10AssistancePolicy\x12L\n" +
 	"\tclipboard\x18\x01 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\tclipboard\x12J\n" +
 	"\bkeyboard\x18\x02 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bkeyboard\x12H\n" +
 	"\adisplay\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\adisplay\x12J\n" +
-	"\bmessages\x18\x04 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmessages\"\xf7\x02\n" +
+	"\bmessages\x18\x04 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\bmessages\x12D\n" +
+	"\x05files\x18\x05 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05files\x12E\n" +
+	"\vfile_limits\x18\x06 \x01(\v2$.lindm.agent.v1.AssistanceFilePolicyR\n" +
+	"fileLimits\x12L\n" +
+	"\treconnect\x18\a \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\treconnect\x12L\n" +
+	"\trecording\x18\b \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\trecording\x12T\n" +
+	"\x10reconnect_limits\x18\t \x01(\v2).lindm.agent.v1.AssistanceReconnectPolicyR\x0freconnectLimits\x12T\n" +
+	"\x10recording_limits\x18\n" +
+	" \x01(\v2).lindm.agent.v1.AssistanceRecordingPolicyR\x0frecordingLimits\x12N\n" +
+	"\n" +
+	"unattended\x18\v \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
+	"unattended\x12L\n" +
+	"\televation\x18\f \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\televation\x12N\n" +
+	"\n" +
+	"annotation\x18\r \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
+	"annotation\x12D\n" +
+	"\x05audio\x18\x0e \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05audio\x12W\n" +
+	"\x11unattended_limits\x18\x0f \x01(\v2*.lindm.agent.v1.AssistanceUnattendedPolicyR\x10unattendedLimits\x12M\n" +
+	"\n" +
+	"kde_plasma\x18\x14 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\tkdePlasma\x12@\n" +
+	"\x03x11\x18\x15 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeB\b\xbaH\x05\x82\x01\x02\x10\x01R\x03x11:\xe6\x04\xbaH\xe2\x04\x1a\x86\x01\n" +
+	"\x1dassistance_policy.file_limits\x12<enabled file transfer requires explicit size and type limits\x1a'this.files < 2 || has(this.file_limits)\x1a\x8d\x01\n" +
+	"\"assistance_policy.reconnect_limits\x125enabled reconnect requires an explicit bounded window\x1a0this.reconnect < 2 || has(this.reconnect_limits)\x1a\x95\x01\n" +
+	"\"assistance_policy.recording_limits\x12=enabled recording requires explicit retention and size limits\x1a0this.recording < 2 || has(this.recording_limits)\x1a\xae\x01\n" +
+	"#assistance_policy.unattended_limits\x12Senabled unattended access requires explicit approval, enrollment and session bounds\x1a2this.unattended < 2 || has(this.unattended_limits)\"\xb9\a\n" +
 	"\x16AssistanceCapabilities\x128\n" +
 	"\x06policy\x18\x01 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x06policy\x12@\n" +
 	"\x10clipboard_reason\x18\x02 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0fclipboardReason\x12>\n" +
 	"\x0fkeyboard_reason\x18\x03 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0ekeyboardReason\x12<\n" +
 	"\x0edisplay_reason\x18\x04 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\rdisplayReason\x12>\n" +
 	"\x0fmessages_reason\x18\x05 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0emessagesReason\x12#\n" +
-	"\rcursor_hidden\x18\x06 \x01(\bR\fcursorHidden\"\xab\x01\n" +
+	"\rcursor_hidden\x18\x06 \x01(\bR\fcursorHidden\x128\n" +
+	"\ffiles_reason\x18\r \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\vfilesReason\x12@\n" +
+	"\x10reconnect_reason\x18\a \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0freconnectReason\x12@\n" +
+	"\x10recording_reason\x18\b \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0frecordingReason\x12B\n" +
+	"\x11unattended_reason\x18\t \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x10unattendedReason\x12@\n" +
+	"\x10elevation_reason\x18\n" +
+	" \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0felevationReason\x12B\n" +
+	"\x11annotation_reason\x18\v \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x10annotationReason\x128\n" +
+	"\faudio_reason\x18\f \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\vaudioReason\x12>\n" +
+	"\x0fdesktop_profile\x18\x14 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0edesktopProfile\x12>\n" +
+	"\x0fportal_versions\x18\x15 \x01(\tB\x15\xbaH\x12r\x10\x18@2\f^[a-z0-9_]*$R\x0eportalVersions\"\xab\x01\n" +
 	"\x11AssistanceDisplay\x12,\n" +
 	"\x02id\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01(@2\x11^[A-Za-z0-9_.-]+$R\x02id\x12 \n" +
 	"\x05label\x18\x02 \x01(\tB\n" +
@@ -1739,7 +2178,7 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"generation\x18\x02 \x01(\rB\a\xbaH\x04*\x02 \x00R\n" +
 	"generation\x12#\n" +
-	"\rrtp_timestamp\x18\x03 \x01(\rR\frtpTimestamp\"\xc9\x05\n" +
+	"\rrtp_timestamp\x18\x03 \x01(\rR\frtpTimestamp\"\xef\x06\n" +
 	"\x11AssistanceCommand\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12E\n" +
@@ -1750,19 +2189,25 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\vspecial_key\x18\x05 \x01(\x0e2$.lindm.agent.v1.AssistanceSpecialKeyB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
 	"specialKey\x129\n" +
 	"\n" +
-	"display_id\x18\x06 \x01(\tB\x1a\xbaH\x17r\x15\x18@2\x11^[A-Za-z0-9_.-]*$R\tdisplayId:\xba\x02\xbaH\xb6\x02\x1a\xb3\x02\n" +
-	"\x1aassistance_command.payload\x12#payload must match the command kind\x1a\xef\x01((this.kind == 1 || this.kind == 5) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048))\"\x97\a\n" +
+	"display_id\x18\x06 \x01(\tB\x1a\xbaH\x17r\x15\x18@2\x11^[A-Za-z0-9_.-]*$R\tdisplayId\x12-\n" +
+	"\x12annotation_enabled\x18\a \x01(\bR\x11annotationEnabled:\xb1\x03\xbaH\xad\x03\x1a\xaa\x03\n" +
+	"\x1aassistance_command.payload\x12#payload must match the command kind\x1a\xe6\x02((this.kind == 1 || this.kind == 5 || this.kind == 6) || this.text == '') && ((this.kind == 3) == (this.special_key != 0)) && ((this.kind == 4) == (this.display_id != '')) && (this.kind != 5 || (size(bytes(this.text)) > 0 && size(bytes(this.text)) <= 2048)) && (this.kind != 6 || size(bytes(this.text)) <= 512) && (this.kind == 7 || !this.annotation_enabled)\"\x97\b\n" +
 	"\x17AssistanceCommandResult\x12'\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\x12E\n" +
 	"\x04kind\x18\x02 \x01(\x0e2%.lindm.agent.v1.AssistanceCommandKindB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04kind\x12K\n" +
 	"\x06status\x18\x03 \x01(\x0e2'.lindm.agent.v1.AssistanceCommandStatusB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\xe8\x02\n" +
-	"\x06reason\x18\x04 \x01(\tB\xcf\x02\xbaH\xcb\x02r\xc8\x02R\x00R\x19command_identity_conflictR\x16command_result_expiredR\x15session_command_limitR\x0fcontent_expiredR\rsession_endedR\x13command_not_grantedR\x18command_deadline_reachedR\x17clipboard_selection_setR\x13clipboard_text_readR\x11special_keys_sentR\x10display_selectedR\x0emessage_postedR\x13command_unsupportedR\x0ecommand_failedR\x12command_state_lostR\x0fcommand_expiredR\x06reason\x12\x1d\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\xe8\x03\n" +
+	"\x06reason\x18\x04 \x01(\tB\xcf\x03\xbaH\xcb\x03r\xc8\x03R\x00R\x19command_identity_conflictR\x16command_result_expiredR\x15session_command_limitR\x0fcontent_expiredR\rsession_endedR\x13command_not_grantedR\x18command_deadline_reachedR\x17clipboard_selection_setR\x13clipboard_text_readR\x11special_keys_sentR\x10display_selectedR\x0emessage_postedR\x13command_unsupportedR\x0ecommand_failedR\x12command_state_lostR\x0fcommand_expiredR\x11local_file_dialogR\x15local_elevation_pauseR\x10elevation_pausedR\x12annotation_enabledR\x13annotation_disabledR\x19annotation_hidden_locallyR\x06reason\x12\x1d\n" +
 	"\x04text\x18\x05 \x01(\tB\t\xbaH\x06r\x04(\x80\x80\x01R\x04text\x12=\n" +
 	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt:\xf5\x01\xbaH\xf1\x01\x1a\xee\x01\n" +
-	"!assistance_command_result.content\x12\\only a successful clipboard read may carry content; terminal results require completion time\x1ak(this.text == '' || (this.kind == 2 && this.status == 2)) && ((this.status != 1) == has(this.completed_at))*h\n" +
+	"!assistance_command_result.content\x12\\only a successful clipboard read may carry content; terminal results require completion time\x1ak(this.text == '' || (this.kind == 2 && this.status == 2)) && ((this.status != 1) == has(this.completed_at))\"\x85\x02\n" +
+	"\x14AssistanceInputState\x12\x1d\n" +
+	"\x05epoch\x18\x01 \x01(\rB\a\xbaH\x04*\x02(\x01R\x05epoch\x12\x16\n" +
+	"\x06paused\x18\x02 \x01(\bR\x06paused\x12D\n" +
+	"\x05pause\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistanceInputPauseB\b\xbaH\x05\x82\x01\x02\x10\x01R\x05pause:p\xbaHm\x1ak\n" +
+	"\x1cassistance_input_state.pause\x12+a pause reason is present only while paused\x1a\x1ethis.pause == 0 || this.paused*h\n" +
 	"\x0eAssistanceMode\x12\x1f\n" +
 	"\x1bASSISTANCE_MODE_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14ASSISTANCE_MODE_VIEW\x10\x01\x12\x1b\n" +
@@ -1773,7 +2218,7 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x19ASSISTANCE_PHASE_PROMPTED\x10\x02\x12\x1c\n" +
 	"\x18ASSISTANCE_PHASE_OFFERED\x10\x03\x12\x1b\n" +
 	"\x17ASSISTANCE_PHASE_ACTIVE\x10\x04\x12\x1a\n" +
-	"\x16ASSISTANCE_PHASE_ENDED\x10\x05*\xc4\x04\n" +
+	"\x16ASSISTANCE_PHASE_ENDED\x10\x05*\xef\x04\n" +
 	"\x12AssistanceEndCause\x12$\n" +
 	" ASSISTANCE_END_CAUSE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dASSISTANCE_END_CAUSE_DECLINED\x10\x01\x12(\n" +
@@ -1789,7 +2234,8 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\x12$\n" +
 	" ASSISTANCE_END_CAUSE_UNAVAILABLE\x10\v\x12*\n" +
 	"&ASSISTANCE_END_CAUSE_CONNECTION_FAILED\x10\f\x12!\n" +
-	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\r*\x84\x01\n" +
+	"\x1dASSISTANCE_END_CAUSE_DISABLED\x10\r\x12)\n" +
+	"%ASSISTANCE_END_CAUSE_RECORDING_FAILED\x10\x0e*\x84\x01\n" +
 	"\x14AssistanceEnablement\x12%\n" +
 	"!ASSISTANCE_ENABLEMENT_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dASSISTANCE_ENABLEMENT_ENABLED\x10\x01\x12\"\n" +
@@ -1798,14 +2244,16 @@ const file_lindm_agent_v1_assistance_proto_rawDesc = "" +
 	"\"ASSISTANCE_POLICY_MODE_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aASSISTANCE_POLICY_MODE_OFF\x10\x01\x12\"\n" +
 	"\x1eASSISTANCE_POLICY_MODE_LIMITED\x10\x02\x12\x1d\n" +
-	"\x19ASSISTANCE_POLICY_MODE_ON\x10\x03*\x94\x02\n" +
+	"\x19ASSISTANCE_POLICY_MODE_ON\x10\x03*\xec\x02\n" +
 	"\x15AssistanceCommandKind\x12'\n" +
 	"#ASSISTANCE_COMMAND_KIND_UNSPECIFIED\x10\x00\x12+\n" +
 	"'ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE\x10\x01\x12*\n" +
 	"&ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ\x10\x02\x12(\n" +
 	"$ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS\x10\x03\x12*\n" +
 	"&ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY\x10\x04\x12#\n" +
-	"\x1fASSISTANCE_COMMAND_KIND_MESSAGE\x10\x05*\xe9\x01\n" +
+	"\x1fASSISTANCE_COMMAND_KIND_MESSAGE\x10\x05\x12.\n" +
+	"*ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE\x10\x06\x12&\n" +
+	"\"ASSISTANCE_COMMAND_KIND_ANNOTATION\x10\a*\xe9\x01\n" +
 	"\x14AssistanceSpecialKey\x12&\n" +
 	"\"ASSISTANCE_SPECIAL_KEY_UNSPECIFIED\x10\x00\x12(\n" +
 	"$ASSISTANCE_SPECIAL_KEY_SWITCH_WINDOW\x10\x01\x12,\n" +
@@ -1833,72 +2281,111 @@ func file_lindm_agent_v1_assistance_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_agent_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 8)
-var file_lindm_agent_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_lindm_agent_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_lindm_agent_v1_assistance_proto_goTypes = []any{
-	(AssistanceMode)(0),             // 0: lindm.agent.v1.AssistanceMode
-	(AssistancePhase)(0),            // 1: lindm.agent.v1.AssistancePhase
-	(AssistanceEndCause)(0),         // 2: lindm.agent.v1.AssistanceEndCause
-	(AssistanceEnablement)(0),       // 3: lindm.agent.v1.AssistanceEnablement
-	(AssistancePolicyMode)(0),       // 4: lindm.agent.v1.AssistancePolicyMode
-	(AssistanceCommandKind)(0),      // 5: lindm.agent.v1.AssistanceCommandKind
-	(AssistanceSpecialKey)(0),       // 6: lindm.agent.v1.AssistanceSpecialKey
-	(AssistanceCommandStatus)(0),    // 7: lindm.agent.v1.AssistanceCommandStatus
-	(*AssistanceIceServer)(nil),     // 8: lindm.agent.v1.AssistanceIceServer
-	(*AssistanceInvitation)(nil),    // 9: lindm.agent.v1.AssistanceInvitation
-	(*AssistanceDirective)(nil),     // 10: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil),  // 11: lindm.agent.v1.AssistanceLocalSession
-	(*AssistanceReport)(nil),        // 12: lindm.agent.v1.AssistanceReport
-	(*SyncAssistanceRequest)(nil),   // 13: lindm.agent.v1.SyncAssistanceRequest
-	(*SyncAssistanceResponse)(nil),  // 14: lindm.agent.v1.SyncAssistanceResponse
-	(*RemoteAssistanceConfig)(nil),  // 15: lindm.agent.v1.RemoteAssistanceConfig
-	(*AssistancePolicy)(nil),        // 16: lindm.agent.v1.AssistancePolicy
-	(*AssistanceCapabilities)(nil),  // 17: lindm.agent.v1.AssistanceCapabilities
-	(*AssistanceDisplay)(nil),       // 18: lindm.agent.v1.AssistanceDisplay
-	(*AssistanceDisplayFrame)(nil),  // 19: lindm.agent.v1.AssistanceDisplayFrame
-	(*AssistanceCommand)(nil),       // 20: lindm.agent.v1.AssistanceCommand
-	(*AssistanceCommandResult)(nil), // 21: lindm.agent.v1.AssistanceCommandResult
-	(*timestamppb.Timestamp)(nil),   // 22: google.protobuf.Timestamp
+	(AssistanceMode)(0),                         // 0: lindm.agent.v1.AssistanceMode
+	(AssistancePhase)(0),                        // 1: lindm.agent.v1.AssistancePhase
+	(AssistanceEndCause)(0),                     // 2: lindm.agent.v1.AssistanceEndCause
+	(AssistanceEnablement)(0),                   // 3: lindm.agent.v1.AssistanceEnablement
+	(AssistancePolicyMode)(0),                   // 4: lindm.agent.v1.AssistancePolicyMode
+	(AssistanceCommandKind)(0),                  // 5: lindm.agent.v1.AssistanceCommandKind
+	(AssistanceSpecialKey)(0),                   // 6: lindm.agent.v1.AssistanceSpecialKey
+	(AssistanceCommandStatus)(0),                // 7: lindm.agent.v1.AssistanceCommandStatus
+	(*AssistanceIceServer)(nil),                 // 8: lindm.agent.v1.AssistanceIceServer
+	(*AssistanceInvitation)(nil),                // 9: lindm.agent.v1.AssistanceInvitation
+	(*AssistanceDirective)(nil),                 // 10: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil),              // 11: lindm.agent.v1.AssistanceLocalSession
+	(*AssistanceReport)(nil),                    // 12: lindm.agent.v1.AssistanceReport
+	(*SyncAssistanceRequest)(nil),               // 13: lindm.agent.v1.SyncAssistanceRequest
+	(*SyncAssistanceResponse)(nil),              // 14: lindm.agent.v1.SyncAssistanceResponse
+	(*RemoteAssistanceConfig)(nil),              // 15: lindm.agent.v1.RemoteAssistanceConfig
+	(*AssistancePolicy)(nil),                    // 16: lindm.agent.v1.AssistancePolicy
+	(*AssistanceCapabilities)(nil),              // 17: lindm.agent.v1.AssistanceCapabilities
+	(*AssistanceDisplay)(nil),                   // 18: lindm.agent.v1.AssistanceDisplay
+	(*AssistanceDisplayFrame)(nil),              // 19: lindm.agent.v1.AssistanceDisplayFrame
+	(*AssistanceCommand)(nil),                   // 20: lindm.agent.v1.AssistanceCommand
+	(*AssistanceCommandResult)(nil),             // 21: lindm.agent.v1.AssistanceCommandResult
+	(*AssistanceInputState)(nil),                // 22: lindm.agent.v1.AssistanceInputState
+	(*timestamppb.Timestamp)(nil),               // 23: google.protobuf.Timestamp
+	(*AssistanceRecordingAuthority)(nil),        // 24: lindm.agent.v1.AssistanceRecordingAuthority
+	(*AssistanceUnattendedEnrollmentOffer)(nil), // 25: lindm.agent.v1.AssistanceUnattendedEnrollmentOffer
+	(*AssistanceUnattendedAuthority)(nil),       // 26: lindm.agent.v1.AssistanceUnattendedAuthority
+	(*AssistanceFileDirective)(nil),             // 27: lindm.agent.v1.AssistanceFileDirective
+	(*AssistanceFileReport)(nil),                // 28: lindm.agent.v1.AssistanceFileReport
+	(*AssistanceRecordingReport)(nil),           // 29: lindm.agent.v1.AssistanceRecordingReport
+	(*AssistanceAudioReport)(nil),               // 30: lindm.agent.v1.AssistanceAudioReport
+	(*AssistanceAnnotationReport)(nil),          // 31: lindm.agent.v1.AssistanceAnnotationReport
+	(*AssistanceUnattendedReport)(nil),          // 32: lindm.agent.v1.AssistanceUnattendedReport
+	(*AssistanceFilePolicy)(nil),                // 33: lindm.agent.v1.AssistanceFilePolicy
+	(*AssistanceReconnectPolicy)(nil),           // 34: lindm.agent.v1.AssistanceReconnectPolicy
+	(*AssistanceRecordingPolicy)(nil),           // 35: lindm.agent.v1.AssistanceRecordingPolicy
+	(*AssistanceUnattendedPolicy)(nil),          // 36: lindm.agent.v1.AssistanceUnattendedPolicy
+	(AssistanceInputPause)(0),                   // 37: lindm.agent.v1.AssistanceInputPause
 }
 var file_lindm_agent_v1_assistance_proto_depIdxs = []int32{
 	0,  // 0: lindm.agent.v1.AssistanceInvitation.mode:type_name -> lindm.agent.v1.AssistanceMode
-	22, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
-	22, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
+	23, // 1: lindm.agent.v1.AssistanceInvitation.consent_deadline:type_name -> google.protobuf.Timestamp
+	23, // 2: lindm.agent.v1.AssistanceInvitation.ends_at:type_name -> google.protobuf.Timestamp
 	8,  // 3: lindm.agent.v1.AssistanceInvitation.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
 	16, // 4: lindm.agent.v1.AssistanceInvitation.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
 	16, // 5: lindm.agent.v1.AssistanceInvitation.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	9,  // 6: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
-	2,  // 7: lindm.agent.v1.AssistanceDirective.terminate_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	20, // 8: lindm.agent.v1.AssistanceDirective.command:type_name -> lindm.agent.v1.AssistanceCommand
-	22, // 9: lindm.agent.v1.AssistanceDirective.authorized_until:type_name -> google.protobuf.Timestamp
-	1,  // 10: lindm.agent.v1.AssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
-	2,  // 11: lindm.agent.v1.AssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	11, // 12: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	17, // 13: lindm.agent.v1.AssistanceReport.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
-	18, // 14: lindm.agent.v1.AssistanceReport.displays:type_name -> lindm.agent.v1.AssistanceDisplay
-	21, // 15: lindm.agent.v1.AssistanceReport.command_result:type_name -> lindm.agent.v1.AssistanceCommandResult
-	16, // 16: lindm.agent.v1.AssistanceReport.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	16, // 17: lindm.agent.v1.AssistanceReport.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	19, // 18: lindm.agent.v1.AssistanceReport.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
-	10, // 19: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	12, // 20: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
-	3,  // 21: lindm.agent.v1.SyncAssistanceResponse.policy:type_name -> lindm.agent.v1.AssistanceEnablement
-	16, // 22: lindm.agent.v1.RemoteAssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
-	4,  // 23: lindm.agent.v1.AssistancePolicy.clipboard:type_name -> lindm.agent.v1.AssistancePolicyMode
-	4,  // 24: lindm.agent.v1.AssistancePolicy.keyboard:type_name -> lindm.agent.v1.AssistancePolicyMode
-	4,  // 25: lindm.agent.v1.AssistancePolicy.display:type_name -> lindm.agent.v1.AssistancePolicyMode
-	4,  // 26: lindm.agent.v1.AssistancePolicy.messages:type_name -> lindm.agent.v1.AssistancePolicyMode
-	16, // 27: lindm.agent.v1.AssistanceCapabilities.policy:type_name -> lindm.agent.v1.AssistancePolicy
-	5,  // 28: lindm.agent.v1.AssistanceCommand.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
-	22, // 29: lindm.agent.v1.AssistanceCommand.deadline:type_name -> google.protobuf.Timestamp
-	6,  // 30: lindm.agent.v1.AssistanceCommand.special_key:type_name -> lindm.agent.v1.AssistanceSpecialKey
-	5,  // 31: lindm.agent.v1.AssistanceCommandResult.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
-	7,  // 32: lindm.agent.v1.AssistanceCommandResult.status:type_name -> lindm.agent.v1.AssistanceCommandStatus
-	22, // 33: lindm.agent.v1.AssistanceCommandResult.completed_at:type_name -> google.protobuf.Timestamp
-	34, // [34:34] is the sub-list for method output_type
-	34, // [34:34] is the sub-list for method input_type
-	34, // [34:34] is the sub-list for extension type_name
-	34, // [34:34] is the sub-list for extension extendee
-	0,  // [0:34] is the sub-list for field type_name
+	24, // 6: lindm.agent.v1.AssistanceInvitation.recording:type_name -> lindm.agent.v1.AssistanceRecordingAuthority
+	25, // 7: lindm.agent.v1.AssistanceInvitation.unattended_enrollment:type_name -> lindm.agent.v1.AssistanceUnattendedEnrollmentOffer
+	26, // 8: lindm.agent.v1.AssistanceInvitation.unattended:type_name -> lindm.agent.v1.AssistanceUnattendedAuthority
+	9,  // 9: lindm.agent.v1.AssistanceDirective.invitation:type_name -> lindm.agent.v1.AssistanceInvitation
+	2,  // 10: lindm.agent.v1.AssistanceDirective.terminate_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	20, // 11: lindm.agent.v1.AssistanceDirective.command:type_name -> lindm.agent.v1.AssistanceCommand
+	23, // 12: lindm.agent.v1.AssistanceDirective.authorized_until:type_name -> google.protobuf.Timestamp
+	27, // 13: lindm.agent.v1.AssistanceDirective.file_transfer:type_name -> lindm.agent.v1.AssistanceFileDirective
+	1,  // 14: lindm.agent.v1.AssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
+	2,  // 15: lindm.agent.v1.AssistanceReport.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	11, // 16: lindm.agent.v1.AssistanceReport.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	17, // 17: lindm.agent.v1.AssistanceReport.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
+	18, // 18: lindm.agent.v1.AssistanceReport.displays:type_name -> lindm.agent.v1.AssistanceDisplay
+	21, // 19: lindm.agent.v1.AssistanceReport.command_result:type_name -> lindm.agent.v1.AssistanceCommandResult
+	16, // 20: lindm.agent.v1.AssistanceReport.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	16, // 21: lindm.agent.v1.AssistanceReport.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	19, // 22: lindm.agent.v1.AssistanceReport.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
+	28, // 23: lindm.agent.v1.AssistanceReport.file_transfer:type_name -> lindm.agent.v1.AssistanceFileReport
+	22, // 24: lindm.agent.v1.AssistanceReport.input_state:type_name -> lindm.agent.v1.AssistanceInputState
+	29, // 25: lindm.agent.v1.AssistanceReport.recording:type_name -> lindm.agent.v1.AssistanceRecordingReport
+	30, // 26: lindm.agent.v1.AssistanceReport.audio:type_name -> lindm.agent.v1.AssistanceAudioReport
+	31, // 27: lindm.agent.v1.AssistanceReport.annotation:type_name -> lindm.agent.v1.AssistanceAnnotationReport
+	32, // 28: lindm.agent.v1.AssistanceReport.unattended:type_name -> lindm.agent.v1.AssistanceUnattendedReport
+	10, // 29: lindm.agent.v1.SyncAssistanceRequest.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	12, // 30: lindm.agent.v1.SyncAssistanceResponse.reports:type_name -> lindm.agent.v1.AssistanceReport
+	3,  // 31: lindm.agent.v1.SyncAssistanceResponse.policy:type_name -> lindm.agent.v1.AssistanceEnablement
+	16, // 32: lindm.agent.v1.RemoteAssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	4,  // 33: lindm.agent.v1.AssistancePolicy.clipboard:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 34: lindm.agent.v1.AssistancePolicy.keyboard:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 35: lindm.agent.v1.AssistancePolicy.display:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 36: lindm.agent.v1.AssistancePolicy.messages:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 37: lindm.agent.v1.AssistancePolicy.files:type_name -> lindm.agent.v1.AssistancePolicyMode
+	33, // 38: lindm.agent.v1.AssistancePolicy.file_limits:type_name -> lindm.agent.v1.AssistanceFilePolicy
+	4,  // 39: lindm.agent.v1.AssistancePolicy.reconnect:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 40: lindm.agent.v1.AssistancePolicy.recording:type_name -> lindm.agent.v1.AssistancePolicyMode
+	34, // 41: lindm.agent.v1.AssistancePolicy.reconnect_limits:type_name -> lindm.agent.v1.AssistanceReconnectPolicy
+	35, // 42: lindm.agent.v1.AssistancePolicy.recording_limits:type_name -> lindm.agent.v1.AssistanceRecordingPolicy
+	4,  // 43: lindm.agent.v1.AssistancePolicy.unattended:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 44: lindm.agent.v1.AssistancePolicy.elevation:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 45: lindm.agent.v1.AssistancePolicy.annotation:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 46: lindm.agent.v1.AssistancePolicy.audio:type_name -> lindm.agent.v1.AssistancePolicyMode
+	36, // 47: lindm.agent.v1.AssistancePolicy.unattended_limits:type_name -> lindm.agent.v1.AssistanceUnattendedPolicy
+	4,  // 48: lindm.agent.v1.AssistancePolicy.kde_plasma:type_name -> lindm.agent.v1.AssistancePolicyMode
+	4,  // 49: lindm.agent.v1.AssistancePolicy.x11:type_name -> lindm.agent.v1.AssistancePolicyMode
+	16, // 50: lindm.agent.v1.AssistanceCapabilities.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	5,  // 51: lindm.agent.v1.AssistanceCommand.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
+	23, // 52: lindm.agent.v1.AssistanceCommand.deadline:type_name -> google.protobuf.Timestamp
+	6,  // 53: lindm.agent.v1.AssistanceCommand.special_key:type_name -> lindm.agent.v1.AssistanceSpecialKey
+	5,  // 54: lindm.agent.v1.AssistanceCommandResult.kind:type_name -> lindm.agent.v1.AssistanceCommandKind
+	7,  // 55: lindm.agent.v1.AssistanceCommandResult.status:type_name -> lindm.agent.v1.AssistanceCommandStatus
+	23, // 56: lindm.agent.v1.AssistanceCommandResult.completed_at:type_name -> google.protobuf.Timestamp
+	37, // 57: lindm.agent.v1.AssistanceInputState.pause:type_name -> lindm.agent.v1.AssistanceInputPause
+	58, // [58:58] is the sub-list for method output_type
+	58, // [58:58] is the sub-list for method input_type
+	58, // [58:58] is the sub-list for extension type_name
+	58, // [58:58] is the sub-list for extension extendee
+	0,  // [0:58] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_assistance_proto_init() }
@@ -1906,13 +2393,17 @@ func file_lindm_agent_v1_assistance_proto_init() {
 	if File_lindm_agent_v1_assistance_proto != nil {
 		return
 	}
+	file_lindm_agent_v1_assistance_files_proto_init()
+	file_lindm_agent_v1_assistance_guidance_proto_init()
+	file_lindm_agent_v1_assistance_recording_proto_init()
+	file_lindm_agent_v1_assistance_unattended_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_agent_v1_assistance_proto_rawDesc), len(file_lindm_agent_v1_assistance_proto_rawDesc)),
 			NumEnums:      8,
-			NumMessages:   14,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -26,6 +26,15 @@
 //     lock.go) end the session UNAVAILABLE before the consent prompt;
 //     CONTROL is never downgraded to VIEW. Missing GStreamer elements end it
 //     UNAVAILABLE after consent.
+//   - Every session also passes the desktop qualification table
+//     (qualification.go), keyed on the executor-observed logind session
+//     type and XDG_CURRENT_DESKTOP. GNOME and COSMIC Wayland keep their
+//     Tier 1/2 admission. KDE Plasma Wayland and every X11 session need the
+//     device policy's kde_plasma or x11 gate (LIMITED: VIEW and non-input
+//     capabilities; ON: also CONTROL and input capabilities) and are
+//     narrowed to the capabilities their own native lanes qualified, with
+//     exact refusal and withholding reasons. X11 uses the same portal
+//     session and persistent local stop; nothing falls back to Xlib/XTest.
 //   - The cursor is embedded into the stream when the portal offers the
 //     embedded cursor mode, otherwise the hidden mode is requested. The
 //     metadata mode is never used because the encoder pipeline does not
@@ -47,9 +56,37 @@
 //     held presses, fence coordinates AND keyboards, and retain one RTP timeline.
 //   - Display-frame witnesses name the first actually emitted post-mapping RTP
 //     timestamp for the exact source/generation. CONTROL also caches/sends this
-//     marker on its existing reliable ordered input channel; VIEW has no data
+//     marker on its existing reliable ordered input channel; VIEW has no input
 //     channel and uses the typed report. A report only exposes a witness matching
 //     its atomically published selection, and end revokes cached publication.
 //   - Operator messages use the bound user's notifier, separate from Stop.
-//     No file transfer, audio, recording, unattended access or session extension.
+//   - Files default off independently of input and require bounded executor
+//     authority plus local approval for each incoming file or a native chooser
+//     selection for each outgoing file. Modal approval drains and pauses input
+//     and clipboard; cancellation or failed cleanup ends the session rather than
+//     resuming remote injection. Only clean local completion creates a new input
+//     epoch. Transfers retain same-session-user descriptors, enforce shared
+//     MIME/extension and size ceilings, and never auto-open received files.
+//     Exact-release admission may disable files without enabling another path.
+//   - Recording happens only with the invitation's immutable recording
+//     authority and the prompt's explicit disclosure: optional recording is the
+//     local user's choice, required recording ends the session when it cannot
+//     be disclosed, sealed, indicated or stored. The recorder taps the consented
+//     VP8 RTP stream before SRTP, muxes WebM and seals each segment in memory
+//     (internal/assistancerecording); nothing is written to disk and nothing
+//     is recorded after capture stops.
+//   - Reconnect invitations are ordinary fresh invitations that disclose the
+//     earlier session; no portal restore token or earlier grant is reused.
+//   - Unattended access restores a persistent portal grant only for an
+//     employee who opted in locally; the token stays in the user's private
+//     state file, a banner precedes the restore, and a dialog, lock, other user
+//     or missing opt-in refuses. Optional recording and sound are refused.
+//   - Password guidance pauses all remote input and clipboard until the
+//     employee's local Resume; nothing detects or answers the prompt.
+//   - The pointer overlay is the GNOME Shell extension owned by the shell's
+//     own bus name; it draws normalized points only and takes no input. Local
+//     Hide is final for the session.
+//   - Sound needs local selection of one output and, under ON, a separate
+//     microphone choice; local Mute stops capture.
+//   - No session extension.
 package desktop

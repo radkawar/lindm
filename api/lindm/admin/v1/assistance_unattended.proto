@@ -1,0 +1,154 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.admin.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/assistance_unattended.proto";
+import "lindm/validation/v1/string_rules.proto";
+
+option go_package = "lindm/gen/lindm/admin/v1;adminv1";
+
+// AuthorizeUnattendedAssistanceRequest asks for one independently approved
+// unattended access grant on one device. Without approval_id it is the exact
+// payload a different approver reviews in the approval inbox; the requester
+// then repeats it with the approved approval_id, which consumes the approval.
+message AuthorizeUnattendedAssistanceRequest {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string device_id = 2 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  lindm.agent.v1.AssistanceMode mode = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  google.protobuf.Timestamp not_before = 5 [(buf.validate.field).required = true];
+  uint32 duration_seconds = 6 [(buf.validate.field).uint32 = {
+    gte: 300
+    lte: 2592000
+  }];
+  // ON policy only: connections are admitted only inside these windows.
+  lindm.agent.v1.AssistanceUnattendedSchedule schedule = 7;
+  lindm.agent.v1.AssistancePolicy requested_capabilities = 8;
+  // The opted-in local account. A changed UID or another user is denied.
+  string target_username = 9 [(buf.validate.field).string.pattern = "^[a-zA-Z_][a-zA-Z0-9_.-]{0,31}$"];
+  string approval_id = 10 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  option (buf.validate.message).cel = {
+    id: "authorize_unattended.capabilities"
+    message: "a grant never requests unattended enrollment, reconnect or optional recording"
+    expression: "!has(this.requested_capabilities) || (this.requested_capabilities.unattended < 2 && this.requested_capabilities.reconnect < 2 && this.requested_capabilities.recording != 2)"
+  };
+}
+message AuthorizeUnattendedAssistanceResponse {
+  AssistanceUnattendedGrant grant = 1;
+}
+
+enum AssistanceUnattendedGrantState {
+  ASSISTANCE_UNATTENDED_GRANT_STATE_UNSPECIFIED = 0;
+  ASSISTANCE_UNATTENDED_GRANT_STATE_ACTIVE = 1;
+  ASSISTANCE_UNATTENDED_GRANT_STATE_REVOKED = 2;
+  ASSISTANCE_UNATTENDED_GRANT_STATE_EXPIRED = 3;
+}
+
+// AssistanceUnattendedGrant is the server's record of one consumed,
+// independently approved unattended access period. It is authority for its
+// requesting operator only, on its device only.
+message AssistanceUnattendedGrant {
+  string id = 1;
+  string device_id = 2;
+  string operator_id = 3;
+  string operator_display = 4;
+  string approver_id = 5;
+  string approver_display = 6;
+  string approval_id = 7;
+  lindm.agent.v1.AssistanceMode mode = 8;
+  string reason = 9;
+  string target_username = 10;
+  google.protobuf.Timestamp not_before = 11;
+  google.protobuf.Timestamp not_after = 12;
+  lindm.agent.v1.AssistanceUnattendedSchedule schedule = 13;
+  lindm.agent.v1.AssistancePolicy requested_capabilities = 14;
+  AssistanceUnattendedGrantState state = 15;
+  google.protobuf.Timestamp created_at = 16;
+  google.protobuf.Timestamp revoked_at = 17;
+  string revoke_reason = 18;
+  // The policy mode (LIMITED or ON) the grant was approved under.
+  lindm.agent.v1.AssistancePolicyMode policy_mode = 19;
+}
+
+enum AssistanceUnattendedEnrollmentStatus {
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATUS_UNSPECIFIED = 0;
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATUS_ENROLLED = 1;
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATUS_REVOKED = 2;
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATUS_EXPIRED = 3;
+}
+
+// AssistanceUnattendedEnrollment is the server's record of a local opt-in the
+// device reported after the employee chose it in an attended session.
+message AssistanceUnattendedEnrollment {
+  string id = 1;
+  string device_id = 2;
+  string username = 3;
+  uint32 uid = 4;
+  lindm.agent.v1.AssistanceMode mode = 5;
+  AssistanceUnattendedEnrollmentStatus state = 6;
+  string consent_session_id = 7;
+  google.protobuf.Timestamp consented_at = 8;
+  google.protobuf.Timestamp expires_at = 9;
+  google.protobuf.Timestamp revoked_at = 10;
+  string revoke_reason = 11;
+}
+
+// AssistanceUnattendedConnection identifies the grant and opt-in an
+// unattended session relies on.
+message AssistanceUnattendedConnection {
+  string grant_id = 1;
+  string enrollment_id = 2;
+  string approver_id = 3;
+  string approver_display = 4;
+  google.protobuf.Timestamp approved_until = 5;
+}
+
+message ListUnattendedAssistanceRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+}
+message ListUnattendedAssistanceResponse {
+  repeated AssistanceUnattendedGrant grants = 1;
+  repeated AssistanceUnattendedEnrollment enrollments = 2;
+}
+
+// RevokeUnattendedAssistanceRequest ends one grant or one opt-in and any
+// unattended connection relying on it. Revocation is de-escalation: the
+// operator, an unattended approver or a policy manager in scope may revoke.
+message RevokeUnattendedAssistanceRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string grant_id = 2 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  string enrollment_id = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  string reason = 4 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+  option (buf.validate.message).cel = {
+    id: "revoke_unattended.target"
+    message: "revoke exactly one grant or one enrollment"
+    expression: "(this.grant_id == '') != (this.enrollment_id == '')"
+  };
+}
+message RevokeUnattendedAssistanceResponse {
+  AssistanceUnattendedGrant grant = 1;
+  AssistanceUnattendedEnrollment enrollment = 2;
+}

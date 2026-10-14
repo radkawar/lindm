@@ -19,6 +19,16 @@ func (s *Service) applyAssistanceProjection(ctx context.Context, q *devicedb.Que
 	bad := func(reason string) error {
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, reason, false, revoked)
 	}
+	input := report.GetInputState()
+	if input == nil || input.GetEpoch() == 0 || int64(input.GetEpoch()) < row.InputEpoch || int64(input.GetEpoch()) == row.InputEpoch && input.GetPaused() != row.InputPaused {
+		return bad("input_epoch_invalid")
+	}
+	if int64(input.GetEpoch()) != row.InputEpoch || input.GetPaused() != row.InputPaused {
+		if err := q.SetAssistanceInputState(ctx, devicedb.SetAssistanceInputStateParams{ID: row.ID, InputEpoch: int64(input.GetEpoch()), InputPaused: input.GetPaused()}); err != nil {
+			return err
+		}
+		row.InputEpoch, row.InputPaused = int64(input.GetEpoch()), input.GetPaused()
+	}
 	grant := assistancePolicy(report.GetGrantedCapabilities().GetPolicy())
 	effective := decodeAssistancePolicy(row.EffectiveCapabilities)
 	reportedEffective := assistancePolicy(report.GetEffectiveCapabilities())
@@ -104,7 +114,15 @@ func (s *Service) applyAssistanceProjection(ctx context.Context, q *devicedb.Que
 		capabilities = &agentv1.AssistanceCapabilities{}
 	}
 	capabilities.Policy = grant
-	projection := &agentv1.AssistanceReport{GrantedCapabilities: capabilities, Displays: report.GetDisplays(), SelectedDisplayId: report.GetSelectedDisplayId(), DisplayGeneration: report.GetDisplayGeneration(), DisplayFrame: frame}
+	if detail, err := auditAssistanceGuidance(ctx, q, *row, previous, report, grant); err != nil {
+		return err
+	} else if detail != "" {
+		return bad(detail)
+	}
+	projection := &agentv1.AssistanceReport{
+		GrantedCapabilities: capabilities, Displays: report.GetDisplays(), SelectedDisplayId: report.GetSelectedDisplayId(), DisplayGeneration: report.GetDisplayGeneration(), DisplayFrame: frame,
+		InputState: report.GetInputState(), Audio: report.GetAudio(), Annotation: report.GetAnnotation(),
+	}
 	data, err := proto.Marshal(projection)
 	if err != nil {
 		return err

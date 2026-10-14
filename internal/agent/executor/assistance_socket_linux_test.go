@@ -106,14 +106,14 @@ func TestSessionSocketBindsPeerCredentialToLogindSession(t *testing.T) {
 	if directives := response.Msg.GetDirectives(); len(directives) != 1 || directives[0].GetInvitation().GetSessionId() != id {
 		t.Fatalf("directives = %v", directives)
 	}
-	if _, err := client.SyncSession(t.Context(), connect.NewRequest(&agentv1.SyncSessionRequest{Reports: []*agentv1.SessionAssistanceReport{{SessionId: id, Phase: agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED}}})); err != nil {
+	if _, err := client.SyncSession(t.Context(), connect.NewRequest(&agentv1.SyncSessionRequest{Reports: []*agentv1.SessionAssistanceReport{report(id, agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED)}})); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.network(directive)[id]; got.GetPhase() != agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED || got.GetLocalSession().GetUid() != uid {
 		t.Fatalf("report after socket consent = %v", got)
 	}
 	// Eager schema validation runs before the broker.
-	if _, err := client.SyncSession(t.Context(), connect.NewRequest(&agentv1.SyncSessionRequest{Reports: []*agentv1.SessionAssistanceReport{{SessionId: "not-a-uuid", Phase: agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED}}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+	if _, err := client.SyncSession(t.Context(), connect.NewRequest(&agentv1.SyncSessionRequest{Reports: []*agentv1.SessionAssistanceReport{report("not-a-uuid", agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED)}})); connect.CodeOf(err) != connect.CodeInvalidArgument {
 		t.Fatalf("invalid report: %v", err)
 	}
 	f.setLogind("42", func(s *actionprovider.LogindSession) { s.Locked = true })

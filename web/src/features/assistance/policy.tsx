@@ -10,6 +10,7 @@ import {
 } from "../../../gen/lindm/admin/v1/assistance_pb";
 import {
   AssistancePolicySchema,
+  AssistancePolicyMode,
   type AssistancePolicy,
 } from "../../../gen/lindm/agent/v1/assistance_pb";
 import { Button } from "@/components/ui/button";
@@ -27,8 +28,15 @@ import { toRpcFailure } from "@/lib/errors";
 import { newRequestId } from "@/lib/ids";
 import { adminClient } from "@/lib/rpc";
 import { CapabilityFields } from "./capabilities";
+import { DesktopPolicyFields } from "./desktop-policy";
+import { FilePolicyFields } from "./file-policy";
 import { assistancePolicyQueryOptions } from "./queries";
 import { validateRequest } from "@/lib/validation";
+import {
+  ReconnectPolicyFields,
+  RecordingPolicyFields,
+  UnattendedPolicyFields,
+} from "./workflow-policy";
 
 export function AssistancePolicyDialog({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
@@ -93,9 +101,78 @@ export function AssistancePolicyDialog({ deviceId }: { deviceId: string }) {
               manage
               disabled={locked || !query.data || !!query.error}
               onChange={(field, mode) =>
+                setDraft(
+                  create(AssistancePolicySchema, {
+                    ...value,
+                    [field]: mode,
+                    fileLimits:
+                      field === "files" && mode >= AssistancePolicyMode.LIMITED
+                        ? (value.fileLimits ?? query.data?.ceiling?.fileLimits)
+                        : value.fileLimits,
+                    reconnectLimits:
+                      field === "reconnect" && mode >= AssistancePolicyMode.LIMITED
+                        ? (value.reconnectLimits ?? query.data?.ceiling?.reconnectLimits)
+                        : value.reconnectLimits,
+                    recordingLimits:
+                      field === "recording" && mode >= AssistancePolicyMode.LIMITED
+                        ? (value.recordingLimits ?? query.data?.ceiling?.recordingLimits)
+                        : value.recordingLimits,
+                    unattendedLimits:
+                      field === "unattended" && mode >= AssistancePolicyMode.LIMITED
+                        ? (value.unattendedLimits ?? query.data?.ceiling?.unattendedLimits)
+                        : value.unattendedLimits,
+                  }),
+                )
+              }
+            />
+            <DesktopPolicyFields
+              value={value}
+              ceiling={query.error ? undefined : query.data?.ceiling}
+              disabled={locked || !query.data || !!query.error}
+              onChange={(field, mode) =>
                 setDraft(create(AssistancePolicySchema, { ...value, [field]: mode }))
               }
             />
+            {value.files >= AssistancePolicyMode.LIMITED ? (
+              <FilePolicyFields
+                value={value.fileLimits}
+                ceiling={query.data?.ceiling?.fileLimits}
+                disabled={locked || !query.data || !!query.error}
+                onChange={(fileLimits) =>
+                  setDraft(create(AssistancePolicySchema, { ...value, fileLimits }))
+                }
+              />
+            ) : null}
+            {value.reconnect >= AssistancePolicyMode.LIMITED ? (
+              <ReconnectPolicyFields
+                value={value.reconnectLimits}
+                ceiling={query.data?.ceiling?.reconnectLimits}
+                disabled={locked || !query.data || !!query.error}
+                onChange={(reconnectLimits) =>
+                  setDraft(create(AssistancePolicySchema, { ...value, reconnectLimits }))
+                }
+              />
+            ) : null}
+            {value.recording >= AssistancePolicyMode.LIMITED ? (
+              <RecordingPolicyFields
+                value={value.recordingLimits}
+                ceiling={query.data?.ceiling?.recordingLimits}
+                disabled={locked || !query.data || !!query.error}
+                onChange={(recordingLimits) =>
+                  setDraft(create(AssistancePolicySchema, { ...value, recordingLimits }))
+                }
+              />
+            ) : null}
+            {value.unattended >= AssistancePolicyMode.LIMITED ? (
+              <UnattendedPolicyFields
+                value={value.unattendedLimits}
+                ceiling={query.data?.ceiling?.unattendedLimits}
+                disabled={locked || !query.data || !!query.error}
+                onChange={(unattendedLimits) =>
+                  setDraft(create(AssistancePolicySchema, { ...value, unattendedLimits }))
+                }
+              />
+            ) : null}
             {exact.invalid ? (
               <p role="alert" className="text-sm text-destructive">
                 {exact.invalid}

@@ -11,6 +11,7 @@ import {
   AssistancePolicyMode,
   AssistanceSpecialKey,
 } from "../../../gen/lindm/agent/v1/assistance_pb";
+import { AssistanceInputPause } from "../../../gen/lindm/agent/v1/assistance_guidance_pb";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -43,6 +44,9 @@ const completedLabels: Record<number, string> = {
   [AssistanceCommandKind.SPECIAL_KEYS]: "Special keys sent to the device.",
   [AssistanceCommandKind.SELECT_DISPLAY]: "Shared display changed.",
   [AssistanceCommandKind.MESSAGE]: "Message sent to the device.",
+  [AssistanceCommandKind.ELEVATION_GUIDANCE]:
+    "Remote input is paused. The user enters their password and resumes when ready.",
+  [AssistanceCommandKind.ANNOTATION]: "Pointer setting updated on the device.",
 };
 
 const incompleteLabels: Record<string, string> = {
@@ -51,6 +55,8 @@ const incompleteLabels: Record<string, string> = {
   command_expired: "The request expired without confirmation of completion.",
   session_ended: "The session ended before this request finished.",
   content_expired: "Clipboard text is no longer available. Choose Read clipboard again.",
+  local_elevation_pause: "Not sent: remote input is paused while the user enters a password.",
+  annotation_hidden_locally: "The user hid the pointer for this session.",
 };
 
 export function AssistanceControls({
@@ -131,6 +137,10 @@ export function AssistanceControls({
   }, [commandResult, clipboardReady, clearResult]);
 
   function reason(field: CapabilityField, minimum = AssistancePolicyMode.LIMITED) {
+    if (session.inputState?.paused)
+      return session.inputState.pause === AssistanceInputPause.ELEVATION
+        ? "Remote input is paused while the user enters a password. Only they can resume it."
+        : "Wait for the user to finish the local dialog before sending commands.";
     if (!active) return "Connect to an active session before using this feature.";
     if (!canPermission(principal, capabilityPermissions[field]))
       return "Your role does not allow this feature.";
@@ -146,6 +156,10 @@ export function AssistanceControls({
       if (detail === "portal_control_not_granted")
         return "The desktop did not grant keyboard control.";
       if (detail === "only_one_monitor_granted") return "The user shared only one display.";
+      if (detail === "desktop_capability_unqualified")
+        return "This feature isn't qualified on the user's desktop.";
+      if (detail === "desktop_policy_view_only")
+        return "The assistance policy allows only viewing on the user's desktop.";
       return "The user or desktop did not allow this feature.";
     }
     if (busy) return "Wait for the current request to finish.";

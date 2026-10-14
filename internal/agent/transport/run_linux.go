@@ -69,6 +69,8 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	defer stopUpdates()
 	stopAssistance := startAssistance(ctx, executor, r.authorityGate)
 	defer stopAssistance()
+	stopRecording := startAssistanceRecording(ctx, executor, r.authorityGate)
+	defer stopRecording()
 	for {
 		if err := ctx.Err(); err != nil {
 			return r.stopped()

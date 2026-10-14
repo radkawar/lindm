@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/platform"
 )
 
@@ -71,8 +72,24 @@ type labDesktop struct {
 	lockedHint bool
 	// logindLock: logind's Session.Lock reaches the locker.
 	logindLock bool
+	// lockKeys, when set, is the desktop's own lock-screen key chord (QEMU
+	// qcodes). The assistance lock scenario then presses it on the local seat
+	// instead of calling loginctl, proving the desktop's own lock path.
+	lockKeys []string
 	// assistance are the scenarios that natively hold on this desktop.
 	assistance []assistanceScenarioSpec
+	// area is where the desktop shows notification popups.
+	area bannerArea
+	// ocrConsent: consent, portal and stop controls are located by their
+	// visible labels (Plasma and xdg-desktop-portal-kde) rather than by
+	// GNOME's fixed banner and dialog geometry.
+	ocrConsent bool
+	// gate is the helper's Tier 3 admission gate ("kde_plasma", "x11");
+	// empty for the ungated GNOME and COSMIC Wayland sessions.
+	gate string
+	// golden is the encrypted golden's desktop variant when it differs from
+	// name (an X11 session of the same golden).
+	golden string
 }
 
 // labDesktops are the natively observed desktop profiles.
@@ -97,7 +114,12 @@ as gsettings set org.gnome.desktop.screensaver lock-enabled false
 as gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
 as gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type nothing
 as gsettings set org.gnome.shell welcome-dialog-last-shown-version 999
-pkill -u "$u" -x gnome-tour || true`,
+pkill -u "$u" -x gnome-tour || true
+# GNOME Software's update window opened over a consent banner on the Fedora 44
+# golden and the local Allow never landed (layers-fedora44-tier3-27).
+as gsettings set org.gnome.software download-updates false 2>/dev/null || true
+as gsettings set org.gnome.software allow-updates false 2>/dev/null || true
+pkill -u "$u" -x gnome-software || true`,
 		lockOracle: `pgrep -u "$uid" -x gnome-shell >/dev/null
 case "$(as gdbus call --session --dest org.gnome.ScreenSaver --object-path /org/gnome/ScreenSaver --method org.gnome.ScreenSaver.GetActive)" in
 "(true,)") echo locked;; "(false,)") echo unlocked;; *) echo invalid;; esac`,
@@ -229,6 +251,93 @@ case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) ech
 		// RemoteDesktop, which refuses CONTROL first.
 		assistance: unavailableScenarios("notification_actions_hidden", "portal_remote_desktop_unavailable"),
 	},
+	{
+		// Plasma Login Manager (Fedora 44's SDDM successor; SDDM where a release
+		// still ships it) autologin into the Plasma 6 Wayland session. The lab
+		// user's kscreenlocker and PowerDevil idle actions are off before its
+		// first login. kscreenlocker sets logind LockedHint and also locks on
+		// logind Session.Lock; Meta+L is its own lock shortcut.
+		name: "kde",
+		autologin: func(session platform.LabSession) string {
+			return `dm=$(basename "$(readlink -f /etc/systemd/system/display-manager.service)" .service)
+case "$dm" in plasmalogin|sddm) ;; *) echo "unsupported KDE display manager: $dm" >&2; exit 1;; esac
+install -d -m 0755 /etc/"$dm".conf.d
+printf '[Autologin]\nUser=%s\nSession=%s\nRelogin=false\n' "$u" ` + nativeQuote(session.Name) + ` > /etc/"$dm".conf.d/zz-lindm-desktop-test.conf
+printf '[Daemon]\nAutolock=false\nLockOnResume=false\n' > /home/"$u"/.config/kscreenlockerrc
+printf '[AC][Display]\nDimDisplayWhenIdle=false\nTurnOffDisplayWhenIdle=false\n\n[AC][SuspendAndShutdown]\nAutoSuspendAction=0\n' > /home/"$u"/.config/powerdevilrc
+chown "$u":"$u" /home/"$u"/.config/kscreenlockerrc /home/"$u"/.config/powerdevilrc
+if command -v restorecon >/dev/null; then restorecon -RF /etc/"$dm".conf.d /home/"$u"; fi
+systemctl restart display-manager.service`
+		},
+		services:     []string{"plasmalogin-autologin", "sddm-autologin"},
+		sessionTypes: []string{"wayland"},
+		userEnv:      "WAYLAND_DISPLAY=wayland-0",
+		ready:        `pgrep -u "$uid" -x kwin_wayland >/dev/null && pgrep -u "$uid" -x plasmashell >/dev/null && as gdbus call --session --dest org.freedesktop.ScreenSaver --object-path /ScreenSaver --method org.freedesktop.ScreenSaver.GetActive >/dev/null`,
+		quiet:        `pkill -u "$u" -x plasma-welcome || true`,
+		lockOracle: `pgrep -u "$uid" -x plasmashell >/dev/null
+case "$(as gdbus call --session --dest org.freedesktop.ScreenSaver --object-path /ScreenSaver --method org.freedesktop.ScreenSaver.GetActive)" in
+"(true,)") echo locked;; "(false,)") echo unlocked;; *) echo invalid;; esac`,
+		locker:     "kscreenlocker org.freedesktop.ScreenSaver.GetActive",
+		lockedHint: true,
+		logindLock: true,
+		lockKeys:   []string{"meta_l", "l"},
+		area:       bannerBottomRight,
+		ocrConsent: true,
+		gate:       "kde_plasma",
+		// xdg-desktop-portal-kde's RemoteDesktop dialog approves screen and
+		// input together (no monitor picker, no view-only choice); its
+		// ScreenCast chooser accepts the single lab output.
+		assistance: append([]assistanceScenarioSpec{desktopGateScenario("kde_plasma")}, namedScenarios("control", "view", "decline", "portal-cancel", "lock")...),
+	},
+}
+
+// namedScenarios selects live scenarios by name, so a scenario added to the
+// GNOME list never silently joins a desktop that cannot serve its mode. An
+// unknown name selects nothing; each profile's test asserts its exact list.
+func namedScenarios(names ...string) []assistanceScenarioSpec {
+	selected := make([]assistanceScenarioSpec, 0, len(names))
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(names, spec.name) {
+			selected = append(selected, spec)
+		}
+	}
+	return selected
+}
+
+// desktopGateScenario proves a gated desktop refuses before consent when the
+// device policy leaves its gate off, after the native portal and lock checks.
+func desktopGateScenario(gate string) assistanceScenarioSpec {
+	return assistanceScenarioSpec{name: "desktop-policy-off", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, detail: gate + "_policy_off", desktopGateOff: true}
+}
+
+// x11Variant is the profile's X11 session on the same golden: the display
+// manager starts the release's X11 session entry, X clients reach it
+// through the DISPLAY and XAUTHORITY the session exported to its user
+// manager, and the helper's X11 gate applies. A release without an X11
+// session entry has no variant.
+func (d *labDesktop) x11Variant(session platform.LabSession) (*labDesktop, error) {
+	if session.X11Name == "" {
+		return nil, fmt.Errorf("the %s lab desktop has no maintained X11 session", d.name)
+	}
+	variant := *d
+	variant.golden, variant.name = d.name, d.name+"-x11"
+	variant.sessionTypes, variant.gate = []string{"x11"}, "x11"
+	autologin := d.autologin
+	variant.autologin = func(session platform.LabSession) string {
+		session.Name = session.X11Name
+		return autologin(session)
+	}
+	variant.userEnv = `$(sudo -n -u "$u" env XDG_RUNTIME_DIR=/run/user/$uid DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus systemctl --user show-environment | grep -E '^(DISPLAY|XAUTHORITY)=')`
+	variant.assistance = append([]assistanceScenarioSpec{desktopGateScenario("x11")}, namedScenarios("control", "view", "decline", "portal-cancel", "lock")...)
+	return &variant, nil
+}
+
+// goldenName is the encrypted golden's desktop variant of the profile.
+func (d *labDesktop) goldenName() string {
+	if d.golden != "" {
+		return d.golden
+	}
+	return d.name
 }
 
 // labDesktopFor returns the profile of the golden's desktop variant, which

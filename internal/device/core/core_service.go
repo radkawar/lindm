@@ -30,6 +30,7 @@ import (
 	recoveryv1 "lindm/gen/lindm/recovery/v1"
 	releasemanagementv1 "lindm/gen/lindm/releasemanagement/v1"
 	"lindm/internal/advisory"
+	"lindm/internal/assistancerecording"
 	"lindm/internal/assistrelay"
 	"lindm/internal/config"
 	"lindm/internal/device/devicedb"
@@ -105,6 +106,10 @@ type Config struct {
 	// and Answer then fail with assistance_unconfigured.
 	Assistance              *assistrelay.Relay
 	AssistancePolicyCeiling *agentv1.AssistancePolicy
+	// AssistanceRecording is nil unless recording custody is configured;
+	// sessions requesting recording are then refused.
+	AssistanceRecording        *assistancerecording.Recipient
+	AssistanceRecordingStorage uint64
 }
 
 // ProfileActivator copies a provisioning token's immutable profile revision to
@@ -148,6 +153,8 @@ type Service struct {
 	RecoveryKeyCustody     func() (*adminv1.RecoveryKeyCustody, error)
 	Assistance             *assistrelay.Relay
 	AssistanceCeiling      *agentv1.AssistancePolicy
+	AssistanceRecording    *assistancerecording.Recipient
+	RecordingStorage       uint64
 }
 
 // NewCore validates cfg and builds the shared device dependencies.
@@ -174,6 +181,9 @@ func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, e
 	}
 	if budget < MinInventoryBudget || budget > maxInventoryBudget {
 		return nil, errors.New("device: inventory budget is outside the admitted range")
+	}
+	if (cfg.AssistanceRecording == nil) != (cfg.AssistanceRecordingStorage == 0) {
+		return nil, errors.New("device: assistance recording requires custody and a storage bound together")
 	}
 	if cfg.ExecutionAuthority != nil && cfg.Identity == nil {
 		return nil, errors.New("device: execution authority requires fresh identity authorization")
@@ -240,6 +250,8 @@ func New(pool *pgxpool.Pool, cfg Config, activate ProfileActivator) (*Service, e
 		RecoveryKeyCustody:     cfg.RecoveryKeyCustody,
 		Assistance:             cfg.Assistance,
 		AssistanceCeiling:      proto.CloneOf(cfg.AssistancePolicyCeiling),
+		AssistanceRecording:    cfg.AssistanceRecording,
+		RecordingStorage:       cfg.AssistanceRecordingStorage,
 	}, nil
 }
 
@@ -394,7 +406,7 @@ func inFlightLimit(pool *pgxpool.Pool) int {
 // validatedMessages are every request, response and config message whose
 // buf.validate rules the device RPC surfaces enforce.
 func validatedMessages() []proto.Message {
-	return []proto.Message{
+	return append(assistanceLayerMessages(), []proto.Message{
 		&adminv1.GetAuthorizationRequest{}, &adminv1.UpdateAuthorizationRequest{},
 		&releasemanagementv1.GetRolloutRequest{},
 		&releasemanagementv1.SetRolloutRequest{},
@@ -508,5 +520,18 @@ func validatedMessages() []proto.Message {
 		&devicev1.RenewIdentityRequest{},
 		&devicev1.RegisterEncryptionKeyRequest{},
 		&inventoryv1.PackageBatch{},
+	}...)
+}
+
+// assistanceLayerMessages are the file transfer, reconnect, recording and
+// unattended access messages among validatedMessages.
+func assistanceLayerMessages() []proto.Message {
+	return []proto.Message{
+		&adminv1.StartAssistanceFileTransferRequest{}, &adminv1.GetAssistanceFileTransferRequest{}, &adminv1.CancelAssistanceFileTransferRequest{},
+		&adminv1.StartAssistanceFileTransferResponse{}, &adminv1.GetAssistanceFileTransferResponse{}, &adminv1.CancelAssistanceFileTransferResponse{},
+		&adminv1.ReconnectAssistanceSessionRequest{}, &adminv1.ListAssistanceRecordingsRequest{},
+		&adminv1.OpenAssistanceRecordingRequest{}, &adminv1.ReadAssistanceRecordingRequest{}, &adminv1.DeleteAssistanceRecordingRequest{},
+		&devicev1.PutAssistanceRecordingRequest{},
+		&adminv1.AuthorizeUnattendedAssistanceRequest{}, &adminv1.ListUnattendedAssistanceRequest{}, &adminv1.RevokeUnattendedAssistanceRequest{},
 	}
 }

@@ -8,11 +8,13 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -100,11 +102,17 @@ func (n *fakeNotifier) Notify(_ context.Context, notification Notification) (Not
 // next returns the next posted notification with summary.
 func (n *fakeNotifier) next(t *testing.T, summary string) *fakeNotice {
 	t.Helper()
+	return n.nextWith(t, summary, func(got string) bool { return got == summary })
+}
+
+// nextWith returns the next posted notification whose summary matches.
+func (n *fakeNotifier) nextWith(t *testing.T, summary string, match func(string) bool) *fakeNotice {
+	t.Helper()
 	timeout := time.After(5 * time.Second)
 	for {
 		select {
 		case notice := <-n.posted:
-			if notice.notification.Summary == summary {
+			if match(notice.notification.Summary) {
 				return notice
 			}
 		case <-timeout:
@@ -126,6 +134,9 @@ type fakeGrant struct {
 	writes       int
 	selected     string
 	cursorHidden bool
+	paused       bool
+	// restore is the persistent-grant token the desktop returns, if any.
+	restore string
 }
 
 func (g *fakeGrant) Streams() []Stream {
@@ -144,18 +155,38 @@ func (g *fakeGrant) CursorHidden() bool      { return g.cursorHidden }
 func (g *fakeGrant) ClipboardGranted() bool  { return g.clipboard }
 func (g *fakeGrant) ClipboardReason() string { return "" }
 func (g *fakeGrant) KeyboardGranted() bool   { return g.control }
+func (g *fakeGrant) PortalVersions() string  { return "screencast_5" }
+func (g *fakeGrant) PauseClipboard(context.Context) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.text, g.paused = "", true
+	return nil
+}
+func (g *fakeGrant) ResumeClipboard() error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.paused = false
+	return nil
+}
 func (g *fakeGrant) ClipboardWrite(_ context.Context, text string, _ time.Time) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.paused {
+		return errors.New("clipboard_paused")
+	}
 	g.text, g.writes = text, g.writes+1
 	return nil
 }
 func (g *fakeGrant) ClipboardRead(context.Context) (string, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.paused {
+		return "", errors.New("clipboard_paused")
+	}
 	return g.text, nil
 }
 func (g *fakeGrant) ControlGranted() bool    { return g.control }
+func (g *fakeGrant) RestoreToken() string    { return g.restore }
 func (g *fakeGrant) Closed() <-chan struct{} { return g.closed }
 
 func (g *fakeGrant) OpenPipeWire(context.Context) (*os.File, error) {
@@ -190,9 +221,11 @@ type fakePortal struct {
 	mu            sync.Mutex
 	modes         []agentv1.AssistanceMode
 	opened        chan struct{}
+	choose        func(context.Context, string) (*os.File, error)
 	// refuse maps a mode to the Check result a desktop's portal produces.
 	refuse  map[agentv1.AssistanceMode]error
 	checked []PortalRequest
+	opens   []PortalRequest
 }
 
 func (p *fakePortal) Check(_ context.Context, request PortalRequest) error {
@@ -206,6 +239,7 @@ func (p *fakePortal) Open(ctx context.Context, request PortalRequest) (Grant, er
 	mode := request.Mode
 	p.mu.Lock()
 	p.modes = append(p.modes, mode)
+	p.opens = append(p.opens, request)
 	p.mu.Unlock()
 	if p.opened != nil {
 		p.opened <- struct{}{}
@@ -221,6 +255,13 @@ func (p *fakePortal) Open(ctx context.Context, request PortalRequest) (Grant, er
 		return p.grantOverride, nil
 	}
 	return p.grant, nil
+}
+
+func (p *fakePortal) ChooseFile(ctx context.Context, title string) (*os.File, error) {
+	if p.choose == nil {
+		return nil, ErrPortalCancelled
+	}
+	return p.choose(ctx, title)
 }
 
 func (p *fakePortal) openCount() int {
@@ -295,6 +336,12 @@ type fakePeer struct {
 	written   int
 	closes    int
 	frames    displayFrames
+	files     chan []byte
+	sentFiles chan []byte
+	inputGate pionPeer
+	// annotations feeds the overlay channel; audio counts sound packets.
+	annotations chan []byte
+	audio       int
 }
 
 func (p *fakePeer) Offer(context.Context) (string, error) { return p.offer, nil }
@@ -322,6 +369,32 @@ func (p *fakePeer) PublishDisplayFrame(frame DisplayFrame) error {
 }
 
 func (p *fakePeer) EndDisplayFrames() { p.frames.close() }
+
+func (p *fakePeer) SetInputState(epoch uint32, paused bool) error {
+	p.inputGate.input = p.input
+	return p.inputGate.SetInputState(epoch, paused)
+}
+func (p *fakePeer) Files() <-chan []byte { return p.files }
+func (p *fakePeer) Annotations() <-chan []byte {
+	if !p.config.Annotation {
+		return nil
+	}
+	return p.annotations
+}
+func (p *fakePeer) WriteAudioRTP([]byte) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.audio++
+	return nil
+}
+func (p *fakePeer) SendFile(ctx context.Context, frame []byte) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case p.sentFiles <- append([]byte(nil), frame...):
+		return nil
+	}
+}
 
 func (p *fakePeer) Connected() <-chan struct{} { return p.connected }
 func (p *fakePeer) Failed() <-chan struct{}    { return p.failed }
@@ -354,10 +427,13 @@ type fakePeers struct {
 
 func newFakePeers() *fakePeers {
 	return &fakePeers{peer: &fakePeer{
-		offer:     testOffer,
-		connected: make(chan struct{}),
-		failed:    make(chan struct{}),
-		input:     make(chan []byte, 16),
+		offer:       testOffer,
+		connected:   make(chan struct{}),
+		failed:      make(chan struct{}),
+		input:       make(chan []byte, 16),
+		files:       make(chan []byte, 8),
+		sentFiles:   make(chan []byte, 8),
+		annotations: make(chan []byte, 16),
 	}}
 }
 
@@ -371,9 +447,11 @@ func (f *fakePeers) NewPeer(config PeerConfig) (Peer, error) {
 
 // fakeClient is the executor's SessionService.
 type fakeClient struct {
-	mu       sync.Mutex
-	respond  func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error)
-	requests []*agentv1.SyncSessionRequest
+	mu           sync.Mutex
+	respond      func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error)
+	requests     []*agentv1.SyncSessionRequest
+	recordings   []*agentv1.PutAssistanceRecordingRequest
+	recordingErr error
 }
 
 func (c *fakeClient) SyncSession(_ context.Context, request *connect.Request[agentv1.SyncSessionRequest]) (*connect.Response[agentv1.SyncSessionResponse], error) {
@@ -386,6 +464,16 @@ func (c *fakeClient) SyncSession(_ context.Context, request *connect.Request[age
 		return nil, err
 	}
 	return connect.NewResponse(response), nil
+}
+
+func (c *fakeClient) PutAssistanceRecording(_ context.Context, request *connect.Request[agentv1.PutAssistanceRecordingRequest]) (*connect.Response[agentv1.PutAssistanceRecordingResponse], error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.recordingErr != nil {
+		return nil, c.recordingErr
+	}
+	c.recordings = append(c.recordings, proto.CloneOf(request.Msg))
+	return connect.NewResponse(&agentv1.PutAssistanceRecordingResponse{}), nil
 }
 
 func (c *fakeClient) set(respond func(*agentv1.SyncSessionRequest) (*agentv1.SyncSessionResponse, error)) {
@@ -405,6 +493,8 @@ type harness struct {
 	peers    *fakePeers
 	locks    *fakeLocks
 	ctx      context.Context
+	// local is the executor-bound session the fake executor reports.
+	local *agentv1.AssistanceLocalSession
 }
 
 // fakeLocks is the LockMonitor boundary: one channel per subscription.
@@ -463,6 +553,7 @@ func newDesktopHarness(t *testing.T, currentDesktop string) *harness {
 		peers:    newFakePeers(),
 		locks:    &fakeLocks{},
 		ctx:      t.Context(),
+		local:    localSession(),
 	}
 	h.client.set(h.directives())
 	helper, err := newHelper(Config{
@@ -518,7 +609,7 @@ func (h *harness) directives(directives ...*agentv1.AssistanceDirective) func(*a
 				directive.AuthorizedUntil = timestamppb.New(h.clock.Now().Add(25 * time.Second))
 			}
 		}
-		return &agentv1.SyncSessionResponse{Directives: directives, LocalSession: localSession()}, nil
+		return &agentv1.SyncSessionResponse{Directives: directives, LocalSession: proto.CloneOf(h.local)}, nil
 	}
 }
 
@@ -573,7 +664,10 @@ func (h *harness) waitEnded(cause agentv1.AssistanceEndCause) *agentv1.SessionAs
 func (h *harness) offered(directive *agentv1.AssistanceDirective) *agentv1.SessionAssistanceReport {
 	h.t.Helper()
 	h.sync(directive)
-	prompt := h.notifier.next(h.t, "Remote assistance request")
+	// Recording disclosure extends the request summary.
+	prompt := h.notifier.nextWith(h.t, "Remote assistance request", func(summary string) bool {
+		return strings.HasPrefix(summary, "Remote assistance request")
+	})
 	h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED)
 	prompt.result <- actionAllow
 	return h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED)

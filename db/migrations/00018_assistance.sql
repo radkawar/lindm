@@ -25,7 +25,7 @@ CREATE TABLE assistance_sessions (
     answered_at timestamptz,
     started_at timestamptz,
     ended_at timestamptz,
-    end_cause smallint NOT NULL DEFAULT 0 CHECK (end_cause BETWEEN 0 AND 13),
+    end_cause smallint NOT NULL DEFAULT 0 CHECK (end_cause BETWEEN 0 AND 14),
     end_detail text NOT NULL DEFAULT '' CHECK (char_length(end_detail) <= 256),
     device_synced_at timestamptz,
     device_ended boolean NOT NULL DEFAULT false,

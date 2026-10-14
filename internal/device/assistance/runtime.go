@@ -17,11 +17,13 @@ import (
 type Runtime struct {
 	assistanceMu       sync.Mutex
 	assistanceCommands map[uuid.UUID]*assistanceCommandMemory
+	assistanceInstance uuid.UUID
 }
 
 // NewRuntime returns an isolated assistance runtime for the composition root.
+// Its immutable incarnation binds file work to this process, not a SQL service.
 func NewRuntime() *Runtime {
-	return &Runtime{}
+	return &Runtime{assistanceInstance: uuid.New()}
 }
 
 // One slot per live session, never journaled. The timer destroys content even

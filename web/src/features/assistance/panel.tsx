@@ -61,6 +61,14 @@ import {
   policyMode,
 } from "./capabilities";
 import { AssistancePolicyDialog } from "./policy";
+import { FileLimitsSummary } from "./file-policy";
+import { DeviceRecordings } from "./recordings";
+import { DeviceUnattendedAssistance } from "./unattended";
+import {
+  ReconnectLimitsSummary,
+  RecordingLimitsSummary,
+  UnattendedLimitsSummary,
+} from "./workflow-policy";
 import {
   assistancePolicyQueryOptions,
   assistanceReadinessQueryOptions,
@@ -97,6 +105,8 @@ export function DeviceAssistanceCard({ deviceId }: { deviceId: string }) {
           <AssistanceRequest deviceId={deviceId} />
         ) : null}
         <AssistanceHistory deviceId={deviceId} />
+        <DeviceUnattendedAssistance deviceId={deviceId} />
+        <DeviceRecordings deviceId={deviceId} />
       </CardContent>
     </Card>
   );
@@ -257,6 +267,38 @@ function AssistanceRequestForm({
           }
           request.requestedCapabilities[field] = requested;
         }
+        if (policyMode(capabilities, "files") >= AssistancePolicyMode.LIMITED) {
+          if (!policyQuery.data?.policy?.fileLimits)
+            throw new Error(
+              "File limits are unavailable. Ask your server admin to configure them.",
+            );
+          request.requestedCapabilities.fileLimits = policyQuery.data.policy.fileLimits;
+        }
+        if (policyMode(capabilities, "reconnect") >= AssistancePolicyMode.LIMITED) {
+          if (!policyQuery.data?.policy?.reconnectLimits)
+            throw new Error(
+              "Reconnect limits are unavailable. Ask your server admin to configure them.",
+            );
+          request.requestedCapabilities.reconnectLimits = policyQuery.data.policy.reconnectLimits;
+        }
+        if (policyMode(capabilities, "recording") >= AssistancePolicyMode.LIMITED) {
+          if (!policyQuery.data?.policy?.recordingLimits)
+            throw new Error(
+              "Recording limits are unavailable. Ask your server admin to configure them.",
+            );
+          request.requestedCapabilities.recordingLimits = policyQuery.data.policy.recordingLimits;
+        }
+        if (policyMode(capabilities, "unattended") >= AssistancePolicyMode.LIMITED) {
+          if (!policyQuery.data?.policy?.unattendedLimits)
+            throw new Error(
+              "Unattended limits are unavailable. Ask your server admin to configure them.",
+            );
+          if (policyMode(capabilities, "recording") === AssistancePolicyMode.LIMITED)
+            throw new Error(
+              "Ask about unattended access or optional recording, not both, in one request.",
+            );
+          request.requestedCapabilities.unattendedLimits = policyQuery.data.policy.unattendedLimits;
+        }
         validateRequest(CreateAssistanceSessionRequestSchema, request);
         return request;
       },
@@ -353,6 +395,56 @@ function AssistanceRequestForm({
           )
         }
       />
+      {policyMode(capabilities, "files") >= AssistancePolicyMode.LIMITED ? (
+        <div className="grid gap-2">
+          <p className="text-sm">
+            The user must approve each incoming file or select each outgoing file on the device.
+          </p>
+          <FileLimitsSummary policy={policyQuery.data?.policy?.fileLimits} />
+        </div>
+      ) : null}
+      {policyMode(capabilities, "reconnect") >= AssistancePolicyMode.LIMITED ? (
+        <div className="grid gap-2">
+          <p className="text-sm">
+            {policyMode(capabilities, "reconnect") === AssistancePolicyMode.ON
+              ? "If the user signs out or restarts, a new request is sent automatically when the device is back."
+              : "If the user signs out or restarts, you can send a new request from the session page."}
+          </p>
+          <ReconnectLimitsSummary policy={policyQuery.data?.policy?.reconnectLimits} />
+        </div>
+      ) : null}
+      {policyMode(capabilities, "recording") >= AssistancePolicyMode.LIMITED ? (
+        <div className="grid gap-2">
+          <p className="text-sm">
+            {policyMode(capabilities, "recording") === AssistancePolicyMode.ON
+              ? "Recording is required: the session cannot start or continue unrecorded."
+              : "The user decides whether this session is recorded."}
+          </p>
+          <RecordingLimitsSummary policy={policyQuery.data?.policy?.recordingLimits} />
+        </div>
+      ) : null}
+      {policyMode(capabilities, "unattended") >= AssistancePolicyMode.LIMITED ? (
+        <div className="grid gap-2">
+          <p className="text-sm">
+            The user may also opt in to unattended access. Nothing is enabled unless they choose it
+            on the device and the desktop keeps the grant.
+          </p>
+          <UnattendedLimitsSummary policy={policyQuery.data?.policy?.unattendedLimits} />
+        </div>
+      ) : null}
+      {policyMode(capabilities, "elevation") >= AssistancePolicyMode.LIMITED ? (
+        <p className="text-sm">
+          You can ask the user to enter a password themselves. All remote input pauses until they
+          resume.
+        </p>
+      ) : null}
+      {policyMode(capabilities, "audio") >= AssistancePolicyMode.LIMITED ? (
+        <p className="text-sm">
+          {policyMode(capabilities, "audio") === AssistancePolicyMode.ON
+            ? "The user chooses whether to share one output's sound and, separately, the microphone."
+            : "The user chooses whether to share one output's sound. The microphone is never shared."}
+        </p>
+      ) : null}
       {policyQuery.error ? (
         <RpcError failure={toRpcFailure(policyQuery.error)} title="Couldn't load assistance policy">
           <Button

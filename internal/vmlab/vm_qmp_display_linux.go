@@ -108,6 +108,20 @@ func (v *guestVM) pointerMove(ctx context.Context, display image.Rectangle, poin
 	return nil
 }
 
+// pointerWake sends a one-pixel relative motion and its return. It reaches the
+// PS/2 mouse rather than the tablet: when GNOME drew no pointer for absolute
+// tablet motion, a relative motion is the other local pointer device.
+func (v *guestVM) pointerWake(ctx context.Context) error {
+	for _, delta := range []int{1, -1} {
+		if err := v.qmpCommand(ctx, map[string]any{"execute": "input-send-event", "id": "wake", "arguments": map[string]any{"events": []map[string]any{
+			{"type": "rel", "data": map[string]any{"axis": "x", "value": delta}},
+		}}}); err != nil {
+			return fmt.Errorf("guest pointer wake: %w", err)
+		}
+	}
+	return nil
+}
+
 // sendKey presses QEMU key codes together, in order, on the guest's local
 // seat and releases them: one code is a key press, several are a chord such
 // as meta_l+esc.

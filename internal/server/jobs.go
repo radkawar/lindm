@@ -20,6 +20,7 @@ const (
 	jobKeyAdvisoryMaintenance int64 = 0x6c696e646d000002
 	jobKeyComplianceDeadlines int64 = 0x6c696e646d000004
 	jobKeyRolloutPromoter     int64 = 0x6c696e646d000005
+	jobKeyAssistance          int64 = 0x6c696e646d000006
 )
 
 // backgroundJobs is the complete inventory of control-plane background work.
@@ -32,6 +33,9 @@ func backgroundJobs(devices, consoleDevices *device.Service, advisories *advisor
 		// Every instance claims disjoint batches of pending devices.
 		{Name: "advisory-evaluation", Mode: jobs.Replicated, Run: advisories.RunEvaluations},
 		{Name: "rollout-promoter", Key: jobKeyRolloutPromoter, Mode: jobs.Exclusive, Run: promoter.Run},
+		// Recording retention, unfinished-recording settlement and reconnect
+		// workflow expiry run on one instance.
+		{Name: "assistance-maintenance", Key: jobKeyAssistance, Mode: jobs.Exclusive, Run: devices.RunAssistanceMaintenance},
 		// Each instance keeps its own read-only unrestricted fleet aggregate,
 		// read on the console pool that serves it.
 		{Name: "fleet-summary", Mode: jobs.Replicated, Run: consoleDevices.RunFleetSummary},

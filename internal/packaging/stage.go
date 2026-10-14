@@ -46,9 +46,10 @@ func stagePayload(work string, binary *os.File, epoch int64, p product) (string,
 	}
 	dirs := append([]string{"usr/bin", "usr/lib/systemd/system", "usr/lib/tmpfiles.d", "usr/lib/sysusers.d"}, p.dirs...)
 	if len(p.userUnits) != 0 {
-		// Shared system directories: staged for the user unit and its XDG
-		// autostart entry, never listed as owned by the package.
-		dirs = append(dirs, "usr/lib/systemd/user", "etc/xdg/autostart")
+		// Shared system directories: staged for the user unit, its XDG
+		// autostart entry and the GNOME Shell overlay extension, never listed
+		// as owned by the package.
+		dirs = append(dirs, "usr/lib/systemd/user", "etc/xdg/autostart", "usr/share/gnome-shell", "usr/share/gnome-shell/extensions")
 	}
 	for _, dir := range dirs {
 		if err := mkdir(filepath.Join(root, dir), epoch); err != nil {

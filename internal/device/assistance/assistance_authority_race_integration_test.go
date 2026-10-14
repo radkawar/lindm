@@ -157,7 +157,7 @@ func TestAssistanceAuthorityStaleObservationPreservesReplacement(t *testing.T) {
 
 					// The stale sync must deliver exactly the independently established
 					// lease, not a new window measured from this poll.
-					directive, err := f.svc.assistanceDirective(assistanceAuthoritySession(t, f, id))
+					directive, err := f.svc.assistanceDirective(assistanceAuthoritySession(t, f, id), nil)
 					if err != nil {
 						t.Fatal(err)
 					}

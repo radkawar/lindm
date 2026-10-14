@@ -41,7 +41,7 @@ type DisplayCompletion = {
 };
 
 type CommandInput = Pick<AssistanceCommand, "kind"> &
-  Partial<Pick<AssistanceCommand, "text" | "specialKey" | "displayId">>;
+  Partial<Pick<AssistanceCommand, "text" | "specialKey" | "displayId" | "annotationEnabled">>;
 
 export type AssistanceCommandController = {
   run: (command: CommandInput) => Promise<void>;

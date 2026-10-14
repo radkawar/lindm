@@ -30,12 +30,12 @@ func assistancePolicyModeName(mode agentv1.AssistancePolicyMode) string {
 }
 
 func assistancePolicyAudit(policy *agentv1.AssistancePolicy) []string {
-	return []string{"clipboard", assistancePolicyModeName(policy.GetClipboard()), "keyboard", assistancePolicyModeName(policy.GetKeyboard()), "display_policy", assistancePolicyModeName(policy.GetDisplay()), "messages", assistancePolicyModeName(policy.GetMessages())}
+	return []string{"clipboard", assistancePolicyModeName(policy.GetClipboard()), "keyboard", assistancePolicyModeName(policy.GetKeyboard()), "display_policy", assistancePolicyModeName(policy.GetDisplay()), "messages", assistancePolicyModeName(policy.GetMessages()), "files", assistancePolicyModeName(policy.GetFiles()), "reconnect", assistancePolicyModeName(policy.GetReconnect()), "recording", assistancePolicyModeName(policy.GetRecording()), "unattended", assistancePolicyModeName(policy.GetUnattended()), "elevation", assistancePolicyModeName(policy.GetElevation()), "annotation", assistancePolicyModeName(policy.GetAnnotation()), "audio", assistancePolicyModeName(policy.GetAudio()), "kde_plasma", assistancePolicyModeName(policy.GetKdePlasma()), "x11", assistancePolicyModeName(policy.GetX11())}
 }
 
 func assistanceOperationMetadata(row devicedb.AssistanceSession, actor uuid.UUID, command *agentv1.AssistanceCommand) devicedb.AssistanceCommand {
 	requestID, _ := uuid.Parse(command.GetRequestId())
-	return devicedb.AssistanceCommand{RequestID: requestID, SessionID: row.ID, DeviceID: row.DeviceID, OperatorID: actor, Kind: int16(command.GetKind()), Policy: row.EffectiveCapabilities, ByteCount: int32(len(command.GetText())), SpecialKey: int16(command.GetSpecialKey()), DisplayID: command.GetDisplayId()}
+	return devicedb.AssistanceCommand{RequestID: requestID, SessionID: row.ID, DeviceID: row.DeviceID, OperatorID: actor, Kind: int16(command.GetKind()), Policy: row.EffectiveCapabilities, ByteCount: int32(len(command.GetText())), SpecialKey: int16(command.GetSpecialKey()), DisplayID: command.GetDisplayId(), AnnotationEnabled: command.GetAnnotationEnabled()}
 }
 
 // This whitelist of metadata fields is the entire audit boundary. In particular,
@@ -60,7 +60,7 @@ func assistanceOperationAudit(operation devicedb.AssistanceCommand, outcome, rea
 
 func denyAssistanceOperation(ctx context.Context, q *devicedb.Queries, row devicedb.AssistanceSession, actor uuid.UUID, command *agentv1.AssistanceCommand, reason string, denied error) error {
 	operation := assistanceOperationMetadata(row, actor, command)
-	if err := recordAssistanceAudit(ctx, q, &actor, assistanceCommandAuditKind(operation.Kind), row, "", assistanceOperationAudit(operation, "denied", reason)...); err != nil {
+	if err := recordAssistanceAudit(ctx, q, &actor, assistanceCommandAuditKind(operation), row, "", assistanceOperationAudit(operation, "denied", reason)...); err != nil {
 		return err
 	}
 	return denied

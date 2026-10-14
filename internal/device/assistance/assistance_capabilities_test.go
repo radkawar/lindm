@@ -23,7 +23,7 @@ import (
 
 func allAssistanceCapabilities() *agentv1.AssistancePolicy {
 	on := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
-	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on}
+	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on, Files: on, FileLimits: testAssistanceFilePolicy()}
 }
 
 func TestAssistancePolicyIntersectionDeniesUnconfiguredFeatures(t *testing.T) {
@@ -38,6 +38,35 @@ func TestAssistancePolicyIntersectionDeniesUnconfiguredFeatures(t *testing.T) {
 	}
 	if !proto.Equal(decodeAssistancePolicy([]byte{0xff}), assistancePolicy(nil)) {
 		t.Fatal("corrupt persisted policy did not fail closed")
+	}
+}
+
+// Desktop admission gates come from device policy within the ceiling only:
+// an operator request can neither set nor widen them, and they default off.
+func TestAssistanceDesktopGatesComeFromPolicyOnly(t *testing.T) {
+	on, limited, off := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	if p := assistancePolicy(nil); p.GetKdePlasma() != off || p.GetX11() != off {
+		t.Fatal("absent policy enabled a desktop gate")
+	}
+	device := &agentv1.AssistancePolicy{Keyboard: on, KdePlasma: on, X11: limited}
+	ceiling := &agentv1.AssistancePolicy{Keyboard: on, KdePlasma: limited, X11: on}
+	allowed := intersectAssistancePolicy(device, ceiling)
+	if allowed.GetKdePlasma() != limited || allowed.GetX11() != limited {
+		t.Fatalf("ceiling did not bound desktop gates: %v", allowed)
+	}
+	requested, effective := assistanceInvitationPolicies(&agentv1.AssistancePolicy{Keyboard: on, KdePlasma: on, X11: on}, allowed)
+	if requested.GetKdePlasma() != off || requested.GetX11() != off {
+		t.Fatal("operator request carried a desktop gate")
+	}
+	if effective.GetKdePlasma() != limited || effective.GetX11() != limited || effective.GetKeyboard() != on {
+		t.Fatalf("effective = %v", effective)
+	}
+	if _, effective := assistanceInvitationPolicies(&agentv1.AssistancePolicy{Keyboard: on}, intersectAssistancePolicy(device, nil)); effective.GetKdePlasma() != off || effective.GetX11() != off {
+		t.Fatal("absent ceiling admitted a desktop")
+	}
+	audit := strings.Join(assistancePolicyAudit(effective), " ")
+	if !strings.Contains(audit, "kde_plasma limited") || !strings.Contains(audit, "x11 limited") {
+		t.Fatalf("policy audit omits desktop gates: %s", audit)
 	}
 }
 

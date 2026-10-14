@@ -218,9 +218,9 @@ func TestAssistanceMessageWitnessRejectsScreenshotExistenceAlone(t *testing.T) {
 		"LINDM Message from your support operator Other Operator " + nonce,
 		"LINDM\nMessage from your support operator\nOther Assistance Operator:\n" + nonce,
 		"LINDM\nMessage from your support operator\nOther Assistance Operator: " + nonce,
-		"LINDM\nMessage from your support operator Assistance Operator: " + nonce,
 		"LINDM\nMessage from your support operator\nAssistance Operator: xxxx" + nonce[4:],
 		"LINDM\nMessage from your support operator\nAssistance Operator: " + nonce[:20],
+		"LINDM\nMessage from your support operator\nAssistance Operator: " + nonce[:16] + " zzzzzzzz",
 	} {
 		witness.OCR = ocr
 		if err := verifyAssistanceCapabilityWitness(scenario, witness); err == nil {
@@ -234,6 +234,12 @@ func TestAssistanceMessageWitnessRejectsScreenshotExistenceAlone(t *testing.T) {
 		"lindm Just now\nRemote assistance in progress\nand controlling your screen. Message from your support operator\nAssistance Operator: iiiiiillllllIIIIII111111\n\nStop\n",
 		// tesseract doubled glyphs of a clear nonce (banner-fix-full-01).
 		"lindm\nMessage from your support operator\nAssistance Operator: 111111111111111111O11l11\n",
+		// tesseract split the nonce at a glyph gap (layers-ubuntu24-full-02).
+		"lindm\nMessage from your support operator\nAssistance Operator: " + nonce[:12] + " " + nonce[12:] + "\n",
+		// GNOME wrapped the sender onto the product line, the nonce below
+		// (layers-ubuntu24-tier1-35), or kept both there.
+		"lindm Just now\nRemote assistance in progress\nAssistance Operator is viewing and controlling your screen. Message\nFrom your support operator Assistance Operator:\n" + nonce + "\n\nStop\n",
+		"LINDM\nMessage from your support operator Assistance Operator: " + nonce,
 	} {
 		witness.OCR = ocr
 		if err := verifyAssistanceCapabilityWitness(scenario, witness); err != nil {

@@ -1975,6 +1975,8 @@ type AssistanceConfig struct {
 	MaxConcurrentSessions uint32 `protobuf:"varint,2,opt,name=max_concurrent_sessions,json=maxConcurrentSessions,proto3" json:"max_concurrent_sessions,omitempty"`
 	// Deployment ceiling, not an implicit per-device grant.
 	PolicyCeiling *v11.AssistancePolicy `protobuf:"bytes,3,opt,name=policy_ceiling,json=policyCeiling,proto3" json:"policy_ceiling,omitempty"`
+	// Absent: recording is unavailable and sessions requesting it are refused.
+	Recording     *AssistanceRecordingConfig `protobuf:"bytes,4,opt,name=recording,proto3" json:"recording,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2030,6 +2032,69 @@ func (x *AssistanceConfig) GetPolicyCeiling() *v11.AssistancePolicy {
 	return nil
 }
 
+func (x *AssistanceConfig) GetRecording() *AssistanceRecordingConfig {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+// AssistanceRecordingConfig is the deployment-managed recording custody.
+type AssistanceRecordingConfig struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Exactly 32 CSPRNG bytes: the HPKE ML-KEM-768+X25519 private key seed.
+	// Owner root or the server identity, mode 0600, separate from every other key.
+	KeyFile string `protobuf:"bytes,1,opt,name=key_file,json=keyFile,proto3" json:"key_file,omitempty"`
+	// Deployment-wide bound on retained recording ciphertext.
+	MaxStorageBytes uint64 `protobuf:"varint,2,opt,name=max_storage_bytes,json=maxStorageBytes,proto3" json:"max_storage_bytes,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AssistanceRecordingConfig) Reset() {
+	*x = AssistanceRecordingConfig{}
+	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceRecordingConfig) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceRecordingConfig) ProtoMessage() {}
+
+func (x *AssistanceRecordingConfig) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceRecordingConfig.ProtoReflect.Descriptor instead.
+func (*AssistanceRecordingConfig) Descriptor() ([]byte, []int) {
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AssistanceRecordingConfig) GetKeyFile() string {
+	if x != nil {
+		return x.KeyFile
+	}
+	return ""
+}
+
+func (x *AssistanceRecordingConfig) GetMaxStorageBytes() uint64 {
+	if x != nil {
+		return x.MaxStorageBytes
+	}
+	return 0
+}
+
 type AssistanceRelayConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// UDP and TCP TURN listener.
@@ -2048,7 +2113,7 @@ type AssistanceRelayConfig struct {
 
 func (x *AssistanceRelayConfig) Reset() {
 	*x = AssistanceRelayConfig{}
-	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2060,7 +2125,7 @@ func (x *AssistanceRelayConfig) String() string {
 func (*AssistanceRelayConfig) ProtoMessage() {}
 
 func (x *AssistanceRelayConfig) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_config_v1_config_proto_msgTypes[27]
+	mi := &file_lindm_config_v1_config_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2073,7 +2138,7 @@ func (x *AssistanceRelayConfig) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistanceRelayConfig.ProtoReflect.Descriptor instead.
 func (*AssistanceRelayConfig) Descriptor() ([]byte, []int) {
-	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{27}
+	return file_lindm_config_v1_config_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *AssistanceRelayConfig) GetListener() *ListenerConfig {
@@ -2309,18 +2374,22 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"providerId\x12$\n" +
 	"\x06issuer\x18\x02 \x01(\tB\f\xbaH\tr\a\x88\xb5\x18\x01\x88\x01\x01R\x06issuer\x12$\n" +
 	"\asubject\x18\x03 \x01(\tB\n" +
-	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\x8b\a\n" +
-	"\x10BreakGlassPolicy\x12\xb3\x05\n" +
-	"\x13allowed_permissions\x18\x01 \x03(\tB\x81\x05\xbaH\xfd\x04\x92\x01\xf9\x04\b\x01\x10\x19\x18\x01\"\xf0\x04r\xed\x04R\n" +
+	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\asubject\"\xc2\t\n" +
+	"\x10BreakGlassPolicy\x12\xea\a\n" +
+	"\x13allowed_permissions\x18\x01 \x03(\tB\xb8\a\xbaH\xb4\a\x92\x01\xb0\a\b\x01\x10\x19\x18\x01\"\xa7\ar\xa4\aR\n" +
 	"fleet.readR\x11enrollment.manageR\rdevice.revokeR\n" +
-	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x16remote_assistance.viewR\x19remote_assistance.controlR\x1fremote_assistance.policy.manageR\x1bremote_assistance.clipboardR\x1aremote_assistance.keyboardR\x19remote_assistance.displayR\x19remote_assistance.messageR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
+	"audit.readR\x16execution_trust.manageR\x0fprofiles.manageR\x10resources.assignR\x0faccounts.manageR\x10inventory.manageR\x12recovery_keys.readR\x14remote_execution.runR\x16remote_assistance.viewR\x19remote_assistance.controlR\x1fremote_assistance.policy.manageR\x1bremote_assistance.clipboardR\x1aremote_assistance.keyboardR\x19remote_assistance.displayR\x19remote_assistance.messageR\x17remote_assistance.filesR\x1bremote_assistance.reconnectR\x18remote_assistance.recordR!remote_assistance.recordings.readR#remote_assistance.recordings.deleteR\x1cremote_assistance.unattendedR$remote_assistance.unattended.approveR$remote_assistance.elevation_guidanceR\x1aremote_assistance.annotateR\x17remote_assistance.audioR\vscripts.runR\x13destructive.executeR\x10approvals.manageR\x13integrations.manageR\x16release_updates.manageR\x1aadvisory_exceptions.manageR\x11encryption.manageR\factions.lockR\x14actions.release-lockR\x12actions.quarantineR\x0esecrets.manageR\x0esecrets.revealR\x12allowedPermissions\x12!\n" +
 	"\fconsole_only\x18\x02 \x01(\bR\vconsoleOnly\x12]\n" +
 	"\x14max_session_lifetime\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x10\xbaH\r\xc8\x01\x01\xaa\x01\a\"\x03\b\x90\x1c*\x00R\x12maxSessionLifetime\x12?\n" +
-	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReason\"\xe3\x01\n" +
+	"\x17require_incident_reason\x18\x04 \x01(\bB\a\xbaH\x04j\x02\b\x01R\x15requireIncidentReason\"\xad\x02\n" +
 	"\x10AssistanceConfig\x12D\n" +
 	"\x05relay\x18\x01 \x01(\v2&.lindm.config.v1.AssistanceRelayConfigB\x06\xbaH\x03\xc8\x01\x01R\x05relay\x12@\n" +
 	"\x17max_concurrent_sessions\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\x80\x02R\x15maxConcurrentSessions\x12G\n" +
-	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\"\xd6\x03\n" +
+	"\x0epolicy_ceiling\x18\x03 \x01(\v2 .lindm.agent.v1.AssistancePolicyR\rpolicyCeiling\x12H\n" +
+	"\trecording\x18\x04 \x01(\v2*.lindm.config.v1.AssistanceRecordingConfigR\trecording\"\x7f\n" +
+	"\x19AssistanceRecordingConfig\x12$\n" +
+	"\bkey_file\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\akeyFile\x12<\n" +
+	"\x11max_storage_bytes\x18\x02 \x01(\x04B\x10\xbaH\r2\v\x18\x80\x80\x80\x80\x80 (\x80\x80@R\x0fmaxStorageBytes\"\xd6\x03\n" +
 	"\x15AssistanceRelayConfig\x12C\n" +
 	"\blistener\x18\x01 \x01(\v2\x1f.lindm.config.v1.ListenerConfigB\x06\xbaH\x03\xc8\x01\x01R\blistener\x12,\n" +
 	"\rrelay_address\x18\x02 \x01(\tB\a\xbaH\x04r\x02p\x01R\frelayAddress\x122\n" +
@@ -2342,7 +2411,7 @@ func file_lindm_config_v1_config_proto_rawDescGZIP() []byte {
 	return file_lindm_config_v1_config_proto_rawDescData
 }
 
-var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_lindm_config_v1_config_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
 var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*ServerConfig)(nil),                // 0: lindm.config.v1.ServerConfig
 	(*ReleaseRepositoryConfig)(nil),     // 1: lindm.config.v1.ReleaseRepositoryConfig
@@ -2371,12 +2440,13 @@ var file_lindm_config_v1_config_proto_goTypes = []any{
 	(*SCIMCorrelation)(nil),             // 24: lindm.config.v1.SCIMCorrelation
 	(*BreakGlassPolicy)(nil),            // 25: lindm.config.v1.BreakGlassPolicy
 	(*AssistanceConfig)(nil),            // 26: lindm.config.v1.AssistanceConfig
-	(*AssistanceRelayConfig)(nil),       // 27: lindm.config.v1.AssistanceRelayConfig
-	(*v1.AuthorizationPolicy)(nil),      // 28: lindm.auth.v1.AuthorizationPolicy
-	(*v11.ConnectivityProbeTarget)(nil), // 29: lindm.agent.v1.ConnectivityProbeTarget
-	(*v12.FeedSource)(nil),              // 30: lindm.advisory.v1.FeedSource
-	(*durationpb.Duration)(nil),         // 31: google.protobuf.Duration
-	(*v11.AssistancePolicy)(nil),        // 32: lindm.agent.v1.AssistancePolicy
+	(*AssistanceRecordingConfig)(nil),   // 27: lindm.config.v1.AssistanceRecordingConfig
+	(*AssistanceRelayConfig)(nil),       // 28: lindm.config.v1.AssistanceRelayConfig
+	(*v1.AuthorizationPolicy)(nil),      // 29: lindm.auth.v1.AuthorizationPolicy
+	(*v11.ConnectivityProbeTarget)(nil), // 30: lindm.agent.v1.ConnectivityProbeTarget
+	(*v12.FeedSource)(nil),              // 31: lindm.advisory.v1.FeedSource
+	(*durationpb.Duration)(nil),         // 32: google.protobuf.Duration
+	(*v11.AssistancePolicy)(nil),        // 33: lindm.agent.v1.AssistancePolicy
 }
 var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	10, // 0: lindm.config.v1.ServerConfig.admin_listener:type_name -> lindm.config.v1.ListenerConfig
@@ -2390,16 +2460,16 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	25, // 8: lindm.config.v1.ServerConfig.break_glass:type_name -> lindm.config.v1.BreakGlassPolicy
 	5,  // 9: lindm.config.v1.ServerConfig.advisories:type_name -> lindm.config.v1.AdvisoryConfig
 	6,  // 10: lindm.config.v1.ServerConfig.integrations:type_name -> lindm.config.v1.IntegrationsConfig
-	28, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
+	29, // 11: lindm.config.v1.ServerConfig.authorization:type_name -> lindm.auth.v1.AuthorizationPolicy
 	7,  // 12: lindm.config.v1.ServerConfig.escrow:type_name -> lindm.config.v1.EscrowConfig
 	11, // 13: lindm.config.v1.ServerConfig.profiling:type_name -> lindm.config.v1.ProfilingConfig
 	1,  // 14: lindm.config.v1.ServerConfig.release_repository:type_name -> lindm.config.v1.ReleaseRepositoryConfig
-	29, // 15: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
+	30, // 15: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
 	26, // 16: lindm.config.v1.ServerConfig.assistance:type_name -> lindm.config.v1.AssistanceConfig
 	3,  // 17: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
 	4,  // 18: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
 	2,  // 19: lindm.config.v1.ReleaseRepositoryConfig.native_repositories:type_name -> lindm.config.v1.NativeRepositoriesConfig
-	30, // 20: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
+	31, // 20: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
 	10, // 21: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
 	16, // 22: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
 	17, // 23: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
@@ -2410,15 +2480,16 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	21, // 28: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
 	23, // 29: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
 	24, // 30: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
-	31, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
-	27, // 32: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
-	32, // 33: lindm.config.v1.AssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
-	10, // 34: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	35, // [35:35] is the sub-list for method output_type
-	35, // [35:35] is the sub-list for method input_type
-	35, // [35:35] is the sub-list for extension type_name
-	35, // [35:35] is the sub-list for extension extendee
-	0,  // [0:35] is the sub-list for field type_name
+	32, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	28, // 32: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
+	33, // 33: lindm.config.v1.AssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	27, // 34: lindm.config.v1.AssistanceConfig.recording:type_name -> lindm.config.v1.AssistanceRecordingConfig
+	10, // 35: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	36, // [36:36] is the sub-list for method output_type
+	36, // [36:36] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }
@@ -2445,7 +2516,7 @@ func file_lindm_config_v1_config_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_config_v1_config_proto_rawDesc), len(file_lindm_config_v1_config_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   29,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

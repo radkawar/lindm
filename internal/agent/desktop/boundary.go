@@ -69,6 +69,10 @@ type Portal interface {
 	// Open runs the portal dialog after product consent and returns the grant.
 	// A user cancellation returns ErrPortalCancelled.
 	Open(ctx context.Context, request PortalRequest) (Grant, error)
+	// ChooseFile returns only the descriptor selected by the local native user.
+	// The chooser's Cancel returns ErrPortalCancelled; closing it (Escape or
+	// the window's close) returns ErrPortalClosed. Neither selects a file.
+	ChooseFile(ctx context.Context, title string) (*os.File, error)
 }
 
 // PortalRequest contains the capabilities named in the product prompt.
@@ -79,10 +83,23 @@ type PortalRequest struct {
 	Policy *agentv1.AssistancePolicy
 	// Lifetime ends ongoing transfers independently of the consent dialog.
 	Lifetime context.Context
+	// Persist asks the local dialog for a persistent grant; only the
+	// employee's explicit unattended opt-in sets it.
+	Persist bool
+	// RestoreToken restores the employee's persistent grant for an
+	// unattended connection. A desktop that shows a dialog instead has not
+	// restored it; the caller bounds Open and refuses.
+	RestoreToken string
 }
 
 // ErrPortalCancelled reports a user-cancelled portal dialog.
 var ErrPortalCancelled = errors.New("portal_cancelled")
+
+// ErrPortalClosed reports a file chooser the local user closed instead of
+// cancelling: xdg-desktop-portal-gnome 46 answers Escape or the dialog's
+// close (GTK delete-event) with response 2, "ended in some other way". No
+// URI is returned, so nothing is selected.
+var ErrPortalClosed = errors.New("portal_closed")
 
 // Grant is a started portal session.
 type Grant interface {
@@ -98,10 +115,17 @@ type Grant interface {
 	// ClipboardReason identifies an explicit independent native refusal.
 	ClipboardReason() string
 	ClipboardRead(ctx context.Context) (string, error)
+	// PauseClipboard cancels and joins transfers and withdraws advertised text.
+	// ResumeClipboard never restores pre-modal text or queued transfers.
+	PauseClipboard(ctx context.Context) error
+	ResumeClipboard() error
 	// ControlGranted reports whether pointer control was granted.
 	ControlGranted() bool
 	// KeyboardGranted is independent; OFF never requests a keyboard device.
 	KeyboardGranted() bool
+	// PortalVersions names the portal frontend interface versions the grant
+	// used, e.g. "screencast_5_remote_desktop_2"; audit data only.
+	PortalVersions() string
 	// OpenPipeWire returns a PipeWire remote fd restricted to the grant. The
 	// caller owns the file.
 	OpenPipeWire(ctx context.Context) (*os.File, error)
@@ -109,6 +133,9 @@ type Grant interface {
 	Closed() <-chan struct{}
 	// Inject sends one input event; only valid when ControlGranted.
 	Inject(ctx context.Context, event InputEvent) error
+	// RestoreToken is the desktop's new persistent-grant token, empty unless
+	// a persistent grant was requested and kept.
+	RestoreToken() string
 	// Close ends the portal session.
 	Close(ctx context.Context) error
 }
@@ -119,6 +146,10 @@ type Stream struct {
 	ID            string
 	Label         string
 	Width, Height int
+	// X and Y are the monitor's logical position when the portal reports
+	// it; the overlay binds to exactly this shared rectangle.
+	X, Y       int
+	Positioned bool
 }
 
 // Capturer starts the capture/encode pipeline.
@@ -151,6 +182,13 @@ type PeerConfig struct {
 	ICEServers []*agentv1.AssistanceIceServer
 	// Input adds the reliable ordered "lindm-input" data channel. VIEW has none.
 	Input bool
+	// Files is independent of Input: VIEW may transfer explicitly consented files.
+	Files bool
+	// Annotation adds the overlay-only "lindm-annotate" channel; it grants
+	// no input in either mode.
+	Annotation bool
+	// Audio adds a send-only Opus track for locally selected sound.
+	Audio bool
 }
 
 // Peer is one WebRTC peer connection that offers a VP8 track.
@@ -175,6 +213,14 @@ type Peer interface {
 	Failed() <-chan struct{}
 	// Input delivers raw operator messages; nil for VIEW.
 	Input() <-chan []byte
+	// SetInputState gates admission and drains queued input at modal boundaries.
+	SetInputState(epoch uint32, paused bool) error
+	Files() <-chan []byte
+	SendFile(ctx context.Context, frame []byte) error
+	// Annotations delivers raw overlay frames; nil without Annotation.
+	Annotations() <-chan []byte
+	// WriteAudioRTP sends one Opus packet on the audio track.
+	WriteAudioRTP(packet []byte) error
 	Close() error
 }
 

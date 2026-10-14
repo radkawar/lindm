@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createInterface } from "node:readline";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import { enroll, openSignIn, signIn } from "./journey.mjs";
@@ -14,6 +14,10 @@ import {
   visibleOutcome,
 } from "./assistance-startup.mjs";
 import { decodeNativeMarker, sampleNativeMarker } from "./assistance-marker.mjs";
+import { createFileIsolationCommands } from "./assistance-files-isolation.mjs";
+import { createAssistanceFileSafetyCommands } from "./assistance-files-safety.mjs";
+import { createWorkflowCommands } from "./assistance-workflows.mjs";
+import { createTierThreeCommands } from "./assistance-tierthree.mjs";
 import { END_HEADINGS } from "./assistance-end.mjs";
 
 // Line-oriented private control protocol for `lab vm assistance`
@@ -35,10 +39,10 @@ function starting(stage) {
 }
 
 let lastCommand;
+let lastFileTransfer;
 let commandURL;
 let commandCSRF;
 let fixtureNonce;
-
 async function completedCommand(action) {
   const previous = lastCommand?.requestId;
   await action();
@@ -85,6 +89,14 @@ function observePeers(forwardedTURNURL) {
       this.addEventListener("datachannel", (event) => {
         record.channels.push(event.channel.label);
         record.inputs.push(event.channel);
+        if (event.channel.label !== "lindm-input") return;
+        // The paused-input probe replays the console's own display, media
+        // generation and epoch; nothing else is retained.
+        const send = event.channel.send.bind(event.channel);
+        event.channel.send = (data) => {
+          if (typeof data === "string" && data.includes('"epoch"')) record.lastInput = data;
+          return send(data);
+        };
       });
     }
   };
@@ -178,6 +190,20 @@ const commands = {
       commandCSRF = request.headers()["x-csrf-token"];
     });
     driver.page.on("response", async (response) => {
+      if (
+        /\/(StartAssistanceFileTransfer|GetAssistanceFileTransfer|CancelAssistanceFileTransfer)$/.test(
+          new URL(response.url()).pathname,
+        )
+      ) {
+        if (!response.ok()) return;
+        try {
+          const { transfer } = await response.json();
+          if (transfer) lastFileTransfer = transfer;
+        } catch {
+          // An aborted response is not file-transfer evidence.
+        }
+        return;
+      }
       if (!/\/(RunAssistanceCommand|GetAssistanceCommand)$/.test(new URL(response.url()).pathname))
         return;
       if (!response.ok()) return;
@@ -311,7 +337,8 @@ const commands = {
     await ui.click({ role: "tab", text: "Remote assistance" });
     await ui.select("Mode", label);
     await ui.fill({ label: "Maximum duration (minutes, 1 to 30)" }, String(args.minutes));
-    await ui.fill({ css: 'textarea[id$="-reason"]' }, args.reason);
+    // The unattended request form below has its own reason textarea.
+    await ui.fill({ label: "Reason (the user sees this; the audit log records it)" }, args.reason);
     for (const [label, option] of Object.entries(args.capabilities ?? {}))
       await ui.select(label, option);
     await ui.click({ role: "button", text: "Request remote assistance" });
@@ -520,6 +547,123 @@ const commands = {
     );
     return { ...refusal, actor };
   },
+  async fileSend(args) {
+    const source = resolve(config.evidenceDirectory, args.file ?? "");
+    if (dirname(source) !== config.evidenceDirectory || !source.endsWith(".txt"))
+      throw new Error("invalid_transfer_fixture_file");
+    const previous = lastFileTransfer?.requestId;
+    await driver.page.getByLabel("File to send", { exact: true }).setInputFiles(source);
+    await ui.click({ role: "button", text: "Send file" });
+    return until(
+      () => (lastFileTransfer?.requestId !== previous ? lastFileTransfer : null),
+      30_000,
+      "file_transfer_request_not_observed",
+    );
+  },
+  async fileRequest() {
+    if (!config.nativeFilePicker) throw new Error("native_operator_picker_required");
+    const previous = lastFileTransfer?.requestId ?? "";
+    await ui.click({ role: "button", text: "Request file" });
+    return { previous };
+  },
+  async fileCreated(args) {
+    return until(
+      () =>
+        lastFileTransfer?.requestId && lastFileTransfer.requestId !== args.previous
+          ? lastFileTransfer
+          : null,
+      30_000,
+      "file_transfer_request_not_observed",
+    );
+  },
+  async fileState(args) {
+    if (!lastFileTransfer || lastFileTransfer.requestId !== args.requestId)
+      throw new Error("file_transfer_request_not_observed");
+    return lastFileTransfer;
+  },
+  async fileCancel() {
+    await ui.click({ role: "button", text: "Cancel transfer" });
+    return {};
+  },
+  async fileRefuse(args) {
+    if (
+      !["direction", "permission", "policy", "size", "extension", "path"].includes(args.boundary) ||
+      !commandURL ||
+      !commandCSRF
+    )
+      throw new Error("invalid_file_refusal_probe");
+    const sessionId = /\/assistance\/([0-9a-f-]{36})$/.exec(
+      new URL(driver.page.url()).pathname,
+    )?.[1];
+    if (!sessionId) throw new Error("invalid_file_refusal_session");
+    if (
+      ["size", "extension", "path"].includes(args.boundary) &&
+      !/^lindm-file-[a-f0-9]{24}\.(txt|exe)$/.test(args.name ?? "")
+    )
+      throw new Error("invalid_file_refusal_name");
+    const actor = await commands.identity();
+    // An ended session's record has no file controls at all; absent is
+    // unavailable (the policy boundary ends the session first).
+    const unavailable = async (name) => {
+      const button = driver.page.getByRole("button", { name, exact: true });
+      return (await button.count()) === 0 || (await button.isDisabled());
+    };
+    const actions = {
+      sendDisabled: await unavailable("Send file"),
+      requestDisabled: await unavailable("Request file"),
+    };
+    if (args.boundary === "permission" && (!actions.sendDisabled || !actions.requestDisabled))
+      throw new Error("unauthorized_file_action_enabled");
+    if (args.boundary === "direction" && !actions.requestDisabled)
+      throw new Error("limited_outgoing_file_action_enabled");
+    const refusal = await driver.page.evaluate(
+      async ({ url, csrf, sessionId, boundary, name }) => {
+        const requestId = crypto.randomUUID();
+        const transfer = { requestId, direction: "ASSISTANCE_FILE_DIRECTION_FROM_USER" };
+        if (["size", "extension", "path"].includes(boundary)) {
+          transfer.direction = "ASSISTANCE_FILE_DIRECTION_TO_USER";
+          transfer.file = {
+            name: boundary === "path" ? "../" + name : name,
+            size: boundary === "size" ? "1025" : "1",
+            mimeType: "text/plain",
+            sha256: btoa(String.fromCharCode(...new Uint8Array(32))),
+          };
+        }
+        const response = await fetch(
+          url.replace(/\/RunAssistanceCommand$/, "/StartAssistanceFileTransfer"),
+          {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: {
+              "Content-Type": "application/json",
+              "Connect-Protocol-Version": "1",
+              "X-CSRF-Token": csrf,
+            },
+            body: JSON.stringify({ sessionId, transfer }),
+          },
+        );
+        const body = await response.json();
+        const code =
+          boundary === "permission"
+            ? "not_found"
+            : boundary === "path"
+              ? "invalid_argument"
+              : "failed_precondition";
+        if (response.ok || body.code !== code) throw new Error("file_refusal_not_observed");
+        return {
+          requestId,
+          boundary,
+          code: body.code,
+          reason: response.headers.get("Lindm-Reason"),
+          httpStatus: response.status,
+          metadata: transfer.file,
+        };
+      },
+      { url: commandURL, csrf: commandCSRF, sessionId, boundary: args.boundary, name: args.name },
+    );
+    return { ...refusal, actor, actions };
+  },
   async clipboardSend(args) {
     if (!/^[a-f0-9]{24}$/.test(args.text ?? "")) throw new Error("invalid_fixture_nonce");
     await driver.page.evaluate((text) => navigator.clipboard.writeText(text), args.text);
@@ -662,7 +806,102 @@ const commands = {
     await driver.goto(`${config.origin}/devices/${args.deviceId}`);
     return {};
   },
+  // Sets one Tier 3 desktop gate through the console's own policy dialog; the
+  // next session's end detail is the server-side oracle.
+  async desktopPolicy(args) {
+    if (!/^[0-9a-f-]{36}$/.test(args.deviceId ?? "")) throw new Error("invalid_device");
+    const label = { kde_plasma: "KDE Plasma (Wayland)", x11: "X11 sessions" }[args.gate];
+    const option = { off: "Off", limited: "View only", on: "View and control" }[args.mode];
+    if (!label || !option) throw new Error("invalid_desktop_policy");
+    const step = async (code, action) => {
+      try {
+        return await action();
+      } catch {
+        throw new Error(code);
+      }
+    };
+    await driver.goto(`${config.origin}/devices/${args.deviceId}`);
+    await step("device_assistance_unavailable", () =>
+      ui.click({ role: "tab", text: "Remote assistance" }),
+    );
+    await step("policy_dialog_unavailable", () =>
+      ui.click({ role: "button", text: "Assistance policy" }),
+    );
+    await step("policy_dialog_not_open", () =>
+      ui.wait({ role: "button", text: "Save policy", dialog: true, enabled: true }),
+    );
+    await step("desktop_gate_unavailable", () => ui.select(label, option, true));
+    await step("policy_save_unavailable", () =>
+      ui.click({ role: "button", text: "Save policy", dialog: true }),
+    );
+    // The dialog closes only after the server accepted the policy; a refused
+    // save keeps it open with its error.
+    await step("policy_save_unconfirmed", () =>
+      until(
+        async () => {
+          const open = await driver.find({ css: '[role="dialog"]', first: true });
+          if (!open) return true;
+          await open.dispose();
+          return false;
+        },
+        config.actionTimeoutMs,
+        "policy_dialog_still_open",
+      ),
+    );
+    return {};
+  },
 };
+
+Object.assign(
+  commands,
+  createFileIsolationCommands({
+    get driver() {
+      return driver;
+    },
+    get ui() {
+      return ui;
+    },
+    get evidenceDirectory() {
+      return config.evidenceDirectory;
+    },
+    identity: () => commands.identity(),
+    commandAuthority: () => ({ url: commandURL, csrf: commandCSRF }),
+  }),
+);
+
+Object.assign(
+  commands,
+  createAssistanceFileSafetyCommands({
+    driver: () => driver,
+    ui: () => ui,
+    evidenceDirectory: () => config.evidenceDirectory,
+    identity: () => commands.identity(),
+    commandAuthority: () => ({ url: commandURL, csrf: commandCSRF }),
+  }),
+);
+
+Object.assign(
+  commands,
+  createTierThreeCommands({
+    driver: () => driver,
+    ui: () => ui,
+    origin: () => config.origin,
+    identity: () => commands.identity(),
+    surface: SURFACE,
+    until,
+    completedCommand,
+  }),
+);
+
+Object.assign(
+  commands,
+  createWorkflowCommands({
+    driver: () => driver,
+    ui: () => ui,
+    origin: () => config.origin,
+    identity: () => commands.identity(),
+  }),
+);
 
 function failure(error) {
   return {
@@ -720,6 +959,10 @@ try {
   config.browserArgs = config.turnTcpOnly
     ? ["--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
     : [];
+  if (config.nativeFilePicker !== undefined && typeof config.nativeFilePicker !== "boolean")
+    throw new Error("invalid_native_file_picker");
+  config.headless = config.nativeFilePicker !== true;
+  if (config.nativeFilePicker) config.browserArgs.push("--ozone-platform=x11");
 } catch (error) {
   await new Promise((done) =>
     process.stdout.write(

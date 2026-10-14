@@ -70,8 +70,11 @@ func (s *Service) refreshAssistanceAuthority(ctx context.Context, q *devicedb.Qu
 			if err != nil {
 				return err
 			}
-			if !proto.Equal(effective, intersectAssistancePolicy(effective, intersectAssistancePolicy(policy, s.AssistanceCeiling))) {
+			current := intersectAssistancePolicy(policy, s.AssistanceCeiling)
+			if !proto.Equal(effective, intersectAssistancePolicy(effective, current)) {
 				reason = "policy_changed"
+			} else if reason, err = s.checkUnattendedConnection(ctx, q, row, authorization.Principal(), current, now); err != nil {
+				return err
 			}
 		}
 	}

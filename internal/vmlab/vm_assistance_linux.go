@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -63,6 +64,10 @@ type VMAssistanceOptions struct {
 	PersistentDir string
 	FixtureDir    string
 	ExistingOwner bool
+	// X11 logs the lab user into the golden desktop's X11 session instead of
+	// its Wayland session; the helper's X11 gate then applies.
+	X11              bool
+	nativeFilePicker bool
 	// RebootPolicy selects separate reboot qualification using this desktop
 	// fixture. It never qualifies remote assistance or a persistent demo.
 	RebootPolicy *VMRebootPolicyResult
@@ -88,9 +93,19 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err != nil {
 		return nil, err
 	}
+	if options.X11 {
+		if desktop, err = desktop.x11Variant(release.Lab.Session.ForDesktop(desktop.name)); err != nil {
+			return nil, err
+		}
+	}
 	if err := assistanceAdmission(release, desktop); err != nil {
 		return nil, err
 	}
+	// A non-default desktop of the golden brings its own session entries,
+	// terminal and capture stack (the KDE variant installs no GNOME stack).
+	variant := *release
+	variant.Lab.Session = release.Lab.Session.ForDesktop(desktop.goldenName())
+	release = &variant
 	if options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.Desktop || !options.Encrypted.Hardware.AllowNetwork {
 		return nil, errors.New("assistance lane requires an installer desktop, a lab display and signed-package egress")
 	}
@@ -115,7 +130,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	result = &VMAssistanceResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), Distribution: manifest.GetDistribution(), DesktopProfile: desktop.name, Architecture: manifest.GetArchitecture(), StartedAt: time.Now().UTC(), Boundaries: []string{
 		"One disposable QEMU guest (virtio-gpu, usb-tablet, virtual keyboard); local-user consent and stop clicks are QMP absolute-pointer input located from QMP screendumps, not a human at a physical display.",
 		"Relayed media stays on the lab host: guest UDP reaches the embedded TURN listener through QEMU user networking (10.0.2.2 to host loopback); NAT traversal, public relays and multi-host paths are not qualified.",
-		"The operator browser is headless Playwright Chromium on the lab host with a virtual WebAuthn authenticator; other browsers are not qualified by this lane.",
+		"The operator uses Playwright Chromium with a virtual WebAuthn authenticator. File scenarios use an isolated authenticated Xvfb and real native save picker; other scenarios are headless unless sharing that browser. Other browsers are not qualified.",
 		"Media and control proofs are the console's own WebRTC statistics and decoded frames plus a guest-side typed nonce; video quality, latency and bandwidth are not qualified.",
 		"Idle blanking and automatic lock are disabled in the lab " + desktop.name + " session; the lock scenario uses loginctl lock-session.",
 		"Scenarios that must end UNAVAILABLE prove the visible refusal before consent on this desktop, not that the capability works.",
@@ -123,7 +138,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		"The GTK witness requires and records GdkWaylandDisplay, observed UID and logind display-session identity. XWayland applications and Wayland/XWayland clipboard interoperability are not qualified.",
 		"Mandatory native negative witnesses cover per-device policy revocation, a real custom-role creator with remote_assistance.view and remote_assistance.control but no remote_assistance.clipboard, denied direction, and oversized/ended-session RPC refusals with independent fresh unchanged GTK clipboard observations; modifier release and selected-monitor hot-unplug are also required. Selected subsets do not inherit these proofs.",
 		"The policy scenario exercises an administrative per-device POLICY downgrade and matching session revocation. Neither agent nor deployment CONFIG ceiling restriction is exercised; both configured ceilings remain ON. FD cancellation and unmappable-Unicode injection remain separate deterministic criteria, not native passes.",
-		"Two-head qualification requires two active native GDK monitors backed by distinct virtio-gpu scanouts activated with private RFB SetDesktopSize. No physical multi-monitor, other compositor, IME, file transfer or secure-attention claim is made.",
+		"Two-head qualification requires two active native GDK monitors backed by distinct virtio-gpu scanouts activated with private RFB SetDesktopSize. No physical multi-monitor, other compositor, IME or secure-attention claim is made.",
 	}}
 	if options.ControlPlane != nil {
 		options.ConsoleTURNTCP = true
@@ -139,7 +154,10 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 			err = verifyAssistanceEvidence(options.EvidenceDir, result)
 		}
 		result.Passed = err == nil && options.RebootPolicy == nil
-		result.TierOnePassed = result.Passed && len(result.Witnesses) == 6 && len(result.NotRun) == 0 && completeAssistanceNativeBoundaries(result)
+		result.TierOnePassed = result.Passed && completeAssistanceTierOne(result)
+		result.FilesPassed = result.TierOnePassed && completeAssistanceFiles(result)
+		result.WorkflowsPassed = result.TierOnePassed && completeAssistanceWorkflows(result)
+		result.TierThreePassed = result.TierOnePassed && completeAssistanceTierThree(result)
 		if err != nil {
 			result.Failure = err.Error()
 		}
@@ -170,7 +188,16 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		selected = append(selected, scenario)
 	}
 	scenarios = selected
-	if slices.ContainsFunc(scenarios, func(scenario assistanceScenarioSpec) bool { return scenario.name == "monitors" }) {
+	if options.Scenarios != nil && options.Hold == nil && options.RebootPolicy == nil {
+		for _, scenario := range scenarios {
+			result.SelectedScenarios = append(result.SelectedScenarios, scenario.name)
+		}
+		result.Boundaries = append(result.Boundaries, "Subset record: only selected_scenarios ran; passed covers exactly those scenarios. tier_one_passed, files_passed, tier_two_workflows_passed and tier_three_passed remain false.")
+	}
+	options.nativeFilePicker = slices.ContainsFunc(scenarios, func(scenario assistanceScenarioSpec) bool { return scenario.capability == platform.AssistanceFiles })
+	if slices.ContainsFunc(scenarios, func(scenario assistanceScenarioSpec) bool {
+		return scenario.name == "monitors" || scenario.name == "annotation-monitors"
+	}) {
 		hardware := *options.Encrypted.Hardware
 		hardware.DisplayHeads = 2
 		options.Encrypted.Hardware = &hardware
@@ -204,6 +231,13 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		return result, err
 	}
 	defer func() { err = errors.Join(err, fixture.Close()) }()
+	// Runs before Close removes the log: the lab's owner RPCs report only a
+	// code ("update assistance policy failed", layers-fedora44-tier2-02).
+	defer func() {
+		if err != nil && options.ControlPlane == nil {
+			err = errors.Join(err, keepAssistanceServerLog(fixture, options.EvidenceDir))
+		}
+	}()
 	result.Database, result.Relay = fixture.DatabaseName, relay
 	control, err := openVMControlPlane(ctx, options.Repository, fixture)
 	if err != nil {
@@ -309,7 +343,7 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if result.Guest.Capabilities, err = observeAssistanceCapabilities(ctx, vm.guest, desktop); err != nil {
 		return result, err
 	}
-	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result}
+	screen := &assistanceScreen{vm: vm.guest, evidence: evidence, result: result, area: desktop.area}
 	if _, err := screen.captureReference(ctx, "desktop-reference"); err != nil {
 		return result, err
 	}
@@ -376,15 +410,43 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 		}
 	}()
 	run.result.Browser.Version = run.browser.version
-	for _, scenario := range scenarios {
+	for i, scenario := range scenarios {
+		// A logout or reboot leaves the latest inventory without a desktop, so
+		// the console hides the request form until the current desktop is
+		// published again (layers-fedora44-reconnect-09 reconnect-expired).
+		if i > 0 && assistanceInterruptsSession(scenarios[i-1].name) {
+			if _, err := awaitAssistanceReadiness(ctx, run.vm.guest, run.owner, run.deviceID); err != nil {
+				return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
+			}
+		}
 		if scenario.name == "authority-view" || scenario.name == "authority-control" {
 			if err := run.modeAuthorityScenario(ctx, fixture, options, private, scenario); err != nil {
 				return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
 			}
 			continue
 		}
-		if scenario.name == "clipboard-permission" {
-			if err := run.restrictedClipboardScenario(ctx, fixture, options, private, scenario); err != nil {
+		if assistanceTierThreeScenario(scenario.name) {
+			if err := run.tierThreeScenario(ctx, scenario); err != nil {
+				current := run.result.Scenarios[len(run.result.Scenarios)-1]
+				capture, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+				screenshotErr := run.browserScreenshot(capture, current, "failure")
+				cancel()
+				return errors.Join(fmt.Errorf("assistance scenario %s: %w", scenario.name, err), screenshotErr)
+			}
+			continue
+		}
+		if assistanceWorkflowScenario(scenario.name) {
+			if err := run.workflowScenario(ctx, fixture, options, private, scenario); err != nil {
+				current := run.result.Scenarios[len(run.result.Scenarios)-1]
+				capture, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+				screenshotErr := run.browserScreenshot(capture, current, "failure")
+				cancel()
+				return errors.Join(fmt.Errorf("assistance scenario %s: %w", scenario.name, err), screenshotErr)
+			}
+			continue
+		}
+		if scenario.name == "clipboard-permission" || scenario.name == "files-permission" {
+			if err := run.restrictedCapabilityScenario(ctx, fixture, options, private, scenario); err != nil {
 				return fmt.Errorf("assistance scenario %s: %w", scenario.name, err)
 			}
 			continue
@@ -401,6 +463,12 @@ func runAssistanceScenarios(ctx context.Context, run *assistanceRun, fixture *de
 		}
 	}
 	return nil
+}
+
+// assistanceInterruptsSession names scenarios that log out or reboot the
+// lane's desktop.
+func assistanceInterruptsSession(name string) bool {
+	return strings.HasPrefix(name, "reconnect-") || name == "unattended-lock"
 }
 
 // selectAssistanceScenarios keeps the desktop's lane order and rejects
@@ -441,6 +509,7 @@ func openAssistanceOperator(ctx context.Context, fixture *devlab.AuthorityFixtur
 	if options.ControlPlane != nil {
 		cfg.ForwardedTURNURL = options.ControlPlane.forwardedTURNURL()
 	}
+	cfg.NativeFilePicker = options.nativeFilePicker && role == "owner"
 	browser, err := startAssistanceBrowser(ctx, VMBuildRepository(options.Repository, options.BuildRepository), private, cfg)
 	cfg.Password, cfg.EnrollmentSecret = "", ""
 	if browser != nil {
@@ -461,6 +530,9 @@ type assistanceScenarioSpec struct {
 	// cannot serve; such a session must end before any consent prompt.
 	detail     string
 	capability platform.Capability
+	// desktopGateOff turns the desktop's Tier 3 gate off in device policy
+	// for this one request and restores the full lab policy afterwards.
+	desktopGateOff bool
 }
 
 var assistanceScenarios = []assistanceScenarioSpec{
@@ -480,6 +552,37 @@ var assistanceScenarios = []assistanceScenarioSpec{
 	{name: "display", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceDisplays},
 	{name: "message", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceMessages},
 	{name: "monitors", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceDisplays},
+	{name: "files", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-cancel", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-limited", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-filesystem", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-limits", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-interrupted", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "files-policy", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, capability: platform.AssistanceFiles},
+	{name: "files-permission", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceFiles},
+	{name: "recording", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceRecording},
+	{name: "recording-declined", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceRecording},
+	{name: "recording-refused", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, capability: platform.AssistanceRecording},
+	{name: "recording-storage", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, capability: platform.AssistanceRecording},
+	{name: "recording-permission", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceRecording},
+	{name: "recording-retention", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceRecording},
+	// A reconnect's first session ends by the real interruption; cause is the
+	// linked session's own end.
+	{name: "reconnect-logout", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceReconnect},
+	{name: "reconnect-reboot", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceReconnect},
+	{name: "reconnect-declined", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, capability: platform.AssistanceReconnect},
+	{name: "reconnect-expired", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, capability: platform.AssistanceReconnect},
+	{name: "reconnect-revoked", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, capability: platform.AssistanceReconnect},
+	{name: "elevation", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceElevation},
+	{name: "annotation", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceAnnotation},
+	{name: "annotation-monitors", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceAnnotation},
+	{name: "audio", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceAudio},
+	{name: "audio-declined", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceAudio},
+	// Unattended connections end by the local turn-off, an operator stop
+	// after a reboot, or server revocation.
+	{name: "unattended", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED, capability: platform.AssistanceUnattended},
+	{name: "unattended-lock", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_OPERATOR_STOPPED, capability: platform.AssistanceUnattended},
+	{name: "unattended-revoked", mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, capability: platform.AssistanceUnattended},
 }
 
 // unavailableScenarios are a desktop's visible pre-consent refusals.
@@ -505,12 +608,14 @@ var assistanceAuditExpectations = map[string][]string{
 	"clipboard-permission": {"assistance.request", "assistance.prompt", "assistance.consent", "assistance.join", "assistance.answer", "assistance.start", "assistance.clipboard", "assistance.stop"},
 	"view-unavailable":     {"assistance.request"},
 	"control-unavailable":  {"assistance.request"},
+	"desktop-policy-off":   {"assistance.request"},
 }
 
 // assistanceAuditForbidden are audit actions a scenario must never leave.
 var assistanceAuditForbidden = map[string][]string{
 	"view-unavailable":    {"assistance.prompt", "assistance.consent", "assistance.start"},
 	"control-unavailable": {"assistance.prompt", "assistance.consent", "assistance.start"},
+	"desktop-policy-off":  {"assistance.prompt", "assistance.consent", "assistance.start"},
 }
 
 func assistanceCauseText(cause agentv1.AssistanceEndCause) string {
@@ -541,4 +646,15 @@ func assistanceAdmission(release *platform.Release, desktop *labDesktop) error {
 // refusal, so no session on it ever captures.
 func (d *labDesktop) refusalOnly() bool {
 	return len(d.assistance) != 0 && !slices.ContainsFunc(d.assistance, func(spec assistanceScenarioSpec) bool { return spec.detail == "" })
+}
+
+// keepAssistanceServerLog writes the isolated lindmd's bounded log tail into
+// the private evidence directory of a failed lane. It is never bound into the
+// record.
+func keepAssistanceServerLog(fixture *devlab.AuthorityFixture, dir string) error {
+	tail, err := fixture.ServerLogTail()
+	if err != nil {
+		return fmt.Errorf("collect private fixture server log: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, "server-log-tail.jsonl"), tail, 0o600)
 }

@@ -252,6 +252,39 @@ const (
 	// AdminServiceGetAssistanceCommandProcedure is the fully-qualified name of the AdminService's
 	// GetAssistanceCommand RPC.
 	AdminServiceGetAssistanceCommandProcedure = "/lindm.admin.v1.AdminService/GetAssistanceCommand"
+	// AdminServiceStartAssistanceFileTransferProcedure is the fully-qualified name of the
+	// AdminService's StartAssistanceFileTransfer RPC.
+	AdminServiceStartAssistanceFileTransferProcedure = "/lindm.admin.v1.AdminService/StartAssistanceFileTransfer"
+	// AdminServiceGetAssistanceFileTransferProcedure is the fully-qualified name of the AdminService's
+	// GetAssistanceFileTransfer RPC.
+	AdminServiceGetAssistanceFileTransferProcedure = "/lindm.admin.v1.AdminService/GetAssistanceFileTransfer"
+	// AdminServiceCancelAssistanceFileTransferProcedure is the fully-qualified name of the
+	// AdminService's CancelAssistanceFileTransfer RPC.
+	AdminServiceCancelAssistanceFileTransferProcedure = "/lindm.admin.v1.AdminService/CancelAssistanceFileTransfer"
+	// AdminServiceReconnectAssistanceSessionProcedure is the fully-qualified name of the AdminService's
+	// ReconnectAssistanceSession RPC.
+	AdminServiceReconnectAssistanceSessionProcedure = "/lindm.admin.v1.AdminService/ReconnectAssistanceSession"
+	// AdminServiceListAssistanceRecordingsProcedure is the fully-qualified name of the AdminService's
+	// ListAssistanceRecordings RPC.
+	AdminServiceListAssistanceRecordingsProcedure = "/lindm.admin.v1.AdminService/ListAssistanceRecordings"
+	// AdminServiceOpenAssistanceRecordingProcedure is the fully-qualified name of the AdminService's
+	// OpenAssistanceRecording RPC.
+	AdminServiceOpenAssistanceRecordingProcedure = "/lindm.admin.v1.AdminService/OpenAssistanceRecording"
+	// AdminServiceReadAssistanceRecordingProcedure is the fully-qualified name of the AdminService's
+	// ReadAssistanceRecording RPC.
+	AdminServiceReadAssistanceRecordingProcedure = "/lindm.admin.v1.AdminService/ReadAssistanceRecording"
+	// AdminServiceDeleteAssistanceRecordingProcedure is the fully-qualified name of the AdminService's
+	// DeleteAssistanceRecording RPC.
+	AdminServiceDeleteAssistanceRecordingProcedure = "/lindm.admin.v1.AdminService/DeleteAssistanceRecording"
+	// AdminServiceAuthorizeUnattendedAssistanceProcedure is the fully-qualified name of the
+	// AdminService's AuthorizeUnattendedAssistance RPC.
+	AdminServiceAuthorizeUnattendedAssistanceProcedure = "/lindm.admin.v1.AdminService/AuthorizeUnattendedAssistance"
+	// AdminServiceListUnattendedAssistanceProcedure is the fully-qualified name of the AdminService's
+	// ListUnattendedAssistance RPC.
+	AdminServiceListUnattendedAssistanceProcedure = "/lindm.admin.v1.AdminService/ListUnattendedAssistance"
+	// AdminServiceRevokeUnattendedAssistanceProcedure is the fully-qualified name of the AdminService's
+	// RevokeUnattendedAssistance RPC.
+	AdminServiceRevokeUnattendedAssistanceProcedure = "/lindm.admin.v1.AdminService/RevokeUnattendedAssistance"
 	// AdminServiceGetAssistanceReadinessProcedure is the fully-qualified name of the AdminService's
 	// GetAssistanceReadiness RPC.
 	AdminServiceGetAssistanceReadinessProcedure = "/lindm.admin.v1.AdminService/GetAssistanceReadiness"
@@ -408,6 +441,21 @@ type AdminServiceClient interface {
 	UpdateAssistancePolicy(context.Context, *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error)
 	RunAssistanceCommand(context.Context, *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error)
 	GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error)
+	StartAssistanceFileTransfer(context.Context, *connect.Request[v1.StartAssistanceFileTransferRequest]) (*connect.Response[v1.StartAssistanceFileTransferResponse], error)
+	GetAssistanceFileTransfer(context.Context, *connect.Request[v1.GetAssistanceFileTransferRequest]) (*connect.Response[v1.GetAssistanceFileTransferResponse], error)
+	CancelAssistanceFileTransfer(context.Context, *connect.Request[v1.CancelAssistanceFileTransferRequest]) (*connect.Response[v1.CancelAssistanceFileTransferResponse], error)
+	ReconnectAssistanceSession(context.Context, *connect.Request[v1.ReconnectAssistanceSessionRequest]) (*connect.Response[v1.ReconnectAssistanceSessionResponse], error)
+	// Recording metadata is fleet-readable; content and deletion require their
+	// own scoped permissions and never grant live assistance.
+	ListAssistanceRecordings(context.Context, *connect.Request[v1.ListAssistanceRecordingsRequest]) (*connect.Response[v1.ListAssistanceRecordingsResponse], error)
+	OpenAssistanceRecording(context.Context, *connect.Request[v1.OpenAssistanceRecordingRequest]) (*connect.Response[v1.OpenAssistanceRecordingResponse], error)
+	ReadAssistanceRecording(context.Context, *connect.Request[v1.ReadAssistanceRecordingRequest]) (*connect.Response[v1.ReadAssistanceRecordingResponse], error)
+	DeleteAssistanceRecording(context.Context, *connect.Request[v1.DeleteAssistanceRecordingRequest]) (*connect.Response[v1.DeleteAssistanceRecordingResponse], error)
+	// Consumes an approval decided by a different person with
+	// remote_assistance.unattended.approve; the requester never approves.
+	AuthorizeUnattendedAssistance(context.Context, *connect.Request[v1.AuthorizeUnattendedAssistanceRequest]) (*connect.Response[v1.AuthorizeUnattendedAssistanceResponse], error)
+	ListUnattendedAssistance(context.Context, *connect.Request[v1.ListUnattendedAssistanceRequest]) (*connect.Response[v1.ListUnattendedAssistanceResponse], error)
+	RevokeUnattendedAssistance(context.Context, *connect.Request[v1.RevokeUnattendedAssistanceRequest]) (*connect.Response[v1.RevokeUnattendedAssistanceResponse], error)
 	// Whether a new request can reach a person on the device, and the evidence.
 	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
@@ -890,6 +938,72 @@ func NewAdminServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(adminServiceMethods.ByName("GetAssistanceCommand")),
 			connect.WithClientOptions(opts...),
 		),
+		startAssistanceFileTransfer: connect.NewClient[v1.StartAssistanceFileTransferRequest, v1.StartAssistanceFileTransferResponse](
+			httpClient,
+			baseURL+AdminServiceStartAssistanceFileTransferProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("StartAssistanceFileTransfer")),
+			connect.WithClientOptions(opts...),
+		),
+		getAssistanceFileTransfer: connect.NewClient[v1.GetAssistanceFileTransferRequest, v1.GetAssistanceFileTransferResponse](
+			httpClient,
+			baseURL+AdminServiceGetAssistanceFileTransferProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("GetAssistanceFileTransfer")),
+			connect.WithClientOptions(opts...),
+		),
+		cancelAssistanceFileTransfer: connect.NewClient[v1.CancelAssistanceFileTransferRequest, v1.CancelAssistanceFileTransferResponse](
+			httpClient,
+			baseURL+AdminServiceCancelAssistanceFileTransferProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("CancelAssistanceFileTransfer")),
+			connect.WithClientOptions(opts...),
+		),
+		reconnectAssistanceSession: connect.NewClient[v1.ReconnectAssistanceSessionRequest, v1.ReconnectAssistanceSessionResponse](
+			httpClient,
+			baseURL+AdminServiceReconnectAssistanceSessionProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ReconnectAssistanceSession")),
+			connect.WithClientOptions(opts...),
+		),
+		listAssistanceRecordings: connect.NewClient[v1.ListAssistanceRecordingsRequest, v1.ListAssistanceRecordingsResponse](
+			httpClient,
+			baseURL+AdminServiceListAssistanceRecordingsProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListAssistanceRecordings")),
+			connect.WithClientOptions(opts...),
+		),
+		openAssistanceRecording: connect.NewClient[v1.OpenAssistanceRecordingRequest, v1.OpenAssistanceRecordingResponse](
+			httpClient,
+			baseURL+AdminServiceOpenAssistanceRecordingProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("OpenAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
+		readAssistanceRecording: connect.NewClient[v1.ReadAssistanceRecordingRequest, v1.ReadAssistanceRecordingResponse](
+			httpClient,
+			baseURL+AdminServiceReadAssistanceRecordingProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ReadAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAssistanceRecording: connect.NewClient[v1.DeleteAssistanceRecordingRequest, v1.DeleteAssistanceRecordingResponse](
+			httpClient,
+			baseURL+AdminServiceDeleteAssistanceRecordingProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("DeleteAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
+		authorizeUnattendedAssistance: connect.NewClient[v1.AuthorizeUnattendedAssistanceRequest, v1.AuthorizeUnattendedAssistanceResponse](
+			httpClient,
+			baseURL+AdminServiceAuthorizeUnattendedAssistanceProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("AuthorizeUnattendedAssistance")),
+			connect.WithClientOptions(opts...),
+		),
+		listUnattendedAssistance: connect.NewClient[v1.ListUnattendedAssistanceRequest, v1.ListUnattendedAssistanceResponse](
+			httpClient,
+			baseURL+AdminServiceListUnattendedAssistanceProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("ListUnattendedAssistance")),
+			connect.WithClientOptions(opts...),
+		),
+		revokeUnattendedAssistance: connect.NewClient[v1.RevokeUnattendedAssistanceRequest, v1.RevokeUnattendedAssistanceResponse](
+			httpClient,
+			baseURL+AdminServiceRevokeUnattendedAssistanceProcedure,
+			connect.WithSchema(adminServiceMethods.ByName("RevokeUnattendedAssistance")),
+			connect.WithClientOptions(opts...),
+		),
 		getAssistanceReadiness: connect.NewClient[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse](
 			httpClient,
 			baseURL+AdminServiceGetAssistanceReadinessProcedure,
@@ -1124,6 +1238,17 @@ type adminServiceClient struct {
 	updateAssistancePolicy               *connect.Client[v1.UpdateAssistancePolicyRequest, v1.UpdateAssistancePolicyResponse]
 	runAssistanceCommand                 *connect.Client[v1.RunAssistanceCommandRequest, v1.RunAssistanceCommandResponse]
 	getAssistanceCommand                 *connect.Client[v1.GetAssistanceCommandRequest, v1.GetAssistanceCommandResponse]
+	startAssistanceFileTransfer          *connect.Client[v1.StartAssistanceFileTransferRequest, v1.StartAssistanceFileTransferResponse]
+	getAssistanceFileTransfer            *connect.Client[v1.GetAssistanceFileTransferRequest, v1.GetAssistanceFileTransferResponse]
+	cancelAssistanceFileTransfer         *connect.Client[v1.CancelAssistanceFileTransferRequest, v1.CancelAssistanceFileTransferResponse]
+	reconnectAssistanceSession           *connect.Client[v1.ReconnectAssistanceSessionRequest, v1.ReconnectAssistanceSessionResponse]
+	listAssistanceRecordings             *connect.Client[v1.ListAssistanceRecordingsRequest, v1.ListAssistanceRecordingsResponse]
+	openAssistanceRecording              *connect.Client[v1.OpenAssistanceRecordingRequest, v1.OpenAssistanceRecordingResponse]
+	readAssistanceRecording              *connect.Client[v1.ReadAssistanceRecordingRequest, v1.ReadAssistanceRecordingResponse]
+	deleteAssistanceRecording            *connect.Client[v1.DeleteAssistanceRecordingRequest, v1.DeleteAssistanceRecordingResponse]
+	authorizeUnattendedAssistance        *connect.Client[v1.AuthorizeUnattendedAssistanceRequest, v1.AuthorizeUnattendedAssistanceResponse]
+	listUnattendedAssistance             *connect.Client[v1.ListUnattendedAssistanceRequest, v1.ListUnattendedAssistanceResponse]
+	revokeUnattendedAssistance           *connect.Client[v1.RevokeUnattendedAssistanceRequest, v1.RevokeUnattendedAssistanceResponse]
 	getAssistanceReadiness               *connect.Client[v1.GetAssistanceReadinessRequest, v1.GetAssistanceReadinessResponse]
 	getDeviceEncryption                  *connect.Client[v1.GetDeviceEncryptionRequest, v1.GetDeviceEncryptionResponse]
 	listDeviceStorageTargets             *connect.Client[v1.ListDeviceStorageTargetsRequest, v1.ListDeviceStorageTargetsResponse]
@@ -1519,6 +1644,61 @@ func (c *adminServiceClient) GetAssistanceCommand(ctx context.Context, req *conn
 	return c.getAssistanceCommand.CallUnary(ctx, req)
 }
 
+// StartAssistanceFileTransfer calls lindm.admin.v1.AdminService.StartAssistanceFileTransfer.
+func (c *adminServiceClient) StartAssistanceFileTransfer(ctx context.Context, req *connect.Request[v1.StartAssistanceFileTransferRequest]) (*connect.Response[v1.StartAssistanceFileTransferResponse], error) {
+	return c.startAssistanceFileTransfer.CallUnary(ctx, req)
+}
+
+// GetAssistanceFileTransfer calls lindm.admin.v1.AdminService.GetAssistanceFileTransfer.
+func (c *adminServiceClient) GetAssistanceFileTransfer(ctx context.Context, req *connect.Request[v1.GetAssistanceFileTransferRequest]) (*connect.Response[v1.GetAssistanceFileTransferResponse], error) {
+	return c.getAssistanceFileTransfer.CallUnary(ctx, req)
+}
+
+// CancelAssistanceFileTransfer calls lindm.admin.v1.AdminService.CancelAssistanceFileTransfer.
+func (c *adminServiceClient) CancelAssistanceFileTransfer(ctx context.Context, req *connect.Request[v1.CancelAssistanceFileTransferRequest]) (*connect.Response[v1.CancelAssistanceFileTransferResponse], error) {
+	return c.cancelAssistanceFileTransfer.CallUnary(ctx, req)
+}
+
+// ReconnectAssistanceSession calls lindm.admin.v1.AdminService.ReconnectAssistanceSession.
+func (c *adminServiceClient) ReconnectAssistanceSession(ctx context.Context, req *connect.Request[v1.ReconnectAssistanceSessionRequest]) (*connect.Response[v1.ReconnectAssistanceSessionResponse], error) {
+	return c.reconnectAssistanceSession.CallUnary(ctx, req)
+}
+
+// ListAssistanceRecordings calls lindm.admin.v1.AdminService.ListAssistanceRecordings.
+func (c *adminServiceClient) ListAssistanceRecordings(ctx context.Context, req *connect.Request[v1.ListAssistanceRecordingsRequest]) (*connect.Response[v1.ListAssistanceRecordingsResponse], error) {
+	return c.listAssistanceRecordings.CallUnary(ctx, req)
+}
+
+// OpenAssistanceRecording calls lindm.admin.v1.AdminService.OpenAssistanceRecording.
+func (c *adminServiceClient) OpenAssistanceRecording(ctx context.Context, req *connect.Request[v1.OpenAssistanceRecordingRequest]) (*connect.Response[v1.OpenAssistanceRecordingResponse], error) {
+	return c.openAssistanceRecording.CallUnary(ctx, req)
+}
+
+// ReadAssistanceRecording calls lindm.admin.v1.AdminService.ReadAssistanceRecording.
+func (c *adminServiceClient) ReadAssistanceRecording(ctx context.Context, req *connect.Request[v1.ReadAssistanceRecordingRequest]) (*connect.Response[v1.ReadAssistanceRecordingResponse], error) {
+	return c.readAssistanceRecording.CallUnary(ctx, req)
+}
+
+// DeleteAssistanceRecording calls lindm.admin.v1.AdminService.DeleteAssistanceRecording.
+func (c *adminServiceClient) DeleteAssistanceRecording(ctx context.Context, req *connect.Request[v1.DeleteAssistanceRecordingRequest]) (*connect.Response[v1.DeleteAssistanceRecordingResponse], error) {
+	return c.deleteAssistanceRecording.CallUnary(ctx, req)
+}
+
+// AuthorizeUnattendedAssistance calls lindm.admin.v1.AdminService.AuthorizeUnattendedAssistance.
+func (c *adminServiceClient) AuthorizeUnattendedAssistance(ctx context.Context, req *connect.Request[v1.AuthorizeUnattendedAssistanceRequest]) (*connect.Response[v1.AuthorizeUnattendedAssistanceResponse], error) {
+	return c.authorizeUnattendedAssistance.CallUnary(ctx, req)
+}
+
+// ListUnattendedAssistance calls lindm.admin.v1.AdminService.ListUnattendedAssistance.
+func (c *adminServiceClient) ListUnattendedAssistance(ctx context.Context, req *connect.Request[v1.ListUnattendedAssistanceRequest]) (*connect.Response[v1.ListUnattendedAssistanceResponse], error) {
+	return c.listUnattendedAssistance.CallUnary(ctx, req)
+}
+
+// RevokeUnattendedAssistance calls lindm.admin.v1.AdminService.RevokeUnattendedAssistance.
+func (c *adminServiceClient) RevokeUnattendedAssistance(ctx context.Context, req *connect.Request[v1.RevokeUnattendedAssistanceRequest]) (*connect.Response[v1.RevokeUnattendedAssistanceResponse], error) {
+	return c.revokeUnattendedAssistance.CallUnary(ctx, req)
+}
+
 // GetAssistanceReadiness calls lindm.admin.v1.AdminService.GetAssistanceReadiness.
 func (c *adminServiceClient) GetAssistanceReadiness(ctx context.Context, req *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {
 	return c.getAssistanceReadiness.CallUnary(ctx, req)
@@ -1727,6 +1907,21 @@ type AdminServiceHandler interface {
 	UpdateAssistancePolicy(context.Context, *connect.Request[v1.UpdateAssistancePolicyRequest]) (*connect.Response[v1.UpdateAssistancePolicyResponse], error)
 	RunAssistanceCommand(context.Context, *connect.Request[v1.RunAssistanceCommandRequest]) (*connect.Response[v1.RunAssistanceCommandResponse], error)
 	GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error)
+	StartAssistanceFileTransfer(context.Context, *connect.Request[v1.StartAssistanceFileTransferRequest]) (*connect.Response[v1.StartAssistanceFileTransferResponse], error)
+	GetAssistanceFileTransfer(context.Context, *connect.Request[v1.GetAssistanceFileTransferRequest]) (*connect.Response[v1.GetAssistanceFileTransferResponse], error)
+	CancelAssistanceFileTransfer(context.Context, *connect.Request[v1.CancelAssistanceFileTransferRequest]) (*connect.Response[v1.CancelAssistanceFileTransferResponse], error)
+	ReconnectAssistanceSession(context.Context, *connect.Request[v1.ReconnectAssistanceSessionRequest]) (*connect.Response[v1.ReconnectAssistanceSessionResponse], error)
+	// Recording metadata is fleet-readable; content and deletion require their
+	// own scoped permissions and never grant live assistance.
+	ListAssistanceRecordings(context.Context, *connect.Request[v1.ListAssistanceRecordingsRequest]) (*connect.Response[v1.ListAssistanceRecordingsResponse], error)
+	OpenAssistanceRecording(context.Context, *connect.Request[v1.OpenAssistanceRecordingRequest]) (*connect.Response[v1.OpenAssistanceRecordingResponse], error)
+	ReadAssistanceRecording(context.Context, *connect.Request[v1.ReadAssistanceRecordingRequest]) (*connect.Response[v1.ReadAssistanceRecordingResponse], error)
+	DeleteAssistanceRecording(context.Context, *connect.Request[v1.DeleteAssistanceRecordingRequest]) (*connect.Response[v1.DeleteAssistanceRecordingResponse], error)
+	// Consumes an approval decided by a different person with
+	// remote_assistance.unattended.approve; the requester never approves.
+	AuthorizeUnattendedAssistance(context.Context, *connect.Request[v1.AuthorizeUnattendedAssistanceRequest]) (*connect.Response[v1.AuthorizeUnattendedAssistanceResponse], error)
+	ListUnattendedAssistance(context.Context, *connect.Request[v1.ListUnattendedAssistanceRequest]) (*connect.Response[v1.ListUnattendedAssistanceResponse], error)
+	RevokeUnattendedAssistance(context.Context, *connect.Request[v1.RevokeUnattendedAssistanceRequest]) (*connect.Response[v1.RevokeUnattendedAssistanceResponse], error)
 	// Whether a new request can reach a person on the device, and the evidence.
 	GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error)
 	GetDeviceEncryption(context.Context, *connect.Request[v1.GetDeviceEncryptionRequest]) (*connect.Response[v1.GetDeviceEncryptionResponse], error)
@@ -2205,6 +2400,72 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(adminServiceMethods.ByName("GetAssistanceCommand")),
 		connect.WithHandlerOptions(opts...),
 	)
+	adminServiceStartAssistanceFileTransferHandler := connect.NewUnaryHandler(
+		AdminServiceStartAssistanceFileTransferProcedure,
+		svc.StartAssistanceFileTransfer,
+		connect.WithSchema(adminServiceMethods.ByName("StartAssistanceFileTransfer")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceGetAssistanceFileTransferHandler := connect.NewUnaryHandler(
+		AdminServiceGetAssistanceFileTransferProcedure,
+		svc.GetAssistanceFileTransfer,
+		connect.WithSchema(adminServiceMethods.ByName("GetAssistanceFileTransfer")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceCancelAssistanceFileTransferHandler := connect.NewUnaryHandler(
+		AdminServiceCancelAssistanceFileTransferProcedure,
+		svc.CancelAssistanceFileTransfer,
+		connect.WithSchema(adminServiceMethods.ByName("CancelAssistanceFileTransfer")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceReconnectAssistanceSessionHandler := connect.NewUnaryHandler(
+		AdminServiceReconnectAssistanceSessionProcedure,
+		svc.ReconnectAssistanceSession,
+		connect.WithSchema(adminServiceMethods.ByName("ReconnectAssistanceSession")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListAssistanceRecordingsHandler := connect.NewUnaryHandler(
+		AdminServiceListAssistanceRecordingsProcedure,
+		svc.ListAssistanceRecordings,
+		connect.WithSchema(adminServiceMethods.ByName("ListAssistanceRecordings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceOpenAssistanceRecordingHandler := connect.NewUnaryHandler(
+		AdminServiceOpenAssistanceRecordingProcedure,
+		svc.OpenAssistanceRecording,
+		connect.WithSchema(adminServiceMethods.ByName("OpenAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceReadAssistanceRecordingHandler := connect.NewUnaryHandler(
+		AdminServiceReadAssistanceRecordingProcedure,
+		svc.ReadAssistanceRecording,
+		connect.WithSchema(adminServiceMethods.ByName("ReadAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceDeleteAssistanceRecordingHandler := connect.NewUnaryHandler(
+		AdminServiceDeleteAssistanceRecordingProcedure,
+		svc.DeleteAssistanceRecording,
+		connect.WithSchema(adminServiceMethods.ByName("DeleteAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceAuthorizeUnattendedAssistanceHandler := connect.NewUnaryHandler(
+		AdminServiceAuthorizeUnattendedAssistanceProcedure,
+		svc.AuthorizeUnattendedAssistance,
+		connect.WithSchema(adminServiceMethods.ByName("AuthorizeUnattendedAssistance")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceListUnattendedAssistanceHandler := connect.NewUnaryHandler(
+		AdminServiceListUnattendedAssistanceProcedure,
+		svc.ListUnattendedAssistance,
+		connect.WithSchema(adminServiceMethods.ByName("ListUnattendedAssistance")),
+		connect.WithHandlerOptions(opts...),
+	)
+	adminServiceRevokeUnattendedAssistanceHandler := connect.NewUnaryHandler(
+		AdminServiceRevokeUnattendedAssistanceProcedure,
+		svc.RevokeUnattendedAssistance,
+		connect.WithSchema(adminServiceMethods.ByName("RevokeUnattendedAssistance")),
+		connect.WithHandlerOptions(opts...),
+	)
 	adminServiceGetAssistanceReadinessHandler := connect.NewUnaryHandler(
 		AdminServiceGetAssistanceReadinessProcedure,
 		svc.GetAssistanceReadiness,
@@ -2509,6 +2770,28 @@ func NewAdminServiceHandler(svc AdminServiceHandler, opts ...connect.HandlerOpti
 			adminServiceRunAssistanceCommandHandler.ServeHTTP(w, r)
 		case AdminServiceGetAssistanceCommandProcedure:
 			adminServiceGetAssistanceCommandHandler.ServeHTTP(w, r)
+		case AdminServiceStartAssistanceFileTransferProcedure:
+			adminServiceStartAssistanceFileTransferHandler.ServeHTTP(w, r)
+		case AdminServiceGetAssistanceFileTransferProcedure:
+			adminServiceGetAssistanceFileTransferHandler.ServeHTTP(w, r)
+		case AdminServiceCancelAssistanceFileTransferProcedure:
+			adminServiceCancelAssistanceFileTransferHandler.ServeHTTP(w, r)
+		case AdminServiceReconnectAssistanceSessionProcedure:
+			adminServiceReconnectAssistanceSessionHandler.ServeHTTP(w, r)
+		case AdminServiceListAssistanceRecordingsProcedure:
+			adminServiceListAssistanceRecordingsHandler.ServeHTTP(w, r)
+		case AdminServiceOpenAssistanceRecordingProcedure:
+			adminServiceOpenAssistanceRecordingHandler.ServeHTTP(w, r)
+		case AdminServiceReadAssistanceRecordingProcedure:
+			adminServiceReadAssistanceRecordingHandler.ServeHTTP(w, r)
+		case AdminServiceDeleteAssistanceRecordingProcedure:
+			adminServiceDeleteAssistanceRecordingHandler.ServeHTTP(w, r)
+		case AdminServiceAuthorizeUnattendedAssistanceProcedure:
+			adminServiceAuthorizeUnattendedAssistanceHandler.ServeHTTP(w, r)
+		case AdminServiceListUnattendedAssistanceProcedure:
+			adminServiceListUnattendedAssistanceHandler.ServeHTTP(w, r)
+		case AdminServiceRevokeUnattendedAssistanceProcedure:
+			adminServiceRevokeUnattendedAssistanceHandler.ServeHTTP(w, r)
 		case AdminServiceGetAssistanceReadinessProcedure:
 			adminServiceGetAssistanceReadinessHandler.ServeHTTP(w, r)
 		case AdminServiceGetDeviceEncryptionProcedure:
@@ -2860,6 +3143,50 @@ func (UnimplementedAdminServiceHandler) RunAssistanceCommand(context.Context, *c
 
 func (UnimplementedAdminServiceHandler) GetAssistanceCommand(context.Context, *connect.Request[v1.GetAssistanceCommandRequest]) (*connect.Response[v1.GetAssistanceCommandResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAssistanceCommand is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) StartAssistanceFileTransfer(context.Context, *connect.Request[v1.StartAssistanceFileTransferRequest]) (*connect.Response[v1.StartAssistanceFileTransferResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.StartAssistanceFileTransfer is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) GetAssistanceFileTransfer(context.Context, *connect.Request[v1.GetAssistanceFileTransferRequest]) (*connect.Response[v1.GetAssistanceFileTransferResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.GetAssistanceFileTransfer is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) CancelAssistanceFileTransfer(context.Context, *connect.Request[v1.CancelAssistanceFileTransferRequest]) (*connect.Response[v1.CancelAssistanceFileTransferResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.CancelAssistanceFileTransfer is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ReconnectAssistanceSession(context.Context, *connect.Request[v1.ReconnectAssistanceSessionRequest]) (*connect.Response[v1.ReconnectAssistanceSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ReconnectAssistanceSession is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListAssistanceRecordings(context.Context, *connect.Request[v1.ListAssistanceRecordingsRequest]) (*connect.Response[v1.ListAssistanceRecordingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListAssistanceRecordings is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) OpenAssistanceRecording(context.Context, *connect.Request[v1.OpenAssistanceRecordingRequest]) (*connect.Response[v1.OpenAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.OpenAssistanceRecording is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ReadAssistanceRecording(context.Context, *connect.Request[v1.ReadAssistanceRecordingRequest]) (*connect.Response[v1.ReadAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ReadAssistanceRecording is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) DeleteAssistanceRecording(context.Context, *connect.Request[v1.DeleteAssistanceRecordingRequest]) (*connect.Response[v1.DeleteAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.DeleteAssistanceRecording is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) AuthorizeUnattendedAssistance(context.Context, *connect.Request[v1.AuthorizeUnattendedAssistanceRequest]) (*connect.Response[v1.AuthorizeUnattendedAssistanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.AuthorizeUnattendedAssistance is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) ListUnattendedAssistance(context.Context, *connect.Request[v1.ListUnattendedAssistanceRequest]) (*connect.Response[v1.ListUnattendedAssistanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.ListUnattendedAssistance is not implemented"))
+}
+
+func (UnimplementedAdminServiceHandler) RevokeUnattendedAssistance(context.Context, *connect.Request[v1.RevokeUnattendedAssistanceRequest]) (*connect.Response[v1.RevokeUnattendedAssistanceResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.admin.v1.AdminService.RevokeUnattendedAssistance is not implemented"))
 }
 
 func (UnimplementedAdminServiceHandler) GetAssistanceReadiness(context.Context, *connect.Request[v1.GetAssistanceReadinessRequest]) (*connect.Response[v1.GetAssistanceReadinessResponse], error) {

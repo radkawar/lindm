@@ -46,9 +46,9 @@ func sendSwitchBurst(t *testing.T, h *harness) {
 	// first-packet readiness is blocked. A lock held across either phase stalls
 	// this loop long before the native call timeout and used to kill the session.
 	messages := []string{
-		`{"t":"move","x":0.5,"y":0.5,"display":"monitor-1","generation":1}`,
-		`{"t":"key","code":"KeyA","down":true,"display":"monitor-2","generation":2}`,
-		`{"t":"keysym","keysym":8364,"down":true,"display":"monitor-2","generation":2}`,
+		`{"t":"move","x":0.5,"y":0.5,"display":"monitor-1","generation":1,"epoch":1}`,
+		`{"t":"key","code":"KeyA","down":true,"display":"monitor-2","generation":2,"epoch":1}`,
+		`{"t":"keysym","keysym":8364,"down":true,"display":"monitor-2","generation":2,"epoch":1}`,
 		`{"t":"release"}`,
 	}
 	deadline := time.NewTimer(time.Second)
@@ -90,7 +90,7 @@ func TestConcurrentInputDrainsThroughoutCaptureSwitchAndRemainsFenced(t *testing
 	h.helper.deps.capturer = capturer
 	inv := tierOneInvitation(modeControl)
 	activateTierOne(h, inv)
-	h.peers.peer.input <- []byte(`{"t":"key","code":"ControlLeft","down":true,"display":"monitor-1","generation":1}`)
+	h.peers.peer.input <- []byte(`{"t":"key","code":"ControlLeft","down":true,"display":"monitor-1","generation":1,"epoch":1}`)
 	waitInjected(t, h.portal.grant, 1)
 	command := newTestCommand(h, 1, agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY)
 	command.DisplayId = "monitor-2"
@@ -119,9 +119,9 @@ func TestConcurrentInputDrainsThroughoutCaptureSwitchAndRemainsFenced(t *testing
 	if result.GetStatus() != agentv1.AssistanceCommandStatus_ASSISTANCE_COMMAND_STATUS_SUCCEEDED {
 		t.Fatalf("switch result = %v", result)
 	}
-	h.peers.peer.input <- []byte(`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}`)
-	h.peers.peer.input <- []byte(`{"t":"keysym","keysym":8364,"down":true,"display":"monitor-1","generation":1}`)
-	h.peers.peer.input <- []byte(`{"t":"move","x":0.25,"y":0.75,"display":"monitor-2","generation":2}`)
+	h.peers.peer.input <- []byte(`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1,"epoch":1}`)
+	h.peers.peer.input <- []byte(`{"t":"keysym","keysym":8364,"down":true,"display":"monitor-1","generation":1,"epoch":1}`)
+	h.peers.peer.input <- []byte(`{"t":"move","x":0.25,"y":0.75,"display":"monitor-2","generation":2,"epoch":1}`)
 	waitInjected(t, h.portal.grant, 3)
 	events, _ := h.portal.grant.snapshot()
 	if len(events) != 3 || events[1].Down || events[1].Keycode != 29 || events[2].kind != inputMove || events[2].Display != "monitor-2" {

@@ -4,7 +4,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { InputCapture, printableKeysym } from "../src/features/assistance/input.ts";
+import {
+  InputCapture,
+  InputEpochFence,
+  printableKeysym,
+} from "../src/features/assistance/input.ts";
 
 function keyboardEvent(key, code, overrides = {}) {
   return {
@@ -23,7 +27,7 @@ function keyboardEvent(key, code, overrides = {}) {
 function capture() {
   const messages = [];
   const channel = { readyState: "open", send: (data) => messages.push(JSON.parse(data)) };
-  return { input: new InputCapture(channel, "monitor-2", 7), messages };
+  return { input: new InputCapture(channel, "monitor-2", 7, 3), messages };
 }
 
 test("printable conversion uses canonical legacy XKB across scripts", () => {
@@ -91,9 +95,9 @@ test("semantic input preserves exact canonical symbol on repeat and release with
   // Layout/modifier state can change before keyup; release the held symbol.
   assert.equal(input.key(keyboardEvent("e", "KeyE", { type: "keyup" }), "text"), true);
   assert.deepEqual(messages, [
-    { t: "keysym", keysym: 0x20ac, down: true, display: "monitor-2", generation: 7 },
-    { t: "keysym", keysym: 0x20ac, down: true, display: "monitor-2", generation: 7 },
-    { t: "keysym", keysym: 0x20ac, down: false, display: "monitor-2", generation: 7 },
+    { t: "keysym", keysym: 0x20ac, down: true, display: "monitor-2", generation: 7, epoch: 3 },
+    { t: "keysym", keysym: 0x20ac, down: true, display: "monitor-2", generation: 7, epoch: 3 },
+    { t: "keysym", keysym: 0x20ac, down: false, display: "monitor-2", generation: 7, epoch: 3 },
   ]);
 });
 
@@ -102,7 +106,7 @@ test("physical mode stays code-based and release-all remains generation-independ
   assert.equal(input.key(keyboardEvent("z", "KeyY"), "physical"), true);
   input.releaseAll();
   assert.deepEqual(messages, [
-    { t: "key", code: "KeyY", down: true, display: "monitor-2", generation: 7 },
+    { t: "key", code: "KeyY", down: true, display: "monitor-2", generation: 7, epoch: 3 },
     { t: "release" },
   ]);
   assert.equal(input.key(keyboardEvent("z", "KeyY", { type: "keyup" }), "physical"), false);
@@ -120,4 +124,52 @@ test("text mode rejects composition and shortcuts without sending operator input
   ])
     assert.equal(input.key(event, "text"), false);
   assert.deepEqual(messages, []);
+});
+
+test("modal input epochs reject stale, missing and conflicting projections without a timer fallback", () => {
+  const fence = new InputEpochFence();
+  assert.equal(fence.receive(undefined), false);
+  assert.equal(fence.receive({ epoch: 0, paused: false }), false);
+  assert.equal(fence.receive({ epoch: 1, paused: false }), true);
+  assert.equal(fence.receive({ epoch: 2, paused: true }), false);
+  assert.equal(fence.receive({ epoch: 1, paused: false }), false);
+  assert.equal(fence.receive({ epoch: 2, paused: false }), false);
+  assert.equal(fence.receive({ epoch: 3, paused: false }), true);
+  assert.equal(fence.receive({ epoch: 3, paused: false }), true);
+  assert.equal(fence.receive({ epoch: 0x100000000, paused: false }), false);
+  assert.equal(fence.receive({ epoch: 3, paused: false }), false);
+  assert.equal(fence.receive({ epoch: 4, paused: false }), true);
+});
+
+test("capture requires a valid epoch and a disposed lifetime cannot send more input", () => {
+  for (const epoch of [undefined, 0, -1, 1.5, NaN, 0x100000000])
+    assert.throws(() => new InputCapture({}, "monitor-2", 7, epoch), /epoch/);
+  const { input, messages } = capture();
+  input.button(0, true);
+  input.dispose();
+  input.key(keyboardEvent("a", "KeyA"), "text");
+  input.button(0, true);
+  assert.deepEqual(messages, [
+    { t: "button", b: "left", down: true, display: "monitor-2", generation: 7, epoch: 3 },
+    { t: "release" },
+  ]);
+});
+
+test("pointer motion and wheel events carry the current modal epoch", () => {
+  const oldWheelEvent = globalThis.WheelEvent;
+  globalThis.WheelEvent = { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 };
+  try {
+    const { input, messages } = capture();
+    input.move({ x: 0.25, y: 0.75 });
+    input.wheel({ deltaMode: 1, deltaX: 3, deltaY: -3 });
+    input.releaseAll();
+    assert.deepEqual(messages, [
+      { t: "move", x: 0.25, y: 0.75, display: "monitor-2", generation: 7, epoch: 3 },
+      { t: "wheel", dx: 1, dy: -1, display: "monitor-2", generation: 7, epoch: 3 },
+      { t: "release" },
+    ]);
+  } finally {
+    if (oldWheelEvent === undefined) delete globalThis.WheelEvent;
+    else globalThis.WheelEvent = oldWheelEvent;
+  }
 });

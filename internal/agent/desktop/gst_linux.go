@@ -102,27 +102,7 @@ func (g *GStreamer) Start(ctx context.Context, request CaptureRequest) (Capture,
 // checkGstElements requires gst-inspect-1.0 (packaged with gst-launch-1.0
 // on the supported distributions) to report every pipeline element.
 func checkGstElements(ctx context.Context) error {
-	if _, err := nativeexec.Executable(gstInspect); err != nil {
-		return unavailable("gst_inspect_missing", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, gstElementsTimeout)
-	defer cancel()
-	for _, element := range gstElements {
-		_, err := nativeexec.Run(ctx, nativeexec.Command{
-			Path:        gstInspect,
-			Args:        gstExistsArguments(element),
-			Timeout:     gstInspectTimeout,
-			StdoutLimit: gstInspectStdout,
-			StderrLimit: gstStderrTail,
-		})
-		if err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			return unavailable("gst_element_missing:"+element, err)
-		}
-	}
-	return nil
+	return checkElements(ctx, gstElements)
 }
 
 type gstCapture struct {
@@ -151,14 +131,24 @@ func (c *gstCapture) watchBus(ctx context.Context) {
 	c.cancel()
 }
 
-// Close kills the whole process group and reaps the pipeline.
+// Close kills the whole process group and reaps the pipeline. The sound
+// pipeline has no separate RTP descriptor or lifecycle bus: it streams RTP on
+// stdout, so only the video capture's fields are closed and awaited (closing
+// it nil-dereferenced the missing cancel and crashed the helper on local Mute,
+// layers-ubuntu24-tier3-25).
 func (c *gstCapture) Close() error {
 	c.once.Do(func() {
-		c.cancel()
+		if c.cancel != nil {
+			c.cancel()
+		}
 		var result nativeexec.Result
 		result, c.err = c.process.Close()
-		c.err = errors.Join(c.err, c.rtp.Close())
-		<-c.busDone
+		if c.rtp != nil {
+			c.err = errors.Join(c.err, c.rtp.Close())
+		}
+		if c.busDone != nil {
+			<-c.busDone
+		}
 		if len(result.Stderr) != 0 {
 			c.logger.Info("capture pipeline stopped", "exit_code", result.ExitCode, "stderr", string(result.Stderr))
 		}

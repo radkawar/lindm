@@ -33,12 +33,15 @@ func agentProduct() product {
 		description: "Versioned agent binary with a root executor and an unprivileged network service.\nRemove and purge retain identity and spool state. This package does not grant a root shell.",
 		units:       []string{executorUnit, agentUnit, poweroffUnit, firewallRestoreUnit, connectivityGuardUnit, connectivityProbeUnit, osUpdateUnit, osUpdateNowUnit, osUpdateStatusUnit},
 		userUnits:   []string{sessionUnit},
-		dirs:        []string{"usr/libexec/lindm", "etc/lindm", "usr/share/doc/lindm-agent"},
+		dirs:        []string{"usr/libexec/lindm", "etc/lindm", "usr/share/doc/lindm-agent", overlayExtensionDir[1:]},
 		// Remote assistance captures through the PipeWire GStreamer source and
 		// encodes VP8 with gst-launch-1.0. Without them it ends UNAVAILABLE.
-		debRecommends:  []string{"gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gstreamer1.0-tools"},
-		rpmRecommends:  []string{"pipewire-gstreamer", "gstreamer1-plugins-good", "gstreamer1"},
-		archOptdepends: []string{"gst-plugin-pipewire: remote assistance screen capture", "gst-plugins-good: remote assistance VP8 encoding", "gstreamer: remote assistance gst-launch-1.0"},
+		// Sound enumerates the user's PipeWire nodes with pw-dump and mixes
+		// and Opus-encodes with gst-plugins-base; without them sound is
+		// unavailable (the Fedora 44 gnome-desktop group lacks pw-dump).
+		debRecommends:  []string{"gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gstreamer1.0-tools", "gstreamer1.0-plugins-base", "pipewire-bin"},
+		rpmRecommends:  []string{"pipewire-gstreamer", "gstreamer1-plugins-good", "gstreamer1", "gstreamer1-plugins-base", "pipewire-utils"},
+		archOptdepends: []string{"gst-plugin-pipewire: remote assistance screen capture", "gst-plugins-good: remote assistance VP8 encoding", "gstreamer: remote assistance gst-launch-1.0", "gst-plugins-base: remote assistance sound mixing and Opus encoding"},
 	}
 }
 
@@ -110,6 +113,8 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 		{rel: "usr/lib/systemd/system/" + osUpdateStatusUnit, mode: 0o644, name: osUpdateStatusUnit},
 		{rel: "usr/lib/systemd/user/" + sessionUnit, mode: 0o644, name: sessionUnit},
 		{rel: sessionAutostartPath[1:], mode: 0o644, conf: true, name: "lindm-session-autostart.desktop"},
+		{rel: overlayExtensionDir[1:] + "/metadata.json", mode: 0o644, name: "lindm-overlay-metadata.json"},
+		{rel: overlayExtensionDir[1:] + "/extension.js", mode: 0o644, name: "lindm-overlay-extension.js"},
 		{rel: "usr/lib/tmpfiles.d/lindm.conf", mode: 0o644, name: "tmpfiles.conf"},
 		{rel: "usr/lib/sysusers.d/lindm.conf", mode: 0o644, name: "sysusers.conf"},
 		{rel: p.lifecycle[1:], mode: 0o755, name: p.lifecycleAsset},

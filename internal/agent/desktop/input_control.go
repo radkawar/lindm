@@ -21,10 +21,11 @@ type inputControl struct {
 	display    string
 	generation uint32
 	paused     bool
+	epoch      uint32
 }
 
 func newInputControl(grant Grant, keyboard agentv1.AssistancePolicyMode, display string) *inputControl {
-	return &inputControl{grant: grant, keyboard: keyboard, pressed: newPressedInput(), display: display, generation: 1}
+	return &inputControl{grant: grant, keyboard: keyboard, pressed: newPressedInput(), display: display, generation: 1, epoch: 1}
 }
 
 func (c *inputControl) inject(ctx context.Context, event InputEvent) error {
@@ -36,7 +37,7 @@ func (c *inputControl) inject(ctx context.Context, event InputEvent) error {
 	if c.paused {
 		return errInvalidInput
 	}
-	if event.kind != inputRelease && (event.Display != c.display || event.Generation != c.generation) {
+	if event.kind != inputRelease && (event.Display != c.display || event.Generation != c.generation || event.Epoch != c.epoch) {
 		return errInvalidInput
 	}
 	switch event.kind {
@@ -79,6 +80,30 @@ func (c *inputControl) releaseAll(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.release(ctx)
+}
+
+// pauseModal joins native injection under the same lock, invalidates all queued
+// frames independently of the display fence, and releases every attempted press.
+func (c *inputControl) pauseModal(ctx context.Context) (uint32, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.paused || c.epoch >= ^uint32(0)-1 {
+		return 0, errors.New("input_epoch_exhausted_or_paused")
+	}
+	c.paused = true
+	c.epoch++
+	return c.epoch, c.release(ctx)
+}
+
+func (c *inputControl) resumeModal() (uint32, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.paused || c.epoch == ^uint32(0) {
+		return 0, errors.New("input_epoch_exhausted_or_not_paused")
+	}
+	c.epoch++
+	c.paused = false
+	return c.epoch, nil
 }
 
 // beginSwitch detaches held inputs and returns the new generation under a short

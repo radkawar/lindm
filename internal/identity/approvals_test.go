@@ -8,9 +8,11 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	authv1 "lindm/gen/lindm/auth/v1"
 )
 
 func TestDeviceActionApprovalPermissions(t *testing.T) {
@@ -154,5 +156,70 @@ func TestRevealApprovalBindings(t *testing.T) {
 		if approvalPayload(request) == nil {
 			t.Fatalf("approval payload arm missing: %v", request)
 		}
+	}
+}
+
+func TestUnattendedApprovalBindsExactRequestAndIndependentReviewer(t *testing.T) {
+	device := uuid.New()
+	request := &adminv1.AuthorizeUnattendedAssistanceRequest{
+		RequestId: uuid.NewString(), DeviceId: device.String(), Mode: agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW,
+		Reason: "printer queue support window", NotBefore: timestamppb.Now(), DurationSeconds: 3600, TargetUsername: "alice",
+	}
+	payload := approvalPayload(&adminv1.CreateApprovalRequest{Payload: &adminv1.CreateApprovalRequest_AuthorizeUnattendedAssistance{AuthorizeUnattendedAssistance: request}})
+	if payload != request {
+		t.Fatal("unattended approval arm lost its request")
+	}
+	binding, err := bindApproval(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if binding.action != "assistance.unattended" || binding.permission != PermissionAssistanceUnattended || binding.target != device || binding.mutation != request.GetRequestId() {
+		t.Fatalf("incorrect unattended authority: %+v", binding)
+	}
+	// The second person is scoped by the independent approve permission; the
+	// requester's own unattended permission never decides.
+	if reviewer := binding.reviewer(); reviewer.permission != PermissionApproveAssistanceUnattended || reviewer.target != device || reviewer.digest != binding.digest {
+		t.Fatalf("reviewer binding = %+v", reviewer)
+	}
+	if approvalReviewerPermission(PermissionRevokeDevice) != PermissionRevokeDevice {
+		t.Fatal("ordinary approvals changed reviewer permission")
+	}
+	request.ApprovalId = uuid.NewString()
+	replay, err := bindApproval(request)
+	if err != nil || replay.digest != binding.digest {
+		t.Fatalf("approval identifier changed the approved payload: %v", err)
+	}
+	for _, change := range []func(*adminv1.AuthorizeUnattendedAssistanceRequest){
+		func(r *adminv1.AuthorizeUnattendedAssistanceRequest) { r.DurationSeconds++ },
+		func(r *adminv1.AuthorizeUnattendedAssistanceRequest) { r.TargetUsername = "bob" },
+		func(r *adminv1.AuthorizeUnattendedAssistanceRequest) {
+			r.Mode = agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+		},
+		func(r *adminv1.AuthorizeUnattendedAssistanceRequest) {
+			r.Schedule = &agentv1.AssistanceUnattendedSchedule{TimeZone: "UTC", Windows: []*agentv1.AssistanceUnattendedWindow{{Weekday: 1, DurationMinutes: 60}}}
+		},
+	} {
+		changed := proto.CloneOf(request)
+		change(changed)
+		bound, err := bindApproval(changed)
+		if err != nil || bound.digest == binding.digest {
+			t.Fatalf("changed unattended request retained approval binding: %v", err)
+		}
+	}
+}
+
+func TestUnattendedApproveNeverImpliesRequestOrLiveAccess(t *testing.T) {
+	approver := Principal{Role: RoleOperator, Bindings: []*authv1.RoleBinding{{Role: "unattended-approver", Permissions: []string{string(PermissionApproveAssistanceUnattended), string(PermissionManageApprovals)}}}}
+	for _, permission := range []Permission{PermissionAssistanceUnattended, PermissionViewRemoteAssistance, PermissionControlRemoteAssistance} {
+		if Authorize(approver, permission) {
+			t.Fatalf("approve permission implied %s", permission)
+		}
+	}
+	requester := Principal{Role: RoleOperator, Bindings: []*authv1.RoleBinding{{Role: "unattended", Permissions: []string{string(PermissionAssistanceUnattended)}}}}
+	if Authorize(requester, PermissionApproveAssistanceUnattended) {
+		t.Fatal("requesting unattended access implied approving it")
+	}
+	if Authorize(Principal{Role: RoleAuditor}, PermissionApproveAssistanceUnattended) || Authorize(Principal{Role: RoleAuditor}, PermissionAssistanceUnattended) {
+		t.Fatal("auditor gained unattended authority")
 	}
 }

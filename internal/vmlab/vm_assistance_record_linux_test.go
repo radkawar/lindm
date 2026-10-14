@@ -11,9 +11,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/platform"
 )
@@ -180,14 +182,14 @@ func TestAssistanceRespondRequiresHeldRun(t *testing.T) {
 
 func TestVerifyAssistanceMediaRequiresTCPRelayWhenAsked(t *testing.T) {
 	media := &assistanceMediaEvidence{VideoWidth: 1280, VideoHeight: 800, DecodedFrames: 30, FramesDecoded: 30, ConnectionState: "connected", TransportPolicy: "relay", LocalCandidateType: "relay", RemoteCandidateType: "relay", LocalRelayProtocol: "udp"}
-	if err := verifyAssistanceMedia(media, false, false); err != nil {
+	if err := verifyAssistanceMedia(media, false, false, false, false); err != nil {
 		t.Fatalf("UDP relay without TCP requirement: %v", err)
 	}
-	if err := verifyAssistanceMedia(media, false, true); err == nil {
+	if err := verifyAssistanceMedia(media, false, false, false, true); err == nil {
 		t.Fatal("UDP relay accepted when TURN over TCP was required")
 	}
 	media.LocalRelayProtocol = "tcp"
-	if err := verifyAssistanceMedia(media, false, true); err != nil {
+	if err := verifyAssistanceMedia(media, false, false, false, true); err != nil {
 		t.Fatalf("TCP relay: %v", err)
 	}
 }
@@ -229,6 +231,24 @@ func TestAssistanceAdmissionMatchesRegistryGate(t *testing.T) {
 	}
 }
 
+func TestVerifyAssistanceMediaIndependentlyGrantsFileChannel(t *testing.T) {
+	media := &assistanceMediaEvidence{VideoWidth: 1280, VideoHeight: 800, DecodedFrames: 30, FramesDecoded: 30, ConnectionState: "connected", TransportPolicy: "relay", LocalCandidateType: "relay", RemoteCandidateType: "relay", RemoteApplication: true, DataChannels: []string{"lindm-files"}}
+	if err := verifyAssistanceMedia(media, false, true, false, false); err != nil {
+		t.Fatalf("view with independently granted files: %v", err)
+	}
+	if err := verifyAssistanceMedia(media, false, false, false, false); err == nil {
+		t.Fatal("ungranted file channel accepted")
+	}
+	media.DataChannels = []string{"lindm-files", "lindm-input"}
+	if err := verifyAssistanceMedia(media, false, true, false, false); err == nil {
+		t.Fatal("file grant manufactured input authority")
+	}
+	media.DataChannels = []string{"lindm-files", "lindm-files"}
+	if err := verifyAssistanceMedia(media, false, true, false, false); err == nil {
+		t.Fatal("duplicate file channels accepted")
+	}
+}
+
 func TestAssistanceAuditEvidenceKeepsStructuredFields(t *testing.T) {
 	audit := assistanceAuditEvidence{
 		ID: "event", ActorID: "actor", Action: "assistance.clipboard",
@@ -264,5 +284,135 @@ func TestAssistanceAuditEvidenceKeepsStructuredFields(t *testing.T) {
 		if details[key] != want {
 			t.Fatalf("audit details[%q] = %q; want %q", key, details[key], want)
 		}
+	}
+}
+
+// This ledger exercises qualification completeness only. Its in-memory fields
+// are not native artifacts and cannot pass the artifact/witness verifier.
+func assistanceTierOneLedgerFixture() *VMAssistanceResult {
+	result := new(VMAssistanceResult)
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(assistanceFileScenarios, spec.name) || assistanceWorkflowScenario(spec.name) || assistanceTierThreeScenario(spec.name) {
+			continue
+		}
+		scenario := &assistanceScenarioEvidence{Name: spec.name, Mode: "view", SessionID: "11111111-1111-4111-8111-111111111111"}
+		if spec.name == "authority-view" || spec.name == "authority-control" {
+			scenario = modeAuthorityFixture(spec.name)
+		}
+		if spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
+			scenario.Mode = "control"
+		}
+		scenario.EndCause = assistanceCauseText(spec.cause)
+		scenario.ConsoleEndCause = scenario.EndCause
+		scenario.Screenshots = []string{spec.name + ".png"}
+		if spec.capability == "" && spec.cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED {
+			control := scenario.Mode == "control"
+			scenario.CaptureStopped, scenario.ControlGranted = true, control
+			scenario.LocalSession = &assistanceLocalEvidence{UID: 1000, LogindSessionID: "3"}
+			scenario.OfferFingerprint, scenario.AnswerFingerprint = "offer", "answer"
+			scenario.Media = &assistanceMediaEvidence{VideoWidth: 1280, VideoHeight: 800, DecodedFrames: 30, FramesDecoded: 30, ConnectionState: "connected", TransportPolicy: "relay", LocalCandidateType: "relay", RemoteCandidateType: "relay", ControlButton: control, RemoteApplication: control}
+			if control {
+				scenario.Media.DataChannels = []string{"lindm-input"}
+				scenario.Nonce, scenario.NonceReceived = "0123456789ab", true
+			}
+		}
+		if slices.Contains([]string{"clipboard", "clipboard-limited", "keyboard", "display", "message", "monitors"}, spec.name) {
+			scenario.CapabilityWitness = spec.name + ".json"
+			result.Witnesses = append(result.Witnesses, assistanceEvidenceFile{Path: scenario.CapabilityWitness})
+		}
+		for _, name := range requiredAssistanceBoundaries(spec.name) {
+			scenario.BoundaryWitnesses = append(scenario.BoundaryWitnesses, name+".json")
+			result.BoundaryWitnesses = append(result.BoundaryWitnesses, assistanceEvidenceFile{Name: name, Path: name + ".json"})
+		}
+		result.Scenarios = append(result.Scenarios, scenario)
+	}
+	return result
+}
+
+func TestAssistanceQualificationRequiresBaselineModeAndNativeProofs(t *testing.T) {
+	if !completeAssistanceTierOne(assistanceTierOneLedgerFixture()) {
+		t.Fatal("complete Tier1 ledger rejected")
+	}
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(assistanceFileScenarios, spec.name) || assistanceWorkflowScenario(spec.name) || assistanceTierThreeScenario(spec.name) {
+			continue
+		}
+		t.Run(spec.name, func(t *testing.T) {
+			result := assistanceTierOneLedgerFixture()
+			result.Scenarios = slices.DeleteFunc(result.Scenarios, func(scenario *assistanceScenarioEvidence) bool { return scenario.Name == spec.name })
+			if completeAssistanceTierOne(result) {
+				t.Fatal("partial ledger qualified full Tier1")
+			}
+			result.TierOnePassed = true
+			if verifyAssistanceEvidence(t.TempDir(), result) == nil {
+				t.Fatal("partial receipt claimed full Tier1")
+			}
+		})
+	}
+	for _, name := range []string{"control", "view", "authority-view", "authority-control", "lock"} {
+		t.Run(name+"-without-media", func(t *testing.T) {
+			result := assistanceTierOneLedgerFixture()
+			index := slices.IndexFunc(result.Scenarios, func(scenario *assistanceScenarioEvidence) bool { return scenario.Name == name })
+			result.Scenarios[index].Media = nil
+			if completeAssistanceTierOne(result) {
+				t.Fatal("baseline without native media qualified")
+			}
+		})
+	}
+	if err := verifyAssistanceEvidence(t.TempDir(), &VMAssistanceResult{Passed: true, FilesPassed: true}); err == nil {
+		t.Fatal("files pass accepted without baseline and Tier1")
+	}
+	if completeAssistanceTierOne(&VMAssistanceResult{Passed: true}) {
+		t.Fatal("zero-scenario hold qualified")
+	}
+	subset := assistanceTierOneLedgerFixture()
+	subset.SelectedScenarios = []string{"control"}
+	if completeAssistanceTierOne(subset) {
+		t.Fatal("subset record qualified full Tier1")
+	}
+}
+
+func TestAssistanceDefaultScenariosIncludeEveryQualificationBoundary(t *testing.T) {
+	scenarios, err := selectAssistanceScenarios(assistanceScenarios, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(scenarios))
+	for _, spec := range scenarios {
+		names = append(names, spec.name)
+	}
+	want := []string{"control", "rerequest", "view", "authority-view", "authority-control", "decline", "portal-cancel", "lock", "clipboard", "clipboard-limited", "clipboard-policy", "clipboard-permission", "keyboard", "display", "message", "monitors", "files", "files-cancel", "files-limited", "files-filesystem", "files-limits", "files-interrupted", "files-policy", "files-permission",
+		"recording", "recording-declined", "recording-refused", "recording-storage", "recording-permission", "recording-retention",
+		"reconnect-logout", "reconnect-reboot", "reconnect-declined", "reconnect-expired", "reconnect-revoked",
+		"elevation", "annotation", "annotation-monitors", "audio", "audio-declined", "unattended", "unattended-lock", "unattended-revoked"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("default qualification scenarios = %v, want %v", names, want)
+	}
+}
+
+func TestAssistanceBindingRejectsDifferentServerMode(t *testing.T) {
+	for _, mode := range []agentv1.AssistanceMode{agentv1.AssistanceMode_ASSISTANCE_MODE_UNSPECIFIED, agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW} {
+		if err := new(assistanceRun).verifyBinding(&assistanceScenarioEvidence{Mode: "control"}, &adminv1.AssistanceSession{Mode: mode}, true); err == nil {
+			t.Fatalf("server mode %s qualified requested control", mode)
+		}
+	}
+	if err := new(assistanceRun).verifyBinding(&assistanceScenarioEvidence{Mode: "view"}, &adminv1.AssistanceSession{Mode: agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL}, false); err == nil {
+		t.Fatal("server control mode qualified requested view")
+	}
+}
+
+// A VIEW session granted pointer and marks negotiates only the annotation
+// channel (layers-fedora44-tier3-08 refused it as ungranted).
+func TestVerifyAssistanceMediaIndependentlyGrantsAnnotationChannel(t *testing.T) {
+	media := &assistanceMediaEvidence{VideoWidth: 1280, VideoHeight: 800, DecodedFrames: 30, FramesDecoded: 30, ConnectionState: "connected", TransportPolicy: "relay", LocalCandidateType: "relay", RemoteCandidateType: "relay", RemoteApplication: true, DataChannels: []string{"lindm-annotate"}}
+	if err := verifyAssistanceMedia(media, false, false, true, false); err != nil {
+		t.Fatalf("view with granted annotation: %v", err)
+	}
+	if err := verifyAssistanceMedia(media, false, false, false, false); err == nil {
+		t.Fatal("ungranted annotation channel accepted")
+	}
+	media.DataChannels = []string{"lindm-annotate", "lindm-input"}
+	if err := verifyAssistanceMedia(media, false, false, true, false); err == nil {
+		t.Fatal("annotation grant manufactured input authority")
 	}
 }

@@ -401,6 +401,29 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
           message: "The current session does not allow this feature.",
           action: "Review the assistance policy and the features the user shared.",
         };
+      case "assistance_files_not_granted":
+        return {
+          tone: "neutral",
+          title: "Files are not shared",
+          message: "The policy or user does not allow this file direction in the current session.",
+          action:
+            "Review file permissions and request a new session with the required file sharing.",
+        };
+      case "assistance_file_policy":
+        return {
+          tone: "warning",
+          title: "File not allowed",
+          message:
+            "The file exceeds the current size allowance or has a disallowed content type or extension.",
+          action: "Review the file limits and select an allowed file.",
+        };
+      case "assistance_file_busy":
+        return {
+          tone: "warning",
+          title: "A file transfer is still running",
+          message: "The previous file request has not finished.",
+          action: "Check its result or cancel it before starting another request.",
+        };
       case "assistance_content_expired":
         return {
           tone: "warning",
@@ -806,6 +829,15 @@ export function classifyRpcFailure(failure: RpcFailure): RpcFailurePresentation 
       title: "Wait before continuing setup",
       message: "The server received too many setup attempts.",
       action: "Wait one minute. Enter the same setup code, username and password.",
+    };
+  }
+  if (failure.code === Code.ResourceExhausted && failure.reason === "assistance_file_quota") {
+    return {
+      tone: "warning",
+      title: "File allowance used",
+      message:
+        "This session has reached its file count or byte allowance, including interrupted transfers.",
+      action: "Finish this session. Further files require a new session and fresh user consent.",
     };
   }
   if (failure.code === Code.ResourceExhausted && failure.reason === "assistance_command_capacity") {

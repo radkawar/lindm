@@ -1753,7 +1753,7 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x14attestation_envelope\x18\x02 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80\x01R\x13attestationEnvelope\"z\n" +
 	"\x1dRegisterEncryptionKeyResponse\x12*\n" +
 	"\x11public_key_sha256\x18\x01 \x01(\fR\x0fpublicKeySha256\x12-\n" +
-	"\x12certificate_sha256\x18\x02 \x01(\fR\x11certificateSha2562\xa7\x12\n" +
+	"\x12certificate_sha256\x18\x02 \x01(\fR\x11certificateSha2562\xa2\x13\n" +
 	"\rDeviceService\x12a\n" +
 	"\x0eAcquireSession\x12&.lindm.device.v1.AcquireSessionRequest\x1a'.lindm.device.v1.AcquireSessionResponse\x12[\n" +
 	"\fGetSyncState\x12$.lindm.device.v1.GetSyncStateRequest\x1a%.lindm.device.v1.GetSyncStateResponse\x12j\n" +
@@ -1774,7 +1774,8 @@ const file_lindm_device_v1_device_proto_rawDesc = "" +
 	"\x1cRegisterDeviceActionRecovery\x124.lindm.device.v1.RegisterDeviceActionRecoveryRequest\x1a5.lindm.device.v1.RegisterDeviceActionRecoveryResponse\x12\x9d\x01\n" +
 	"\"ConfirmRefreshInventoryPublication\x12:.lindm.device.v1.ConfirmRefreshInventoryPublicationRequest\x1a;.lindm.device.v1.ConfirmRefreshInventoryPublicationResponse\x12a\n" +
 	"\x0eSyncAssistance\x12&.lindm.device.v1.SyncAssistanceRequest\x1a'.lindm.device.v1.SyncAssistanceResponse\x12p\n" +
-	"\x13GetCapabilityPolicy\x12+.lindm.device.v1.GetCapabilityPolicyRequest\x1a,.lindm.device.v1.GetCapabilityPolicyResponseB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
+	"\x13GetCapabilityPolicy\x12+.lindm.device.v1.GetCapabilityPolicyRequest\x1a,.lindm.device.v1.GetCapabilityPolicyResponse\x12y\n" +
+	"\x16PutAssistanceRecording\x12..lindm.device.v1.PutAssistanceRecordingRequest\x1a/.lindm.device.v1.PutAssistanceRecordingResponseB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
 	file_lindm_device_v1_device_proto_rawDescOnce sync.Once
@@ -1829,15 +1830,17 @@ var file_lindm_device_v1_device_proto_goTypes = []any{
 	(*RegisterDeviceActionRecoveryRequest)(nil),        // 36: lindm.device.v1.RegisterDeviceActionRecoveryRequest
 	(*ConfirmRefreshInventoryPublicationRequest)(nil),  // 37: lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
 	(*SyncAssistanceRequest)(nil),                      // 38: lindm.device.v1.SyncAssistanceRequest
-	(*GetResourceWorkResponse)(nil),                    // 39: lindm.device.v1.GetResourceWorkResponse
-	(*AuthorizeResourceStartResponse)(nil),             // 40: lindm.device.v1.AuthorizeResourceStartResponse
-	(*ReportResourceResultResponse)(nil),               // 41: lindm.device.v1.ReportResourceResultResponse
-	(*GetDeviceActionWorkResponse)(nil),                // 42: lindm.device.v1.GetDeviceActionWorkResponse
-	(*AuthorizeDeviceActionStartResponse)(nil),         // 43: lindm.device.v1.AuthorizeDeviceActionStartResponse
-	(*ReportDeviceActionResultResponse)(nil),           // 44: lindm.device.v1.ReportDeviceActionResultResponse
-	(*RegisterDeviceActionRecoveryResponse)(nil),       // 45: lindm.device.v1.RegisterDeviceActionRecoveryResponse
-	(*ConfirmRefreshInventoryPublicationResponse)(nil), // 46: lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
-	(*SyncAssistanceResponse)(nil),                     // 47: lindm.device.v1.SyncAssistanceResponse
+	(*PutAssistanceRecordingRequest)(nil),              // 39: lindm.device.v1.PutAssistanceRecordingRequest
+	(*GetResourceWorkResponse)(nil),                    // 40: lindm.device.v1.GetResourceWorkResponse
+	(*AuthorizeResourceStartResponse)(nil),             // 41: lindm.device.v1.AuthorizeResourceStartResponse
+	(*ReportResourceResultResponse)(nil),               // 42: lindm.device.v1.ReportResourceResultResponse
+	(*GetDeviceActionWorkResponse)(nil),                // 43: lindm.device.v1.GetDeviceActionWorkResponse
+	(*AuthorizeDeviceActionStartResponse)(nil),         // 44: lindm.device.v1.AuthorizeDeviceActionStartResponse
+	(*ReportDeviceActionResultResponse)(nil),           // 45: lindm.device.v1.ReportDeviceActionResultResponse
+	(*RegisterDeviceActionRecoveryResponse)(nil),       // 46: lindm.device.v1.RegisterDeviceActionRecoveryResponse
+	(*ConfirmRefreshInventoryPublicationResponse)(nil), // 47: lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
+	(*SyncAssistanceResponse)(nil),                     // 48: lindm.device.v1.SyncAssistanceResponse
+	(*PutAssistanceRecordingResponse)(nil),             // 49: lindm.device.v1.PutAssistanceRecordingResponse
 }
 var file_lindm_device_v1_device_proto_depIdxs = []int32{
 	24, // 0: lindm.device.v1.AcquireSessionResponse.server_time:type_name -> google.protobuf.Timestamp
@@ -1889,28 +1892,30 @@ var file_lindm_device_v1_device_proto_depIdxs = []int32{
 	37, // 46: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:input_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationRequest
 	38, // 47: lindm.device.v1.DeviceService.SyncAssistance:input_type -> lindm.device.v1.SyncAssistanceRequest
 	6,  // 48: lindm.device.v1.DeviceService.GetCapabilityPolicy:input_type -> lindm.device.v1.GetCapabilityPolicyRequest
-	1,  // 49: lindm.device.v1.DeviceService.AcquireSession:output_type -> lindm.device.v1.AcquireSessionResponse
-	3,  // 50: lindm.device.v1.DeviceService.GetSyncState:output_type -> lindm.device.v1.GetSyncStateResponse
-	5,  // 51: lindm.device.v1.DeviceService.GetExecutionTrust:output_type -> lindm.device.v1.GetExecutionTrustResponse
-	11, // 52: lindm.device.v1.DeviceService.ReportHostObservation:output_type -> lindm.device.v1.ReportHostObservationResponse
-	13, // 53: lindm.device.v1.DeviceService.ReportPackageAttempt:output_type -> lindm.device.v1.ReportPackageAttemptResponse
-	15, // 54: lindm.device.v1.DeviceService.BeginPackageSnapshot:output_type -> lindm.device.v1.BeginPackageSnapshotResponse
-	17, // 55: lindm.device.v1.DeviceService.PutPackageBatch:output_type -> lindm.device.v1.PutPackageBatchResponse
-	19, // 56: lindm.device.v1.DeviceService.CommitPackageSnapshot:output_type -> lindm.device.v1.CommitPackageSnapshotResponse
-	21, // 57: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
-	23, // 58: lindm.device.v1.DeviceService.RegisterEncryptionKey:output_type -> lindm.device.v1.RegisterEncryptionKeyResponse
-	39, // 59: lindm.device.v1.DeviceService.GetResourceWork:output_type -> lindm.device.v1.GetResourceWorkResponse
-	40, // 60: lindm.device.v1.DeviceService.AuthorizeResourceStart:output_type -> lindm.device.v1.AuthorizeResourceStartResponse
-	41, // 61: lindm.device.v1.DeviceService.ReportResourceResult:output_type -> lindm.device.v1.ReportResourceResultResponse
-	42, // 62: lindm.device.v1.DeviceService.GetDeviceActionWork:output_type -> lindm.device.v1.GetDeviceActionWorkResponse
-	43, // 63: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:output_type -> lindm.device.v1.AuthorizeDeviceActionStartResponse
-	44, // 64: lindm.device.v1.DeviceService.ReportDeviceActionResult:output_type -> lindm.device.v1.ReportDeviceActionResultResponse
-	45, // 65: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:output_type -> lindm.device.v1.RegisterDeviceActionRecoveryResponse
-	46, // 66: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:output_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
-	47, // 67: lindm.device.v1.DeviceService.SyncAssistance:output_type -> lindm.device.v1.SyncAssistanceResponse
-	7,  // 68: lindm.device.v1.DeviceService.GetCapabilityPolicy:output_type -> lindm.device.v1.GetCapabilityPolicyResponse
-	49, // [49:69] is the sub-list for method output_type
-	29, // [29:49] is the sub-list for method input_type
+	39, // 49: lindm.device.v1.DeviceService.PutAssistanceRecording:input_type -> lindm.device.v1.PutAssistanceRecordingRequest
+	1,  // 50: lindm.device.v1.DeviceService.AcquireSession:output_type -> lindm.device.v1.AcquireSessionResponse
+	3,  // 51: lindm.device.v1.DeviceService.GetSyncState:output_type -> lindm.device.v1.GetSyncStateResponse
+	5,  // 52: lindm.device.v1.DeviceService.GetExecutionTrust:output_type -> lindm.device.v1.GetExecutionTrustResponse
+	11, // 53: lindm.device.v1.DeviceService.ReportHostObservation:output_type -> lindm.device.v1.ReportHostObservationResponse
+	13, // 54: lindm.device.v1.DeviceService.ReportPackageAttempt:output_type -> lindm.device.v1.ReportPackageAttemptResponse
+	15, // 55: lindm.device.v1.DeviceService.BeginPackageSnapshot:output_type -> lindm.device.v1.BeginPackageSnapshotResponse
+	17, // 56: lindm.device.v1.DeviceService.PutPackageBatch:output_type -> lindm.device.v1.PutPackageBatchResponse
+	19, // 57: lindm.device.v1.DeviceService.CommitPackageSnapshot:output_type -> lindm.device.v1.CommitPackageSnapshotResponse
+	21, // 58: lindm.device.v1.DeviceService.RenewIdentity:output_type -> lindm.device.v1.RenewIdentityResponse
+	23, // 59: lindm.device.v1.DeviceService.RegisterEncryptionKey:output_type -> lindm.device.v1.RegisterEncryptionKeyResponse
+	40, // 60: lindm.device.v1.DeviceService.GetResourceWork:output_type -> lindm.device.v1.GetResourceWorkResponse
+	41, // 61: lindm.device.v1.DeviceService.AuthorizeResourceStart:output_type -> lindm.device.v1.AuthorizeResourceStartResponse
+	42, // 62: lindm.device.v1.DeviceService.ReportResourceResult:output_type -> lindm.device.v1.ReportResourceResultResponse
+	43, // 63: lindm.device.v1.DeviceService.GetDeviceActionWork:output_type -> lindm.device.v1.GetDeviceActionWorkResponse
+	44, // 64: lindm.device.v1.DeviceService.AuthorizeDeviceActionStart:output_type -> lindm.device.v1.AuthorizeDeviceActionStartResponse
+	45, // 65: lindm.device.v1.DeviceService.ReportDeviceActionResult:output_type -> lindm.device.v1.ReportDeviceActionResultResponse
+	46, // 66: lindm.device.v1.DeviceService.RegisterDeviceActionRecovery:output_type -> lindm.device.v1.RegisterDeviceActionRecoveryResponse
+	47, // 67: lindm.device.v1.DeviceService.ConfirmRefreshInventoryPublication:output_type -> lindm.device.v1.ConfirmRefreshInventoryPublicationResponse
+	48, // 68: lindm.device.v1.DeviceService.SyncAssistance:output_type -> lindm.device.v1.SyncAssistanceResponse
+	7,  // 69: lindm.device.v1.DeviceService.GetCapabilityPolicy:output_type -> lindm.device.v1.GetCapabilityPolicyResponse
+	49, // 70: lindm.device.v1.DeviceService.PutAssistanceRecording:output_type -> lindm.device.v1.PutAssistanceRecordingResponse
+	50, // [50:71] is the sub-list for method output_type
+	29, // [29:50] is the sub-list for method input_type
 	29, // [29:29] is the sub-list for extension type_name
 	29, // [29:29] is the sub-list for extension extendee
 	0,  // [0:29] is the sub-list for field type_name

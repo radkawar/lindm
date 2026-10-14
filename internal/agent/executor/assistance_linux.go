@@ -73,3 +73,38 @@ func (h *sessionService) SyncSession(ctx context.Context, req *connect.Request[a
 	}
 	return noStore(response), nil
 }
+
+// ExchangeAssistanceRecording relays sealed recording segments to the network
+// process and applies the server's receipts. It never carries plaintext.
+func (s *Service) ExchangeAssistanceRecording(ctx context.Context, req *connect.Request[agentv1.ExchangeAssistanceRecordingRequest]) (*connect.Response[agentv1.ExchangeAssistanceRecordingResponse], error) {
+	_, cancel := s.bounded(ctx)
+	defer cancel()
+	response, err := s.assistance.exchangeRecording(req.Msg)
+	if err != nil {
+		return nil, mapError(err)
+	}
+	return noStore(response), nil
+}
+
+// PutAssistanceRecording queues one sealed segment of the caller's own bound
+// session. Identity comes only from SO_PEERCRED and logind.
+func (h *sessionService) PutAssistanceRecording(ctx context.Context, req *connect.Request[agentv1.PutAssistanceRecordingRequest]) (*connect.Response[agentv1.PutAssistanceRecordingResponse], error) {
+	uid, ok := localrpc.PeerUID(ctx)
+	if !ok {
+		return nil, rpcreason.Error(connect.CodeUnauthenticated, "unauthenticated")
+	}
+	ctx, cancel := context.WithTimeout(ctx, rpcTimeout)
+	defer cancel()
+	err := h.broker.putRecording(ctx, uid, req.Msg)
+	switch {
+	case errors.Is(err, errNoGraphicalSession):
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "no_graphical_session")
+	case errors.Is(err, errAmbiguousGraphicalSession):
+		return nil, rpcreason.Error(connect.CodePermissionDenied, "ambiguous_graphical_session")
+	case errors.Is(err, errLogindUnavailable):
+		return nil, rpcreason.Error(connect.CodeUnavailable, "logind_unavailable")
+	case err != nil:
+		return nil, mapError(err)
+	}
+	return noStore(&agentv1.PutAssistanceRecordingResponse{}), nil
+}

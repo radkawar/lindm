@@ -288,6 +288,8 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		RecoveryKeyCustody:           newRecoveryCustodyReader(resources),
 		Assistance:                   relay,
 		AssistancePolicyCeiling:      resources.Proto.GetAssistance().GetPolicyCeiling(),
+		AssistanceRecording:          resources.AssistanceRecording,
+		AssistanceRecordingStorage:   resources.Proto.GetAssistance().GetRecording().GetMaxStorageBytes(),
 	}
 	devices, err := device.New(pool, deviceConfig, assistanceRuntime)
 	if err != nil {
@@ -494,6 +496,12 @@ func shutdown(servers ...*http.Server) error {
 	return err
 }
 
+// consoleContentSecurityPolicy admits media only from blob: URLs, which is how
+// the console plays a recording it decrypted in the page; without media-src
+// the default 'none' blocked every playback (layers-fedora44-recording-diag-01).
+// Live assistance media is a MediaStream, which CSP does not govern.
+const consoleContentSecurityPolicy = "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+
 func guard(next http.Handler) http.Handler {
 	slots := make(chan struct{}, 256)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -505,7 +513,7 @@ func guard(next http.Handler) http.Handler {
 		// Cross-origin requests still receive no referrer.
 		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+		w.Header().Set("Content-Security-Policy", consoleContentSecurityPolicy)
 		select {
 		case slots <- struct{}{}:
 			defer func() { <-slots }()

@@ -62,7 +62,8 @@ func Serve(ctx context.Context, cfg ListenConfig, handler agentv1connect.Executo
 
 // executorValidator compiles every executor request eagerly. Lazy compilation
 // is off, so a request missing here fails every call with "no evaluator
-// available" before its handler runs (ImportOfflineEnrollment did).
+// available" (ExchangeAssistanceRecording did on Fedora 44,
+// layers-fedora44-files-02).
 func executorValidator() (protovalidate.Validator, error) {
 	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.PrepareBootstrapRequest{},
@@ -101,6 +102,7 @@ func executorValidator() (protovalidate.Validator, error) {
 		&agentv1.GetAgentUpdateRequest{},
 		&agentv1.StatusRequest{},
 		&agentv1.SyncAssistanceRequest{},
+		&agentv1.ExchangeAssistanceRecordingRequest{},
 	), protovalidate.WithDisableLazy())
 }
 
@@ -206,7 +208,8 @@ func authorize(procedure string, uid, networkUID uint32) error {
 		procedure == agentv1connect.ExecutorServiceExchangeAgentUpdateProcedure ||
 		procedure == agentv1connect.ExecutorServiceGetAgentUpdateProcedure ||
 		procedure == agentv1connect.ExecutorServiceStatusProcedure ||
-		procedure == agentv1connect.ExecutorServiceSyncAssistanceProcedure
+		procedure == agentv1connect.ExecutorServiceSyncAssistanceProcedure ||
+		procedure == agentv1connect.ExecutorServiceExchangeAssistanceRecordingProcedure
 	if !known || uid != 0 && (uid != networkUID || rootOnly) {
 		return errors.New("permission denied")
 	}

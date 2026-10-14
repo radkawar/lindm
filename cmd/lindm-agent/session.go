@@ -13,7 +13,9 @@ import (
 	"os"
 
 	"lindm/internal/agent/desktop"
+	"lindm/internal/agent/inventory"
 	"lindm/internal/agent/localrpc"
+	"lindm/internal/platform"
 )
 
 // sessionCommand runs the unprivileged per-user remote-assistance helper,
@@ -55,19 +57,58 @@ func sessionCommand(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	overlay, err := desktop.NewShellOverlay(bus, os.Getenv("XDG_CURRENT_DESKTOP"))
+	if err != nil {
+		return err
+	}
+	enrollments, err := desktop.NewFileEnrollmentStore()
+	if err != nil {
+		return err
+	}
+	// A helper without a usable runtime directory shares no sound; that is a
+	// per-capability refusal, not a helper failure.
+	var audio desktop.AudioDevices
+	audioUnavailable := sessionCapabilityUnavailableReason(ctx, platform.AssistanceAudio, "platform_audio_unqualified")
+	if devices, err := desktop.NewPipeWireAudio(logger); err == nil {
+		audio = devices
+	} else if audioUnavailable == "" {
+		logger.Warn("session helper audio unavailable", "err", err)
+		audioUnavailable = "pipewire_runtime_unavailable"
+	}
 	helper, err := desktop.New(desktop.Config{
-		Client:         client,
-		Notifier:       notifier,
-		Portal:         portal,
-		Capturer:       capturer,
-		Peers:          desktop.NewPionPeers(),
-		Locks:          desktop.LogindLockMonitor{},
-		CurrentDesktop: os.Getenv("XDG_CURRENT_DESKTOP"),
-		Logger:         logger,
+		Client:                      client,
+		Notifier:                    notifier,
+		Portal:                      portal,
+		Capturer:                    capturer,
+		Peers:                       desktop.NewPionPeers(),
+		Locks:                       desktop.LogindLockMonitor{},
+		CurrentDesktop:              os.Getenv("XDG_CURRENT_DESKTOP"),
+		Logger:                      logger,
+		FilesUnavailableReason:      sessionCapabilityUnavailableReason(ctx, platform.AssistanceFiles, "platform_files_unqualified"),
+		RecordingUnavailableReason:  sessionCapabilityUnavailableReason(ctx, platform.AssistanceRecording, "platform_recording_unqualified"),
+		ReconnectUnavailableReason:  sessionCapabilityUnavailableReason(ctx, platform.AssistanceReconnect, "platform_reconnect_unqualified"),
+		Overlay:                     overlay,
+		Audio:                       audio,
+		Enrollments:                 enrollments,
+		UnattendedUnavailableReason: sessionCapabilityUnavailableReason(ctx, platform.AssistanceUnattended, "platform_unattended_unqualified"),
+		ElevationUnavailableReason:  sessionCapabilityUnavailableReason(ctx, platform.AssistanceElevation, "platform_elevation_unqualified"),
+		AnnotationUnavailableReason: sessionCapabilityUnavailableReason(ctx, platform.AssistanceAnnotation, "platform_annotation_unqualified"),
+		AudioUnavailableReason:      audioUnavailable,
 	})
 	if err != nil {
 		return err
 	}
 	logger.Info("session helper started", "socket", *socket, "uid", os.Getuid(), "current_desktop", os.Getenv("XDG_CURRENT_DESKTOP"))
 	return helper.Run(ctx)
+}
+
+func sessionCapabilityUnavailableReason(ctx context.Context, capability platform.Capability, gated string) string {
+	release, err := inventory.HostOSRelease(ctx)
+	if err != nil {
+		return "platform_identity_unavailable"
+	}
+	if platform.Identify(release).Gate(capability) != nil {
+		return gated
+	}
+	return ""
 }

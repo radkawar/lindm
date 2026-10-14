@@ -86,6 +86,52 @@ var (
 	CapabilityPolicySet   = kind("capability_policy.set")
 )
 
+// Remote assistance file transfer.
+var (
+	AssistanceFileCancel   = kind("assistance.file.cancel")
+	AssistanceFileComplete = kind("assistance.file.complete")
+	AssistanceFileDeny     = kind("assistance.file.deny")
+	AssistanceFileRequest  = kind("assistance.file.request")
+)
+
+// Remote assistance reconnect workflows and encrypted recordings.
+var (
+	AssistanceReconnectConsent = kind("assistance.reconnect.consent")
+	AssistanceReconnectEnd     = kind("assistance.reconnect.end")
+	AssistanceReconnectExpire  = kind("assistance.reconnect.expire")
+	AssistanceReconnectRequest = kind("assistance.reconnect.request")
+	AssistanceRecordingDelete  = kind("assistance.recording.delete")
+	AssistanceRecordingRead    = kind("assistance.recording.read")
+	// Written by the server's own retention maintenance, never by a person.
+	AssistanceRecordingRetention = kind("assistance.recording.retention")
+	AssistanceRecordingStart     = kind("assistance.recording.start")
+	AssistanceRecordingStop      = kind("assistance.recording.stop")
+)
+
+// Remote assistance Tier 3: unattended access, password guidance, pointer and
+// sound.
+var (
+	AssistanceAnnotationClear   = kind("assistance.annotation.clear")
+	AssistanceAnnotationDisable = kind("assistance.annotation.disable")
+	AssistanceAnnotationEnable  = kind("assistance.annotation.enable")
+	AssistanceAudioConsent      = kind("assistance.audio.consent")
+	AssistanceAudioMute         = kind("assistance.audio.mute")
+	AssistanceAudioSource       = kind("assistance.audio.source")
+	AssistanceAudioStop         = kind("assistance.audio.stop")
+	AssistanceElevationPause    = kind("assistance.elevation.pause")
+	AssistanceElevationRequest  = kind("assistance.elevation.request")
+	AssistanceElevationResume   = kind("assistance.elevation.resume")
+	AssistanceUnattendedApprove = kind("assistance.unattended.approve")
+	// Activation of an approved access period by its requester.
+	AssistanceUnattendedAuthorize = kind("assistance.unattended.authorize")
+	AssistanceUnattendedEnroll    = kind("assistance.unattended.enroll")
+	AssistanceUnattendedReject    = kind("assistance.unattended.reject")
+	AssistanceUnattendedRequest   = kind("assistance.unattended.request")
+	AssistanceUnattendedRevoke    = kind("assistance.unattended.revoke")
+	AssistanceUnattendedStart     = kind("assistance.unattended.start")
+	AssistanceUnattendedStop      = kind("assistance.unattended.stop")
+)
+
 // Written by the compliance_record_states database function.
 var ComplianceStateChanged = kind("compliance.state.changed")
 

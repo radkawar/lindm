@@ -38,7 +38,7 @@ func ServeSession(ctx context.Context, cfg SessionListenConfig, handler agentv1c
 	if handler == nil || cfg.NetworkUID == 0 || cfg.Directory == "" {
 		return errors.New("invalid session listener")
 	}
-	compiled, err := protovalidate.New(protovalidate.WithMessages(&agentv1.SyncSessionRequest{}), protovalidate.WithDisableLazy())
+	compiled, err := protovalidate.New(protovalidate.WithMessages(&agentv1.SyncSessionRequest{}, &agentv1.PutAssistanceRecordingRequest{}), protovalidate.WithDisableLazy())
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (g *sessionGate) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	// Root, the network account and group-0 peers (refused by peerCredential)
 	// never act as a desktop user. Session binding is the handler's job.
-	if uid == 0 || uid == g.networkUID || r.URL.Path != agentv1connect.SessionServiceSyncSessionProcedure {
+	if uid == 0 || uid == g.networkUID || (r.URL.Path != agentv1connect.SessionServiceSyncSessionProcedure && r.URL.Path != agentv1connect.SessionServicePutAssistanceRecordingProcedure) {
 		slog.Warn("session rpc denied", "procedure", r.URL.Path, "uid", uid)
 		writeDenied(w, r, connect.CodePermissionDenied, "permission_denied")
 		return

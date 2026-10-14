@@ -36,6 +36,10 @@ func assistanceCommandPermission(kind agentv1.AssistanceCommandKind) identity.Pe
 		return identity.PermissionAssistanceDisplay
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_MESSAGE:
 		return identity.PermissionAssistanceMessage
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE:
+		return identity.PermissionAssistanceElevation
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ANNOTATION:
+		return identity.PermissionAssistanceAnnotate
 	default:
 		return ""
 	}
@@ -63,12 +67,25 @@ func assistanceCommandAllowed(row devicedb.AssistanceSession, command *agentv1.A
 		}
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_MESSAGE:
 		return policy.GetMessages() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE:
+		return policy.GetElevation() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ANNOTATION:
+		// A locally hidden overlay stays hidden for the rest of the session.
+		return policy.GetAnnotation() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED && (!command.GetAnnotationEnabled() || !projection.GetAnnotation().GetHidden())
 	}
 	return false
 }
 
-func assistanceCommandAuditKind(kind int16) auditkind.Kind {
-	switch agentv1.AssistanceCommandKind(kind) {
+func assistanceCommandAuditKind(operation devicedb.AssistanceCommand) auditkind.Kind {
+	switch agentv1.AssistanceCommandKind(operation.Kind) {
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE:
+		// The device-observed pause and local resume are audited separately.
+		return auditkind.AssistanceElevationRequest
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ANNOTATION:
+		if operation.AnnotationEnabled {
+			return auditkind.AssistanceAnnotationEnable
+		}
+		return auditkind.AssistanceAnnotationDisable
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE, agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_READ:
 		return auditkind.AssistanceClipboard
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SPECIAL_KEYS:
@@ -98,7 +115,7 @@ func finishAssistanceCommand(ctx context.Context, q *devicedb.Queries, command *
 		}
 	}
 	return core.InsertDetailedAudit(ctx, q, devicedb.InsertAuditEventParams{
-		ID: uuid.New(), ActorID: &command.OperatorID, Action: assistanceCommandAuditKind(command.Kind).String(), ResourceID: command.SessionID.String(), TargetDeviceID: &command.DeviceID,
+		ID: uuid.New(), ActorID: &command.OperatorID, Action: assistanceCommandAuditKind(*command).String(), ResourceID: command.SessionID.String(), TargetDeviceID: &command.DeviceID,
 	}, core.AuditDetails(assistanceOperationAudit(*command, outcome, reason)...))
 }
 
@@ -215,6 +232,14 @@ func (s *Service) RunAssistanceCommand(ctx context.Context, req *connect.Request
 		if !assistanceCommandAllowed(row, command) {
 			return deny("capability_not_granted", rpcreason.Error(connect.CodeFailedPrecondition, "assistance_capability_not_granted"))
 		}
+		if row.InputPaused {
+			return deny("input_paused", rpcreason.Error(connect.CodeFailedPrecondition, "assistance_input_paused"))
+		}
+		if busy, err := s.assistanceFileBusy(ctx, q, id, now); err != nil {
+			return err
+		} else if busy {
+			return deny("file_busy", rpcreason.Error(connect.CodeFailedPrecondition, "assistance_file_busy"))
+		}
 		count, err := q.CountAssistanceCommands(ctx, id)
 		if err != nil {
 			return err
@@ -239,7 +264,7 @@ func (s *Service) RunAssistanceCommand(ctx context.Context, req *connect.Request
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		if err := q.InsertAssistanceCommand(ctx, devicedb.InsertAssistanceCommandParams{RequestID: requestID, SessionID: id, DeviceID: row.DeviceID, OperatorID: actor.ID, RequestDigest: digest, Kind: int16(command.GetKind()), Policy: row.EffectiveCapabilities, ByteCount: int32(len(command.GetText())), SpecialKey: int16(command.GetSpecialKey()), DisplayID: command.GetDisplayId(), Deadline: core.Timestamptz(deadline)}); err != nil {
+		if err := q.InsertAssistanceCommand(ctx, devicedb.InsertAssistanceCommandParams{RequestID: requestID, SessionID: id, DeviceID: row.DeviceID, OperatorID: actor.ID, RequestDigest: digest, Kind: int16(command.GetKind()), Policy: row.EffectiveCapabilities, ByteCount: int32(len(command.GetText())), SpecialKey: int16(command.GetSpecialKey()), DisplayID: command.GetDisplayId(), AnnotationEnabled: command.GetAnnotationEnabled(), Deadline: core.Timestamptz(deadline)}); err != nil {
 			return err
 		}
 		accepted = s.runtime.rememberAssistanceCommand(id, command, s.Now())

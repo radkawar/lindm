@@ -93,6 +93,132 @@ func (AssistanceState) EnumDescriptor() ([]byte, []int) {
 	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{0}
 }
 
+type AssistanceReconnectState int32
+
+const (
+	AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_UNSPECIFIED AssistanceReconnectState = 0
+	// A linked session is open; the workflow waits for its end.
+	AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_ACTIVE AssistanceReconnectState = 1
+	// The latest session ended by logout, reboot, lock or lost connection; a
+	// fresh linked invitation may be issued until expires_at.
+	AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_WAITING AssistanceReconnectState = 2
+	AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_ENDED   AssistanceReconnectState = 3
+	AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_EXPIRED AssistanceReconnectState = 4
+)
+
+// Enum value maps for AssistanceReconnectState.
+var (
+	AssistanceReconnectState_name = map[int32]string{
+		0: "ASSISTANCE_RECONNECT_STATE_UNSPECIFIED",
+		1: "ASSISTANCE_RECONNECT_STATE_ACTIVE",
+		2: "ASSISTANCE_RECONNECT_STATE_WAITING",
+		3: "ASSISTANCE_RECONNECT_STATE_ENDED",
+		4: "ASSISTANCE_RECONNECT_STATE_EXPIRED",
+	}
+	AssistanceReconnectState_value = map[string]int32{
+		"ASSISTANCE_RECONNECT_STATE_UNSPECIFIED": 0,
+		"ASSISTANCE_RECONNECT_STATE_ACTIVE":      1,
+		"ASSISTANCE_RECONNECT_STATE_WAITING":     2,
+		"ASSISTANCE_RECONNECT_STATE_ENDED":       3,
+		"ASSISTANCE_RECONNECT_STATE_EXPIRED":     4,
+	}
+)
+
+func (x AssistanceReconnectState) Enum() *AssistanceReconnectState {
+	p := new(AssistanceReconnectState)
+	*p = x
+	return p
+}
+
+func (x AssistanceReconnectState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceReconnectState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_assistance_proto_enumTypes[1].Descriptor()
+}
+
+func (AssistanceReconnectState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[1]
+}
+
+func (x AssistanceReconnectState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceReconnectState.Descriptor instead.
+func (AssistanceReconnectState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{1}
+}
+
+type AssistanceRecordingArchiveState int32
+
+const (
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED AssistanceRecordingArchiveState = 0
+	// Authorized; the local user has not yet approved capture.
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING   AssistanceRecordingArchiveState = 1
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING AssistanceRecordingArchiveState = 2
+	// The final authenticated segment was stored.
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE AssistanceRecordingArchiveState = 3
+	// Capture ended without a final segment; the stored prefix is retained.
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE AssistanceRecordingArchiveState = 4
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED     AssistanceRecordingArchiveState = 5
+	// The local user did not approve optional recording; nothing was stored.
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED AssistanceRecordingArchiveState = 6
+	AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED  AssistanceRecordingArchiveState = 7
+)
+
+// Enum value maps for AssistanceRecordingArchiveState.
+var (
+	AssistanceRecordingArchiveState_name = map[int32]string{
+		0: "ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED",
+		1: "ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING",
+		2: "ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING",
+		3: "ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE",
+		4: "ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE",
+		5: "ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED",
+		6: "ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED",
+		7: "ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED",
+	}
+	AssistanceRecordingArchiveState_value = map[string]int32{
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED": 0,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING":     1,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING":   2,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE":    3,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE":  4,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED":      5,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED":    6,
+		"ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED":     7,
+	}
+)
+
+func (x AssistanceRecordingArchiveState) Enum() *AssistanceRecordingArchiveState {
+	p := new(AssistanceRecordingArchiveState)
+	*p = x
+	return p
+}
+
+func (x AssistanceRecordingArchiveState) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AssistanceRecordingArchiveState) Descriptor() protoreflect.EnumDescriptor {
+	return file_lindm_admin_v1_assistance_proto_enumTypes[2].Descriptor()
+}
+
+func (AssistanceRecordingArchiveState) Type() protoreflect.EnumType {
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[2]
+}
+
+func (x AssistanceRecordingArchiveState) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AssistanceRecordingArchiveState.Descriptor instead.
+func (AssistanceRecordingArchiveState) EnumDescriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{2}
+}
+
 // AssistanceReadinessState is the server's answer to "can a new request reach
 // a person on this device now?", from evidence the device has reported.
 type AssistanceReadinessState int32
@@ -151,11 +277,11 @@ func (x AssistanceReadinessState) String() string {
 }
 
 func (AssistanceReadinessState) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_assistance_proto_enumTypes[1].Descriptor()
+	return file_lindm_admin_v1_assistance_proto_enumTypes[3].Descriptor()
 }
 
 func (AssistanceReadinessState) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_assistance_proto_enumTypes[1]
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[3]
 }
 
 func (x AssistanceReadinessState) Number() protoreflect.EnumNumber {
@@ -164,7 +290,7 @@ func (x AssistanceReadinessState) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AssistanceReadinessState.Descriptor instead.
 func (AssistanceReadinessState) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{1}
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{3}
 }
 
 // AssistanceDesktop is the session-inventory evidence for a local desktop.
@@ -203,11 +329,11 @@ func (x AssistanceDesktop) String() string {
 }
 
 func (AssistanceDesktop) Descriptor() protoreflect.EnumDescriptor {
-	return file_lindm_admin_v1_assistance_proto_enumTypes[2].Descriptor()
+	return file_lindm_admin_v1_assistance_proto_enumTypes[4].Descriptor()
 }
 
 func (AssistanceDesktop) Type() protoreflect.EnumType {
-	return &file_lindm_admin_v1_assistance_proto_enumTypes[2]
+	return &file_lindm_admin_v1_assistance_proto_enumTypes[4]
 }
 
 func (x AssistanceDesktop) Number() protoreflect.EnumNumber {
@@ -216,7 +342,7 @@ func (x AssistanceDesktop) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AssistanceDesktop.Descriptor instead.
 func (AssistanceDesktop) EnumDescriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{2}
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{4}
 }
 
 type AssistanceSession struct {
@@ -250,8 +376,19 @@ type AssistanceSession struct {
 	SelectedDisplayId     string                     `protobuf:"bytes,25,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
 	DisplayGeneration     uint32                     `protobuf:"varint,26,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
 	DisplayFrame          *v1.AssistanceDisplayFrame `protobuf:"bytes,27,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	InputState            *v1.AssistanceInputState   `protobuf:"bytes,29,opt,name=input_state,json=inputState,proto3" json:"input_state,omitempty"`
+	// The ended session this one continues; empty for an original invitation.
+	ReconnectOf string                       `protobuf:"bytes,30,opt,name=reconnect_of,json=reconnectOf,proto3" json:"reconnect_of,omitempty"`
+	Reconnect   *AssistanceReconnectWorkflow `protobuf:"bytes,31,opt,name=reconnect,proto3" json:"reconnect,omitempty"`
+	Recording   *AssistanceRecording         `protobuf:"bytes,32,opt,name=recording,proto3" json:"recording,omitempty"`
+	// Present exactly on an unattended connection.
+	Unattended *AssistanceUnattendedConnection `protobuf:"bytes,33,opt,name=unattended,proto3" json:"unattended,omitempty"`
+	// The opt-in this attended session offered, if any.
+	UnattendedEnrollmentId string                         `protobuf:"bytes,34,opt,name=unattended_enrollment_id,json=unattendedEnrollmentId,proto3" json:"unattended_enrollment_id,omitempty"`
+	Audio                  *v1.AssistanceAudioReport      `protobuf:"bytes,35,opt,name=audio,proto3" json:"audio,omitempty"`
+	Annotation             *v1.AssistanceAnnotationReport `protobuf:"bytes,36,opt,name=annotation,proto3" json:"annotation,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *AssistanceSession) Reset() {
@@ -473,6 +610,62 @@ func (x *AssistanceSession) GetDisplayFrame() *v1.AssistanceDisplayFrame {
 	return nil
 }
 
+func (x *AssistanceSession) GetInputState() *v1.AssistanceInputState {
+	if x != nil {
+		return x.InputState
+	}
+	return nil
+}
+
+func (x *AssistanceSession) GetReconnectOf() string {
+	if x != nil {
+		return x.ReconnectOf
+	}
+	return ""
+}
+
+func (x *AssistanceSession) GetReconnect() *AssistanceReconnectWorkflow {
+	if x != nil {
+		return x.Reconnect
+	}
+	return nil
+}
+
+func (x *AssistanceSession) GetRecording() *AssistanceRecording {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+func (x *AssistanceSession) GetUnattended() *AssistanceUnattendedConnection {
+	if x != nil {
+		return x.Unattended
+	}
+	return nil
+}
+
+func (x *AssistanceSession) GetUnattendedEnrollmentId() string {
+	if x != nil {
+		return x.UnattendedEnrollmentId
+	}
+	return ""
+}
+
+func (x *AssistanceSession) GetAudio() *v1.AssistanceAudioReport {
+	if x != nil {
+		return x.Audio
+	}
+	return nil
+}
+
+func (x *AssistanceSession) GetAnnotation() *v1.AssistanceAnnotationReport {
+	if x != nil {
+		return x.Annotation
+	}
+	return nil
+}
+
 type CreateAssistanceSessionRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	RequestId string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
@@ -484,8 +677,11 @@ type CreateAssistanceSessionRequest struct {
 	// Empty targets the user of the device's active local graphical session.
 	TargetUsername        string               `protobuf:"bytes,6,opt,name=target_username,json=targetUsername,proto3" json:"target_username,omitempty"`
 	RequestedCapabilities *v1.AssistancePolicy `protobuf:"bytes,7,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Starts an unattended connection under this caller's in-force,
+	// independently approved grant. The target is the grant's opted-in user.
+	UnattendedGrantId string `protobuf:"bytes,8,opt,name=unattended_grant_id,json=unattendedGrantId,proto3" json:"unattended_grant_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CreateAssistanceSessionRequest) Reset() {
@@ -565,6 +761,13 @@ func (x *CreateAssistanceSessionRequest) GetRequestedCapabilities() *v1.Assistan
 		return x.RequestedCapabilities
 	}
 	return nil
+}
+
+func (x *CreateAssistanceSessionRequest) GetUnattendedGrantId() string {
+	if x != nil {
+		return x.UnattendedGrantId
+	}
+	return ""
 }
 
 type CreateAssistanceSessionResponse struct {
@@ -1503,6 +1706,1164 @@ func (x *GetAssistanceCommandResponse) GetResult() *v1.AssistanceCommandResult {
 	return nil
 }
 
+type StartAssistanceFileTransferRequest struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	SessionId     string                    `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Transfer      *v1.AssistanceFileRequest `protobuf:"bytes,2,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartAssistanceFileTransferRequest) Reset() {
+	*x = StartAssistanceFileTransferRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAssistanceFileTransferRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAssistanceFileTransferRequest) ProtoMessage() {}
+
+func (x *StartAssistanceFileTransferRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAssistanceFileTransferRequest.ProtoReflect.Descriptor instead.
+func (*StartAssistanceFileTransferRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *StartAssistanceFileTransferRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *StartAssistanceFileTransferRequest) GetTransfer() *v1.AssistanceFileRequest {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
+type StartAssistanceFileTransferResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Transfer      *v1.AssistanceFileReport `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartAssistanceFileTransferResponse) Reset() {
+	*x = StartAssistanceFileTransferResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAssistanceFileTransferResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAssistanceFileTransferResponse) ProtoMessage() {}
+
+func (x *StartAssistanceFileTransferResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAssistanceFileTransferResponse.ProtoReflect.Descriptor instead.
+func (*StartAssistanceFileTransferResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *StartAssistanceFileTransferResponse) GetTransfer() *v1.AssistanceFileReport {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
+type GetAssistanceFileTransferRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssistanceFileTransferRequest) Reset() {
+	*x = GetAssistanceFileTransferRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssistanceFileTransferRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssistanceFileTransferRequest) ProtoMessage() {}
+
+func (x *GetAssistanceFileTransferRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssistanceFileTransferRequest.ProtoReflect.Descriptor instead.
+func (*GetAssistanceFileTransferRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetAssistanceFileTransferRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *GetAssistanceFileTransferRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type GetAssistanceFileTransferResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Transfer      *v1.AssistanceFileReport `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssistanceFileTransferResponse) Reset() {
+	*x = GetAssistanceFileTransferResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssistanceFileTransferResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssistanceFileTransferResponse) ProtoMessage() {}
+
+func (x *GetAssistanceFileTransferResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssistanceFileTransferResponse.ProtoReflect.Descriptor instead.
+func (*GetAssistanceFileTransferResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *GetAssistanceFileTransferResponse) GetTransfer() *v1.AssistanceFileReport {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
+type CancelAssistanceFileTransferRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelAssistanceFileTransferRequest) Reset() {
+	*x = CancelAssistanceFileTransferRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAssistanceFileTransferRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAssistanceFileTransferRequest) ProtoMessage() {}
+
+func (x *CancelAssistanceFileTransferRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAssistanceFileTransferRequest.ProtoReflect.Descriptor instead.
+func (*CancelAssistanceFileTransferRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CancelAssistanceFileTransferRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *CancelAssistanceFileTransferRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type CancelAssistanceFileTransferResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Transfer      *v1.AssistanceFileReport `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CancelAssistanceFileTransferResponse) Reset() {
+	*x = CancelAssistanceFileTransferResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CancelAssistanceFileTransferResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CancelAssistanceFileTransferResponse) ProtoMessage() {}
+
+func (x *CancelAssistanceFileTransferResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CancelAssistanceFileTransferResponse.ProtoReflect.Descriptor instead.
+func (*CancelAssistanceFileTransferResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *CancelAssistanceFileTransferResponse) GetTransfer() *v1.AssistanceFileReport {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
+// AssistanceReconnectWorkflow is bounded workflow metadata. It never holds a
+// grant, portal token, relay credential or DTLS identity.
+type AssistanceReconnectWorkflow struct {
+	state protoimpl.MessageState   `protogen:"open.v1"`
+	Id    string                   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	State AssistanceReconnectState `protobuf:"varint,2,opt,name=state,proto3,enum=lindm.admin.v1.AssistanceReconnectState" json:"state,omitempty"`
+	// LIMITED: operator-issued reconnect only. ON: automatic re-invitation.
+	Mode            v1.AssistancePolicyMode `protobuf:"varint,3,opt,name=mode,proto3,enum=lindm.agent.v1.AssistancePolicyMode" json:"mode,omitempty"`
+	OriginSessionId string                  `protobuf:"bytes,4,opt,name=origin_session_id,json=originSessionId,proto3" json:"origin_session_id,omitempty"`
+	LatestSessionId string                  `protobuf:"bytes,5,opt,name=latest_session_id,json=latestSessionId,proto3" json:"latest_session_id,omitempty"`
+	Reconnects      uint32                  `protobuf:"varint,6,opt,name=reconnects,proto3" json:"reconnects,omitempty"`
+	MaxReconnects   uint32                  `protobuf:"varint,7,opt,name=max_reconnects,json=maxReconnects,proto3" json:"max_reconnects,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp  `protobuf:"bytes,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	EndedAt         *timestamppb.Timestamp  `protobuf:"bytes,9,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
+	EndReason       string                  `protobuf:"bytes,10,opt,name=end_reason,json=endReason,proto3" json:"end_reason,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AssistanceReconnectWorkflow) Reset() {
+	*x = AssistanceReconnectWorkflow{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceReconnectWorkflow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceReconnectWorkflow) ProtoMessage() {}
+
+func (x *AssistanceReconnectWorkflow) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceReconnectWorkflow.ProtoReflect.Descriptor instead.
+func (*AssistanceReconnectWorkflow) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *AssistanceReconnectWorkflow) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AssistanceReconnectWorkflow) GetState() AssistanceReconnectState {
+	if x != nil {
+		return x.State
+	}
+	return AssistanceReconnectState_ASSISTANCE_RECONNECT_STATE_UNSPECIFIED
+}
+
+func (x *AssistanceReconnectWorkflow) GetMode() v1.AssistancePolicyMode {
+	if x != nil {
+		return x.Mode
+	}
+	return v1.AssistancePolicyMode(0)
+}
+
+func (x *AssistanceReconnectWorkflow) GetOriginSessionId() string {
+	if x != nil {
+		return x.OriginSessionId
+	}
+	return ""
+}
+
+func (x *AssistanceReconnectWorkflow) GetLatestSessionId() string {
+	if x != nil {
+		return x.LatestSessionId
+	}
+	return ""
+}
+
+func (x *AssistanceReconnectWorkflow) GetReconnects() uint32 {
+	if x != nil {
+		return x.Reconnects
+	}
+	return 0
+}
+
+func (x *AssistanceReconnectWorkflow) GetMaxReconnects() uint32 {
+	if x != nil {
+		return x.MaxReconnects
+	}
+	return 0
+}
+
+func (x *AssistanceReconnectWorkflow) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *AssistanceReconnectWorkflow) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
+func (x *AssistanceReconnectWorkflow) GetEndReason() string {
+	if x != nil {
+		return x.EndReason
+	}
+	return ""
+}
+
+// AssistanceRecording is archive metadata. Content requires a separate
+// OpenAssistanceRecording retrieval with remote_assistance.recordings.read.
+type AssistanceRecording struct {
+	state       protoimpl.MessageState          `protogen:"open.v1"`
+	Id          string                          `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	SessionId   string                          `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	DeviceId    string                          `protobuf:"bytes,3,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	OperatorId  string                          `protobuf:"bytes,4,opt,name=operator_id,json=operatorId,proto3" json:"operator_id,omitempty"`
+	Required    bool                            `protobuf:"varint,5,opt,name=required,proto3" json:"required,omitempty"`
+	State       AssistanceRecordingArchiveState `protobuf:"varint,6,opt,name=state,proto3,enum=lindm.admin.v1.AssistanceRecordingArchiveState" json:"state,omitempty"`
+	StoredBytes uint64                          `protobuf:"varint,7,opt,name=stored_bytes,json=storedBytes,proto3" json:"stored_bytes,omitempty"`
+	Segments    uint32                          `protobuf:"varint,8,opt,name=segments,proto3" json:"segments,omitempty"`
+	CreatedAt   *timestamppb.Timestamp          `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	StartedAt   *timestamppb.Timestamp          `protobuf:"bytes,10,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	FinalizedAt *timestamppb.Timestamp          `protobuf:"bytes,11,opt,name=finalized_at,json=finalizedAt,proto3" json:"finalized_at,omitempty"`
+	RetainUntil *timestamppb.Timestamp          `protobuf:"bytes,12,opt,name=retain_until,json=retainUntil,proto3" json:"retain_until,omitempty"`
+	DeletedAt   *timestamppb.Timestamp          `protobuf:"bytes,13,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
+	// Lowercase hex SHA-256 of the stored ciphertext stream, once finalized.
+	CiphertextSha256 string `protobuf:"bytes,14,opt,name=ciphertext_sha256,json=ciphertextSha256,proto3" json:"ciphertext_sha256,omitempty"`
+	DurationSeconds  uint32 `protobuf:"varint,15,opt,name=duration_seconds,json=durationSeconds,proto3" json:"duration_seconds,omitempty"`
+	Reason           string `protobuf:"bytes,16,opt,name=reason,proto3" json:"reason,omitempty"`
+	KeyId            string `protobuf:"bytes,17,opt,name=key_id,json=keyId,proto3" json:"key_id,omitempty"`
+	RetentionDays    uint32 `protobuf:"varint,18,opt,name=retention_days,json=retentionDays,proto3" json:"retention_days,omitempty"`
+	MaxBytes         uint64 `protobuf:"varint,19,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AssistanceRecording) Reset() {
+	*x = AssistanceRecording{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssistanceRecording) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssistanceRecording) ProtoMessage() {}
+
+func (x *AssistanceRecording) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssistanceRecording.ProtoReflect.Descriptor instead.
+func (*AssistanceRecording) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *AssistanceRecording) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetOperatorId() string {
+	if x != nil {
+		return x.OperatorId
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *AssistanceRecording) GetState() AssistanceRecordingArchiveState {
+	if x != nil {
+		return x.State
+	}
+	return AssistanceRecordingArchiveState_ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED
+}
+
+func (x *AssistanceRecording) GetStoredBytes() uint64 {
+	if x != nil {
+		return x.StoredBytes
+	}
+	return 0
+}
+
+func (x *AssistanceRecording) GetSegments() uint32 {
+	if x != nil {
+		return x.Segments
+	}
+	return 0
+}
+
+func (x *AssistanceRecording) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *AssistanceRecording) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *AssistanceRecording) GetFinalizedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.FinalizedAt
+	}
+	return nil
+}
+
+func (x *AssistanceRecording) GetRetainUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RetainUntil
+	}
+	return nil
+}
+
+func (x *AssistanceRecording) GetDeletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeletedAt
+	}
+	return nil
+}
+
+func (x *AssistanceRecording) GetCiphertextSha256() string {
+	if x != nil {
+		return x.CiphertextSha256
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetDurationSeconds() uint32 {
+	if x != nil {
+		return x.DurationSeconds
+	}
+	return 0
+}
+
+func (x *AssistanceRecording) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetKeyId() string {
+	if x != nil {
+		return x.KeyId
+	}
+	return ""
+}
+
+func (x *AssistanceRecording) GetRetentionDays() uint32 {
+	if x != nil {
+		return x.RetentionDays
+	}
+	return 0
+}
+
+func (x *AssistanceRecording) GetMaxBytes() uint64 {
+	if x != nil {
+		return x.MaxBytes
+	}
+	return 0
+}
+
+// ReconnectAssistanceSession issues a fresh linked invitation for an ended
+// session of a waiting workflow. Every authority check of Create is repeated
+// and the local user must consent again.
+type ReconnectAssistanceSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReconnectAssistanceSessionRequest) Reset() {
+	*x = ReconnectAssistanceSessionRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReconnectAssistanceSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReconnectAssistanceSessionRequest) ProtoMessage() {}
+
+func (x *ReconnectAssistanceSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReconnectAssistanceSessionRequest.ProtoReflect.Descriptor instead.
+func (*ReconnectAssistanceSessionRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *ReconnectAssistanceSessionRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ReconnectAssistanceSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type ReconnectAssistanceSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *AssistanceSession     `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReconnectAssistanceSessionResponse) Reset() {
+	*x = ReconnectAssistanceSessionResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReconnectAssistanceSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReconnectAssistanceSessionResponse) ProtoMessage() {}
+
+func (x *ReconnectAssistanceSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReconnectAssistanceSessionResponse.ProtoReflect.Descriptor instead.
+func (*ReconnectAssistanceSessionResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ReconnectAssistanceSessionResponse) GetSession() *AssistanceSession {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type ListAssistanceRecordingsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
+	PageSize      uint32                 `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAssistanceRecordingsRequest) Reset() {
+	*x = ListAssistanceRecordingsRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAssistanceRecordingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAssistanceRecordingsRequest) ProtoMessage() {}
+
+func (x *ListAssistanceRecordingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAssistanceRecordingsRequest.ProtoReflect.Descriptor instead.
+func (*ListAssistanceRecordingsRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListAssistanceRecordingsRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
+	}
+	return ""
+}
+
+func (x *ListAssistanceRecordingsRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListAssistanceRecordingsRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListAssistanceRecordingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Recordings    []*AssistanceRecording `protobuf:"bytes,1,rep,name=recordings,proto3" json:"recordings,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAssistanceRecordingsResponse) Reset() {
+	*x = ListAssistanceRecordingsResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAssistanceRecordingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAssistanceRecordingsResponse) ProtoMessage() {}
+
+func (x *ListAssistanceRecordingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAssistanceRecordingsResponse.ProtoReflect.Descriptor instead.
+func (*ListAssistanceRecordingsResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *ListAssistanceRecordingsResponse) GetRecordings() []*AssistanceRecording {
+	if x != nil {
+		return x.Recordings
+	}
+	return nil
+}
+
+func (x *ListAssistanceRecordingsResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+// OpenAssistanceRecording audits and starts one expiring retrieval.
+type OpenAssistanceRecordingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RecordingId   string                 `protobuf:"bytes,1,opt,name=recording_id,json=recordingId,proto3" json:"recording_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OpenAssistanceRecordingRequest) Reset() {
+	*x = OpenAssistanceRecordingRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OpenAssistanceRecordingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenAssistanceRecordingRequest) ProtoMessage() {}
+
+func (x *OpenAssistanceRecordingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenAssistanceRecordingRequest.ProtoReflect.Descriptor instead.
+func (*OpenAssistanceRecordingRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *OpenAssistanceRecordingRequest) GetRecordingId() string {
+	if x != nil {
+		return x.RecordingId
+	}
+	return ""
+}
+
+func (x *OpenAssistanceRecordingRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type OpenAssistanceRecordingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RetrievalId   string                 `protobuf:"bytes,1,opt,name=retrieval_id,json=retrievalId,proto3" json:"retrieval_id,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Recording     *AssistanceRecording   `protobuf:"bytes,3,opt,name=recording,proto3" json:"recording,omitempty"`
+	MediaType     string                 `protobuf:"bytes,4,opt,name=media_type,json=mediaType,proto3" json:"media_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OpenAssistanceRecordingResponse) Reset() {
+	*x = OpenAssistanceRecordingResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OpenAssistanceRecordingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OpenAssistanceRecordingResponse) ProtoMessage() {}
+
+func (x *OpenAssistanceRecordingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OpenAssistanceRecordingResponse.ProtoReflect.Descriptor instead.
+func (*OpenAssistanceRecordingResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *OpenAssistanceRecordingResponse) GetRetrievalId() string {
+	if x != nil {
+		return x.RetrievalId
+	}
+	return ""
+}
+
+func (x *OpenAssistanceRecordingResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *OpenAssistanceRecordingResponse) GetRecording() *AssistanceRecording {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+func (x *OpenAssistanceRecordingResponse) GetMediaType() string {
+	if x != nil {
+		return x.MediaType
+	}
+	return ""
+}
+
+// ReadAssistanceRecording returns one decrypted segment of an open retrieval.
+// Plaintext is streamed from memory and never written to server storage.
+type ReadAssistanceRecordingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RetrievalId   string                 `protobuf:"bytes,1,opt,name=retrieval_id,json=retrievalId,proto3" json:"retrieval_id,omitempty"`
+	Sequence      uint32                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadAssistanceRecordingRequest) Reset() {
+	*x = ReadAssistanceRecordingRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadAssistanceRecordingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadAssistanceRecordingRequest) ProtoMessage() {}
+
+func (x *ReadAssistanceRecordingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadAssistanceRecordingRequest.ProtoReflect.Descriptor instead.
+func (*ReadAssistanceRecordingRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ReadAssistanceRecordingRequest) GetRetrievalId() string {
+	if x != nil {
+		return x.RetrievalId
+	}
+	return ""
+}
+
+func (x *ReadAssistanceRecordingRequest) GetSequence() uint32 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+type ReadAssistanceRecordingResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Data     []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Sequence uint32                 `protobuf:"varint,2,opt,name=sequence,proto3" json:"sequence,omitempty"`
+	// True for the last stored segment; complete distinguishes an authenticated
+	// final segment from a retained incomplete prefix.
+	Last          bool `protobuf:"varint,3,opt,name=last,proto3" json:"last,omitempty"`
+	Complete      bool `protobuf:"varint,4,opt,name=complete,proto3" json:"complete,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReadAssistanceRecordingResponse) Reset() {
+	*x = ReadAssistanceRecordingResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReadAssistanceRecordingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReadAssistanceRecordingResponse) ProtoMessage() {}
+
+func (x *ReadAssistanceRecordingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReadAssistanceRecordingResponse.ProtoReflect.Descriptor instead.
+func (*ReadAssistanceRecordingResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ReadAssistanceRecordingResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *ReadAssistanceRecordingResponse) GetSequence() uint32 {
+	if x != nil {
+		return x.Sequence
+	}
+	return 0
+}
+
+func (x *ReadAssistanceRecordingResponse) GetLast() bool {
+	if x != nil {
+		return x.Last
+	}
+	return false
+}
+
+func (x *ReadAssistanceRecordingResponse) GetComplete() bool {
+	if x != nil {
+		return x.Complete
+	}
+	return false
+}
+
+type DeleteAssistanceRecordingRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	RecordingId   string                 `protobuf:"bytes,2,opt,name=recording_id,json=recordingId,proto3" json:"recording_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAssistanceRecordingRequest) Reset() {
+	*x = DeleteAssistanceRecordingRequest{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAssistanceRecordingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAssistanceRecordingRequest) ProtoMessage() {}
+
+func (x *DeleteAssistanceRecordingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAssistanceRecordingRequest.ProtoReflect.Descriptor instead.
+func (*DeleteAssistanceRecordingRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *DeleteAssistanceRecordingRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *DeleteAssistanceRecordingRequest) GetRecordingId() string {
+	if x != nil {
+		return x.RecordingId
+	}
+	return ""
+}
+
+func (x *DeleteAssistanceRecordingRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type DeleteAssistanceRecordingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Recording     *AssistanceRecording   `protobuf:"bytes,1,opt,name=recording,proto3" json:"recording,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAssistanceRecordingResponse) Reset() {
+	*x = DeleteAssistanceRecordingResponse{}
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAssistanceRecordingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAssistanceRecordingResponse) ProtoMessage() {}
+
+func (x *DeleteAssistanceRecordingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAssistanceRecordingResponse.ProtoReflect.Descriptor instead.
+func (*DeleteAssistanceRecordingResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *DeleteAssistanceRecordingResponse) GetRecording() *AssistanceRecording {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
 type AssistanceReadiness struct {
 	state protoimpl.MessageState   `protogen:"open.v1"`
 	State AssistanceReadinessState `protobuf:"varint,1,opt,name=state,proto3,enum=lindm.admin.v1.AssistanceReadinessState" json:"state,omitempty"`
@@ -1520,7 +2881,7 @@ type AssistanceReadiness struct {
 
 func (x *AssistanceReadiness) Reset() {
 	*x = AssistanceReadiness{}
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1532,7 +2893,7 @@ func (x *AssistanceReadiness) String() string {
 func (*AssistanceReadiness) ProtoMessage() {}
 
 func (x *AssistanceReadiness) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[21]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1545,7 +2906,7 @@ func (x *AssistanceReadiness) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssistanceReadiness.ProtoReflect.Descriptor instead.
 func (*AssistanceReadiness) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{21}
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *AssistanceReadiness) GetState() AssistanceReadinessState {
@@ -1599,7 +2960,7 @@ type GetAssistanceReadinessRequest struct {
 
 func (x *GetAssistanceReadinessRequest) Reset() {
 	*x = GetAssistanceReadinessRequest{}
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1611,7 +2972,7 @@ func (x *GetAssistanceReadinessRequest) String() string {
 func (*GetAssistanceReadinessRequest) ProtoMessage() {}
 
 func (x *GetAssistanceReadinessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[22]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1624,7 +2985,7 @@ func (x *GetAssistanceReadinessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistanceReadinessRequest.ProtoReflect.Descriptor instead.
 func (*GetAssistanceReadinessRequest) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{22}
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetAssistanceReadinessRequest) GetDeviceId() string {
@@ -1643,7 +3004,7 @@ type GetAssistanceReadinessResponse struct {
 
 func (x *GetAssistanceReadinessResponse) Reset() {
 	*x = GetAssistanceReadinessResponse{}
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1655,7 +3016,7 @@ func (x *GetAssistanceReadinessResponse) String() string {
 func (*GetAssistanceReadinessResponse) ProtoMessage() {}
 
 func (x *GetAssistanceReadinessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[23]
+	mi := &file_lindm_admin_v1_assistance_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1668,7 +3029,7 @@ func (x *GetAssistanceReadinessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssistanceReadinessResponse.ProtoReflect.Descriptor instead.
 func (*GetAssistanceReadinessResponse) Descriptor() ([]byte, []int) {
-	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{23}
+	return file_lindm_admin_v1_assistance_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetAssistanceReadinessResponse) GetReadiness() *AssistanceReadiness {
@@ -1682,7 +3043,7 @@ var File_lindm_admin_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\n" +
-	"\x1flindm/admin/v1/assistance.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a&lindm/validation/v1/string_rules.proto\"\x90\x0e\n" +
+	"\x1flindm/admin/v1/assistance.proto\x12\x0elindm.admin.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a*lindm/admin/v1/assistance_unattended.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a%lindm/agent/v1/assistance_files.proto\x1a(lindm/agent/v1/assistance_guidance.proto\x1a&lindm/validation/v1/string_rules.proto\"\x9b\x12\n" +
 	"\x11AssistanceSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x12\x1f\n" +
@@ -1715,8 +3076,21 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\bdisplays\x18\x18 \x03(\v2!.lindm.agent.v1.AssistanceDisplayR\bdisplays\x12.\n" +
 	"\x13selected_display_id\x18\x19 \x01(\tR\x11selectedDisplayId\x12-\n" +
 	"\x12display_generation\x18\x1a \x01(\rR\x11displayGeneration\x12K\n" +
-	"\rdisplay_frame\x18\x1b \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame:\xc3\x02\xbaH\xbf\x02\x1a\xbc\x02\n" +
-	" assistance_session.display_frame\x12@frame identity must name the currently shared display generation\x1a\xd5\x01!has(this.display_frame) || (this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))\"\x8d\x04\n" +
+	"\rdisplay_frame\x18\x1b \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame\x12E\n" +
+	"\vinput_state\x18\x1d \x01(\v2$.lindm.agent.v1.AssistanceInputStateR\n" +
+	"inputState\x12!\n" +
+	"\freconnect_of\x18\x1e \x01(\tR\vreconnectOf\x12I\n" +
+	"\treconnect\x18\x1f \x01(\v2+.lindm.admin.v1.AssistanceReconnectWorkflowR\treconnect\x12A\n" +
+	"\trecording\x18  \x01(\v2#.lindm.admin.v1.AssistanceRecordingR\trecording\x12N\n" +
+	"\n" +
+	"unattended\x18! \x01(\v2..lindm.admin.v1.AssistanceUnattendedConnectionR\n" +
+	"unattended\x128\n" +
+	"\x18unattended_enrollment_id\x18\" \x01(\tR\x16unattendedEnrollmentId\x12;\n" +
+	"\x05audio\x18# \x01(\v2%.lindm.agent.v1.AssistanceAudioReportR\x05audio\x12J\n" +
+	"\n" +
+	"annotation\x18$ \x01(\v2*.lindm.agent.v1.AssistanceAnnotationReportR\n" +
+	"annotation:\xc3\x02\xbaH\xbf\x02\x1a\xbc\x02\n" +
+	" assistance_session.display_frame\x12@frame identity must name the currently shared display generation\x1a\xd5\x01!has(this.display_frame) || (this.display_frame.display_id == this.selected_display_id && this.display_frame.generation == this.display_generation && this.displays.exists(d, d.id == this.display_frame.display_id))\"\xaf\x06\n" +
 	"\x1eCreateAssistanceSessionRequest\x12M\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12K\n" +
@@ -1727,7 +3101,9 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\x14max_duration_seconds\x18\x05 \x01(\rB\r\xbaH\n" +
 	"\xd8\x01\x01*\x05\x18\x88\x0e(<R\x12maxDurationSeconds\x12R\n" +
 	"\x0ftarget_username\x18\x06 \x01(\tB)\xbaH&r$2\"^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$R\x0etargetUsername\x12W\n" +
-	"\x16requested_capabilities\x18\a \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\"^\n" +
+	"\x16requested_capabilities\x18\a \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12;\n" +
+	"\x13unattended_grant_id\x18\b \x01(\tB\v\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01R\x11unattendedGrantId:\xe2\x01\xbaH\xde\x01\x1a\xdb\x01\n" +
+	"$create_assistance_session.unattended\x12@an unattended connection cannot also offer unattended enrollment\x1aqthis.unattended_grant_id == '' || !has(this.requested_capabilities) || this.requested_capabilities.unattended < 2\"^\n" +
 	"\x1fCreateAssistanceSessionResponse\x12;\n" +
 	"\asession\x18\x01 \x01(\v2!.lindm.admin.v1.AssistanceSessionR\asession\"\x95\x01\n" +
 	"\x1dListAssistanceSessionsRequest\x12%\n" +
@@ -1790,7 +3166,112 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\"_\n" +
 	"\x1cGetAssistanceCommandResponse\x12?\n" +
-	"\x06result\x18\x01 \x01(\v2'.lindm.agent.v1.AssistanceCommandResultR\x06result\"\x86\x03\n" +
+	"\x06result\x18\x01 \x01(\v2'.lindm.agent.v1.AssistanceCommandResultR\x06result\"\xe5\x02\n" +
+	"\"StartAssistanceFileTransferRequest\x12'\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12I\n" +
+	"\btransfer\x18\x02 \x01(\v2%.lindm.agent.v1.AssistanceFileRequestB\x06\xbaH\x03\xc8\x01\x01R\btransfer:\xca\x01\xbaH\xc6\x01\x1a\xc3\x01\n" +
+	"(start_assistance_file_transfer.authority\x12Bonly the server sets a file transfer deadline and effective policy\x1aS!has(this.transfer) || (!has(this.transfer.deadline) && !has(this.transfer.policy))\"g\n" +
+	"#StartAssistanceFileTransferResponse\x12@\n" +
+	"\btransfer\x18\x01 \x01(\v2$.lindm.agent.v1.AssistanceFileReportR\btransfer\"t\n" +
+	" GetAssistanceFileTransferRequest\x12'\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12'\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\"e\n" +
+	"!GetAssistanceFileTransferResponse\x12@\n" +
+	"\btransfer\x18\x01 \x01(\v2$.lindm.agent.v1.AssistanceFileReportR\btransfer\"w\n" +
+	"#CancelAssistanceFileTransferRequest\x12'\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12'\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\trequestId\"h\n" +
+	"$CancelAssistanceFileTransferResponse\x12@\n" +
+	"\btransfer\x18\x01 \x01(\v2$.lindm.agent.v1.AssistanceFileReportR\btransfer\"\xd7\x03\n" +
+	"\x1bAssistanceReconnectWorkflow\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12>\n" +
+	"\x05state\x18\x02 \x01(\x0e2(.lindm.admin.v1.AssistanceReconnectStateR\x05state\x128\n" +
+	"\x04mode\x18\x03 \x01(\x0e2$.lindm.agent.v1.AssistancePolicyModeR\x04mode\x12*\n" +
+	"\x11origin_session_id\x18\x04 \x01(\tR\x0foriginSessionId\x12*\n" +
+	"\x11latest_session_id\x18\x05 \x01(\tR\x0flatestSessionId\x12\x1e\n" +
+	"\n" +
+	"reconnects\x18\x06 \x01(\rR\n" +
+	"reconnects\x12%\n" +
+	"\x0emax_reconnects\x18\a \x01(\rR\rmaxReconnects\x129\n" +
+	"\n" +
+	"expires_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x125\n" +
+	"\bended_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\x12\x1d\n" +
+	"\n" +
+	"end_reason\x18\n" +
+	" \x01(\tR\tendReason\"\x9e\x06\n" +
+	"\x13AssistanceRecording\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\x12\x1b\n" +
+	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\x12\x1f\n" +
+	"\voperator_id\x18\x04 \x01(\tR\n" +
+	"operatorId\x12\x1a\n" +
+	"\brequired\x18\x05 \x01(\bR\brequired\x12E\n" +
+	"\x05state\x18\x06 \x01(\x0e2/.lindm.admin.v1.AssistanceRecordingArchiveStateR\x05state\x12!\n" +
+	"\fstored_bytes\x18\a \x01(\x04R\vstoredBytes\x12\x1a\n" +
+	"\bsegments\x18\b \x01(\rR\bsegments\x129\n" +
+	"\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"started_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
+	"\ffinalized_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\vfinalizedAt\x12=\n" +
+	"\fretain_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\vretainUntil\x129\n" +
+	"\n" +
+	"deleted_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tdeletedAt\x12+\n" +
+	"\x11ciphertext_sha256\x18\x0e \x01(\tR\x10ciphertextSha256\x12)\n" +
+	"\x10duration_seconds\x18\x0f \x01(\rR\x0fdurationSeconds\x12\x16\n" +
+	"\x06reason\x18\x10 \x01(\tR\x06reason\x12\x15\n" +
+	"\x06key_id\x18\x11 \x01(\tR\x05keyId\x12%\n" +
+	"\x0eretention_days\x18\x12 \x01(\rR\rretentionDays\x12\x1b\n" +
+	"\tmax_bytes\x18\x13 \x01(\x04R\bmaxBytes\"\x9b\x01\n" +
+	"!ReconnectAssistanceSessionRequest\x12M\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12'\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\"a\n" +
+	"\"ReconnectAssistanceSessionResponse\x12;\n" +
+	"\asession\x18\x01 \x01(\v2!.lindm.admin.v1.AssistanceSessionR\asession\"\x97\x01\n" +
+	"\x1fListAssistanceRecordingsRequest\x12%\n" +
+	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12$\n" +
+	"\tpage_size\x18\x02 \x01(\rB\a\xbaH\x04*\x02\x18dR\bpageSize\x12'\n" +
+	"\n" +
+	"page_token\x18\x03 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\"\x8f\x01\n" +
+	" ListAssistanceRecordingsResponse\x12C\n" +
+	"\n" +
+	"recordings\x18\x01 \x03(\v2#.lindm.admin.v1.AssistanceRecordingR\n" +
+	"recordings\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"p\n" +
+	"\x1eOpenAssistanceRecordingRequest\x12+\n" +
+	"\frecording_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\x12!\n" +
+	"\x06reason\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"\xe1\x01\n" +
+	"\x1fOpenAssistanceRecordingResponse\x12!\n" +
+	"\fretrieval_id\x18\x01 \x01(\tR\vretrievalId\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12A\n" +
+	"\trecording\x18\x03 \x01(\v2#.lindm.admin.v1.AssistanceRecordingR\trecording\x12\x1d\n" +
+	"\n" +
+	"media_type\x18\x04 \x01(\tR\tmediaType\"t\n" +
+	"\x1eReadAssistanceRecordingRequest\x12+\n" +
+	"\fretrieval_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vretrievalId\x12%\n" +
+	"\bsequence\x18\x02 \x01(\rB\t\xbaH\x06*\x04\x18\xff\xff\x03R\bsequence\"\x81\x01\n" +
+	"\x1fReadAssistanceRecordingResponse\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x1a\n" +
+	"\bsequence\x18\x02 \x01(\rR\bsequence\x12\x12\n" +
+	"\x04last\x18\x03 \x01(\bR\x04last\x12\x1a\n" +
+	"\bcomplete\x18\x04 \x01(\bR\bcomplete\"\xc1\x01\n" +
+	" DeleteAssistanceRecordingRequest\x12M\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\trequestId\x12+\n" +
+	"\frecording_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\vrecordingId\x12!\n" +
+	"\x06reason\x18\x03 \x01(\tB\t\xbaH\x06r\x04\x98\xb5\x18\x01R\x06reason\"f\n" +
+	"!DeleteAssistanceRecordingResponse\x12A\n" +
+	"\trecording\x18\x01 \x01(\v2#.lindm.admin.v1.AssistanceRecordingR\trecording\"\x86\x03\n" +
 	"\x13AssistanceReadiness\x12>\n" +
 	"\x05state\x18\x01 \x01(\x0e2(.lindm.admin.v1.AssistanceReadinessStateR\x05state\x12<\n" +
 	"\x06policy\x18\x02 \x01(\x0e2$.lindm.agent.v1.AssistanceEnablementR\x06policy\x12;\n" +
@@ -1810,7 +3291,22 @@ const file_lindm_admin_v1_assistance_proto_rawDesc = "" +
 	"\x18ASSISTANCE_STATE_OFFERED\x10\x03\x12\x1d\n" +
 	"\x19ASSISTANCE_STATE_ANSWERED\x10\x04\x12\x1b\n" +
 	"\x17ASSISTANCE_STATE_ACTIVE\x10\x05\x12\x1a\n" +
-	"\x16ASSISTANCE_STATE_ENDED\x10\x06*\xe7\x02\n" +
+	"\x16ASSISTANCE_STATE_ENDED\x10\x06*\xe3\x01\n" +
+	"\x18AssistanceReconnectState\x12*\n" +
+	"&ASSISTANCE_RECONNECT_STATE_UNSPECIFIED\x10\x00\x12%\n" +
+	"!ASSISTANCE_RECONNECT_STATE_ACTIVE\x10\x01\x12&\n" +
+	"\"ASSISTANCE_RECONNECT_STATE_WAITING\x10\x02\x12$\n" +
+	" ASSISTANCE_RECONNECT_STATE_ENDED\x10\x03\x12&\n" +
+	"\"ASSISTANCE_RECONNECT_STATE_EXPIRED\x10\x04*\xab\x03\n" +
+	"\x1fAssistanceRecordingArchiveState\x122\n" +
+	".ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED\x10\x00\x12.\n" +
+	"*ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING\x10\x01\x120\n" +
+	",ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING\x10\x02\x12/\n" +
+	"+ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE\x10\x03\x121\n" +
+	"-ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE\x10\x04\x12-\n" +
+	")ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED\x10\x05\x12/\n" +
+	"+ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED\x10\x06\x12.\n" +
+	"*ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED\x10\a*\xe7\x02\n" +
 	"\x18AssistanceReadinessState\x12*\n" +
 	"&ASSISTANCE_READINESS_STATE_UNSPECIFIED\x10\x00\x12$\n" +
 	" ASSISTANCE_READINESS_STATE_READY\x10\x01\x12+\n" +
@@ -1837,93 +3333,145 @@ func file_lindm_admin_v1_assistance_proto_rawDescGZIP() []byte {
 	return file_lindm_admin_v1_assistance_proto_rawDescData
 }
 
-var file_lindm_admin_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_lindm_admin_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_lindm_admin_v1_assistance_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_lindm_admin_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
 var file_lindm_admin_v1_assistance_proto_goTypes = []any{
-	(AssistanceState)(0),                    // 0: lindm.admin.v1.AssistanceState
-	(AssistanceReadinessState)(0),           // 1: lindm.admin.v1.AssistanceReadinessState
-	(AssistanceDesktop)(0),                  // 2: lindm.admin.v1.AssistanceDesktop
-	(*AssistanceSession)(nil),               // 3: lindm.admin.v1.AssistanceSession
-	(*CreateAssistanceSessionRequest)(nil),  // 4: lindm.admin.v1.CreateAssistanceSessionRequest
-	(*CreateAssistanceSessionResponse)(nil), // 5: lindm.admin.v1.CreateAssistanceSessionResponse
-	(*ListAssistanceSessionsRequest)(nil),   // 6: lindm.admin.v1.ListAssistanceSessionsRequest
-	(*ListAssistanceSessionsResponse)(nil),  // 7: lindm.admin.v1.ListAssistanceSessionsResponse
-	(*GetAssistanceSessionRequest)(nil),     // 8: lindm.admin.v1.GetAssistanceSessionRequest
-	(*GetAssistanceSessionResponse)(nil),    // 9: lindm.admin.v1.GetAssistanceSessionResponse
-	(*JoinAssistanceSessionRequest)(nil),    // 10: lindm.admin.v1.JoinAssistanceSessionRequest
-	(*JoinAssistanceSessionResponse)(nil),   // 11: lindm.admin.v1.JoinAssistanceSessionResponse
-	(*AnswerAssistanceSessionRequest)(nil),  // 12: lindm.admin.v1.AnswerAssistanceSessionRequest
-	(*AnswerAssistanceSessionResponse)(nil), // 13: lindm.admin.v1.AnswerAssistanceSessionResponse
-	(*StopAssistanceSessionRequest)(nil),    // 14: lindm.admin.v1.StopAssistanceSessionRequest
-	(*StopAssistanceSessionResponse)(nil),   // 15: lindm.admin.v1.StopAssistanceSessionResponse
-	(*GetAssistancePolicyRequest)(nil),      // 16: lindm.admin.v1.GetAssistancePolicyRequest
-	(*GetAssistancePolicyResponse)(nil),     // 17: lindm.admin.v1.GetAssistancePolicyResponse
-	(*UpdateAssistancePolicyRequest)(nil),   // 18: lindm.admin.v1.UpdateAssistancePolicyRequest
-	(*UpdateAssistancePolicyResponse)(nil),  // 19: lindm.admin.v1.UpdateAssistancePolicyResponse
-	(*RunAssistanceCommandRequest)(nil),     // 20: lindm.admin.v1.RunAssistanceCommandRequest
-	(*RunAssistanceCommandResponse)(nil),    // 21: lindm.admin.v1.RunAssistanceCommandResponse
-	(*GetAssistanceCommandRequest)(nil),     // 22: lindm.admin.v1.GetAssistanceCommandRequest
-	(*GetAssistanceCommandResponse)(nil),    // 23: lindm.admin.v1.GetAssistanceCommandResponse
-	(*AssistanceReadiness)(nil),             // 24: lindm.admin.v1.AssistanceReadiness
-	(*GetAssistanceReadinessRequest)(nil),   // 25: lindm.admin.v1.GetAssistanceReadinessRequest
-	(*GetAssistanceReadinessResponse)(nil),  // 26: lindm.admin.v1.GetAssistanceReadinessResponse
-	(v1.AssistanceMode)(0),                  // 27: lindm.agent.v1.AssistanceMode
-	(*timestamppb.Timestamp)(nil),           // 28: google.protobuf.Timestamp
-	(v1.AssistanceEndCause)(0),              // 29: lindm.agent.v1.AssistanceEndCause
-	(*v1.AssistanceLocalSession)(nil),       // 30: lindm.agent.v1.AssistanceLocalSession
-	(*v1.AssistancePolicy)(nil),             // 31: lindm.agent.v1.AssistancePolicy
-	(*v1.AssistanceCapabilities)(nil),       // 32: lindm.agent.v1.AssistanceCapabilities
-	(*v1.AssistanceDisplay)(nil),            // 33: lindm.agent.v1.AssistanceDisplay
-	(*v1.AssistanceDisplayFrame)(nil),       // 34: lindm.agent.v1.AssistanceDisplayFrame
-	(*v1.AssistanceIceServer)(nil),          // 35: lindm.agent.v1.AssistanceIceServer
-	(*v1.AssistanceCommand)(nil),            // 36: lindm.agent.v1.AssistanceCommand
-	(*v1.AssistanceCommandResult)(nil),      // 37: lindm.agent.v1.AssistanceCommandResult
-	(v1.AssistanceEnablement)(0),            // 38: lindm.agent.v1.AssistanceEnablement
+	(AssistanceState)(0),                         // 0: lindm.admin.v1.AssistanceState
+	(AssistanceReconnectState)(0),                // 1: lindm.admin.v1.AssistanceReconnectState
+	(AssistanceRecordingArchiveState)(0),         // 2: lindm.admin.v1.AssistanceRecordingArchiveState
+	(AssistanceReadinessState)(0),                // 3: lindm.admin.v1.AssistanceReadinessState
+	(AssistanceDesktop)(0),                       // 4: lindm.admin.v1.AssistanceDesktop
+	(*AssistanceSession)(nil),                    // 5: lindm.admin.v1.AssistanceSession
+	(*CreateAssistanceSessionRequest)(nil),       // 6: lindm.admin.v1.CreateAssistanceSessionRequest
+	(*CreateAssistanceSessionResponse)(nil),      // 7: lindm.admin.v1.CreateAssistanceSessionResponse
+	(*ListAssistanceSessionsRequest)(nil),        // 8: lindm.admin.v1.ListAssistanceSessionsRequest
+	(*ListAssistanceSessionsResponse)(nil),       // 9: lindm.admin.v1.ListAssistanceSessionsResponse
+	(*GetAssistanceSessionRequest)(nil),          // 10: lindm.admin.v1.GetAssistanceSessionRequest
+	(*GetAssistanceSessionResponse)(nil),         // 11: lindm.admin.v1.GetAssistanceSessionResponse
+	(*JoinAssistanceSessionRequest)(nil),         // 12: lindm.admin.v1.JoinAssistanceSessionRequest
+	(*JoinAssistanceSessionResponse)(nil),        // 13: lindm.admin.v1.JoinAssistanceSessionResponse
+	(*AnswerAssistanceSessionRequest)(nil),       // 14: lindm.admin.v1.AnswerAssistanceSessionRequest
+	(*AnswerAssistanceSessionResponse)(nil),      // 15: lindm.admin.v1.AnswerAssistanceSessionResponse
+	(*StopAssistanceSessionRequest)(nil),         // 16: lindm.admin.v1.StopAssistanceSessionRequest
+	(*StopAssistanceSessionResponse)(nil),        // 17: lindm.admin.v1.StopAssistanceSessionResponse
+	(*GetAssistancePolicyRequest)(nil),           // 18: lindm.admin.v1.GetAssistancePolicyRequest
+	(*GetAssistancePolicyResponse)(nil),          // 19: lindm.admin.v1.GetAssistancePolicyResponse
+	(*UpdateAssistancePolicyRequest)(nil),        // 20: lindm.admin.v1.UpdateAssistancePolicyRequest
+	(*UpdateAssistancePolicyResponse)(nil),       // 21: lindm.admin.v1.UpdateAssistancePolicyResponse
+	(*RunAssistanceCommandRequest)(nil),          // 22: lindm.admin.v1.RunAssistanceCommandRequest
+	(*RunAssistanceCommandResponse)(nil),         // 23: lindm.admin.v1.RunAssistanceCommandResponse
+	(*GetAssistanceCommandRequest)(nil),          // 24: lindm.admin.v1.GetAssistanceCommandRequest
+	(*GetAssistanceCommandResponse)(nil),         // 25: lindm.admin.v1.GetAssistanceCommandResponse
+	(*StartAssistanceFileTransferRequest)(nil),   // 26: lindm.admin.v1.StartAssistanceFileTransferRequest
+	(*StartAssistanceFileTransferResponse)(nil),  // 27: lindm.admin.v1.StartAssistanceFileTransferResponse
+	(*GetAssistanceFileTransferRequest)(nil),     // 28: lindm.admin.v1.GetAssistanceFileTransferRequest
+	(*GetAssistanceFileTransferResponse)(nil),    // 29: lindm.admin.v1.GetAssistanceFileTransferResponse
+	(*CancelAssistanceFileTransferRequest)(nil),  // 30: lindm.admin.v1.CancelAssistanceFileTransferRequest
+	(*CancelAssistanceFileTransferResponse)(nil), // 31: lindm.admin.v1.CancelAssistanceFileTransferResponse
+	(*AssistanceReconnectWorkflow)(nil),          // 32: lindm.admin.v1.AssistanceReconnectWorkflow
+	(*AssistanceRecording)(nil),                  // 33: lindm.admin.v1.AssistanceRecording
+	(*ReconnectAssistanceSessionRequest)(nil),    // 34: lindm.admin.v1.ReconnectAssistanceSessionRequest
+	(*ReconnectAssistanceSessionResponse)(nil),   // 35: lindm.admin.v1.ReconnectAssistanceSessionResponse
+	(*ListAssistanceRecordingsRequest)(nil),      // 36: lindm.admin.v1.ListAssistanceRecordingsRequest
+	(*ListAssistanceRecordingsResponse)(nil),     // 37: lindm.admin.v1.ListAssistanceRecordingsResponse
+	(*OpenAssistanceRecordingRequest)(nil),       // 38: lindm.admin.v1.OpenAssistanceRecordingRequest
+	(*OpenAssistanceRecordingResponse)(nil),      // 39: lindm.admin.v1.OpenAssistanceRecordingResponse
+	(*ReadAssistanceRecordingRequest)(nil),       // 40: lindm.admin.v1.ReadAssistanceRecordingRequest
+	(*ReadAssistanceRecordingResponse)(nil),      // 41: lindm.admin.v1.ReadAssistanceRecordingResponse
+	(*DeleteAssistanceRecordingRequest)(nil),     // 42: lindm.admin.v1.DeleteAssistanceRecordingRequest
+	(*DeleteAssistanceRecordingResponse)(nil),    // 43: lindm.admin.v1.DeleteAssistanceRecordingResponse
+	(*AssistanceReadiness)(nil),                  // 44: lindm.admin.v1.AssistanceReadiness
+	(*GetAssistanceReadinessRequest)(nil),        // 45: lindm.admin.v1.GetAssistanceReadinessRequest
+	(*GetAssistanceReadinessResponse)(nil),       // 46: lindm.admin.v1.GetAssistanceReadinessResponse
+	(v1.AssistanceMode)(0),                       // 47: lindm.agent.v1.AssistanceMode
+	(*timestamppb.Timestamp)(nil),                // 48: google.protobuf.Timestamp
+	(v1.AssistanceEndCause)(0),                   // 49: lindm.agent.v1.AssistanceEndCause
+	(*v1.AssistanceLocalSession)(nil),            // 50: lindm.agent.v1.AssistanceLocalSession
+	(*v1.AssistancePolicy)(nil),                  // 51: lindm.agent.v1.AssistancePolicy
+	(*v1.AssistanceCapabilities)(nil),            // 52: lindm.agent.v1.AssistanceCapabilities
+	(*v1.AssistanceDisplay)(nil),                 // 53: lindm.agent.v1.AssistanceDisplay
+	(*v1.AssistanceDisplayFrame)(nil),            // 54: lindm.agent.v1.AssistanceDisplayFrame
+	(*v1.AssistanceInputState)(nil),              // 55: lindm.agent.v1.AssistanceInputState
+	(*AssistanceUnattendedConnection)(nil),       // 56: lindm.admin.v1.AssistanceUnattendedConnection
+	(*v1.AssistanceAudioReport)(nil),             // 57: lindm.agent.v1.AssistanceAudioReport
+	(*v1.AssistanceAnnotationReport)(nil),        // 58: lindm.agent.v1.AssistanceAnnotationReport
+	(*v1.AssistanceIceServer)(nil),               // 59: lindm.agent.v1.AssistanceIceServer
+	(*v1.AssistanceCommand)(nil),                 // 60: lindm.agent.v1.AssistanceCommand
+	(*v1.AssistanceCommandResult)(nil),           // 61: lindm.agent.v1.AssistanceCommandResult
+	(*v1.AssistanceFileRequest)(nil),             // 62: lindm.agent.v1.AssistanceFileRequest
+	(*v1.AssistanceFileReport)(nil),              // 63: lindm.agent.v1.AssistanceFileReport
+	(v1.AssistancePolicyMode)(0),                 // 64: lindm.agent.v1.AssistancePolicyMode
+	(v1.AssistanceEnablement)(0),                 // 65: lindm.agent.v1.AssistanceEnablement
 }
 var file_lindm_admin_v1_assistance_proto_depIdxs = []int32{
-	27, // 0: lindm.admin.v1.AssistanceSession.mode:type_name -> lindm.agent.v1.AssistanceMode
+	47, // 0: lindm.admin.v1.AssistanceSession.mode:type_name -> lindm.agent.v1.AssistanceMode
 	0,  // 1: lindm.admin.v1.AssistanceSession.state:type_name -> lindm.admin.v1.AssistanceState
-	28, // 2: lindm.admin.v1.AssistanceSession.created_at:type_name -> google.protobuf.Timestamp
-	28, // 3: lindm.admin.v1.AssistanceSession.consent_deadline:type_name -> google.protobuf.Timestamp
-	28, // 4: lindm.admin.v1.AssistanceSession.ends_at:type_name -> google.protobuf.Timestamp
-	28, // 5: lindm.admin.v1.AssistanceSession.consented_at:type_name -> google.protobuf.Timestamp
-	28, // 6: lindm.admin.v1.AssistanceSession.started_at:type_name -> google.protobuf.Timestamp
-	28, // 7: lindm.admin.v1.AssistanceSession.ended_at:type_name -> google.protobuf.Timestamp
-	29, // 8: lindm.admin.v1.AssistanceSession.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
-	30, // 9: lindm.admin.v1.AssistanceSession.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	31, // 10: lindm.admin.v1.AssistanceSession.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	31, // 11: lindm.admin.v1.AssistanceSession.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	32, // 12: lindm.admin.v1.AssistanceSession.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
-	33, // 13: lindm.admin.v1.AssistanceSession.displays:type_name -> lindm.agent.v1.AssistanceDisplay
-	34, // 14: lindm.admin.v1.AssistanceSession.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
-	27, // 15: lindm.admin.v1.CreateAssistanceSessionRequest.mode:type_name -> lindm.agent.v1.AssistanceMode
-	31, // 16: lindm.admin.v1.CreateAssistanceSessionRequest.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
-	3,  // 17: lindm.admin.v1.CreateAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	3,  // 18: lindm.admin.v1.ListAssistanceSessionsResponse.sessions:type_name -> lindm.admin.v1.AssistanceSession
-	3,  // 19: lindm.admin.v1.GetAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	3,  // 20: lindm.admin.v1.JoinAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	35, // 21: lindm.admin.v1.JoinAssistanceSessionResponse.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
-	3,  // 22: lindm.admin.v1.AnswerAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	3,  // 23: lindm.admin.v1.StopAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
-	31, // 24: lindm.admin.v1.GetAssistancePolicyResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
-	31, // 25: lindm.admin.v1.GetAssistancePolicyResponse.ceiling:type_name -> lindm.agent.v1.AssistancePolicy
-	31, // 26: lindm.admin.v1.UpdateAssistancePolicyRequest.policy:type_name -> lindm.agent.v1.AssistancePolicy
-	31, // 27: lindm.admin.v1.UpdateAssistancePolicyResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
-	31, // 28: lindm.admin.v1.UpdateAssistancePolicyResponse.ceiling:type_name -> lindm.agent.v1.AssistancePolicy
-	36, // 29: lindm.admin.v1.RunAssistanceCommandRequest.command:type_name -> lindm.agent.v1.AssistanceCommand
-	37, // 30: lindm.admin.v1.RunAssistanceCommandResponse.result:type_name -> lindm.agent.v1.AssistanceCommandResult
-	37, // 31: lindm.admin.v1.GetAssistanceCommandResponse.result:type_name -> lindm.agent.v1.AssistanceCommandResult
-	1,  // 32: lindm.admin.v1.AssistanceReadiness.state:type_name -> lindm.admin.v1.AssistanceReadinessState
-	38, // 33: lindm.admin.v1.AssistanceReadiness.policy:type_name -> lindm.agent.v1.AssistanceEnablement
-	2,  // 34: lindm.admin.v1.AssistanceReadiness.desktop:type_name -> lindm.admin.v1.AssistanceDesktop
-	28, // 35: lindm.admin.v1.AssistanceReadiness.inventory_observed_at:type_name -> google.protobuf.Timestamp
-	28, // 36: lindm.admin.v1.AssistanceReadiness.last_seen_at:type_name -> google.protobuf.Timestamp
-	24, // 37: lindm.admin.v1.GetAssistanceReadinessResponse.readiness:type_name -> lindm.admin.v1.AssistanceReadiness
-	38, // [38:38] is the sub-list for method output_type
-	38, // [38:38] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	48, // 2: lindm.admin.v1.AssistanceSession.created_at:type_name -> google.protobuf.Timestamp
+	48, // 3: lindm.admin.v1.AssistanceSession.consent_deadline:type_name -> google.protobuf.Timestamp
+	48, // 4: lindm.admin.v1.AssistanceSession.ends_at:type_name -> google.protobuf.Timestamp
+	48, // 5: lindm.admin.v1.AssistanceSession.consented_at:type_name -> google.protobuf.Timestamp
+	48, // 6: lindm.admin.v1.AssistanceSession.started_at:type_name -> google.protobuf.Timestamp
+	48, // 7: lindm.admin.v1.AssistanceSession.ended_at:type_name -> google.protobuf.Timestamp
+	49, // 8: lindm.admin.v1.AssistanceSession.end_cause:type_name -> lindm.agent.v1.AssistanceEndCause
+	50, // 9: lindm.admin.v1.AssistanceSession.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	51, // 10: lindm.admin.v1.AssistanceSession.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	51, // 11: lindm.admin.v1.AssistanceSession.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	52, // 12: lindm.admin.v1.AssistanceSession.granted_capabilities:type_name -> lindm.agent.v1.AssistanceCapabilities
+	53, // 13: lindm.admin.v1.AssistanceSession.displays:type_name -> lindm.agent.v1.AssistanceDisplay
+	54, // 14: lindm.admin.v1.AssistanceSession.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
+	55, // 15: lindm.admin.v1.AssistanceSession.input_state:type_name -> lindm.agent.v1.AssistanceInputState
+	32, // 16: lindm.admin.v1.AssistanceSession.reconnect:type_name -> lindm.admin.v1.AssistanceReconnectWorkflow
+	33, // 17: lindm.admin.v1.AssistanceSession.recording:type_name -> lindm.admin.v1.AssistanceRecording
+	56, // 18: lindm.admin.v1.AssistanceSession.unattended:type_name -> lindm.admin.v1.AssistanceUnattendedConnection
+	57, // 19: lindm.admin.v1.AssistanceSession.audio:type_name -> lindm.agent.v1.AssistanceAudioReport
+	58, // 20: lindm.admin.v1.AssistanceSession.annotation:type_name -> lindm.agent.v1.AssistanceAnnotationReport
+	47, // 21: lindm.admin.v1.CreateAssistanceSessionRequest.mode:type_name -> lindm.agent.v1.AssistanceMode
+	51, // 22: lindm.admin.v1.CreateAssistanceSessionRequest.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
+	5,  // 23: lindm.admin.v1.CreateAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	5,  // 24: lindm.admin.v1.ListAssistanceSessionsResponse.sessions:type_name -> lindm.admin.v1.AssistanceSession
+	5,  // 25: lindm.admin.v1.GetAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	5,  // 26: lindm.admin.v1.JoinAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	59, // 27: lindm.admin.v1.JoinAssistanceSessionResponse.ice_servers:type_name -> lindm.agent.v1.AssistanceIceServer
+	5,  // 28: lindm.admin.v1.AnswerAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	5,  // 29: lindm.admin.v1.StopAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	51, // 30: lindm.admin.v1.GetAssistancePolicyResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	51, // 31: lindm.admin.v1.GetAssistancePolicyResponse.ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	51, // 32: lindm.admin.v1.UpdateAssistancePolicyRequest.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	51, // 33: lindm.admin.v1.UpdateAssistancePolicyResponse.policy:type_name -> lindm.agent.v1.AssistancePolicy
+	51, // 34: lindm.admin.v1.UpdateAssistancePolicyResponse.ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	60, // 35: lindm.admin.v1.RunAssistanceCommandRequest.command:type_name -> lindm.agent.v1.AssistanceCommand
+	61, // 36: lindm.admin.v1.RunAssistanceCommandResponse.result:type_name -> lindm.agent.v1.AssistanceCommandResult
+	61, // 37: lindm.admin.v1.GetAssistanceCommandResponse.result:type_name -> lindm.agent.v1.AssistanceCommandResult
+	62, // 38: lindm.admin.v1.StartAssistanceFileTransferRequest.transfer:type_name -> lindm.agent.v1.AssistanceFileRequest
+	63, // 39: lindm.admin.v1.StartAssistanceFileTransferResponse.transfer:type_name -> lindm.agent.v1.AssistanceFileReport
+	63, // 40: lindm.admin.v1.GetAssistanceFileTransferResponse.transfer:type_name -> lindm.agent.v1.AssistanceFileReport
+	63, // 41: lindm.admin.v1.CancelAssistanceFileTransferResponse.transfer:type_name -> lindm.agent.v1.AssistanceFileReport
+	1,  // 42: lindm.admin.v1.AssistanceReconnectWorkflow.state:type_name -> lindm.admin.v1.AssistanceReconnectState
+	64, // 43: lindm.admin.v1.AssistanceReconnectWorkflow.mode:type_name -> lindm.agent.v1.AssistancePolicyMode
+	48, // 44: lindm.admin.v1.AssistanceReconnectWorkflow.expires_at:type_name -> google.protobuf.Timestamp
+	48, // 45: lindm.admin.v1.AssistanceReconnectWorkflow.ended_at:type_name -> google.protobuf.Timestamp
+	2,  // 46: lindm.admin.v1.AssistanceRecording.state:type_name -> lindm.admin.v1.AssistanceRecordingArchiveState
+	48, // 47: lindm.admin.v1.AssistanceRecording.created_at:type_name -> google.protobuf.Timestamp
+	48, // 48: lindm.admin.v1.AssistanceRecording.started_at:type_name -> google.protobuf.Timestamp
+	48, // 49: lindm.admin.v1.AssistanceRecording.finalized_at:type_name -> google.protobuf.Timestamp
+	48, // 50: lindm.admin.v1.AssistanceRecording.retain_until:type_name -> google.protobuf.Timestamp
+	48, // 51: lindm.admin.v1.AssistanceRecording.deleted_at:type_name -> google.protobuf.Timestamp
+	5,  // 52: lindm.admin.v1.ReconnectAssistanceSessionResponse.session:type_name -> lindm.admin.v1.AssistanceSession
+	33, // 53: lindm.admin.v1.ListAssistanceRecordingsResponse.recordings:type_name -> lindm.admin.v1.AssistanceRecording
+	48, // 54: lindm.admin.v1.OpenAssistanceRecordingResponse.expires_at:type_name -> google.protobuf.Timestamp
+	33, // 55: lindm.admin.v1.OpenAssistanceRecordingResponse.recording:type_name -> lindm.admin.v1.AssistanceRecording
+	33, // 56: lindm.admin.v1.DeleteAssistanceRecordingResponse.recording:type_name -> lindm.admin.v1.AssistanceRecording
+	3,  // 57: lindm.admin.v1.AssistanceReadiness.state:type_name -> lindm.admin.v1.AssistanceReadinessState
+	65, // 58: lindm.admin.v1.AssistanceReadiness.policy:type_name -> lindm.agent.v1.AssistanceEnablement
+	4,  // 59: lindm.admin.v1.AssistanceReadiness.desktop:type_name -> lindm.admin.v1.AssistanceDesktop
+	48, // 60: lindm.admin.v1.AssistanceReadiness.inventory_observed_at:type_name -> google.protobuf.Timestamp
+	48, // 61: lindm.admin.v1.AssistanceReadiness.last_seen_at:type_name -> google.protobuf.Timestamp
+	44, // 62: lindm.admin.v1.GetAssistanceReadinessResponse.readiness:type_name -> lindm.admin.v1.AssistanceReadiness
+	63, // [63:63] is the sub-list for method output_type
+	63, // [63:63] is the sub-list for method input_type
+	63, // [63:63] is the sub-list for extension type_name
+	63, // [63:63] is the sub-list for extension extendee
+	0,  // [0:63] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_assistance_proto_init() }
@@ -1931,13 +3479,14 @@ func file_lindm_admin_v1_assistance_proto_init() {
 	if File_lindm_admin_v1_assistance_proto != nil {
 		return
 	}
+	file_lindm_admin_v1_assistance_unattended_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_admin_v1_assistance_proto_rawDesc), len(file_lindm_admin_v1_assistance_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   24,
+			NumEnums:      5,
+			NumMessages:   42,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

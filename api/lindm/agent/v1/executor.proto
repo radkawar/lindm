@@ -8,6 +8,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/agent/v1/approved_configuration.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/assistance_recording.proto";
 import "lindm/agent/v1/capability_policy.proto";
 import "lindm/agent/v1/device_action_recovery.proto";
 import "lindm/agent/v1/device_actions.proto";
@@ -127,6 +128,9 @@ service ExecutorService {
   // returns the device-observed state. Local identities come from logind and
   // kernel peer credentials, not from a session helper.
   rpc SyncAssistance(SyncAssistanceRequest) returns (SyncAssistanceResponse);
+  // ExchangeAssistanceRecording acknowledges server outcomes and returns the
+  // next sealed recording segments. It carries ciphertext only.
+  rpc ExchangeAssistanceRecording(ExchangeAssistanceRecordingRequest) returns (ExchangeAssistanceRecordingResponse);
 }
 
 message PrepareBootstrapRequest {

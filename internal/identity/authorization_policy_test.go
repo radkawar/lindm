@@ -16,7 +16,7 @@ import (
 
 func TestBuiltInPermissionMatrix(t *testing.T) {
 	all := []Permission{PermissionReadFleet, PermissionManageEnrollment, PermissionRevokeDevice, PermissionReadAudit, PermissionManageExecutionTrust, PermissionManageProfiles, PermissionAssignResources, PermissionManageAccounts, PermissionManageInventory, PermissionReadRecoveryKeys, PermissionRunRemoteExecution, PermissionRunScripts, PermissionExecuteDestructive, PermissionManageApprovals, PermissionManageIntegrations, PermissionManageReleaseUpdates, PermissionManageAdvisoryExceptions, PermissionManageEncryption, PermissionLockDevice, PermissionReleaseLockDevice, PermissionQuarantineDevice, PermissionManageSecrets, PermissionRevealSecrets, PermissionViewRemoteAssistance}
-	all = append(all, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage)
+	all = append(all, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage, PermissionAssistanceFiles, PermissionAssistanceReconnect, PermissionAssistanceRecord, PermissionReadAssistanceRecordings, PermissionDeleteAssistanceRecordings, PermissionAssistanceUnattended, PermissionApproveAssistanceUnattended, PermissionAssistanceElevation, PermissionAssistanceAnnotate, PermissionAssistanceAudio)
 	for _, test := range []struct {
 		role   string
 		grants []Permission
@@ -30,7 +30,7 @@ func TestBuiltInPermissionMatrix(t *testing.T) {
 	} {
 		t.Run(test.role, func(t *testing.T) {
 			if test.role == RoleAdmin {
-				test.grants = append(test.grants, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage)
+				test.grants = append(test.grants, PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage, PermissionAssistanceFiles, PermissionAssistanceReconnect, PermissionAssistanceRecord, PermissionReadAssistanceRecordings, PermissionDeleteAssistanceRecordings, PermissionAssistanceUnattended, PermissionApproveAssistanceUnattended, PermissionAssistanceElevation, PermissionAssistanceAnnotate, PermissionAssistanceAudio)
 			}
 			for _, permission := range append(append([]Permission(nil), all...), Permission("unknown.permission")) {
 				if got := Authorize(Principal{Role: test.role}, permission); got != slices.Contains(test.grants, permission) {
@@ -173,7 +173,7 @@ func TestReleaseLockPermissionDoesNotInheritLockScope(t *testing.T) {
 }
 
 func TestAssistancePermissionsRequireIndependentScopedGrants(t *testing.T) {
-	permissions := []Permission{PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage}
+	permissions := []Permission{PermissionControlRemoteAssistance, PermissionManageAssistancePolicy, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage, PermissionAssistanceFiles, PermissionAssistanceReconnect, PermissionAssistanceRecord, PermissionReadAssistanceRecordings, PermissionDeleteAssistanceRecordings, PermissionAssistanceUnattended, PermissionApproveAssistanceUnattended, PermissionAssistanceElevation, PermissionAssistanceAnnotate, PermissionAssistanceAudio}
 	for _, permission := range permissions {
 		t.Run(string(permission), func(t *testing.T) {
 			scope := &authv1.DeviceScope{Labels: []string{"support-owned"}}
@@ -199,11 +199,30 @@ func TestAssistancePermissionsRequireIndependentScopedGrants(t *testing.T) {
 }
 
 func TestAssistanceControlAndCapabilitiesNeverImplyView(t *testing.T) {
-	for _, permission := range []Permission{PermissionControlRemoteAssistance, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage} {
+	for _, permission := range []Permission{PermissionControlRemoteAssistance, PermissionAssistanceClipboard, PermissionAssistanceKeyboard, PermissionAssistanceDisplay, PermissionAssistanceMessage, PermissionAssistanceFiles, PermissionAssistanceReconnect, PermissionAssistanceRecord, PermissionReadAssistanceRecordings, PermissionDeleteAssistanceRecordings, PermissionAssistanceUnattended, PermissionApproveAssistanceUnattended, PermissionAssistanceElevation, PermissionAssistanceAnnotate, PermissionAssistanceAudio} {
 		principal := Principal{Role: RoleOwner, Bindings: []*authv1.RoleBinding{{Permissions: []string{string(permission)}}}}
 		if Authorize(principal, PermissionViewRemoteAssistance) {
 			t.Fatalf("%s implicitly granted view", permission)
 		}
+	}
+}
+
+func TestRecordingArchivePermissionsAreSeparateFromLiveAssistance(t *testing.T) {
+	if Authorize(Principal{Role: RoleAuditor}, PermissionReadAssistanceRecordings) || Authorize(Principal{Role: RoleAuditor}, PermissionDeleteAssistanceRecordings) {
+		t.Fatal("auditor metadata access implied recording retrieval or deletion")
+	}
+	scope := &authv1.DeviceScope{Labels: []string{"archive"}}
+	auditor := Principal{Role: RoleAuditor, Bindings: []*authv1.RoleBinding{{Role: "archive", Permissions: []string{string(PermissionReadAudit)}}, {Role: "recordings", Permissions: []string{string(PermissionReadAssistanceRecordings)}, Scopes: []*authv1.DeviceScope{scope}}}}
+	if !Authorize(auditor, PermissionReadAssistanceRecordings) {
+		t.Fatal("explicit retrieval grant was not honoured")
+	}
+	for _, live := range []Permission{PermissionViewRemoteAssistance, PermissionControlRemoteAssistance, PermissionAssistanceRecord, PermissionDeleteAssistanceRecordings} {
+		if Authorize(auditor, live) {
+			t.Fatalf("retrieval grant implied %s", live)
+		}
+	}
+	if unrestricted, scopes := DeviceScopes(auditor, PermissionReadAssistanceRecordings); unrestricted || len(scopes) != 1 || !proto.Equal(scopes[0], scope) {
+		t.Fatal("retrieval scope was widened")
 	}
 }
 

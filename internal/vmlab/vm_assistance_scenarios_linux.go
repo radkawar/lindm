@@ -144,6 +144,11 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 			return err
 		}
 	}
+	if spec.capability == platform.AssistanceFiles {
+		if err := r.prepareFileScenario(ctx, spec.name); err != nil {
+			return err
+		}
+	}
 	if spec.name == "monitors" {
 		if err := r.screen.waitNoBanner(ctx, 45*time.Second); err != nil {
 			return err
@@ -153,7 +158,7 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 			return err
 		}
 		r.headConnection = head
-		defer func() { err = errors.Join(err, head.Close()) }()
+		defer func() { err = errors.Join(err, r.releaseAssistanceHead(context.WithoutCancel(ctx), head)) }()
 		if err := r.observeMonitorLayout(ctx); err != nil {
 			return err
 		}
@@ -166,6 +171,21 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	r.result.Scenarios = append(r.result.Scenarios, scenario)
 	if err := r.prepareModeAuthority(ctx, scenario); err != nil {
 		return err
+	}
+	if spec.desktopGateOff {
+		// The operator's own console policy dialog turns the desktop's gate
+		// off and back on; the refused session's end detail is the oracle.
+		if r.desktop.gate == "" {
+			return fmt.Errorf("the %s lab desktop has no desktop gate", r.desktop.name)
+		}
+		gate := map[string]any{"deviceId": r.deviceID, "gate": r.desktop.gate, "mode": "off"}
+		if err := r.browser.call(ctx, "desktopPolicy", gate, nil, time.Minute); err != nil {
+			return err
+		}
+		defer func() {
+			gate["mode"] = "on"
+			err = errors.Join(err, r.browser.call(context.WithoutCancel(ctx), "desktopPolicy", gate, nil, time.Minute))
+		}()
 	}
 	// rerequest asks again right after control ended, without waiting for
 	// its "ended" notice to go: the new request must be on screen at once.
@@ -192,6 +212,12 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		capabilities["Displays"] = "Select shared displays"
 	case "message":
 		capabilities["Messages"] = "Sequential messages"
+	case "files-limited":
+		capabilities["Files"] = "Send files only"
+		capabilities["Clipboard"] = "Send and read text"
+	case "files", "files-cancel", "files-filesystem", "files-limits", "files-interrupted", "files-policy":
+		capabilities["Files"] = "Send and request files"
+		capabilities["Clipboard"] = "Send and read text"
 	}
 	if err := r.browser.call(ctx, "request", map[string]any{"deviceId": r.deviceID, "mode": scenario.Mode, "reason": "lab assistance " + spec.name + " scenario", "minutes": 10, "capabilities": capabilities}, &created, time.Minute); err != nil {
 		return err
@@ -233,13 +259,22 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	scenario.NegativeBoundaries = append(scenario.NegativeBoundaries, "preconsent-capability-actions-disabled")
 	// The prompt's actions are declared allow, decline.
 	if spec.cause == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED && !spec.portalCancel {
-		if err := r.screen.clickNotificationAction(ctx, banner, 2, 1, "consent-decline", scenario); err != nil {
+		if err := r.clickPromptAction(ctx, banner, "Decline", 1, "consent-decline", scenario); err != nil {
 			return err
 		}
 		return r.finish(ctx, spec, scenario, false)
 	}
-	if err := r.screen.clickNotificationAction(ctx, banner, 2, 0, "consent-allow", scenario); err != nil {
+	if err := r.clickPromptAction(ctx, banner, "Allow", 0, "consent-allow", scenario); err != nil {
 		return err
+	}
+	if r.desktop.ocrConsent {
+		if err := r.plasmaPortal(ctx, spec, control, scenario); err != nil {
+			return err
+		}
+		if spec.portalCancel {
+			return r.finish(ctx, spec, scenario, false)
+		}
+		return r.serveScenario(ctx, spec, scenario, control)
 	}
 	portal, dialog, err := r.screen.waitDialog(ctx, 45*time.Second)
 	if err != nil {
@@ -269,6 +304,21 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if err := r.screen.click(ctx, portal.Bounds(), portalShareButton(dialog), "portal-share", scenario); err != nil {
 		return err
 	}
+	return r.serveScenario(ctx, spec, scenario, control)
+}
+
+// clickPromptAction answers the consent notification, whose actions are
+// declared allow, decline: by label where the desktop's popup layout is not
+// fixed, otherwise by GNOME's banner geometry.
+func (r *assistanceRun) clickPromptAction(ctx context.Context, banner image.Rectangle, label string, index int, target string, scenario *assistanceScenarioEvidence) error {
+	if r.desktop.ocrConsent {
+		return r.screen.clickText(ctx, r.screen.popupRegion, label, target, scenario)
+	}
+	return r.screen.clickNotificationAction(ctx, banner, 2, index, target, scenario)
+}
+
+// serveScenario runs a consented session from its portal grant to its end.
+func (r *assistanceRun) serveScenario(ctx context.Context, spec assistanceScenarioSpec, scenario *assistanceScenarioEvidence, control bool) error {
 	session, err := r.waitSession(ctx, scenario, 90*time.Second, "active", atLeast(adminv1.AssistanceState_ASSISTANCE_STATE_ACTIVE))
 	if err != nil {
 		return err
@@ -285,7 +335,7 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	if r.forwardedTURNURL != "" && media.LocalCandidateURL != r.forwardedTURNURL {
 		return fmt.Errorf("console relay candidate URL %q bypassed SSH-forwarded %q", media.LocalCandidateURL, r.forwardedTURNURL)
 	}
-	if err := verifyAssistanceMedia(scenario.Media, control, r.turnTCP); err != nil {
+	if err := verifyAssistanceMedia(scenario.Media, control, session.GetGrantedCapabilities().GetPolicy().GetFiles() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, false, r.turnTCP); err != nil {
 		return err
 	}
 	if err := r.browserScreenshot(ctx, scenario, "live"); err != nil {
@@ -303,6 +353,13 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 			return err
 		}
 		if spec.name == "clipboard-policy" {
+			return r.finish(ctx, spec, scenario, true)
+		}
+	} else if spec.capability == platform.AssistanceFiles {
+		if err := r.fileScenario(ctx, scenario, session); err != nil {
+			return err
+		}
+		if spec.name == "files-policy" {
 			return r.finish(ctx, spec, scenario, true)
 		}
 	} else if spec.capability != "" {
@@ -349,13 +406,27 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		if err := r.guestScreenshot(scenario, "indicator", indicator); err != nil {
 			return err
 		}
-		if err := r.screen.clickNotificationAction(ctx, banner, 1, 0, "indicator-stop", scenario); err != nil {
+		if r.desktop.ocrConsent {
+			err = r.screen.clickText(ctx, r.screen.popupRegion, "Stop", "indicator-stop", scenario)
+		} else {
+			err = r.screen.clickNotificationAction(ctx, banner, 1, 0, "indicator-stop", scenario)
+		}
+		if err != nil {
 			return err
 		}
 	case agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_LOCKED:
-		scenario.LockPath = "loginctl lock-session"
-		if err := lockAssistanceSession(ctx, r.vm.guest, r.result.Guest.Desktop.SessionID, true); err != nil {
-			return err
+		if len(r.desktop.lockKeys) != 0 {
+			// The desktop's own lock shortcut on the local seat, not loginctl:
+			// the session must still end SESSION_LOCKED through that path.
+			scenario.LockPath = "keybinding:" + strings.Join(r.desktop.lockKeys, "+")
+			if err := r.vm.guest.sendKey(ctx, r.desktop.lockKeys...); err != nil {
+				return err
+			}
+		} else {
+			scenario.LockPath = "loginctl lock-session"
+			if err := lockAssistanceSession(ctx, r.vm.guest, r.result.Guest.Desktop.SessionID, true); err != nil {
+				return err
+			}
 		}
 	default:
 		return fmt.Errorf("unsupported scenario end cause %s", spec.cause)
@@ -413,6 +484,13 @@ func (r *assistanceRun) unavailable(ctx context.Context, spec assistanceScenario
 // verifyBinding checks the server bound the consenting local session the lab
 // logged in through GDM, and that control was granted exactly when requested.
 func (r *assistanceRun) verifyBinding(scenario *assistanceScenarioEvidence, session *adminv1.AssistanceSession, control bool) error {
+	expectedMode := agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW
+	if control {
+		expectedMode = agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+	}
+	if session.GetMode() != expectedMode {
+		return fmt.Errorf("server mode %s differs from requested %s", session.GetMode(), expectedMode)
+	}
 	scenario.OperatorID, scenario.OperatorDisplay = session.GetOperatorId(), session.GetOperatorDisplay()
 	local := session.GetLocalSession()
 	scenario.LocalSession = &assistanceLocalEvidence{Username: local.GetUsername(), UID: local.GetUid(), LogindSessionID: local.GetLogindSessionId()}
@@ -431,8 +509,8 @@ func (r *assistanceRun) verifyBinding(scenario *assistanceScenarioEvidence, sess
 }
 
 // verifyAssistanceMedia requires decoded video over a relay-only connection,
-// and an input channel exactly for control sessions.
-func verifyAssistanceMedia(media *assistanceMediaEvidence, control, turnTCP bool) error {
+// and exactly the separately granted input, file and annotation channels.
+func verifyAssistanceMedia(media *assistanceMediaEvidence, control, files, annotate, turnTCP bool) error {
 	if media.VideoWidth <= 0 || media.VideoHeight <= 0 || media.DecodedFrames < 15 || media.FramesDecoded <= 0 {
 		return fmt.Errorf("console decoded no live video (%dx%d, %d frames)", media.VideoWidth, media.VideoHeight, media.DecodedFrames)
 	}
@@ -442,12 +520,30 @@ func verifyAssistanceMedia(media *assistanceMediaEvidence, control, turnTCP bool
 	if turnTCP && media.LocalRelayProtocol != "tcp" {
 		return fmt.Errorf("console relay candidate used %q, want TURN over TCP", media.LocalRelayProtocol)
 	}
-	input := slices.Contains(media.DataChannels, "lindm-input")
-	if control && (!media.RemoteApplication || !input || !media.ControlButton) {
-		return errors.New("control session lacks the lindm-input data channel or control toggle")
+	if media.ControlButton != control || media.RemoteApplication != (control || files || annotate) {
+		return errors.New("media application or control action does not match its grants")
 	}
-	if !control && (media.RemoteApplication || len(media.DataChannels) != 0 || media.ControlButton) {
-		return errors.New("view session negotiated a data channel or offered control")
+	expected := 0
+	for _, channelGrant := range [3]struct {
+		name    string
+		granted bool
+	}{{"lindm-input", control}, {"lindm-files", files}, {"lindm-annotate", annotate}} {
+		channel, granted := channelGrant.name, channelGrant.granted
+		count := 0
+		for _, observed := range media.DataChannels {
+			if observed == channel {
+				count++
+			}
+		}
+		if granted {
+			expected++
+		}
+		if (granted && count != 1) || (!granted && count != 0) {
+			return fmt.Errorf("data channel %s does not match its independent grant", channel)
+		}
+	}
+	if len(media.DataChannels) != expected {
+		return errors.New("media negotiated an ungranted data channel")
 	}
 	return nil
 }

@@ -7,31 +7,40 @@
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability           | Arch Linux                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------------ |
-| inventory            | implemented                                                                                |
-| lifecycle            | implemented                                                                                |
-| dispatch             | implemented                                                                                |
-| packages             | implemented                                                                                |
-| accounts             | implemented                                                                                |
-| sysctl               | implemented                                                                                |
-| definitions          | implemented                                                                                |
-| password             | implemented                                                                                |
-| firewall             | implemented                                                                                |
-| encryption           | implemented                                                                                |
-| wipe                 | implemented                                                                                |
-| report-loss          | implemented                                                                                |
-| lock                 | implemented                                                                                |
-| recovery-sanitize    | implemented                                                                                |
-| self-update          | implemented                                                                                |
-| assistance           | implemented                                                                                |
-| assistance-clipboard | gated: not implemented for Arch Linux                                                      |
-| assistance-keyboard  | gated: not implemented for Arch Linux                                                      |
-| assistance-displays  | gated: not implemented for Arch Linux                                                      |
-| assistance-messages  | gated: not implemented for Arch Linux                                                      |
-| advisories           | implemented                                                                                |
-| os-update            | implemented                                                                                |
-| release-upgrade      | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade |
+| Capability            | Arch Linux                                                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| inventory             | implemented                                                                                                                   |
+| lifecycle             | implemented                                                                                                                   |
+| dispatch              | implemented                                                                                                                   |
+| packages              | implemented                                                                                                                   |
+| accounts              | implemented                                                                                                                   |
+| sysctl                | implemented                                                                                                                   |
+| definitions           | implemented                                                                                                                   |
+| password              | implemented                                                                                                                   |
+| firewall              | implemented                                                                                                                   |
+| encryption            | implemented                                                                                                                   |
+| wipe                  | implemented                                                                                                                   |
+| report-loss           | implemented                                                                                                                   |
+| lock                  | implemented                                                                                                                   |
+| recovery-sanitize     | implemented                                                                                                                   |
+| self-update           | implemented                                                                                                                   |
+| assistance            | implemented                                                                                                                   |
+| assistance-clipboard  | gated: not implemented for Arch Linux                                                                                         |
+| assistance-keyboard   | gated: not implemented for Arch Linux                                                                                         |
+| assistance-displays   | gated: not implemented for Arch Linux                                                                                         |
+| assistance-messages   | gated: not implemented for Arch Linux                                                                                         |
+| assistance-files      | gated: local FileChooser consent, input isolation and secure transfer are not qualified on this release                       |
+| assistance-reconnect  | gated: fresh consent after real logout/reboot and workflow expiry are not qualified on this release                           |
+| assistance-recording  | gated: recording disclosure, encrypted storage and retention are not qualified on this release                                |
+| assistance-unattended | gated: a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release |
+| assistance-elevation  | gated: pausing all remote injection around a local privileged prompt is not qualified on this release                         |
+| assistance-annotation | gated: no qualified non-interactive compositor overlay exists on this release                                                 |
+| assistance-audio      | gated: selected PipeWire output/microphone capture with local mute is not qualified on this release                           |
+| assistance-kde        | gated: kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability |
+| assistance-x11        | gated: x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE                      |
+| advisories            | implemented                                                                                                                   |
+| os-update             | implemented                                                                                                                   |
+| release-upgrade       | gated: rolling whole-system snapshot update; use os-update, not a numbered release upgrade                                    |
 
 <!-- END GENERATED platform-capabilities -->
 

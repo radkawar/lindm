@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io/fs"
 	"testing"
+
+	"lindm/internal/platform"
 )
 
 func TestResourcePlatformNativeIdentity(t *testing.T) {
@@ -46,5 +48,45 @@ func TestResourcePlatformRefusesUnavailableIdentity(t *testing.T) {
 	_, err = hostPlatform(ctx, func(string) ([]byte, error) { t.Fatal("read after cancellation"); return nil, nil }, func() (string, error) { t.Fatal("uname after cancellation"); return "", nil })
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation lost: %v", err)
+	}
+}
+
+func TestHostOSReleasePreservesCapabilityIdentity(t *testing.T) {
+	for _, test := range []struct {
+		name, data string
+		want       platform.OSRelease
+		files      bool
+	}{
+		{"ubuntu", "ID=ubuntu\nVERSION_ID=24.04\nID_LIKE=debian\n", platform.OSRelease{ID: "ubuntu", VersionID: "24.04"}, true},
+		{"workstation", "ID=fedora\nVERSION_ID=44\nVARIANT_ID=workstation\n", platform.OSRelease{ID: "fedora", VersionID: "44", VariantID: "workstation"}, true},
+		{"atomic", "ID=fedora\nVERSION_ID=44\nVARIANT_ID=silverblue\n", platform.OSRelease{ID: "fedora", VersionID: "44", VariantID: "silverblue"}, false},
+		{"derivative", "ID=linuxmint\nVERSION_ID=22.3\nID_LIKE=ubuntu\n", platform.OSRelease{ID: "linuxmint", VersionID: "22.3"}, false},
+		{"rolling", "ID=arch\nBUILD_ID=20261001\n", platform.OSRelease{ID: "arch"}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := hostOSRelease(t.Context(), func(string) ([]byte, error) { return []byte(test.data), nil })
+			if err != nil || got != test.want {
+				t.Fatalf("release = %#v, %v; want %#v", got, err, test.want)
+			}
+			if admitted := platform.Identify(got).Gate(platform.AssistanceFiles) == nil; admitted != test.files {
+				t.Fatalf("file capability admission = %v, want %v", admitted, test.files)
+			}
+		})
+	}
+}
+
+func TestHostOSReleasePreservesFailureAndCancellation(t *testing.T) {
+	_, err := hostOSRelease(t.Context(), func(string) ([]byte, error) { return nil, fs.ErrPermission })
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("read failure = %v", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = hostOSRelease(ctx, func(string) ([]byte, error) {
+		t.Fatal("read after cancellation")
+		return nil, nil
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation = %v", err)
 	}
 }

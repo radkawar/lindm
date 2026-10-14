@@ -474,10 +474,10 @@ func TestControlGrantedForwardsInputAndReleasesHeld(t *testing.T) {
 		t.Fatalf("indicator body = %q", indicator.notification.Body)
 	}
 	for _, message := range []string{
-		`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}`,
-		`{"t":"button","b":"left","down":true,"display":"monitor-1","generation":1}`,
-		`{"t":"move","x":0.5,"y":0.25,"display":"monitor-1","generation":1}`,
-		`{"t":"key","code":"Power","down":true,"display":"monitor-1","generation":1}`,
+		`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1,"epoch":1}`,
+		`{"t":"button","b":"left","down":true,"display":"monitor-1","generation":1,"epoch":1}`,
+		`{"t":"move","x":0.5,"y":0.25,"display":"monitor-1","generation":1,"epoch":1}`,
+		`{"t":"key","code":"Power","down":true,"display":"monitor-1","generation":1,"epoch":1}`,
 		`not json`,
 	} {
 		h.peers.peer.input <- []byte(message)

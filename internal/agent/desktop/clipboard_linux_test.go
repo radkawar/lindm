@@ -211,7 +211,7 @@ func TestClipboardReadRefusalsClassifyObservedMetadataWithoutReading(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			// A nil bus ensures no refusal attempts a native read or fallback.
 			grant := &portalGrant{handle: "/session/ours"}
-			grant.clipboard = &portalClipboard{grant: grant, enabled: true, announced: make(chan struct{})}
+			grant.clipboard = &portalClipboard{grant: grant, ctx: t.Context(), enabled: true, announced: make(chan struct{})}
 			if tc.options != nil {
 				grant.clipboard.observeOwner([]any{grant.handle, tc.options}, 1)
 			}

@@ -18,7 +18,7 @@ import (
 
 func assistanceAllCapabilities() *agentv1.AssistancePolicy {
 	on := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
-	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on}
+	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on, Files: on, FileLimits: brokerFileLimits()}
 }
 
 func activeCapabilitiesFixture(t *testing.T) (*assistanceFixture, *agentv1.AssistanceDirective, *agentv1.SessionAssistanceReport) {

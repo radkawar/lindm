@@ -43,10 +43,11 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 	flags.StringVar(&options.Encrypted.Firmware.Package, "firmware-package", "", "installed host firmware package")
 	flags.StringVar(&options.Encrypted.Firmware.Version, "firmware-version", "", "exact required firmware package version")
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
-	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland")
+	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, kde, cinnamon, cosmic or hyprland")
+	flags.BoolVar(&options.X11, "x11", false, "log the lab user into the golden desktop's X11 session (the helper's X11 gate applies); only releases with a maintained X11 session entry")
 	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack (must match the cached golden)")
 	evidence := flags.String("evidence", "", "required new private directory for the record, screenshots and journal excerpts")
-	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock,clipboard,clipboard-limited,clipboard-policy,clipboard-permission,keyboard,display,message,monitors; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none")
+	scenarios := flags.String("scenarios", "", "comma-separated subset of the desktop's scenarios (gnome: control,view,decline,portal-cancel,lock,clipboard,clipboard-limited,clipboard-policy,clipboard-permission,keyboard,display,message,monitors,files,files-cancel,files-limited,files-filesystem,files-limits,files-interrupted,files-policy,files-permission,recording,recording-declined,recording-refused,recording-storage,recording-permission,recording-retention,reconnect-logout,reconnect-reboot,reconnect-declined,reconnect-expired,reconnect-revoked,elevation,annotation,annotation-monitors,audio,audio-declined,unattended,unattended-lock,unattended-revoked; kde and every -x11 session: desktop-policy-off,control,view,decline,portal-cancel,lock; refusal-only desktops: view-unavailable,control-unavailable); -hold defaults to none; a non-held subset record names its selection and never sets tier_one/files/workflows/tier_three passed")
 	rebootPolicy := flags.Bool("reboot-policy", false, "qualify signed reboot windows and employee deferral on a disposable desktop; emits reboot-policy.json, not assistance qualification")
 	hold := flags.Bool("hold", false, "hands-on demo: after the selected scenarios keep lindmd and the VM running until interrupted; writes owner access to EVIDENCE/owner-access, never a qualification record")
 	name := flags.String("name", "", "persistent held demo name; Ctrl-C stops processes but keeps enrolled state")
@@ -124,14 +125,11 @@ func runVMAssistance(ctx context.Context, args []string, stdout, stderr io.Write
 		options.RebootPolicy = new(vmlab.VMRebootPolicyResult)
 		options.Scenarios = []string{}
 	}
-	if *scenarios != "" && !*hold {
-		return errors.New("vm assistance -scenarios requires -hold; a qualification record always runs every scenario")
-	}
 	if *hold {
 		options.Scenarios = []string{}
-		if *scenarios != "" {
-			options.Scenarios = strings.Split(*scenarios, ",")
-		}
+	}
+	if *scenarios != "" {
+		options.Scenarios = strings.Split(*scenarios, ",")
 	}
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {

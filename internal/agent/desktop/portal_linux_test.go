@@ -21,7 +21,7 @@ func TestGrantedStreamsDecodesWireShape(t *testing.T) {
 			uint32(51),
 			map[string]dbus.Variant{
 				"size":        dbus.MakeVariantWithSignature([]any{int32(1280), int32(800)}, dbus.ParseSignatureMust("(ii)")),
-				"position":    dbus.MakeVariantWithSignature([]any{int32(0), int32(0)}, dbus.ParseSignatureMust("(ii)")),
+				"position":    dbus.MakeVariantWithSignature([]any{int32(1920), int32(0)}, dbus.ParseSignatureMust("(ii)")),
 				"source_type": dbus.MakeVariant(uint32(1)),
 			},
 		}}, dbus.ParseSignatureMust("a(ua{sv})")),
@@ -30,7 +30,7 @@ func TestGrantedStreamsDecodesWireShape(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(streams) != 1 || streams[0] != (Stream{NodeID: 51, ID: "monitor-1", Label: "Monitor 1", Width: 1280, Height: 800}) {
+	if len(streams) != 1 || streams[0] != (Stream{NodeID: 51, ID: "monitor-1", Label: "Monitor 1", Width: 1280, Height: 800, X: 1920, Positioned: true}) {
 		t.Fatalf("streams = %+v", streams)
 	}
 	if _, err := grantedStreams(map[string]dbus.Variant{}); err == nil {

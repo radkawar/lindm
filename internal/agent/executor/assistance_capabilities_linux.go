@@ -12,6 +12,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/assistancefiles"
+	"lindm/internal/assistancereconnect"
+	"lindm/internal/assistancerecording"
+	"lindm/internal/assistanceunattended"
 )
 
 func assistancePolicyMode(mode agentv1.AssistancePolicyMode) agentv1.AssistancePolicyMode {
@@ -22,12 +26,38 @@ func assistancePolicyMode(mode agentv1.AssistancePolicyMode) agentv1.AssistanceP
 }
 
 func assistancePolicyIntersection(a, b *agentv1.AssistancePolicy) *agentv1.AssistancePolicy {
-	return &agentv1.AssistancePolicy{
-		Clipboard: min(assistancePolicyMode(a.GetClipboard()), assistancePolicyMode(b.GetClipboard())),
-		Keyboard:  min(assistancePolicyMode(a.GetKeyboard()), assistancePolicyMode(b.GetKeyboard())),
-		Display:   min(assistancePolicyMode(a.GetDisplay()), assistancePolicyMode(b.GetDisplay())),
-		Messages:  min(assistancePolicyMode(a.GetMessages()), assistancePolicyMode(b.GetMessages())),
+	policy := &agentv1.AssistancePolicy{
+		Clipboard:        min(assistancePolicyMode(a.GetClipboard()), assistancePolicyMode(b.GetClipboard())),
+		Keyboard:         min(assistancePolicyMode(a.GetKeyboard()), assistancePolicyMode(b.GetKeyboard())),
+		Display:          min(assistancePolicyMode(a.GetDisplay()), assistancePolicyMode(b.GetDisplay())),
+		Messages:         min(assistancePolicyMode(a.GetMessages()), assistancePolicyMode(b.GetMessages())),
+		Files:            min(assistancePolicyMode(a.GetFiles()), assistancePolicyMode(b.GetFiles())),
+		FileLimits:       assistancefiles.Intersect(a.GetFileLimits(), b.GetFileLimits()),
+		Reconnect:        min(assistancePolicyMode(a.GetReconnect()), assistancePolicyMode(b.GetReconnect())),
+		Recording:        min(assistancePolicyMode(a.GetRecording()), assistancePolicyMode(b.GetRecording())),
+		ReconnectLimits:  assistancereconnect.Intersect(a.GetReconnectLimits(), b.GetReconnectLimits()),
+		RecordingLimits:  assistancerecording.Intersect(a.GetRecordingLimits(), b.GetRecordingLimits()),
+		Unattended:       min(assistancePolicyMode(a.GetUnattended()), assistancePolicyMode(b.GetUnattended())),
+		Elevation:        min(assistancePolicyMode(a.GetElevation()), assistancePolicyMode(b.GetElevation())),
+		Annotation:       min(assistancePolicyMode(a.GetAnnotation()), assistancePolicyMode(b.GetAnnotation())),
+		Audio:            min(assistancePolicyMode(a.GetAudio()), assistancePolicyMode(b.GetAudio())),
+		UnattendedLimits: assistanceunattended.Intersect(a.GetUnattendedLimits(), b.GetUnattendedLimits()),
+		KdePlasma:        min(assistancePolicyMode(a.GetKdePlasma()), assistancePolicyMode(b.GetKdePlasma())),
+		X11:              min(assistancePolicyMode(a.GetX11()), assistancePolicyMode(b.GetX11())),
 	}
+	if policy.UnattendedLimits == nil || policy.Unattended == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.Unattended, policy.UnattendedLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	if policy.FileLimits == nil || policy.Files == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.Files, policy.FileLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	if policy.ReconnectLimits == nil || policy.Reconnect == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.Reconnect, policy.ReconnectLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	if policy.RecordingLimits == nil || policy.Recording == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.Recording, policy.RecordingLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	return policy
 }
 
 func cloneAssistanceDisplays(in []*agentv1.AssistanceDisplay) []*agentv1.AssistanceDisplay {
@@ -41,7 +71,11 @@ func cloneAssistanceDisplays(in []*agentv1.AssistanceDisplay) []*agentv1.Assista
 func (b *assistanceBroker) helperDirective(session *assistanceSession) *agentv1.AssistanceDirective {
 	invitation := proto.CloneOf(session.invitation)
 	invitation.EffectiveCapabilities = assistancePolicyIntersection(invitation.GetEffectiveCapabilities(), b.ceiling)
-	return &agentv1.AssistanceDirective{Invitation: invitation, AnswerSdp: session.answerSDP, Command: proto.CloneOf(session.command), AuthorizedUntil: timestamppb.New(session.authorizedUntil)}
+	fileDirective := session.fileDirective
+	if assistancefiles.Terminal(session.fileReport.GetState()) {
+		fileDirective = nil
+	}
+	return &agentv1.AssistanceDirective{Invitation: invitation, AnswerSdp: session.answerSDP, Command: proto.CloneOf(session.command), FileTransfer: proto.CloneOf(fileDirective), AuthorizedUntil: timestamppb.New(session.authorizedUntil)}
 }
 
 func (b *assistanceBroker) applyCapabilities(session *assistanceSession, report *agentv1.SessionAssistanceReport) bool {
@@ -50,7 +84,8 @@ func (b *assistanceBroker) applyCapabilities(session *assistanceSession, report 
 	if !proto.Equal(assistancePolicyIntersection(report.GetRequestedCapabilities(), report.GetRequestedCapabilities()), assistancePolicyIntersection(session.invitation.GetRequestedCapabilities(), session.invitation.GetRequestedCapabilities())) || !proto.Equal(assistancePolicyIntersection(report.GetEffectiveCapabilities(), report.GetEffectiveCapabilities()), effective) {
 		return false
 	}
-	if !proto.Equal(assistancePolicyIntersection(grant, grant), assistancePolicyIntersection(grant, effective)) {
+	if !proto.Equal(assistancePolicyIntersection(grant, grant), assistancePolicyIntersection(grant, effective)) ||
+		!proto.Equal(assistancePolicyIntersection(grant, grant), assistancePolicyIntersection(grant, session.invitation.GetRequestedCapabilities())) {
 		return false
 	}
 	if assistancePolicyMode(grant.GetKeyboard()) > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF && (!report.GetControlGranted() || session.invitation.GetMode() != agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL) {
@@ -112,6 +147,9 @@ func (b *assistanceBroker) applyCapabilities(session *assistanceSession, report 
 
 func assistanceBrokerCommandAllowed(session *assistanceSession, command *agentv1.AssistanceCommand) bool {
 	policy := session.granted.GetPolicy()
+	if session.inputState.GetPaused() || (session.fileDirective != nil && session.fileReport.GetState() <= agentv1.AssistanceFileState_ASSISTANCE_FILE_STATE_WAITING_CONSENT) {
+		return false
+	}
 	on := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
 	switch command.GetKind() {
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_CLIPBOARD_WRITE:
@@ -122,6 +160,10 @@ func assistanceBrokerCommandAllowed(session *assistanceSession, command *agentv1
 		return session.controlGranted && policy.GetKeyboard() == on
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_MESSAGE:
 		return policy.GetMessages() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ELEVATION_GUIDANCE:
+		return policy.GetElevation() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED
+	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_ANNOTATION:
+		return policy.GetAnnotation() >= agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED && (!command.GetAnnotationEnabled() || !session.annotation.GetHidden())
 	case agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY:
 		if policy.GetDisplay() != on {
 			return false

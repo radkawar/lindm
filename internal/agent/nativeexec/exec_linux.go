@@ -70,6 +70,9 @@ var allowedEnv = map[string]bool{
 	// The caller's own user session bus, validated by sessionBusAddress: only
 	// unix:path=/run/user/<uid>/bus, and with Credential set only that UID's.
 	"DBUS_SESSION_BUS_ADDRESS": true,
+	// The caller's own runtime directory, validated by runtimeDirectory: only
+	// /run/user/<uid>, so PipeWire clients reach only that user's daemon.
+	"XDG_RUNTIME_DIR": true,
 }
 
 var (
@@ -212,6 +215,18 @@ func sessionBusAddress(value string, credential *syscall.Credential) bool {
 	return credential == nil || credential.Uid == uint32(n)
 }
 
+func runtimeDirectory(value string, credential *syscall.Credential) bool {
+	uid, ok := strings.CutPrefix(value, "/run/user/")
+	if !ok {
+		return false
+	}
+	n, err := strconv.ParseUint(uid, 10, 32)
+	if err != nil || strconv.FormatUint(n, 10) != uid {
+		return false
+	}
+	return credential == nil || credential.Uid == uint32(n)
+}
+
 func (c *Command) prepare() (*exec.Cmd, error) {
 	if c.Timeout <= 0 || c.Timeout > MaxTimeout || c.StderrLimit <= 0 || c.StderrLimit > MaxOutputLimit {
 		return nil, ErrInvalidCommand
@@ -224,6 +239,9 @@ func (c *Command) prepare() (*exec.Cmd, error) {
 		}
 		if key == "DBUS_SESSION_BUS_ADDRESS" && !sessionBusAddress(value, c.Credential) {
 			return nil, fmt.Errorf("%w: session bus address", ErrInvalidCommand)
+		}
+		if key == "XDG_RUNTIME_DIR" && !runtimeDirectory(value, c.Credential) {
+			return nil, fmt.Errorf("%w: runtime directory", ErrInvalidCommand)
 		}
 		env = append(env, entry)
 	}

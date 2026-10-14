@@ -1,0 +1,206 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AssistanceFilePolicy is intersected at deployment, device and executor scope.
+// An absent policy never enables transfer. MIME and extension must both match.
+message AssistanceFilePolicy {
+  uint64 max_file_bytes = 1 [(buf.validate.field).uint64 = {
+    gte: 1
+    lte: 16777216
+  }];
+  uint64 max_session_bytes = 2 [(buf.validate.field).uint64 = {
+    gte: 1
+    lte: 67108864
+  }];
+  repeated string allowed_mime_types = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4
+    unique: true
+    items: {
+      string: {
+        in: [
+          "text/plain",
+          "application/pdf",
+          "image/png",
+          "image/jpeg"
+        ]
+      }
+    }
+  }];
+  repeated string allowed_extensions = 4 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 32
+    unique: true
+    items: {
+      string: {pattern: "^\\.[a-z0-9]{1,16}$"}
+    }
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_file_policy.session_bound"
+    message: "per-file capacity must fit within the session quota"
+    expression: "this.max_file_bytes <= this.max_session_bytes"
+  };
+}
+
+enum AssistanceFileDirection {
+  ASSISTANCE_FILE_DIRECTION_UNSPECIFIED = 0;
+  ASSISTANCE_FILE_DIRECTION_TO_USER = 1;
+  ASSISTANCE_FILE_DIRECTION_FROM_USER = 2;
+}
+
+// AssistanceFileMetadata never contains a directory or full source path.
+message AssistanceFileMetadata {
+  string name = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 240
+    pattern: "^[^/\\\\\\x00-\\x1f\\x7f]+$"
+    not_in: [
+      ".",
+      ".."
+    ]
+  }];
+  uint64 size = 2 [(buf.validate.field).uint64.lte = 16777216];
+  // Outgoing chooser metadata may precede hashing; final receipts require it.
+  bytes sha256 = 3 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).bytes.len = 32
+  ];
+  string mime_type = 4 [(buf.validate.field).string = {
+    in: [
+      "text/plain",
+      "application/pdf",
+      "image/png",
+      "image/jpeg"
+    ]
+  }];
+}
+
+// AssistanceFileRequest is metadata authority, never a byte transport.
+message AssistanceFileRequest {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  AssistanceFileDirection direction = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Only TO_USER specifies a file. FROM_USER is always a local portal chooser.
+  AssistanceFileMetadata file = 3;
+  // Server-issued deadline and effective reservation; callers cannot supply them.
+  google.protobuf.Timestamp deadline = 4;
+  AssistanceFilePolicy policy = 5;
+  option (buf.validate.message).cel = {
+    id: "assistance_file_request.selection"
+    message: "only operator-to-user requests specify a file"
+    expression: "(this.direction == 1) == has(this.file) && (this.direction != 1 || this.file.sha256.size() == 32)"
+  };
+}
+
+message AssistanceFileDirective {
+  AssistanceFileRequest request = 1 [(buf.validate.field).required = true];
+  bool cancel = 2;
+  option (buf.validate.message).cel = {
+    id: "assistance_file_directive.authority"
+    message: "file directives require server-issued policy and deadline"
+    expression: "has(this.request) && has(this.request.deadline) && has(this.request.policy)"
+  };
+}
+
+enum AssistanceFileState {
+  ASSISTANCE_FILE_STATE_UNSPECIFIED = 0;
+  ASSISTANCE_FILE_STATE_REQUESTED = 1;
+  ASSISTANCE_FILE_STATE_WAITING_CONSENT = 2;
+  ASSISTANCE_FILE_STATE_TRANSFERRING = 3;
+  ASSISTANCE_FILE_STATE_SUCCEEDED = 4;
+  ASSISTANCE_FILE_STATE_DENIED = 5;
+  ASSISTANCE_FILE_STATE_CANCELLED = 6;
+  ASSISTANCE_FILE_STATE_FAILED = 7;
+}
+
+message AssistanceFileReport {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceFileDirection direction = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  AssistanceFileState state = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint64 bytes_transferred = 4 [(buf.validate.field).uint64.lte = 16777216];
+  // Populated only after independent receiver digest verification, including
+  // a published file whose notification or durability acknowledgement failed.
+  AssistanceFileMetadata file = 5;
+  string reason = 6 [(buf.validate.field).string = {
+    max_bytes: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  google.protobuf.Timestamp completed_at = 7;
+  option (buf.validate.message).cel = {
+    id: "assistance_file_report.completion"
+    message: "terminal reports require a completion instant and successful verified metadata"
+    expression: "(this.state >= 4) == has(this.completed_at) && (this.state != 4 || (has(this.file) && this.file.sha256.size() == 32 && this.bytes_transferred == this.file.size))"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_file_report.verified_metadata"
+    message: "only verified success or uncertain incoming publication may carry file metadata"
+    expression: "!has(this.file) || ((this.state == 4 || (this.state == 7 && this.direction == 1 && this.reason == 'file_published_unconfirmed')) && this.file.sha256.size() == 32 && this.bytes_transferred == this.file.size)"
+  };
+  option (buf.validate.message).cel = {
+    id: "assistance_file_report.uncertain_publication"
+    message: "uncertain publication requires the independently verified incoming file metadata"
+    expression: "this.reason != 'file_published_unconfirmed' || (this.state == 7 && this.direction == 1 && has(this.file))"
+  };
+}
+
+// AssistanceFileFrame is used only on the bounded reliable ordered lindm-files
+// DTLS/SCTP channel. A channel frame alone never authorizes local side effects.
+message AssistanceFileFrame {
+  string request_id = 1 [(buf.validate.field).string.uuid = true];
+  oneof body {
+    option (buf.validate.oneof).required = true;
+    AssistanceFileMetadata start = 2;
+    AssistanceFileReady ready = 3;
+    AssistanceFileChunk chunk = 4;
+    AssistanceFileEnd end = 5;
+    AssistanceFileReceipt receipt = 6;
+    AssistanceFileCancel cancel = 7;
+  }
+}
+
+message AssistanceFileReady {}
+message AssistanceFileChunk {
+  uint64 offset = 1 [(buf.validate.field).uint64.lte = 16777216];
+  bytes data = 2 [(buf.validate.field).bytes = {
+    min_len: 1
+    max_len: 16384
+  }];
+}
+message AssistanceFileEnd {
+  uint64 size = 1 [(buf.validate.field).uint64.lte = 16777216];
+  bytes sha256 = 2 [(buf.validate.field).bytes.len = 32];
+}
+message AssistanceFileReceipt {
+  AssistanceFileMetadata file = 1 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "assistance_file_receipt.digest"
+    message: "a successful receiver receipt requires the verified SHA-256"
+    expression: "has(this.file) && this.file.sha256.size() == 32"
+  };
+}
+message AssistanceFileCancel {
+  string reason = 1 [(buf.validate.field).string = {
+    min_bytes: 1
+    max_bytes: 64
+    pattern: "^[a-z0-9_]+$"
+  }];
+}

@@ -12,20 +12,40 @@ import (
 )
 
 type AssistanceCommand struct {
-	RequestID     uuid.UUID
-	SessionID     uuid.UUID
-	DeviceID      uuid.UUID
-	OperatorID    uuid.UUID
-	RequestDigest []byte
-	Kind          int16
-	Policy        []byte
-	ByteCount     int32
-	SpecialKey    int16
-	DisplayID     string
-	Deadline      pgtype.Timestamptz
-	Status        int16
-	Reason        string
-	CompletedAt   pgtype.Timestamptz
+	RequestID         uuid.UUID
+	SessionID         uuid.UUID
+	DeviceID          uuid.UUID
+	OperatorID        uuid.UUID
+	RequestDigest     []byte
+	Kind              int16
+	Policy            []byte
+	ByteCount         int32
+	SpecialKey        int16
+	DisplayID         string
+	Deadline          pgtype.Timestamptz
+	Status            int16
+	Reason            string
+	CompletedAt       pgtype.Timestamptz
+	AnnotationEnabled bool
+}
+
+type AssistanceFileTransfer struct {
+	RequestID        uuid.UUID
+	SessionID        uuid.UUID
+	DeviceID         uuid.UUID
+	OperatorID       uuid.UUID
+	OwnerInstance    uuid.UUID
+	RequestDigest    []byte
+	RequestNumber    int16
+	Direction        int16
+	RequestMetadata  []byte
+	Report           []byte
+	ReservedBytes    int64
+	BytesTransferred int64
+	State            int16
+	CreatedAt        pgtype.Timestamptz
+	Deadline         pgtype.Timestamptz
+	CompletedAt      pgtype.Timestamptz
 }
 
 type AssistancePolicyRequest struct {
@@ -36,44 +56,156 @@ type AssistancePolicyRequest struct {
 	Policy        []byte
 }
 
+type AssistanceReconnectWorkflow struct {
+	ID              uuid.UUID
+	DeviceID        uuid.UUID
+	OperatorID      uuid.UUID
+	OriginSessionID uuid.UUID
+	LatestSessionID uuid.UUID
+	Mode            int16
+	WindowSeconds   int32
+	MaxReconnects   int16
+	Reconnects      int16
+	TargetUsername  string
+	Approved        bool
+	State           int16
+	CreatedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+	NextAttemptAt   pgtype.Timestamptz
+	EndedAt         pgtype.Timestamptz
+	EndReason       string
+}
+
+type AssistanceRecording struct {
+	ID               uuid.UUID
+	SessionID        uuid.UUID
+	DeviceID         uuid.UUID
+	OperatorID       uuid.UUID
+	Required         bool
+	KeyID            string
+	MaxBytes         int64
+	RetentionDays    int16
+	State            int16
+	EncapsulatedKey  []byte
+	Segments         int32
+	StoredBytes      int64
+	HashState        []byte
+	CiphertextSha256 []byte
+	CreatedAt        pgtype.Timestamptz
+	StartedAt        pgtype.Timestamptz
+	LastSegmentAt    pgtype.Timestamptz
+	FinalizedAt      pgtype.Timestamptz
+	RetainUntil      pgtype.Timestamptz
+	DeletedAt        pgtype.Timestamptz
+	Reason           string
+}
+
+type AssistanceRecordingDeletion struct {
+	RequestID     uuid.UUID
+	RecordingID   uuid.UUID
+	OperatorID    uuid.UUID
+	RequestDigest []byte
+}
+
+type AssistanceRecordingRetrieval struct {
+	ID          uuid.UUID
+	RecordingID uuid.UUID
+	OperatorID  uuid.UUID
+	CreatedAt   pgtype.Timestamptz
+	ExpiresAt   pgtype.Timestamptz
+}
+
+type AssistanceRecordingSegment struct {
+	RecordingID uuid.UUID
+	Sequence    int32
+	Final       bool
+	Ciphertext  []byte
+	Digest      []byte
+	StoredAt    pgtype.Timestamptz
+}
+
 type AssistanceSession struct {
+	ID                     uuid.UUID
+	DeviceID               uuid.UUID
+	GenerationID           uuid.UUID
+	RequestID              uuid.UUID
+	RequestDigest          []byte
+	OperatorID             uuid.UUID
+	OperatorDisplay        string
+	Mode                   int16
+	Reason                 string
+	TargetUsername         string
+	State                  int16
+	CreatedAt              pgtype.Timestamptz
+	ConsentDeadline        pgtype.Timestamptz
+	EndsAt                 pgtype.Timestamptz
+	PromptedAt             pgtype.Timestamptz
+	ConsentedAt            pgtype.Timestamptz
+	AnsweredAt             pgtype.Timestamptz
+	StartedAt              pgtype.Timestamptz
+	EndedAt                pgtype.Timestamptz
+	EndCause               int16
+	EndDetail              string
+	DeviceSyncedAt         pgtype.Timestamptz
+	DeviceEnded            bool
+	ControlGranted         bool
+	LocalUsername          string
+	LocalUid               int64
+	LocalLogindSession     string
+	LocalSessionType       string
+	LocalDesktop           string
+	OfferSdp               string
+	OfferFingerprint       string
+	AnswerSdp              string
+	AnswerFingerprint      string
+	AuthorizedUntil        pgtype.Timestamptz
+	RequestedCapabilities  []byte
+	EffectiveCapabilities  []byte
+	CapabilityProjection   []byte
+	InputEpoch             int64
+	InputPaused            bool
+	ReconnectWorkflowID    *uuid.UUID
+	ReconnectOf            *uuid.UUID
+	UnattendedGrantID      *uuid.UUID
+	UnattendedEnrollmentID *uuid.UUID
+}
+
+type AssistanceUnattendedEnrollment struct {
+	ID           uuid.UUID
+	DeviceID     uuid.UUID
+	SessionID    uuid.UUID
+	Mode         int16
+	State        int16
+	Username     string
+	Uid          int64
+	CreatedAt    pgtype.Timestamptz
+	ExpiresAt    pgtype.Timestamptz
+	ConsentedAt  pgtype.Timestamptz
+	RevokedAt    pgtype.Timestamptz
+	RevokeReason string
+}
+
+type AssistanceUnattendedGrant struct {
 	ID                    uuid.UUID
-	DeviceID              uuid.UUID
-	GenerationID          uuid.UUID
 	RequestID             uuid.UUID
 	RequestDigest         []byte
+	ApprovalID            uuid.UUID
+	DeviceID              uuid.UUID
 	OperatorID            uuid.UUID
-	OperatorDisplay       string
+	ApproverID            uuid.UUID
 	Mode                  int16
+	PolicyMode            int16
 	Reason                string
 	TargetUsername        string
-	State                 int16
-	CreatedAt             pgtype.Timestamptz
-	ConsentDeadline       pgtype.Timestamptz
-	EndsAt                pgtype.Timestamptz
-	PromptedAt            pgtype.Timestamptz
-	ConsentedAt           pgtype.Timestamptz
-	AnsweredAt            pgtype.Timestamptz
-	StartedAt             pgtype.Timestamptz
-	EndedAt               pgtype.Timestamptz
-	EndCause              int16
-	EndDetail             string
-	DeviceSyncedAt        pgtype.Timestamptz
-	DeviceEnded           bool
-	ControlGranted        bool
-	LocalUsername         string
-	LocalUid              int64
-	LocalLogindSession    string
-	LocalSessionType      string
-	LocalDesktop          string
-	OfferSdp              string
-	OfferFingerprint      string
-	AnswerSdp             string
-	AnswerFingerprint     string
-	AuthorizedUntil       pgtype.Timestamptz
+	NotBefore             pgtype.Timestamptz
+	NotAfter              pgtype.Timestamptz
+	Schedule              []byte
 	RequestedCapabilities []byte
-	EffectiveCapabilities []byte
-	CapabilityProjection  []byte
+	MaxSessionSeconds     int32
+	CreatedAt             pgtype.Timestamptz
+	RevokedAt             pgtype.Timestamptz
+	RevokedBy             *uuid.UUID
+	RevokeReason          string
 }
 
 type DeviceAction struct {

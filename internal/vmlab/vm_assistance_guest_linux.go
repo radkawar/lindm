@@ -63,7 +63,7 @@ func configureAssistanceGuest(ctx context.Context, vm *guestVM) error {
 	if config.GetRemoteAssistance().GetEnabled() && config.GetRemoteAssistance().GetPolicyCeiling() != nil {
 		return pollGuest(ctx, vm, time.Minute, "executor session socket", "test -S "+nativeQuote(localrpc.DefaultSessionSocketPath))
 	}
-	config.RemoteAssistance = &agentv1.RemoteAssistanceConfig{Enabled: true, PolicyCeiling: assistanceFullPolicy()}
+	config.RemoteAssistance = &agentv1.RemoteAssistanceConfig{Enabled: true, PolicyCeiling: assistanceCeilingPolicy()}
 	data, err = protojson.Marshal(config)
 	if err != nil {
 		return err
@@ -130,7 +130,7 @@ loginctl unlock-session "$session"`
 	if result, err := vm.guest.runResult(ctx, desktop.rootScript(settings), nil, 16<<10, time.Minute); err != nil || result.ExitCode != 0 {
 		return nil, errors.Join(fmt.Errorf("configure lab %s session: exit %d: %s", desktop.name, result.ExitCode, bytes.TrimSpace(result.Stderr)), err)
 	}
-	if desktop.name == "gnome" {
+	if desktop.goldenName() == "gnome" {
 		if err := closeGNOMEOverview(ctx, vm, desktop); err != nil {
 			return nil, err
 		}
@@ -247,7 +247,8 @@ func waitAssistanceNonce(ctx context.Context, vm *guestVM, path string, timeout 
 }
 
 // waitAssistanceCaptureStopped proves the device side ended capture: no
-// encoder runs in the lab user's session any more.
+// encoder runs in the lab user's session any more. The sound scenarios' tones
+// play through pw-play, so no lab process matches.
 func waitAssistanceCaptureStopped(ctx context.Context, vm *guestVM) error {
 	return pollGuest(ctx, vm, 30*time.Second, "capture shutdown", "! pgrep -u "+actionDesktopUser+" -x gst-launch-1.0 >/dev/null")
 }
@@ -331,7 +332,7 @@ func observeAssistanceCapabilities(ctx context.Context, vm *guestVM, desktop *la
 	if evidence.CurrentDesktop, err = probe(`as systemctl --user show-environment | sed -n 's/^XDG_CURRENT_DESKTOP=//p'`); err != nil {
 		return nil, err
 	}
-	interfaces, err := probe(`for p in ScreenCast:version ScreenCast:AvailableSourceTypes ScreenCast:AvailableCursorModes RemoteDesktop:version RemoteDesktop:AvailableDeviceTypes; do
+	interfaces, err := probe(`for p in ScreenCast:version ScreenCast:AvailableSourceTypes ScreenCast:AvailableCursorModes RemoteDesktop:version RemoteDesktop:AvailableDeviceTypes Clipboard:version; do
 printf '%s=%s\n' "$p" "$(` + get + ` org.freedesktop.portal.${p%%:*} ${p#*:} 2>&1 | tr -d '\n')"
 done`)
 	if err != nil {
@@ -360,8 +361,15 @@ var assistanceJournalUnits = []struct{ name, selector string }{
 	{"portal", "_SYSTEMD_USER_UNIT=xdg-desktop-portal.service"},
 	{"portal-gnome", "_SYSTEMD_USER_UNIT=xdg-desktop-portal-gnome.service"},
 	{"gnome-shell", "_COMM=gnome-shell"},
+	{"portal-kde", "_SYSTEMD_USER_UNIT=plasma-xdg-desktop-portal-kde.service"},
+	{"kwin", "_COMM=kwin_wayland"},
+	{"kscreenlocker", "_COMM=kscreenlocker_g"},
 	{"coredump", "SYSLOG_IDENTIFIER=systemd-coredump"},
 	{"kernel", "-k"},
+	// The screen capture of a sound session got no frames on Fedora 44
+	// (layers-fedora44-tier3-28/-30); the graph's own logs explain it.
+	{"pipewire", "_SYSTEMD_USER_UNIT=pipewire.service"},
+	{"wireplumber", "_SYSTEMD_USER_UNIT=wireplumber.service"},
 }
 
 func collectAssistanceJournals(ctx context.Context, vm *guestVM, since int64, evidence *assistanceEvidence) ([]assistanceEvidenceFile, error) {

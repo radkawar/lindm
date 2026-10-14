@@ -46,6 +46,9 @@ type portalClipboard struct {
 	cancel            context.CancelFunc
 	done              chan struct{}
 	mu                sync.Mutex
+	opMu              sync.Mutex
+	paused            bool
+	operationCancel   context.CancelFunc
 	mime              string
 	owner             bool
 	mimeReason        string
@@ -179,6 +182,63 @@ func (c *portalClipboard) close() {
 	c.text, c.hasText, c.mime = "", false, ""
 	clear(c.serials)
 	c.mu.Unlock()
+}
+
+// PauseClipboard closes the injection/read boundary before joining the current
+// transfer. No native dialog may open until this returns successfully.
+func (g *portalGrant) PauseClipboard(ctx context.Context) error {
+	c := g.clipboard
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	c.paused = true
+	c.version++
+	c.text, c.hasText, c.mime, c.owner = "", false, "", false
+	if c.operationCancel != nil {
+		c.operationCancel()
+	}
+	c.mu.Unlock()
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+	return g.bus.call(ctx, g.owner, portalPath, clipboardIface+".SetSelection", g.handle,
+		map[string]dbus.Variant{"mime_types": dbus.MakeVariant([]string{})}).Err
+}
+
+func (g *portalGrant) ResumeClipboard() error {
+	c := g.clipboard
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.ctx.Err() != nil {
+		return c.ctx.Err()
+	}
+	c.text, c.hasText, c.mime, c.owner = "", false, "", false
+	c.version++
+	c.paused = false
+	return nil
+}
+
+func (c *portalClipboard) operation(parent context.Context) (context.Context, func(), error) {
+	c.opMu.Lock()
+	c.mu.Lock()
+	if c.paused || c.ctx.Err() != nil {
+		c.mu.Unlock()
+		c.opMu.Unlock()
+		return nil, nil, errors.New("clipboard_paused")
+	}
+	ctx, cancel := context.WithTimeout(parent, clipboardTransferTimeout)
+	c.operationCancel = cancel
+	c.mu.Unlock()
+	return ctx, func() {
+		cancel()
+		c.mu.Lock()
+		c.operationCancel = nil
+		c.mu.Unlock()
+		c.opMu.Unlock()
+	}, nil
 }
 
 func (c *portalClipboard) run() {
@@ -336,6 +396,9 @@ func (c *portalClipboard) observeOwner(body []any, sequence dbus.Sequence) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.version++
+	if c.paused {
+		return
+	}
 	c.mime = ""
 	c.mimeReason = "clipboard_mime_unavailable"
 	owner, valid := options["session_is_owner"].Value().(bool)
@@ -371,6 +434,11 @@ func (g *portalGrant) ClipboardWrite(ctx context.Context, text string, deadline 
 		return errors.New("clipboard_not_granted")
 	}
 	c := g.clipboard
+	ctx, done, err := c.operation(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.text, c.hasText, c.expires = text, true, deadline
@@ -390,6 +458,11 @@ func (g *portalGrant) ClipboardRead(ctx context.Context) (string, error) {
 		return "", &clipboardReadError{reason: "clipboard_not_granted"}
 	}
 	c := g.clipboard
+	ctx, done, err := c.operation(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer done()
 	c.mu.Lock()
 	mime, mimeReason, version, owner := c.mime, c.mimeReason, c.version, c.owner
 	c.mu.Unlock()
@@ -427,12 +500,15 @@ func (c *portalClipboard) transfer(body []any, sequence dbus.Sequence) {
 	if dbus.Store(body, &handle, &mime, &serial) != nil || handle != c.grant.handle {
 		return
 	}
+	ctx, done, err := c.operation(c.ctx)
+	if err != nil {
+		return
+	}
+	defer done()
 	text, allowed, duplicate := c.claimTransfer(mime, serial, sequence, time.Now())
 	if duplicate {
 		return
 	}
-	ctx, cancel := context.WithTimeout(c.ctx, clipboardTransferTimeout)
-	defer cancel()
 	success := false
 	if allowed {
 		var fd dbus.UnixFD
@@ -457,7 +533,7 @@ func (c *portalClipboard) claimTransfer(mime string, serial uint32, sequence dbu
 		return "", false, true
 	}
 	c.serials[serial] = struct{}{}
-	allowed := c.ctx.Err() == nil && c.enabled && c.owner && c.hasText && now.Before(c.expires) && clipboardTextMIME(mime) && sequence > c.selectionSequence
+	allowed := !c.paused && c.ctx.Err() == nil && c.enabled && c.owner && c.hasText && now.Before(c.expires) && clipboardTextMIME(mime) && sequence > c.selectionSequence
 	if !allowed {
 		return "", false, false
 	}

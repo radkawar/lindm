@@ -89,11 +89,124 @@ func pointerHoverSettled(before, previous, current *image.RGBA, point image.Poin
 // sits below it: missing the "ended" notice let waitNoBanner pass while GNOME
 // kept it on the idle seat and queued the next consent prompt behind it.
 func locateNotificationBanner(reference, current *image.RGBA) (image.Rectangle, bool) {
-	display := current.Bounds()
-	centre := display.Min.X + display.Dx()/2
-	region := image.Rect(centre-420, display.Min.Y+gnomeTopBarHeight, centre+420, display.Min.Y+360)
-	bounds, count := screenDiffBounds(reference, current, region, screenDiffThreshold)
+	bounds, count := screenDiffBounds(reference, current, bannerTopCentre.region(current.Bounds()), screenDiffThreshold)
 	if count < 2000 || bounds.Dx() < 300 || bounds.Dx() > 760 || bounds.Dy() < 64 || bounds.Dy() > 320 {
+		return image.Rectangle{}, false
+	}
+	return bounds, true
+}
+
+// bannerArea is where a desktop shows notification popups.
+type bannerArea uint8
+
+const (
+	// bannerTopCentre is GNOME Shell's banner area under its top bar.
+	bannerTopCentre bannerArea = iota
+	// bannerBottomRight is Plasma's popup area above its bottom panel.
+	bannerBottomRight
+	// bannerOverFixture is GNOME Shell's banner over the fullscreen native
+	// witness, which has no top bar and draws operator marks.
+	bannerOverFixture
+)
+
+// locateBannerOverFixture finds a GNOME banner over the fullscreen witness
+// by its own pixels: the witness's red field is saturated, while a banner,
+// dark (GNOME 50) or light (Ubuntu's Yaru), is neutral edge to edge, text
+// and buttons included. Rows whose longest neutral run spans a banner width
+// vote for its left and right edges, so neither an operator mark drawn
+// across it, which cuts some rows short, nor white witness text touching it
+// moves the result (layers-fedora44-tier3-12 clicked off "Clear marks" from
+// diff bounds that took in the stroke). The banner must also differ from
+// reference, the witness screen with the notice already up when it started,
+// so that earlier notice alone is no banner.
+func locateBannerOverFixture(reference, current *image.RGBA) (image.Rectangle, bool) {
+	region := bannerOverFixture.region(current.Bounds())
+	starts, ends := map[int]int{}, map[int]int{}
+	top, bottom := -1, -1
+	for y := region.Min.Y; y < region.Max.Y; y++ {
+		bestStart, bestEnd, start := 0, 0, -1
+		for x := region.Min.X; x <= region.Max.X; x++ {
+			neutral := x < region.Max.X && pixelSaturation(current, x, y) <= bannerNeutralSaturation
+			if neutral && start < 0 {
+				start = x
+			}
+			if !neutral && start >= 0 {
+				if x-start > bestEnd-bestStart {
+					bestStart, bestEnd = start, x
+				}
+				start = -1
+			}
+		}
+		if bestEnd-bestStart < 300 {
+			// A diagonal mark across the banner cuts a run of rows short.
+			if top >= 0 && y-bottom > bannerMarkRows {
+				break
+			}
+			continue
+		}
+		if top < 0 {
+			top = y
+		}
+		bottom = y + 1
+		starts[bestStart]++
+		ends[bestEnd]++
+	}
+	mode := func(votes map[int]int) int {
+		best, count := 0, 0
+		for edge, n := range votes {
+			if n > count || (n == count && edge < best) {
+				best, count = edge, n
+			}
+		}
+		return best
+	}
+	bounds := image.Rect(mode(starts), top, mode(ends), bottom)
+	if top < 0 || bounds.Dx() < 300 || bounds.Dx() > 760 || bounds.Dy() < 64 || bounds.Dy() > 320 {
+		return image.Rectangle{}, false
+	}
+	if _, count := screenDiffBounds(reference, current, bounds, screenDiffThreshold); count < 1000 {
+		return image.Rectangle{}, false
+	}
+	return bounds, true
+}
+
+// bannerMarkRows is how many consecutive banner rows an operator mark may
+// cut short before the banner is taken to have ended.
+const bannerMarkRows = 64
+
+// bannerNeutralSaturation bounds a neutral pixel's channel spread; the
+// witness's red field is far above it.
+const bannerNeutralSaturation = 16
+
+// plasmaPanelHeight excludes Plasma's floating bottom panel, whose clock and
+// tray (including the portal's own sharing indicator) change independently
+// of notification popups.
+const plasmaPanelHeight = 64
+
+func (a bannerArea) region(display image.Rectangle) image.Rectangle {
+	if a == bannerBottomRight {
+		return image.Rect(display.Max.X-640, display.Min.Y, display.Max.X, display.Max.Y-plasmaPanelHeight)
+	}
+	centre := display.Min.X + display.Dx()/2
+	top := display.Min.Y + gnomeTopBarHeight
+	if a == bannerOverFixture {
+		top = display.Min.Y
+	}
+	return image.Rect(centre-420, top, centre+420, display.Min.Y+360).Intersect(display)
+}
+
+// locate finds a settled notification popup in the area. Plasma popups are
+// a fixed ~18 grid units wide and stack upwards from the panel; a one-line
+// popup without actions is still over 50 px tall.
+func (a bannerArea) locate(reference, current *image.RGBA) (image.Rectangle, bool) {
+	switch a {
+	case bannerTopCentre:
+		return locateNotificationBanner(reference, current)
+	case bannerOverFixture:
+		return locateBannerOverFixture(reference, current)
+	}
+	bounds, count := screenDiffBounds(reference, current, a.region(current.Bounds()), screenDiffThreshold)
+	if count < 1500 || bounds.Dx() < 200 || bounds.Dx() > 640 || bounds.Dy() < 50 || bounds.Dy() > 640 {
 		return image.Rectangle{}, false
 	}
 	return bounds, true
@@ -168,6 +281,23 @@ func locatePortalDialog(img *image.RGBA) (image.Rectangle, bool) {
 // 48 and 50.
 func portalShareButton(dialog image.Rectangle) image.Point {
 	return image.Pt(dialog.Max.X-44, dialog.Min.Y+22)
+}
+
+// portalShareEnabled reports whether the dialog's Share button is drawn in
+// the accent colour. Disabled, GNOME pales it: channel spread 60 (Fedora 44
+// blue) or 100 (Ubuntu orange) against 175 and 201 when enabled.
+func portalShareEnabled(img *image.RGBA, dialog image.Rectangle) bool {
+	point := portalShareButton(dialog)
+	area := image.Rect(point.X-10, point.Y-5, point.X+10, point.Y+5).Intersect(img.Bounds())
+	accent := 0
+	for y := area.Min.Y; y < area.Max.Y; y++ {
+		for x := area.Min.X; x < area.Max.X; x++ {
+			if pixelSaturation(img, x, y) >= 140 {
+				accent++
+			}
+		}
+	}
+	return accent >= 50
 }
 
 func portalCancelButton(dialog image.Rectangle) image.Point {

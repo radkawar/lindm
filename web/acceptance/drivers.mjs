@@ -117,7 +117,7 @@ export class ChromiumDriver {
     const args = [...(config.browserArgs ?? [])];
     if (config.hostResolverRules) args.push(`--host-resolver-rules=${config.hostResolverRules}`);
     this.browser = await chromium.launch({
-      headless: true,
+      headless: config.headless ?? true,
       timeout: 30_000,
       args,
       // Headless Chromium hides scrollbars by default; the console review keeps

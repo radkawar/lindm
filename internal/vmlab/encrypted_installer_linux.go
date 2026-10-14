@@ -346,21 +346,25 @@ func encryptedInstallerDesktopProvision(release *platform.Release, desktop, arch
 		fmt.Fprintf(&script, "cat > /var/lib/AccountsService/users/lindm-lab <<'LINDM_SESSION'\n[User]\nSystemAccount=false\nSession=%s\nXSession=%s\nLINDM_SESSION\n", session.Name, session.Name)
 		fmt.Fprintf(&script, "systemctl enable --force %s.service\n", release.Desktop.DisplayManager)
 	} else {
-		script.WriteString(`install -d -m 0755 /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/99-lindm-lab.conf <<'LINDM_SDDM'
+		// Plasma Login Manager succeeds SDDM (Fedora 44's KDE group ships only
+		// plasmalogin.service); both read [Autologin] from their conf.d.
+		script.WriteString(`dm=sddm
+if test -e /usr/lib/systemd/system/plasmalogin.service; then dm=plasmalogin; fi
+install -d -m 0755 /etc/"$dm".conf.d
+cat > /etc/"$dm".conf.d/99-lindm-lab.conf <<'LINDM_DM'
 [Autologin]
 User=lindm-lab
 Session=plasma.desktop
 Relogin=false
-LINDM_SDDM
-systemctl enable --force sddm.service
+LINDM_DM
+systemctl enable --force "$dm".service
 `)
 	}
 	if anaconda {
 		if desktop == "gnome" {
 			script.WriteString("restorecon -RF " + path.Dir(session.GDMConfig) + " /var/lib/AccountsService\n")
 		} else {
-			script.WriteString("restorecon -RF /etc/sddm.conf.d\n")
+			script.WriteString("restorecon -RF /etc/\"$dm\".conf.d\n")
 		}
 	}
 	script.WriteString("systemctl set-default graphical.target\n")

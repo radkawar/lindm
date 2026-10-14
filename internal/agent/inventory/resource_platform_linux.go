@@ -40,6 +40,24 @@ func HostPlatform(ctx context.Context) (*resourcev1.PlatformProduct, error) {
 	})
 }
 
+// HostOSRelease observes exact distribution identity for capability admission.
+// It shares inventory's bounded os-release parser and absence-only fallback.
+func HostOSRelease(ctx context.Context) (platform.OSRelease, error) {
+	return hostOSRelease(ctx, readHostFile)
+}
+
+func hostOSRelease(ctx context.Context, readFile func(string) ([]byte, error)) (platform.OSRelease, error) {
+	release, err := loadOSRelease(ctx, readFile)
+	if err != nil {
+		return platform.OSRelease{}, fmt.Errorf("observe OS release: %w", err)
+	}
+	return platform.OSRelease{
+		ID:        release["ID"],
+		VersionID: release["VERSION_ID"],
+		VariantID: release["VARIANT_ID"],
+	}, nil
+}
+
 func hostPlatform(ctx context.Context, readFile func(string) ([]byte, error), architecture func() (string, error)) (*resourcev1.PlatformProduct, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

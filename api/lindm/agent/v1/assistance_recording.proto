@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AssistanceReconnectPolicy bounds a remembered support workflow. Only workflow
+// metadata is remembered: never a portal token, grant, relay or DTLS identity.
+message AssistanceReconnectPolicy {
+  // Each eligible end (logout, reboot, lock, lost connection) opens a window
+  // of this length in which one fresh linked invitation may be issued.
+  uint32 window_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 14400
+  }];
+  // Maximum fresh invitations linked to one originally approved session.
+  uint32 max_reconnects = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 8
+  }];
+}
+
+// AssistanceRecordingPolicy bounds one encrypted support recording.
+message AssistanceRecordingPolicy {
+  uint32 retention_days = 1 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 365
+  }];
+  uint64 max_bytes = 2 [(buf.validate.field).uint64 = {
+    gte: 1048576
+    lte: 1073741824
+  }];
+}
+
+// AssistanceRecordingAuthority is the server-issued, immutable authority to
+// record one session. The helper derives a fresh per-recording key by HPKE
+// (RFC 9180, ML-KEM-768+X25519, HKDF-SHA256, AES-256-GCM) to this recipient
+// public key and encrypts every segment before it leaves session memory.
+message AssistanceRecordingAuthority {
+  string recording_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  // Required recording ends the session rather than continuing unrecorded.
+  bool required = 2;
+  bytes public_key = 3 [(buf.validate.field).bytes.len = 1216];
+  // Lowercase hex SHA-256 of public_key.
+  string key_id = 4 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  uint64 max_bytes = 5 [(buf.validate.field).uint64 = {
+    gte: 1048576
+    lte: 1073741824
+  }];
+  uint32 retention_days = 6 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 365
+  }];
+}
+
+enum AssistanceRecordingState {
+  ASSISTANCE_RECORDING_STATE_UNSPECIFIED = 0;
+  // Capture is being encrypted and the continuous local indicator is shown.
+  ASSISTANCE_RECORDING_STATE_RECORDING = 1;
+  // Recording ended and its final segment was produced.
+  ASSISTANCE_RECORDING_STATE_STOPPED = 2;
+  // The local user did not approve optional recording; nothing was captured.
+  ASSISTANCE_RECORDING_STATE_DECLINED = 3;
+  // Encryption, indicator or upload failed; no further segment is produced.
+  ASSISTANCE_RECORDING_STATE_FAILED = 4;
+}
+
+// AssistanceRecordingReport is the helper's content-free recording observation.
+message AssistanceRecordingReport {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceRecordingState state = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 3 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+}
+
+// AssistanceRecordingChunk is one sealed segment of the WebM recording stream.
+// Plaintext never leaves the helper; the executor, network process and relay
+// carry ciphertext only. The AEAD binds recording identity, order and finality.
+message AssistanceRecordingChunk {
+  string recording_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  uint32 sequence = 2 [(buf.validate.field).uint32.lte = 65535];
+  bool final = 3;
+  // HPKE encapsulated key, present exactly on sequence zero.
+  bytes encapsulated_key = 4 [(buf.validate.field).bytes.max_len = 1120];
+  // At most 192 KiB of plaintext plus the 16-byte tag.
+  bytes ciphertext = 5 [(buf.validate.field).bytes = {
+    min_len: 16
+    max_len: 196624
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_recording_chunk.encapsulated_key"
+    message: "the encapsulated key is carried exactly by the first segment"
+    expression: "(this.sequence == 0u) == (size(this.encapsulated_key) == 1120) && (this.sequence == 0u || size(this.encapsulated_key) == 0)"
+  };
+}
+
+// AssistanceRecordingReceipt tells the executor the server's durable outcome
+// for its outbox. A rejection is final for that recording.
+message AssistanceRecordingReceipt {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  // Every segment up to and including this sequence is durable.
+  uint32 stored_through = 2 [(buf.validate.field).uint32.lte = 65535];
+  bool stored = 3;
+  string rejection = 4 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_recording_receipt.outcome"
+    message: "a receipt either stores or rejects"
+    expression: "this.stored != (this.rejection != '')"
+  };
+}
+
+// The session helper hands one sealed segment to the executor.
+message PutAssistanceRecordingRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceRecordingChunk chunk = 2 [(buf.validate.field).required = true];
+}
+message PutAssistanceRecordingResponse {}
+
+// The network process acknowledges the previous server outcome and collects
+// the next contiguous segments of one session's recording.
+message ExchangeAssistanceRecordingRequest {
+  repeated AssistanceRecordingReceipt receipts = 1 [(buf.validate.field).repeated.max_items = 8];
+}
+message ExchangeAssistanceRecordingResponse {
+  string session_id = 1 [(buf.validate.field).string = {pattern: "^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$"}];
+  repeated AssistanceRecordingChunk chunks = 2 [(buf.validate.field).repeated.max_items = 4];
+  option (buf.validate.message).cel = {
+    id: "exchange_assistance_recording.session"
+    message: "segments belong to exactly one named session recording"
+    expression: "(this.session_id == '') == (this.chunks.size() == 0) && this.chunks.all(c, c.recording_id == this.chunks[0].recording_id)"
+  };
+}

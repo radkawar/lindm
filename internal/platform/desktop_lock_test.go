@@ -17,7 +17,7 @@ func TestLockOfDesktopFollowsNativeTable(t *testing.T) {
 		{"X-Cinnamon", DesktopLockUnreported, "X-Cinnamon", false},
 		{"Hyprland", DesktopLockIgnoresLogind, "Hyprland", false},
 		{"Hyprland:" + string(make([]byte, 300)), DesktopLockIgnoresLogind, "Hyprland", false},
-		{"KDE", DesktopLockUnknown, "", false},
+		{"KDE", DesktopLockHinted, "KDE", true},
 		{"gnome", DesktopLockUnknown, "", false},
 		{"", DesktopLockUnknown, "", false},
 	} {

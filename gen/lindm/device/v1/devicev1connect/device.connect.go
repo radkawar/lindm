@@ -95,6 +95,9 @@ const (
 	// DeviceServiceGetCapabilityPolicyProcedure is the fully-qualified name of the DeviceService's
 	// GetCapabilityPolicy RPC.
 	DeviceServiceGetCapabilityPolicyProcedure = "/lindm.device.v1.DeviceService/GetCapabilityPolicy"
+	// DeviceServicePutAssistanceRecordingProcedure is the fully-qualified name of the DeviceService's
+	// PutAssistanceRecording RPC.
+	DeviceServicePutAssistanceRecordingProcedure = "/lindm.device.v1.DeviceService/PutAssistanceRecording"
 )
 
 // DeviceServiceClient is a client for the lindm.device.v1.DeviceService service.
@@ -129,6 +132,8 @@ type DeviceServiceClient interface {
 	// Returns this enrollment generation's current signed capability policy,
 	// signing a new version only when the effective server policy changed.
 	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
+	// PutAssistanceRecording stores sealed segments of an authorized recording.
+	PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error)
 }
 
 // NewDeviceServiceClient constructs a client for the lindm.device.v1.DeviceService service. By
@@ -262,6 +267,12 @@ func NewDeviceServiceClient(httpClient connect.HTTPClient, baseURL string, opts 
 			connect.WithSchema(deviceServiceMethods.ByName("GetCapabilityPolicy")),
 			connect.WithClientOptions(opts...),
 		),
+		putAssistanceRecording: connect.NewClient[v1.PutAssistanceRecordingRequest, v1.PutAssistanceRecordingResponse](
+			httpClient,
+			baseURL+DeviceServicePutAssistanceRecordingProcedure,
+			connect.WithSchema(deviceServiceMethods.ByName("PutAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -287,6 +298,7 @@ type deviceServiceClient struct {
 	confirmRefreshInventoryPublication *connect.Client[v1.ConfirmRefreshInventoryPublicationRequest, v1.ConfirmRefreshInventoryPublicationResponse]
 	syncAssistance                     *connect.Client[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse]
 	getCapabilityPolicy                *connect.Client[v1.GetCapabilityPolicyRequest, v1.GetCapabilityPolicyResponse]
+	putAssistanceRecording             *connect.Client[v1.PutAssistanceRecordingRequest, v1.PutAssistanceRecordingResponse]
 }
 
 // AcquireSession calls lindm.device.v1.DeviceService.AcquireSession.
@@ -390,6 +402,11 @@ func (c *deviceServiceClient) GetCapabilityPolicy(ctx context.Context, req *conn
 	return c.getCapabilityPolicy.CallUnary(ctx, req)
 }
 
+// PutAssistanceRecording calls lindm.device.v1.DeviceService.PutAssistanceRecording.
+func (c *deviceServiceClient) PutAssistanceRecording(ctx context.Context, req *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error) {
+	return c.putAssistanceRecording.CallUnary(ctx, req)
+}
+
 // DeviceServiceHandler is an implementation of the lindm.device.v1.DeviceService service.
 type DeviceServiceHandler interface {
 	AcquireSession(context.Context, *connect.Request[v1.AcquireSessionRequest]) (*connect.Response[v1.AcquireSessionResponse], error)
@@ -422,6 +439,8 @@ type DeviceServiceHandler interface {
 	// Returns this enrollment generation's current signed capability policy,
 	// signing a new version only when the effective server policy changed.
 	GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error)
+	// PutAssistanceRecording stores sealed segments of an authorized recording.
+	PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error)
 }
 
 // NewDeviceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -551,6 +570,12 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 		connect.WithSchema(deviceServiceMethods.ByName("GetCapabilityPolicy")),
 		connect.WithHandlerOptions(opts...),
 	)
+	deviceServicePutAssistanceRecordingHandler := connect.NewUnaryHandler(
+		DeviceServicePutAssistanceRecordingProcedure,
+		svc.PutAssistanceRecording,
+		connect.WithSchema(deviceServiceMethods.ByName("PutAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.device.v1.DeviceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DeviceServiceAcquireSessionProcedure:
@@ -593,6 +618,8 @@ func NewDeviceServiceHandler(svc DeviceServiceHandler, opts ...connect.HandlerOp
 			deviceServiceSyncAssistanceHandler.ServeHTTP(w, r)
 		case DeviceServiceGetCapabilityPolicyProcedure:
 			deviceServiceGetCapabilityPolicyHandler.ServeHTTP(w, r)
+		case DeviceServicePutAssistanceRecordingProcedure:
+			deviceServicePutAssistanceRecordingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -680,4 +707,8 @@ func (UnimplementedDeviceServiceHandler) SyncAssistance(context.Context, *connec
 
 func (UnimplementedDeviceServiceHandler) GetCapabilityPolicy(context.Context, *connect.Request[v1.GetCapabilityPolicyRequest]) (*connect.Response[v1.GetCapabilityPolicyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.GetCapabilityPolicy is not implemented"))
+}
+
+func (UnimplementedDeviceServiceHandler) PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.device.v1.DeviceService.PutAssistanceRecording is not implemented"))
 }

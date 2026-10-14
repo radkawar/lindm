@@ -66,7 +66,11 @@ type assistanceBroker struct {
 }
 
 type assistanceSession struct {
-	invitation        *agentv1.AssistanceInvitation
+	invitation *agentv1.AssistanceInvitation
+	// delivered is the helper session this executor handed the PENDING
+	// invitation to; an unattended helper may report OFFERED before any
+	// earlier report reached the executor.
+	delivered         *agentv1.AssistanceLocalSession
 	answerSDP         string
 	created           time.Time
 	lastDirective     time.Time
@@ -83,6 +87,12 @@ type assistanceSession struct {
 	commandDeadline   time.Time
 	commandTimer      *time.Timer
 	commandDigests    map[string][32]byte
+	fileDirective     *agentv1.AssistanceFileDirective
+	fileReport        *agentv1.AssistanceFileReport
+	fileDigests       map[string][32]byte
+	fileReserved      uint64
+	inputState        *agentv1.AssistanceInputState
+	fileInputEpoch    uint32
 	phase             agentv1.AssistancePhase
 	offerSDP          string
 	controlGranted    bool
@@ -96,6 +106,16 @@ type assistanceSession struct {
 	// assistancePortalCloseSettle elapses or a lock/logout supersedes it.
 	portalClosed       time.Time
 	portalClosedDetail string
+	// recording relays sealed segments; recordingReport is the helper's
+	// content-free recording state.
+	recording       *assistanceRecordingOutbox
+	recordingReport *agentv1.AssistanceRecordingReport
+	// Content-free Tier 3 observations: local audio and overlay state and
+	// the employee's unattended opt-in decision.
+	audio      *agentv1.AssistanceAudioReport
+	annotation *agentv1.AssistanceAnnotationReport
+	unattended *agentv1.AssistanceUnattendedReport
+	endedAt    time.Time
 }
 
 // assistanceTombstone keeps the outcome of a forgotten session so a late
@@ -113,6 +133,7 @@ var assistanceRules = sync.OnceValues(func() (protovalidate.Validator, error) {
 	return protovalidate.New(protovalidate.WithMessages(
 		&agentv1.SyncAssistanceRequest{}, &agentv1.SyncSessionRequest{}, &agentv1.AssistanceLocalSession{},
 		&agentv1.SyncAssistanceResponse{}, &agentv1.SyncSessionResponse{},
+		&agentv1.PutAssistanceRecordingRequest{}, &agentv1.ExchangeAssistanceRecordingRequest{}, &agentv1.ExchangeAssistanceRecordingResponse{},
 	), protovalidate.WithDisableLazy())
 })
 
@@ -135,8 +156,12 @@ func newAssistanceBroker(enabled bool, ceiling *agentv1.AssistancePolicy, clock 
 	}, nil
 }
 
+// assistanceBrokerMessageBytes bounds every message the broker admits or
+// returns.
+const assistanceBrokerMessageBytes = 256 << 10
+
 func (b *assistanceBroker) admit(msg proto.Message) error {
-	if msg == nil || !msg.ProtoReflect().IsValid() || proto.Size(msg) > 256<<10 {
+	if msg == nil || !msg.ProtoReflect().IsValid() || proto.Size(msg) > assistanceBrokerMessageBytes {
 		return errInvalid
 	}
 	if err := protodata.ValidateClosed(msg.ProtoReflect()); err != nil || b.validator.Validate(msg) != nil {
@@ -310,7 +335,7 @@ func (b *assistanceBroker) applyDirectives(now time.Time, directives []*agentv1.
 	// An ENDED session absent from directives has been confirmed or abandoned
 	// by the server; forget it before admitting new invitations.
 	for id, session := range b.sessions {
-		if _, ok := present[id]; !ok && session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+		if _, ok := present[id]; !ok && session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED && !recordingRetained(session, now) {
 			b.forget(now, id, session)
 		}
 	}
@@ -323,12 +348,16 @@ func (b *assistanceBroker) applyDirectives(now time.Time, directives []*agentv1.
 				continue
 			}
 		}
+		if !proto.Equal(session.invitation, directive.GetInvitation()) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "invitation_authority_changed")
+		}
 		session.lastDirective = now
 		session.authorizedUntil = directive.GetAuthorizedUntil().AsTime()
 		if !directive.GetTerminate() && (!now.Before(session.authorizedUntil) || session.authorizedUntil.After(now.Add(assistanceReauthorization))) {
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "operator_authorization_expired")
 		}
 		b.applyCommand(now, session, directive.GetCommand())
+		b.applyFileDirective(now, session, directive.GetFileTransfer())
 		// The invitation is immutable once seen; only the answer and
 		// termination may arrive later. The answer is single use.
 		if session.answerSDP == "" && directive.GetAnswerSdp() != "" {
@@ -405,6 +434,9 @@ func (b *assistanceBroker) forget(now time.Time, id string, session *assistanceS
 func (b *assistanceBroker) expire(now time.Time) {
 	for _, session := range b.sessions {
 		expireAssistanceCommand(session, now)
+		if session.fileDirective != nil && !now.Before(session.fileDirective.GetRequest().GetDeadline().AsTime()) {
+			session.fileDirective.Cancel = true
+		}
 		if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
 			continue
 		}
@@ -431,7 +463,11 @@ func (b *assistanceBroker) end(session *assistanceSession, cause agentv1.Assista
 	}
 	session.phase = agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED
 	session.endCause, session.endDetail = cause, detail
+	session.endedAt = b.clock()
 	session.command, session.commandResult = nil, nil
+	if session.fileDirective != nil {
+		session.fileDirective.Cancel = true
+	}
 	session.displayFrame = nil
 	if session.commandTimer != nil {
 		session.commandTimer.Stop()
@@ -449,11 +485,15 @@ func (b *assistanceBroker) applyReport(now time.Time, local *agentv1.AssistanceL
 		if session.phase != agentv1.AssistancePhase_ASSISTANCE_PHASE_PENDING || !targets(session.invitation, local) {
 			return
 		}
+		delivered := sameLocalSession(session.delivered, local)
 		session.local = proto.CloneOf(local)
-		if phase := report.GetPhase(); phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE {
+		if phase := report.GetPhase(); (phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE) && !delivered {
 			// A helper already past consent for an invitation this executor
-			// never delivered (for example after an executor restart) is not
-			// re-adopted: capture ends and the helper receives terminate.
+			// never delivered to it (for example after an executor restart)
+			// is not re-adopted: capture ends and the helper receives
+			// terminate. An unattended helper that needs no consent offers
+			// within its first sync of a delivered invitation and is claimed
+			// (layers-ubuntu24-tier3-27).
 			session.lastHelper = now
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "executor_state_lost")
 			return
@@ -462,12 +502,27 @@ func (b *assistanceBroker) applyReport(now time.Time, local *agentv1.AssistanceL
 		return
 	}
 	if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+		if report.GetFileTransfer() != nil && report.GetFileTransfer().GetState() != agentv1.AssistanceFileState_ASSISTANCE_FILE_STATE_SUCCEEDED {
+			if !b.applyFileObservation(now, session, report) {
+				return
+			}
+		}
+		if session.capabilitiesSet {
+			// The final stop/failure observation of an ended session.
+			applyRecordingReport(session, report.GetRecording())
+		}
 		session.helperEnded = session.helperEnded || report.GetPhase() == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED
 		return
 	}
 	session.lastHelper = now
 	phase := report.GetPhase()
 	if phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
+		if report.GetFileTransfer() != nil && report.GetFileTransfer().GetState() != agentv1.AssistanceFileState_ASSISTANCE_FILE_STATE_SUCCEEDED {
+			if !b.applyFileObservation(now, session, report) {
+				b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "file_report_invalid")
+				return
+			}
+		}
 		session.helperEnded = true
 		if report.GetEndCause() == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_PORTAL_CLOSED {
 			// Capture already stopped on the helper; only the recorded cause
@@ -499,7 +554,19 @@ func (b *assistanceBroker) applyReport(now time.Time, local *agentv1.AssistanceL
 			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "capability_report_invalid")
 			return
 		}
+		if !applyRecordingReport(session, report.GetRecording()) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "recording_report_invalid")
+			return
+		}
+		if !applyGuidanceReport(session, report) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "guidance_report_invalid")
+			return
+		}
 		b.applyCommandResult(now, session, report.GetCommandResult())
+		if !b.applyFileObservation(now, session, report) {
+			b.end(session, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "file_report_invalid")
+			return
+		}
 		if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED {
 			return
 		}
@@ -545,6 +612,7 @@ func (b *assistanceBroker) helperDirectives(local *agentv1.AssistanceLocalSessio
 		switch {
 		case session.local == nil:
 			if session.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_PENDING && targets(session.invitation, local) {
+				session.delivered = proto.CloneOf(local)
 				out = append(out, b.helperDirective(session))
 			}
 		case !sameLocalSession(session.local, local):
@@ -575,6 +643,12 @@ func (b *assistanceBroker) reports() []*agentv1.AssistanceReport {
 			DisplayGeneration:     session.displayGeneration,
 			DisplayFrame:          proto.CloneOf(session.displayFrame),
 			CommandResult:         proto.CloneOf(session.commandResult),
+			FileTransfer:          proto.CloneOf(session.fileReport),
+			InputState:            proto.CloneOf(session.inputState),
+			Recording:             proto.CloneOf(session.recordingReport),
+			Audio:                 proto.CloneOf(session.audio),
+			Annotation:            proto.CloneOf(session.annotation),
+			Unattended:            proto.CloneOf(session.unattended),
 			RequestedCapabilities: proto.CloneOf(session.invitation.GetRequestedCapabilities()),
 			EffectiveCapabilities: assistancePolicyIntersection(session.invitation.GetEffectiveCapabilities(), b.ceiling),
 		}

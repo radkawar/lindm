@@ -340,7 +340,8 @@ func TestBreakGlassAuthorityAndAudit(t *testing.T) {
 }
 
 // An emergency operator's approval inbox takes one break-glass observation and
-// denial audit per inbox permission, each inside its own observation timeout.
+// denial audit per observed inbox permission (action and independent reviewer
+// permissions), each inside its own observation timeout.
 // A slow store whose total exceeds the shared round wait must not fail it.
 func TestBreakGlassInboxObservationsEachGetTheirOwnTimeout(t *testing.T) {
 	s, ctx, pool := localIntegrationService(t)
@@ -360,10 +361,12 @@ func TestBreakGlassInboxObservationsEachGetTheirOwnTimeout(t *testing.T) {
 	if err != nil || !principal.BreakGlass {
 		t.Fatalf("emergency principal: %+v %v", principal, err)
 	}
-	// Every denied inbox permission commits its own break-glass denial audit.
-	// Slow each audit write so their sum exceeds the round's shared wait while
-	// each observation stays well inside its own timeout.
-	denied := len(approvalInboxPermissions) - 1
+	// Every denied observed inbox permission, including an independent
+	// reviewer permission such as remote_assistance.unattended.approve,
+	// commits its own break-glass denial audit. Slow each audit write so their
+	// sum exceeds the round's shared wait while each observation stays well
+	// inside its own timeout.
+	denied := len(approvalInboxObserved) - 1
 	delay := 2*directoryFetchTimeout/time.Duration(denied) + 250*time.Millisecond
 	if delay > directoryFetchTimeout/4 {
 		t.Fatalf("audit delay %v leaves no headroom within the %v observation timeout", delay, directoryFetchTimeout)

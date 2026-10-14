@@ -122,3 +122,38 @@ func (s *assistanceServer) SyncAssistance(_ context.Context, req *connect.Reques
 	}
 	return connect.NewResponse(&devicev1.SyncAssistanceResponse{Directives: s.directives}), nil
 }
+
+func TestAssistanceRelayPreservesFileAuthorityAndInputEpochWithoutRenewal(t *testing.T) {
+	directive := assistanceTestDirective(false)
+	directive.FileTransfer = &agentv1.AssistanceFileDirective{Request: &agentv1.AssistanceFileRequest{
+		RequestId: "8de05e06-9a06-42ad-9004-12cbfe087ba8",
+		Direction: agentv1.AssistanceFileDirection_ASSISTANCE_FILE_DIRECTION_FROM_USER,
+		Deadline:  timestamppb.New(time.Now().Add(time.Minute)),
+		Policy:    &agentv1.AssistanceFilePolicy{MaxFileBytes: 1024, MaxSessionBytes: 4096, AllowedMimeTypes: []string{"text/plain"}, AllowedExtensions: []string{".txt"}},
+	}}
+	root := &assistanceRoot{reports: []*agentv1.AssistanceReport{{
+		SessionId: assistanceTestSession, Phase: agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE,
+		OfferSdp:   "v=0",
+		InputState: &agentv1.AssistanceInputState{Epoch: 2, Paused: true},
+		FileTransfer: &agentv1.AssistanceFileReport{RequestId: directive.FileTransfer.Request.RequestId,
+			Direction: directive.FileTransfer.Request.Direction, State: agentv1.AssistanceFileState_ASSISTANCE_FILE_STATE_WAITING_CONSENT},
+	}}}
+	server := &assistanceServer{directives: []*agentv1.AssistanceDirective{directive}}
+	loop := &assistanceLoop{executor: root, gate: make(authorityGate, 1), cache: connectionCache{connection: proto.CloneOf(root.connection()), servers: &connections{device: server}}}
+	if err := loop.cycle(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	server.fail = true
+	if err := loop.cycle(t.Context()); err == nil {
+		t.Fatal("server failure ignored")
+	}
+	if !proto.Equal(root.received[1][0], directive) || !proto.Equal(server.reports[1][0], root.reports[0]) {
+		t.Fatal("transport changed file ID/deadline/policy or independent input epoch")
+	}
+	if err := loop.cycle(t.Context()); err == nil {
+		t.Fatal("server failure ignored")
+	}
+	if len(root.received[2]) != 0 {
+		t.Fatal("failed server RPC replayed file authority")
+	}
+}

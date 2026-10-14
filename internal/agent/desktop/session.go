@@ -3,6 +3,7 @@
 package desktop
 
 import (
+	"cmp"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -22,9 +23,11 @@ import (
 )
 
 const (
-	actionAllow   = "allow"
-	actionDecline = "decline"
-	actionStop    = "stop"
+	actionAllow         = "allow"
+	actionAllowRecord   = "allow_record"
+	actionDecline       = "decline"
+	actionStop          = "stop"
+	actionStopRecording = "stop_recording"
 
 	maxEndDetail   = 256
 	inputQueueSize = 64
@@ -39,16 +42,37 @@ var (
 // sessionDeps are the per-session collaborators and timings shared by all
 // sessions of one helper.
 type sessionDeps struct {
-	notifier  Notifier
-	portal    Portal
-	capturer  Capturer
-	peers     PeerFactory
-	logger    *slog.Logger
-	clock     func() time.Time
-	validator protovalidate.Validator
+	notifier               Notifier
+	portal                 Portal
+	capturer               Capturer
+	peers                  PeerFactory
+	logger                 *slog.Logger
+	clock                  func() time.Time
+	validator              protovalidate.Validator
+	filesUnavailableReason string
+	// recordings uploads sealed recording segments; recording and reconnect
+	// gates carry the production composition's exact-release admission.
+	recordings                 recordingSink
+	recordingUnavailableReason string
+	reconnectUnavailableReason string
+	recordingFlush             time.Duration
+	// Tier 3 collaborators, each with the composition's exact-release gate.
+	overlay                     Overlay
+	annotationUnavailableReason string
+	audio                       AudioDevices
+	audioUnavailableReason      string
+	enrollments                 EnrollmentStore
+	unattendedUnavailableReason string
+	elevationUnavailableReason  string
+	// unattendedRestore bounds restoring the persistent grant; a dialog in
+	// its place is a refusal, never something an absent user could answer.
+	unattendedRestore time.Duration
 	// lockReporting is nil when every lock of this desktop is observable
 	// (logind LockedHint or the LockMonitor's logind signals).
 	lockReporting error
+	// currentDesktop is the session's XDG_CURRENT_DESKTOP; with the
+	// executor-observed session type it selects the desktop profile.
+	currentDesktop string
 
 	firstPacketTimeout time.Duration
 	captureGrace       time.Duration
@@ -81,8 +105,12 @@ func (d *sessionDeps) replaceEndedNotice(ctx context.Context, next Notice) error
 // desktop resources; the helper loop only reads reports and forwards
 // directives.
 type session struct {
-	deps            *sessionDeps
-	invitation      *agentv1.AssistanceInvitation
+	deps        *sessionDeps
+	invitation  *agentv1.AssistanceInvitation
+	sessionType string
+	// profile is the desktop profile that admitted the session; set by drive
+	// before the prompt and read only on its goroutine.
+	profile         *desktopProfile
 	logger          *slog.Logger
 	cancel          context.CancelCauseFunc
 	done            chan struct{}
@@ -90,6 +118,8 @@ type session struct {
 	commands        chan *agentv1.AssistanceCommand
 	authority       *time.Timer
 	authorizedUntil time.Time
+	life            context.Context
+	files           chan *fileOperation
 
 	mu             sync.Mutex
 	phase          agentv1.AssistancePhase
@@ -109,6 +139,18 @@ type session struct {
 	commandResult  *agentv1.AssistanceCommandResult
 	commandHistory map[string][32]byte
 	commandBusy    bool
+	commandEpoch   uint32
+	commandCancel  context.CancelFunc
+	fileOperation  *fileOperation
+	fileReport     *agentv1.AssistanceFileReport
+	fileHistory    map[string][32]byte
+	fileReserved   uint64
+	fileBusy       bool
+	inputState     *agentv1.AssistanceInputState
+	recorder       *recorder
+	audio          *agentv1.AssistanceAudioReport
+	annotation     *agentv1.AssistanceAnnotationReport
+	unattended     *agentv1.AssistanceUnattendedReport
 }
 
 // sessionResources are released by cleanup in a fixed order.
@@ -119,35 +161,58 @@ type sessionResources struct {
 	capture     Capture
 	forwardDone chan struct{}
 	inputDone   chan struct{}
-	// indicatorMu guards indicator between serve and operator messages.
-	indicatorMu   sync.Mutex
-	indicator     Notice
-	markup        bool
-	input         *inputControl
-	captureCancel context.CancelFunc
-	captureDone   chan error
-	timeline      rtpTimeline
-	commandDone   chan struct{}
-	message       Notice
-	messageUntil  time.Time
-	lastMessage   time.Time
+	// indicatorMu guards the indicator and its banner slot between serve,
+	// operator messages and in-session notices (prompt_banner.go).
+	indicatorMu sync.Mutex
+	indicator   Notice
+	// prompts counts in-session notices holding the banner; while one does,
+	// the indicator is withdrawn (indicatorWithdrawn) and reposted on release.
+	prompts            int
+	indicatorWithdrawn bool
+	// indicatorClosed is set by cleanup; nothing reposts the indicator after.
+	indicatorClosed bool
+	// indicatorChanged tells serve that the posted indicator changed.
+	indicatorChanged chan struct{}
+	markup           bool
+	input            *inputControl
+	captureCancel    context.CancelFunc
+	captureDone      chan error
+	timeline         rtpTimeline
+	commandDone      chan struct{}
+	message          Notice
+	messageUntil     time.Time
+	lastMessage      time.Time
+	modalMu          sync.Mutex
+	fileDone         chan struct{}
+	filePumpDone     chan struct{}
+	recorder         *recorder
+	// recordingChanged re-posts the indicator when recording stops or fails.
+	recordingChanged chan struct{}
+	annotation       *annotationControl
+	annotationDone   chan struct{}
+	audio            *audioControl
 }
 
-func startSession(parent context.Context, deps *sessionDeps, directive *agentv1.AssistanceDirective, group *sync.WaitGroup) *session {
+func startSession(parent context.Context, deps *sessionDeps, directive *agentv1.AssistanceDirective, sessionType string, group *sync.WaitGroup) *session {
 	invitation := directive.GetInvitation()
 	ctx, cancel := context.WithCancelCause(parent)
 	s := &session{
 		deps:           deps,
 		invitation:     invitation,
+		sessionType:    sessionType,
 		logger:         deps.logger.With("session_id", invitation.GetSessionId()),
 		cancel:         cancel,
 		done:           make(chan struct{}),
 		answers:        make(chan string, 1),
 		commands:       make(chan *agentv1.AssistanceCommand, 1),
 		commandHistory: make(map[string][32]byte),
+		files:          make(chan *fileOperation, 1),
+		fileHistory:    make(map[string][32]byte),
+		inputState:     &agentv1.AssistanceInputState{Epoch: 1},
 	}
 	s.renewAuthority(directive)
 	runCtx, release := context.WithDeadlineCause(ctx, invitation.GetEndsAt().AsTime(), errExpired)
+	s.life = runCtx
 	group.Go(func() {
 		defer release()
 		s.run(runCtx)
@@ -222,6 +287,14 @@ func (s *session) report() (*agentv1.SessionAssistanceReport, bool) {
 		SelectedDisplayId:     s.selected,
 		DisplayGeneration:     s.generation,
 	}
+	report.FileTransfer = proto.CloneOf(s.fileReport)
+	report.InputState = proto.CloneOf(s.inputState)
+	if s.recorder != nil {
+		report.Recording = s.recorder.report()
+	}
+	report.Audio = proto.CloneOf(s.audio)
+	report.Annotation = proto.CloneOf(s.annotation)
+	report.Unattended = proto.CloneOf(s.unattended)
 	if (s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED || s.phase == agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE) &&
 		s.frame.Generation != 0 && s.frame.Display == s.selected && s.frame.Generation == s.generation {
 		report.DisplayFrame = &agentv1.AssistanceDisplayFrame{DisplayId: s.frame.Display, Generation: s.frame.Generation, RtpTimestamp: s.frame.RTPTimestamp}
@@ -262,6 +335,7 @@ func (s *session) apply(directive *agentv1.AssistanceDirective) {
 	if command := directive.GetCommand(); command != nil {
 		s.applyCommand(command)
 	}
+	s.applyFile(directive.GetFileTransfer())
 	answer := directive.GetAnswerSdp()
 	if answer == "" {
 		return
@@ -298,7 +372,7 @@ func (s *session) offered(offer string, control bool) {
 
 func (s *session) run(ctx context.Context) {
 	defer close(s.done)
-	resources := &sessionResources{}
+	resources := &sessionResources{indicatorChanged: make(chan struct{}, 1)}
 	cause, detail := s.drive(ctx, resources)
 	s.end(cause, detail)
 	s.cleanup(resources)
@@ -322,42 +396,65 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	if !slices.Contains(capabilities, "actions") {
 		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "notification_actions_unavailable"
 	}
-	// Never ask for consent the desktop cannot honour: a missing ScreenCast
-	// (or, for CONTROL, RemoteDesktop) portal ends the session before the prompt.
-	policy := consentedPolicy(s.invitation)
+	admission := admitDesktop(desktopProfileFor(s.sessionType, deps.currentDesktop), s.invitation.GetMode(), consentedPolicy(s.invitation))
+	s.profile = admission.profile
+	policy := admission.policy
 	request := PortalRequest{Mode: s.invitation.GetMode(), Policy: policy, Lifetime: ctx}
-	if err := deps.portal.Check(consentCtx, request); err != nil {
-		return s.failure(consentCtx, unavailable("portal_unavailable", err))
+	if err := s.servable(consentCtx, request, admission); err != nil {
+		return s.failure(consentCtx, err)
 	}
-	// A server that advertises actions but never shows them would present a
-	// prompt without visible Allow/Decline, where activating it allows.
-	server, err := deps.notifier.ServerName(consentCtx)
+	recording, err := s.recordingOffer(policy)
 	if err != nil {
-		return s.failure(consentCtx, unavailable("notification_server_unavailable", err))
-	}
-	if platform.NotificationActionsHidden(server) {
-		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "notification_actions_hidden"
-	}
-	// A desktop whose locks lindm cannot observe would keep sharing a locked
-	// screen; such a session is refused before consent rather than started
-	// with a lock guarantee that does not hold.
-	if deps.lockReporting != nil {
-		return s.failure(consentCtx, deps.lockReporting)
+		return s.failure(consentCtx, err)
 	}
 	r.markup = slices.Contains(capabilities, "body-markup")
 	s.logIfErr("withdraw previous end notice", deps.replaceEndedNotice(consentCtx, nil))
-	prompt, err := deps.notifier.Notify(consentCtx, s.promptNotification(r.markup))
+	unattended := s.invitation.GetUnattended() != nil
+	enroll := false
+	var audio []AudioSource
+	audioMode := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	var grant Grant
+	if unattended {
+		if recording.offered && !recording.required {
+			// Nobody attends to opt in to optional recording.
+			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "unattended_optional_recording"
+		}
+		record := recording.required
+		grant, err = s.openUnattended(consentCtx, r, capabilities, request)
+		if err != nil {
+			return s.failure(consentCtx, err)
+		}
+		r.grant = grant
+		if cause, detail := s.establish(ctx, consentCtx, r, admission, recording, record, audio, audioMode, "unattended_no_local_choice", false); cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED || detail != "" {
+			return cause, detail
+		}
+		cancelConsent()
+		return s.serve(ctx, r, r.captureDone)
+	}
+	prompt, err := deps.notifier.Notify(consentCtx, s.promptNotification(r.markup, recording, policy))
 	if err != nil {
 		return s.failure(consentCtx, unavailable("notification_failed", err))
 	}
 	r.prompt = prompt
 	s.advance(agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED)
 	s.logger.Info("remote assistance prompt shown", "mode", s.invitation.GetMode().String())
+	record := false
 	select {
 	case action := <-prompt.Result():
 		r.prompt = nil
 		switch action {
 		case actionAllow:
+			record = recording.required
+		case actionAllowRecord:
+			if !recording.offered || recording.required {
+				return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, "prompt_action_invalid"
+			}
+			record = true
+		case actionAllowUnattended:
+			if !s.enrollmentOffered(policy, recording) {
+				return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, "prompt_action_invalid"
+			}
+			record, enroll = recording.required, true
 		case "":
 			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED, "prompt_dismissed"
 		default:
@@ -366,26 +463,58 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	case <-consentCtx.Done():
 		return s.failure(consentCtx, consentCtx.Err())
 	}
-
-	grant, err := deps.portal.Open(consentCtx, request)
+	// Sound and microphone are separate local choices; screen consent never
+	// implies either.
+	audio, audioMode, audioReason := s.chooseAudio(consentCtx, r, policy)
+	if consentCtx.Err() != nil {
+		return s.failure(consentCtx, consentCtx.Err())
+	}
+	request.Persist = enroll
+	grant, err = deps.portal.Open(consentCtx, request)
 	if err != nil {
 		return s.failure(consentCtx, err)
 	}
 	r.grant = grant
+	if cause, detail := s.establish(ctx, consentCtx, r, admission, recording, record, audio, audioMode, audioReason, enroll); cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED || detail != "" {
+		return cause, detail
+	}
+	cancelConsent()
+	return s.serve(ctx, r, r.captureDone)
+}
+
+// enrollmentOffered reports whether the prompt offers the unattended opt-in
+// under policy, the consented policy narrowed to the desktop profile.
+// Desktops show at most three actions, so it is never combined with optional
+// recording; the server refuses that combination before inviting.
+func (s *session) enrollmentOffered(policy *agentv1.AssistancePolicy, recording recordingOffer) bool {
+	return policyEnabled(policy.GetUnattended()) && s.deps.enrollments != nil && s.deps.unattendedUnavailableReason == "" && (!recording.offered || recording.required)
+}
+
+// establish turns a started portal grant into the offered peer: the local
+// grant narrowed by the desktop admission, recording, peer, capture and
+// offer. It returns UNSPECIFIED with an empty detail on success.
+func (s *session) establish(ctx, consentCtx context.Context, r *sessionResources, admission desktopAdmission, recording recordingOffer, record bool, audio []AudioSource, audioMode agentv1.AssistancePolicyMode, audioReason string, enroll bool) (agentv1.AssistanceEndCause, string) {
+	deps := s.deps
+	grant := r.grant
 	control := s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL && grant.ControlGranted()
 	streams := grant.Streams()
 	if len(streams) == 0 || len(streams) > 8 {
 		return s.failure(consentCtx, unavailable("portal_stream_missing", nil))
 	}
-	s.mu.Lock()
-	s.granted = grantedCapabilities(policy, grant)
-	s.selected, s.generation = streams[0].ID, 1
-	for _, stream := range streams {
-		s.displays = append(s.displays, &agentv1.AssistanceDisplay{Id: stream.ID, Label: stream.Label, Width: uint32(stream.Width), Height: uint32(stream.Height)})
+	granted := grantedCapabilities(admission.policy, grant)
+	admission.annotate(granted, grant.PortalVersions())
+	if err := s.prepareRecording(r, granted, recording, record, streams[0]); err != nil {
+		return s.failure(consentCtx, err)
 	}
-	s.mu.Unlock()
+	unattendedReport := s.enrollUnattended(grant, granted, enroll)
+	s.grantTierThree(consentCtx, granted, streams, audio, audioMode, audioReason)
+	if !policyEnabled(granted.GetPolicy().GetAudio()) {
+		audio = nil
+	}
+	s.adoptGrant(r, granted, streams, unattendedReport)
 	r.input = newInputControl(grant, s.granted.GetPolicy().GetKeyboard(), streams[0].ID)
-	peer, err := deps.peers.NewPeer(PeerConfig{ICEServers: s.invitation.GetIceServers(), Input: control})
+	annotate := policyEnabled(s.granted.GetPolicy().GetAnnotation())
+	peer, err := deps.peers.NewPeer(PeerConfig{ICEServers: s.invitation.GetIceServers(), Input: control, Files: policyEnabled(s.granted.GetPolicy().GetFiles()), Annotation: annotate, Audio: len(audio) != 0})
 	if err != nil {
 		return s.failure(consentCtx, unavailable("peer_setup_failed", err))
 	}
@@ -396,6 +525,13 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 		peer.EndDisplayFrames()
 	}
 	s.mu.Unlock()
+	if annotate {
+		r.annotation = newAnnotationControl(s, deps.overlay, s.granted.GetPolicy().GetAnnotation())
+		r.annotation.publish()
+	}
+	if policyEnabled(admission.policy.GetAudio()) {
+		r.audio = newAudioControl(s, deps.audio, audio)
+	}
 	r.captureDone = make(chan error, 1)
 	if err := s.startCapture(ctx, consentCtx, r, streams[0]); err != nil {
 		return s.failure(consentCtx, err)
@@ -407,27 +543,222 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	if err := relayOnly(offer); err != nil {
 		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, err.Error()
 	}
-	cancelConsent()
 	s.offered(offer, control)
-	s.logger.Info("remote assistance offered", "control_granted", control)
+	s.logger.Info("remote assistance offered", "control_granted", control, "unattended", s.invitation.GetUnattended() != nil)
 	if control {
 		r.inputDone = make(chan struct{})
 		go s.forwardInput(ctx, r.input, peer.Input(), r.inputDone)
 	}
 	r.commandDone = make(chan struct{})
 	go s.commandLoop(ctx, r)
-	return s.serve(ctx, r, r.captureDone)
+	if policyEnabled(s.granted.GetPolicy().GetFiles()) {
+		r.fileDone, r.filePumpDone = make(chan struct{}), make(chan struct{})
+		go s.fileLoop(ctx, r)
+		go s.filePump(ctx, r)
+	}
+	if r.annotation != nil {
+		r.annotationDone = make(chan struct{})
+		go s.annotationLoop(ctx, r, r.annotationDone)
+	}
+	if r.audio != nil {
+		r.audio.start(ctx, r)
+	}
+	return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED, ""
+}
+
+// grantTierThree applies each Tier 3 capability's local gate to the grant.
+// A missing overlay, audio choice or release qualification withholds that
+// capability with an exact reason; it never ends the session.
+func (s *session) grantTierThree(ctx context.Context, granted *agentv1.AssistanceCapabilities, streams []Stream, audio []AudioSource, audioMode agentv1.AssistancePolicyMode, audioReason string) {
+	p := granted.Policy
+	off := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	if policyEnabled(p.GetElevation()) && s.deps.elevationUnavailableReason != "" {
+		p.Elevation, granted.ElevationReason = off, s.deps.elevationUnavailableReason
+	}
+	if policyEnabled(p.GetAnnotation()) {
+		reason := s.deps.annotationUnavailableReason
+		switch {
+		case reason != "":
+		case s.deps.overlay == nil:
+			reason = "overlay_unavailable"
+		case len(streams) > 1 && slices.ContainsFunc(streams, func(stream Stream) bool { return !stream.Positioned }):
+			// Without each monitor's position marks could land on the wrong one.
+			reason = "overlay_monitor_position_unknown"
+		default:
+			if err := s.deps.overlay.Check(ctx); err != nil {
+				reason = "overlay_unavailable"
+				var endErr *EndError
+				if errors.As(err, &endErr) {
+					reason = endErr.Detail
+				}
+			}
+		}
+		if reason != "" {
+			p.Annotation, granted.AnnotationReason = off, reason
+		}
+	}
+	if policyEnabled(p.GetAudio()) {
+		if len(audio) == 0 {
+			p.Audio, granted.AudioReason = off, audioReason
+		} else {
+			p.Audio = min(p.GetAudio(), audioMode)
+		}
+	}
+}
+
+// adoptGrant publishes the consented capabilities, recorder, unattended
+// enrollment and displays.
+func (s *session) adoptGrant(r *sessionResources, granted *agentv1.AssistanceCapabilities, streams []Stream, unattended *agentv1.AssistanceUnattendedReport) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.granted = granted
+	s.unattended = unattended
+	s.recorder = r.recorder
+	if s.deps.filesUnavailableReason != "" && policyEnabled(s.granted.GetPolicy().GetFiles()) {
+		s.granted.Policy.Files = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+		s.granted.Policy.FileLimits = nil
+		s.granted.FilesReason = s.deps.filesUnavailableReason
+	}
+	s.selected, s.generation = streams[0].ID, 1
+	for _, stream := range streams {
+		s.displays = append(s.displays, &agentv1.AssistanceDisplay{Id: stream.ID, Label: stream.Label, Width: uint32(stream.Width), Height: uint32(stream.Height)})
+	}
+}
+
+// servable refuses, before any prompt, a session this desktop cannot honour.
+// The request is already narrowed to the desktop profile, so the portal is
+// asked only for that. Native gaps are named first: a missing ScreenCast (or,
+// for CONTROL, RemoteDesktop) portal; a notification server that advertises
+// actions but never shows them, which would present a prompt without visible
+// Allow/Decline where activating it allows; then a desktop whose locks lindm
+// cannot observe, which would keep sharing a locked screen. Then the Tier 3
+// desktop gate and qualification table refuse what policy or evidence does
+// not admit.
+func (s *session) servable(ctx context.Context, request PortalRequest, admission desktopAdmission) error {
+	if err := s.deps.portal.Check(ctx, request); err != nil {
+		return unavailable("portal_unavailable", err)
+	}
+	server, err := s.deps.notifier.ServerName(ctx)
+	if err != nil {
+		return unavailable("notification_server_unavailable", err)
+	}
+	if platform.NotificationActionsHidden(server) {
+		return unavailable("notification_actions_hidden", nil)
+	}
+	if s.deps.lockReporting != nil {
+		return s.deps.lockReporting
+	}
+	if admission.refusal != "" {
+		return unavailable(admission.refusal, fmt.Errorf("desktop profile %s", admission.profile.name))
+	}
+	return nil
+}
+
+// recordingOffer is the recording the prompt may disclose on this device.
+// Required recording that this release cannot provide is refused before any
+// prompt or capture; optional recording is simply not offered.
+func (s *session) recordingOffer(policy *agentv1.AssistancePolicy) (recordingOffer, error) {
+	recording, err := offerRecording(s.invitation, policy)
+	if err != nil || !recording.offered || (s.deps.recordingUnavailableReason == "" && s.deps.recordings != nil) {
+		return recording, err
+	}
+	if recording.required {
+		return recordingOffer{}, &EndError{Cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, Detail: "recording_unavailable"}
+	}
+	return recordingOffer{}, nil
+}
+
+// prepareRecording applies the local recording decision to the grant and
+// starts sealing before the first captured frame. Required recording that
+// cannot start ends the session; optional recording is withheld instead.
+func (s *session) prepareRecording(r *sessionResources, granted *agentv1.AssistanceCapabilities, recording recordingOffer, record bool, stream Stream) error {
+	deps := s.deps
+	if deps.reconnectUnavailableReason != "" && policyEnabled(granted.GetPolicy().GetReconnect()) {
+		granted.Policy.Reconnect, granted.Policy.ReconnectLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+		granted.ReconnectReason = deps.reconnectUnavailableReason
+	}
+	switch {
+	case !recording.offered:
+		if policyEnabled(granted.GetPolicy().GetRecording()) {
+			withholdRecording(granted, cmp.Or(deps.recordingUnavailableReason, "recording_unavailable"))
+		}
+		return nil
+	case !record:
+		withholdRecording(granted, "user_declined")
+		return nil
+	}
+	width, height, ok := scaledSize(stream.Width, stream.Height)
+	if !ok {
+		width, height = 1280, 720
+	}
+	r.recordingChanged = make(chan struct{}, 1)
+	r.recorder = newRecorder(s.id(), s.invitation.GetRecording(), deps.recordings, s.logger, deps.clock, deps.callTimeout, deps.recordingFlush, func(string) {
+		if recording.required {
+			s.end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, "recording_failed")
+			return
+		}
+		select {
+		case r.recordingChanged <- struct{}{}:
+		default:
+		}
+	})
+	if err := r.recorder.start(uint32(width), uint32(height)); err != nil {
+		r.recorder = nil
+		if recording.required {
+			return &EndError{Cause: agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, Detail: "recording_key_invalid", Err: err}
+		}
+		withholdRecording(granted, "recording_key_invalid")
+	}
+	return nil
+}
+
+// openIndicator shows the in-progress indicator as the OFFERED phase begins
+// and reports an end cause when it cannot.
+func (s *session) openIndicator(ctx context.Context, r *sessionResources) (agentv1.AssistanceEndCause, string) {
+	indicatorFailed := func(err error) (agentv1.AssistanceEndCause, string) {
+		if r.recorder != nil && r.recorder.recording() {
+			// Recording is never captured without its continuous indicator.
+			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, "recording_indicator_failed"
+		}
+		if s.invitation.GetUnattended() != nil {
+			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "unattended_banner_failed"
+		}
+		return s.failure(ctx, unavailable("indicator_failed", err))
+	}
+	if r.prompt == nil {
+		if err := s.showIndicator(ctx, r); err != nil {
+			return indicatorFailed(err)
+		}
+		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED, ""
+	}
+	select {
+	case action := <-r.prompt.Result():
+		r.prompt = nil
+		return s.failure(ctx, s.unattendedStopped(action))
+	default:
+	}
+	// The unattended banner becomes the indicator in place, so there is never
+	// a moment without it. A separate indicator posted while the banner shows
+	// waits behind it on GNOME without animations, and closing the banner
+	// then stranded it unseen (layers-fedora44-tier3-34).
+	if err := r.prompt.Update(ctx, s.indicatorNotification(r.markup, r.recorder)); err != nil {
+		return indicatorFailed(err)
+	}
+	r.indicatorMu.Lock()
+	r.indicator = r.prompt
+	r.indicatorMu.Unlock()
+	r.prompt = nil
+	return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED, ""
 }
 
 // serve runs the OFFERED/ACTIVE phase.
 func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-chan error) (agentv1.AssistanceEndCause, string) {
-	indicator, err := s.deps.notifier.Notify(ctx, s.indicatorNotification(r.markup))
-	if err != nil {
-		return s.failure(ctx, unavailable("indicator_failed", err))
+	if cause, detail := s.openIndicator(ctx, r); cause != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNSPECIFIED {
+		return cause, detail
 	}
-	r.setIndicator(indicator)
 	lastPost := s.deps.clock()
-	indicatorResult := indicator.Result()
+	indicator := r.currentIndicator()
+	indicatorResult := noticeResult(indicator)
 	var repost *time.Timer
 	var repostC <-chan time.Time
 	defer func() {
@@ -439,6 +770,36 @@ func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-
 	answers := s.answers
 	for {
 		select {
+		case <-r.recordingChanged:
+			// Recording stopped or failed: the continuous indicator must
+			// never claim, or omit, recording that is not, or is, happening.
+			r.indicatorMu.Lock()
+			old := r.indicator
+			r.indicator = nil
+			r.indicatorMu.Unlock()
+			if old != nil {
+				s.logIfErr("replace indicator", old.Close(ctx))
+			}
+			if repost != nil {
+				repost.Stop()
+				repost, repostC = nil, nil
+			}
+			if err := s.showIndicator(ctx, r); err != nil {
+				return s.failure(ctx, unavailable("indicator_failed", err))
+			}
+			indicator = r.currentIndicator()
+			indicatorResult, lastPost = noticeResult(indicator), s.deps.clock()
+		case <-r.indicatorChanged:
+			// An in-session notice withdrew the indicator or gave it back.
+			if repost != nil {
+				repost.Stop()
+				repost, repostC = nil, nil
+			}
+			indicator = r.currentIndicator()
+			indicatorResult = noticeResult(indicator)
+			if indicator != nil {
+				lastPost = s.deps.clock()
+			}
 		case <-ctx.Done():
 			return s.failure(ctx, ctx.Err())
 		case sdp := <-answers:
@@ -476,25 +837,54 @@ func (s *session) serve(ctx context.Context, r *sessionResources, captureDone <-
 			if action == actionStop {
 				return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED, "local_stop"
 			}
-			r.setIndicator(nil)
+			if action == actionUnattendedOff && s.invitation.GetUnattended() != nil {
+				return s.failure(ctx, s.unattendedStopped(action))
+			}
+			if action == actionElevationPause && policyEnabled(s.granted.GetPolicy().GetElevation()) {
+				go s.localElevation(ctx, r)
+			}
+			if action == actionStopRecording && r.recorder != nil && r.recorder.recording() && !r.recorder.authority.GetRequired() {
+				rec := r.recorder
+				go func() {
+					rec.finish("user_stopped")
+					select {
+					case r.recordingChanged <- struct{}{}:
+					default:
+					}
+				}()
+			}
+			r.clearIndicator(indicator)
 			repost = time.NewTimer(max(0, lastPost.Add(s.deps.repostInterval).Sub(s.deps.clock())))
 			repostC = repost.C
 		case <-repostC:
 			repostC, repost = nil, nil
-			indicator, err := s.deps.notifier.Notify(ctx, s.indicatorNotification(r.markup))
-			if err != nil {
+			if err := s.showIndicator(ctx, r); err != nil {
+				if r.recorder != nil && r.recorder.recording() {
+					return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, "recording_indicator_failed"
+				}
 				return s.failure(ctx, unavailable("indicator_failed", err))
 			}
-			r.setIndicator(indicator)
-			indicatorResult, lastPost = indicator.Result(), s.deps.clock()
+			indicator = r.currentIndicator()
+			indicatorResult, lastPost = noticeResult(indicator), s.deps.clock()
 		}
 	}
 }
 
-func (r *sessionResources) setIndicator(indicator Notice) {
+// clearIndicator forgets indicator once the employee acted on it, unless an
+// in-session notice already replaced it.
+func (r *sessionResources) clearIndicator(indicator Notice) {
 	r.indicatorMu.Lock()
-	r.indicator = indicator
+	if r.indicator == indicator {
+		r.indicator = nil
+	}
 	r.indicatorMu.Unlock()
+}
+
+func noticeResult(notice Notice) <-chan string {
+	if notice == nil {
+		return nil
+	}
+	return notice.Result()
 }
 
 // failure maps a step error to an end cause. Context causes win because
@@ -508,6 +898,8 @@ func (s *session) failure(ctx context.Context, err error) (agentv1.AssistanceEnd
 			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_EXPIRED, "ends_at_reached"
 		case errors.Is(cause, errConsentTimeout):
 			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT, "consent_deadline_reached"
+		case errors.Is(cause, errFileProtocol):
+			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "file_authority_invalid"
 		default:
 			return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "helper_stopped"
 		}
@@ -554,6 +946,9 @@ func (s *session) forwardMedia(ctx context.Context, r *sessionResources, capture
 		if first {
 			first = false
 			close(firstPacket)
+		}
+		if r.recorder != nil {
+			r.recorder.write(buf[:n])
 		}
 		emitted, err := r.peer.WriteRTP(buf[:n])
 		if err != nil {
@@ -659,6 +1054,12 @@ func (s *session) cleanup(r *sessionResources) {
 	if r.commandDone != nil {
 		<-r.commandDone
 	}
+	if r.fileDone != nil {
+		<-r.fileDone
+	}
+	if r.filePumpDone != nil {
+		<-r.filePumpDone
+	}
 	s.mu.Lock()
 	if s.command != nil {
 		s.command.Text = ""
@@ -667,6 +1068,16 @@ func (s *session) cleanup(r *sessionResources) {
 		<-s.commands
 	}
 	s.mu.Unlock()
+	if r.annotationDone != nil {
+		<-r.annotationDone
+	}
+	if r.annotation != nil {
+		s.logIfErr("close overlay", r.annotation.close(ctx))
+	}
+	if r.audio != nil {
+		// Sound capture stops before the peer and portal session close.
+		r.audio.close(ctx)
+	}
 	if r.captureCancel != nil {
 		r.captureCancel()
 	}
@@ -688,8 +1099,17 @@ func (s *session) cleanup(r *sessionResources) {
 			<-r.forwardDone
 		}
 	}
-	if r.indicator != nil {
-		s.logIfErr("close indicator", r.indicator.Close(ctx))
+	if r.recorder != nil {
+		// No frame after termination is recorded; the final segment seals
+		// only what was captured before capture stopped.
+		r.recorder.finish("session_ended")
+	}
+	r.indicatorMu.Lock()
+	indicator := r.indicator
+	r.indicator, r.indicatorClosed = nil, true
+	r.indicatorMu.Unlock()
+	if indicator != nil {
+		s.logIfErr("close indicator", indicator.Close(ctx))
 	}
 	if r.message != nil {
 		s.logIfErr("close operator message", r.message.Close(ctx))
@@ -716,14 +1136,16 @@ func (s *session) logIfErr(step string, err error) {
 	}
 }
 
-func (s *session) promptNotification(markup bool) Notification {
+// promptNotification discloses policy, the consented policy already narrowed
+// to the desktop profile.
+func (s *session) promptNotification(markup bool, offer recordingOffer, policy *agentv1.AssistancePolicy) Notification {
 	operator, reason := s.invitation.GetOperatorDisplay(), s.invitation.GetReason()
 	if markup {
 		operator, reason = html.EscapeString(operator), html.EscapeString(reason)
 	}
 	var body strings.Builder
 	if s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
-		if policyEnabled(consentedPolicy(s.invitation).GetKeyboard()) {
+		if policyEnabled(policy.GetKeyboard()) {
 			fmt.Fprintf(&body, "%s asks to view your screen and control your keyboard and pointer.\n", operator)
 		} else {
 			fmt.Fprintf(&body, "%s asks to view your screen and control your pointer. Keyboard control is not requested.\n", operator)
@@ -733,22 +1155,58 @@ func (s *session) promptNotification(markup bool) Notification {
 	}
 	fmt.Fprintf(&body, "Reason: %s\n", reason)
 	if s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
-		body.WriteString("Control is requested. The system dialog that follows lets you allow viewing only.")
+		if s.profile != nil && s.profile.sharedControlDialog {
+			body.WriteString("Control is requested. On this desktop the system dialog that follows approves sharing your whole screen, every monitor, together with control; choose Decline here to refuse both.")
+		} else {
+			body.WriteString("Control is requested. The system dialog that follows lets you allow viewing only.")
+		}
 	} else {
 		body.WriteString("Control is not requested. The system dialog that follows selects what is shared.")
 	}
-	body.WriteString(capabilityConsentText(consentedPolicy(s.invitation)))
+	policy = proto.CloneOf(policy)
+	if s.deps != nil && s.deps.filesUnavailableReason != "" {
+		policy.Files, policy.FileLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	body.WriteString(capabilityConsentText(policy))
+	body.WriteString(recordingConsentText(offer))
+	actions := []NotificationAction{{Key: actionAllow, Label: "Allow"}, {Key: actionDecline, Label: "Decline"}}
+	switch {
+	case offer.required:
+		actions[0].Label = "Allow (recorded)"
+	case offer.offered:
+		actions = []NotificationAction{{Key: actionAllowRecord, Label: "Allow and record"}, {Key: actionAllow, Label: "Allow without recording"}, {Key: actionDecline, Label: "Decline"}}
+	}
+	if s.deps != nil && s.enrollmentOffered(policy, offer) {
+		body.WriteString(unattendedConsentText(policy, s.invitation.GetUnattendedEnrollment()))
+		actions = append([]NotificationAction{actions[0], {Key: actionAllowUnattended, Label: "Allow and enable unattended"}}, actions[1:]...)
+	}
+	// The banner summary stays visible when a desktop truncates the body, so
+	// it carries the recording disclosure itself.
+	summary := "Remote assistance request"
+	if s.invitation.GetReconnectOf() != "" {
+		summary = "Remote assistance reconnect request"
+		body.WriteString("\nThis continues an earlier support session that ended. Nothing you allowed before carries over; choose again.")
+	}
+	switch {
+	case offer.required:
+		summary += " (recorded)"
+	case offer.offered:
+		summary += " (recording requested)"
+	}
 	return Notification{
-		Summary:    "Remote assistance request",
+		Summary:    summary,
 		Body:       body.String(),
-		Actions:    []NotificationAction{{Key: actionAllow, Label: "Allow"}, {Key: actionDecline, Label: "Decline"}},
+		Actions:    actions,
 		Critical:   true,
 		Persistent: true,
 		Reshow:     true,
 	}
 }
 
-func (s *session) indicatorNotification(markup bool) Notification {
+func (s *session) indicatorNotification(markup bool, rec *recorder) Notification {
+	if s.invitation.GetUnattended() != nil {
+		return s.unattendedNotification(markup, true)
+	}
 	operator := s.invitation.GetOperatorDisplay()
 	if markup {
 		operator = html.EscapeString(operator)
@@ -760,10 +1218,26 @@ func (s *session) indicatorNotification(markup bool) Notification {
 	if control {
 		activity = "viewing and controlling"
 	}
+	summary := "Remote assistance in progress"
+	body := fmt.Sprintf("%s is %s your screen.", operator, activity)
+	actions := []NotificationAction{{Key: actionStop, Label: "Stop"}}
+	if rec != nil && rec.recording() {
+		summary = "Remote assistance in progress — recording"
+		body += fmt.Sprintf(" This session is being recorded. Your organization keeps the encrypted recording for up to %d days and people it authorizes can play it back later.", rec.authority.GetRetentionDays())
+		if !rec.authority.GetRequired() {
+			actions = append(actions, NotificationAction{Key: actionStopRecording, Label: "Stop recording"})
+		}
+	}
+	s.mu.Lock()
+	elevation := policyEnabled(s.granted.GetPolicy().GetElevation())
+	s.mu.Unlock()
+	if elevation {
+		actions = append(actions, NotificationAction{Key: actionElevationPause, Label: "Pause for password"})
+	}
 	return Notification{
-		Summary:    "Remote assistance in progress",
-		Body:       fmt.Sprintf("%s is %s your screen.", operator, activity),
-		Actions:    []NotificationAction{{Key: actionStop, Label: "Stop"}},
+		Summary:    summary,
+		Body:       body,
+		Actions:    actions,
 		Critical:   true,
 		Persistent: true,
 	}

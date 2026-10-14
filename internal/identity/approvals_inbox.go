@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -168,23 +169,47 @@ func approvalRequiredScopes(principal Principal, permission Permission) ([]appro
 	return required, nil
 }
 
+// inboxViewer is one fresh inbox observation: viewer is the permission
+// observed, permission the requester's action permission the visible row
+// keeps.
+type inboxViewer struct{ permission, viewer Permission }
+
+// approvalInboxViewers are every inbox permission and, after it, its
+// independent reviewer permission when the action has one: a reviewer sees
+// the requests it may decide. approvalInboxObserved lists the observed
+// permissions in the same order.
+var approvalInboxViewers, approvalInboxObserved = func() ([]inboxViewer, []Permission) {
+	viewers := make([]inboxViewer, 0, len(approvalInboxPermissions))
+	for _, permission := range approvalInboxPermissions {
+		viewers = append(viewers, inboxViewer{permission, permission})
+		if reviewer := approvalReviewerPermission(permission); reviewer != permission {
+			viewers = append(viewers, inboxViewer{permission, reviewer})
+		}
+	}
+	observed := make([]Permission, len(viewers))
+	for i, v := range viewers {
+		observed[i] = v.viewer
+	}
+	return viewers, observed
+}()
+
 // approvalInboxVisibility is shared by the paged inbox and its pending count.
 // An action grant alone never grants access to another requester's inbox.
 // Every inbox permission is decided from one fresh observation of the actor.
 func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) ([]*Authorization, identitydb.ListVisibleApprovalsParams, error) {
-	permissions := approvalInboxPermissions
-	authorizations := make([]*Authorization, 0, len(permissions))
+	permissions, viewers := approvalInboxPermissions, approvalInboxViewers
+	authorizations := make([]*Authorization, 0, len(viewers))
 	visibility := identitydb.ListVisibleApprovalsParams{
 		ActorID: actor, UnrestrictedPermissions: make([]string, 0, len(permissions)), ManageScopes: []byte("[]"),
 	}
-	scopes := make(map[string]json.RawMessage, len(permissions))
+	restrictedScopes := make(map[string][]*authv1.DeviceScope, len(permissions))
 	requiredScopes := make(map[string][]approvalRequiredScope)
-	fresh := make([]*Authorization, len(permissions))
-	if err := s.authorizeFreshEach(ctx, actor, permissions, fresh); err != nil {
+	fresh := make([]*Authorization, len(approvalInboxObserved))
+	if err := s.authorizeFreshEach(ctx, actor, approvalInboxObserved, fresh); err != nil {
 		return nil, visibility, err
 	}
 	var err error
-	for i, permission := range permissions {
+	for i, v := range viewers {
 		authorization := fresh[i]
 		if authorization == nil {
 			continue
@@ -193,29 +218,35 @@ func (s *Service) approvalInboxVisibility(ctx context.Context, actor uuid.UUID) 
 		if principal.ServiceAccount {
 			continue
 		}
-		if len(approvalPermissionRequirements[permission]) != 0 {
-			requiredScopes[string(permission)], err = approvalRequiredScopes(principal, permission)
+		if v.viewer == v.permission && len(approvalPermissionRequirements[v.permission]) != 0 {
+			requiredScopes[string(v.permission)], err = approvalRequiredScopes(principal, v.permission)
 			if err != nil {
 				return nil, visibility, err
 			}
 		}
 		authorizations = append(authorizations, authorization)
-		all, restricted := DeviceScopes(principal, permission)
-		if all {
-			visibility.UnrestrictedPermissions = append(visibility.UnrestrictedPermissions, string(permission))
+		all, restricted := DeviceScopes(principal, v.viewer)
+		if all && !slices.Contains(visibility.UnrestrictedPermissions, string(v.permission)) {
+			visibility.UnrestrictedPermissions = append(visibility.UnrestrictedPermissions, string(v.permission))
 		}
-		scopes[string(permission)], err = approvalScopesJSON(restricted)
-		if err != nil {
-			return nil, visibility, err
-		}
-		visibility.ManageUnrestricted, restricted = DeviceScopes(principal, PermissionManageApprovals)
-		visibility.ManageScopes, err = approvalScopesJSON(restricted)
+		restrictedScopes[string(v.permission)] = append(restrictedScopes[string(v.permission)], restricted...)
+		var manage []*authv1.DeviceScope
+		visibility.ManageUnrestricted, manage = DeviceScopes(principal, PermissionManageApprovals)
+		visibility.ManageScopes, err = approvalScopesJSON(manage)
 		if err != nil {
 			return nil, visibility, err
 		}
 	}
 	if len(authorizations) == 0 {
 		return nil, visibility, ErrAuthorizationDenied
+	}
+	scopes := make(map[string]json.RawMessage, len(restrictedScopes))
+	for permission, restricted := range restrictedScopes {
+		encoded, err := approvalScopesJSON(restricted)
+		if err != nil {
+			return nil, visibility, err
+		}
+		scopes[permission] = encoded
 	}
 	visibility.Scopes, err = json.Marshal(scopes)
 	if err != nil {

@@ -57,10 +57,13 @@ const (
 	// sessionAutostartPath starts sessionUnit from XDG autostart on desktops
 	// whose session manager never activates graphical-session.target.
 	sessionAutostartPath = "/etc/xdg/autostart/lindm-session.desktop"
-	sysusersPath         = "/usr/lib/sysusers.d/lindm.conf"
-	tmpfilesPath         = "/usr/lib/tmpfiles.d/lindm.conf"
-	copyrightPath        = "/usr/share/doc/lindm-agent/copyright"
-	purposeText          = "development-package-signing\n"
+	// overlayExtensionDir is the system GNOME Shell extension the session
+	// helper uses as its only qualified non-interactive assistance overlay.
+	overlayExtensionDir = "/usr/share/gnome-shell/extensions/lindm-overlay@lindm.dev"
+	sysusersPath        = "/usr/lib/sysusers.d/lindm.conf"
+	tmpfilesPath        = "/usr/lib/tmpfiles.d/lindm.conf"
+	copyrightPath       = "/usr/share/doc/lindm-agent/copyright"
+	purposeText         = "development-package-signing\n"
 )
 
 //go:embed assets/*

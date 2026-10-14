@@ -16,8 +16,11 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
+// assistanceHeadRemoval is an RFB SetDesktopSize with one zero-sized screen.
 // QEMU virtio_gpu_ui_info clears the scanout's enabled bit on a zero-sized
 // display. This is a real connector removal, not a hidden fixture window.
+var assistanceHeadRemoval = [24]byte{251, 0, 0, 0, 0, 0, 1, 0}
+
 func (r *assistanceRun) unplugSelectedMonitor(ctx context.Context, scenario *assistanceScenarioEvidence) (*adminv1.AssistanceSession, error) {
 	if r.headConnection == nil || r.headOneLabel == "" {
 		return nil, errors.New("missing real head-one activation")
@@ -37,12 +40,11 @@ func (r *assistanceRun) unplugSelectedMonitor(ctx context.Context, scenario *ass
 	if err := r.headConnection.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
 		return nil, err
 	}
-	packet := [24]byte{251, 0, 0, 0, 0, 0, 1, 0} // one zero-sized RFB screen
-	written, err := r.headConnection.Write(packet[:])
+	written, err := r.headConnection.Write(assistanceHeadRemoval[:])
 	if err != nil {
 		return nil, err
 	}
-	if written != len(packet) {
+	if written != len(assistanceHeadRemoval) {
 		return nil, io.ErrShortWrite
 	}
 	var observationErr error

@@ -73,3 +73,15 @@ func TestRevocationRetainsOpenedApproverAfterApprovalFailure(t *testing.T) {
 		t.Fatal("approval failure silently replaced or lost the owned session")
 	}
 }
+
+// Callers return vmControlPlaneError unconditionally; success must stay nil
+// (setDevicePolicy reported every successful update as "unknown").
+func TestControlPlaneErrorKeepsSuccessAndCodeOnly(t *testing.T) {
+	if err := vmControlPlaneError("update assistance policy", nil); err != nil {
+		t.Fatalf("success became %v", err)
+	}
+	err := vmControlPlaneError("update assistance policy", connect.NewError(connect.CodeFailedPrecondition, errors.New("server detail")))
+	if connect.CodeOf(err) != connect.CodeFailedPrecondition || err.Error() != "failed_precondition: update assistance policy failed" {
+		t.Fatalf("mapped error = %v", err)
+	}
+}

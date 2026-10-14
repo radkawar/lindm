@@ -136,11 +136,119 @@ func (x *SyncAssistanceResponse) GetDirectives() []*v1.AssistanceDirective {
 	return nil
 }
 
+// PutAssistanceRecordingRequest stores contiguous sealed segments of the
+// recording authorized for one session of this device. The server stores the
+// ciphertext as received and never decrypts it outside authorized retrieval.
+type PutAssistanceRecordingRequest struct {
+	state         protoimpl.MessageState         `protogen:"open.v1"`
+	SessionEpoch  uint64                         `protobuf:"varint,1,opt,name=session_epoch,json=sessionEpoch,proto3" json:"session_epoch,omitempty"`
+	SessionId     string                         `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Chunks        []*v1.AssistanceRecordingChunk `protobuf:"bytes,3,rep,name=chunks,proto3" json:"chunks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutAssistanceRecordingRequest) Reset() {
+	*x = PutAssistanceRecordingRequest{}
+	mi := &file_lindm_device_v1_assistance_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutAssistanceRecordingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutAssistanceRecordingRequest) ProtoMessage() {}
+
+func (x *PutAssistanceRecordingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_assistance_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutAssistanceRecordingRequest.ProtoReflect.Descriptor instead.
+func (*PutAssistanceRecordingRequest) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_assistance_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PutAssistanceRecordingRequest) GetSessionEpoch() uint64 {
+	if x != nil {
+		return x.SessionEpoch
+	}
+	return 0
+}
+
+func (x *PutAssistanceRecordingRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *PutAssistanceRecordingRequest) GetChunks() []*v1.AssistanceRecordingChunk {
+	if x != nil {
+		return x.Chunks
+	}
+	return nil
+}
+
+type PutAssistanceRecordingResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Every segment up to and including this sequence is durable.
+	StoredThrough uint32 `protobuf:"varint,1,opt,name=stored_through,json=storedThrough,proto3" json:"stored_through,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutAssistanceRecordingResponse) Reset() {
+	*x = PutAssistanceRecordingResponse{}
+	mi := &file_lindm_device_v1_assistance_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutAssistanceRecordingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutAssistanceRecordingResponse) ProtoMessage() {}
+
+func (x *PutAssistanceRecordingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_device_v1_assistance_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutAssistanceRecordingResponse.ProtoReflect.Descriptor instead.
+func (*PutAssistanceRecordingResponse) Descriptor() ([]byte, []int) {
+	return file_lindm_device_v1_assistance_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PutAssistanceRecordingResponse) GetStoredThrough() uint32 {
+	if x != nil {
+		return x.StoredThrough
+	}
+	return 0
+}
+
 var File_lindm_device_v1_assistance_proto protoreflect.FileDescriptor
 
 const file_lindm_device_v1_assistance_proto_rawDesc = "" +
 	"\n" +
-	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\"\x97\x03\n" +
+	" lindm/device/v1/assistance.proto\x12\x0flindm.device.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a)lindm/agent/v1/assistance_recording.proto\"\x97\x03\n" +
 	"\x15SyncAssistanceRequest\x126\n" +
 	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12D\n" +
 	"\areports\x18\x02 \x03(\v2 .lindm.agent.v1.AssistanceReportB\b\xbaH\x05\x92\x01\x02\x10\bR\areports\x12F\n" +
@@ -150,7 +258,16 @@ const file_lindm_device_v1_assistance_proto_rawDesc = "" +
 	"\n" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\bR\n" +
 	"directives:\x8e\x01\xbaH\x8a\x01\x1a\x87\x01\n" +
-	"\"device_sync_assistance.one_command\x12*only one device command may be outstanding\x1a5this.directives.filter(d, has(d.command)).size() <= 1B$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
+	"\"device_sync_assistance.one_command\x12*only one device command may be outstanding\x1a5this.directives.filter(d, has(d.command)).size() <= 1\"\x8b\x03\n" +
+	"\x1dPutAssistanceRecordingRequest\x126\n" +
+	"\rsession_epoch\x18\x01 \x01(\x04B\x11\xbaH\x0e2\f\x18\xff\xff\xff\xff\xff\xff\xff\xff\x7f \x00R\fsessionEpoch\x12M\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\tsessionId\x12L\n" +
+	"\x06chunks\x18\x03 \x03(\v2(.lindm.agent.v1.AssistanceRecordingChunkB\n" +
+	"\xbaH\a\x92\x01\x04\b\x01\x10\x04R\x06chunks:\x94\x01\xbaH\x90\x01\x1a\x8d\x01\n" +
+	"&put_assistance_recording.one_recording\x12 segments belong to one recording\x1aAthis.chunks.all(c, c.recording_id == this.chunks[0].recording_id)\"G\n" +
+	"\x1ePutAssistanceRecordingResponse\x12%\n" +
+	"\x0estored_through\x18\x01 \x01(\rR\rstoredThroughB$Z\"lindm/gen/lindm/device/v1;devicev1b\x06proto3"
 
 var (
 	file_lindm_device_v1_assistance_proto_rawDescOnce sync.Once
@@ -164,23 +281,27 @@ func file_lindm_device_v1_assistance_proto_rawDescGZIP() []byte {
 	return file_lindm_device_v1_assistance_proto_rawDescData
 }
 
-var file_lindm_device_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_lindm_device_v1_assistance_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_lindm_device_v1_assistance_proto_goTypes = []any{
-	(*SyncAssistanceRequest)(nil),  // 0: lindm.device.v1.SyncAssistanceRequest
-	(*SyncAssistanceResponse)(nil), // 1: lindm.device.v1.SyncAssistanceResponse
-	(*v1.AssistanceReport)(nil),    // 2: lindm.agent.v1.AssistanceReport
-	(v1.AssistanceEnablement)(0),   // 3: lindm.agent.v1.AssistanceEnablement
-	(*v1.AssistanceDirective)(nil), // 4: lindm.agent.v1.AssistanceDirective
+	(*SyncAssistanceRequest)(nil),          // 0: lindm.device.v1.SyncAssistanceRequest
+	(*SyncAssistanceResponse)(nil),         // 1: lindm.device.v1.SyncAssistanceResponse
+	(*PutAssistanceRecordingRequest)(nil),  // 2: lindm.device.v1.PutAssistanceRecordingRequest
+	(*PutAssistanceRecordingResponse)(nil), // 3: lindm.device.v1.PutAssistanceRecordingResponse
+	(*v1.AssistanceReport)(nil),            // 4: lindm.agent.v1.AssistanceReport
+	(v1.AssistanceEnablement)(0),           // 5: lindm.agent.v1.AssistanceEnablement
+	(*v1.AssistanceDirective)(nil),         // 6: lindm.agent.v1.AssistanceDirective
+	(*v1.AssistanceRecordingChunk)(nil),    // 7: lindm.agent.v1.AssistanceRecordingChunk
 }
 var file_lindm_device_v1_assistance_proto_depIdxs = []int32{
-	2, // 0: lindm.device.v1.SyncAssistanceRequest.reports:type_name -> lindm.agent.v1.AssistanceReport
-	3, // 1: lindm.device.v1.SyncAssistanceRequest.policy:type_name -> lindm.agent.v1.AssistanceEnablement
-	4, // 2: lindm.device.v1.SyncAssistanceResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	4, // 0: lindm.device.v1.SyncAssistanceRequest.reports:type_name -> lindm.agent.v1.AssistanceReport
+	5, // 1: lindm.device.v1.SyncAssistanceRequest.policy:type_name -> lindm.agent.v1.AssistanceEnablement
+	6, // 2: lindm.device.v1.SyncAssistanceResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	7, // 3: lindm.device.v1.PutAssistanceRecordingRequest.chunks:type_name -> lindm.agent.v1.AssistanceRecordingChunk
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_lindm_device_v1_assistance_proto_init() }
@@ -194,7 +315,7 @@ func file_lindm_device_v1_assistance_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_device_v1_assistance_proto_rawDesc), len(file_lindm_device_v1_assistance_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

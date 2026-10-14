@@ -1,0 +1,6 @@
+{
+  "uuid": "lindm-overlay@lindm.dev",
+  "name": "Lindm remote assistance overlay",
+  "description": "Shows a remote support pointer and short-lived marks only during a consented lindm assistance session. It never receives input and never covers system dialogs or the lock screen.",
+  "shell-version": ["46", "47", "48", "49", "50"]
+}

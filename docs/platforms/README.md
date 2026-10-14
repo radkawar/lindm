@@ -147,8 +147,10 @@ The [new qualification rows](../verification.md#commercial-assistance-capability
 are not run. Each platform needs its own clipboard nonce round-trip, guest shortcut
 effects, two-head monitor/pointer checks, visible notification, transfer hashes,
 reboot/logout re-consent and encrypted-recording/retention evidence as applicable.
-Tier 3 designs remain gated; unattended implementation and Plasma qualification
-require parent confirmation.
+Tier 3 unattended access, password guidance, the GNOME Shell pointer overlay and
+sound are owner-approved and implemented, unqualified, on Ubuntu 24.04 and Fedora 44
+GNOME Wayland only; every other platform gates them. Plasma and X11 keep their own
+qualification rows.
 
 ## Maintaining these pages
 

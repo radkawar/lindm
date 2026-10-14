@@ -128,9 +128,21 @@ func assistanceMessageVisible(ocr, sender, nonce string) bool {
 		return false
 	}
 	hex := strings.NewReplacer("i", "1", "l", "1", "o", "0")
+	// tesseract can split the nonce at a glyph gap ("308173518883
+	// 18e3048f8028", layers-ubuntu24-full-02), so leading tokens are joined
+	// until they read as the nonce or are longer than any accepted reading.
 	isNonce := func(line string) bool {
-		token, _, _ := strings.Cut(line, " ")
-		return editDistance(hex.Replace(token), strings.ToLower(nonce)) <= assistanceNonceOCREdits
+		joined := ""
+		for _, token := range strings.Fields(line) {
+			joined = hex.Replace(joined + token)
+			if editDistance(joined, strings.ToLower(nonce)) <= assistanceNonceOCREdits {
+				return true
+			}
+			if len(joined) > len(nonce)+assistanceNonceOCREdits {
+				return false
+			}
+		}
+		return false
 	}
 	var lines []string
 	for line := range strings.Lines(ocr) {
@@ -139,11 +151,22 @@ func assistanceMessageVisible(ocr, sender, nonce string) bool {
 		}
 	}
 	prefix := normalize(sender) + ":"
+	// The sender starts a line, or directly follows the product's "from your
+	// support operator" when GNOME wraps the body there ("…Message from your
+	// support operator assistance-operator:" then the nonce,
+	// layers-ubuntu24-tier1-35). Any other text before it, such as another
+	// operator's name, is not the authenticated sender.
 	for i, line := range lines {
-		switch {
-		case line == prefix && i+1 < len(lines) && isNonce(lines[i+1]):
-			return true
-		case strings.HasPrefix(line, prefix+" ") && isNonce(line[len(prefix)+1:]):
+		at := 0
+		if !strings.HasPrefix(line, prefix) {
+			anchor := strings.Index(line, "support operator "+prefix)
+			if anchor < 0 {
+				continue
+			}
+			at = anchor + len("support operator ")
+		}
+		rest := strings.TrimSpace(line[at+len(prefix):])
+		if rest == "" && i+1 < len(lines) && isNonce(lines[i+1]) || rest != "" && isNonce(rest) {
 			return true
 		}
 	}

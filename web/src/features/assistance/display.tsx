@@ -43,6 +43,8 @@ const endCauseLabels: Record<AssistanceEndCause, string> = {
   [AssistanceEndCause.UNAVAILABLE]: "This device cannot share its screen.",
   [AssistanceEndCause.CONNECTION_FAILED]: "The connection failed.",
   [AssistanceEndCause.DISABLED]: "The device configuration disables remote assistance.",
+  [AssistanceEndCause.RECORDING_FAILED]:
+    "Required recording couldn't be shown, stored or continued, so the session ended.",
 };
 
 // Assistance is a device-local agent setting (packaged default: off); no console role
@@ -180,6 +182,20 @@ const failureMessages: Record<string, ReactNode> = {
     "Your browser couldn't set up a secure connection. Try again.",
   [`${Code.PermissionDenied}:assistance_not_creator`]:
     "Only the admin who requested this session can connect to it.",
+  [`${Code.FailedPrecondition}:assistance_recording_not_permitted`]:
+    "This device's policy doesn't allow required recording. Choose optional recording or none.",
+  [`${Code.FailedPrecondition}:assistance_recording_unavailable`]:
+    "Recording isn't set up on this server. Request the session without recording.",
+  [`${Code.FailedPrecondition}:assistance_reconnect_not_permitted`]:
+    "This device's policy no longer allows reconnecting.",
+  [`${Code.FailedPrecondition}:assistance_reconnect_expired`]:
+    "The time to reconnect has passed. Request a new session.",
+  [`${Code.FailedPrecondition}:assistance_reconnect_not_waiting`]:
+    "This session can't be reconnected. It may already have a newer request, or it ended for a reason that doesn't allow reconnecting.",
+  [`${Code.FailedPrecondition}:assistance_reconnect_exhausted`]:
+    "This session has been reconnected as many times as the policy allows.",
+  [`${Code.FailedPrecondition}:assistance_reconnect_unavailable`]:
+    "This session wasn't requested with reconnect.",
   [`${Code.AlreadyExists}:idempotency_conflict`]:
     "This request was already sent with different details. Start over.",
 };

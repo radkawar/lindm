@@ -320,6 +320,14 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		machine, emulator, serialDevice = "virt", "qemu-system-aarch64", ""
 	}
 	machine += ",accel=" + hardware.Accelerator
+	if hardware.Architecture == "x86_64" {
+		// q35's VMware port gives the guest a VMMouse absolute device. When
+		// its driver enables absolute mode QEMU routes QMP pointer events to
+		// it instead of the usb-tablet, and GNOME drew no pointer and no hover
+		// (Fedora 44 missing-hover-input: VirtualPS/2 VMware VMMouse beside
+		// the tablet, layers-fedora44-reconnect-05/-07, files-18).
+		machine += ",vmport=off"
+	}
 	if hardware.Architecture == "x86_64" && hardware.Firmware.SecureBoot {
 		machine += ",smm=on"
 	}

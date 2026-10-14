@@ -18,7 +18,7 @@ func TestLockReportingAcceptsOnlyQualifiedDesktops(t *testing.T) {
 		"COSMIC":                true,
 		"X-Cinnamon":            false,
 		"Hyprland":              false,
-		"KDE":                   false,
+		"KDE":                   true,
 		"":                      false,
 		"gnome":                 false,
 		"GNOME-Flashback:Unity": false,

@@ -1479,13 +1479,150 @@ previous "ended" notice, and a request's own banner is withdrawn when it is
 answered, expires or is cancelled. The `rerequest` lab scenario asks again
 right after a session ends and fails unless the new request is on screen
 within 15 s.
+The same rule holds during a session: the critical in-progress notice stays the
+shown banner until the employee acts on it, so a separate in-session notice
+(the incoming-file consent, elevation guidance, the pointer controls, the sound
+controls) would wait behind it unseen. Each such notice therefore takes the
+indicator's place. While one is posted, the indicator is withdrawn, and the
+notice carries the indicator's disclosure (who is viewing or controlling, and
+recording) plus the indicator's Stop as its last action, at most three actions
+in all. When the notice is answered, dismissed, withdrawn or fails to post, the
+indicator is posted again at once; Stop on the notice ends the session
+`USER_STOPPED` like the indicator's Stop, and nothing is reposted for an ended
+session. A second in-session notice waits behind the first. The file-received
+note is shown inside the indicator, like a message.
 
 The [capability contract](product-specification.md#remote-assistance-capabilities)
 defines the separate file, reconnect, recording and unattended boundaries. File
 approval/selection must pause all remote injection before a local user acts.
-Recording is off by default and discloses the organization's later archive access;
-its helper-side encryption is distinct from media relay encryption. A future
-unattended policy must not become an unlock, login-screen or consent bypass.
+The fail-closed property for outgoing files is that nothing leaves without an
+explicit local selection. Cancelling the chooser and closing it (Escape, which
+GNOME 46's portal reports as response 2) both carry no URI, so each ends only
+that request (`file_dialog_dismissed` / `file_dialog_closed`), resumes input and
+keeps the session. A refusal that still names files, an unknown response or a
+malformed reply ends assistance.
+Unattended policy is never an unlock, login-screen or consent bypass.
+
+#### Reconnect and recording operations
+
+Reconnect and recording are off unless the deployment ceiling, the device policy
+and the request all enable them with explicit limits. Grant
+`remote_assistance.reconnect` and `remote_assistance.record` only to operators who
+may resume or record support. Reconnect remembers workflow metadata for at most
+the configured window (60 s to 4 h) and attempt count (1 to 8); each new login
+still needs the employee's consent, and a remembered workflow is never unattended
+access. Lowering the device policy ends waiting workflows.
+
+Recording requires `assistance.recording` in the server configuration:
+`key_file` holds exactly 32 CSPRNG bytes (for example
+`umask 077; head -c 32 /dev/urandom > recording.key`), owned by root or the server identity,
+mode `0600`, distinct from the escrow and every other key, and identical on all
+replicas. `max_storage_bytes` bounds all retained ciphertext; when it is full,
+optional recording stops and required recording ends its session. The server can
+decrypt a recording only through an authorized retrieval and keeps plaintext only
+in request memory. Back up the key separately from the database: losing it loses
+every retained recording, and replacing it makes earlier recordings and sessions
+still recording unavailable (required sessions end `RECORDING_FAILED`). There is
+no re-encryption or key rotation of retained recordings.
+
+Policy `recording_limits` bounds each recording's size (1 MiB to 1 GiB) and
+retention (1 to 365 days); the `assistance-maintenance` job deletes expired
+archives and their keys and records `assistance.recording.retention`. Retrieval
+(`remote_assistance.recordings.read`) and deletion
+(`remote_assistance.recordings.delete`) are separate scoped grants that never allow
+live assistance; auditors see metadata and audit only unless granted retrieval.
+Every retrieval is audited with the operator's reason and expires after ten
+minutes; playback holds the decrypted WebM only in the reviewer's browser memory.
+Recording is disclosed to the employee before capture and continuously during it,
+including the organization's later archive access. Ordinary audit and logs never
+contain recording content, keys or ciphertext.
+
+#### Unattended, password guidance, pointer and sound operations
+
+These Tier 3 capabilities are off unless the server and executor ceilings, the
+device policy and the request all enable them; they are supported only where the
+platform registry marks them (GNOME Wayland on Ubuntu 24.04 LTS and Fedora 44) and
+remain unqualified until their native scenarios pass.
+
+Unattended access needs three independent facts: the employee's local opt-in
+("Allow and enable unattended" in an attended session, which also asks GNOME to
+remember the screen-sharing grant), an access period approved by a second person,
+and the device policy (`unattended_limits` bound the approval length, opt-in days
+and connection length; ON additionally requires a weekly schedule). Grant
+`remote_assistance.unattended` to operators who may request and use periods and
+`remote_assistance.unattended.approve` (with `approvals.manage`) to different
+people who may approve them; the requester can never approve. The device keeps
+the portal restore token only in the employee's
+`$XDG_STATE_HOME/lindm/assistance-unattended.json` (mode 0600); the server never
+receives it. Each connection shows a critical banner naming the operator and
+approver with Stop and "Stop and turn off unattended"; a locked or signed-out
+seat, another user, an expired period, a missing opt-in or a portal dialog in place
+of a silent restore refuses. Revoking the period or the opt-in, lowering the
+policy, or the operator losing scope ends a live connection. Revoking an opt-in on
+the server does not delete the device file; the next connection is refused by the
+server, and the file expires or is removed when the employee turns access off.
+Audit actions: `assistance.unattended.request`, `.approve`, `.reject`,
+`.authorize`, `.enroll`, `.start`, `.stop`, `.revoke`.
+
+Password guidance (`remote_assistance.elevation_guidance`) is an audited request
+that pauses every remote pointer, key, shortcut, clipboard and file path; the
+employee can also choose "Pause for password" locally. Only the employee's local
+"Resume remote control" resumes input. lindm never detects, answers or relaxes a
+polkit prompt and never receives credentials. Audit: `assistance.elevation.request`,
+`.pause`, `.resume`.
+
+The pointer overlay (`remote_assistance.annotate`) is the packaged GNOME Shell
+extension `lindm-overlay@lindm.dev` in `/usr/share/gnome-shell/extensions`; it
+draws only and takes no input. GNOME Shell discovers it at the employee's next
+login after installation; the session helper enables it through GNOME Shell only
+for a session that uses the pointer and disables it afterwards. Without it, or
+when its bus name is not owned by GNOME Shell itself, the capability is refused.
+The extension draws only for the one session-bus connection that claimed it and
+whose bus-daemon credentials show the shell's own Unix user and the packaged
+`/usr/libexec/lindm/lindm-agent` process; every other sender is refused. This
+is not a boundary against the employee's own account running the packaged
+helper binary, which is already the session helper; the live bus connection
+pins the checked process.
+Audit: `assistance.annotation.enable`, `.disable`, `.clear`.
+
+Sound (`remote_assistance.audio`) uses PipeWire `pw-dump` and GStreamer Opus on the
+existing encrypted peer connection. The employee chooses the output, and under ON
+separately the microphone; Mute and Stop are local. Audit:
+`assistance.audio.consent`, `.mute`, `.source`, `.stop`. Recordings never contain
+sound, and audit never contains audio, marks, guidance text beyond its length, or
+restore tokens.
+
+#### KDE Plasma and X11 desktop gates
+
+GNOME and COSMIC on Wayland need no desktop setting. Sessions on KDE Plasma
+(Wayland) and on **any** X11 session are refused before the employee's prompt
+unless the server ceiling, the executor ceiling and the device policy enable
+`kde_plasma` or `x11`. These gates are device policy only: an operator request
+never chooses or widens a desktop, and no new permission exists. Existing
+capability permissions apply unchanged, and `.policy.manage` changes the gates.
+
+- **Limited** admits VIEW with only the displays, messages, reconnect and recording
+  capabilities that desktop qualified; CONTROL ends `UNAVAILABLE`
+  (`kde_plasma_control_not_permitted` / `x11_control_not_permitted`), never a view.
+- **On** also admits CONTROL, keyboard, clipboard and files, still only as
+  qualified for that desktop.
+- The session helper's qualification table (built into the agent) withholds every
+  unqualified capability with `desktop_capability_unqualified`. An X11 desktop
+  without a qualified row ends `x11_desktop_unqualified`. Portal and lock gaps keep
+  their own details (`portal_screencast_unavailable`,
+  `session_lock_state_unreported`) and are reported first.
+
+X11 never falls back to Xlib, XTest or xclip: it uses the same desktop portal
+session, consent prompt and persistent local stop as Wayland. The X11 protocol
+does not isolate one client's input or pixels from another client of the same
+display; enabling `x11` accepts that the consenting user's own X clients share
+that display. GNOME on Xorg shows no screen-sharing icon in its top bar, so the
+persistent notification with **Stop** is the only local sharing indicator there.
+On KDE the RemoteDesktop dialog approves sharing of every monitor together with
+input, so the employee's prompt says so. The consent audit records the admitting
+`desktop_profile` and portal interface versions; see the
+[desktop qualification records](verification.md#tier-3-kde-plasma-and-x11-desktop-qualification)
+for which desktops and capabilities have native evidence.
 
 #### Retired permission names on upgrade
 

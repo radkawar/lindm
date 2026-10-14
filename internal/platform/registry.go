@@ -22,6 +22,15 @@ var (
 	// assistanceInteractive requires the base session gate and runtime portal
 	// grants; source support alone is not native qualification.
 	assistanceInteractive = []Capability{AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages}
+	assistanceFiles       = []Capability{AssistanceFiles}
+	// Tier 2 workflows: implemented on the Ubuntu/Fedora reference releases,
+	// native qualification is recorded separately in the ledger.
+	assistanceWorkflows = []Capability{AssistanceReconnect, AssistanceRecording}
+	// Tier 3: implemented on the GNOME Wayland reference releases only. The
+	// overlay is a packaged GNOME Shell extension and unattended access relies
+	// on GNOME's persistent RemoteDesktop/ScreenCast restore; neither exists
+	// as a universal portal, so every other desktop remains gated.
+	assistanceTierThree = []Capability{AssistanceUnattended, AssistanceElevation, AssistanceAnnotation, AssistanceAudio}
 )
 
 // RepositorySnapshotRecipes is the trust/source and explicit lane input set for
@@ -104,7 +113,19 @@ const (
 func caps(groups ...[]Capability) []Capability { return slices.Concat(groups...) }
 
 func gates(pairs ...string) map[Capability]string {
-	m := map[Capability]string{OSUpdate: reasonOSPatch, ReleaseUpgrade: reasonReleaseUpgrade}
+	m := map[Capability]string{
+		OSUpdate:             reasonOSPatch,
+		ReleaseUpgrade:       reasonReleaseUpgrade,
+		AssistanceFiles:      "local FileChooser consent, input isolation and secure transfer are not qualified on this release",
+		AssistanceReconnect:  "fresh consent after real logout/reboot and workflow expiry are not qualified on this release",
+		AssistanceRecording:  "recording disclosure, encrypted storage and retention are not qualified on this release",
+		AssistanceUnattended: "a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release",
+		AssistanceElevation:  "pausing all remote injection around a local privileged prompt is not qualified on this release",
+		AssistanceAnnotation: "no qualified non-interactive compositor overlay exists on this release",
+		AssistanceAudio:      "selected PipeWire output/microphone capture with local mute is not qualified on this release",
+		AssistanceKDE:        "kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability",
+		AssistanceX11:        "x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE",
+	}
 	for i := 0; i+1 < len(pairs); i += 2 {
 		m[Capability(pairs[i])] = pairs[i+1]
 	}
@@ -220,9 +241,9 @@ var (
 	dracutSplitTPM = []string{"systemd", "crypt", "tpm2-tss", "lvm", "systemd-cryptsetup"}
 	ubuntuSession  = LabSession{
 		Desktops:  map[string][]string{"gnome": {"ubuntu-desktop-minimal"}, "kde": {"kubuntu-desktop"}},
-		GDMConfig: "/etc/gdm3/custom.conf", Name: "ubuntu", Terminal: []string{"gnome-terminal", "--"},
+		GDMConfig: "/etc/gdm3/custom.conf", Name: "ubuntu", X11Name: "ubuntu-xorg", Terminal: []string{"gnome-terminal", "--"},
 		UpgradePrompt: "/etc/update-manager/release-upgrades",
-		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gnome-shell", "mutter-common"},
+		Capture:       []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good", "gstreamer1.0-plugins-base", "pipewire-bin", "gnome-shell", "mutter-common"},
 	}
 	// The 26.04 desktop ISO replaces gnome-terminal with Ptyxis and carries
 	// Mutter ABI 18; keep both choices separate from the GNOME 46 recipe.
@@ -251,7 +272,13 @@ var (
 	fedoraSession   = LabSession{
 		Desktops:  map[string][]string{"gnome": slices.Concat(fedoraGraphical, []string{"gnome-desktop"}), "kde": slices.Concat(fedoraGraphical, []string{"kde-desktop"})},
 		GDMConfig: "/etc/gdm/custom.conf", Name: "gnome", Terminal: []string{"ptyxis", "--new-window", "--"},
-		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gnome-shell", "mutter"},
+		Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-gnome", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gstreamer1-plugins-base", "pipewire-utils", "gnome-shell", "mutter"},
+		// Fedora 44's kde-desktop group logs in through Plasma Login Manager
+		// (plasmalogin-autologin), observed natively.
+		Variants: map[string]LabSessionVariant{"kde": {
+			Name: "plasma.desktop", Terminal: []string{"konsole", "--separate", "-e"},
+			Capture: []string{"xdg-desktop-portal", "xdg-desktop-portal-kde", "pipewire", "pipewire-gstreamer", "gstreamer1-plugins-good", "gstreamer1-plugins-base", "pipewire-utils", "kwin", "plasma-workspace", "kscreenlocker"},
+		}},
 	}
 	fedoraGuest = LabGuest{
 		KernelConfig: "/boot/config-%s",
@@ -521,7 +548,7 @@ var registry = []*Release{
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneDeploy, LaneProductionReleaseSigning, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionAutoinstall},
 			LaneArchitectures: map[LabLane][]string{LaneDeploy: {"x86_64"}, LaneProductionReleaseSigning: {"x86_64"}},
 			Installer:         Subiquity,
-			Session: assistanceSession(withCapture(ubuntuSession, "libmutter-14-0"),
+			Session: assistanceSession(withCapture(ubuntuSession, "libmutter-14-0", "nautilus"),
 				[]string{"python3-gi", "python3-gi-cairo", "gir1.2-gtk-3.0"}),
 			Guest: ubuntuGuest,
 			// The signed arm64 vmlinuz (linux-signed 6.8.0-142.142) is a gzip-compressed
@@ -529,8 +556,9 @@ var registry = []*Release{
 			OwnedBootUnavailableOn: map[string]string{"aarch64": "the arm64 vendor kernel is a gzip-compressed Image that systemd-stub cannot embed in the owned ordinary UKI"},
 			TPM:                    LabTPM{Modules: dracutTPM, Packages: []string{"dracut", "systemd", "tpm2-tools", "libtss2-tcti-device0t64", "cryptsetup-initramfs-"}}},
 		// ReleaseUpgrade: do-release-upgrade to UpgradeTo, `lab vm resources -phase release-upgrade`.
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade}, actionLanes, assistanceInteractive),
-		Gates:    without(gates(), OSUpdate, ReleaseUpgrade),
+		// AssistanceX11: GNOME 46 on Xorg ("ubuntu-xorg"), `lab vm assistance -x11`.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, ReleaseUpgrade, AssistanceX11}, actionLanes, assistanceInteractive, assistanceFiles, assistanceWorkflows, assistanceTierThree),
+		Gates:    without(gates(), OSUpdate, ReleaseUpgrade, AssistanceFiles, AssistanceReconnect, AssistanceRecording, AssistanceUnattended, AssistanceElevation, AssistanceAnnotation, AssistanceAudio, AssistanceX11),
 	},
 	{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
@@ -650,14 +678,15 @@ var registry = []*Release{
 		VendorRepositories: []VendorRepository{fedora44Archive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		Lab: Lab{Lanes: []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneAdvisories, LaneAcceptance, LaneEnrollFromConsole, LaneProvisionCloudInit, LaneProvisionKickstart},
 			Installer: Anaconda,
-			Session: assistanceSession(fedoraSession,
+			Session: assistanceSession(withCapture(fedoraSession, "nautilus"),
 				[]string{"python3-gobject", "python3-cairo", "gtk3"}),
 			Guest:     fedoraGuest,
 			Kickstart: "F44", Repository: "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/%s/os/", RepositoryKey: "/etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-44-%s",
 			TPM:                     LabTPM{Modules: dracutSplitTPM, Packages: []string{"systemd-udev", "tpm2-tools", "tpm2-tss"}},
 			SecureBootUnavailableOn: fedoraARMNoSecureBoot},
-		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate}, actionLanes, assistanceInteractive),
-		Gates:    without(gates(), OSUpdate),
+		// AssistanceKDE: Plasma 6.6 Wayland (kde-desktop), `lab vm assistance -desktop kde`.
+		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, OSUpdate, AssistanceKDE}, actionLanes, assistanceInteractive, assistanceFiles, assistanceWorkflows, assistanceTierThree),
+		Gates:    without(gates(), OSUpdate, AssistanceFiles, AssistanceReconnect, AssistanceRecording, AssistanceUnattended, AssistanceElevation, AssistanceAnnotation, AssistanceAudio, AssistanceKDE),
 		// Recovery needs Secure Boot (measured GRUB: PCR 7 SecureBoot=1; owned
 		// UKI: signed recovery). Under AAVMF Secure Boot shim refuses Fedora's
 		// unsigned aarch64 kernel (fedora44-mgrub-nvme-arm64-01/-02), and the

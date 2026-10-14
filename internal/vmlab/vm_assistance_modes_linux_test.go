@@ -5,8 +5,11 @@
 package vmlab
 
 import (
+	"slices"
 	"testing"
 	"time"
+
+	authv1 "lindm/gen/lindm/auth/v1"
 )
 
 func modeAuthorityFixture(name string) *assistanceScenarioEvidence {
@@ -90,6 +93,34 @@ func TestAssistanceRevocationEvidenceRequiresActualControlLoss(t *testing.T) {
 			change(scenario)
 			if verifyAssistanceModeAuthority(scenario) == nil {
 				t.Fatal("unproven native control revocation qualified")
+			}
+		})
+	}
+}
+
+func TestAssistanceRestrictedRolesRetainIndependentModeAuthority(t *testing.T) {
+	roles := assistanceQualificationRoles()
+	for _, test := range []struct {
+		role    string
+		missing string
+		granted string
+	}{
+		{assistanceNoClipboardRole, "remote_assistance.clipboard", "remote_assistance.files"},
+		{assistanceNoFilesRole, "remote_assistance.files", "remote_assistance.clipboard"},
+	} {
+		t.Run(test.role, func(t *testing.T) {
+			index := slices.IndexFunc(roles, func(role *authv1.RoleDefinition) bool { return role.GetName() == test.role })
+			if index < 0 {
+				t.Fatal("restricted fixture role is not registered")
+			}
+			permissions := roles[index].GetPermissions()
+			for _, permission := range []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.keyboard", "remote_assistance.display", "remote_assistance.message", test.granted} {
+				if !slices.Contains(permissions, permission) {
+					t.Fatalf("capability refusal is confounded by missing %s", permission)
+				}
+			}
+			if slices.Contains(permissions, test.missing) {
+				t.Fatalf("restricted role grants %s", test.missing)
 			}
 		})
 	}

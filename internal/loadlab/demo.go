@@ -964,7 +964,7 @@ func (s *demoSeed) assistance(ctx context.Context, d *simulatedDevice, accept bo
 		return "", err
 	}
 	id := created.Msg.GetSession().GetId()
-	report := &agentv1.AssistanceReport{SessionId: id, LocalSession: &agentv1.AssistanceLocalSession{Username: "demo", Uid: 1000, LogindSessionId: "2", SessionType: "wayland", Desktop: d.demo.release.Desktop.Name}}
+	report := &agentv1.AssistanceReport{SessionId: id, LocalSession: &agentv1.AssistanceLocalSession{Username: "demo", Uid: 1000, LogindSessionId: "2", SessionType: "wayland", Desktop: d.demo.release.Desktop.Name}, InputState: &agentv1.AssistanceInputState{Epoch: 1}}
 	sync := func(phase agentv1.AssistancePhase, cause agentv1.AssistanceEndCause) error {
 		report.Phase, report.EndCause = phase, cause
 		_, err := d.syncAssistance(ctx, report)

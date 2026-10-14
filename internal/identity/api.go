@@ -98,6 +98,20 @@ const (
 	PermissionAssistanceKeyboard      Permission = "remote_assistance.keyboard"
 	PermissionAssistanceDisplay       Permission = "remote_assistance.display"
 	PermissionAssistanceMessage       Permission = "remote_assistance.message"
+	PermissionAssistanceFiles         Permission = "remote_assistance.files"
+	PermissionAssistanceReconnect     Permission = "remote_assistance.reconnect"
+	PermissionAssistanceRecord        Permission = "remote_assistance.record"
+	// Recording retrieval and deletion are archive authority on their own
+	// device scope; they never grant view, control or another live capability.
+	PermissionReadAssistanceRecordings   Permission = "remote_assistance.recordings.read"
+	PermissionDeleteAssistanceRecordings Permission = "remote_assistance.recordings.delete"
+	// Unattended access is requested with one permission and approved by a
+	// different person holding the independent approve permission.
+	PermissionAssistanceUnattended        Permission = "remote_assistance.unattended"
+	PermissionApproveAssistanceUnattended Permission = "remote_assistance.unattended.approve"
+	PermissionAssistanceElevation         Permission = "remote_assistance.elevation_guidance"
+	PermissionAssistanceAnnotate          Permission = "remote_assistance.annotate"
+	PermissionAssistanceAudio             Permission = "remote_assistance.audio"
 
 	RoleOwner    = "owner"
 	RoleAdmin    = "admin"

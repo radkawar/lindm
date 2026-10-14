@@ -14,7 +14,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -129,8 +128,8 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 			if err := enforceAssistance(ctx, q, &old, now, revoked); err != nil {
 				return err
 			}
-			session = assistanceMessage(old)
-			return nil
+			session, err = s.assistanceSessionMessage(ctx, q, old)
+			return err
 		}
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return err
@@ -142,60 +141,34 @@ func (s *Service) CreateAssistanceSession(ctx context.Context, req *connect.Requ
 		if device.State != core.StateActive || device.CurrentGenerationID == nil || !device.LastSeenAt.Valid || now.Sub(device.LastSeenAt.Time) > assistanceOnlineWindow {
 			return rpcreason.Error(connect.CodeFailedPrecondition, "device_offline")
 		}
-		if err := enforceOpenAssistance(ctx, q, deviceID, now, revoked); err != nil {
-			return err
+		invitation := assistanceInvitation{
+			requestID: requestID, digest: digest, deviceID: deviceID, generationID: *device.CurrentGenerationID,
+			operatorID: actor.ID, display: display, mode: req.Msg.GetMode(), reason: req.Msg.GetReason(),
+			target: req.Msg.GetTargetUsername(), requested: req.Msg.GetRequestedCapabilities(), duration: duration,
+			authorizedUntil: authorization.ExpiresAt(), actor: &actor.ID,
 		}
-		if _, err := q.LockOpenAssistanceSession(ctx, deviceID); err == nil {
-			return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_busy")
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
+		if id := req.Msg.GetUnattendedGrantId(); id != "" {
+			grantID, _ := uuid.Parse(id)
+			admission, err := s.admitUnattended(ctx, q, authorization.Principal(), deviceID, grantID, req.Msg.GetMode(), req.Msg.GetTargetUsername(), now)
+			if err != nil {
+				return err
+			}
+			// The connection can never exceed the approved window, the opt-in
+			// or the policy's single-connection bound.
+			invitation.duration = min(invitation.duration, time.Duration(admission.grant.MaxSessionSeconds)*time.Second, admission.until.Sub(now))
+			if invitation.duration < time.Minute {
+				return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_unattended_window_ending")
+			}
+			invitation.target = admission.grant.TargetUsername
+			invitation.requested = intersectAssistancePolicy(assistancePolicy(req.Msg.GetRequestedCapabilities()), decodeAssistancePolicy(admission.grant.RequestedCapabilities))
+			invitation.unattended = &admission
 		}
-		if err := q.LockAssistanceAdmission(ctx); err != nil {
-			return err
-		}
-		live, err := q.CountLiveAssistanceSessions(ctx, devicedb.CountLiveAssistanceSessionsParams{Now: core.Timestamptz(now), UnreachableBefore: core.Timestamptz(now.Add(-assistanceUnreachable))})
+		row, err := s.issueAssistanceInvitation(ctx, q, invitation, now, revoked)
 		if err != nil {
 			return err
 		}
-		if live >= int64(s.Assistance.MaxSessions()) {
-			return rpcreason.Error(connect.CodeFailedPrecondition, "assistance_capacity")
-		}
-		id := uuid.New()
-		policy, err := loadAssistancePolicy(ctx, q, deviceID)
-		if err != nil {
-			return err
-		}
-		requested, err := proto.Marshal(assistancePolicy(req.Msg.GetRequestedCapabilities()))
-		if err != nil {
-			return err
-		}
-		effective, err := proto.Marshal(intersectAssistancePolicy(req.Msg.GetRequestedCapabilities(), intersectAssistancePolicy(policy, s.AssistanceCeiling)))
-		if err != nil {
-			return err
-		}
-		if err := q.InsertAssistanceSession(ctx, devicedb.InsertAssistanceSessionParams{
-			ID: id, DeviceID: deviceID, GenerationID: *device.CurrentGenerationID, RequestID: requestID, RequestDigest: digest,
-			OperatorID: actor.ID, OperatorDisplay: display, Mode: int16(req.Msg.GetMode()), Reason: req.Msg.GetReason(),
-			TargetUsername: req.Msg.GetTargetUsername(), CreatedAt: core.Timestamptz(now),
-			ConsentDeadline: core.Timestamptz(now.Add(assistanceConsentWindow)), EndsAt: core.Timestamptz(now.Add(duration)),
-		}); err != nil {
-			return err
-		}
-		if err := q.SetAssistanceCapabilities(ctx, devicedb.SetAssistanceCapabilitiesParams{ID: id, RequestedCapabilities: requested, EffectiveCapabilities: effective}); err != nil {
-			return err
-		}
-		if err := q.AuthorizeAssistanceSession(ctx, devicedb.AuthorizeAssistanceSessionParams{ID: id, AuthorizedUntil: core.Timestamptz(authorization.ExpiresAt())}); err != nil {
-			return err
-		}
-		row, err := q.GetAssistanceSession(ctx, id)
-		if err != nil {
-			return err
-		}
-		if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceRequest, row, req.Msg.GetReason(), "target", req.Msg.GetTargetUsername()); err != nil {
-			return err
-		}
-		session = assistanceMessage(row)
-		return nil
+		session, err = s.assistanceSessionMessage(ctx, q, row)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -262,7 +235,11 @@ func (s *Service) ListAssistanceSessions(ctx context.Context, req *connect.Reque
 				response.NextPageToken = token
 				break
 			}
-			response.Sessions = append(response.Sessions, assistanceMessage(row))
+			message, err := s.assistanceSessionMessage(ctx, q, row)
+			if err != nil {
+				return err
+			}
+			response.Sessions = append(response.Sessions, message)
 		}
 		return nil
 	})
@@ -292,8 +269,8 @@ func (s *Service) GetAssistanceSession(ctx context.Context, req *connect.Request
 		if err := enforceAssistance(ctx, q, &row, s.Now(), revoked); err != nil {
 			return err
 		}
-		session = assistanceMessage(row)
-		return nil
+		session, err = s.assistanceSessionMessage(ctx, q, row)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -378,8 +355,9 @@ func (s *Service) JoinAssistanceSession(ctx context.Context, req *connect.Reques
 		if err := recordAssistanceAudit(ctx, q, &actor.ID, auditkind.AssistanceJoin, row, "", "offer", row.OfferFingerprint); err != nil {
 			return err
 		}
-		response.Session, response.OfferSdp, response.IceServers = assistanceMessage(row), row.OfferSdp, []*agentv1.AssistanceIceServer{ice}
-		return nil
+		response.Session, err = s.assistanceSessionMessage(ctx, q, row)
+		response.OfferSdp, response.IceServers = row.OfferSdp, []*agentv1.AssistanceIceServer{ice}
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -441,8 +419,8 @@ func (s *Service) AnswerAssistanceSession(ctx context.Context, req *connect.Requ
 		if err != nil {
 			return err
 		}
-		session = assistanceMessage(row)
-		return nil
+		session, err = s.assistanceSessionMessage(ctx, q, row)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -485,8 +463,8 @@ func (s *Service) StopAssistanceSession(ctx context.Context, req *connect.Reques
 				return err
 			}
 		}
-		session = assistanceMessage(row)
-		return nil
+		session, err = s.assistanceSessionMessage(ctx, q, row)
+		return err
 	})
 	if err != nil {
 		return nil, err

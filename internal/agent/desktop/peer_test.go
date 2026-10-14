@@ -211,12 +211,12 @@ func TestPionPeerOffersOnlyRelayCandidatesAndConnects(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("display marker not delivered")
 	}
-	if err := channel.SendText(`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}`); err != nil {
+	if err := channel.SendText(`{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1,"epoch":1}`); err != nil {
 		t.Fatal(err)
 	}
 	select {
 	case message := <-peer.Input():
-		if string(message) != `{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1}` {
+		if string(message) != `{"t":"key","code":"KeyA","down":true,"display":"monitor-1","generation":1,"epoch":1}` {
 			t.Fatalf("input = %q", message)
 		}
 	case <-ctx.Done():

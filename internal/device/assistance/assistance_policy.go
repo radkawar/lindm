@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
@@ -14,6 +15,9 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/assistancereconnect"
+	"lindm/internal/assistancerecording"
+	"lindm/internal/assistanceunattended"
 	"lindm/internal/auditkind"
 	"lindm/internal/device/core"
 	"lindm/internal/device/devicedb"
@@ -29,16 +33,104 @@ func assistanceMode(mode agentv1.AssistancePolicyMode) agentv1.AssistancePolicyM
 }
 
 func assistancePolicy(p *agentv1.AssistancePolicy) *agentv1.AssistancePolicy {
-	return &agentv1.AssistancePolicy{Clipboard: assistanceMode(p.GetClipboard()), Keyboard: assistanceMode(p.GetKeyboard()), Display: assistanceMode(p.GetDisplay()), Messages: assistanceMode(p.GetMessages())}
+	policy := &agentv1.AssistancePolicy{Clipboard: assistanceMode(p.GetClipboard()), Keyboard: assistanceMode(p.GetKeyboard()), Display: assistanceMode(p.GetDisplay()), Messages: assistanceMode(p.GetMessages()), Files: assistanceMode(p.GetFiles()), Reconnect: assistanceMode(p.GetReconnect()), Recording: assistanceMode(p.GetRecording()), Unattended: assistanceMode(p.GetUnattended()), Elevation: assistanceMode(p.GetElevation()), Annotation: assistanceMode(p.GetAnnotation()), Audio: assistanceMode(p.GetAudio()), KdePlasma: assistanceMode(p.GetKdePlasma()), X11: assistanceMode(p.GetX11())}
+	if policy.Files > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.FileLimits = intersectAssistanceFilePolicy(p.GetFileLimits(), p.GetFileLimits())
+	}
+	if policy.Files == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF || policy.FileLimits == nil {
+		policy.Files, policy.FileLimits = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, nil
+	}
+	boundAssistanceWorkflow(policy, p, p)
+	return policy
+}
+
+// boundAssistanceWorkflow applies the reconnect, recording and unattended
+// limits of a and b to policy. A mode without explicit limits is off, never
+// unbounded.
+func boundAssistanceWorkflow(policy, a, b *agentv1.AssistancePolicy) {
+	policy.ReconnectLimits, policy.RecordingLimits, policy.UnattendedLimits = nil, nil, nil
+	if policy.Unattended > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.UnattendedLimits = assistanceunattended.Intersect(a.GetUnattendedLimits(), b.GetUnattendedLimits())
+	}
+	if policy.UnattendedLimits == nil {
+		policy.Unattended = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	}
+	if policy.Reconnect > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.ReconnectLimits = assistancereconnect.Intersect(a.GetReconnectLimits(), b.GetReconnectLimits())
+	}
+	if policy.ReconnectLimits == nil {
+		policy.Reconnect = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	}
+	if policy.Recording > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.RecordingLimits = assistancerecording.Intersect(a.GetRecordingLimits(), b.GetRecordingLimits())
+	}
+	if policy.RecordingLimits == nil {
+		policy.Recording = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	}
 }
 
 func intersectAssistancePolicy(a, b *agentv1.AssistancePolicy) *agentv1.AssistancePolicy {
-	return &agentv1.AssistancePolicy{
-		Clipboard: min(assistanceMode(a.GetClipboard()), assistanceMode(b.GetClipboard())),
-		Keyboard:  min(assistanceMode(a.GetKeyboard()), assistanceMode(b.GetKeyboard())),
-		Display:   min(assistanceMode(a.GetDisplay()), assistanceMode(b.GetDisplay())),
-		Messages:  min(assistanceMode(a.GetMessages()), assistanceMode(b.GetMessages())),
+	policy := &agentv1.AssistancePolicy{
+		Clipboard:  min(assistanceMode(a.GetClipboard()), assistanceMode(b.GetClipboard())),
+		Keyboard:   min(assistanceMode(a.GetKeyboard()), assistanceMode(b.GetKeyboard())),
+		Display:    min(assistanceMode(a.GetDisplay()), assistanceMode(b.GetDisplay())),
+		Messages:   min(assistanceMode(a.GetMessages()), assistanceMode(b.GetMessages())),
+		Files:      min(assistanceMode(a.GetFiles()), assistanceMode(b.GetFiles())),
+		Reconnect:  min(assistanceMode(a.GetReconnect()), assistanceMode(b.GetReconnect())),
+		Recording:  min(assistanceMode(a.GetRecording()), assistanceMode(b.GetRecording())),
+		Unattended: min(assistanceMode(a.GetUnattended()), assistanceMode(b.GetUnattended())),
+		Elevation:  min(assistanceMode(a.GetElevation()), assistanceMode(b.GetElevation())),
+		Annotation: min(assistanceMode(a.GetAnnotation()), assistanceMode(b.GetAnnotation())),
+		Audio:      min(assistanceMode(a.GetAudio()), assistanceMode(b.GetAudio())),
+		KdePlasma:  min(assistanceMode(a.GetKdePlasma()), assistanceMode(b.GetKdePlasma())),
+		X11:        min(assistanceMode(a.GetX11()), assistanceMode(b.GetX11())),
 	}
+	if policy.Files > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
+		policy.FileLimits = intersectAssistanceFilePolicy(a.GetFileLimits(), b.GetFileLimits())
+		if policy.FileLimits == nil {
+			policy.Files = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+		}
+	}
+	boundAssistanceWorkflow(policy, a, b)
+	return policy
+}
+
+// assistanceInvitationPolicies returns an invitation's requested and effective
+// policies. The operator requests capabilities, never a desktop: the Tier 3
+// desktop admission gates (KDE Plasma, X11) come from allowed, the device
+// policy within the configured ceiling, alone.
+func assistanceInvitationPolicies(requested, allowed *agentv1.AssistancePolicy) (*agentv1.AssistancePolicy, *agentv1.AssistancePolicy) {
+	request := assistancePolicy(requested)
+	request.KdePlasma, request.X11 = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF
+	effective := intersectAssistancePolicy(request, allowed)
+	effective.KdePlasma, effective.X11 = assistanceMode(allowed.GetKdePlasma()), assistanceMode(allowed.GetX11())
+	return request, effective
+}
+
+func intersectAssistanceFilePolicy(a, b *agentv1.AssistanceFilePolicy) *agentv1.AssistanceFilePolicy {
+	if a == nil || b == nil {
+		return nil
+	}
+	policy := &agentv1.AssistanceFilePolicy{
+		MaxFileBytes:    min(a.GetMaxFileBytes(), b.GetMaxFileBytes()),
+		MaxSessionBytes: min(a.GetMaxSessionBytes(), b.GetMaxSessionBytes()),
+	}
+	for _, value := range a.GetAllowedMimeTypes() {
+		if slices.Contains(b.GetAllowedMimeTypes(), value) {
+			policy.AllowedMimeTypes = append(policy.AllowedMimeTypes, value)
+		}
+	}
+	for _, value := range a.GetAllowedExtensions() {
+		if slices.Contains(b.GetAllowedExtensions(), value) {
+			policy.AllowedExtensions = append(policy.AllowedExtensions, value)
+		}
+	}
+	slices.Sort(policy.AllowedMimeTypes)
+	slices.Sort(policy.AllowedExtensions)
+	if policy.MaxFileBytes == 0 || policy.MaxSessionBytes == 0 || len(policy.AllowedMimeTypes) == 0 || len(policy.AllowedExtensions) == 0 {
+		return nil
+	}
+	return policy
 }
 
 func decodeAssistancePolicy(data []byte) *agentv1.AssistancePolicy {
@@ -102,6 +194,14 @@ func scopeAssistanceCapabilities(ctx context.Context, q *devicedb.Queries, princ
 		{policy.GetKeyboard(), identity.PermissionAssistanceKeyboard},
 		{policy.GetDisplay(), identity.PermissionAssistanceDisplay},
 		{policy.GetMessages(), identity.PermissionAssistanceMessage},
+		{policy.GetFiles(), identity.PermissionAssistanceFiles},
+		{policy.GetReconnect(), identity.PermissionAssistanceReconnect},
+		{policy.GetRecording(), identity.PermissionAssistanceRecord},
+		// Requesting unattended in an attended session offers the opt-in.
+		{policy.GetUnattended(), identity.PermissionAssistanceUnattended},
+		{policy.GetElevation(), identity.PermissionAssistanceElevation},
+		{policy.GetAnnotation(), identity.PermissionAssistanceAnnotate},
+		{policy.GetAudio(), identity.PermissionAssistanceAudio},
 	} {
 		if assistanceMode(capability.mode) > agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF {
 			if err := core.RequireDeviceScope(ctx, q, principal, capability.permission, deviceID); err != nil {
@@ -225,6 +325,19 @@ func (s *Service) UpdateAssistancePolicy(ctx context.Context, req *connect.Reque
 			effective := decodeAssistancePolicy(row.EffectiveCapabilities)
 			if !proto.Equal(effective, intersectAssistancePolicy(effective, policy)) {
 				if err := endAssistance(ctx, q, &row, s.Now(), &actor.ID, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "policy_changed", false, revoked); err != nil {
+					return err
+				}
+			}
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		if err := revokeUnattendedForPolicy(ctx, q, id, intersectAssistancePolicy(policy, s.AssistanceCeiling).GetUnattended(), s.Now(), &actor.ID, revoked); err != nil {
+			return err
+		}
+		workflow, err := q.LockOpenAssistanceReconnectWorkflow(ctx, id)
+		if err == nil {
+			if !policyEnabled(intersectAssistancePolicy(policy, s.AssistanceCeiling).GetReconnect()) {
+				if err := endAssistanceReconnect(ctx, q, &workflow, s.Now(), &actor.ID, "policy_changed"); err != nil {
 					return err
 				}
 			}

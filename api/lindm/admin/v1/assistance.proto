@@ -6,7 +6,10 @@ package lindm.admin.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
+import "lindm/admin/v1/assistance_unattended.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/assistance_files.proto";
+import "lindm/agent/v1/assistance_guidance.proto";
 import "lindm/validation/v1/string_rules.proto";
 
 option go_package = "lindm/gen/lindm/admin/v1;adminv1";
@@ -56,6 +59,17 @@ message AssistanceSession {
   string selected_display_id = 25;
   uint32 display_generation = 26;
   lindm.agent.v1.AssistanceDisplayFrame display_frame = 27;
+  lindm.agent.v1.AssistanceInputState input_state = 29;
+  // The ended session this one continues; empty for an original invitation.
+  string reconnect_of = 30;
+  AssistanceReconnectWorkflow reconnect = 31;
+  AssistanceRecording recording = 32;
+  // Present exactly on an unattended connection.
+  AssistanceUnattendedConnection unattended = 33;
+  // The opt-in this attended session offered, if any.
+  string unattended_enrollment_id = 34;
+  lindm.agent.v1.AssistanceAudioReport audio = 35;
+  lindm.agent.v1.AssistanceAnnotationReport annotation = 36;
   option (buf.validate.message).cel = {
     id: "assistance_session.display_frame"
     message: "frame identity must name the currently shared display generation"
@@ -88,6 +102,17 @@ message CreateAssistanceSessionRequest {
   // Empty targets the user of the device's active local graphical session.
   string target_username = 6 [(buf.validate.field).string.pattern = "^([a-zA-Z_][a-zA-Z0-9_.-]{0,31})?$"];
   lindm.agent.v1.AssistancePolicy requested_capabilities = 7;
+  // Starts an unattended connection under this caller's in-force,
+  // independently approved grant. The target is the grant's opted-in user.
+  string unattended_grant_id = 8 [
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
+    (buf.validate.field).string.uuid = true
+  ];
+  option (buf.validate.message).cel = {
+    id: "create_assistance_session.unattended"
+    message: "an unattended connection cannot also offer unattended enrollment"
+    expression: "this.unattended_grant_id == '' || !has(this.requested_capabilities) || this.requested_capabilities.unattended < 2"
+  };
 }
 message CreateAssistanceSessionResponse {
   AssistanceSession session = 1;
@@ -183,6 +208,163 @@ message GetAssistanceCommandRequest {
 }
 message GetAssistanceCommandResponse {
   lindm.agent.v1.AssistanceCommandResult result = 1;
+}
+
+message StartAssistanceFileTransferRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  lindm.agent.v1.AssistanceFileRequest transfer = 2 [(buf.validate.field).required = true];
+  option (buf.validate.message).cel = {
+    id: "start_assistance_file_transfer.authority"
+    message: "only the server sets a file transfer deadline and effective policy"
+    expression: "!has(this.transfer) || (!has(this.transfer.deadline) && !has(this.transfer.policy))"
+  };
+}
+message StartAssistanceFileTransferResponse {
+  lindm.agent.v1.AssistanceFileReport transfer = 1;
+}
+message GetAssistanceFileTransferRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  string request_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message GetAssistanceFileTransferResponse {
+  lindm.agent.v1.AssistanceFileReport transfer = 1;
+}
+message CancelAssistanceFileTransferRequest {
+  string session_id = 1 [(buf.validate.field).string.uuid = true];
+  string request_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message CancelAssistanceFileTransferResponse {
+  lindm.agent.v1.AssistanceFileReport transfer = 1;
+}
+
+enum AssistanceReconnectState {
+  ASSISTANCE_RECONNECT_STATE_UNSPECIFIED = 0;
+  // A linked session is open; the workflow waits for its end.
+  ASSISTANCE_RECONNECT_STATE_ACTIVE = 1;
+  // The latest session ended by logout, reboot, lock or lost connection; a
+  // fresh linked invitation may be issued until expires_at.
+  ASSISTANCE_RECONNECT_STATE_WAITING = 2;
+  ASSISTANCE_RECONNECT_STATE_ENDED = 3;
+  ASSISTANCE_RECONNECT_STATE_EXPIRED = 4;
+}
+
+// AssistanceReconnectWorkflow is bounded workflow metadata. It never holds a
+// grant, portal token, relay credential or DTLS identity.
+message AssistanceReconnectWorkflow {
+  string id = 1;
+  AssistanceReconnectState state = 2;
+  // LIMITED: operator-issued reconnect only. ON: automatic re-invitation.
+  lindm.agent.v1.AssistancePolicyMode mode = 3;
+  string origin_session_id = 4;
+  string latest_session_id = 5;
+  uint32 reconnects = 6;
+  uint32 max_reconnects = 7;
+  google.protobuf.Timestamp expires_at = 8;
+  google.protobuf.Timestamp ended_at = 9;
+  string end_reason = 10;
+}
+
+enum AssistanceRecordingArchiveState {
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_UNSPECIFIED = 0;
+  // Authorized; the local user has not yet approved capture.
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_PENDING = 1;
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_RECORDING = 2;
+  // The final authenticated segment was stored.
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_COMPLETE = 3;
+  // Capture ended without a final segment; the stored prefix is retained.
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_INCOMPLETE = 4;
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_FAILED = 5;
+  // The local user did not approve optional recording; nothing was stored.
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_DECLINED = 6;
+  ASSISTANCE_RECORDING_ARCHIVE_STATE_DELETED = 7;
+}
+
+// AssistanceRecording is archive metadata. Content requires a separate
+// OpenAssistanceRecording retrieval with remote_assistance.recordings.read.
+message AssistanceRecording {
+  string id = 1;
+  string session_id = 2;
+  string device_id = 3;
+  string operator_id = 4;
+  bool required = 5;
+  AssistanceRecordingArchiveState state = 6;
+  uint64 stored_bytes = 7;
+  uint32 segments = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp finalized_at = 11;
+  google.protobuf.Timestamp retain_until = 12;
+  google.protobuf.Timestamp deleted_at = 13;
+  // Lowercase hex SHA-256 of the stored ciphertext stream, once finalized.
+  string ciphertext_sha256 = 14;
+  uint32 duration_seconds = 15;
+  string reason = 16;
+  string key_id = 17;
+  uint32 retention_days = 18;
+  uint64 max_bytes = 19;
+}
+
+// ReconnectAssistanceSession issues a fresh linked invitation for an ended
+// session of a waiting workflow. Every authority check of Create is repeated
+// and the local user must consent again.
+message ReconnectAssistanceSessionRequest {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string session_id = 2 [(buf.validate.field).string.uuid = true];
+}
+message ReconnectAssistanceSessionResponse {
+  AssistanceSession session = 1;
+}
+
+message ListAssistanceRecordingsRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 page_size = 2 [(buf.validate.field).uint32.lte = 100];
+  string page_token = 3 [(buf.validate.field).string.max_len = 512];
+}
+message ListAssistanceRecordingsResponse {
+  repeated AssistanceRecording recordings = 1;
+  string next_page_token = 2;
+}
+
+// OpenAssistanceRecording audits and starts one expiring retrieval.
+message OpenAssistanceRecordingRequest {
+  string recording_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message OpenAssistanceRecordingResponse {
+  string retrieval_id = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  AssistanceRecording recording = 3;
+  string media_type = 4;
+}
+
+// ReadAssistanceRecording returns one decrypted segment of an open retrieval.
+// Plaintext is streamed from memory and never written to server storage.
+message ReadAssistanceRecordingRequest {
+  string retrieval_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 sequence = 2 [(buf.validate.field).uint32.lte = 65535];
+}
+message ReadAssistanceRecordingResponse {
+  bytes data = 1;
+  uint32 sequence = 2;
+  // True for the last stored segment; complete distinguishes an authenticated
+  // final segment from a retained incomplete prefix.
+  bool last = 3;
+  bool complete = 4;
+}
+
+message DeleteAssistanceRecordingRequest {
+  string request_id = 1 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  string recording_id = 2 [(buf.validate.field).string.uuid = true];
+  string reason = 3 [(buf.validate.field).string.(lindm.validation.v1.audit_reason) = true];
+}
+message DeleteAssistanceRecordingResponse {
+  AssistanceRecording recording = 1;
 }
 
 // AssistanceReadinessState is the server's answer to "can a new request reach

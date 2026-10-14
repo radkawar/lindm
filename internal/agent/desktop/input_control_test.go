@@ -13,14 +13,14 @@ import (
 func TestLimitedKeyboardRejectsPhysicalAndNonPrintableKeysyms(t *testing.T) {
 	grant := &fakeGrant{control: true}
 	input := newInputControl(grant, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, "monitor-1")
-	if err := input.inject(t.Context(), InputEvent{kind: inputKey, Keycode: 29, Down: true, Display: "monitor-1", Generation: 1}); err == nil {
+	if err := input.inject(t.Context(), InputEvent{kind: inputKey, Keycode: 29, Down: true, Display: "monitor-1", Generation: 1, Epoch: 1}); err == nil {
 		t.Fatal("LIMITED admitted physical Control")
 	}
 	for _, symbol := range []int32{0xff1b, 0xffff, 0xff0d, 0xffbe, 0xffe1, 0xfe50, 0xff80, 0xffb1, 0x1008ff12, 0x7f, 0x9f, 0xa0, 0x01000061, 0x0100d800, 0x01110000, -1} {
 		if printableKeysym(symbol) {
 			t.Fatalf("admitted noncanonical/nonprintable keysym %#x", symbol)
 		}
-		if err := input.inject(t.Context(), InputEvent{kind: inputKeysym, Keysym: symbol, Down: true, Display: "monitor-1", Generation: 1}); err == nil {
+		if err := input.inject(t.Context(), InputEvent{kind: inputKeysym, Keysym: symbol, Down: true, Display: "monitor-1", Generation: 1, Epoch: 1}); err == nil {
 			t.Fatalf("LIMITED injected forbidden keysym %#x", symbol)
 		}
 	}
@@ -29,7 +29,7 @@ func TestLimitedKeyboardRejectsPhysicalAndNonPrintableKeysyms(t *testing.T) {
 			t.Fatalf("rejected printable keysym %#x", symbol)
 		}
 	}
-	semantic, err := parseInput([]byte(`{"t":"keysym","keysym":121,"down":true,"display":"monitor-1","generation":1}`))
+	semantic, err := parseInput([]byte(`{"t":"keysym","keysym":121,"down":true,"display":"monitor-1","generation":1,"epoch":1}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestLimitedKeyboardRejectsPhysicalAndNonPrintableKeysyms(t *testing.T) {
 		t.Fatalf("semantic y confused with physical Y: %+v", events)
 	}
 	// Physical KeyY is evdev 21 regardless of semantic y/z on the layout.
-	physical, err := parseInput([]byte(`{"t":"key","code":"KeyY","down":true,"display":"monitor-1","generation":1}`))
+	physical, err := parseInput([]byte(`{"t":"key","code":"KeyY","down":true,"display":"monitor-1","generation":1,"epoch":1}`))
 	if err != nil || physical.Keycode != 21 || physical.Keysym != 0 {
 		t.Fatalf("physical mapping = %+v, %v", physical, err)
 	}
@@ -53,7 +53,7 @@ func TestLimitedKeyboardRejectsPhysicalAndNonPrintableKeysyms(t *testing.T) {
 func TestLimitedKeyboardAcceptsCanonicalEncodedUnicodeSymbol(t *testing.T) {
 	grant := &fakeGrant{control: true}
 	input := newInputControl(grant, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, "monitor-1")
-	event, err := parseInput([]byte(`{"t":"keysym","keysym":16803301,"down":true,"display":"monitor-1","generation":1}`))
+	event, err := parseInput([]byte(`{"t":"keysym","keysym":16803301,"down":true,"display":"monitor-1","generation":1,"epoch":1}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,15 +74,15 @@ func TestPointerFenceAndReleaseAreIndependentOfKeyboardPolicy(t *testing.T) {
 	input := newInputControl(grant, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_OFF, "monitor-2")
 	input.generation = 3
 	for _, event := range []InputEvent{
-		{kind: inputMove, Display: "monitor-1", Generation: 3},
-		{kind: inputButton, Display: "monitor-2", Generation: 2, Button: btnLeft, Down: true},
-		{kind: inputWheel, Display: "monitor-2", Generation: 0, DY: 1},
+		{kind: inputMove, Display: "monitor-1", Generation: 3, Epoch: 1},
+		{kind: inputButton, Display: "monitor-2", Generation: 2, Epoch: 1, Button: btnLeft, Down: true},
+		{kind: inputWheel, Display: "monitor-2", Generation: 0, Epoch: 1, DY: 1},
 	} {
 		if err := input.inject(t.Context(), event); err == nil {
 			t.Fatal("stale pointer event accepted")
 		}
 	}
-	if err := input.inject(t.Context(), InputEvent{kind: inputButton, Display: "monitor-2", Generation: 3, Button: btnLeft, Down: true}); err != nil {
+	if err := input.inject(t.Context(), InputEvent{kind: inputButton, Display: "monitor-2", Generation: 3, Epoch: 1, Button: btnLeft, Down: true}); err != nil {
 		t.Fatal(err)
 	}
 	if err := input.inject(t.Context(), InputEvent{kind: inputRelease}); err != nil {
@@ -134,7 +134,7 @@ func TestLimitedKeyboardAcceptsGraphicalLegacyXKBWithoutActionAliases(t *testing
 	for _, symbol := range []int32{0x01a1, 0x03c0, 0x04b1, 0x05c7, 0x06d1, 0x07e1, 0x0ce0, 0x0da1, 0x0ea1, 0x13bc, 0x20ac} {
 		grant := &fakeGrant{control: true}
 		input := newInputControl(grant, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, "monitor-1")
-		event := InputEvent{kind: inputKeysym, Keysym: symbol, Down: true, Display: "monitor-1", Generation: 1}
+		event := InputEvent{kind: inputKeysym, Keysym: symbol, Down: true, Display: "monitor-1", Generation: 1, Epoch: 1}
 		if err := input.inject(t.Context(), event); err != nil {
 			t.Fatalf("graphical legacy %#x rejected: %v", symbol, err)
 		}
@@ -161,9 +161,9 @@ func TestAllKeyboardInputRequiresCurrentDisplayFence(t *testing.T) {
 	input.generation = 2
 	for _, event := range []InputEvent{
 		{kind: inputKey, Keycode: 30, Down: true},
-		{kind: inputKey, Keycode: 30, Down: true, Display: "monitor-1", Generation: 1},
-		{kind: inputKeysym, Keysym: 0x06d1, Down: true, Display: "monitor-1", Generation: 2},
-		{kind: inputKeysym, Keysym: 0x20ac, Down: true, Display: "monitor-2", Generation: 1},
+		{kind: inputKey, Keycode: 30, Down: true, Display: "monitor-1", Generation: 1, Epoch: 1},
+		{kind: inputKeysym, Keysym: 0x06d1, Down: true, Display: "monitor-1", Generation: 2, Epoch: 1},
+		{kind: inputKeysym, Keysym: 0x20ac, Down: true, Display: "monitor-2", Generation: 1, Epoch: 1},
 	} {
 		if err := input.inject(t.Context(), event); !errors.Is(err, errInvalidInput) {
 			t.Fatalf("stale keyboard admitted: %+v %v", event, err)
@@ -171,9 +171,9 @@ func TestAllKeyboardInputRequiresCurrentDisplayFence(t *testing.T) {
 	}
 	input.paused = true
 	for _, event := range []InputEvent{
-		{kind: inputKey, Keycode: 30, Down: true, Display: "monitor-2", Generation: 2},
-		{kind: inputKeysym, Keysym: 0x20ac, Down: true, Display: "monitor-2", Generation: 2},
-		{kind: inputMove, X: 0.5, Y: 0.5, Display: "monitor-2", Generation: 2},
+		{kind: inputKey, Keycode: 30, Down: true, Display: "monitor-2", Generation: 2, Epoch: 1},
+		{kind: inputKeysym, Keysym: 0x20ac, Down: true, Display: "monitor-2", Generation: 2, Epoch: 1},
+		{kind: inputMove, X: 0.5, Y: 0.5, Display: "monitor-2", Generation: 2, Epoch: 1},
 	} {
 		if err := input.inject(t.Context(), event); !errors.Is(err, errInvalidInput) {
 			t.Fatalf("paused input admitted: %+v %v", event, err)

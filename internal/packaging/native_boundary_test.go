@@ -52,7 +52,7 @@ func TestRPMPayloadPathIsLiteral(t *testing.T) {
 	work := t.TempDir()
 	// Both shell expansion and RPM macro expansion must remain literal data.
 	payload := filepath.Join(work, "payload ' $(touch SHELL_EXPANDED) %{_arch}")
-	for _, dir := range []string{"usr/libexec/lindm", "etc/lindm", "usr/share/doc/lindm-agent"} {
+	for _, dir := range agentProduct().dirs {
 		if err := os.MkdirAll(filepath.Join(payload, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}

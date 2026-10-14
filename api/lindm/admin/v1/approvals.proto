@@ -8,6 +8,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "lindm/admin/v1/advisories.proto";
 import "lindm/admin/v1/assignments.proto";
+import "lindm/admin/v1/assistance_unattended.proto";
 import "lindm/admin/v1/device_actions.proto";
 import "lindm/admin/v1/enrollment_recovery.proto";
 import "lindm/admin/v1/provisioning.proto";
@@ -86,6 +87,7 @@ message Approval {
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 24;
     AcceptAdvisoryFindingRequest accept_advisory_finding = 26;
     StartRolloutRequest start_rollout = 30;
+    AuthorizeUnattendedAssistanceRequest authorize_unattended_assistance = 31;
   }
   // Current labels projected only for authorized approval responses.
   string requester_display_name = 20;
@@ -120,6 +122,7 @@ message CreateApprovalRequest {
     RevealLocalAdminPasswordRequest reveal_local_admin_password = 11;
     AcceptAdvisoryFindingRequest accept_advisory_finding = 12;
     StartRolloutRequest start_rollout = 13;
+    AuthorizeUnattendedAssistanceRequest authorize_unattended_assistance = 14;
   }
 }
 message CreateApprovalResponse {

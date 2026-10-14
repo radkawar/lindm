@@ -283,6 +283,9 @@ func TestSeedDemoProducesConsoleReviewStates(t *testing.T) {
 		if session.GetId() == routes.AssistanceSessionID && session.GetStartedAt() == nil {
 			t.Fatal("completed assistance session never started")
 		}
+		if session.GetId() == routes.AssistanceSessionID && (session.GetInputState().GetEpoch() != 1 || !session.GetInputState().GetPaused()) {
+			t.Fatal("completed synthetic assistance session lost its input epoch or terminal pause")
+		}
 	}
 	if !causes[agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED] || !causes[agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED] {
 		t.Fatalf("assistance end causes: %v", causes)

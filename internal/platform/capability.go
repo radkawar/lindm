@@ -27,17 +27,32 @@ const (
 	AssistanceKeyboard  Capability = "assistance-keyboard"
 	AssistanceDisplays  Capability = "assistance-displays"
 	AssistanceMessages  Capability = "assistance-messages"
-	Advisories          Capability = "advisories"
-	OSUpdate            Capability = "os-update"
-	ReleaseUpgrade      Capability = "release-upgrade"
+	AssistanceFiles     Capability = "assistance-files"
+	AssistanceReconnect Capability = "assistance-reconnect"
+	AssistanceRecording Capability = "assistance-recording"
+	// Tier 3: unattended access, elevation guidance, pointer/annotation
+	// overlay and audio each gate independently of the interactive session.
+	AssistanceUnattended Capability = "assistance-unattended"
+	AssistanceElevation  Capability = "assistance-elevation"
+	AssistanceAnnotation Capability = "assistance-annotation"
+	AssistanceAudio      Capability = "assistance-audio"
+	// AssistanceKDE and AssistanceX11 are the Tier 3 desktop rows: a release
+	// supports them only with a native lane of the KDE Plasma Wayland or X11
+	// session; the helper's qualification table names the capabilities.
+	AssistanceKDE  Capability = "assistance-kde"
+	AssistanceX11  Capability = "assistance-x11"
+	Advisories     Capability = "advisories"
+	OSUpdate       Capability = "os-update"
+	ReleaseUpgrade Capability = "release-upgrade"
 )
 
 // Capabilities lists every capability in documentation order.
 var Capabilities = []Capability{
 	Inventory, Lifecycle, Dispatch, Packages, Accounts, Sysctl, Definitions, Password, Firewall,
 	Encryption, Wipe, ReportLoss, Lock, RecoverySanitize, SelfUpdate, Assistance,
-	AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages,
-	Advisories, OSUpdate, ReleaseUpgrade,
+	AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages, AssistanceFiles,
+	AssistanceReconnect, AssistanceRecording, AssistanceUnattended, AssistanceElevation, AssistanceAnnotation, AssistanceAudio,
+	AssistanceKDE, AssistanceX11, Advisories, OSUpdate, ReleaseUpgrade,
 }
 
 // ResourceCapabilities are the configuration-resource provider capabilities.

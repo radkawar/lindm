@@ -33,6 +33,18 @@ func TestResolveAssistanceRelay(t *testing.T) {
 		{name: "unknown capability mode", change: func(c *configv1.ServerConfig) {
 			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Messages: agentv1.AssistancePolicyMode(99)}
 		}},
+		{name: "files require explicit limits", change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Files: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON}
+		}},
+		{name: "bounded files ceiling", accepted: true, change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Files: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_LIMITED, FileLimits: &agentv1.AssistanceFilePolicy{MaxFileBytes: 1024, MaxSessionBytes: 4096, AllowedMimeTypes: []string{"text/plain"}, AllowedExtensions: []string{".txt"}}}
+		}},
+		{name: "files hard bound", change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Files: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON, FileLimits: &agentv1.AssistanceFilePolicy{MaxFileBytes: 16777217, MaxSessionBytes: 67108864, AllowedMimeTypes: []string{"text/plain"}, AllowedExtensions: []string{".txt"}}}
+		}},
+		{name: "files unsupported type", change: func(c *configv1.ServerConfig) {
+			c.Assistance.PolicyCeiling = &agentv1.AssistancePolicy{Files: agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON, FileLimits: &agentv1.AssistanceFilePolicy{MaxFileBytes: 1024, MaxSessionBytes: 4096, AllowedMimeTypes: []string{"application/x-unimplemented"}, AllowedExtensions: []string{".bin"}}}
+		}},
 		{name: "wildcard relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "0.0.0.0" }},
 		{name: "IPv6 relay address", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.RelayAddress = "2001:db8::1" }},
 		{name: "listener inside relay ports", change: func(c *configv1.ServerConfig) { c.Assistance.Relay.Listener.Port = 49170 }},

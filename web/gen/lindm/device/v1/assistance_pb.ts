@@ -9,13 +9,15 @@ import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import type { AssistanceDirective, AssistanceEnablement, AssistanceReport } from "../../agent/v1/assistance_pb.js";
 import { file_lindm_agent_v1_assistance } from "../../agent/v1/assistance_pb.js";
+import type { AssistanceRecordingChunk } from "../../agent/v1/assistance_recording_pb.js";
+import { file_lindm_agent_v1_assistance_recording } from "../../agent/v1/assistance_recording_pb.js";
 import type { Message } from "@bufbuild/protobuf";
 
 /**
  * Describes the file lindm/device/v1/assistance.proto.
  */
 export const file_lindm_device_v1_assistance: GenFile = /*@__PURE__*/
-  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIvgCChVTeW5jQXNzaXN0YW5jZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASOwoHcmVwb3J0cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZXBvcnRCCLpIBZIBAhAIEj4KBnBvbGljeRgDIAEoDjIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmFibGVtZW50Qgi6SAWCAQIQATq3AbpIswEasAEKImRldmljZV9zeW5jX2Fzc2lzdGFuY2Uub25lX2NvbnRlbnQSMG9ubHkgb25lIGRldmljZSBjb21tYW5kIHJlc3VsdCBtYXkgY2FycnkgY29udGVudBpYdGhpcy5yZXBvcnRzLmZpbHRlcihyLCBoYXMoci5jb21tYW5kX3Jlc3VsdCkgJiYgci5jb21tYW5kX3Jlc3VsdC50ZXh0ICE9ICcnKS5zaXplKCkgPD0gMSLsAQoWU3luY0Fzc2lzdGFuY2VSZXNwb25zZRJBCgpkaXJlY3RpdmVzGAEgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpcmVjdGl2ZUIIukgFkgECEAg6jgG6SIoBGocBCiJkZXZpY2Vfc3luY19hc3Npc3RhbmNlLm9uZV9jb21tYW5kEipvbmx5IG9uZSBkZXZpY2UgY29tbWFuZCBtYXkgYmUgb3V0c3RhbmRpbmcaNXRoaXMuZGlyZWN0aXZlcy5maWx0ZXIoZCwgaGFzKGQuY29tbWFuZCkpLnNpemUoKSA8PSAxQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_assistance]);
+  fileDesc("CiBsaW5kbS9kZXZpY2UvdjEvYXNzaXN0YW5jZS5wcm90bxIPbGluZG0uZGV2aWNlLnYxIvgCChVTeW5jQXNzaXN0YW5jZVJlcXVlc3QSKAoNc2Vzc2lvbl9lcG9jaBgBIAEoBEIRukgOMgwY//////////9/IAASOwoHcmVwb3J0cxgCIAMoCzIgLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZXBvcnRCCLpIBZIBAhAIEj4KBnBvbGljeRgDIAEoDjIkLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VFbmFibGVtZW50Qgi6SAWCAQIQATq3AbpIswEasAEKImRldmljZV9zeW5jX2Fzc2lzdGFuY2Uub25lX2NvbnRlbnQSMG9ubHkgb25lIGRldmljZSBjb21tYW5kIHJlc3VsdCBtYXkgY2FycnkgY29udGVudBpYdGhpcy5yZXBvcnRzLmZpbHRlcihyLCBoYXMoci5jb21tYW5kX3Jlc3VsdCkgJiYgci5jb21tYW5kX3Jlc3VsdC50ZXh0ICE9ICcnKS5zaXplKCkgPD0gMSLsAQoWU3luY0Fzc2lzdGFuY2VSZXNwb25zZRJBCgpkaXJlY3RpdmVzGAEgAygLMiMubGluZG0uYWdlbnQudjEuQXNzaXN0YW5jZURpcmVjdGl2ZUIIukgFkgECEAg6jgG6SIoBGocBCiJkZXZpY2Vfc3luY19hc3Npc3RhbmNlLm9uZV9jb21tYW5kEipvbmx5IG9uZSBkZXZpY2UgY29tbWFuZCBtYXkgYmUgb3V0c3RhbmRpbmcaNXRoaXMuZGlyZWN0aXZlcy5maWx0ZXIoZCwgaGFzKGQuY29tbWFuZCkpLnNpemUoKSA8PSAxIuoCCh1QdXRBc3Npc3RhbmNlUmVjb3JkaW5nUmVxdWVzdBIoCg1zZXNzaW9uX2Vwb2NoGAEgASgEQhG6SA4yDBj//////////38gABJCCgpzZXNzaW9uX2lkGAIgASgJQi66SCtyKVokMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAwsAEBEkQKBmNodW5rcxgDIAMoCzIoLmxpbmRtLmFnZW50LnYxLkFzc2lzdGFuY2VSZWNvcmRpbmdDaHVua0IKukgHkgEECAEQBDqUAbpIkAEajQEKJnB1dF9hc3Npc3RhbmNlX3JlY29yZGluZy5vbmVfcmVjb3JkaW5nEiBzZWdtZW50cyBiZWxvbmcgdG8gb25lIHJlY29yZGluZxpBdGhpcy5jaHVua3MuYWxsKGMsIGMucmVjb3JkaW5nX2lkID09IHRoaXMuY2h1bmtzWzBdLnJlY29yZGluZ19pZCkiOAoeUHV0QXNzaXN0YW5jZVJlY29yZGluZ1Jlc3BvbnNlEhYKDnN0b3JlZF90aHJvdWdoGAEgASgNQiRaImxpbmRtL2dlbi9saW5kbS9kZXZpY2UvdjE7ZGV2aWNldjFiBnByb3RvMw", [file_buf_validate_validate, file_lindm_agent_v1_assistance, file_lindm_agent_v1_assistance_recording]);
 
 /**
  * SyncAssistanceRequest reports the device's complete observed state for each
@@ -70,4 +72,54 @@ export type SyncAssistanceResponse = Message<"lindm.device.v1.SyncAssistanceResp
  */
 export const SyncAssistanceResponseSchema: GenMessage<SyncAssistanceResponse> = /*@__PURE__*/
   messageDesc(file_lindm_device_v1_assistance, 1);
+
+/**
+ * PutAssistanceRecordingRequest stores contiguous sealed segments of the
+ * recording authorized for one session of this device. The server stores the
+ * ciphertext as received and never decrypts it outside authorized retrieval.
+ *
+ * @generated from message lindm.device.v1.PutAssistanceRecordingRequest
+ */
+export type PutAssistanceRecordingRequest = Message<"lindm.device.v1.PutAssistanceRecordingRequest"> & {
+  /**
+   * @generated from field: uint64 session_epoch = 1;
+   */
+  sessionEpoch: bigint;
+
+  /**
+   * @generated from field: string session_id = 2;
+   */
+  sessionId: string;
+
+  /**
+   * @generated from field: repeated lindm.agent.v1.AssistanceRecordingChunk chunks = 3;
+   */
+  chunks: AssistanceRecordingChunk[];
+};
+
+/**
+ * Describes the message lindm.device.v1.PutAssistanceRecordingRequest.
+ * Use `create(PutAssistanceRecordingRequestSchema)` to create a new message.
+ */
+export const PutAssistanceRecordingRequestSchema: GenMessage<PutAssistanceRecordingRequest> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_assistance, 2);
+
+/**
+ * @generated from message lindm.device.v1.PutAssistanceRecordingResponse
+ */
+export type PutAssistanceRecordingResponse = Message<"lindm.device.v1.PutAssistanceRecordingResponse"> & {
+  /**
+   * Every segment up to and including this sequence is durable.
+   *
+   * @generated from field: uint32 stored_through = 1;
+   */
+  storedThrough: number;
+};
+
+/**
+ * Describes the message lindm.device.v1.PutAssistanceRecordingResponse.
+ * Use `create(PutAssistanceRecordingResponseSchema)` to create a new message.
+ */
+export const PutAssistanceRecordingResponseSchema: GenMessage<PutAssistanceRecordingResponse> = /*@__PURE__*/
+  messageDesc(file_lindm_device_v1_assistance, 3);
 

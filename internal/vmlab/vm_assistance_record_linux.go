@@ -16,6 +16,10 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
+
+	agentv1 "lindm/gen/lindm/agent/v1"
 )
 
 // VMAssistanceResult is the nonsecret evidence record of `lab vm assistance`.
@@ -50,12 +54,23 @@ type VMAssistanceResult struct {
 	Witnesses         []assistanceEvidenceFile      `json:"capability_witnesses"`
 	BoundaryWitnesses []assistanceEvidenceFile      `json:"native_boundary_witnesses"`
 	TierOnePassed     bool                          `json:"tier_one_passed"`
-	NotRun            []assistanceNotRunEvidence    `json:"capabilities_not_run"`
-	StartedAt         time.Time                     `json:"started_at"`
-	FinishedAt        time.Time                     `json:"finished_at"`
-	Passed            bool                          `json:"passed"`
-	Failure           string                        `json:"failure,omitempty"`
-	Boundaries        []string                      `json:"boundaries"`
+	FilesPassed       bool                          `json:"files_passed"`
+	FileWitnesses     []assistanceEvidenceFile      `json:"file_transfer_witnesses"`
+	WorkflowsPassed   bool                          `json:"tier_two_workflows_passed"`
+	WorkflowWitnesses []assistanceEvidenceFile      `json:"workflow_witnesses"`
+	// TierThreePassed covers password guidance, pointer and marks, sound and
+	// unattended access; it never inherits from another run.
+	TierThreePassed    bool                     `json:"tier_three_passed"`
+	TierThreeWitnesses []assistanceEvidenceFile `json:"tier_three_witnesses"`
+	// SelectedScenarios names a non-held subset run's selection; such a
+	// record proves only those scenarios and never sets a tier flag.
+	SelectedScenarios []string                   `json:"selected_scenarios,omitempty"`
+	NotRun            []assistanceNotRunEvidence `json:"capabilities_not_run"`
+	StartedAt         time.Time                  `json:"started_at"`
+	FinishedAt        time.Time                  `json:"finished_at"`
+	Passed            bool                       `json:"passed"`
+	Failure           string                     `json:"failure,omitempty"`
+	Boundaries        []string                   `json:"boundaries"`
 }
 
 // assistanceReadinessEvidence is GetAssistanceReadiness when the lane began.
@@ -190,7 +205,10 @@ type assistanceScenarioEvidence struct {
 	NegativeBoundaries []string                         `json:"negative_boundaries"`
 	ModeAuthority      *assistanceModeAuthorityEvidence `json:"mode_authority,omitempty"`
 	// LockPath is how the lock scenario locked the desktop.
-	LockPath string `json:"lock_path,omitempty"`
+	LockPath         string `json:"lock_path,omitempty"`
+	FileWitness      string `json:"file_transfer_witness,omitempty"`
+	WorkflowWitness  string `json:"workflow_witness,omitempty"`
+	TierThreeWitness string `json:"tier_three_witness,omitempty"`
 }
 
 type assistanceAuditEvidence struct {
@@ -270,15 +288,14 @@ func (e *assistanceEvidence) bind(name, relative string) (assistanceEvidenceFile
 	if !info.Mode().IsRegular() || info.Size() > 64<<20 {
 		return assistanceEvidenceFile{}, fmt.Errorf("assistance evidence %s is not a bounded regular file", relative)
 	}
-	data, err := os.ReadFile(path)
+	digest, size, err := assistanceEvidenceDigest(path)
 	if err != nil {
 		return assistanceEvidenceFile{}, err
 	}
 	if err := os.Chmod(path, 0o400); err != nil {
 		return assistanceEvidenceFile{}, err
 	}
-	digest := sha256.Sum256(data)
-	bound := assistanceEvidenceFile{Name: name, Path: relative, SHA256: hex.EncodeToString(digest[:]), Bytes: int64(len(data))}
+	bound := assistanceEvidenceFile{Name: name, Path: relative, SHA256: digest, Bytes: size}
 	e.files[relative] = bound
 	return bound, nil
 }
@@ -287,18 +304,29 @@ func (e *assistanceEvidence) bind(name, relative string) (assistanceEvidenceFile
 // checks presence, size and digest, and that scenario screenshot references
 // resolve to bound screenshots.
 func verifyAssistanceEvidence(dir string, result *VMAssistanceResult) error {
+	if result.TierOnePassed && !completeAssistanceTierOne(result) {
+		return errors.New("Tier1 qualification lacks baseline, mode authority or native capability proofs")
+	}
+	if result.FilesPassed && (!result.TierOnePassed || !completeAssistanceFiles(result)) {
+		return errors.New("file qualification lacks complete Tier1 and file safety proofs")
+	}
+	if result.WorkflowsPassed && (!result.TierOnePassed || !completeAssistanceWorkflows(result)) {
+		return errors.New("workflow (Tier 2) qualification lacks complete Tier1 and workflow proofs")
+	}
+	if result.TierThreePassed && (!result.TierOnePassed || !completeAssistanceTierThree(result)) {
+		return errors.New("tier 3 qualification lacks complete Tier1 and Tier 3 proofs")
+	}
 	screenshots := map[string]bool{}
-	for _, group := range [][]assistanceEvidenceFile{result.Screenshots, result.Journals, result.Witnesses, result.BoundaryWitnesses} {
+	for _, group := range [][]assistanceEvidenceFile{result.Screenshots, result.Journals, result.Witnesses, result.BoundaryWitnesses, result.FileWitnesses, result.WorkflowWitnesses, result.TierThreeWitnesses} {
 		for _, bound := range group {
 			if bound.Path == "" || filepath.Base(bound.Path) != bound.Path {
 				return fmt.Errorf("evidence %q is not a plain file name", bound.Path)
 			}
-			data, err := os.ReadFile(filepath.Join(dir, bound.Path))
+			digest, size, err := assistanceEvidenceDigest(filepath.Join(dir, bound.Path))
 			if err != nil {
 				return fmt.Errorf("read evidence %s: %w", bound.Path, err)
 			}
-			digest := sha256.Sum256(data)
-			if int64(len(data)) != bound.Bytes || hex.EncodeToString(digest[:]) != bound.SHA256 {
+			if size != bound.Bytes || digest != bound.SHA256 {
 				return fmt.Errorf("evidence %s does not match its recorded digest", bound.Path)
 			}
 		}
@@ -309,6 +337,21 @@ func verifyAssistanceEvidence(dir string, result *VMAssistanceResult) error {
 	for _, scenario := range result.Scenarios {
 		if scenario.Name == "authority-view" || scenario.Name == "authority-control" {
 			if err := verifyAssistanceModeAuthority(scenario); err != nil {
+				return err
+			}
+		}
+		if slices.Contains(assistanceFileScenarios, scenario.Name) {
+			if err := verifyFilesWitnessRecord(dir, result, scenario); err != nil {
+				return err
+			}
+		}
+		if assistanceWorkflowScenario(scenario.Name) {
+			if err := verifyWorkflowWitnessRecord(dir, result, scenario); err != nil {
+				return err
+			}
+		}
+		if assistanceTierThreeScenario(scenario.Name) {
+			if err := verifyTierThreeWitnessRecord(dir, result, scenario); err != nil {
 				return err
 			}
 		}
@@ -364,4 +407,86 @@ func verifyAssistanceEvidence(dir string, result *VMAssistanceResult) error {
 		}
 	}
 	return nil
+}
+
+// completeAssistanceTierOne checks the ledger after its bound witnesses have
+// been verified. A capability-only selection never inherits baseline consent,
+// mode authority or another run's native observations.
+func completeAssistanceTierOne(result *VMAssistanceResult) bool {
+	if len(result.SelectedScenarios) != 0 || len(result.NotRun) != 0 || len(result.Witnesses) != 6 || !completeAssistanceNativeBoundaries(result) {
+		return false
+	}
+	for _, spec := range assistanceScenarios {
+		if slices.Contains(assistanceFileScenarios, spec.name) || assistanceWorkflowScenario(spec.name) || assistanceTierThreeScenario(spec.name) {
+			continue
+		}
+		index := slices.IndexFunc(result.Scenarios, func(scenario *assistanceScenarioEvidence) bool { return scenario.Name == spec.name })
+		if index < 0 {
+			return false
+		}
+		scenario := result.Scenarios[index]
+		if spec.capability == "" {
+			control := spec.mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+			mode := "view"
+			if control {
+				mode = "control"
+			}
+			if scenario.Mode != mode || scenario.EndCause != assistanceCauseText(spec.cause) || scenario.ConsoleEndCause == "" || len(scenario.Screenshots) == 0 || !vmValidID(scenario.SessionID) {
+				return false
+			}
+			if spec.cause == agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED {
+				if scenario.Media != nil || scenario.ControlGranted {
+					return false
+				}
+			} else {
+				if !scenario.CaptureStopped || scenario.LocalSession == nil || scenario.OfferFingerprint == "" || scenario.AnswerFingerprint == "" || scenario.Media == nil || verifyAssistanceMedia(scenario.Media, control, false, false, false) != nil {
+					return false
+				}
+				if control && (!scenario.NonceReceived || len(scenario.Nonce) != 12) {
+					return false
+				}
+			}
+		}
+		if spec.name == "authority-view" || spec.name == "authority-control" {
+			if verifyAssistanceModeAuthority(scenario) != nil {
+				return false
+			}
+		}
+		if slices.Contains([]string{"clipboard", "clipboard-limited", "keyboard", "display", "message", "monitors"}, spec.name) {
+			if scenario.CapabilityWitness == "" || !slices.ContainsFunc(result.Witnesses, func(file assistanceEvidenceFile) bool { return file.Path == scenario.CapabilityWitness }) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// assistanceEvidenceDigest streams bounded artifacts, including file-transfer
+// payload witnesses, without retaining whole files in lab memory.
+func assistanceEvidenceDigest(path string) (_ string, _ int64, err error) {
+	file, err := os.OpenFile(path, os.O_RDONLY|unix.O_NOFOLLOW, 0)
+	if err != nil {
+		return "", 0, err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	before, err := file.Stat()
+	if err != nil {
+		return "", 0, err
+	}
+	if !before.Mode().IsRegular() || before.Size() < 0 || before.Size() > 64<<20 {
+		return "", 0, errors.New("evidence is not a bounded regular file")
+	}
+	hash := sha256.New()
+	size, err := io.Copy(hash, io.LimitReader(file, (64<<20)+1))
+	if err != nil {
+		return "", 0, err
+	}
+	after, err := file.Stat()
+	if err != nil {
+		return "", 0, err
+	}
+	if size != before.Size() || after.Size() != before.Size() || after.ModTime() != before.ModTime() {
+		return "", 0, errors.New("evidence changed during hashing")
+	}
+	return hex.EncodeToString(hash.Sum(nil)), size, nil
 }

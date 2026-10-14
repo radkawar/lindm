@@ -395,6 +395,12 @@ type LabSession struct {
 	// lab user's AccountsService session. The GDM service is the release's
 	// Desktop.DisplayManager.
 	GDMConfig, Name string
+	// X11Name is the default desktop's X11 session where the release still
+	// ships one ("ubuntu-xorg"); empty means no X11 lab session exists.
+	X11Name string
+	// Variants are the lab facts of non-default desktops in Desktops (KDE on
+	// Fedora): their own sessions, terminal and capture stack.
+	Variants map[string]LabSessionVariant
 	// GDMSysconfig, when set, is the sysconfig file whose
 	// DISPLAYMANAGER_AUTOLOGIN openSUSE's GDM (gdm-sysconfig-settings.patch)
 	// answers AutomaticLoginEnable and AutomaticLogin from ahead of GDMConfig;
@@ -422,6 +428,29 @@ func (s LabSession) DesktopPackages(desktop, architecture string) []string {
 		return packages
 	}
 	return s.Desktops[desktop]
+}
+
+// LabSessionVariant is a non-default lab desktop of the same release.
+type LabSessionVariant struct {
+	// Name and X11Name are the display manager's Wayland and X11 session
+	// entries; empty X11Name means the release ships no X11 session for it.
+	Name, X11Name string
+	Terminal      []string
+	// Capture is the variant's assistance capture stack; the release's
+	// AssistanceFixtures are appended as for the default desktop.
+	Capture []string
+}
+
+// ForDesktop returns the lab session facts of desktop: a variant's own
+// sessions, terminal and capture stack, or the default session unchanged.
+func (s LabSession) ForDesktop(desktop string) LabSession {
+	variant, ok := s.Variants[desktop]
+	if !ok {
+		return s
+	}
+	s.Name, s.X11Name, s.Terminal = variant.Name, variant.X11Name, variant.Terminal
+	s.Capture = slices.Concat(variant.Capture, s.AssistanceFixtures)
+	return s
 }
 
 // LabGuest are the native guest facts of the device-action lanes.

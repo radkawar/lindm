@@ -95,7 +95,10 @@ func nativeActionStatus(ctx context.Context, vm *guestVM, path string) (*agentv1
 // server, installed relay, root challenge and installed executor own every effect.
 // stopAtEscrow deliberately withholds retirement credential for crash injection.
 func dispatchNativeAction(ctx context.Context, vm *guestVM, owner *devlab.OwnerSession, request *adminv1.CreateDeviceActionRequest, credential []byte, stopAtEscrow bool) (_ *actionDispatchEvidence, _ *agentv1.DeviceActionStatus, err error) {
-	if err := waitNativeActionPresence(ctx, owner, request.GetDeviceId()); err != nil {
+	// The server gates inventory freshness except for these two actions
+	// (dispatch.requireActionInventory).
+	inventory := request.GetSpec().GetRefreshInventory() == nil && request.GetSpec().GetLocalAdminPasswordRotate() == nil
+	if err := waitNativeDevicePresence(ctx, owner, request.GetDeviceId(), inventory); err != nil {
 		return nil, nil, err
 	}
 	created, err := owner.Admin.CreateDeviceAction(ctx, connect.NewRequest(request))

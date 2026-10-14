@@ -22,11 +22,13 @@ import (
 	"lindm/internal/labexec"
 )
 
-// assistanceBrowser drives one real headless Chromium through the maintained
-// Playwright runner (web/acceptance/assistance.mjs) with a line-oriented
-// private protocol. The operator signs in through the console UI. Negative
-// probes use that creator's real RPC cookie/CSRF authority; the lane never
-// injects cookies, product data-channel frames or alternate application code.
+// assistanceBrowser drives real Chromium through the maintained Playwright
+// runner and private line protocol, headless except for native file pickers.
+// The operator signs in through the console UI. Negative probes use that
+// creator's real RPC cookie/CSRF authority. Explicit hostile-input witnesses
+// send actual stale/paused input frames or rewrite one bounded outgoing file
+// payload to test native receiver MIME enforcement. They never inject cookies,
+// fabricate incoming acknowledgements/results or bypass local approval.
 type assistanceBrowser struct {
 	process *labexec.Process
 	stdin   *os.File
@@ -36,8 +38,9 @@ type assistanceBrowser struct {
 	waitErr error
 	next    int
 	// version is the Chromium build Playwright launched.
-	version   string
-	accountID string
+	version     string
+	accountID   string
+	hostDisplay *assistanceHostDisplay
 }
 
 type assistanceBrowserConfig struct {
@@ -49,6 +52,7 @@ type assistanceBrowserConfig struct {
 	ActionTimeoutMS   int    `json:"actionTimeoutMs"`
 	TURNTCPOnly       bool   `json:"turnTcpOnly"`
 	ForwardedTURNURL  string `json:"forwardedTurnUrl,omitempty"`
+	NativeFilePicker  bool   `json:"nativeFilePicker"`
 }
 
 type assistanceBrowserReply struct {
@@ -67,6 +71,18 @@ const maxAssistanceBrowserReply = 64 << 10
 // file that is removed once the runner has read it, and starts the runner in
 // its own process group so cleanup reaches Chromium too.
 func startAssistanceBrowser(ctx context.Context, repository, private string, cfg assistanceBrowserConfig) (_ *assistanceBrowser, err error) {
+	var host *assistanceHostDisplay
+	if cfg.NativeFilePicker {
+		host, err = startAssistanceHostDisplay(ctx, private)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			if err != nil {
+				err = errors.Join(err, host.Close())
+			}
+		}()
+	}
 	encoded, err := json.Marshal(cfg)
 	if err != nil {
 		return nil, err
@@ -88,7 +104,12 @@ func startAssistanceBrowser(ctx context.Context, repository, private string, cfg
 	// Framework diagnostics can echo filled credentials, so raw stderr remains
 	// discarded. The bootstrap catches module-load failures before the runner's
 	// command loop and emits only bounded, allowlisted startup classifications.
-	node, environ, err := toolchain.Node(ctx, repository, os.Environ())
+	base := os.Environ()
+	if host != nil {
+		// The native file picker's private host display.
+		base = host.env
+	}
+	node, environ, err := toolchain.Node(ctx, repository, base)
 	if err != nil {
 		return nil, errors.Join(err, childStdin.Close(), childStdout.Close(), stdin.Close(), stdout.Close())
 	}
@@ -99,7 +120,7 @@ func startAssistanceBrowser(ctx context.Context, repository, private string, cfg
 		}
 		return nil, errors.Join(fmt.Errorf("start assistance browser runner: %w", err), stdin.Close(), stdout.Close())
 	}
-	b := &assistanceBrowser{process: process, stdin: stdin, stdout: stdout, replies: make(chan assistanceBrowserReply, 1), done: make(chan struct{})}
+	b := &assistanceBrowser{process: process, stdin: stdin, stdout: stdout, replies: make(chan assistanceBrowserReply, 1), done: make(chan struct{}), hostDisplay: host}
 	go b.read(stdout)
 	defer func() {
 		if err != nil {
@@ -224,7 +245,13 @@ func assistanceBrowserStartupStep(stage string) int {
 
 // Close asks the runner to close Chromium, waits a bounded grace period for it
 // to finish, then kills whatever remains of its process group and reaps it.
-func (b *assistanceBrowser) Close() error {
+func (b *assistanceBrowser) Close() (err error) {
+	defer func() {
+		if b.hostDisplay != nil {
+			err = errors.Join(err, b.hostDisplay.Close())
+			b.hostDisplay = nil
+		}
+	}()
 	if b.process == nil {
 		return nil
 	}
@@ -236,7 +263,6 @@ func (b *assistanceBrowser) Close() error {
 	graceCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	replies, grace, killed := b.replies, graceCtx.Done(), false
-	var err error
 	for waiting := true; waiting; {
 		select {
 		case <-b.done:

@@ -91,7 +91,7 @@ func TestInteractiveAssistanceGates(t *testing.T) {
 		{OSRelease{ID: "zorin", VersionID: "17"}, false},
 	} {
 		release := Identify(test.os)
-		for _, capability := range []Capability{AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages} {
+		for _, capability := range []Capability{AssistanceClipboard, AssistanceKeyboard, AssistanceDisplays, AssistanceMessages, AssistanceFiles} {
 			err := release.Gate(capability)
 			if test.supported {
 				if err != nil {
@@ -205,6 +205,15 @@ func TestAssistanceTerminalMatchesInstalledDesktop(t *testing.T) {
 		release := ForManifest(test.id, test.version)
 		if !release.Supported(Assistance) || !slices.Equal(release.Lab.Session.Terminal, test.argv) {
 			t.Errorf("%s assistance terminal = %v, want %v", release.Name, release.Lab.Session.Terminal, test.argv)
+		}
+	}
+}
+
+func TestAssistanceFilesRecordsRealNativeChooserPackages(t *testing.T) {
+	for _, tuple := range [][2]string{{"ubuntu", "24.04"}, {"fedora", "44"}} {
+		target := ForManifest(tuple[0], tuple[1])
+		if !target.Supported(AssistanceFiles) || !slices.Contains(target.Lab.Session.Capture, "nautilus") {
+			t.Fatalf("%s file chooser lacks explicit target and package provenance", target.Key)
 		}
 	}
 }

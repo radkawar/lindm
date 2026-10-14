@@ -185,7 +185,18 @@ func rebootLifecycleGuest(ctx context.Context, vm *guestVM, previousBoot string)
 func awaitLifecycleGuestBoot(ctx context.Context, vm *guestVM, previous uuid.UUID, timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	if err := waitGuestBootChange(ctx, previous, func(probe context.Context) (string, error) {
+	if err := awaitGuestBootChange(ctx, vm, previous); err != nil {
+		return err
+	}
+	_, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute)
+	return err
+}
+
+// awaitGuestBootChange waits, without issuing any reboot, for a fresh pinned
+// connection to report a boot ID other than previous. Installer-built
+// goldens have no cloud-init to wait for.
+func awaitGuestBootChange(ctx context.Context, vm *guestVM, previous uuid.UUID) error {
+	return waitGuestBootChange(ctx, previous, func(probe context.Context) (string, error) {
 		// QEMU/slirp can retain the old host TCP connection after the guest
 		// has rebooted. A FIN is neither necessary nor sufficient boot proof.
 		if vm.client != nil {
@@ -197,11 +208,7 @@ func awaitLifecycleGuestBoot(ctx context.Context, vm *guestVM, previous uuid.UUI
 		}
 		boot, err := vm.run(probe, "cat /proc/sys/kernel/random/boot_id", nil, 128, 10*time.Second)
 		return strings.TrimSpace(string(boot)), err
-	}); err != nil {
-		return err
-	}
-	_, err := vm.run(ctx, "sudo -n cloud-init status --wait --format=json", nil, 64<<10, 5*time.Minute)
-	return err
+	})
 }
 
 // Only a fresh pinned connection reporting a changed boot ID establishes the

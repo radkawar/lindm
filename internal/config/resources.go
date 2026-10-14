@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/assistancerecording"
 	"lindm/internal/assistrelay"
 	"lindm/internal/escrow"
 	"lindm/internal/pki"
@@ -53,6 +54,9 @@ type Resources struct {
 	ExecutionSigning *ExecutionSigning
 	// IntegrationEncryptionKey protects destination credentials at rest.
 	IntegrationEncryptionKey []byte
+	// AssistanceRecording is the deployment recording recipient, or nil when
+	// recording is not configured.
+	AssistanceRecording *assistancerecording.Recipient
 	// Escrow uses distinct ingress and wrapping keys, never inventory storage.
 	Escrow                            *escrow.Custody
 	EscrowRevealApprovalRequired      bool
@@ -190,6 +194,12 @@ func (d *Document) Resolve() (*Resources, error) {
 	if assistance := cfg.GetAssistance(); assistance != nil {
 		if err := assistrelay.Validate(assistance); err != nil {
 			return nil, fmt.Errorf("invalid assistance configuration: %w", err)
+		}
+		if assistance.GetRecording() != nil {
+			result.AssistanceRecording, err = d.assistanceRecording()
+			if err != nil {
+				return nil, err
+			}
 		}
 		relay := assistance.GetRelay().GetListener()
 		for _, other := range []*configv1.ListenerConfig{cfg.GetAdminListener(), cfg.GetDeviceListener(), cfg.GetProfiling().GetListener()} {

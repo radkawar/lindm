@@ -8,8 +8,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -90,5 +92,39 @@ func TestPackagedUnitsVerifyInTheirManagerScope(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(work, "units-user", sessionUnit)); err != nil {
 		t.Fatalf("user unit was not verified: %v", err)
+	}
+}
+
+// The packaged overlay's identity must match its install directory, the GNOME
+// Shell releases the platform registry supports, and the session helper's
+// D-Bus contract (internal/agent/desktop/overlay_linux.go).
+func TestOverlayExtensionAssetsMatchInstallAndHelperContract(t *testing.T) {
+	data, err := assetFS.ReadFile("assets/lindm-overlay-metadata.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var metadata struct {
+		UUID         string   `json:"uuid"`
+		ShellVersion []string `json:"shell-version"`
+	}
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		t.Fatal(err)
+	}
+	if metadata.UUID != filepath.Base(overlayExtensionDir) {
+		t.Fatalf("extension uuid %q does not name its directory %s", metadata.UUID, overlayExtensionDir)
+	}
+	for _, version := range []string{"46", "50"} {
+		if !slices.Contains(metadata.ShellVersion, version) {
+			t.Fatalf("extension does not declare GNOME Shell %s: %v", version, metadata.ShellVersion)
+		}
+	}
+	script, err := assetFS.ReadFile("assets/lindm-overlay-extension.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`const BUS_NAME = ["']dev\.lindm\.AssistOverlay["']`, `const OBJECT_PATH = ["']/dev/lindm/AssistOverlay["']`, `<interface name="dev\.lindm\.AssistOverlay1">`, `reactive: false,\s+can_focus: false`, `const HELPER = ["']` + regexp.QuoteMeta(BinaryPath) + `["']`, `ClaimAsync\(`, `DrawAsync\(`, `ClearAsync\(`} {
+		if !regexp.MustCompile(want).Match(script) {
+			t.Fatalf("extension lacks %s", want)
+		}
 	}
 }

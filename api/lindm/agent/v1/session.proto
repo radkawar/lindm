@@ -6,6 +6,10 @@ package lindm.agent.v1;
 
 import "buf/validate/validate.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/assistance_files.proto";
+import "lindm/agent/v1/assistance_guidance.proto";
+import "lindm/agent/v1/assistance_recording.proto";
+import "lindm/agent/v1/assistance_unattended.proto";
 import "lindm/agent/v1/os_update.proto";
 
 option go_package = "lindm/gen/lindm/agent/v1;agentv1";
@@ -18,6 +22,9 @@ service SessionService {
   // SyncSession exchanges the helper's complete observed state for the
   // directives addressed to the caller's active graphical session.
   rpc SyncSession(SyncSessionRequest) returns (SyncSessionResponse);
+  // PutAssistanceRecording queues one sealed recording segment of the caller's
+  // own bound session for upload. The executor never sees plaintext.
+  rpc PutAssistanceRecording(PutAssistanceRecordingRequest) returns (PutAssistanceRecordingResponse);
 }
 
 // SessionAssistanceReport is a helper observation. Local identity fields are
@@ -48,6 +55,12 @@ message SessionAssistanceReport {
   AssistancePolicy requested_capabilities = 12;
   AssistancePolicy effective_capabilities = 13;
   AssistanceDisplayFrame display_frame = 14;
+  AssistanceFileReport file_transfer = 15;
+  AssistanceInputState input_state = 16;
+  AssistanceRecordingReport recording = 17;
+  AssistanceAudioReport audio = 18;
+  AssistanceAnnotationReport annotation = 19;
+  AssistanceUnattendedReport unattended = 20;
   option (buf.validate.message).cel = {
     id: "session_assistance_report.offer"
     message: "offer_sdp is required from OFFERED and absent before it"

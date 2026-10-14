@@ -38,6 +38,10 @@ const (
 //     idle run `loginctl lock-session`, the panel applet calls Session.Lock;
 //     it never sets LockedHint. logind LockSessions engaged it natively
 //     (pop2404-lock-quarantine-11).
+//   - KDE (Plasma 6): kscreenlocker's ksldapp sets LockedHint once its lock is
+//     established and locks on logind Session.Lock and PrepareForSleep
+//     (kscreenlocker logind.cpp; Fedora 44 Plasma 6.6). Admission still
+//     requires the KDE Plasma policy gate and helper qualification row.
 //   - X-Cinnamon: cinnamon-screensaver 6.6 engages on logind Lock but never
 //     sets LockedHint and also locks directly (Mint 22.3,
 //     mint223-lock-quarantine-01).
@@ -47,7 +51,7 @@ const (
 func LockOfDesktop(currentDesktop string) (DesktopLock, string) {
 	for _, name := range strings.Split(currentDesktop, ":") {
 		switch name {
-		case "GNOME":
+		case "GNOME", "KDE":
 			return DesktopLockHinted, name
 		case "COSMIC":
 			return DesktopLockLogindOnly, name

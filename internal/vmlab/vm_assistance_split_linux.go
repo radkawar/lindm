@@ -88,7 +88,10 @@ func openAssistanceController(ctx context.Context, repository, binary, stateDir 
 	if err != nil {
 		return nil, err
 	}
-	assistance.PolicyCeiling = assistanceFullPolicy()
+	assistance.PolicyCeiling = assistanceCeilingPolicy()
+	if err := assistanceRecordingCustody(fixture, assistance); err != nil {
+		return nil, err
+	}
 	roles := assistanceQualificationRoles()
 	if err := fixture.ConfigureAssistance(ctx, assistance, roles); err != nil {
 		return nil, err
@@ -238,7 +241,10 @@ func openAssistanceFixture(ctx context.Context, options VMAssistanceOptions, arc
 	if err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err
 	}
-	assistance.PolicyCeiling = assistanceFullPolicy()
+	assistance.PolicyCeiling = assistanceCeilingPolicy()
+	if err := assistanceRecordingCustody(fixture, assistance); err != nil {
+		return nil, nil, assistanceRelayEvidence{}, err
+	}
 	roles := assistanceQualificationRoles()
 	if err := fixture.ConfigureAssistance(ctx, assistance, roles); err != nil {
 		return nil, nil, assistanceRelayEvidence{}, err

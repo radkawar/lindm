@@ -529,6 +529,12 @@ func (c *vmControlPlane) Close(ctx context.Context) error {
 }
 
 func vmControlPlaneError(operation string, err error) error {
+	// A successful call stays successful: callers return this unconditionally
+	// (setDevicePolicy reported every successful update as "unknown",
+	// layers-fedora44-tier3-05).
+	if err == nil {
+		return nil
+	}
 	// Do not propagate server-controlled messages or request/response bodies.
 	return connect.NewError(connect.CodeOf(err), errors.New(operation+" failed"))
 }

@@ -135,7 +135,8 @@ SET
     end_detail = sqlc.arg('end_detail'),
     device_ended = sqlc.arg('device_ended'),
     offer_sdp = '',
-    answer_sdp = ''
+    answer_sdp = '',
+    input_paused = true
 WHERE id = sqlc.arg('id') AND state <> 6;
 
 -- name: ConfirmAssistanceDeviceEnded :exec
@@ -173,8 +174,8 @@ INSERT INTO assistance_policy_requests(request_id, device_id, operator_id, reque
 VALUES (sqlc.arg('request_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('request_digest'), sqlc.arg('policy'));
 
 -- name: InsertAssistanceCommand :exec
-INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status)
-VALUES (sqlc.arg('request_id'), sqlc.arg('session_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('request_digest'), sqlc.arg('kind'), sqlc.arg('policy'), sqlc.arg('byte_count'), sqlc.arg('special_key'), sqlc.arg('display_id'), sqlc.arg('deadline'), 1);
+INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, annotation_enabled, deadline, status)
+VALUES (sqlc.arg('request_id'), sqlc.arg('session_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('request_digest'), sqlc.arg('kind'), sqlc.arg('policy'), sqlc.arg('byte_count'), sqlc.arg('special_key'), sqlc.arg('display_id'), sqlc.arg('annotation_enabled'), sqlc.arg('deadline'), 1);
 
 -- name: GetAssistanceCommand :one
 SELECT * FROM assistance_commands WHERE request_id = sqlc.arg('request_id');
@@ -198,6 +199,44 @@ WHERE id = sqlc.arg('id') AND state <> 6;
 -- name: CountAssistanceCommands :one
 SELECT count(*)::bigint FROM assistance_commands WHERE session_id = sqlc.arg('session_id');
 
+-- name: InsertAssistanceFileTransfer :exec
+INSERT INTO assistance_file_transfers(request_id, session_id, device_id, operator_id, owner_instance, request_number, request_digest, direction, request_metadata, report, reserved_bytes, created_at, deadline)
+VALUES (sqlc.arg('request_id'), sqlc.arg('session_id'), sqlc.arg('device_id'), sqlc.arg('operator_id'), sqlc.arg('owner_instance'), sqlc.arg('request_number'), sqlc.arg('request_digest'), sqlc.arg('direction'), sqlc.arg('request_metadata'), sqlc.arg('report'), sqlc.arg('reserved_bytes'), sqlc.arg('created_at'), sqlc.arg('deadline'));
+
+-- name: GetAssistanceFileTransfer :one
+SELECT * FROM assistance_file_transfers WHERE request_id = sqlc.arg('request_id');
+
+-- name: GetActiveAssistanceFileTransfer :one
+SELECT * FROM assistance_file_transfers WHERE session_id = sqlc.arg('session_id') AND state < 4;
+
+-- name: GetLatestAssistanceFileTransfer :one
+SELECT * FROM assistance_file_transfers WHERE session_id = sqlc.arg('session_id')
+ORDER BY request_number DESC LIMIT 1;
+
+-- name: AssistanceFileQuota :one
+-- Pending/denied/cancelled/failed operations retain their full reservation.
+-- Only independently verified success settles that reservation to actual bytes.
+SELECT count(*)::bigint AS requests, COALESCE(sum(reserved_bytes), 0)::bigint AS reserved_bytes
+FROM assistance_file_transfers WHERE session_id = sqlc.arg('session_id');
+
+-- name: UpdateAssistanceFileTransfer :exec
+UPDATE assistance_file_transfers
+SET state = sqlc.arg('state')::smallint, report = sqlc.arg('report'),
+    bytes_transferred = sqlc.arg('bytes_transferred'), completed_at = sqlc.narg('completed_at'),
+    reserved_bytes = CASE WHEN sqlc.arg('state')::smallint = 4 THEN sqlc.arg('bytes_transferred') ELSE reserved_bytes END
+WHERE request_id = sqlc.arg('request_id') AND state < 4;
+
+-- name: SetAssistanceInputState :exec
+UPDATE assistance_sessions SET input_epoch = sqlc.arg('input_epoch'), input_paused = sqlc.arg('input_paused')
+WHERE id = sqlc.arg('id') AND state <> 6;
+
+-- name: RecordAssistanceFilePublicationFailure :exec
+-- A late publication warning can enrich a cancellation, never claim success,
+-- widen a reservation or recreate live transfer authority.
+UPDATE assistance_file_transfers
+SET state = 7, report = sqlc.arg('report'), bytes_transferred = sqlc.arg('bytes_transferred'),
+    completed_at = sqlc.arg('completed_at')
+WHERE request_id = sqlc.arg('request_id') AND direction = 1 AND state IN (1, 2, 3, 6);
 -- name: SetAssistanceDevicePolicy :exec
 -- Writes only when the reported value changes, not on every idle sync.
 INSERT INTO assistance_device_policies (device_id, policy, changed_at)

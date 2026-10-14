@@ -55,6 +55,7 @@ type InputEvent struct {
 	Keysym     int32
 	Display    string
 	Generation uint32
+	Epoch      uint32
 	DX, DY     int32
 	Down       bool
 }
@@ -73,16 +74,17 @@ type inputWire struct {
 	Keysym     *int32   `json:"keysym"`
 	Display    *string  `json:"display"`
 	Generation *uint32  `json:"generation"`
+	Epoch      *uint32  `json:"epoch"`
 }
 
 // parseInput validates one data-channel message. Messages are single JSON
 // objects of at most 256 bytes with exactly the fields of their type:
 //
-//	{"t":"move","x":0..1,"y":0..1,"display":"monitor-1","generation":1}
-//	{"t":"button","b":"left|middle|right","down":bool,"display":"monitor-1","generation":1}
-//	{"t":"wheel","dx":-10..10,"dy":-10..10,"display":"monitor-1","generation":1}
-//	{"t":"key","code":"<KeyboardEvent.code>","down":bool,"display":"monitor-1","generation":1}
-//	{"t":"keysym","keysym":<printable XKB keysym>,"down":bool,"display":"monitor-1","generation":1}
+//	{"t":"move","x":0..1,"y":0..1,"display":"monitor-1","generation":1,"epoch":1}
+//	{"t":"button","b":"left|middle|right","down":bool,"display":"monitor-1","generation":1,"epoch":1}
+//	{"t":"wheel","dx":-10..10,"dy":-10..10,"display":"monitor-1","generation":1,"epoch":1}
+//	{"t":"key","code":"<KeyboardEvent.code>","down":bool,"display":"monitor-1","generation":1,"epoch":1}
+//	{"t":"keysym","keysym":<printable XKB keysym>,"down":bool,"display":"monitor-1","generation":1,"epoch":1}
 //	{"t":"release"}
 func parseInput(message []byte) (InputEvent, error) {
 	if len(message) == 0 || len(message) > maxInputMessageBytes {
@@ -107,10 +109,10 @@ func parseInput(message []byte) (InputEvent, error) {
 	}
 	x, y, b, down, dx, dy, code := wire.X != nil, wire.Y != nil, wire.B != nil, wire.Down != nil, wire.DX != nil, wire.DY != nil, wire.Code != nil
 	if wire.T == "move" || wire.T == "button" || wire.T == "wheel" || wire.T == "key" || wire.T == "keysym" {
-		if wire.Display == nil || *wire.Display == "" || len(*wire.Display) > 64 || wire.Generation == nil || *wire.Generation == 0 {
+		if wire.Display == nil || *wire.Display == "" || len(*wire.Display) > 64 || wire.Generation == nil || *wire.Generation == 0 || wire.Epoch == nil || *wire.Epoch == 0 {
 			return InputEvent{}, fmt.Errorf("%w: display fence", errInvalidInput)
 		}
-	} else if wire.Display != nil || wire.Generation != nil {
+	} else if wire.Display != nil || wire.Generation != nil || wire.Epoch != nil {
 		return InputEvent{}, fmt.Errorf("%w: unexpected display fence", errInvalidInput)
 	}
 	if wire.T != "keysym" && wire.Keysym != nil {
@@ -124,7 +126,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !unit(*wire.X) || !unit(*wire.Y) {
 			return InputEvent{}, fmt.Errorf("%w: move range", errInvalidInput)
 		}
-		return InputEvent{kind: inputMove, X: *wire.X, Y: *wire.Y, Display: *wire.Display, Generation: *wire.Generation}, nil
+		return InputEvent{kind: inputMove, X: *wire.X, Y: *wire.Y, Display: *wire.Display, Generation: *wire.Generation, Epoch: *wire.Epoch}, nil
 	case "button":
 		if !present(b, down) || x || y || dx || dy || code {
 			return InputEvent{}, fmt.Errorf("%w: button fields", errInvalidInput)
@@ -140,7 +142,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		default:
 			return InputEvent{}, fmt.Errorf("%w: button name", errInvalidInput)
 		}
-		return InputEvent{kind: inputButton, Button: button, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
+		return InputEvent{kind: inputButton, Button: button, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation, Epoch: *wire.Epoch}, nil
 	case "wheel":
 		if !present(dx, dy) || x || y || b || down || code {
 			return InputEvent{}, fmt.Errorf("%w: wheel fields", errInvalidInput)
@@ -150,7 +152,7 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !okX || !okY {
 			return InputEvent{}, fmt.Errorf("%w: wheel range", errInvalidInput)
 		}
-		return InputEvent{kind: inputWheel, DX: stepsX, DY: stepsY, Display: *wire.Display, Generation: *wire.Generation}, nil
+		return InputEvent{kind: inputWheel, DX: stepsX, DY: stepsY, Display: *wire.Display, Generation: *wire.Generation, Epoch: *wire.Epoch}, nil
 	case "key":
 		if !present(code, down) || x || y || b || dx || dy {
 			return InputEvent{}, fmt.Errorf("%w: key fields", errInvalidInput)
@@ -159,12 +161,12 @@ func parseInput(message []byte) (InputEvent, error) {
 		if !ok {
 			return InputEvent{}, fmt.Errorf("%w: unmapped key", errInvalidInput)
 		}
-		return InputEvent{kind: inputKey, Keycode: keycode, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
+		return InputEvent{kind: inputKey, Keycode: keycode, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation, Epoch: *wire.Epoch}, nil
 	case "keysym":
 		if !present(wire.Keysym != nil, down) || x || y || b || dx || dy || code || !printableKeysym(*wire.Keysym) {
 			return InputEvent{}, fmt.Errorf("%w: keysym fields", errInvalidInput)
 		}
-		return InputEvent{kind: inputKeysym, Keysym: *wire.Keysym, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation}, nil
+		return InputEvent{kind: inputKeysym, Keysym: *wire.Keysym, Down: *wire.Down, Display: *wire.Display, Generation: *wire.Generation, Epoch: *wire.Epoch}, nil
 	case "release":
 		if x || y || b || down || dx || dy || code {
 			return InputEvent{}, fmt.Errorf("%w: release fields", errInvalidInput)

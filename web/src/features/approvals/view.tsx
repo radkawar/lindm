@@ -67,6 +67,13 @@ const approvalEffects: Record<NonNullable<Approval["payload"]["case"]>, string> 
   revealSecret: "Reveal secret",
   revealLocalAdminPassword: "Reveal local-admin password",
   acceptAdvisoryFinding: "Accept advisory risk",
+  authorizeUnattendedAssistance: "Allow unattended remote assistance",
+};
+
+// Unattended assistance is decided under its own independent permission, never
+// the requester's.
+const reviewerPermissions: Record<string, string> = {
+  "remote_assistance.unattended": "remote_assistance.unattended.approve",
 };
 
 // One line naming what an approved destructive request irreversibly does to
@@ -436,7 +443,7 @@ function ApprovalCard({
     !ownRequest &&
     !principal.serviceAccount &&
     canPermission(principal, "approvals.manage") &&
-    canPermission(principal, approval.permission);
+    canPermission(principal, reviewerPermissions[approval.permission] ?? approval.permission);
   const ownRequestReasonId = useId();
   const decisionHintId = useId();
   const evidenceGoneId = useId();
@@ -563,6 +570,12 @@ function ApprovalCard({
             });
             break;
           }
+          case "authorizeUnattendedAssistance":
+            await adminClient.authorizeUnattendedAssistance(
+              { ...approval.payload.value, approvalId: approval.id },
+              options,
+            );
+            break;
           case "revealLocalAdminPassword": {
             const response = await adminClient.revealLocalAdminPassword(
               { ...approval.payload.value, approvalId: approval.id },
@@ -721,6 +734,18 @@ function ApprovalCard({
             <Timestamp value={approval.expiresAt} />
           </dd>
         </div>
+        {approval.payload.case === "authorizeUnattendedAssistance" ? (
+          <div className="sm:col-span-2">
+            <dt>Unattended access: </dt>
+            <dd className="whitespace-pre-wrap">
+              {`${approval.payload.value.reason}\nUser ${approval.payload.value.targetUsername}, ${
+                approval.payload.value.mode === 2 ? "view and control" : "view only"
+              }, ${Math.round(approval.payload.value.durationSeconds / 3600)} hours from ${
+                formatTimestamp(approval.payload.value.notBefore).local
+              }${approval.payload.value.schedule ? ", weekly schedule" : ""}. The user opted in on the device and always sees a banner with Stop.`}
+            </dd>
+          </div>
+        ) : null}
         {approval.approverId ? (
           <div>
             <dt>Decided by: </dt>

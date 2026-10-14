@@ -78,6 +78,8 @@ export class InputCapture {
   private readonly channel: RTCDataChannel;
   private readonly display: string;
   private readonly generation: number;
+  private readonly epoch: number;
+  private disposed = false;
   private readonly pressedKeys = new Map<string, Extract<InputMessage, { t: "key" | "keysym" }>>();
   private readonly pressedButtons = new Set<"left" | "middle" | "right">();
   private pendingMove: { x: number; y: number } | null = null;
@@ -86,10 +88,13 @@ export class InputCapture {
   private wheelX = 0;
   private wheelY = 0;
 
-  constructor(channel: RTCDataChannel, display: string, generation: number) {
+  constructor(channel: RTCDataChannel, display: string, generation: number, epoch: number) {
+    if (!Number.isInteger(epoch) || epoch < 1 || epoch > 0xffffffff)
+      throw new Error("Remote input requires a current input epoch.");
     this.channel = channel;
     this.display = display;
     this.generation = generation;
+    this.epoch = epoch;
   }
 
   get dragging(): boolean {
@@ -97,6 +102,7 @@ export class InputCapture {
   }
 
   move(point: { x: number; y: number }) {
+    if (this.disposed) return;
     this.pendingMove = point;
     if (this.moveTimer !== undefined) return;
     const wait = this.lastMoveAt + MOVE_INTERVAL_MS - performance.now();
@@ -111,6 +117,7 @@ export class InputCapture {
   }
 
   button(domButton: number, down: boolean): boolean {
+    if (this.disposed) return false;
     const name = buttonNames[domButton];
     if (!name) return false;
     if (down === this.pressedButtons.has(name)) return true;
@@ -122,6 +129,7 @@ export class InputCapture {
   }
 
   wheel(event: WheelEvent) {
+    if (this.disposed) return;
     const perStep =
       event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? WHEEL_LINES_PER_STEP
@@ -141,6 +149,7 @@ export class InputCapture {
   }
 
   key(event: KeyboardEvent, mode: KeyboardMode): boolean {
+    if (this.disposed) return false;
     const { code } = event;
     const down = event.type === "keydown";
     if (code === "" || code === "Unidentified" || code.length > MAX_CODE_LENGTH) return false;
@@ -195,6 +204,7 @@ export class InputCapture {
     clearTimeout(this.moveTimer);
     this.moveTimer = undefined;
     this.pendingMove = null;
+    this.disposed = true;
   }
 
   private flushMove() {
@@ -215,7 +225,37 @@ export class InputCapture {
   }
 
   private send(message: InputMessage) {
-    if (this.channel.readyState !== "open") return;
-    this.channel.send(JSON.stringify(message));
+    if (this.disposed || this.channel.readyState !== "open") return;
+    this.channel.send(
+      JSON.stringify(message.t === "release" ? message : { ...message, epoch: this.epoch }),
+    );
+  }
+}
+
+// This authority clock is independent of the displayed media generation. A stale
+// poll or a changed pause flag without a new epoch can never resume remote input.
+export class InputEpochFence {
+  private epoch = 0;
+  private paused = true;
+  private valid = false;
+
+  receive(state: { epoch: number; paused: boolean } | undefined): boolean {
+    if (
+      !state ||
+      !Number.isInteger(state.epoch) ||
+      state.epoch < 1 ||
+      state.epoch > 0xffffffff ||
+      state.epoch < this.epoch ||
+      (state.epoch === this.epoch && state.paused !== this.paused)
+    ) {
+      this.valid = false;
+      return false;
+    }
+    if (state.epoch > this.epoch) {
+      this.epoch = state.epoch;
+      this.paused = state.paused;
+      this.valid = true;
+    }
+    return this.valid && !this.paused;
   }
 }

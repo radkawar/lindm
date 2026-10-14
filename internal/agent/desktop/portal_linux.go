@@ -32,15 +32,26 @@ const (
 
 // Portal enumerations (xdg-desktop-portal ScreenCast/RemoteDesktop).
 const (
-	sourceMonitor   uint32 = 1
-	cursorHidden    uint32 = 1
-	cursorEmbedded  uint32 = 2
-	deviceKeyboard  uint32 = 1
-	devicePointer   uint32 = 2
-	persistNone     uint32 = 0
-	responseSuccess uint32 = 0
-	responseCancel  uint32 = 1
+	sourceMonitor  uint32 = 1
+	cursorHidden   uint32 = 1
+	cursorEmbedded uint32 = 2
+	deviceKeyboard uint32 = 1
+	devicePointer  uint32 = 2
+	persistNone    uint32 = 0
+	// persistUntilRevoked asks the desktop for a grant it keeps until revoked;
+	// the local dialog still decides, through its own remember choice.
+	persistUntilRevoked uint32 = 2
+	responseSuccess     uint32 = 0
+	responseCancel      uint32 = 1
+	// responseOther ends the interaction "in some other way";
+	// xdg-desktop-portal-gnome 46.2 filechooser.c sends it for GTK's
+	// delete-event (Escape or closing the chooser).
+	responseOther uint32 = 2
 )
+
+// errPortalOther marks a Request that ended with responseOther. Only the
+// file chooser treats it as a local outcome; every other portal fails closed.
+var errPortalOther = errors.New("portal_response_other")
 
 // DesktopPortal drives xdg-desktop-portal over the session bus. Every
 // Request follows the documented pattern: the Response signal on the
@@ -68,34 +79,45 @@ func (p *DesktopPortal) Check(ctx context.Context, request PortalRequest) error 
 	return err
 }
 
-// capabilities returns the advertised cursor modes once the request is servable.
-// The frontend exports an interface only when a backend selected for this
-// desktop implements it: xdg-desktop-portal-xapp (Cinnamon) has no
-// ScreenCast, and xdg-desktop-portal-hyprland has ScreenCast but no
-// RemoteDesktop, so CONTROL there is refused rather than reduced to VIEW.
-func (p *DesktopPortal) capabilities(ctx context.Context, request PortalRequest) (uint32, error) {
+// portalCapabilities are the frontend facts a servable request observed.
+type portalCapabilities struct {
+	cursorModes uint32
+	// versions is the audited interface-version summary.
+	versions string
+}
+
+// capabilities returns the advertised cursor modes and interface versions
+// once the request is servable. The frontend exports an interface only when
+// a backend selected for this desktop implements it: xdg-desktop-portal-xapp
+// (Cinnamon) has no ScreenCast, and xdg-desktop-portal-hyprland has
+// ScreenCast but no RemoteDesktop, so CONTROL there is refused rather than
+// reduced to VIEW.
+func (p *DesktopPortal) capabilities(ctx context.Context, request PortalRequest) (portalCapabilities, error) {
 	mode := request.Mode
 	// The first call to the well-known name D-Bus-activates the portal;
 	// GetNameOwner alone would not.
 	sourceTypes, err := p.uint32Property(ctx, screenCastIface, "AvailableSourceTypes")
 	if err != nil {
-		return 0, unavailable("portal_screencast_unavailable", err)
+		return portalCapabilities{}, unavailable("portal_screencast_unavailable", err)
 	}
 	if sourceTypes&sourceMonitor == 0 {
-		return 0, unavailable("portal_monitor_source_unavailable", nil)
+		return portalCapabilities{}, unavailable("portal_monitor_source_unavailable", nil)
 	}
 	screenCastVersion, _ := p.uint32Property(ctx, screenCastIface, "version")
+	// Versions are clamped so the audited summary stays within its 64-byte bound.
+	versions := fmt.Sprintf("screencast_%d", min(screenCastVersion, 999))
 	var deviceTypes, remoteDesktopVersion uint32
 	if mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
 		deviceTypes, err = p.uint32Property(ctx, remoteDesktopIface, "AvailableDeviceTypes")
 		if err != nil {
-			return 0, unavailable("portal_remote_desktop_unavailable", err)
+			return portalCapabilities{}, unavailable("portal_remote_desktop_unavailable", err)
 		}
 		devicesRequested := request.deviceTypes()
 		if deviceTypes&devicesRequested != devicesRequested {
-			return 0, unavailable("portal_input_devices_unavailable", nil)
+			return portalCapabilities{}, unavailable("portal_input_devices_unavailable", nil)
 		}
 		remoteDesktopVersion, _ = p.uint32Property(ctx, remoteDesktopIface, "version")
+		versions += fmt.Sprintf("_remote_desktop_%d", min(remoteDesktopVersion, 999))
 	}
 	// Absent before ScreenCast version 2: no cursor mode is requested then.
 	cursorModes, err := p.uint32Property(ctx, screenCastIface, "AvailableCursorModes")
@@ -104,7 +126,7 @@ func (p *DesktopPortal) capabilities(ctx context.Context, request PortalRequest)
 	}
 	p.logger.Info("portal capabilities", "mode", mode.String(), "screencast_version", screenCastVersion, "source_types", sourceTypes,
 		"cursor_modes", cursorModes, "remote_desktop_version", remoteDesktopVersion, "device_types", deviceTypes)
-	return cursorModes, nil
+	return portalCapabilities{cursorModes: cursorModes, versions: versions}, nil
 }
 
 // Open creates, configures and starts a portal session. VIEW uses a
@@ -115,7 +137,8 @@ func (p *DesktopPortal) Open(ctx context.Context, request PortalRequest) (_ Gran
 	if request.Lifetime == nil {
 		return nil, errors.New("portal session lifetime missing")
 	}
-	cursorModes, err := p.capabilities(ctx, request)
+	observed, err := p.capabilities(ctx, request)
+	cursorModes := observed.cursorModes
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +167,14 @@ func (p *DesktopPortal) Open(ctx context.Context, request PortalRequest) (_ Gran
 		return nil, unavailable("portal_watch_failed", err)
 	}
 	grant := &portalGrant{
-		bus:     p.bus,
-		owner:   owner,
-		watch:   closedWatch,
-		closed:  make(chan struct{}),
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
-		control: false,
+		bus:      p.bus,
+		owner:    owner,
+		watch:    closedWatch,
+		versions: observed.versions,
+		closed:   make(chan struct{}),
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
+		control:  false,
 	}
 	go grant.watchClosed()
 	defer func() {
@@ -191,6 +215,16 @@ func (p *DesktopPortal) Open(ctx context.Context, request PortalRequest) (_ Gran
 	}
 	grant.streams, grant.stream = streams, streams[0]
 	grant.startClipboard(started)
+	if request.Persist || request.RestoreToken != "" {
+		// Only a returned token proves the desktop kept the grant; each
+		// restore consumes the old token and issues a new one.
+		if value, ok := started["restore_token"]; ok {
+			var token string
+			if value.Store(&token) == nil && validRestoreToken(token) {
+				grant.restoreToken = token
+			}
+		}
+	}
 	if control {
 		if value, ok := started["devices"]; ok {
 			var devices uint32
@@ -218,12 +252,19 @@ func (r PortalRequest) deviceTypes() uint32 {
 
 func (p *DesktopPortal) configureSession(ctx context.Context, request PortalRequest, grant *portalGrant, sender string, devicesRequested, cursorModes uint32) error {
 	control := request.Mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
+	persist := persistNone
+	if request.Persist || request.RestoreToken != "" {
+		persist = persistUntilRevoked
+	}
 	if control {
-		if _, err := p.request(ctx, grant.owner, sender, remoteDesktopIface+".SelectDevices", []any{grant.handle},
-			map[string]dbus.Variant{
-				"types":        dbus.MakeVariant(devicesRequested),
-				"persist_mode": dbus.MakeVariant(persistNone),
-			}); err != nil {
+		devices := map[string]dbus.Variant{
+			"types":        dbus.MakeVariant(devicesRequested),
+			"persist_mode": dbus.MakeVariant(persist),
+		}
+		if request.RestoreToken != "" {
+			devices["restore_token"] = dbus.MakeVariant(request.RestoreToken)
+		}
+		if _, err := p.request(ctx, grant.owner, sender, remoteDesktopIface+".SelectDevices", []any{grant.handle}, devices); err != nil {
 			return err
 		}
 	}
@@ -231,6 +272,13 @@ func (p *DesktopPortal) configureSession(ctx context.Context, request PortalRequ
 		"types":        dbus.MakeVariant(sourceMonitor),
 		"multiple":     dbus.MakeVariant(request.Policy.GetDisplay() == agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON),
 		"persist_mode": dbus.MakeVariant(persistNone),
+	}
+	if !control {
+		// A RemoteDesktop session persists through SelectDevices only.
+		sources["persist_mode"] = dbus.MakeVariant(persist)
+		if request.RestoreToken != "" {
+			sources["restore_token"] = dbus.MakeVariant(request.RestoreToken)
+		}
 	}
 	cursorMode, err := p.captureCursorMode(ctx, cursorModes)
 	if err != nil {
@@ -260,6 +308,7 @@ func (p *DesktopPortal) configureSession(ctx context.Context, request PortalRequ
 		case version < 1:
 			grant.clipboardReason = "portal_clipboard_unsupported"
 		default:
+			grant.versions += fmt.Sprintf("_clipboard_%d", min(version, 999))
 			if err := grant.requestClipboard(ctx, request.Lifetime); err != nil {
 				return unavailable("portal_clipboard_request_failed", err)
 			}
@@ -299,7 +348,9 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 	defer func() {
 		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), busCallTimeout)
 		defer cancel()
-		err = errors.Join(err, watch.stop(stop))
+		if watchErr := watch.stop(stop); watchErr != nil {
+			err = errors.Join(err, watchErr)
+		}
 		// The native Request can exist before the method acknowledgement.
 		// Cancellation must close that predicted handle, including a Response
 		// racing cancellation, and must never return its grant.
@@ -337,11 +388,17 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 			return nil, unavailable("portal_response_invalid", nil)
 		}
 		pending = false
+		if response != responseSuccess && portalResultURIs(results) {
+			// A refusal that still names files is not a refusal.
+			return nil, unavailable("portal_response_invalid", fmt.Errorf("%s: response %d with URIs", method, response))
+		}
 		switch response {
 		case responseSuccess:
 			return results, nil
 		case responseCancel:
 			return nil, ErrPortalCancelled
+		case responseOther:
+			return nil, unavailable("portal_request_failed", fmt.Errorf("%s: response %d: %w", method, response, errPortalOther))
 		default:
 			return nil, unavailable("portal_request_failed", fmt.Errorf("%s: response %d", method, response))
 		}
@@ -350,6 +407,17 @@ func (p *DesktopPortal) request(ctx context.Context, owner, sender, method strin
 	case <-p.bus.done:
 		return nil, unavailable("session_bus_closed", nil)
 	}
+}
+
+// portalResultURIs reports whether results carry any "uris" entry other than
+// an empty string list (GNOME sends an empty list with every refusal).
+func portalResultURIs(results map[string]dbus.Variant) bool {
+	value, ok := results["uris"]
+	if !ok {
+		return false
+	}
+	uris, ok := value.Value().([]string)
+	return !ok || len(uris) != 0
 }
 
 func (p *DesktopPortal) closeRequest(ctx context.Context, owner string, handle dbus.ObjectPath) error {
@@ -424,6 +492,12 @@ func grantedStreams(results map[string]dbus.Variant) ([]Stream, error) {
 		if stream.Width == 0 || stream.Height == 0 {
 			return nil, errors.New("monitor_geometry_unknown")
 		}
+		if position, ok := native.Properties["position"]; ok {
+			var at struct{ X, Y int32 }
+			if position.Store(&at) == nil && at.X > -65536 && at.X < 65536 && at.Y > -65536 && at.Y < 65536 {
+				stream.X, stream.Y, stream.Positioned = int(at.X), int(at.Y), true
+			}
+		}
 		streams = append(streams, stream)
 	}
 	return streams, nil
@@ -440,6 +514,7 @@ type portalGrant struct {
 	stream          Stream
 	control         bool
 	keyboard        bool
+	restoreToken    string
 	cursorHidden    bool
 	watch           *busWatch
 	closed          chan struct{}
@@ -447,6 +522,7 @@ type portalGrant struct {
 	stop            chan struct{}
 	stopOnce        sync.Once
 	done            chan struct{}
+	versions        string
 }
 
 var _ Grant = (*portalGrant)(nil)
@@ -464,7 +540,9 @@ func (g *portalGrant) SelectStream(id string) error {
 	return errors.New("display_not_granted")
 }
 func (g *portalGrant) ControlGranted() bool    { return g.control }
+func (g *portalGrant) RestoreToken() string    { return g.restoreToken }
 func (g *portalGrant) KeyboardGranted() bool   { return g.keyboard }
+func (g *portalGrant) PortalVersions() string  { return g.versions }
 func (g *portalGrant) Closed() <-chan struct{} { return g.closed }
 
 func (g *portalGrant) watchClosed() {
@@ -613,4 +691,22 @@ func (g *portalGrant) Close(ctx context.Context) error {
 		return fmt.Errorf("close portal session: %w", err)
 	}
 	return nil
+}
+
+// validRestoreToken accepts the portal frontend's UUID tokens only.
+func validRestoreToken(token string) bool {
+	if len(token) != 36 {
+		return false
+	}
+	for i, r := range token {
+		switch {
+		case i == 8 || i == 13 || i == 18 || i == 23:
+			if r != '-' {
+				return false
+			}
+		case (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F'):
+			return false
+		}
+	}
+	return true
 }

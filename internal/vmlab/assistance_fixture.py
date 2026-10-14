@@ -110,6 +110,10 @@ def key(_window, event, head):
 
 
 def click(area, event, head):
+    # GTK 3 also delivers its synthesized 2BUTTON/3BUTTON_PRESS here after a
+    # second press; only real presses are clicks.
+    if event.type != Gdk.EventType.BUTTON_PRESS:
+        return True
     if len(state["clicks"]) >= 32:
         Gtk.main_quit()
         return True

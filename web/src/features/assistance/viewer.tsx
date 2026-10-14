@@ -19,6 +19,7 @@ import {
   AssistanceMode,
   AssistancePolicyMode,
 } from "../../../gen/lindm/agent/v1/assistance_pb";
+import { AssistanceInputPause } from "../../../gen/lindm/agent/v1/assistance_guidance_pb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,7 +49,12 @@ import {
 import { policyMode, type CapabilityField } from "./capabilities";
 import { AssistanceControls } from "./controls";
 import { useAssistanceCommand } from "./commands";
-import { InputCapture, videoFramePoint, type KeyboardMode } from "./input";
+import { InputCapture, InputEpochFence, videoFramePoint, type KeyboardMode } from "./input";
+import { AssistanceFiles } from "./files";
+import { ANNOTATION_CHANNEL_LABEL, AnnotationSender } from "./annotation";
+import { AssistanceGuidance } from "./guidance";
+import { SessionWorkflow } from "./workflow";
+import { FILE_CHANNEL_LABEL } from "./files-stream";
 import {
   cursorVisibilityNote,
   DisplayPresentationFence,
@@ -282,6 +288,7 @@ function AssistanceViewerSession({
               ]}
             />
           ) : null}
+          {!query.error ? <SessionWorkflow session={session} deviceId={deviceId} /> : null}
           {creator && allowed && !ended ? (
             <AssistanceConnection
               key={`${lifetime.generation}:${sessionId}`}
@@ -557,6 +564,14 @@ function AssistanceConnection({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [channel, setChannel] = useState<RTCDataChannel | null>(null);
   const [channelOpen, setChannelOpen] = useState(false);
+  const [fileChannel, setFileChannel] = useState<RTCDataChannel | null>(null);
+  const [annotationChannel, setAnnotationChannel] = useState<RTCDataChannel | null>(null);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
+  const [pointing, setPointing] = useState(false);
+  const annotationSenderRef = useRef<AnnotationSender | null>(null);
+  const [filesBusy, setFilesBusy] = useState(false);
+  const [inputReady, setInputReady] = useState(false);
+  const inputEpochFence = useRef(new InputEpochFence());
   const [controlOn, setControlOn] = useState(false);
   const [message, setMessage] = useState("");
   const [keyboardMode, setKeyboardMode] = useState<KeyboardMode>("text");
@@ -584,6 +599,9 @@ function AssistanceConnection({
     const signal = AbortSignal.any([controller.signal, lifetime.signal]);
     let pc: RTCPeerConnection | null = null;
     let answerSent = false;
+    let inputSeen = false;
+    let filesSeen = false;
+    let annotationSeen = false;
     const update = (next: Partial<LinkState>) => {
       if (!signal.aborted) setLink((current) => ({ ...current, ...next }));
     };
@@ -623,15 +641,34 @@ function AssistanceConnection({
       });
       peer.addEventListener("track", (event) => {
         if (signal.aborted) return;
+        if (event.track.kind === "audio") {
+          // Sound plays only after the user's local choice; the video element stays muted.
+          setAudioStream(new MediaStream([event.track]));
+          return;
+        }
         setStream(event.streams[0] ?? new MediaStream([event.track]));
       });
       peer.addEventListener("datachannel", (event) => {
         const incoming = event.channel;
-        // View sessions have no data channel; their marker arrives in the session projection.
+        const filesAllowed =
+          policyMode(join.session?.effectiveCapabilities, "files") >=
+            AssistancePolicyMode.LIMITED &&
+          policyMode(join.session?.grantedCapabilities?.policy, "files") >=
+            AssistancePolicyMode.LIMITED;
+        const annotationAllowed =
+          policyMode(join.session?.effectiveCapabilities, "annotation") >=
+            AssistancePolicyMode.LIMITED &&
+          policyMode(join.session?.grantedCapabilities?.policy, "annotation") >=
+            AssistancePolicyMode.LIMITED;
+        const isInput = incoming.label === INPUT_CHANNEL_LABEL;
+        const isFiles = incoming.label === FILE_CHANNEL_LABEL;
+        const isAnnotation = incoming.label === ANNOTATION_CHANNEL_LABEL;
         if (
           signal.aborted ||
-          !controlRequested ||
-          incoming.label !== INPUT_CHANNEL_LABEL ||
+          (!isInput && !isFiles && !isAnnotation) ||
+          (isInput && (!controlRequested || inputSeen)) ||
+          (isFiles && (!filesAllowed || filesSeen)) ||
+          (isAnnotation && (!annotationAllowed || annotationSeen)) ||
           !incoming.ordered ||
           incoming.maxRetransmits !== null ||
           incoming.maxPacketLifeTime !== null
@@ -639,6 +676,33 @@ function AssistanceConnection({
           incoming.close();
           return;
         }
+        if (isAnnotation) {
+          annotationSeen = true;
+          incoming.addEventListener("open", () => {
+            if (!signal.aborted) setAnnotationChannel(incoming);
+          });
+          incoming.addEventListener("close", () => {
+            if (!signal.aborted) {
+              setAnnotationChannel(null);
+              setPointing(false);
+            }
+          });
+          if (incoming.readyState === "open") setAnnotationChannel(incoming);
+          return;
+        }
+        if (isFiles) {
+          filesSeen = true;
+          incoming.binaryType = "arraybuffer";
+          incoming.addEventListener("open", () => {
+            if (!signal.aborted) setFileChannel(incoming);
+          });
+          incoming.addEventListener("close", () => {
+            if (!signal.aborted) setFileChannel(null);
+          });
+          if (incoming.readyState === "open") setFileChannel(incoming);
+          return;
+        }
+        inputSeen = true;
         incoming.addEventListener("open", () => {
           if (!signal.aborted) setChannelOpen(true);
         });
@@ -690,7 +754,10 @@ function AssistanceConnection({
       if (signal.aborted) return;
       pc?.close();
       setStream(null);
+      setAudioStream(null);
+      setAnnotationChannel(null);
       setChannel(null);
+      setFileChannel(null);
       setChannelOpen(false);
       setControlOn(false);
       const rpc = error instanceof ConnectError;
@@ -705,7 +772,11 @@ function AssistanceConnection({
       controller.abort();
       pc?.close();
       setStream(null);
+      setAudioStream(null);
+      setAnnotationChannel(null);
+      setPointing(false);
       setChannel(null);
+      setFileChannel(null);
       setChannelOpen(false);
       setControlOn(false);
     };
@@ -722,14 +793,33 @@ function AssistanceConnection({
 
   const active =
     sessionAvailable && session.state === AssistanceState.ACTIVE && connectionState === "connected";
-  const commands = useAssistanceCommand(session, active, () => setMessage(""));
+  const inputEpoch = session.inputState?.epoch;
+  const inputPaused = session.inputState?.paused !== false;
+  useLayoutEffect(() => {
+    inputCaptureRef.current?.releaseAll();
+    setControlOn(false);
+    setInputReady(
+      inputEpochFence.current.receive(
+        inputEpoch === undefined ? undefined : { epoch: inputEpoch, paused: inputPaused },
+      ),
+    );
+  }, [inputEpoch, inputPaused]);
+  const commandsActive = active && inputReady && !inputPaused && !filesBusy;
+  const commands = useAssistanceCommand(session, commandsActive, () => setMessage(""));
   const frameReady =
     active &&
     !commands.displayPending &&
     presentation.ready &&
     presentation.display === session.selectedDisplayId &&
     presentation.generation === session.displayGeneration;
-  const controlAvailable = frameReady && session.controlGranted && channel !== null && channelOpen;
+  const controlAvailable =
+    frameReady &&
+    inputReady &&
+    !inputPaused &&
+    !filesBusy &&
+    session.controlGranted &&
+    channel !== null &&
+    channelOpen;
   const capturing = controlOn && controlAvailable;
 
   // Reconcile all three independent clocks before paint. Marker receipt also
@@ -766,8 +856,8 @@ function AssistanceConnection({
     refresh();
   }, [active, commands.displayPending, session.selectedDisplayId, session.displayGeneration]);
 
-  // VIEW keeps its no-data-channel boundary. The session carries the same exact
-  // media marker; CONTROL can observe either transport first without rolling back.
+  // VIEW never gets an input channel. Its exact media marker arrives in the
+  // session projection, independent of the separately consented files channel.
   useLayoutEffect(() => {
     const marker = session.displayFrame;
     if (!sessionAvailable || !marker) return;
@@ -824,13 +914,20 @@ function AssistanceConnection({
           : "Control is available after the user accepts and allows it."
         : !active
           ? "Control is available once the screen connects."
-          : presentation.metadataAvailable === false
-            ? "This browser cannot confirm the shared screen. Remote control is unavailable."
-            : !frameReady
-              ? "Wait for the selected screen to appear."
-              : !controlAvailable
-                ? "Wait for the screen and controls to connect."
-                : "";
+          : session.inputState?.paused &&
+              session.inputState.pause === AssistanceInputPause.ELEVATION
+            ? "Controls are paused while the user enters a password. Only they can resume them."
+            : session.inputState?.paused || filesBusy
+              ? "Controls are paused during the file request. Choose Take control after it finishes."
+              : !inputReady
+                ? "Current input permission could not be confirmed. Stop this session and reconnect."
+                : presentation.metadataAvailable === false
+                  ? "This browser cannot confirm the shared screen. Remote control is unavailable."
+                  : !frameReady
+                    ? "Wait for the selected screen to appear."
+                    : !controlAvailable
+                      ? "Wait for the screen and controls to connect."
+                      : "";
 
   useEffect(() => {
     const container = fullscreenRef.current;
@@ -859,8 +956,13 @@ function AssistanceConnection({
   useLayoutEffect(() => {
     const surface = surfaceRef.current;
     const video = videoRef.current;
-    if (!capturing || !surface || !video || !channel) return;
-    const capture = new InputCapture(channel, session.selectedDisplayId, session.displayGeneration);
+    if (!capturing || !surface || !video || !channel || inputEpoch === undefined) return;
+    const capture = new InputCapture(
+      channel,
+      session.selectedDisplayId,
+      session.displayGeneration,
+      inputEpoch,
+    );
     inputCaptureRef.current = capture;
     const currentFrame = () => fenceRef.current.ready && channel.readyState === "open";
     const point = (event: PointerEvent) =>
@@ -935,6 +1037,73 @@ function AssistanceConnection({
     channel,
     keyboardAllowed,
     keyboardMode,
+    session.selectedDisplayId,
+    session.displayGeneration,
+    inputEpoch,
+  ]);
+
+  // Pointing never uses the input channel: frames go only to the overlay channel
+  // and carry no clicks or keys, so it is unavailable while control is on.
+  const marksGranted =
+    policyMode(session.grantedCapabilities?.policy, "annotation") === AssistancePolicyMode.ON;
+  const pointingActive =
+    pointing &&
+    session.annotation?.enabled === true &&
+    frameReady &&
+    !capturing &&
+    annotationChannel !== null;
+  useLayoutEffect(() => {
+    const surface = surfaceRef.current;
+    const video = videoRef.current;
+    if (!pointingActive || !surface || !video || !annotationChannel) return;
+    const sender = new AnnotationSender(
+      annotationChannel,
+      session.selectedDisplayId,
+      session.displayGeneration,
+      marksGranted,
+    );
+    annotationSenderRef.current = sender;
+    let drawing = false;
+    const point = (event: PointerEvent) =>
+      fenceRef.current.ready ? videoFramePoint(video, event.clientX, event.clientY, drawing) : null;
+    const onMove = (event: PointerEvent) => {
+      const next = point(event);
+      if (!next) return;
+      if (drawing) sender.extendStroke(next);
+      else sender.pointer(next);
+    };
+    const onDown = (event: PointerEvent) => {
+      const next = point(event);
+      if (!next) return;
+      event.preventDefault();
+      drawing = sender.beginStroke(next);
+      if (drawing) surface.setPointerCapture(event.pointerId);
+    };
+    const onUp = (event: PointerEvent) => {
+      if (!drawing) return;
+      const next = point(event);
+      if (next) sender.extendStroke(next);
+      sender.endStroke();
+      drawing = false;
+      if (surface.hasPointerCapture(event.pointerId))
+        surface.releasePointerCapture(event.pointerId);
+    };
+    surface.addEventListener("pointermove", onMove);
+    surface.addEventListener("pointerdown", onDown);
+    surface.addEventListener("pointerup", onUp);
+    surface.addEventListener("pointercancel", onUp);
+    return () => {
+      surface.removeEventListener("pointermove", onMove);
+      surface.removeEventListener("pointerdown", onDown);
+      surface.removeEventListener("pointerup", onUp);
+      surface.removeEventListener("pointercancel", onUp);
+      sender.dispose();
+      annotationSenderRef.current = null;
+    };
+  }, [
+    pointingActive,
+    annotationChannel,
+    marksGranted,
     session.selectedDisplayId,
     session.displayGeneration,
   ]);
@@ -1088,7 +1257,13 @@ function AssistanceConnection({
               tabIndex={capturing ? 0 : -1}
               role="region"
               aria-label="Remote screen"
-              aria-describedby={capturing ? `${controlHelpId}-capture` : undefined}
+              aria-describedby={
+                capturing
+                  ? `${controlHelpId}-capture`
+                  : pointingActive
+                    ? `${controlHelpId}-pointing`
+                    : undefined
+              }
               className={
                 capturing
                   ? "relative aspect-video w-full touch-none overflow-auto bg-viewer outline-none ring-2 ring-destructive"
@@ -1156,10 +1331,14 @@ function AssistanceConnection({
               Control is on. Your keys and clicks go to the device. Select outside the screen to
               release the keyboard.
             </p>
+          ) : pointingActive ? (
+            <p id={`${controlHelpId}-pointing`} className="text-sm text-muted-foreground">
+              Your pointer is shown on the device; nothing is clicked or typed.
+            </p>
           ) : null}
           <AssistanceControls
             session={session}
-            active={active}
+            active={commandsActive}
             controlOn={capturing}
             frameReady={frameReady}
             commands={commands}
@@ -1178,6 +1357,43 @@ function AssistanceConnection({
               setControlOn(false);
             }}
             portalContainer={fullscreenRef}
+          />
+          <AssistanceGuidance
+            session={session}
+            active={commandsActive}
+            commands={commands}
+            pointing={pointingActive}
+            onPointing={setPointing}
+            annotationReady={annotationChannel !== null && frameReady && !capturing}
+            onClearMarks={() => {
+              if (!annotationChannel) return;
+              (
+                annotationSenderRef.current ??
+                new AnnotationSender(
+                  annotationChannel,
+                  session.selectedDisplayId,
+                  session.displayGeneration,
+                  marksGranted,
+                )
+              ).clear();
+            }}
+            audioStream={audioStream}
+            releaseControl={() => {
+              inputCaptureRef.current?.releaseAll();
+              setControlOn(false);
+            }}
+          />
+          <AssistanceFiles
+            key={session.id}
+            session={session}
+            channel={fileChannel}
+            active={active}
+            commandsBusy={commands.busy}
+            onBusy={setFilesBusy}
+            releaseControl={() => {
+              inputCaptureRef.current?.releaseAll();
+              setControlOn(false);
+            }}
           />
         </CardContent>
       </Card>

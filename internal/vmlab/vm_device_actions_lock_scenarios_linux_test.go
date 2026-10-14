@@ -92,11 +92,11 @@ func TestCinnamonLockExpectsLockerWithoutLockedHint(t *testing.T) {
 	if _, err := parseActionDesktop(cinnamon, []byte(strings.Join(desktopFields(cinnamon, "wayland", "cinnamon", want), "\n")), want); err == nil {
 		t.Fatal("a Wayland session was accepted for the X11 Cinnamon profile")
 	}
-	release := &platform.Release{Name: "fixture", Lab: platform.Lab{Session: platform.LabSession{Desktops: map[string][]string{"gnome": nil, "kde": nil}}}}
+	release := &platform.Release{Name: "fixture", Lab: platform.Lab{Session: platform.LabSession{Desktops: map[string][]string{"gnome": nil, "lxqt": nil}}}}
 	if _, err := labDesktopFor("cinnamon", release); err == nil {
 		t.Fatal("cinnamon profile accepted on a release whose lab session lacks it")
 	}
-	if _, err := labDesktopFor("kde", release); err == nil {
+	if _, err := labDesktopFor("lxqt", release); err == nil {
 		t.Fatal("a lab session without a desktop profile was accepted")
 	}
 	if desktop, err := labDesktopFor("gnome", release); err != nil || desktop.name != "gnome" {
@@ -147,5 +147,61 @@ func TestCOSMICProfileLocksThroughLogindAndRefusesAssistance(t *testing.T) {
 	fields := desktopFields(cosmic, "wayland", "COSMIC", want)
 	if _, err := parseActionDesktop(cosmic, []byte(strings.Join(fields, "\n")), want); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Plasma's kscreenlocker sets LockedHint and locks on Session.Lock; the lane
+// presses its own Meta+L, reads consent controls by label in the bottom-right
+// popup area, and proves the KDE gate's pre-consent refusal.
+func TestKDEProfileLocksWithLockedHintAndProvesItsGate(t *testing.T) {
+	kde := mustLabDesktop(t, "kde")
+	if want := kde.expectedLock(true); !want.hint || !want.locker {
+		t.Fatalf("kde lock expectation %+v", want)
+	}
+	if strings.Join(kde.lockKeys, "+") != "meta_l+l" || !kde.ocrConsent || kde.area != bannerBottomRight || kde.gate != "kde_plasma" {
+		t.Fatalf("kde lane controls %+v", kde)
+	}
+	var names []string
+	for _, spec := range kde.assistance {
+		names = append(names, spec.name)
+		if spec.desktopGateOff && spec.detail != "kde_plasma_policy_off" {
+			t.Fatalf("kde gate scenario %+v", spec)
+		}
+	}
+	if strings.Join(names, ",") != "desktop-policy-off,control,view,decline,portal-cancel,lock" {
+		t.Fatalf("kde scenarios = %v", names)
+	}
+	want := kde.expectedLock(true)
+	if _, err := parseActionDesktop(kde, []byte(strings.Join(desktopFields(kde, "wayland", "KDE", want), "\n")), want); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseActionDesktop(kde, []byte(strings.Join(desktopFields(kde, "x11", "KDE", want), "\n")), want); err == nil {
+		t.Fatal("an X11 session was accepted for the Wayland Plasma profile")
+	}
+}
+
+// An X11 variant logs into the same golden's X11 entry, accepts only x11
+// logind sessions and proves the X11 gate; without an entry there is none.
+func TestX11VariantUsesTheReleaseX11Session(t *testing.T) {
+	gnome := mustLabDesktop(t, "gnome")
+	if _, err := gnome.x11Variant(platform.LabSession{Name: "gnome"}); err == nil {
+		t.Fatal("a release without an X11 session entry produced an X11 variant")
+	}
+	x11, err := gnome.x11Variant(platform.LabSession{Name: "ubuntu", X11Name: "ubuntu-xorg", GDMConfig: "/etc/gdm3/custom.conf"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x11.name != "gnome-x11" || x11.goldenName() != "gnome" || x11.gate != "x11" || strings.Join(x11.sessionTypes, ",") != "x11" {
+		t.Fatalf("x11 variant %+v", x11)
+	}
+	if script := x11.autologin(platform.LabSession{Name: "ubuntu", X11Name: "ubuntu-xorg", GDMConfig: "/etc/gdm3/custom.conf"}); !strings.Contains(script, "'ubuntu-xorg'") || strings.Contains(script, "'ubuntu'") {
+		t.Fatalf("x11 autologin does not select the X11 entry: %s", script)
+	}
+	if gnome.gate != "" || strings.Join(gnome.sessionTypes, ",") != "wayland,x11" {
+		t.Fatal("deriving the X11 variant changed the Wayland profile")
+	}
+	want := x11.expectedLock(true)
+	if _, err := parseActionDesktop(x11, []byte(strings.Join(desktopFields(x11, "wayland", "GNOME", want), "\n")), want); err == nil {
+		t.Fatal("a Wayland session was accepted for the X11 variant")
 	}
 }

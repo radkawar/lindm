@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AssistanceInputPause names why remote injection is paused.
+enum AssistanceInputPause {
+  ASSISTANCE_INPUT_PAUSE_UNSPECIFIED = 0;
+  // A local file approval or chooser is open.
+  ASSISTANCE_INPUT_PAUSE_FILE = 1;
+  // The employee is completing a privileged prompt locally. Only the
+  // employee's local Resume ends it.
+  ASSISTANCE_INPUT_PAUSE_ELEVATION = 2;
+}
+
+enum AssistanceAudioState {
+  ASSISTANCE_AUDIO_STATE_UNSPECIFIED = 0;
+  // Audio was not offered, or the employee chose not to share sound.
+  ASSISTANCE_AUDIO_STATE_NOT_SHARED = 1;
+  ASSISTANCE_AUDIO_STATE_SHARING = 2;
+  // The employee muted sharing locally; no samples are sent.
+  ASSISTANCE_AUDIO_STATE_MUTED = 3;
+  // The employee stopped sound sharing or capture ended; it does not restart.
+  ASSISTANCE_AUDIO_STATE_STOPPED = 4;
+}
+
+// AssistanceAudioReport is the device's audio observation: the locally
+// selected sources and mute state, never samples.
+message AssistanceAudioReport {
+  AssistanceAudioState state = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // The PipeWire description of the selected output whose sound is shared.
+  string output_source = 2 [(buf.validate.field).string = {
+    max_len: 128
+    pattern: "^[ -~]*$"
+  }];
+  // Present only after the separate microphone consent.
+  string microphone_source = 3 [(buf.validate.field).string = {
+    max_len: 128
+    pattern: "^[ -~]*$"
+  }];
+  option (buf.validate.message).cel = {
+    id: "assistance_audio_report.sources"
+    message: "a shared or muted stream names its locally selected source"
+    expression: "(this.state != 2 && this.state != 3) || this.output_source != '' || this.microphone_source != ''"
+  };
+}
+
+// AssistanceAnnotationReport is the overlay observation: whether the operator
+// enabled pointing/drawing and whether the employee hid it, never content.
+message AssistanceAnnotationReport {
+  bool enabled = 1;
+  // The employee hid the overlay locally for the rest of the session.
+  bool hidden = 2;
+  // Local clear actions so far.
+  uint32 clears = 3 [(buf.validate.field).uint32.lte = 1024];
+  option (buf.validate.message).cel = {
+    id: "assistance_annotation_report.hidden"
+    message: "a hidden overlay is never enabled"
+    expression: "!this.hidden || !this.enabled"
+  };
+}

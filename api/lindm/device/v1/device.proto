@@ -47,6 +47,8 @@ service DeviceService {
   // Returns this enrollment generation's current signed capability policy,
   // signing a new version only when the effective server policy changed.
   rpc GetCapabilityPolicy(GetCapabilityPolicyRequest) returns (GetCapabilityPolicyResponse);
+  // PutAssistanceRecording stores sealed segments of an authorized recording.
+  rpc PutAssistanceRecording(PutAssistanceRecordingRequest) returns (PutAssistanceRecordingResponse);
 }
 message AcquireSessionRequest {
   bytes authority_proof = 1 [(buf.validate.field).bytes = {

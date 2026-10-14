@@ -38,6 +38,9 @@ const (
 	// SessionServiceSyncSessionProcedure is the fully-qualified name of the SessionService's
 	// SyncSession RPC.
 	SessionServiceSyncSessionProcedure = "/lindm.agent.v1.SessionService/SyncSession"
+	// SessionServicePutAssistanceRecordingProcedure is the fully-qualified name of the SessionService's
+	// PutAssistanceRecording RPC.
+	SessionServicePutAssistanceRecordingProcedure = "/lindm.agent.v1.SessionService/PutAssistanceRecording"
 )
 
 // SessionServiceClient is a client for the lindm.agent.v1.SessionService service.
@@ -45,6 +48,9 @@ type SessionServiceClient interface {
 	// SyncSession exchanges the helper's complete observed state for the
 	// directives addressed to the caller's active graphical session.
 	SyncSession(context.Context, *connect.Request[v1.SyncSessionRequest]) (*connect.Response[v1.SyncSessionResponse], error)
+	// PutAssistanceRecording queues one sealed recording segment of the caller's
+	// own bound session for upload. The executor never sees plaintext.
+	PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error)
 }
 
 // NewSessionServiceClient constructs a client for the lindm.agent.v1.SessionService service. By
@@ -64,12 +70,19 @@ func NewSessionServiceClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(sessionServiceMethods.ByName("SyncSession")),
 			connect.WithClientOptions(opts...),
 		),
+		putAssistanceRecording: connect.NewClient[v1.PutAssistanceRecordingRequest, v1.PutAssistanceRecordingResponse](
+			httpClient,
+			baseURL+SessionServicePutAssistanceRecordingProcedure,
+			connect.WithSchema(sessionServiceMethods.ByName("PutAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sessionServiceClient implements SessionServiceClient.
 type sessionServiceClient struct {
-	syncSession *connect.Client[v1.SyncSessionRequest, v1.SyncSessionResponse]
+	syncSession            *connect.Client[v1.SyncSessionRequest, v1.SyncSessionResponse]
+	putAssistanceRecording *connect.Client[v1.PutAssistanceRecordingRequest, v1.PutAssistanceRecordingResponse]
 }
 
 // SyncSession calls lindm.agent.v1.SessionService.SyncSession.
@@ -77,11 +90,19 @@ func (c *sessionServiceClient) SyncSession(ctx context.Context, req *connect.Req
 	return c.syncSession.CallUnary(ctx, req)
 }
 
+// PutAssistanceRecording calls lindm.agent.v1.SessionService.PutAssistanceRecording.
+func (c *sessionServiceClient) PutAssistanceRecording(ctx context.Context, req *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error) {
+	return c.putAssistanceRecording.CallUnary(ctx, req)
+}
+
 // SessionServiceHandler is an implementation of the lindm.agent.v1.SessionService service.
 type SessionServiceHandler interface {
 	// SyncSession exchanges the helper's complete observed state for the
 	// directives addressed to the caller's active graphical session.
 	SyncSession(context.Context, *connect.Request[v1.SyncSessionRequest]) (*connect.Response[v1.SyncSessionResponse], error)
+	// PutAssistanceRecording queues one sealed recording segment of the caller's
+	// own bound session for upload. The executor never sees plaintext.
+	PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error)
 }
 
 // NewSessionServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -97,10 +118,18 @@ func NewSessionServiceHandler(svc SessionServiceHandler, opts ...connect.Handler
 		connect.WithSchema(sessionServiceMethods.ByName("SyncSession")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sessionServicePutAssistanceRecordingHandler := connect.NewUnaryHandler(
+		SessionServicePutAssistanceRecordingProcedure,
+		svc.PutAssistanceRecording,
+		connect.WithSchema(sessionServiceMethods.ByName("PutAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.agent.v1.SessionService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SessionServiceSyncSessionProcedure:
 			sessionServiceSyncSessionHandler.ServeHTTP(w, r)
+		case SessionServicePutAssistanceRecordingProcedure:
+			sessionServicePutAssistanceRecordingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -112,4 +141,8 @@ type UnimplementedSessionServiceHandler struct{}
 
 func (UnimplementedSessionServiceHandler) SyncSession(context.Context, *connect.Request[v1.SyncSessionRequest]) (*connect.Response[v1.SyncSessionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.SessionService.SyncSession is not implemented"))
+}
+
+func (UnimplementedSessionServiceHandler) PutAssistanceRecording(context.Context, *connect.Request[v1.PutAssistanceRecordingRequest]) (*connect.Response[v1.PutAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.SessionService.PutAssistanceRecording is not implemented"))
 }

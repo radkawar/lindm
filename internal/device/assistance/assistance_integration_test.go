@@ -120,7 +120,7 @@ func localSession(logind string) *agentv1.AssistanceLocalSession {
 }
 
 func report(id string, phase agentv1.AssistancePhase, local *agentv1.AssistanceLocalSession, offer string) *agentv1.AssistanceReport {
-	return &agentv1.AssistanceReport{SessionId: id, Phase: phase, LocalSession: local, OfferSdp: offer, ControlGranted: true}
+	return &agentv1.AssistanceReport{SessionId: id, Phase: phase, LocalSession: local, OfferSdp: offer, ControlGranted: true, InputState: &agentv1.AssistanceInputState{Epoch: 1}}
 }
 
 func ended(id string, cause agentv1.AssistanceEndCause) *agentv1.AssistanceReport {
@@ -389,6 +389,31 @@ func TestAssistanceDeadlines(t *testing.T) {
 			t.Fatalf("consent timeout not audited: %v", got)
 		}
 	})
+	// A device that held the invitation without a helper claiming it had no
+	// eligible session: nobody was asked (layers-fedora44-tier3-37). A device
+	// that never synced keeps the consent timeout.
+	t.Run("unclaimed invitation", func(t *testing.T) {
+		for name, synced := range map[string]bool{"held": true, "never delivered": false} {
+			t.Run(name, func(t *testing.T) {
+				f := newAssistanceFixture(t, 0)
+				session := f.create(t, agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, "")
+				if _, err := f.conn.Exec(f.ctx, "UPDATE assistance_sessions SET consent_deadline=$2 WHERE id=$1", session.GetId(), f.now.Add(2*time.Second)); err != nil {
+					t.Fatal(err)
+				}
+				if synced {
+					f.sync(t)
+				}
+				f.advance(2 * time.Second)
+				want := agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT
+				if synced {
+					want = agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION
+				}
+				if got := f.get(t, session.GetId()); got.GetState() != adminv1.AssistanceState_ASSISTANCE_STATE_ENDED || got.GetEndCause() != want {
+					t.Fatalf("unclaimed invitation %v, want ENDED/%v", got, want)
+				}
+			})
+		}
+	})
 	t.Run("expiry", func(t *testing.T) {
 		f := newAssistanceFixture(t, 0)
 		session := f.create(t, agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 60, "")
@@ -424,6 +449,32 @@ func TestAssistanceDeadlines(t *testing.T) {
 			t.Fatalf("unreachable %v", got)
 		}
 	})
+	// Only a device sync renews the operator's authority, so a rebooting
+	// device lapses it just before the unreachable rule: that is the device's
+	// absence (layers-fedora44-reconnect-12). A lapse while the device keeps
+	// syncing is still the operator's.
+	for _, c := range []struct {
+		name, detail string
+		silence      time.Duration
+	}{
+		{"authority lapse during device silence", "device_unreachable", 28 * time.Second},
+		{"authority lapse while the device syncs", "operator_authorization_expired", time.Second},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newAssistanceFixture(t, 0)
+			session := f.create(t, agentv1.AssistanceMode_ASSISTANCE_MODE_VIEW, 0, "")
+			f.advance(28*time.Second - c.silence)
+			f.sync(t, report(session.GetId(), agentv1.AssistancePhase_ASSISTANCE_PHASE_PROMPTED, localSession("3"), ""))
+			if _, err := f.conn.Exec(f.ctx, "UPDATE assistance_sessions SET authorized_until=$2 WHERE id=$1", session.GetId(), f.now.Add(c.silence)); err != nil {
+				t.Fatal(err)
+			}
+			f.advance(c.silence)
+			got := f.get(t, session.GetId())
+			if got.GetEndCause() != agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST || got.GetEndDetail() != c.detail {
+				t.Fatalf("lapse ended %v/%s, want %s", got.GetEndCause(), got.GetEndDetail(), c.detail)
+			}
+		})
+	}
 }
 
 func TestAssistanceDeviceIdentityChecks(t *testing.T) {

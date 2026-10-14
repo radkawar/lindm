@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"net"
 	"strings"
 	"time"
 
@@ -68,7 +69,31 @@ type assistancePointerWitness struct {
 
 func assistanceFullPolicy() *agentv1.AssistancePolicy {
 	const on = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
-	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on}
+	return &agentv1.AssistancePolicy{Clipboard: on, Keyboard: on, Display: on, Messages: on, Files: on, FileLimits: assistanceFileLimits(),
+		Reconnect: on, ReconnectLimits: assistanceReconnectLimits(), Recording: on, RecordingLimits: assistanceRecordingLimits(),
+		// Desktop gates admit the KDE Plasma and X11 lab sessions; their
+		// desktop-policy-off scenario turns its own gate off.
+		KdePlasma: on, X11: on}
+}
+
+// assistanceCeilingPolicy is the deployment and agent ceiling of the lane:
+// the full device policy plus every Tier 3 capability at its widest lane
+// policy, so each scenario's device policy is the only restriction. With
+// assistanceFullPolicy as the ceiling every Tier 3 policy update was refused
+// assistance_policy_ceiling (layers-fedora44-tier3-02).
+func assistanceCeilingPolicy() *agentv1.AssistancePolicy {
+	policy := assistanceTierThreePolicy()
+	policy.Unattended = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
+	return policy
+}
+
+func assistanceFileLimits() *agentv1.AssistanceFilePolicy {
+	return &agentv1.AssistanceFilePolicy{
+		MaxFileBytes:      16 << 20,
+		MaxSessionBytes:   64 << 20,
+		AllowedMimeTypes:  []string{"text/plain", "application/pdf", "image/png", "image/jpeg"},
+		AllowedExtensions: []string{".txt", ".log", ".pdf", ".png", ".jpg", ".jpeg"},
+	}
 }
 
 func installAssistanceFixture(ctx context.Context, vm *guestVM, desktop *labDesktop, release *platform.Release, evidence *assistanceEvidence, result *VMAssistanceResult) error {
@@ -101,6 +126,26 @@ as systemd-run --user --collect --unit=lindm-assistance-fixture --property=Runti
 	// not visible media. Bind the independently read nonce and require its
 	// pixels on the current console stream before any native interaction.
 	return r.browser.call(ctx, "fixture", map[string]any{"nonce": state.ClipboardSource}, nil, 45*time.Second)
+}
+
+// useFixtureReference makes the fullscreen fixture's own screen, with any
+// notice already on it, the banner locator's reference until restore, and
+// locates GNOME banners over it by their own pixels. Against the desktop
+// reference the whole fixture differs and no notice is located
+// (layers-fedora44-tier3-10 annotation, layers-fedora44-files-09
+// files-filesystem); diff bounds against the fixture took in operator marks
+// (layers-fedora44-tier3-12).
+func (r *assistanceRun) useFixtureReference(ctx context.Context) (restore func(), err error) {
+	img, err := r.vm.guest.screendump(ctx)
+	if err != nil {
+		return nil, err
+	}
+	previous, area := r.screen.reference, r.screen.area
+	r.screen.reference = img
+	if area == bannerTopCentre {
+		r.screen.area = bannerOverFixture
+	}
+	return func() { r.screen.reference, r.screen.area = previous, area }, nil
 }
 
 func (r *assistanceRun) stopFixture(ctx context.Context) error {
@@ -220,7 +265,7 @@ func (r *assistanceRun) pointerWitness(ctx context.Context, head int, x, y float
 		return nil, err
 	}
 	if len(after.Clicks) != len(before.Clicks)+1 {
-		return nil, errors.New("unexpected duplicate guest pointer events")
+		return nil, fmt.Errorf("unexpected duplicate guest pointer events: %+v after %+v", after.Clicks[len(before.Clicks):], before.Clicks)
 	}
 	return after, verifyAssistancePointer(after.Clicks[len(before.Clicks)], head, x, y)
 }
@@ -235,17 +280,23 @@ func fixtureSymbols(state *assistanceFixtureState) string {
 	return result.String()
 }
 
+const monitorLayoutProbe = `import gi,json; gi.require_version("Gdk","3.0"); from gi.repository import Gdk; d=Gdk.Display.get_default(); print(json.dumps([[g.x,g.y,g.width,g.height] for g in [d.get_monitor(i).get_geometry() for i in range(d.get_n_monitors())]]))`
+
+func (r *assistanceRun) monitorLayout(ctx context.Context) ([][4]int, error) {
+	out, err := r.vm.guest.run(ctx, r.desktop.rootScript("as python3 -c "+nativeQuote(monitorLayoutProbe)), nil, 4096, 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	var monitors [][4]int
+	return monitors, json.Unmarshal(out, &monitors)
+}
+
 func (r *assistanceRun) observeMonitorLayout(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	const probe = `import gi,json; gi.require_version("Gdk","3.0"); from gi.repository import Gdk; d=Gdk.Display.get_default(); print(json.dumps([[g.x,g.y,g.width,g.height] for g in [d.get_monitor(i).get_geometry() for i in range(d.get_n_monitors())]]))`
 	for {
-		out, err := r.vm.guest.run(ctx, r.desktop.rootScript("as python3 -c "+nativeQuote(probe)), nil, 4096, 10*time.Second)
+		monitors, err := r.monitorLayout(ctx)
 		if err != nil {
-			return err
-		}
-		var monitors [][4]int
-		if err := json.Unmarshal(out, &monitors); err != nil {
 			return err
 		}
 		if len(monitors) == 2 {
@@ -260,6 +311,42 @@ func (r *assistanceRun) observeMonitorLayout(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("RFB resize did not activate two native monitors: %w", ctx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+// releaseAssistanceHead ends the second head's RFB client and maps local
+// pointer input to whatever the guest then shows. A two-head mapping kept
+// after the head was removed sent every later local click to the wrong place
+// (layers-ubuntu24-full-03: the files consent hover after monitors). The head
+// is not removed here: a zero-sized screen after annotation-monitors lost the
+// Fedora 44 guest's SSH transport (layers-fedora44-tier3-21); later portal
+// dialogs pick a monitor instead (selectOfferedMonitor).
+func (r *assistanceRun) releaseAssistanceHead(ctx context.Context, head net.Conn) error {
+	err := head.Close()
+	r.headConnection = nil
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	for {
+		monitors, probeErr := r.monitorLayout(ctx)
+		if probeErr != nil {
+			return errors.Join(err, probeErr)
+		}
+		switch len(monitors) {
+		case 1:
+			r.screen.desktopBounds, r.screen.headOrigin = image.Rectangle{}, image.Point{}
+			return err
+		case 2:
+			// QEMU keeps a head enabled after its RFB client leaves; the
+			// observed two-head mapping stays valid.
+			if first, second := monitorRectangle(monitors[0]), monitorRectangle(monitors[1]); first.Union(second) == r.screen.desktopBounds && first.Min == r.screen.headOrigin {
+				return err
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return errors.Join(err, fmt.Errorf("guest monitor layout did not settle after the second head: %w", ctx.Err()))
 		case <-time.After(500 * time.Millisecond):
 		}
 	}

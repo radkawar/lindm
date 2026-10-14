@@ -5,6 +5,7 @@ package assistance
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -31,6 +32,9 @@ const (
 	assistanceUnreachable     = 30 * time.Second
 	assistanceOnlineWindow    = 2 * time.Minute
 	assistanceEndedDelivery   = 2 * time.Minute
+	// assistanceAuthoritySkew bounds how far a sync's renewed operator
+	// authority can precede its committed device sync time.
+	assistanceAuthoritySkew = 5 * time.Second
 
 	assistanceRequested = int16(adminv1.AssistanceState_ASSISTANCE_STATE_REQUESTED)
 	assistancePrompted  = int16(adminv1.AssistanceState_ASSISTANCE_STATE_PROMPTED)
@@ -73,7 +77,11 @@ func endAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.Assis
 	if row.State == assistanceEnded {
 		return nil
 	}
+	prior := row.State
 	if err := cancelAssistanceCommand(ctx, q, row.ID, now, "session_ended"); err != nil {
+		return err
+	}
+	if err := cancelAssistanceFile(ctx, q, row.ID, now, "session_ended"); err != nil {
 		return err
 	}
 	if err := q.EndAssistanceSession(ctx, devicedb.EndAssistanceSessionParams{ID: row.ID, EndedAt: core.Timestamptz(now), EndCause: int16(cause), EndDetail: detail, DeviceEnded: deviceEnded}); err != nil {
@@ -81,9 +89,22 @@ func endAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.Assis
 	}
 	row.State, row.EndedAt, row.EndCause, row.EndDetail, row.DeviceEnded = assistanceEnded, core.Timestamptz(now), int16(cause), detail, deviceEnded
 	row.OfferSdp, row.AnswerSdp = "", ""
+	row.InputPaused = true
 	*revoked = append(*revoked, *row)
 	details := append([]string{"operator", row.OperatorID.String(), "cause", assistanceCauseName(cause), "detail", detail}, assistancePolicyAudit(decodeAssistancePolicy(row.EffectiveCapabilities))...)
-	return recordAssistanceAudit(ctx, q, actor, auditkind.AssistanceEnd, *row, "", details...)
+	if err := recordAssistanceAudit(ctx, q, actor, auditkind.AssistanceEnd, *row, "", details...); err != nil {
+		return err
+	}
+	if err := recordUnattendedStop(ctx, q, *row, actor); err != nil {
+		return err
+	}
+	if err := recordAssistanceMediaEnd(ctx, q, *row, actor); err != nil {
+		return err
+	}
+	if err := endAssistanceRecording(ctx, q, *row, now); err != nil {
+		return err
+	}
+	return continueAssistanceReconnect(ctx, q, *row, prior, now)
 }
 
 // enforceAssistance applies the server-side deadlines to an open session:
@@ -95,13 +116,33 @@ func enforceAssistance(ctx context.Context, q *devicedb.Queries, row *devicedb.A
 	case !now.Before(row.EndsAt.Time):
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_EXPIRED, "", false, revoked)
 	case row.State <= assistancePrompted && !now.Before(row.ConsentDeadline.Time):
-		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT, "", false, revoked)
+		cause := agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_CONSENT_TIMEOUT
+		if row.State == assistanceRequested && row.DeviceSyncedAt.Valid {
+			// The device held the invitation but no helper claimed it: no
+			// unlocked signed-in session, which the executor's own deadline
+			// reports. Nobody was asked, so it is not a consent timeout (an
+			// unattended connection to a locked seat, layers-fedora44-tier3-37).
+			cause = agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION
+		}
+		return endAssistance(ctx, q, row, now, nil, cause, "", false, revoked)
 	case row.State >= assistancePrompted && (!row.DeviceSyncedAt.Valid || now.Sub(row.DeviceSyncedAt.Time) >= assistanceUnreachable):
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "device_unreachable", false, revoked)
+	case !now.Before(row.AuthorizedUntil.Time) && row.State >= assistancePrompted && now.Sub(row.DeviceSyncedAt.Time) >= assistanceUnreachable-assistanceAuthoritySkew:
+		// Only a device sync renews the operator's 30 s authority, and the
+		// renewal is observed just before the sync commits. A device that went
+		// silent (a reboot) therefore lapses its authority a moment before the
+		// unreachable rule fires; that is still the device's absence, not the
+		// operator's, and stays reconnect-eligible (layers-fedora44-
+		// reconnect-12 ended operator_authorization_expired mid-reboot).
+		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "device_unreachable", false, revoked)
 	case !now.Before(row.AuthorizedUntil.Time):
+		// The times decide between operator and device absence; keep them
+		// (an ON reconnect lapsed within a second of issue in
+		// layers-fedora44-reconnect-13/-15).
+		slog.Info("assistance operator authority lapsed", "session_id", row.ID, "state", row.State, "now", now, "authorized_until", row.AuthorizedUntil.Time, "device_synced_at", row.DeviceSyncedAt.Time, "created_at", row.CreatedAt.Time)
 		return endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "operator_authorization_expired", false, revoked)
 	}
-	return nil
+	return enforceAssistanceRecording(ctx, q, row, now, revoked)
 }
 
 // enforceOpenAssistance applies deadlines to the device's open session, if any.
@@ -154,13 +195,19 @@ func assistanceMessage(row devicedb.AssistanceSession) *adminv1.AssistanceSessio
 	session.Displays = projection.GetDisplays()
 	session.SelectedDisplayId = projection.GetSelectedDisplayId()
 	session.DisplayGeneration = projection.GetDisplayGeneration()
+	session.InputState = &agentv1.AssistanceInputState{Epoch: uint32(row.InputEpoch), Paused: row.InputPaused}
+	if observed := projection.GetInputState(); row.InputPaused && observed.GetEpoch() == uint32(row.InputEpoch) && observed.GetPaused() {
+		session.InputState.Pause = observed.GetPause()
+	}
+	session.Audio = projection.GetAudio()
+	session.Annotation = projection.GetAnnotation()
 	if row.State != int16(adminv1.AssistanceState_ASSISTANCE_STATE_ENDED) {
 		session.DisplayFrame = projection.GetDisplayFrame()
 	}
 	return session
 }
 
-func (s *Service) assistanceDirective(row devicedb.AssistanceSession) (*agentv1.AssistanceDirective, error) {
+func (s *Service) assistanceDirective(row devicedb.AssistanceSession, recording *agentv1.AssistanceRecordingAuthority) (*agentv1.AssistanceDirective, error) {
 	ice, err := s.Assistance.ICEServer(row.ID, assistrelay.RoleDevice, row.EndsAt.Time)
 	if err != nil {
 		return nil, err
@@ -176,7 +223,11 @@ func (s *Service) assistanceDirective(row devicedb.AssistanceSession) (*agentv1.
 		IceServers:            []*agentv1.AssistanceIceServer{ice},
 		RequestedCapabilities: decodeAssistancePolicy(row.RequestedCapabilities),
 		EffectiveCapabilities: decodeAssistancePolicy(row.EffectiveCapabilities),
+		Recording:             recording,
 	}}
+	if row.ReconnectOf != nil {
+		directive.Invitation.ReconnectOf = row.ReconnectOf.String()
+	}
 	directive.AuthorizedUntil = core.ProtoTime(row.AuthorizedUntil)
 	switch row.State {
 	case assistanceAnswered, assistanceActive:

@@ -3080,18 +3080,60 @@ Tier 2 has independent operation identities, cancellation and content bounds:
   rather than continuing an unrecorded session. Consent withdrawal closes capture
   first; plaintext in-memory buffers and child processes have bounded lifetimes.
 
-Tier 3 keeps the same privilege boundaries. Unattended access requires a separately
-qualified persistent compositor grant, prior local opt-in, independent approval and
-an on-device banner/stop. It is limited to an already-unlocked opted-in user session;
-an absent-and-locked workstation remains unavailable. It does not expose a login
-screen or unlock a session. Elevation guidance releases/discards pending inputs and
-pauses all pointer, scroll, key, shortcut and clipboard injection until local resume;
-it never supplies credentials. Pointer/annotation needs a compositor-qualified,
-non-interactive overlay
-bound to the selected stream; audio needs its own visible source permission and
-mute. Plasma/KWin and X11 backend behavior must each pass native portal, input,
+Tier 3 keeps the same privilege boundaries (owner-approved; implemented, unqualified):
+
+- **Unattended access:** the opt-in is a local choice ("Allow and enable
+  unattended") in an attended session whose portal request asks for a persistent
+  grant (`persist_mode` 2). The helper stores only the restore token, enrollment ID,
+  mode and expiry in `$XDG_STATE_HOME/lindm/assistance-unattended.json` (0600, private
+  directory, no links); the server stores the enrollment, never the token. Each
+  access period is a generic two-person approval (`assistance.unattended`): the
+  approver needs `remote_assistance.unattended.approve` and `approvals.manage` and
+  is never the requester; the requester consumes it with
+  `AuthorizeUnattendedAssistance`. Admission and every authority refresh intersect
+  policy (LIMITED: time window; ON: also a weekly schedule), grant window, enrollment
+  expiry and mode, target user and operator scope. The device shows a critical banner
+  naming operator and approver before restoring the grant. A locked or signed-out
+  seat, another user or a missing opt-in refuses; a dialog in place of a restore
+  also drops the stale opt-in. Unattended connections never record optionally or share
+  sound. "Stop and turn off unattended" removes the local opt-in and revokes the
+  server enrollment. It does not expose a login screen or unlock a session.
+- **Elevation guidance:** an audited operator command or the employee's local
+  "Pause for password" releases pressed inputs, advances the input epoch with an
+  `ELEVATION` pause and pauses clipboard, special keys and file transfer. Only the
+  employee's local "Resume remote control" resumes under a new epoch. The product
+  never detects or answers polkit prompts and never handles credentials.
+- **Pointer and marks:** a packaged GNOME Shell extension draws a non-reactive actor
+  below modal dialogs; the helper talks only to the extension owned by the same
+  unique name as `org.gnome.Shell`, and the extension accepts frames only from the
+  connection that claimed it with the shell's Unix user and the packaged helper
+  executable, verified through the bus daemon's connection credentials. Frames carry only normalized points on the
+  selected stream over the `lindm-annotate` data channel; LIMITED is a pointer,
+  ON adds short-lived bounded marks. Local Clear and Hide are final for the session.
+- **Audio:** the helper offers at most two outputs and "Don't share sound", then
+  under ON a separate microphone choice; Opus from the selected PipeWire monitor or
+  source travels on the existing peer connection. Local Mute stops capture; Stop
+  ends it for the session. Recordings never contain sound.
+
+Plasma/KWin and X11 backend behavior must each pass native portal, input,
 notification, lock and session-isolation gates. No X11 fallback may bypass consent.
-Unattended implementation and KDE qualification wait for parent confirmation.
+
+KDE Plasma (Wayland) and every X11 session are admitted through two Tier 3
+device-policy gates, `kde_plasma` and `x11`, that the server copies from device
+policy within the ceilings into each invitation's effective policy. They are never
+taken from the operator request, and they need no new permission. The unprivileged
+helper selects a desktop profile from the executor's logind session type and its
+`XDG_CURRENT_DESKTOP`. GNOME and COSMIC Wayland are ungated. A gated profile is
+checked after the native portal and lock checks and still before the prompt.
+The profile refuses an off gate, refuses Limited CONTROL rather than downgrading
+it, and withholds every capability its own native lane did not pass. The grant
+reports the admitting profile and portal interface versions for the consent audit.
+X11 uses only the desktop portal, the same prompt and the persistent notification
+Stop. Xlib, XTest and xclip are never fallbacks, and an X11 desktop without a
+qualified row is refused. The table, not the policy gate, is the qualification
+authority; the
+[ledger](verification.md#tier-3-kde-plasma-and-x11-desktop-qualification) lists
+its evidence.
 
 The platform registry owns per-capability support and refusal reasons; the session
 level assistance gate remains a prerequisite, not evidence of clipboard/files/audio
@@ -3263,3 +3305,192 @@ The native `clipboard`, `clipboard-limited`, `clipboard-policy`,
 are separate from the historical baseline. Their result rows remain not run until
 the [capability ledger](verification.md#commercial-assistance-capability-qualification)
 contains the exact new run evidence.
+
+### Scoped file-transfer authority and native receipt
+
+File transfer is independently off by default. `remote_assistance.files` and
+fresh creator/run/device-scope authorization protect `StartAssistanceFileTransfer`,
+`GetAssistanceFileTransfer` and `CancelAssistanceFileTransfer`. A generic fleet
+session read does not expose transfer metadata. `LIMITED` permits only
+operator-to-user transfers; `ON` permits both directions. Server and agent
+deployment ceilings intersect per-device policy and explicit session consent.
+Unknown operating-system identity or an unsupported per-platform gate denies
+files rather than borrowing clipboard or control authority.
+
+Each server-issued operation has one immutable request identity, direction,
+bounded policy and deadline no later than five minutes or session end. One
+operation may be active; the session admits at most 32 operations, 16 MiB per
+file and 64 MiB in reserved bytes. MIME/extension allowlists intersect, not unite.
+The shared `internal/assistancefiles` metadata rules reject hidden names,
+separators, leading/trailing whitespace and unsafe Unicode format/control
+characters before durable admission. Allowed file types are text, PDF, PNG and
+JPEG; content sniffing must agree with the permitted canonical MIME and extension.
+This is an allowlist, not malware scanning or a claim that a document is safe.
+
+The reliable ordered `lindm-files` data channel shares the existing session's
+DTLS/relay authority. A files-enabled view session may have this channel without
+an input channel. Frames, chunks, queues and buffered bytes are independently
+bounded; file bytes are streamed and never persisted by the MDM server or relay.
+There is no HTTP upload/download endpoint. The server stores operation metadata
+and audit, not content. A restarted server cancels unknown old work instead of
+executing it again. A cancellation arriving before the operation's first device
+sync becomes a bounded immutable tombstone, not a new local prompt and not a
+reason to terminate otherwise valid support. Stale active snapshots cannot
+resurrect that request.
+
+The helper drains held keys/buttons and in-flight special-key/clipboard commands
+before opening a native approval or chooser. Input becomes paused at a new epoch;
+after the local decision it advances again. Frames carrying old, future or paused
+authority cannot approve/select a file and are never replayed. Remote cancellation
+while a local dialog remains open ends assistance without restoring input through
+that still-visible dialog. Portal requests are owner-bound, and cancellation
+closes the predicted request path even if the method acknowledgement has not yet
+arrived; signal-watch cleanup failures are not silently discarded.
+
+Incoming files require their own local notification decision. Storage derives the
+home directory from the actual nonroot account, traverses retained directory
+descriptors without following symlinks, stages a private regular file in
+`~/Downloads`, hashes the received bytes and publishes without replacement.
+File and directory durability plus the visible completion notification precede a
+success receipt. Existing files, symlinks and unexpected staging identities are
+never replaced. A publish that becomes visible before a later durability or
+notification failure is **not success**: the report may retain independently
+verified metadata as `file_published_unconfirmed`, while retaining its full quota
+reservation.
+
+Outgoing selection uses only the real FileChooser portal; its URI is not itself
+an inode capability. The helper opens and retains the selected owned regular-file
+descriptor, rejects unsafe filesystem objects and checks identity/size/timestamp
+around streaming. Same-UID mutation cannot be excluded completely by a URI
+chooser; this limit is not disguised as a stronger portal guarantee. The browser
+requires a real, user-activated File System Access save picker before requesting
+selection. It independently hashes and closes the destination before returning a
+receipt. Browser close is not an asserted filesystem-directory `fsync`; cancel
+can leave an empty newly selected placeholder and does not claim its removal.
+Unsupported browser APIs fail closed, with no synthetic click or hidden download.
+
+The chooser's Cancel (portal response 1) and closing it (response 2:
+xdg-desktop-portal-gnome 46.2 sends it for Escape or the window's close, its GTK
+delete-event) both end only that request, `DENIED` with reason
+`file_dialog_dismissed` or `file_dialog_closed`. Either is a local completion with
+no URI, so input resumes under a fresh epoch and the session continues. A refusal
+that still names files, an unknown response code or a malformed response fails
+closed and ends assistance, as does a request the operator cancels or that
+expires while the chooser is open.
+
+Audit events `assistance.file.request`, `.deny`, `.cancel` and `.complete` bind
+the actor, device, session, direction, byte counts, MIME and digest origin.
+Authorized source digests are distinct from `receiver_verified` digests.
+Ordinary filenames, source paths and content are excluded from audit. Failed,
+denied and interrupted reservations are consumed; only verified success settles
+the actual bytes once. Late independently verified publication metadata can
+enrich a bounded cancelled/ended operation but never turn it into late success.
+
+Native qualification adds `files`, `files-cancel`, `files-limited`,
+`files-filesystem`, `files-limits`, `files-interrupted`, `files-policy` and
+`files-permission` to `lab vm assistance`. Real local portals, operator save
+pickers, screenshots, independent filesystem rereads and actual typed audit are
+required; a protocol unit test is not a native transfer pass. The
+[ledger](verification.md#commercial-assistance-capability-qualification) remains
+not run until each complete platform lane and the independent security review
+are evidenced.
+
+### Reconnect workflows
+
+Reconnect is independently off by default and needs `remote_assistance.reconnect`
+in the device's scope in addition to the mode grants. An invitation whose effective
+policy enables reconnect creates one bounded workflow (migration 33). It stores only
+the origin and latest session identities, the operator, the effective mode, window,
+attempt bound, the first consenting account and the end reason; never a grant,
+portal restore token, relay credential, DTLS identity or media key. Every device has
+at most one open workflow, and an unrelated new invitation supersedes it.
+
+A workflow is approved only when its first session reaches local consent with the
+device's own reconnect grant (an unqualified release withholds it). Only an end
+that represents a logout, reboot, lock or lost connection (`SESSION_ENDED`,
+`SESSION_LOCKED`, `CONNECTION_FAILED` or `AUTHORIZATION_LOST`/`device_unreachable`)
+leaves the workflow waiting for the policy's window. Declines, local or operator
+stops, expiry, recording failure, lost operator scope or policy changes end it and
+record `assistance.reconnect.end`; an elapsed window records
+`assistance.reconnect.expire`. A session read reports a waiting workflow whose
+window has elapsed as expired even before that is recorded, so the console never
+offers a reconnect the server would refuse.
+Only a device sync renews the operator's 30-second authority for an open session,
+and the renewal is observed just before that sync commits. An authority that lapses
+after the device has been silent for at least 25 seconds (a reboot) therefore ends
+`device_unreachable`, not `operator_authorization_expired`, and stays
+reconnect-eligible. A lapse while the device keeps syncing is still the operator's.
+
+`ReconnectAssistanceSession` lets the creating operator issue the next linked
+invitation under LIMITED or ON. It repeats every Create check: fresh view and mode
+grants, every requested capability permission including reconnect, device scope,
+online device, capacity and the current policy intersection. ON additionally lets
+device sync re-issue the remembered invitation after freshly observing the
+operator's authority outside SQL locks and fencing it again before commit. That
+observation must still have at least 15 seconds left when the sync commits, or the
+attempt waits for the next sync's fresh observation, so an invitation never starts
+with authority about to lapse. An
+attempt that finds no eligible local login (no prompt was shown) is refunded and
+paced by 30 seconds without extending the window. The linked invitation targets the
+originally consenting account, discloses that it continues an earlier session and
+starts at REQUESTED: the helper shows a fresh product prompt and a fresh portal
+dialog, so no screen or input exists before new consent. `assistance.reconnect.request`
+and `.consent` link the old and new sessions.
+
+### Encrypted support recording
+
+Recording is independently off by default. Requesting it needs
+`remote_assistance.record`; LIMITED lets the local user opt in per session and ON
+lets the operator require it. Required recording is never silently downgraded:
+creation fails when the policy only allows optional recording or the server has no
+recording custody. The invitation carries an immutable recording authority: the
+recording identity, whether it is required, the size and retention bounds and the
+deployment's HPKE recipient public key and key identity.
+
+The helper discloses recording in the prompt summary and body before capture,
+including retention and the organization's later archive access. Optional recording
+offers "Allow and record" and "Allow without recording"; required recording offers
+only allow and decline, and a release, policy or key that cannot honour it ends the
+session `RECORDING_FAILED` before any prompt or capture. While recording, the
+critical in-progress notification states it and is re-posted if dismissed; a failed
+post while recording ends the session. The user may stop optional recording locally.
+
+The recorder taps the same consented VP8 RTP stream the operator receives, before
+SRTP, reassembles whole frames (dropping incomplete frames until the next
+keyframe), muxes progressive WebM and seals each segment of at most 192 KiB.
+`internal/assistancerecording` runs HPKE (RFC 9180, ML-KEM-768+X25519,
+HKDF-SHA256) in export-only mode to the recipient key and exports one AES-256-GCM
+key per recording; the nonce is the segment sequence and additional data binds the
+recording identity, sequence and finality. Plaintext exists only in bounded helper
+memory and is never written to disk. The executor accepts segments only from the
+bound login's helper for a granted recording, keeps a bounded in-order outbox and
+drains sealed segments for one minute after the session ends; the network process
+relays them with `PutAssistanceRecording`. A full queue, stalled or refused upload
+fails the recording, ending a required session.
+
+The server stores ciphertext segments, the encapsulated key, a running SHA-256 of
+the ciphertext and metadata; it rejects gaps, substitutions, foreign recordings,
+recordings beyond their size bound and the deployment storage bound. Storage failure
+and a required recording without a durable segment for 30 seconds end the session.
+A final authenticated segment completes the archive; a session that ends without one
+leaves an incomplete prefix after a one-minute grace. `assistance.recording.start`,
+`.stop`, `.read`, `.delete` and `.retention` record object identity, ciphertext
+digest, duration, size and outcome, never content or keys.
+
+Archive metadata is fleet-readable. Playback needs
+`remote_assistance.recordings.read` in the recording's device scope:
+`OpenAssistanceRecording` audits the operator's reason and creates a ten-minute
+operator-bound retrieval; `ReadAssistanceRecording` derives the key in memory,
+authenticates one segment and returns it over TLS. Deletion needs
+`remote_assistance.recordings.delete` and destroys segments and the encapsulated key.
+Neither permission grants view, control or another live capability. The exclusive
+`assistance-maintenance` job applies retention, settles unfinished archives and
+expires reconnect windows.
+
+Native qualification adds `recording`, `recording-declined`, `recording-refused`,
+`recording-storage`, `recording-permission`, `recording-retention`,
+`reconnect-logout`, `reconnect-reboot`, `reconnect-declined`, `reconnect-expired`
+and `reconnect-revoked` to `lab vm assistance`. The
+[ledger](verification.md#commercial-assistance-capability-qualification) remains
+not run until each complete platform lane and an independent security review are
+evidenced.

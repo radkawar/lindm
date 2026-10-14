@@ -11,6 +11,7 @@ import "lindm/admin/v1/approvals.proto";
 import "lindm/admin/v1/approved_references.proto";
 import "lindm/admin/v1/assignments.proto";
 import "lindm/admin/v1/assistance.proto";
+import "lindm/admin/v1/assistance_unattended.proto";
 import "lindm/admin/v1/authorization.proto";
 import "lindm/admin/v1/authz_groups.proto";
 import "lindm/admin/v1/capabilities.proto";
@@ -112,6 +113,21 @@ service AdminService {
   rpc UpdateAssistancePolicy(UpdateAssistancePolicyRequest) returns (UpdateAssistancePolicyResponse);
   rpc RunAssistanceCommand(RunAssistanceCommandRequest) returns (RunAssistanceCommandResponse);
   rpc GetAssistanceCommand(GetAssistanceCommandRequest) returns (GetAssistanceCommandResponse);
+  rpc StartAssistanceFileTransfer(StartAssistanceFileTransferRequest) returns (StartAssistanceFileTransferResponse);
+  rpc GetAssistanceFileTransfer(GetAssistanceFileTransferRequest) returns (GetAssistanceFileTransferResponse);
+  rpc CancelAssistanceFileTransfer(CancelAssistanceFileTransferRequest) returns (CancelAssistanceFileTransferResponse);
+  rpc ReconnectAssistanceSession(ReconnectAssistanceSessionRequest) returns (ReconnectAssistanceSessionResponse);
+  // Recording metadata is fleet-readable; content and deletion require their
+  // own scoped permissions and never grant live assistance.
+  rpc ListAssistanceRecordings(ListAssistanceRecordingsRequest) returns (ListAssistanceRecordingsResponse);
+  rpc OpenAssistanceRecording(OpenAssistanceRecordingRequest) returns (OpenAssistanceRecordingResponse);
+  rpc ReadAssistanceRecording(ReadAssistanceRecordingRequest) returns (ReadAssistanceRecordingResponse);
+  rpc DeleteAssistanceRecording(DeleteAssistanceRecordingRequest) returns (DeleteAssistanceRecordingResponse);
+  // Consumes an approval decided by a different person with
+  // remote_assistance.unattended.approve; the requester never approves.
+  rpc AuthorizeUnattendedAssistance(AuthorizeUnattendedAssistanceRequest) returns (AuthorizeUnattendedAssistanceResponse);
+  rpc ListUnattendedAssistance(ListUnattendedAssistanceRequest) returns (ListUnattendedAssistanceResponse);
+  rpc RevokeUnattendedAssistance(RevokeUnattendedAssistanceRequest) returns (RevokeUnattendedAssistanceResponse);
   // Whether a new request can reach a person on the device, and the evidence.
   rpc GetAssistanceReadiness(GetAssistanceReadinessRequest) returns (GetAssistanceReadinessResponse);
   rpc GetDeviceEncryption(GetDeviceEncryptionRequest) returns (GetDeviceEncryptionResponse);

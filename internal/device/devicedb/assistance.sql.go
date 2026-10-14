@@ -41,6 +41,25 @@ func (q *Queries) AnswerAssistanceSession(ctx context.Context, arg AnswerAssista
 	return err
 }
 
+const assistanceFileQuota = `-- name: AssistanceFileQuota :one
+SELECT count(*)::bigint AS requests, COALESCE(sum(reserved_bytes), 0)::bigint AS reserved_bytes
+FROM assistance_file_transfers WHERE session_id = $1
+`
+
+type AssistanceFileQuotaRow struct {
+	Requests      int64
+	ReservedBytes int64
+}
+
+// Pending/denied/cancelled/failed operations retain their full reservation.
+// Only independently verified success settles that reservation to actual bytes.
+func (q *Queries) AssistanceFileQuota(ctx context.Context, sessionID uuid.UUID) (AssistanceFileQuotaRow, error) {
+	row := q.db.QueryRow(ctx, assistanceFileQuota, sessionID)
+	var i AssistanceFileQuotaRow
+	err := row.Scan(&i.Requests, &i.ReservedBytes)
+	return i, err
+}
+
 const authorizeAssistanceSession = `-- name: AuthorizeAssistanceSession :exec
 UPDATE assistance_sessions SET authorized_until = $1
 WHERE id = $2 AND state <> 6
@@ -154,7 +173,8 @@ SET
     end_detail = $3,
     device_ended = $4,
     offer_sdp = '',
-    answer_sdp = ''
+    answer_sdp = '',
+    input_paused = true
 WHERE id = $5 AND state <> 6
 `
 
@@ -203,8 +223,36 @@ func (q *Queries) FinishAssistanceCommand(ctx context.Context, arg FinishAssista
 	return err
 }
 
+const getActiveAssistanceFileTransfer = `-- name: GetActiveAssistanceFileTransfer :one
+SELECT request_id, session_id, device_id, operator_id, owner_instance, request_digest, request_number, direction, request_metadata, report, reserved_bytes, bytes_transferred, state, created_at, deadline, completed_at FROM assistance_file_transfers WHERE session_id = $1 AND state < 4
+`
+
+func (q *Queries) GetActiveAssistanceFileTransfer(ctx context.Context, sessionID uuid.UUID) (AssistanceFileTransfer, error) {
+	row := q.db.QueryRow(ctx, getActiveAssistanceFileTransfer, sessionID)
+	var i AssistanceFileTransfer
+	err := row.Scan(
+		&i.RequestID,
+		&i.SessionID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.OwnerInstance,
+		&i.RequestDigest,
+		&i.RequestNumber,
+		&i.Direction,
+		&i.RequestMetadata,
+		&i.Report,
+		&i.ReservedBytes,
+		&i.BytesTransferred,
+		&i.State,
+		&i.CreatedAt,
+		&i.Deadline,
+		&i.CompletedAt,
+	)
+	return i, err
+}
+
 const getAssistanceCommand = `-- name: GetAssistanceCommand :one
-SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at FROM assistance_commands WHERE request_id = $1
+SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at, annotation_enabled FROM assistance_commands WHERE request_id = $1
 `
 
 func (q *Queries) GetAssistanceCommand(ctx context.Context, requestID uuid.UUID) (AssistanceCommand, error) {
@@ -224,6 +272,35 @@ func (q *Queries) GetAssistanceCommand(ctx context.Context, requestID uuid.UUID)
 		&i.Deadline,
 		&i.Status,
 		&i.Reason,
+		&i.CompletedAt,
+		&i.AnnotationEnabled,
+	)
+	return i, err
+}
+
+const getAssistanceFileTransfer = `-- name: GetAssistanceFileTransfer :one
+SELECT request_id, session_id, device_id, operator_id, owner_instance, request_digest, request_number, direction, request_metadata, report, reserved_bytes, bytes_transferred, state, created_at, deadline, completed_at FROM assistance_file_transfers WHERE request_id = $1
+`
+
+func (q *Queries) GetAssistanceFileTransfer(ctx context.Context, requestID uuid.UUID) (AssistanceFileTransfer, error) {
+	row := q.db.QueryRow(ctx, getAssistanceFileTransfer, requestID)
+	var i AssistanceFileTransfer
+	err := row.Scan(
+		&i.RequestID,
+		&i.SessionID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.OwnerInstance,
+		&i.RequestDigest,
+		&i.RequestNumber,
+		&i.Direction,
+		&i.RequestMetadata,
+		&i.Report,
+		&i.ReservedBytes,
+		&i.BytesTransferred,
+		&i.State,
+		&i.CreatedAt,
+		&i.Deadline,
 		&i.CompletedAt,
 	)
 	return i, err
@@ -300,7 +377,7 @@ func (q *Queries) GetAssistanceReadiness(ctx context.Context, deviceID uuid.UUID
 }
 
 const getAssistanceSession = `-- name: GetAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE id = $1
 `
 
@@ -345,12 +422,18 @@ func (q *Queries) GetAssistanceSession(ctx context.Context, id uuid.UUID) (Assis
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
 	)
 	return i, err
 }
 
 const getAssistanceSessionByRequest = `-- name: GetAssistanceSessionByRequest :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE request_id = $1
 `
 
@@ -395,12 +478,47 @@ func (q *Queries) GetAssistanceSessionByRequest(ctx context.Context, requestID u
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
+	)
+	return i, err
+}
+
+const getLatestAssistanceFileTransfer = `-- name: GetLatestAssistanceFileTransfer :one
+SELECT request_id, session_id, device_id, operator_id, owner_instance, request_digest, request_number, direction, request_metadata, report, reserved_bytes, bytes_transferred, state, created_at, deadline, completed_at FROM assistance_file_transfers WHERE session_id = $1
+ORDER BY request_number DESC LIMIT 1
+`
+
+func (q *Queries) GetLatestAssistanceFileTransfer(ctx context.Context, sessionID uuid.UUID) (AssistanceFileTransfer, error) {
+	row := q.db.QueryRow(ctx, getLatestAssistanceFileTransfer, sessionID)
+	var i AssistanceFileTransfer
+	err := row.Scan(
+		&i.RequestID,
+		&i.SessionID,
+		&i.DeviceID,
+		&i.OperatorID,
+		&i.OwnerInstance,
+		&i.RequestDigest,
+		&i.RequestNumber,
+		&i.Direction,
+		&i.RequestMetadata,
+		&i.Report,
+		&i.ReservedBytes,
+		&i.BytesTransferred,
+		&i.State,
+		&i.CreatedAt,
+		&i.Deadline,
+		&i.CompletedAt,
 	)
 	return i, err
 }
 
 const getOpenAssistanceSession = `-- name: GetOpenAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions WHERE device_id = $1 AND state <> 6
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions WHERE device_id = $1 AND state <> 6
 `
 
 func (q *Queries) GetOpenAssistanceSession(ctx context.Context, deviceID uuid.UUID) (AssistanceSession, error) {
@@ -444,12 +562,18 @@ func (q *Queries) GetOpenAssistanceSession(ctx context.Context, deviceID uuid.UU
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
 	)
 	return i, err
 }
 
 const getPendingAssistanceCommand = `-- name: GetPendingAssistanceCommand :one
-SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at FROM assistance_commands WHERE session_id = $1 AND status = 1
+SELECT request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status, reason, completed_at, annotation_enabled FROM assistance_commands WHERE session_id = $1 AND status = 1
 `
 
 func (q *Queries) GetPendingAssistanceCommand(ctx context.Context, sessionID uuid.UUID) (AssistanceCommand, error) {
@@ -470,27 +594,29 @@ func (q *Queries) GetPendingAssistanceCommand(ctx context.Context, sessionID uui
 		&i.Status,
 		&i.Reason,
 		&i.CompletedAt,
+		&i.AnnotationEnabled,
 	)
 	return i, err
 }
 
 const insertAssistanceCommand = `-- name: InsertAssistanceCommand :exec
-INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, deadline, status)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 1)
+INSERT INTO assistance_commands(request_id, session_id, device_id, operator_id, request_digest, kind, policy, byte_count, special_key, display_id, annotation_enabled, deadline, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 1)
 `
 
 type InsertAssistanceCommandParams struct {
-	RequestID     uuid.UUID
-	SessionID     uuid.UUID
-	DeviceID      uuid.UUID
-	OperatorID    uuid.UUID
-	RequestDigest []byte
-	Kind          int16
-	Policy        []byte
-	ByteCount     int32
-	SpecialKey    int16
-	DisplayID     string
-	Deadline      pgtype.Timestamptz
+	RequestID         uuid.UUID
+	SessionID         uuid.UUID
+	DeviceID          uuid.UUID
+	OperatorID        uuid.UUID
+	RequestDigest     []byte
+	Kind              int16
+	Policy            []byte
+	ByteCount         int32
+	SpecialKey        int16
+	DisplayID         string
+	AnnotationEnabled bool
+	Deadline          pgtype.Timestamptz
 }
 
 func (q *Queries) InsertAssistanceCommand(ctx context.Context, arg InsertAssistanceCommandParams) error {
@@ -505,6 +631,47 @@ func (q *Queries) InsertAssistanceCommand(ctx context.Context, arg InsertAssista
 		arg.ByteCount,
 		arg.SpecialKey,
 		arg.DisplayID,
+		arg.AnnotationEnabled,
+		arg.Deadline,
+	)
+	return err
+}
+
+const insertAssistanceFileTransfer = `-- name: InsertAssistanceFileTransfer :exec
+INSERT INTO assistance_file_transfers(request_id, session_id, device_id, operator_id, owner_instance, request_number, request_digest, direction, request_metadata, report, reserved_bytes, created_at, deadline)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+`
+
+type InsertAssistanceFileTransferParams struct {
+	RequestID       uuid.UUID
+	SessionID       uuid.UUID
+	DeviceID        uuid.UUID
+	OperatorID      uuid.UUID
+	OwnerInstance   uuid.UUID
+	RequestNumber   int16
+	RequestDigest   []byte
+	Direction       int16
+	RequestMetadata []byte
+	Report          []byte
+	ReservedBytes   int64
+	CreatedAt       pgtype.Timestamptz
+	Deadline        pgtype.Timestamptz
+}
+
+func (q *Queries) InsertAssistanceFileTransfer(ctx context.Context, arg InsertAssistanceFileTransferParams) error {
+	_, err := q.db.Exec(ctx, insertAssistanceFileTransfer,
+		arg.RequestID,
+		arg.SessionID,
+		arg.DeviceID,
+		arg.OperatorID,
+		arg.OwnerInstance,
+		arg.RequestNumber,
+		arg.RequestDigest,
+		arg.Direction,
+		arg.RequestMetadata,
+		arg.Report,
+		arg.ReservedBytes,
+		arg.CreatedAt,
 		arg.Deadline,
 	)
 	return err
@@ -606,7 +773,7 @@ func (q *Queries) InsertAssistanceSession(ctx context.Context, arg InsertAssista
 }
 
 const listAssistanceDirectiveSessions = `-- name: ListAssistanceDirectiveSessions :many
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE device_id = $1
   AND (state <> 6 OR (NOT device_ended AND ended_at > $2::timestamptz))
 ORDER BY (state = 6), created_at DESC, id DESC
@@ -666,6 +833,12 @@ func (q *Queries) ListAssistanceDirectiveSessions(ctx context.Context, arg ListA
 			&i.RequestedCapabilities,
 			&i.EffectiveCapabilities,
 			&i.CapabilityProjection,
+			&i.InputEpoch,
+			&i.InputPaused,
+			&i.ReconnectWorkflowID,
+			&i.ReconnectOf,
+			&i.UnattendedGrantID,
+			&i.UnattendedEnrollmentID,
 		); err != nil {
 			return nil, err
 		}
@@ -678,7 +851,7 @@ func (q *Queries) ListAssistanceDirectiveSessions(ctx context.Context, arg ListA
 }
 
 const listAssistanceSessions = `-- name: ListAssistanceSessions :many
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE device_id = $1
   AND (NOT $2::boolean OR (created_at, id) < ($3::timestamptz, $4::uuid))
 ORDER BY created_at DESC, id DESC
@@ -746,6 +919,12 @@ func (q *Queries) ListAssistanceSessions(ctx context.Context, arg ListAssistance
 			&i.RequestedCapabilities,
 			&i.EffectiveCapabilities,
 			&i.CapabilityProjection,
+			&i.InputEpoch,
+			&i.InputPaused,
+			&i.ReconnectWorkflowID,
+			&i.ReconnectOf,
+			&i.UnattendedGrantID,
+			&i.UnattendedEnrollmentID,
 		); err != nil {
 			return nil, err
 		}
@@ -767,7 +946,7 @@ func (q *Queries) LockAssistanceAdmission(ctx context.Context) error {
 }
 
 const lockAssistanceSession = `-- name: LockAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE id = $1
 FOR UPDATE
 `
@@ -813,12 +992,18 @@ func (q *Queries) LockAssistanceSession(ctx context.Context, id uuid.UUID) (Assi
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
 	)
 	return i, err
 }
 
 const lockAssistanceSessionForDevice = `-- name: LockAssistanceSessionForDevice :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE id = $1 AND device_id = $2
 FOR UPDATE
 `
@@ -869,12 +1054,18 @@ func (q *Queries) LockAssistanceSessionForDevice(ctx context.Context, arg LockAs
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
 	)
 	return i, err
 }
 
 const lockOpenAssistanceSession = `-- name: LockOpenAssistanceSession :one
-SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection FROM assistance_sessions
+SELECT id, device_id, generation_id, request_id, request_digest, operator_id, operator_display, mode, reason, target_username, state, created_at, consent_deadline, ends_at, prompted_at, consented_at, answered_at, started_at, ended_at, end_cause, end_detail, device_synced_at, device_ended, control_granted, local_username, local_uid, local_logind_session, local_session_type, local_desktop, offer_sdp, offer_fingerprint, answer_sdp, answer_fingerprint, authorized_until, requested_capabilities, effective_capabilities, capability_projection, input_epoch, input_paused, reconnect_workflow_id, reconnect_of, unattended_grant_id, unattended_enrollment_id FROM assistance_sessions
 WHERE device_id = $1 AND state <> 6
 FOR UPDATE
 `
@@ -920,6 +1111,12 @@ func (q *Queries) LockOpenAssistanceSession(ctx context.Context, deviceID uuid.U
 		&i.RequestedCapabilities,
 		&i.EffectiveCapabilities,
 		&i.CapabilityProjection,
+		&i.InputEpoch,
+		&i.InputPaused,
+		&i.ReconnectWorkflowID,
+		&i.ReconnectOf,
+		&i.UnattendedGrantID,
+		&i.UnattendedEnrollmentID,
 	)
 	return i, err
 }
@@ -967,6 +1164,32 @@ type PutAssistancePolicyParams struct {
 
 func (q *Queries) PutAssistancePolicy(ctx context.Context, arg PutAssistancePolicyParams) error {
 	_, err := q.db.Exec(ctx, putAssistancePolicy, arg.DeviceID, arg.Policy)
+	return err
+}
+
+const recordAssistanceFilePublicationFailure = `-- name: RecordAssistanceFilePublicationFailure :exec
+UPDATE assistance_file_transfers
+SET state = 7, report = $1, bytes_transferred = $2,
+    completed_at = $3
+WHERE request_id = $4 AND direction = 1 AND state IN (1, 2, 3, 6)
+`
+
+type RecordAssistanceFilePublicationFailureParams struct {
+	Report           []byte
+	BytesTransferred int64
+	CompletedAt      pgtype.Timestamptz
+	RequestID        uuid.UUID
+}
+
+// A late publication warning can enrich a cancellation, never claim success,
+// widen a reservation or recreate live transfer authority.
+func (q *Queries) RecordAssistanceFilePublicationFailure(ctx context.Context, arg RecordAssistanceFilePublicationFailureParams) error {
+	_, err := q.db.Exec(ctx, recordAssistanceFilePublicationFailure,
+		arg.Report,
+		arg.BytesTransferred,
+		arg.CompletedAt,
+		arg.RequestID,
+	)
 	return err
 }
 
@@ -1023,6 +1246,22 @@ func (q *Queries) SetAssistanceEffectiveCapabilities(ctx context.Context, arg Se
 	return err
 }
 
+const setAssistanceInputState = `-- name: SetAssistanceInputState :exec
+UPDATE assistance_sessions SET input_epoch = $1, input_paused = $2
+WHERE id = $3 AND state <> 6
+`
+
+type SetAssistanceInputStateParams struct {
+	InputEpoch  int64
+	InputPaused bool
+	ID          uuid.UUID
+}
+
+func (q *Queries) SetAssistanceInputState(ctx context.Context, arg SetAssistanceInputStateParams) error {
+	_, err := q.db.Exec(ctx, setAssistanceInputState, arg.InputEpoch, arg.InputPaused, arg.ID)
+	return err
+}
+
 const setAssistanceProjection = `-- name: SetAssistanceProjection :exec
 UPDATE assistance_sessions
 SET capability_projection = $1
@@ -1070,5 +1309,32 @@ type TouchAssistanceDeviceSyncParams struct {
 
 func (q *Queries) TouchAssistanceDeviceSync(ctx context.Context, arg TouchAssistanceDeviceSyncParams) error {
 	_, err := q.db.Exec(ctx, touchAssistanceDeviceSync, arg.SyncedAt, arg.DeviceID)
+	return err
+}
+
+const updateAssistanceFileTransfer = `-- name: UpdateAssistanceFileTransfer :exec
+UPDATE assistance_file_transfers
+SET state = $1::smallint, report = $2,
+    bytes_transferred = $3, completed_at = $4,
+    reserved_bytes = CASE WHEN $1::smallint = 4 THEN $3 ELSE reserved_bytes END
+WHERE request_id = $5 AND state < 4
+`
+
+type UpdateAssistanceFileTransferParams struct {
+	State            int16
+	Report           []byte
+	BytesTransferred int64
+	CompletedAt      pgtype.Timestamptz
+	RequestID        uuid.UUID
+}
+
+func (q *Queries) UpdateAssistanceFileTransfer(ctx context.Context, arg UpdateAssistanceFileTransferParams) error {
+	_, err := q.db.Exec(ctx, updateAssistanceFileTransfer,
+		arg.State,
+		arg.Report,
+		arg.BytesTransferred,
+		arg.CompletedAt,
+		arg.RequestID,
+	)
 	return err
 }

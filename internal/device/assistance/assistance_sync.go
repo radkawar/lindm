@@ -47,6 +47,13 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
+	var reconnect assistanceReconnectObservation
+	if observedID == uuid.Nil {
+		reconnect, err = s.observeAssistanceReconnect(ctx, principal.DeviceID, s.Now())
+		if err != nil {
+			return nil, core.MapErr(err)
+		}
+	}
 	tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 	if err != nil {
 		return nil, core.MapErr(err)
@@ -94,6 +101,10 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 			return nil, core.MapErr(err)
 		}
 	}
+	reconnected, err := s.automaticAssistanceReconnect(ctx, tx, q, reconnect, principal.GenerationID, now, &revoked)
+	if err != nil {
+		return nil, core.MapErr(err)
+	}
 	if err := q.TouchAssistanceDeviceSync(ctx, devicedb.TouchAssistanceDeviceSyncParams{DeviceID: principal.DeviceID, SyncedAt: core.Timestamptz(now)}); err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -111,6 +122,12 @@ func (s *Service) SyncAssistance(ctx context.Context, req *connect.Request[devic
 	}
 	if authorization != nil {
 		if err := s.Identity.LockAuthorization(ctx, tx, authorization, identity.PermissionViewRemoteAssistance); err != nil {
+			return nil, core.ExecutionError(err)
+		}
+	}
+	if reconnected {
+		// The remembered workflow's operator is fenced like a creator.
+		if err := s.Identity.LockAuthorization(ctx, tx, reconnect.authorization, identity.PermissionViewRemoteAssistance); err != nil {
 			return nil, core.ExecutionError(err)
 		}
 	}
@@ -154,11 +171,7 @@ func (s *Service) assistanceDirectives(ctx context.Context, q *devicedb.Queries,
 			// relay revocation is idempotent.
 			*revoked = append(*revoked, *row)
 		}
-		directive, err := s.assistanceDirective(*row)
-		if err != nil {
-			return nil, err
-		}
-		directive.Command, err = s.commandForAssistance(ctx, q, *row, now)
+		directive, err := s.assistanceWorkDirective(ctx, q, row, now, revoked)
 		if err != nil {
 			return nil, err
 		}
@@ -167,19 +180,62 @@ func (s *Service) assistanceDirectives(ctx context.Context, q *devicedb.Queries,
 	return response, nil
 }
 
+func (s *Service) assistanceWorkDirective(ctx context.Context, q *devicedb.Queries, row *devicedb.AssistanceSession, now time.Time, revoked *assistanceRevocations) (*agentv1.AssistanceDirective, error) {
+	var authority *agentv1.AssistanceRecordingAuthority
+	recording, err := q.GetAssistanceRecordingBySession(ctx, row.ID)
+	switch {
+	case err == nil:
+		authority, err = s.assistanceRecordingAuthority(recording)
+		if errors.Is(err, errRecordingKeyUnavailable) {
+			// A replaced or removed deployment key cannot receive this
+			// recording; the session ends rather than capturing unencrypted.
+			authority, err = nil, nil
+			if row.State != assistanceEnded {
+				if err := endAssistance(ctx, q, row, now, nil, agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, "recording_key_unavailable", false, revoked); err != nil {
+					return nil, err
+				}
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return nil, err
+	}
+	directive, err := s.assistanceDirective(*row, authority)
+	if err != nil {
+		return nil, err
+	}
+	if err := unattendedInvitation(ctx, q, *row, directive.GetInvitation()); err != nil {
+		return nil, err
+	}
+	directive.Command, err = s.commandForAssistance(ctx, q, *row, now)
+	if err != nil {
+		return nil, err
+	}
+	directive.FileTransfer, err = s.fileForAssistance(ctx, q, *row, now)
+	if err != nil {
+		return nil, err
+	}
+	return directive, nil
+}
+
 // applyAssistanceReport advances one locked session from a device report.
 // Stale or regressing phases are ignored; protocol violations end the session.
 func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries, row *devicedb.AssistanceSession, report *agentv1.AssistanceReport, generation uuid.UUID, now time.Time, revoked *assistanceRevocations) error {
 	if err := enforceAssistance(ctx, q, row, now, revoked); err != nil {
 		return err
 	}
+	if row.GenerationID != generation {
+		return nil
+	}
+	if err := recordAssistanceFilePublicationFailure(ctx, q, *row, report.GetFileTransfer(), now); err != nil {
+		return err
+	}
 	if row.State == assistanceEnded {
 		if report.GetPhase() == agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED && !row.DeviceEnded {
 			return q.ConfirmAssistanceDeviceEnded(ctx, row.ID)
 		}
-		return nil
-	}
-	if row.GenerationID != generation {
 		return nil
 	}
 	end := func(cause agentv1.AssistanceEndCause, detail string, deviceEnded bool) error {
@@ -193,7 +249,10 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 	case agentv1.AssistancePhase_ASSISTANCE_PHASE_PENDING:
 		return nil
 	case agentv1.AssistancePhase_ASSISTANCE_PHASE_ENDED:
-		return end(report.GetEndCause(), report.GetEndDetail(), true)
+		if err := end(report.GetEndCause(), report.GetEndDetail(), true); err != nil {
+			return err
+		}
+		return unattendedDeviceRefusal(ctx, q, *row, now, revoked)
 	}
 	local := report.GetLocalSession()
 	switch {
@@ -202,17 +261,10 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 	case row.TargetUsername != "" && local.GetUsername() != row.TargetUsername:
 		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION, "target_user_mismatch", false)
 	case row.State == assistanceRequested:
-		params := devicedb.BindAssistanceLocalSessionParams{
-			ID: row.ID, PromptedAt: core.Timestamptz(now), LocalUsername: local.GetUsername(), LocalUid: int64(local.GetUid()),
-			LocalLogindSession: local.GetLogindSessionId(), LocalSessionType: local.GetSessionType(), LocalDesktop: local.GetDesktop(),
-		}
-		if err := q.BindAssistanceLocalSession(ctx, params); err != nil {
+		if detail, err := bindAssistanceLocalSession(ctx, q, row, local, now); err != nil {
 			return err
-		}
-		row.State, row.PromptedAt = assistancePrompted, params.PromptedAt
-		row.LocalUsername, row.LocalUid, row.LocalLogindSession, row.LocalSessionType, row.LocalDesktop = params.LocalUsername, params.LocalUid, params.LocalLogindSession, params.LocalSessionType, params.LocalDesktop
-		if err := recordAssistanceAudit(ctx, q, nil, auditkind.AssistancePrompt, *row, "", append(assistanceLocalAudit(*row), "desktop", row.LocalDesktop)...); err != nil {
-			return err
+		} else if detail != "" {
+			return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_NO_ELIGIBLE_SESSION, detail, false)
 		}
 	case local.GetUsername() != row.LocalUsername || int64(local.GetUid()) != row.LocalUid || local.GetLogindSessionId() != row.LocalLogindSession || local.GetSessionType() != row.LocalSessionType:
 		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_SESSION_ENDED, "local_session_changed", false)
@@ -239,13 +291,24 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 		return nil
 	}
 	if consented {
-		details := append([]string{"operator", row.OperatorID.String(), "control_granted", boolText(row.ControlGranted), "result", "accepted"}, assistancePolicyAudit(decodeAssistancePolicy(row.EffectiveCapabilities))...)
-		details = append(details, assistanceLocalAudit(*row)...)
-		grant := report.GetGrantedCapabilities().GetPolicy()
-		details = append(details, "clipboard_granted", assistancePolicyModeName(grant.GetClipboard()), "keyboard_granted", assistancePolicyModeName(grant.GetKeyboard()), "display_granted", assistancePolicyModeName(grant.GetDisplay()), "messages_granted", assistancePolicyModeName(grant.GetMessages()), "offer", row.OfferFingerprint)
-		if err := recordAssistanceAudit(ctx, q, nil, auditkind.AssistanceConsent, *row, "", details...); err != nil {
+		if detail, err := consentAssistance(ctx, q, *row, report.GetGrantedCapabilities(), now); err != nil {
 			return err
+		} else if detail != "" {
+			return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, detail, false)
 		}
+	}
+	if detail, err := applyUnattendedReport(ctx, q, *row, report.GetUnattended(), assistanceProjection(*row).GetGrantedCapabilities().GetPolicy(), now, revoked); err != nil {
+		return err
+	} else if detail != "" {
+		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, detail, false)
+	}
+	if row.State == assistanceEnded {
+		return nil
+	}
+	if detail, err := applyAssistanceRecordingReport(ctx, q, *row, report.GetRecording(), now); err != nil {
+		return err
+	} else if detail != "" {
+		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_RECORDING_FAILED, detail, false)
 	}
 	if phase != agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE {
 		return nil
@@ -268,7 +331,69 @@ func (s *Service) applyAssistanceReport(ctx context.Context, q *devicedb.Queries
 	if errors.Is(err, pgx.ErrNoRows) || errors.As(err, &domain) {
 		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "command_result_invalid", false)
 	}
+	if err != nil {
+		return err
+	}
+	err = s.applyAssistanceFileReport(ctx, q, *row, report.GetFileTransfer(), now)
+	if errors.Is(err, pgx.ErrNoRows) || errors.As(err, &domain) {
+		if auditErr := auditAssistanceFileDenied(ctx, q, row.OperatorID, row.ID.String(), report.GetFileTransfer().GetRequestId(), "file_report_invalid", nil); auditErr != nil {
+			return auditErr
+		}
+		return end(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_AUTHORIZATION_LOST, "file_report_invalid", false)
+	}
 	return err
+}
+
+// bindAssistanceLocalSession binds a requested session to the reported local
+// login and audits the prompt. An unattended connection reaches only the
+// opted-in account's own UID; a recycled name or changed account returns a
+// refusal detail instead.
+func bindAssistanceLocalSession(ctx context.Context, q *devicedb.Queries, row *devicedb.AssistanceSession, local *agentv1.AssistanceLocalSession, now time.Time) (string, error) {
+	params := devicedb.BindAssistanceLocalSessionParams{
+		ID: row.ID, PromptedAt: core.Timestamptz(now), LocalUsername: local.GetUsername(), LocalUid: int64(local.GetUid()),
+		LocalLogindSession: local.GetLogindSessionId(), LocalSessionType: local.GetSessionType(), LocalDesktop: local.GetDesktop(),
+	}
+	if row.UnattendedEnrollmentID != nil {
+		enrollment, err := q.LockAssistanceUnattendedEnrollment(ctx, *row.UnattendedEnrollmentID)
+		if err != nil {
+			return "", err
+		}
+		if enrollment.Uid != int64(local.GetUid()) || enrollment.Username != local.GetUsername() {
+			return "unattended_uid_changed", nil
+		}
+	}
+	if err := q.BindAssistanceLocalSession(ctx, params); err != nil {
+		return "", err
+	}
+	row.State, row.PromptedAt = assistancePrompted, params.PromptedAt
+	row.LocalUsername, row.LocalUid, row.LocalLogindSession, row.LocalSessionType, row.LocalDesktop = params.LocalUsername, params.LocalUid, params.LocalLogindSession, params.LocalSessionType, params.LocalDesktop
+	return "", recordAssistanceAudit(ctx, q, nil, auditkind.AssistancePrompt, *row, "", append(assistanceLocalAudit(*row), "desktop", row.LocalDesktop)...)
+}
+
+// consentAssistance audits the local consent and applies its recording and
+// reconnect decisions. A non-empty detail ends the session: required
+// recording that was not granted never continues unrecorded. The helper's
+// desktop qualification profile and portal interface versions are audited
+// with the grant they admitted.
+func consentAssistance(ctx context.Context, q *devicedb.Queries, row devicedb.AssistanceSession, granted *agentv1.AssistanceCapabilities, now time.Time) (string, error) {
+	grant := granted.GetPolicy()
+	details := append([]string{"operator", row.OperatorID.String(), "control_granted", boolText(row.ControlGranted), "result", "accepted"}, assistancePolicyAudit(decodeAssistancePolicy(row.EffectiveCapabilities))...)
+	details = append(details, assistanceLocalAudit(row)...)
+	details = append(details, "elevation_granted", assistancePolicyModeName(grant.GetElevation()), "annotation_granted", assistancePolicyModeName(grant.GetAnnotation()), "audio_granted", assistancePolicyModeName(grant.GetAudio()), "unattended_opt_in_offered", assistancePolicyModeName(grant.GetUnattended()))
+	details = append(details, "clipboard_granted", assistancePolicyModeName(grant.GetClipboard()), "keyboard_granted", assistancePolicyModeName(grant.GetKeyboard()), "display_granted", assistancePolicyModeName(grant.GetDisplay()), "messages_granted", assistancePolicyModeName(grant.GetMessages()), "files_granted", assistancePolicyModeName(grant.GetFiles()), "reconnect_granted", assistancePolicyModeName(grant.GetReconnect()), "recording_granted", assistancePolicyModeName(grant.GetRecording()), "desktop", row.LocalDesktop, "desktop_profile", granted.GetDesktopProfile(), "portal_versions", granted.GetPortalVersions(), "offer", row.OfferFingerprint)
+	if row.UnattendedGrantID != nil {
+		// No local click consented: the banner and the restored persistent
+		// grant start an unattended connection.
+		if err := recordUnattendedStart(ctx, q, row); err != nil {
+			return "", err
+		}
+	} else if err := recordAssistanceAudit(ctx, q, nil, auditkind.AssistanceConsent, row, "", details...); err != nil {
+		return "", err
+	}
+	if err := approveAssistanceReconnect(ctx, q, row, grant, now); err != nil {
+		return "", err
+	}
+	return startAssistanceRecording(ctx, q, row, grant, now)
 }
 
 func boolText(v bool) string {

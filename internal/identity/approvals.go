@@ -135,6 +135,13 @@ func bindApproval(message proto.Message) (approvalBinding, error) {
 		copy := proto.CloneOf(request)
 		copy.ApprovalId = ""
 		payload, err = b.bindDevice("local_admin.reveal", copy)
+	case *adminv1.AuthorizeUnattendedAssistanceRequest:
+		if request == nil {
+			return b, ErrApprovalInvalid
+		}
+		copy := proto.CloneOf(request)
+		copy.ApprovalId = ""
+		payload, err = b.bindDevice("assistance.unattended", copy)
 	default:
 		return b, ErrApprovalInvalid
 	}
@@ -197,6 +204,8 @@ func approvalPayload(request *adminv1.CreateApprovalRequest) proto.Message {
 		return request.GetRevealSecret()
 	case *adminv1.CreateApprovalRequest_RevealLocalAdminPassword:
 		return request.GetRevealLocalAdminPassword()
+	case *adminv1.CreateApprovalRequest_AuthorizeUnattendedAssistance:
+		return request.GetAuthorizeUnattendedAssistance()
 	default:
 		return nil
 	}
@@ -283,6 +292,9 @@ func (s *Service) CreateApproval(ctx context.Context, actor uuid.UUID, request *
 		if err := s.insertSystemAudit(ctx, q, &actor, auditkind.ApprovalCreated, row.ID.String(), binding.action); err != nil {
 			return err
 		}
+		if err := s.insertApprovalActionAudit(ctx, q, actor, binding.action, "request", row.ID, row.DeviceID); err != nil {
+			return err
+		}
 		projection, err = q.GetApprovalProjection(ctx, row.ID)
 		return s.dbErr(err)
 	})
@@ -332,7 +344,7 @@ func (s *Service) freshApprovalPair(ctx context.Context, row identitydb.Approval
 	if err != nil {
 		return nil, err
 	}
-	reviewer, err := s.AuthorizeFresh(ctx, approver, Permission(row.Permission))
+	reviewer, err := s.AuthorizeFresh(ctx, approver, approvalReviewerPermission(Permission(row.Permission)))
 	if err != nil {
 		return nil, err
 	}
@@ -438,7 +450,7 @@ func (s *Service) lockApprovalPair(ctx context.Context, tx pgx.Tx, pair *Approva
 	if err := scopeApproval(ctx, tx, pair.requester.Principal(), pair.binding, scope); err != nil {
 		return err
 	}
-	if err := scopeApproval(ctx, tx, pair.approver.Principal(), pair.binding, scope); err != nil {
+	if err := scopeApproval(ctx, tx, pair.approver.Principal(), pair.binding.reviewer(), scope); err != nil {
 		return err
 	}
 	return scope(ctx, tx, pair.approver.Principal(), PermissionManageApprovals, pair.binding.target)
@@ -547,6 +559,9 @@ func (s *Service) DecideApproval(ctx context.Context, actor, id uuid.UUID, appro
 			return s.dbErr(err)
 		}
 		if err := s.insertAudit(ctx, q, &actor, action, id.String(), reason); err != nil {
+			return err
+		}
+		if err := s.insertApprovalActionAudit(ctx, q, actor, current.Action, state, id, current.DeviceID); err != nil {
 			return err
 		}
 		projection, err = q.GetApprovalProjection(ctx, id)
@@ -686,6 +701,10 @@ func approvalMessage(projection *approvalProjection, now time.Time) (*adminv1.Ap
 		request := &adminv1.RevealLocalAdminPasswordRequest{}
 		payload = request
 		out.Payload = &adminv1.Approval_RevealLocalAdminPassword{RevealLocalAdminPassword: request}
+	case "assistance.unattended":
+		request := &adminv1.AuthorizeUnattendedAssistanceRequest{}
+		payload = request
+		out.Payload = &adminv1.Approval_AuthorizeUnattendedAssistance{AuthorizeUnattendedAssistance: request}
 	default:
 		return nil, ErrApprovalInvalid
 	}

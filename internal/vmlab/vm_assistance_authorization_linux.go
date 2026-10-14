@@ -19,6 +19,7 @@ import (
 )
 
 const assistanceNoClipboardRole = "assistance-no-clipboard"
+const assistanceNoFilesRole = "assistance-no-files"
 
 // assistanceActor is a whitelist from the real authenticated /auth/session
 // response. In particular it cannot serialize the response's CSRF token.
@@ -52,14 +53,24 @@ type assistanceAuthorityWitness struct {
 
 // Keep the administrative owner and the restricted session creator separate.
 // Enrollment is real, and a distinct Chromium cookie jar owns the whole session.
-func (r *assistanceRun) restrictedClipboardScenario(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private string, spec assistanceScenarioSpec) (err error) {
-	browser, err := openAssistanceOperator(ctx, fixture, options, private, "assistance-restricted", assistanceNoClipboardRole)
+func (r *assistanceRun) restrictedCapabilityScenario(ctx context.Context, fixture *devlab.AuthorityFixture, options VMAssistanceOptions, private string, spec assistanceScenarioSpec) (err error) {
+	role, account := assistanceNoClipboardRole, "assistance-restricted"
+	if spec.name == "files-permission" {
+		role, account = assistanceNoFilesRole, "assistance-file-restricted"
+	}
+	browser, err := openAssistanceOperator(ctx, fixture, options, private, account, role)
 	if err != nil {
 		return err
 	}
 	previous := r.browser
 	r.browser = browser
-	defer func() { r.browser = previous; err = errors.Join(err, browser.Close()) }()
+	defer func() {
+		r.browser = previous
+		err = errors.Join(err, browser.Close())
+		if options.PersistentDir != "" {
+			err = errors.Join(err, retireAssistanceOperator(ctx, fixture, browser.accountID))
+		}
+	}()
 	return r.scenario(ctx, spec)
 }
 

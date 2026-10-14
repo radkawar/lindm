@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: Apache-2.0
+
+syntax = "proto3";
+
+package lindm.agent.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "lindm/gen/lindm/agent/v1;agentv1";
+
+// AssistanceUnattendedPolicy bounds unattended access. A mode without these
+// explicit limits is off, never unbounded.
+message AssistanceUnattendedPolicy {
+  // Longest independently approved access period of one grant.
+  uint32 max_approval_seconds = 1 [(buf.validate.field).uint32 = {
+    gte: 300
+    lte: 2592000
+  }];
+  // Longest validity of one local opt-in before the employee must opt in again.
+  uint32 max_enrollment_days = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 90
+  }];
+  // Longest single unattended connection; never beyond the approved window.
+  uint32 max_session_seconds = 3 [(buf.validate.field).uint32 = {
+    gte: 60
+    lte: 1800
+  }];
+}
+
+// AssistanceUnattendedWindow is one weekly recurring access window of an ON
+// schedule, in the schedule's IANA time zone.
+message AssistanceUnattendedWindow {
+  // 0 is Sunday.
+  uint32 weekday = 1 [(buf.validate.field).uint32.lte = 6];
+  uint32 start_minute = 2 [(buf.validate.field).uint32.lte = 1439];
+  uint32 duration_minutes = 3 [(buf.validate.field).uint32 = {
+    gte: 15
+    lte: 720
+  }];
+}
+
+// AssistanceUnattendedSchedule is the bounded approved schedule of ON policy.
+message AssistanceUnattendedSchedule {
+  string time_zone = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+    pattern: "^[A-Za-z0-9_+./-]+$"
+  }];
+  repeated AssistanceUnattendedWindow windows = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 7
+  }];
+}
+
+// AssistanceUnattendedEnrollmentOffer lets an attended, locally consented
+// session ask the employee to opt in to later unattended access. Opting in is
+// a separate local action plus the desktop's own persistent portal grant.
+message AssistanceUnattendedEnrollmentOffer {
+  string enrollment_id = 1 [(buf.validate.field).string.uuid = true];
+  google.protobuf.Timestamp expires_at = 2 [(buf.validate.field).required = true];
+}
+
+// AssistanceUnattendedAuthority is present exactly on an unattended
+// connection. It names the independently approved grant and the local opt-in
+// it relies on; neither is consent for anything the device has not enrolled.
+message AssistanceUnattendedAuthority {
+  string grant_id = 1 [(buf.validate.field).string.uuid = true];
+  string enrollment_id = 2 [(buf.validate.field).string.uuid = true];
+  string approver_display = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  // The end of the approved window this connection runs in.
+  google.protobuf.Timestamp approved_until = 4 [(buf.validate.field).required = true];
+}
+
+enum AssistanceUnattendedEnrollmentState {
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATE_UNSPECIFIED = 0;
+  // The local user opted in and the desktop granted a persistent session.
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATE_ENROLLED = 1;
+  // The local user did not opt in, or the desktop withheld persistence.
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATE_DECLINED = 2;
+  // The local user turned unattended access off, or the device lost or
+  // could not restore the persistent grant.
+  ASSISTANCE_UNATTENDED_ENROLLMENT_STATE_REVOKED = 3;
+}
+
+// AssistanceUnattendedReport is the device's opt-in observation. It never
+// carries the portal restore token.
+message AssistanceUnattendedReport {
+  string enrollment_id = 1 [(buf.validate.field).string.uuid = true];
+  AssistanceUnattendedEnrollmentState state = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 3 [(buf.validate.field).string = {
+    max_len: 64
+    pattern: "^[a-z0-9_]*$"
+  }];
+}

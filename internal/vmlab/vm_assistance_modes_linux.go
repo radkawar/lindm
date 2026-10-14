@@ -22,12 +22,17 @@ const (
 
 func assistanceQualificationRoles() []*authv1.RoleDefinition {
 	return []*authv1.RoleDefinition{
-		{Name: assistanceNoClipboardRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.keyboard"}},
+		{Name: assistanceNoClipboardRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.keyboard", "remote_assistance.display", "remote_assistance.message", "remote_assistance.files"}},
+		{Name: assistanceNoFilesRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.keyboard", "remote_assistance.display", "remote_assistance.message", "remote_assistance.clipboard"}},
 		// Keep keyboard unchanged when control is revoked, so another capability's
 		// withdrawal cannot masquerade as proof of the control-permission fence.
 		{Name: assistanceViewRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.keyboard"}},
 		{Name: assistanceControlRole, Permissions: []string{"fleet.read", "remote_assistance.control"}},
 		{Name: assistanceViewControlRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.keyboard"}},
+		// Archive authority never implies live assistance, and recording a
+		// session never implies retrieving it.
+		{Name: assistanceArchiveRole, Permissions: []string{"fleet.read", "remote_assistance.recordings.read"}},
+		{Name: assistanceNoRecordingsRole, Permissions: []string{"fleet.read", "remote_assistance.view", "remote_assistance.control", "remote_assistance.record"}},
 	}
 }
 
@@ -68,7 +73,13 @@ func (r *assistanceRun) modeAuthorityScenario(ctx context.Context, fixture *devl
 	}
 	previous := r.browser
 	r.browser = browser
-	defer func() { r.browser = previous; err = errors.Join(err, browser.Close()) }()
+	defer func() {
+		r.browser = previous
+		err = errors.Join(err, browser.Close())
+		if options.PersistentDir != "" {
+			err = errors.Join(err, retireAssistanceOperator(ctx, fixture, browser.accountID))
+		}
+	}()
 	var controlDenial *assistanceModeDenial
 	if spec.name == "authority-view" {
 		controlDenial = &assistanceModeDenial{}
@@ -92,7 +103,12 @@ func (r *assistanceRun) controlOnlyDenial(ctx context.Context, fixture *devlab.A
 	if err != nil {
 		return nil, err
 	}
-	defer func() { err = errors.Join(err, browser.Close()) }()
+	defer func() {
+		err = errors.Join(err, browser.Close())
+		if options.PersistentDir != "" {
+			err = errors.Join(err, retireAssistanceOperator(ctx, fixture, browser.accountID))
+		}
+	}()
 	denial := &assistanceModeDenial{}
 	if err := browser.call(ctx, "refuseMode", map[string]any{"deviceId": r.deviceID, "mode": "view"}, denial, time.Minute); err != nil {
 		return nil, err

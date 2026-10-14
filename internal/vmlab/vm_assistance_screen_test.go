@@ -108,6 +108,50 @@ func TestLocateNotificationBannerIgnoresSmallChanges(t *testing.T) {
 	}
 }
 
+// Over the fullscreen witness (red field, white heading, no top bar) the
+// banner is bounded by its own neutral pixels, not by an operator mark drawn
+// across it or the pointer beside it (layers-fedora44-tier3-12).
+func TestLocateBannerOverFixtureIgnoresMarksAndPointer(t *testing.T) {
+	for _, theme := range []struct {
+		name   string
+		banner color.RGBA
+		bounds image.Rectangle
+	}{
+		{"ubuntu", color.RGBA{250, 250, 250, 0xff}, image.Rect(423, 4, 923, 196)},
+		{"fedora", color.RGBA{84, 84, 90, 0xff}, image.Rect(383, 4, 896, 202)},
+	} {
+		t.Run(theme.name, func(t *testing.T) {
+			witness := image.NewRGBA(image.Rect(0, 0, 1280, 800))
+			fill(witness, witness.Bounds(), color.RGBA{204, 12, 12, 0xff})
+			for x := 60; x < 600; x += 24 { // heading glyphs under the banner
+				fill(witness, image.Rect(x, 90, x+14, 125), color.RGBA{255, 255, 255, 0xff})
+			}
+			reference := clone(witness)
+			fill(reference, image.Rect(theme.bounds.Min.X, theme.bounds.Min.Y, theme.bounds.Max.X, theme.bounds.Min.Y+120), theme.banner)
+			if _, found := locateBannerOverFixture(reference, clone(reference)); found {
+				t.Fatal("the notice already up at witness start was located")
+			}
+			current := clone(witness)
+			fill(current, theme.bounds, theme.banner)
+			for y := 60; y < 150; y += 20 { // text lines
+				fill(current, image.Rect(theme.bounds.Min.X+13, y, theme.bounds.Max.X-40, y+12), color.RGBA{255 - theme.banner.R, 255 - theme.banner.G, 255 - theme.banner.B, 0xff})
+			}
+			for i := range 160 { // a red mark from the banner's middle out
+				x, y := (theme.bounds.Min.X+theme.bounds.Max.X)/2+2*i, 100+i
+				fill(current, image.Rect(x, y, x+4, y+4), color.RGBA{230, 60, 50, 0xff})
+			}
+			fill(current, image.Rect(468, 240, 480, 258), color.RGBA{0, 0, 0, 0xff}) // pointer
+			banner, found := locateBannerOverFixture(reference, current)
+			if !found || banner != theme.bounds {
+				t.Fatalf("banner = %v %t, want %v", banner, found, theme.bounds)
+			}
+			if _, found := locateBannerOverFixture(reference, clone(witness)); found {
+				t.Fatal("the bare witness reported a banner")
+			}
+		})
+	}
+}
+
 // debian12-arm64-dgx21-assistance-10: GNOME 43's action-less "Remote assistance
 // ended" banner is 499x77, so it was not a banner, waitNoBanner never nudged it
 // away on the idle seat, and the next consent prompt stayed queued behind it.
@@ -210,6 +254,30 @@ func TestLocatePortalDialog(t *testing.T) {
 				t.Fatal("accent switch reported off")
 			}
 		})
+	}
+}
+
+// GNOME pales a disabled Share button; the observed colours decide whether a
+// monitor must still be chosen (layers-fedora44-tier3-25).
+func TestPortalShareEnabledFollowsAccent(t *testing.T) {
+	dialog := image.Rect(310, 166, 970, 666)
+	for _, c := range []struct {
+		name    string
+		button  color.RGBA
+		enabled bool
+	}{
+		{"fedora disabled", color.RGBA{183, 210, 243, 0xff}, false},
+		{"ubuntu disabled", color.RGBA{241, 167, 141, 0xff}, false},
+		{"fedora enabled", color.RGBA{53, 132, 228, 0xff}, true},
+		{"ubuntu enabled", color.RGBA{233, 84, 32, 0xff}, true},
+	} {
+		img := image.NewRGBA(image.Rect(0, 0, 1280, 800))
+		fill(img, dialog, color.RGBA{250, 250, 250, 0xff})
+		point := portalShareButton(dialog)
+		fill(img, image.Rect(point.X-35, point.Y-16, point.X+35, point.Y+16), c.button)
+		if got := portalShareEnabled(img, dialog); got != c.enabled {
+			t.Errorf("%s: enabled = %t", c.name, got)
+		}
 	}
 }
 

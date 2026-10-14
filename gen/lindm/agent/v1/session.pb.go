@@ -27,21 +27,27 @@ const (
 // SessionAssistanceReport is a helper observation. Local identity fields are
 // absent by design; the executor adds them from kernel and logind facts.
 type SessionAssistanceReport struct {
-	state                 protoimpl.MessageState   `protogen:"open.v1"`
-	SessionId             string                   `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Phase                 AssistancePhase          `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
-	OfferSdp              string                   `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
-	ControlGranted        bool                     `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
-	EndCause              AssistanceEndCause       `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
-	EndDetail             string                   `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
-	GrantedCapabilities   *AssistanceCapabilities  `protobuf:"bytes,7,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
-	Displays              []*AssistanceDisplay     `protobuf:"bytes,8,rep,name=displays,proto3" json:"displays,omitempty"`
-	SelectedDisplayId     string                   `protobuf:"bytes,9,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
-	CommandResult         *AssistanceCommandResult `protobuf:"bytes,10,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
-	DisplayGeneration     uint32                   `protobuf:"varint,11,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
-	RequestedCapabilities *AssistancePolicy        `protobuf:"bytes,12,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
-	EffectiveCapabilities *AssistancePolicy        `protobuf:"bytes,13,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
-	DisplayFrame          *AssistanceDisplayFrame  `protobuf:"bytes,14,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	state                 protoimpl.MessageState      `protogen:"open.v1"`
+	SessionId             string                      `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Phase                 AssistancePhase             `protobuf:"varint,2,opt,name=phase,proto3,enum=lindm.agent.v1.AssistancePhase" json:"phase,omitempty"`
+	OfferSdp              string                      `protobuf:"bytes,3,opt,name=offer_sdp,json=offerSdp,proto3" json:"offer_sdp,omitempty"`
+	ControlGranted        bool                        `protobuf:"varint,4,opt,name=control_granted,json=controlGranted,proto3" json:"control_granted,omitempty"`
+	EndCause              AssistanceEndCause          `protobuf:"varint,5,opt,name=end_cause,json=endCause,proto3,enum=lindm.agent.v1.AssistanceEndCause" json:"end_cause,omitempty"`
+	EndDetail             string                      `protobuf:"bytes,6,opt,name=end_detail,json=endDetail,proto3" json:"end_detail,omitempty"`
+	GrantedCapabilities   *AssistanceCapabilities     `protobuf:"bytes,7,opt,name=granted_capabilities,json=grantedCapabilities,proto3" json:"granted_capabilities,omitempty"`
+	Displays              []*AssistanceDisplay        `protobuf:"bytes,8,rep,name=displays,proto3" json:"displays,omitempty"`
+	SelectedDisplayId     string                      `protobuf:"bytes,9,opt,name=selected_display_id,json=selectedDisplayId,proto3" json:"selected_display_id,omitempty"`
+	CommandResult         *AssistanceCommandResult    `protobuf:"bytes,10,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`
+	DisplayGeneration     uint32                      `protobuf:"varint,11,opt,name=display_generation,json=displayGeneration,proto3" json:"display_generation,omitempty"`
+	RequestedCapabilities *AssistancePolicy           `protobuf:"bytes,12,opt,name=requested_capabilities,json=requestedCapabilities,proto3" json:"requested_capabilities,omitempty"`
+	EffectiveCapabilities *AssistancePolicy           `protobuf:"bytes,13,opt,name=effective_capabilities,json=effectiveCapabilities,proto3" json:"effective_capabilities,omitempty"`
+	DisplayFrame          *AssistanceDisplayFrame     `protobuf:"bytes,14,opt,name=display_frame,json=displayFrame,proto3" json:"display_frame,omitempty"`
+	FileTransfer          *AssistanceFileReport       `protobuf:"bytes,15,opt,name=file_transfer,json=fileTransfer,proto3" json:"file_transfer,omitempty"`
+	InputState            *AssistanceInputState       `protobuf:"bytes,16,opt,name=input_state,json=inputState,proto3" json:"input_state,omitempty"`
+	Recording             *AssistanceRecordingReport  `protobuf:"bytes,17,opt,name=recording,proto3" json:"recording,omitempty"`
+	Audio                 *AssistanceAudioReport      `protobuf:"bytes,18,opt,name=audio,proto3" json:"audio,omitempty"`
+	Annotation            *AssistanceAnnotationReport `protobuf:"bytes,19,opt,name=annotation,proto3" json:"annotation,omitempty"`
+	Unattended            *AssistanceUnattendedReport `protobuf:"bytes,20,opt,name=unattended,proto3" json:"unattended,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -174,6 +180,48 @@ func (x *SessionAssistanceReport) GetDisplayFrame() *AssistanceDisplayFrame {
 	return nil
 }
 
+func (x *SessionAssistanceReport) GetFileTransfer() *AssistanceFileReport {
+	if x != nil {
+		return x.FileTransfer
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetInputState() *AssistanceInputState {
+	if x != nil {
+		return x.InputState
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetRecording() *AssistanceRecordingReport {
+	if x != nil {
+		return x.Recording
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetAudio() *AssistanceAudioReport {
+	if x != nil {
+		return x.Audio
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetAnnotation() *AssistanceAnnotationReport {
+	if x != nil {
+		return x.Annotation
+	}
+	return nil
+}
+
+func (x *SessionAssistanceReport) GetUnattended() *AssistanceUnattendedReport {
+	if x != nil {
+		return x.Unattended
+	}
+	return nil
+}
+
 type SyncSessionRequest struct {
 	state          protoimpl.MessageState         `protogen:"open.v1"`
 	Reports        []*SessionAssistanceReport     `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
@@ -293,7 +341,7 @@ var File_lindm_agent_v1_session_proto protoreflect.FileDescriptor
 
 const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a\x1elindm/agent/v1/os_update.proto\"\xd8\x0e\n" +
+	"\x1clindm/agent/v1/session.proto\x12\x0elindm.agent.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a%lindm/agent/v1/assistance_files.proto\x1a(lindm/agent/v1/assistance_guidance.proto\x1a)lindm/agent/v1/assistance_recording.proto\x1a*lindm/agent/v1/assistance_unattended.proto\x1a\x1elindm/agent/v1/os_update.proto\"\x88\x12\n" +
 	"\x17SessionAssistanceReport\x12'\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\tsessionId\x12G\n" +
@@ -312,7 +360,18 @@ const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"\x12display_generation\x18\v \x01(\rR\x11displayGeneration\x12W\n" +
 	"\x16requested_capabilities\x18\f \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15requestedCapabilities\x12W\n" +
 	"\x16effective_capabilities\x18\r \x01(\v2 .lindm.agent.v1.AssistancePolicyR\x15effectiveCapabilities\x12K\n" +
-	"\rdisplay_frame\x18\x0e \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame:\xa0\a\xbaH\x9c\a\x1a\xc9\x01\n" +
+	"\rdisplay_frame\x18\x0e \x01(\v2&.lindm.agent.v1.AssistanceDisplayFrameR\fdisplayFrame\x12I\n" +
+	"\rfile_transfer\x18\x0f \x01(\v2$.lindm.agent.v1.AssistanceFileReportR\ffileTransfer\x12E\n" +
+	"\vinput_state\x18\x10 \x01(\v2$.lindm.agent.v1.AssistanceInputStateR\n" +
+	"inputState\x12G\n" +
+	"\trecording\x18\x11 \x01(\v2).lindm.agent.v1.AssistanceRecordingReportR\trecording\x12;\n" +
+	"\x05audio\x18\x12 \x01(\v2%.lindm.agent.v1.AssistanceAudioReportR\x05audio\x12J\n" +
+	"\n" +
+	"annotation\x18\x13 \x01(\v2*.lindm.agent.v1.AssistanceAnnotationReportR\n" +
+	"annotation\x12J\n" +
+	"\n" +
+	"unattended\x18\x14 \x01(\v2*.lindm.agent.v1.AssistanceUnattendedReportR\n" +
+	"unattended:\xa0\a\xbaH\x9c\a\x1a\xc9\x01\n" +
 	"\x1fsession_assistance_report.offer\x127offer_sdp is required from OFFERED and absent before it\x1am(this.phase == 3 || this.phase == 4) ? this.offer_sdp != '' : (this.phase != 5 ? this.offer_sdp == '' : true)\x1au\n" +
 	"\x1dsession_assistance_report.end\x12(end_cause is required exactly when ENDED\x1a*(this.phase == 5) == (this.end_cause != 0)\x1a\xe8\x01\n" +
 	"(session_assistance_report.command_result\x12Ecommand reports are terminal and ended sessions cannot retain content\x1au!has(this.command_result) || (this.command_result.status != 1 && (this.phase != 5 || this.command_result.text == ''))\x1a\xeb\x02\n" +
@@ -326,9 +385,10 @@ const file_lindm_agent_v1_session_proto_rawDesc = "" +
 	"directives\x18\x01 \x03(\v2#.lindm.agent.v1.AssistanceDirectiveB\b\xbaH\x05\x92\x01\x02\x10\x04R\n" +
 	"directives\x12S\n" +
 	"\rlocal_session\x18\x02 \x01(\v2&.lindm.agent.v1.AssistanceLocalSessionB\x06\xbaH\x03\xc8\x01\x01R\flocalSession\x12<\n" +
-	"\x06reboot\x18\x03 \x01(\v2$.lindm.agent.v1.OSUpdateRebootNoticeR\x06reboot2h\n" +
+	"\x06reboot\x18\x03 \x01(\v2$.lindm.agent.v1.OSUpdateRebootNoticeR\x06reboot2\xe1\x01\n" +
 	"\x0eSessionService\x12V\n" +
-	"\vSyncSession\x12\".lindm.agent.v1.SyncSessionRequest\x1a#.lindm.agent.v1.SyncSessionResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
+	"\vSyncSession\x12\".lindm.agent.v1.SyncSessionRequest\x1a#.lindm.agent.v1.SyncSessionResponse\x12w\n" +
+	"\x16PutAssistanceRecording\x12-.lindm.agent.v1.PutAssistanceRecordingRequest\x1a..lindm.agent.v1.PutAssistanceRecordingResponseB\"Z lindm/gen/lindm/agent/v1;agentv1b\x06proto3"
 
 var (
 	file_lindm_agent_v1_session_proto_rawDescOnce sync.Once
@@ -344,20 +404,28 @@ func file_lindm_agent_v1_session_proto_rawDescGZIP() []byte {
 
 var file_lindm_agent_v1_session_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lindm_agent_v1_session_proto_goTypes = []any{
-	(*SessionAssistanceReport)(nil),       // 0: lindm.agent.v1.SessionAssistanceReport
-	(*SyncSessionRequest)(nil),            // 1: lindm.agent.v1.SyncSessionRequest
-	(*SyncSessionResponse)(nil),           // 2: lindm.agent.v1.SyncSessionResponse
-	(AssistancePhase)(0),                  // 3: lindm.agent.v1.AssistancePhase
-	(AssistanceEndCause)(0),               // 4: lindm.agent.v1.AssistanceEndCause
-	(*AssistanceCapabilities)(nil),        // 5: lindm.agent.v1.AssistanceCapabilities
-	(*AssistanceDisplay)(nil),             // 6: lindm.agent.v1.AssistanceDisplay
-	(*AssistanceCommandResult)(nil),       // 7: lindm.agent.v1.AssistanceCommandResult
-	(*AssistancePolicy)(nil),              // 8: lindm.agent.v1.AssistancePolicy
-	(*AssistanceDisplayFrame)(nil),        // 9: lindm.agent.v1.AssistanceDisplayFrame
-	(*OSUpdateRebootDeferralRequest)(nil), // 10: lindm.agent.v1.OSUpdateRebootDeferralRequest
-	(*AssistanceDirective)(nil),           // 11: lindm.agent.v1.AssistanceDirective
-	(*AssistanceLocalSession)(nil),        // 12: lindm.agent.v1.AssistanceLocalSession
-	(*OSUpdateRebootNotice)(nil),          // 13: lindm.agent.v1.OSUpdateRebootNotice
+	(*SessionAssistanceReport)(nil),        // 0: lindm.agent.v1.SessionAssistanceReport
+	(*SyncSessionRequest)(nil),             // 1: lindm.agent.v1.SyncSessionRequest
+	(*SyncSessionResponse)(nil),            // 2: lindm.agent.v1.SyncSessionResponse
+	(AssistancePhase)(0),                   // 3: lindm.agent.v1.AssistancePhase
+	(AssistanceEndCause)(0),                // 4: lindm.agent.v1.AssistanceEndCause
+	(*AssistanceCapabilities)(nil),         // 5: lindm.agent.v1.AssistanceCapabilities
+	(*AssistanceDisplay)(nil),              // 6: lindm.agent.v1.AssistanceDisplay
+	(*AssistanceCommandResult)(nil),        // 7: lindm.agent.v1.AssistanceCommandResult
+	(*AssistancePolicy)(nil),               // 8: lindm.agent.v1.AssistancePolicy
+	(*AssistanceDisplayFrame)(nil),         // 9: lindm.agent.v1.AssistanceDisplayFrame
+	(*AssistanceFileReport)(nil),           // 10: lindm.agent.v1.AssistanceFileReport
+	(*AssistanceInputState)(nil),           // 11: lindm.agent.v1.AssistanceInputState
+	(*AssistanceRecordingReport)(nil),      // 12: lindm.agent.v1.AssistanceRecordingReport
+	(*AssistanceAudioReport)(nil),          // 13: lindm.agent.v1.AssistanceAudioReport
+	(*AssistanceAnnotationReport)(nil),     // 14: lindm.agent.v1.AssistanceAnnotationReport
+	(*AssistanceUnattendedReport)(nil),     // 15: lindm.agent.v1.AssistanceUnattendedReport
+	(*OSUpdateRebootDeferralRequest)(nil),  // 16: lindm.agent.v1.OSUpdateRebootDeferralRequest
+	(*AssistanceDirective)(nil),            // 17: lindm.agent.v1.AssistanceDirective
+	(*AssistanceLocalSession)(nil),         // 18: lindm.agent.v1.AssistanceLocalSession
+	(*OSUpdateRebootNotice)(nil),           // 19: lindm.agent.v1.OSUpdateRebootNotice
+	(*PutAssistanceRecordingRequest)(nil),  // 20: lindm.agent.v1.PutAssistanceRecordingRequest
+	(*PutAssistanceRecordingResponse)(nil), // 21: lindm.agent.v1.PutAssistanceRecordingResponse
 }
 var file_lindm_agent_v1_session_proto_depIdxs = []int32{
 	3,  // 0: lindm.agent.v1.SessionAssistanceReport.phase:type_name -> lindm.agent.v1.AssistancePhase
@@ -368,18 +436,26 @@ var file_lindm_agent_v1_session_proto_depIdxs = []int32{
 	8,  // 5: lindm.agent.v1.SessionAssistanceReport.requested_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
 	8,  // 6: lindm.agent.v1.SessionAssistanceReport.effective_capabilities:type_name -> lindm.agent.v1.AssistancePolicy
 	9,  // 7: lindm.agent.v1.SessionAssistanceReport.display_frame:type_name -> lindm.agent.v1.AssistanceDisplayFrame
-	0,  // 8: lindm.agent.v1.SyncSessionRequest.reports:type_name -> lindm.agent.v1.SessionAssistanceReport
-	10, // 9: lindm.agent.v1.SyncSessionRequest.reboot_deferral:type_name -> lindm.agent.v1.OSUpdateRebootDeferralRequest
-	11, // 10: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
-	12, // 11: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
-	13, // 12: lindm.agent.v1.SyncSessionResponse.reboot:type_name -> lindm.agent.v1.OSUpdateRebootNotice
-	1,  // 13: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
-	2,  // 14: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
-	14, // [14:15] is the sub-list for method output_type
-	13, // [13:14] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	10, // 8: lindm.agent.v1.SessionAssistanceReport.file_transfer:type_name -> lindm.agent.v1.AssistanceFileReport
+	11, // 9: lindm.agent.v1.SessionAssistanceReport.input_state:type_name -> lindm.agent.v1.AssistanceInputState
+	12, // 10: lindm.agent.v1.SessionAssistanceReport.recording:type_name -> lindm.agent.v1.AssistanceRecordingReport
+	13, // 11: lindm.agent.v1.SessionAssistanceReport.audio:type_name -> lindm.agent.v1.AssistanceAudioReport
+	14, // 12: lindm.agent.v1.SessionAssistanceReport.annotation:type_name -> lindm.agent.v1.AssistanceAnnotationReport
+	15, // 13: lindm.agent.v1.SessionAssistanceReport.unattended:type_name -> lindm.agent.v1.AssistanceUnattendedReport
+	0,  // 14: lindm.agent.v1.SyncSessionRequest.reports:type_name -> lindm.agent.v1.SessionAssistanceReport
+	16, // 15: lindm.agent.v1.SyncSessionRequest.reboot_deferral:type_name -> lindm.agent.v1.OSUpdateRebootDeferralRequest
+	17, // 16: lindm.agent.v1.SyncSessionResponse.directives:type_name -> lindm.agent.v1.AssistanceDirective
+	18, // 17: lindm.agent.v1.SyncSessionResponse.local_session:type_name -> lindm.agent.v1.AssistanceLocalSession
+	19, // 18: lindm.agent.v1.SyncSessionResponse.reboot:type_name -> lindm.agent.v1.OSUpdateRebootNotice
+	1,  // 19: lindm.agent.v1.SessionService.SyncSession:input_type -> lindm.agent.v1.SyncSessionRequest
+	20, // 20: lindm.agent.v1.SessionService.PutAssistanceRecording:input_type -> lindm.agent.v1.PutAssistanceRecordingRequest
+	2,  // 21: lindm.agent.v1.SessionService.SyncSession:output_type -> lindm.agent.v1.SyncSessionResponse
+	21, // 22: lindm.agent.v1.SessionService.PutAssistanceRecording:output_type -> lindm.agent.v1.PutAssistanceRecordingResponse
+	21, // [21:23] is the sub-list for method output_type
+	19, // [19:21] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_lindm_agent_v1_session_proto_init() }
@@ -388,6 +464,10 @@ func file_lindm_agent_v1_session_proto_init() {
 		return
 	}
 	file_lindm_agent_v1_assistance_proto_init()
+	file_lindm_agent_v1_assistance_files_proto_init()
+	file_lindm_agent_v1_assistance_guidance_proto_init()
+	file_lindm_agent_v1_assistance_recording_proto_init()
+	file_lindm_agent_v1_assistance_unattended_proto_init()
 	file_lindm_agent_v1_os_update_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{

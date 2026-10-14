@@ -107,6 +107,7 @@ func TestAuthorizeDeniesWrongUIDAndRootMethods(t *testing.T) {
 		agentv1connect.ExecutorServicePrepareEncryptionKeyProcedure,
 		agentv1connect.ExecutorServiceAcknowledgeEncryptionKeyProcedure,
 		agentv1connect.ExecutorServiceSyncAssistanceProcedure,
+		agentv1connect.ExecutorServiceExchangeAssistanceRecordingProcedure,
 	} {
 		for _, uid := range []uint32{0, 40} {
 			if err := authorize(procedure, uid, 40); err != nil {

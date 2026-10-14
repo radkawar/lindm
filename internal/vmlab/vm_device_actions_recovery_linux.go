@@ -194,6 +194,14 @@ func nativeRecoveryDestruction(ctx context.Context, target *EncryptedVM, manifes
 const nativeActionPresenceTimeout = 3 * time.Minute
 
 func waitNativeActionPresence(ctx context.Context, owner *devlab.OwnerSession, deviceID string) error {
+	return waitNativeDevicePresence(ctx, owner, deviceID, true)
+}
+
+// waitNativeDevicePresence waits for fresh presence and, with inventory, a
+// recent host inventory. A RefreshInventory action is what publishes the
+// inventory, so its dispatch needs presence only: a long lane's last refresh
+// was 8 min old after a reboot (layers-ubuntu24-tier1-41).
+func waitNativeDevicePresence(ctx context.Context, owner *devlab.OwnerSession, deviceID string, inventory bool) error {
 	ctx, cancel := context.WithTimeout(ctx, nativeActionPresenceTimeout)
 	defer cancel()
 	ticker := time.NewTicker(time.Second)
@@ -213,7 +221,8 @@ func waitNativeActionPresence(ctx context.Context, owner *devlab.OwnerSession, d
 		now := time.Now()
 		seen = response.Msg.GetDevice().GetLastSeenAt()
 		host = response.Msg.GetHost().GetReceivedAt()
-		if seen != nil && host != nil && now.Sub(seen.AsTime()) < 30*time.Second && now.Sub(host.AsTime()) < 4*time.Minute {
+		fresh := !inventory || host != nil && now.Sub(host.AsTime()) < 4*time.Minute
+		if seen != nil && now.Sub(seen.AsTime()) < 30*time.Second && fresh {
 			return nil
 		}
 		select {

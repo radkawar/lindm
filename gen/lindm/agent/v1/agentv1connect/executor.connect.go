@@ -142,6 +142,9 @@ const (
 	// ExecutorServiceSyncAssistanceProcedure is the fully-qualified name of the ExecutorService's
 	// SyncAssistance RPC.
 	ExecutorServiceSyncAssistanceProcedure = "/lindm.agent.v1.ExecutorService/SyncAssistance"
+	// ExecutorServiceExchangeAssistanceRecordingProcedure is the fully-qualified name of the
+	// ExecutorService's ExchangeAssistanceRecording RPC.
+	ExecutorServiceExchangeAssistanceRecordingProcedure = "/lindm.agent.v1.ExecutorService/ExchangeAssistanceRecording"
 )
 
 // ExecutorServiceClient is a client for the lindm.agent.v1.ExecutorService service.
@@ -239,6 +242,9 @@ type ExecutorServiceClient interface {
 	// returns the device-observed state. Local identities come from logind and
 	// kernel peer credentials, not from a session helper.
 	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
+	// ExchangeAssistanceRecording acknowledges server outcomes and returns the
+	// next sealed recording segments. It carries ciphertext only.
+	ExchangeAssistanceRecording(context.Context, *connect.Request[v1.ExchangeAssistanceRecordingRequest]) (*connect.Response[v1.ExchangeAssistanceRecordingResponse], error)
 }
 
 // NewExecutorServiceClient constructs a client for the lindm.agent.v1.ExecutorService service. By
@@ -468,6 +474,12 @@ func NewExecutorServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(executorServiceMethods.ByName("SyncAssistance")),
 			connect.WithClientOptions(opts...),
 		),
+		exchangeAssistanceRecording: connect.NewClient[v1.ExchangeAssistanceRecordingRequest, v1.ExchangeAssistanceRecordingResponse](
+			httpClient,
+			baseURL+ExecutorServiceExchangeAssistanceRecordingProcedure,
+			connect.WithSchema(executorServiceMethods.ByName("ExchangeAssistanceRecording")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -509,6 +521,7 @@ type executorServiceClient struct {
 	getAgentUpdate               *connect.Client[v1.GetAgentUpdateRequest, v1.GetAgentUpdateResponse]
 	status                       *connect.Client[v1.StatusRequest, v1.StatusResponse]
 	syncAssistance               *connect.Client[v1.SyncAssistanceRequest, v1.SyncAssistanceResponse]
+	exchangeAssistanceRecording  *connect.Client[v1.ExchangeAssistanceRecordingRequest, v1.ExchangeAssistanceRecordingResponse]
 }
 
 // PrepareBootstrap calls lindm.agent.v1.ExecutorService.PrepareBootstrap.
@@ -691,6 +704,11 @@ func (c *executorServiceClient) SyncAssistance(ctx context.Context, req *connect
 	return c.syncAssistance.CallUnary(ctx, req)
 }
 
+// ExchangeAssistanceRecording calls lindm.agent.v1.ExecutorService.ExchangeAssistanceRecording.
+func (c *executorServiceClient) ExchangeAssistanceRecording(ctx context.Context, req *connect.Request[v1.ExchangeAssistanceRecordingRequest]) (*connect.Response[v1.ExchangeAssistanceRecordingResponse], error) {
+	return c.exchangeAssistanceRecording.CallUnary(ctx, req)
+}
+
 // ExecutorServiceHandler is an implementation of the lindm.agent.v1.ExecutorService service.
 type ExecutorServiceHandler interface {
 	// PrepareBootstrap validates supplied trust, or returns the existing pending
@@ -786,6 +804,9 @@ type ExecutorServiceHandler interface {
 	// returns the device-observed state. Local identities come from logind and
 	// kernel peer credentials, not from a session helper.
 	SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error)
+	// ExchangeAssistanceRecording acknowledges server outcomes and returns the
+	// next sealed recording segments. It carries ciphertext only.
+	ExchangeAssistanceRecording(context.Context, *connect.Request[v1.ExchangeAssistanceRecordingRequest]) (*connect.Response[v1.ExchangeAssistanceRecordingResponse], error)
 }
 
 // NewExecutorServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -1011,6 +1032,12 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 		connect.WithSchema(executorServiceMethods.ByName("SyncAssistance")),
 		connect.WithHandlerOptions(opts...),
 	)
+	executorServiceExchangeAssistanceRecordingHandler := connect.NewUnaryHandler(
+		ExecutorServiceExchangeAssistanceRecordingProcedure,
+		svc.ExchangeAssistanceRecording,
+		connect.WithSchema(executorServiceMethods.ByName("ExchangeAssistanceRecording")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/lindm.agent.v1.ExecutorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ExecutorServicePrepareBootstrapProcedure:
@@ -1085,6 +1112,8 @@ func NewExecutorServiceHandler(svc ExecutorServiceHandler, opts ...connect.Handl
 			executorServiceStatusHandler.ServeHTTP(w, r)
 		case ExecutorServiceSyncAssistanceProcedure:
 			executorServiceSyncAssistanceHandler.ServeHTTP(w, r)
+		case ExecutorServiceExchangeAssistanceRecordingProcedure:
+			executorServiceExchangeAssistanceRecordingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1236,4 +1265,8 @@ func (UnimplementedExecutorServiceHandler) Status(context.Context, *connect.Requ
 
 func (UnimplementedExecutorServiceHandler) SyncAssistance(context.Context, *connect.Request[v1.SyncAssistanceRequest]) (*connect.Response[v1.SyncAssistanceResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.SyncAssistance is not implemented"))
+}
+
+func (UnimplementedExecutorServiceHandler) ExchangeAssistanceRecording(context.Context, *connect.Request[v1.ExchangeAssistanceRecordingRequest]) (*connect.Response[v1.ExchangeAssistanceRecordingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("lindm.agent.v1.ExecutorService.ExchangeAssistanceRecording is not implemented"))
 }

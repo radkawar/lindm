@@ -135,17 +135,33 @@ func adminAuthorizationCases() map[string]adminAuthorizationCase {
 		"RevealLocalAdminPassword":          {identity.PermissionRevealSecrets, admins, false},
 		// Join/Answer additionally require the creating operator; scoped grants
 		// are exercised by the assistance integration tests.
-		"CreateAssistanceSession": {identity.PermissionViewRemoteAssistance, admins, false},
-		"ListAssistanceSessions":  {identity.PermissionReadFleet, readers, false},
-		"GetAssistanceSession":    {identity.PermissionReadFleet, readers, false},
-		"JoinAssistanceSession":   {identity.PermissionViewRemoteAssistance, admins, false},
-		"AnswerAssistanceSession": {identity.PermissionViewRemoteAssistance, admins, false},
-		"StopAssistanceSession":   {identity.PermissionViewRemoteAssistance, admins, false},
-		"GetAssistanceReadiness":  {identity.PermissionViewRemoteAssistance, admins, false},
-		"GetAssistancePolicy":     {identity.PermissionReadFleet, readers, false},
-		"UpdateAssistancePolicy":  {identity.PermissionManageAssistancePolicy, admins, false},
-		"RunAssistanceCommand":    {identity.PermissionViewRemoteAssistance, admins, false},
-		"GetAssistanceCommand":    {identity.PermissionViewRemoteAssistance, admins, false},
+		"CreateAssistanceSession":      {identity.PermissionViewRemoteAssistance, admins, false},
+		"ListAssistanceSessions":       {identity.PermissionReadFleet, readers, false},
+		"GetAssistanceSession":         {identity.PermissionReadFleet, readers, false},
+		"JoinAssistanceSession":        {identity.PermissionViewRemoteAssistance, admins, false},
+		"AnswerAssistanceSession":      {identity.PermissionViewRemoteAssistance, admins, false},
+		"StopAssistanceSession":        {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistanceReadiness":       {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistancePolicy":          {identity.PermissionReadFleet, readers, false},
+		"UpdateAssistancePolicy":       {identity.PermissionManageAssistancePolicy, admins, false},
+		"RunAssistanceCommand":         {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistanceCommand":         {identity.PermissionViewRemoteAssistance, admins, false},
+		"StartAssistanceFileTransfer":  {identity.PermissionViewRemoteAssistance, admins, false},
+		"GetAssistanceFileTransfer":    {identity.PermissionViewRemoteAssistance, admins, false},
+		"CancelAssistanceFileTransfer": {identity.PermissionViewRemoteAssistance, admins, false},
+		// Reconnect also requires the creator and remote_assistance.reconnect in
+		// scope; archive retrieval/deletion never require or grant live access.
+		"ReconnectAssistanceSession": {identity.PermissionViewRemoteAssistance, admins, false},
+		"ListAssistanceRecordings":   {identity.PermissionReadFleet, readers, false},
+		"OpenAssistanceRecording":    {identity.PermissionReadAssistanceRecordings, admins, false},
+		"ReadAssistanceRecording":    {identity.PermissionReadAssistanceRecordings, admins, false},
+		"DeleteAssistanceRecording":  {identity.PermissionDeleteAssistanceRecordings, admins, false},
+		// Unattended grants consume an approval decided under the independent
+		// approve permission; revocation accepts the requester, an approver or
+		// a policy manager in scope.
+		"AuthorizeUnattendedAssistance": {identity.PermissionAssistanceUnattended, admins, false},
+		"ListUnattendedAssistance":      {identity.PermissionReadFleet, readers, false},
+		"RevokeUnattendedAssistance":    {identity.PermissionAssistanceUnattended, admins, false},
 	}
 }
 

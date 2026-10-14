@@ -6,6 +6,7 @@ package lindm.device.v1;
 
 import "buf/validate/validate.proto";
 import "lindm/agent/v1/assistance.proto";
+import "lindm/agent/v1/assistance_recording.proto";
 
 option go_package = "lindm/gen/lindm/device/v1;devicev1";
 
@@ -37,4 +38,31 @@ message SyncAssistanceResponse {
     message: "only one device command may be outstanding"
     expression: "this.directives.filter(d, has(d.command)).size() <= 1"
   };
+}
+
+// PutAssistanceRecordingRequest stores contiguous sealed segments of the
+// recording authorized for one session of this device. The server stores the
+// ciphertext as received and never decrypts it outside authorized retrieval.
+message PutAssistanceRecordingRequest {
+  uint64 session_epoch = 1 [(buf.validate.field).uint64 = {
+    gt: 0
+    lte: 9223372036854775807
+  }];
+  string session_id = 2 [(buf.validate.field).string = {
+    uuid: true
+    not_in: "00000000-0000-0000-0000-000000000000"
+  }];
+  repeated lindm.agent.v1.AssistanceRecordingChunk chunks = 3 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 4
+  }];
+  option (buf.validate.message).cel = {
+    id: "put_assistance_recording.one_recording"
+    message: "segments belong to one recording"
+    expression: "this.chunks.all(c, c.recording_id == this.chunks[0].recording_id)"
+  };
+}
+message PutAssistanceRecordingResponse {
+  // Every segment up to and including this sequence is durable.
+  uint32 stored_through = 1;
 }

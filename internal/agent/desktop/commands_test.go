@@ -129,7 +129,7 @@ func TestDisplaySwitchOnlyGrantedMonitorReleasesInputAndFencesOldCoordinates(t *
 	h.capturer.captures = []*fakeCapture{h.capturer.capture, second}
 	inv := tierOneInvitation(modeControl)
 	activateTierOne(h, inv)
-	h.peers.peer.input <- []byte(`{"t":"key","code":"ControlLeft","down":true,"display":"monitor-1","generation":1}`)
+	h.peers.peer.input <- []byte(`{"t":"key","code":"ControlLeft","down":true,"display":"monitor-1","generation":1,"epoch":1}`)
 	waitInjected(t, h.portal.grant, 1)
 	command := newTestCommand(h, 1, agentv1.AssistanceCommandKind_ASSISTANCE_COMMAND_KIND_SELECT_DISPLAY)
 	command.DisplayId = "monitor-2"
@@ -150,8 +150,8 @@ func TestDisplaySwitchOnlyGrantedMonitorReleasesInputAndFencesOldCoordinates(t *
 	if len(events) != 2 || events[1].Down || events[1].Keycode != 29 {
 		t.Fatalf("switch did not release held modifier: %+v", events)
 	}
-	h.peers.peer.input <- []byte(`{"t":"move","x":0.5,"y":0.5,"display":"monitor-1","generation":1}`)
-	h.peers.peer.input <- []byte(`{"t":"move","x":0.25,"y":0.75,"display":"monitor-2","generation":2}`)
+	h.peers.peer.input <- []byte(`{"t":"move","x":0.5,"y":0.5,"display":"monitor-1","generation":1,"epoch":1}`)
+	h.peers.peer.input <- []byte(`{"t":"move","x":0.25,"y":0.75,"display":"monitor-2","generation":2,"epoch":1}`)
 	waitInjected(t, h.portal.grant, 3)
 	events, _ = h.portal.grant.snapshot()
 	if len(events) != 3 || events[2].Display != "monitor-2" {
