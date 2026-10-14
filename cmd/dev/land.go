@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"lindm/internal/devlab/toolchain"
 	"lindm/internal/devlab/worktree"
 	"lindm/internal/gendoc"
 	"lindm/internal/labexec"
@@ -95,11 +96,18 @@ func runLand(args []string) (resultErr error) {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
+	shared, err := worktree.Open(ctx, ".")
+	if err != nil {
+		return err
+	}
+	// The gate runs the shared checkout's pinned Node and Go, whatever the
+	// lander's PATH puts first; resolved before queueing for the lock.
+	if err := toolchain.Apply(ctx, shared.Main); err != nil {
+		return err
+	}
 	// Collect before queueing for the lock, so a short disk never fails a
 	// gate halfway and no landing waits behind a collection.
-	if shared, err := worktree.Open(ctx, "."); err == nil {
-		collectIfLow(ctx, shared.Main)
-	}
+	collectIfLow(ctx, shared.Main)
 	repo, unlock, err := lockedRepository(ctx)
 	if err != nil {
 		return err
@@ -207,6 +215,13 @@ func runGateCommit(args []string) (resultErr error) {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
+	shared, err := worktree.Open(ctx, ".")
+	if err != nil {
+		return err
+	}
+	if err := toolchain.Apply(ctx, shared.Main); err != nil {
+		return err
+	}
 	repo, unlock, err := lockedRepository(ctx)
 	if err != nil {
 		return err

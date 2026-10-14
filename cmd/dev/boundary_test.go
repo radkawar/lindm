@@ -16,6 +16,7 @@ import (
 var devtoolPackages = []string{
 	"lindm/cmd/dev",
 	"lindm/internal/devlab/project",
+	"lindm/internal/devlab/toolchain",
 	"lindm/internal/devlab/worktree",
 	"lindm/internal/diskgc",
 	"lindm/internal/gendoc",

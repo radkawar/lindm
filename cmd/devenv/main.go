@@ -20,6 +20,7 @@ import (
 
 	"lindm/internal/devlab"
 	"lindm/internal/devlab/project"
+	"lindm/internal/devlab/toolchain"
 )
 
 const usage = `Usage: go run ./cmd/devenv <init|up|check|trust|test-integration|down|reset|recreate-database|rotate-credentials|signoff|pre-push|gc|generate-docs> [options]
@@ -92,11 +93,11 @@ func run() error {
 	}
 	switch verb {
 	case "signoff":
-		return runSignoff(os.Args[2:])
+		return pinned(runSignoff)
 	case "pre-push":
-		return runPrePush(os.Args[2:])
+		return pinned(runPrePush)
 	case "gc":
-		return runGC(os.Args[2:])
+		return pinned(runGC)
 	}
 	if verb != "init" && verb != "up" && verb != "check" && verb != "trust" && verb != "test-integration" && verb != "down" && verb != "reset" && verb != "recreate-database" && verb != "rotate-credentials" {
 		return fmt.Errorf("unknown command %q; use help (land, gate-commit, status, protect and worktree are go run ./cmd/dev)", verb)
@@ -188,6 +189,9 @@ func run() error {
 		},
 		"rotate-credentials": devlab.RotateCredentials,
 	}
+	if err := pinToolchains(); err != nil {
+		return err
+	}
 	fmt.Printf("Compose project: %s\nFixture: %s\n", project.ComposeName(absolute), devlab.FixturePath(absolute))
 	if err := operations[verb](ctx, absolute); err != nil {
 		return err
@@ -207,4 +211,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, "devenv:", err)
 		os.Exit(1)
 	}
+}
+
+// pinned runs a subcommand with the pinned toolchains (pinToolchains).
+func pinned(command func([]string) error) error {
+	if err := pinToolchains(); err != nil {
+		return err
+	}
+	return command(os.Args[2:])
+}
+
+// pinToolchains makes every gate, build and fixture command use the
+// checkout's pinned Node and Go, whatever the invoking shell's PATH puts
+// first. The checkout is the module containing the working directory.
+func pinToolchains() error {
+	root, err := toolchain.ModuleRoot(".")
+	if err != nil {
+		return err
+	}
+	return toolchain.Apply(context.Background(), root)
 }
