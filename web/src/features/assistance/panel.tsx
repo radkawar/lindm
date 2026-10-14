@@ -229,6 +229,9 @@ function AssistanceRequestForm({
   const locked = exact.busy || exact.ambiguous;
   const precondition = exact.failure ? assistanceFailureMessage(exact.failure) : null;
   const controlAllowed = canPermission(principal, ASSISTANCE_CONTROL_PERMISSION);
+  const requestedTools = capabilityFields.filter(
+    (field) => policyMode(capabilities, field) !== AssistancePolicyMode.OFF,
+  ).length;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -385,16 +388,24 @@ function AssistanceRequestForm({
       {!controlAllowed ? (
         <p className="text-sm text-muted-foreground">Your role allows viewing only, not control.</p>
       ) : null}
-      <CapabilityFields
-        value={capabilities}
-        ceiling={policyQuery.error ? undefined : policyQuery.data?.policy}
-        disabled={locked || policyQuery.isPending}
-        onChange={(field, value) =>
-          setCapabilities((current) =>
-            create(AssistancePolicySchema, { ...current, [field]: value }),
-          )
-        }
-      />
+      <details className="text-sm" data-assistance-request-tools>
+        <summary className="w-fit cursor-pointer font-medium">
+          Session tools: {requestedTools ? `${requestedTools} requested` : "none requested"}
+        </summary>
+        <p className="my-3 text-muted-foreground">
+          Choose tools before you send the request. The policy and user must allow each tool.
+        </p>
+        <CapabilityFields
+          value={capabilities}
+          ceiling={policyQuery.error ? undefined : policyQuery.data?.policy}
+          disabled={locked || policyQuery.isPending}
+          onChange={(field, value) =>
+            setCapabilities((current) =>
+              create(AssistancePolicySchema, { ...current, [field]: value }),
+            )
+          }
+        />
+      </details>
       {policyMode(capabilities, "files") >= AssistancePolicyMode.LIMITED ? (
         <div className="grid gap-2">
           <p className="text-sm">
@@ -525,14 +536,11 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Status</TableHead>
-              <TableHead>Admin</TableHead>
-              <TableHead>Device user</TableHead>
+              <TableHead>Support request</TableHead>
+              <TableHead>People</TableHead>
               <TableHead>Control</TableHead>
               <TableHead>Requested</TableHead>
-              <TableHead>Started</TableHead>
-              <TableHead>Ended</TableHead>
-              <TableHead>Why it ended</TableHead>
+              <TableHead>Outcome</TableHead>
               <TableHead>
                 <span className="sr-only">Open</span>
               </TableHead>
@@ -541,36 +549,39 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
           <TableBody>
             {data.sessions.map((session) => (
               <TableRow key={session.id}>
-                <TableCell>
+                <TableCell className="min-w-48 max-w-sm whitespace-normal">
                   <AssistanceStateBadge session={session} />
+                  <p className="mt-1 text-sm" data-freeform="recorded support reason">
+                    {session.reason}
+                  </p>
                   <p className="text-xs text-muted-foreground">{modeLabels[session.mode]}</p>
                 </TableCell>
-                <TableCell className="whitespace-normal">
-                  {session.operatorDisplay || "Unknown"}
+                <TableCell className="min-w-40 whitespace-normal">
+                  <p>Admin: {session.operatorDisplay || "Unknown"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Device user: {localSessionText(session) || "None"}
+                  </p>
                 </TableCell>
-                <TableCell className="whitespace-normal">
-                  {localSessionText(session) || <span className="text-muted-foreground">None</span>}
-                </TableCell>
-                <TableCell>
+                <TableCell className="min-w-40 whitespace-normal">
                   {controlText(session) || (
                     <span className="text-muted-foreground">Not answered</span>
                   )}
                 </TableCell>
                 <TableCell>
                   <TimeCell value={session.createdAt} />
-                </TableCell>
-                <TableCell>
                   {session.startedAt ? (
-                    <TimeCell value={session.startedAt} />
-                  ) : (
-                    <span className="text-muted-foreground">Never</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <TimeCell value={session.endedAt} />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Started <TimeCell value={session.startedAt} />
+                    </p>
+                  ) : null}
                 </TableCell>
                 <TableCell className="min-w-48 whitespace-normal">
                   {endCauseText(session) || "Still open"}
+                  {session.endedAt ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Ended <TimeCell value={session.endedAt} />
+                    </p>
+                  ) : null}
                 </TableCell>
                 <TableCell>
                   <Link
@@ -578,7 +589,7 @@ function AssistanceHistory({ deviceId }: { deviceId: string }) {
                     params={{ deviceId, sessionId: session.id }}
                     className="text-sm underline"
                   >
-                    Details
+                    Open record
                   </Link>
                 </TableCell>
               </TableRow>

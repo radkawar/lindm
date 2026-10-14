@@ -26,6 +26,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Serialize golden integration-schema migration, PostgreSQL snapshot and removal across package processes to avoid exhausting shared relation locks, without serializing normal test cases or restarting the fixture.
 - Connect dashboard security findings to named, scope-filtered advisory exposure. Keep accepted risks and unknown coverage separate, link findings to patch review and maintenance policies, explain native patch-status and reboot reasons without showing raw codes as primary text, and verify time-limited risk exceptions through independent approval in the console walkthrough.
 - Let the interactive demo complete its refused package-scan state after a finding's risk was accepted, instead of waiting for a finding that acceptance removed from the open population.
+- Keep remote-help requests focused on consent, collapse optional session tools, show support reasons in compact session history and prevent search from stacking over task dialogs.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.

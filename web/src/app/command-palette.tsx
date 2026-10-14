@@ -77,6 +77,8 @@ export function CommandPalette({
         document.fullscreenElement?.hasAttribute("data-assistance-fullscreen")
       )
         return;
+      // A shortcut must not stack a second modal over navigation or a task dialog.
+      if (!open && document.querySelector('[role="dialog"]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         // Typing in a form field keeps the shortcut out of the way; the palette's own
         // search box still closes it.
@@ -111,7 +113,7 @@ export function CommandPalette({
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
     };
-  }, []);
+  }, [open]);
 
   const searched = query.trim();
   const emptyText = deviceAction
@@ -133,12 +135,13 @@ export function CommandPalette({
           changeOpen(true);
         }}
         aria-label="Search pages, actions and devices (Control or Command K)"
+        aria-keyshortcuts="Control+k Meta+k"
         aria-haspopup="dialog"
       >
         <SearchIcon />
         <span className="sm:hidden">Find</span>
         <span className="hidden sm:inline">Find a page or device</span>
-        <kbd className="ml-auto hidden border px-1 text-xs md:inline">⌘ K</kbd>
+        <kbd className="ml-auto hidden border px-1 text-xs md:inline">Ctrl / ⌘ K</kbd>
       </Button>
       <CommandDialog
         open={open}

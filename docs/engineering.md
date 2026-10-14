@@ -522,6 +522,12 @@ After a confirmed stop, cancel older in-flight session polls before installing t
 ended response, so the record appears without a reload and cannot regress to live
 controls. Review accepts an already-ended request but verifies the visible record
 has neither a screen nor live controls before starting task walkthroughs.
+The request keeps optional session tools in a **Session tools** disclosure with the
+requested count. Tool-specific consent and recording warnings remain visible below
+the disclosure. During consent waiting, the preview and disabled Take control
+explanation remain visible; clipboard, messages, keys and files appear after the
+request leaves the consent-wait state. Session history leads with the support
+reason, people and outcome instead of three separate time columns.
 
 Inventory distinguishes missing optional observations from collection failures.
 Unavailable fields are hidden by default behind **Show unavailable fields**;
@@ -1658,6 +1664,11 @@ runner failure. Read the task outcomes alongside the machine gate: a green route
 review never means every administrator job succeeded. Fixture observations and
 provisioned accounts are synthetic; do not describe simulated device membership
 as a newly enrolled laptop or a queued action as a completed patch.
+The remote-help walk also uses Control K to find the named device, checks default
+view-only access and tool choices, captures consent and ended records in light
+desktop and dark mobile, and reopens its exact history record. It checks theme,
+one desktop breadcrumb trail, mobile focus recovery and refusal to stack search
+over navigation. Native assistance effects remain the separate VM lane's evidence.
 
 The organisation walk saves a narrow custom role, creates and disables a disposable
 administrator, searches accounts by username, reviews the configured sign-in source,

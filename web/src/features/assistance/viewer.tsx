@@ -220,7 +220,10 @@ function AssistanceViewerSession({
       data-review-page="assistance"
       data-assistance-state={session ? AssistanceState[session.state].toLowerCase() : "loading"}
     >
-      <nav aria-label="Remote assistance breadcrumbs" className="flex flex-wrap gap-2 text-sm">
+      <nav
+        aria-label="Remote assistance breadcrumbs"
+        className="flex flex-wrap gap-2 text-sm md:hidden"
+      >
         <Link to="/devices" className="underline">
           Devices
         </Link>
@@ -1148,6 +1151,7 @@ function AssistanceConnection({
               ) : null}
               <Button
                 variant="outline"
+                className={waitingForUser ? "hidden" : undefined}
                 disabled={!fullscreen && (!displayAllowed || !document.fullscreenEnabled)}
                 aria-describedby="assistance-display-help"
                 onClick={() => void toggleFullscreen()}
@@ -1166,7 +1170,7 @@ function AssistanceConnection({
               {controlReason}
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2">
+          <div className={waitingForUser ? "hidden" : "flex flex-wrap gap-2"}>
             <Button
               variant="outline"
               aria-pressed={!actualSize}
@@ -1192,7 +1196,10 @@ function AssistanceConnection({
               Actual size
             </Button>
           </div>
-          <p id="assistance-display-help" className="text-sm text-muted-foreground">
+          <p
+            id="assistance-display-help"
+            className={waitingForUser ? "hidden" : "text-sm text-muted-foreground"}
+          >
             {!displayAllowed
               ? "Display adjustments require an active session and permission from the policy and user."
               : !document.fullscreenEnabled
@@ -1336,65 +1343,72 @@ function AssistanceConnection({
               Your pointer is shown on the device; nothing is clicked or typed.
             </p>
           ) : null}
-          <AssistanceControls
-            session={session}
-            active={commandsActive}
-            controlOn={capturing}
-            frameReady={frameReady}
-            commands={commands}
-            message={message}
-            onMessage={setMessage}
-            onSpecialKey={(specialKey) => {
-              if (!capturing || !fenceRef.current.ready || channel?.readyState !== "open") return;
-              inputCaptureRef.current?.releaseAll();
-              setControlOn(false);
-              void commands.run({ kind: AssistanceCommandKind.SPECIAL_KEYS, specialKey });
-            }}
-            keyboardMode={keyboardMode}
-            onKeyboardMode={setKeyboardMode}
-            releaseControl={() => {
-              inputCaptureRef.current?.releaseAll();
-              setControlOn(false);
-            }}
-            portalContainer={fullscreenRef}
-          />
-          <AssistanceGuidance
-            session={session}
-            active={commandsActive}
-            commands={commands}
-            pointing={pointingActive}
-            onPointing={setPointing}
-            annotationReady={annotationChannel !== null && frameReady && !capturing}
-            onClearMarks={() => {
-              if (!annotationChannel) return;
-              (
-                annotationSenderRef.current ??
-                new AnnotationSender(
-                  annotationChannel,
-                  session.selectedDisplayId,
-                  session.displayGeneration,
-                  marksGranted,
-                )
-              ).clear();
-            }}
-            audioStream={audioStream}
-            releaseControl={() => {
-              inputCaptureRef.current?.releaseAll();
-              setControlOn(false);
-            }}
-          />
-          <AssistanceFiles
-            key={session.id}
-            session={session}
-            channel={fileChannel}
-            active={active}
-            commandsBusy={commands.busy}
-            onBusy={setFilesBusy}
-            releaseControl={() => {
-              inputCaptureRef.current?.releaseAll();
-              setControlOn(false);
-            }}
-          />
+          {waitingForUser ? (
+            <p className="text-sm text-muted-foreground">
+              The user must accept before you can use session tools.
+            </p>
+          ) : null}
+          <div className={waitingForUser ? "hidden" : "grid gap-3"}>
+            <AssistanceControls
+              session={session}
+              active={commandsActive}
+              controlOn={capturing}
+              frameReady={frameReady}
+              commands={commands}
+              message={message}
+              onMessage={setMessage}
+              onSpecialKey={(specialKey) => {
+                if (!capturing || !fenceRef.current.ready || channel?.readyState !== "open") return;
+                inputCaptureRef.current?.releaseAll();
+                setControlOn(false);
+                void commands.run({ kind: AssistanceCommandKind.SPECIAL_KEYS, specialKey });
+              }}
+              keyboardMode={keyboardMode}
+              onKeyboardMode={setKeyboardMode}
+              releaseControl={() => {
+                inputCaptureRef.current?.releaseAll();
+                setControlOn(false);
+              }}
+              portalContainer={fullscreenRef}
+            />
+            <AssistanceGuidance
+              session={session}
+              active={commandsActive}
+              commands={commands}
+              pointing={pointingActive}
+              onPointing={setPointing}
+              annotationReady={annotationChannel !== null && frameReady && !capturing}
+              onClearMarks={() => {
+                if (!annotationChannel) return;
+                (
+                  annotationSenderRef.current ??
+                  new AnnotationSender(
+                    annotationChannel,
+                    session.selectedDisplayId,
+                    session.displayGeneration,
+                    marksGranted,
+                  )
+                ).clear();
+              }}
+              audioStream={audioStream}
+              releaseControl={() => {
+                inputCaptureRef.current?.releaseAll();
+                setControlOn(false);
+              }}
+            />
+            <AssistanceFiles
+              key={session.id}
+              session={session}
+              channel={fileChannel}
+              active={active}
+              commandsBusy={commands.busy}
+              onBusy={setFilesBusy}
+              releaseControl={() => {
+                inputCaptureRef.current?.releaseAll();
+                setControlOn(false);
+              }}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

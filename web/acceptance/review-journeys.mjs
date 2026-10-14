@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { journeys as administration } from "./review-journeys-admin.mjs";
+import { journeys as assistance } from "./review-journeys-assist.mjs";
 import { journeys as enrollment } from "./review-journeys-enrollment.mjs";
 import { journeys as lostDevice } from "./review-journeys-lost-device.mjs";
 import { journeys as policy } from "./review-journeys-policy.mjs";
@@ -41,6 +42,7 @@ export async function taskWalkthroughs({
 }) {
   const definitions = [
     ...administration,
+    ...assistance,
     ...enrollment,
     ...lostDevice,
     ...policy,

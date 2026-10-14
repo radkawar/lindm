@@ -339,6 +339,8 @@ const commands = {
     await ui.fill({ label: "Maximum duration (minutes, 1 to 30)" }, String(args.minutes));
     // The unattended request form below has its own reason textarea.
     await ui.fill({ label: "Reason (the user sees this; the audit log records it)" }, args.reason);
+    if (Object.keys(args.capabilities ?? {}).length)
+      await driver.page.locator("[data-assistance-request-tools] > summary").click();
     for (const [label, option] of Object.entries(args.capabilities ?? {}))
       await ui.select(label, option);
     await ui.click({ role: "button", text: "Request remote assistance" });
