@@ -4051,6 +4051,19 @@ The successful cold-build-only record is
 `~/work/turnkey-cold-key-care-20261014/cold-release-attempt7.json`, SHA-256
 `3fe9c9a6fc53548d7e22327282a02c95284fe284a319f9e68e985d0b8797bfd0`.
 It explicitly retains `lifecycle_qualified: false`; native proof is separate.
+The readable failed records `native-ubuntu-attempt3.json` (SHA-256
+`6a869245b9fcae77d2f3d0b591f022e23c83bba093e084721d889fdd1e51f6f6`)
+and `native-ubuntu-attempt4.json` (SHA-256
+`ae0b3a817719e23d7b4ec4be91e99c975962f7ae9c0b93537def7202d441ed1a`)
+are imported under `specific-source-da970de98`, never the final deploy cell.
+The second reached the role verifier with a 32 GiB server, but authentication
+failed before its privilege query. The follow-on readable
+`diagnostic-ubuntu-attempt2.json` (SHA-256
+`425c8d1abfac2efd8c398e2b39da0c91a0fd6dbe6cec4347d1f1054635969d13`)
+is imported only as failed `first-run-install-only` evidence. All three retain
+their private evidence under the same `~/work/turnkey-cold-key-care-20261014`
+ancestry. Their product source is `da970de98`; ledger import revisions identify
+the later repaired checkout, not a newer signed product or successful lifecycle.
 
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated

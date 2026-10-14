@@ -13218,6 +13218,51 @@
       "scope": "GNOME; full record: Tier 1, files, Tier 2 reconnect/recording, Tier 3",
       "reference": "#built-in-graphical-remote-assistance-l09-l12",
       "mainlineRevision": "24e274c1f7bb3f75ed6d252e18b277131f5d71af"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt3.json",
+      "sha256": "6a869245b9fcae77d2f3d0b591f022e23c83bba093e084721d889fdd1e51f6f6",
+      "recorded": "2026-10-14T10:43:47.089101846Z",
+      "revision": "b0c940259d18ad75030016ff54d651efbcdf1ca1",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-da970de98",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "b0c940259d18ad75030016ff54d651efbcdf1ca1"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt4.json",
+      "sha256": "ae0b3a817719e23d7b4ec4be91e99c975962f7ae9c0b93537def7202d441ed1a",
+      "recorded": "2026-10-14T11:25:56.610520827Z",
+      "revision": "b0c940259d18ad75030016ff54d651efbcdf1ca1-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-da970de98",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "b0c940259d18ad75030016ff54d651efbcdf1ca1"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/diagnostic-ubuntu-attempt2.json",
+      "sha256": "425c8d1abfac2efd8c398e2b39da0c91a0fd6dbe6cec4347d1f1054635969d13",
+      "recorded": "2026-10-14T12:00:08.532637899Z",
+      "revision": "b0c940259d18ad75030016ff54d651efbcdf1ca1-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "first-run-install-only",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "b0c940259d18ad75030016ff54d651efbcdf1ca1"
     }
   ]
 }
