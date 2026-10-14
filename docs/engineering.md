@@ -4105,6 +4105,23 @@ observation, not lifecycle qualification. Its secret-safe encrypted diagnosis
 plaintext SHA-256 is
 `b97d8310c34542011dafd486f356fca324e45c57b2c32a31640262e5bf924628`.
 
+The new `b0c940259` cold SDK pair passed literal Make signing, export verification
+and owned cleanup. Its `cold-release-attempt8.json` SHA-256 is
+`023124d0a340a26154183c9af80444e3d37dd1dc702111fcdfb395cda34a97d3`;
+it remains build-only evidence. Fresh `native-ubuntu-attempt5.json` reached the
+database checks and observed successful migrator authentication plus all four
+restricted-owner predicates, but then failed with the fixed
+`operations: explicit_database_credential_required` category. The runtime
+verifier had requested the migrator-only staging API against a runtime document
+that intentionally has no migrator URL. Both role verification and metadata
+restriction now use the existing runtime-only stage, preserving separate
+migration custody. Security review caught the second caller before another
+signed bundle. Repository-wide AST coverage forbids the migrator stage on the
+runtime document; the remaining migrator callers use the separate migrate path
+or an explicit CLI migration-configuration argument.
+This failed source observation is retained; no browser, enrollment or lifecycle
+qualification is claimed.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

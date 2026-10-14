@@ -268,7 +268,7 @@ func validateDatabaseRoles(ctx context.Context) (err error) {
 		return errors.New("migrator must be restricted database owner with schema authority, not superuser")
 	}
 	// External runtime cannot share migration identity or own the schema.
-	d, cleanup, err := serverops.StageDatabaseConfig("/etc/lindm/server.json")
+	d, cleanup, err := serverops.StageRuntimeDatabaseConfig("/etc/lindm/server.json")
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ func restrictMetadata(ctx context.Context) (err error) {
 		return err
 	}
 	defer pool.Close()
-	d, cleanup, err := serverops.StageDatabaseConfig("/etc/lindm/server.json")
+	d, cleanup, err := serverops.StageRuntimeDatabaseConfig("/etc/lindm/server.json")
 	if err != nil {
 		return err
 	}

@@ -23,10 +23,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgproto3"
+	"google.golang.org/protobuf/encoding/protojson"
 
+	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/custody"
 	"lindm/internal/labexec"
+	"lindm/internal/serverops"
 )
 
 // TestInstallerPostgresSCRAMPlus uses the integration driver's already verified,
@@ -464,4 +467,55 @@ func plusDockerOutput(t *testing.T, category string, args ...string) string {
 		t.Fatal(category)
 	}
 	return output.String()
+}
+
+func TestRuntimeRoleStageNeverRequiresMigratorCredential(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("installation ownership policy requires root")
+	}
+	root := plusPrivateDirectory(t)
+	if err := newFile(filepath.Join(root, "database-url"), []byte("postgresql://runtime:fixture@localhost/lindm?sslmode=verify-full&channel_binding=require&require_auth=scram-sha-256\n"), 0, 0, 0600); err != nil {
+		t.Fatal("runtime_stage_fixture_credential")
+	}
+	path := filepath.Join(root, "server.json")
+	devicePublic := "https://devices.example.invalid"
+	body, err := protojson.Marshal(&configv1.ServerConfig{
+		DeploymentId: "a9dff5b8-966d-4bbd-a568-b613bc0d056e", PublicUrl: "https://admin.example.invalid", DevicePublicUrl: &devicePublic,
+		AdminListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18444}, DeviceListener: &configv1.ListenerConfig{Address: "127.0.0.1", Port: 18445},
+		Database:       &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 2},
+		Tls:            &configv1.TLSConfig{CertificateFile: "never-read-server.crt", PrivateKeyFile: "never-read-server.key"},
+		DeviceCa:       &configv1.DeviceCAConfig{CertificateFile: "never-read-device.crt", PrivateKeyFile: "never-read-device.key"},
+		Authentication: &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}},
+	})
+	if err != nil {
+		t.Fatal("runtime_stage_fixture_encoding")
+	}
+	if err := newFile(path, body, 0, 0, 0600); err != nil {
+		t.Fatal("runtime_stage_fixture_configuration")
+	}
+	document, cleanup, err := serverops.StageRuntimeDatabaseConfig(path)
+	if err != nil {
+		t.Fatal("runtime_stage_requires_only_runtime_credential")
+	}
+	defer func() {
+		if err := cleanup(); err != nil {
+			t.Error("runtime_stage_cleanup")
+		}
+	}()
+	database, err := document.Database()
+	if err != nil || database.ConnConfig.User != "runtime" || database.ConnConfig.ChannelBinding != "require" ||
+		database.ConnConfig.RequireAuth != "scram-sha-256" || document.Proto.Database.GetMigrationUrlFile() != "" {
+		t.Fatal("runtime_stage_changed_identity_or_authentication_policy")
+	}
+	_, unexpectedCleanup, err := serverops.StageDatabaseConfig(path)
+	if unexpectedCleanup != nil {
+		t.Cleanup(func() {
+			if err := unexpectedCleanup(); err != nil {
+				t.Error("unexpected_migrator_stage_cleanup")
+			}
+		})
+	}
+	if err == nil || !strings.Contains(err.Error(), "explicit_database_credential_required") {
+		t.Fatal("migrator_stage_must_still_require_separate_migration_credential")
+	}
 }

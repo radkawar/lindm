@@ -12,9 +12,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -238,5 +242,65 @@ func TestLocalDatabaseURLsRequireBoundSCRAMForBothRoles(t *testing.T) {
 				t.Fatal("generated URL changed its restricted role")
 			}
 		})
+	}
+}
+
+func TestRuntimeDatabaseCallersUseRoleSpecificStages(t *testing.T) {
+	required := map[string]bool{"validateDatabaseRoles": false, "restrictMetadata": false}
+	for _, root := range []string{filepath.Join("..", "..", "internal"), filepath.Join("..", "..", "cmd")} {
+		err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
+			}
+			file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+			if err != nil {
+				return err
+			}
+			for _, declaration := range file.Decls {
+				function, ok := declaration.(*ast.FuncDecl)
+				if !ok || function.Body == nil {
+					continue
+				}
+				ast.Inspect(function.Body, func(node ast.Node) bool {
+					call, ok := node.(*ast.CallExpr)
+					if !ok || len(call.Args) != 1 {
+						return true
+					}
+					var name string
+					switch target := call.Fun.(type) {
+					case *ast.Ident:
+						name = target.Name
+					case *ast.SelectorExpr:
+						name = target.Sel.Name
+					}
+					argument, ok := call.Args[0].(*ast.BasicLit)
+					if !ok || argument.Kind != token.STRING {
+						return true
+					}
+					value, err := strconv.Unquote(argument.Value)
+					if err != nil || value != "/etc/lindm/server.json" {
+						return true
+					}
+					if name == "StageDatabaseConfig" {
+						t.Errorf("%s: runtime configuration must not request migration credentials", path)
+					}
+					if name == "StageRuntimeDatabaseConfig" && filepath.Base(path) == "provision_linux.go" {
+						if _, expected := required[function.Name.Name]; expected {
+							required[function.Name.Name] = true
+						}
+					}
+					return true
+				})
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, found := range required {
+		if !found {
+			t.Errorf("%s does not stage the installed runtime configuration", name)
+		}
 	}
 }
