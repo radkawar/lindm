@@ -47,3 +47,17 @@ reports under [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Mark the report as a
 community safety report, not a software vulnerability. Include only the information
 needed to investigate. Maintainers must preserve the reporter's privacy and limit
 sharing to the people needed to handle the report.
+
+## Dependency updates
+
+Dependabot checks Go modules, npm packages and GitHub Actions each week for version
+updates. Security updates use repository alerts and do not wait for that schedule.
+Dependency changes must pass the same CI and DCO checks as other contributions.
+
+`govulncheck` also reports advisories for modules whose affected packages are not
+imported. [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) concerns the retired
+`golang.org/x/crypto/openpgp` packages. lindm does not import those packages. It uses
+the maintained `github.com/ProtonMail/go-crypto` fork for OpenPGP. The advisory lists
+no fixed module version. Other packages from `golang.org/x/crypto` remain required
+for password hashing and SSH keys. A module version bump does not resolve this
+advisory.

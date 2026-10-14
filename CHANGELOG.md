@@ -11,6 +11,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - GitHub Actions checks for lint, generated output, unit tests, container integration and the Chromium console journey.
 - Public platform status and operator documentation for self-built, operator-signed releases.
 - Require DCO trailers for each new commit's author and recorded coauthors in public CI.
+- Weekly Dependabot version updates for Go modules, npm and GitHub Actions.
 - Create the native integrations encryption key automatically, retain root-only custody through systemd credentials, and preserve the original key with encrypted backups and restores.
 
 ### Changed
