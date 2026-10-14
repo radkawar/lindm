@@ -59,7 +59,7 @@ function EvidenceRow({ check }: { check: ServerStatusCheck }) {
         <p className="text-muted-foreground">
           {check.nextAction || "Inspect the server service journal."}
         </p>
-        <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+        <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
           <div className="min-w-0">
             <dt className="font-medium">Checked</dt>
             <dd className="break-words">

@@ -239,6 +239,7 @@ platform lists in the existing Details disclosure.
 forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.
 Inspect paragraphs and structured fields separately. Do not merge nested fields
 into a prose sentence. Keep check, evidence and expiry times in labeled fields.
+Let timestamp fields wrap onto another row before their values overflow.
 Inputs use normal foreground text, not inherited notice colors.
 Declare narrow exceptions with `data-ste-exempt="rule: reason"` in code.
 Use `data-ste-procedure` for procedural text. Explain each exception; never exempt

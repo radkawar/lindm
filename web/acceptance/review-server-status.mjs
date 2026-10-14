@@ -213,9 +213,17 @@ export async function reviewServerStatus({
             .evaluateAll((rows) =>
               rows.map((row) => {
                 const metadata = row.querySelector(":scope > div > dl");
+                const bounds = metadata?.getBoundingClientRect();
                 return [...(metadata?.children ?? [])].map((field) => ({
                   label: field.querySelector("dt")?.textContent?.trim(),
                   value: field.querySelector("dd")?.textContent?.trim(),
+                  contained: [...field.querySelectorAll("time > span")].every((span) => {
+                    const rect = span.getBoundingClientRect();
+                    return (
+                      rect.left >= Math.max(bounds.left, 0) - 1 &&
+                      rect.right <= Math.min(bounds.right, document.documentElement.clientWidth) + 1
+                    );
+                  }),
                 }));
               }),
             );
@@ -227,6 +235,9 @@ export async function reviewServerStatus({
                     ? "Checked,Evidence,Expires"
                     : "Checked,Evidence") && row.every((field) => field.value),
             ), "Check, evidence and expiry times must remain separate labeled fields with visible values");
+          require(fields.every((row) =>
+            row.every((field) => field.contained),
+          ), "A status timestamp overflows its metadata region or the visible page");
         }
         await page.evaluate(() => window.scrollTo(0, 0));
         entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
