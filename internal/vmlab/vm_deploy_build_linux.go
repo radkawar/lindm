@@ -213,8 +213,11 @@ func prepareColdReleaseGuest(ctx context.Context, guest *guestVM, result *VMDepl
 	if err := productionSigningWrite(filepath.Join(options.EvidenceDirectory, "guest-tool-versions.json"), versions.Stdout); err != nil {
 		return err
 	}
-	if _, err := coldReleaseCommand(ctx, guest, result, "web-and-licenses", productionSigningEnvironment()+" /bin/bash -s", strings.NewReader(productionSigningBuildPrerequisites), 45*time.Minute); err != nil {
-		return err
+	output, err := coldReleaseCommand(ctx, guest, result, "web-and-licenses", productionSigningEnvironment()+" /bin/bash -s", strings.NewReader(productionSigningBuildPrerequisites), 45*time.Minute)
+	defer clear(output.Stdout)
+	defer clear(output.Stderr)
+	if err != nil {
+		return errors.Join(err, writeDeployInstallerDiagnostics(options.OperatorRecipientFile, options.EvidenceDirectory, "cold-web-and-licenses", output.Stdout, output.Stderr))
 	}
 	return nil
 }

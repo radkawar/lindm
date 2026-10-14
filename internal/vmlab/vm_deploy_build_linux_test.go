@@ -6,6 +6,9 @@ package vmlab
 import (
 	"bytes"
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
 )
@@ -80,5 +83,47 @@ func TestColdReleaseLogDrainsExcessWithoutRetainingPlaintext(t *testing.T) {
 	}
 	if _, err := writer.Write([]byte(strings.Repeat("x", 100))); err != nil || destination.Len() != 4 {
 		t.Fatalf("excess retained or not drained: %v", err)
+	}
+}
+
+func TestColdPrerequisiteFailureKeepsEncryptedDiagnosticBoundary(t *testing.T) {
+	file, err := parser.ParseFile(token.NewFileSet(), "vm_deploy_build_linux.go", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prepare *ast.FuncDecl
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if ok && function.Name.Name == "prepareColdReleaseGuest" {
+			prepare = function
+			break
+		}
+	}
+	if prepare == nil {
+		t.Fatal("cold prerequisite driver is missing")
+	}
+	var encrypted, stdoutCleared, stderrCleared bool
+	ast.Inspect(prepare.Body, func(node ast.Node) bool {
+		switch value := node.(type) {
+		case *ast.CallExpr:
+			name, ok := value.Fun.(*ast.Ident)
+			if ok && name.Name == "writeDeployInstallerDiagnostics" && len(value.Args) == 5 {
+				stage, ok := value.Args[2].(*ast.BasicLit)
+				encrypted = ok && stage.Value == `"cold-web-and-licenses"`
+			}
+		case *ast.DeferStmt:
+			name, ok := value.Call.Fun.(*ast.Ident)
+			if ok && name.Name == "clear" && len(value.Call.Args) == 1 {
+				buffer, ok := value.Call.Args[0].(*ast.SelectorExpr)
+				if ok {
+					stdoutCleared = stdoutCleared || buffer.Sel.Name == "Stdout"
+					stderrCleared = stderrCleared || buffer.Sel.Name == "Stderr"
+				}
+			}
+		}
+		return true
+	})
+	if !encrypted || !stdoutCleared || !stderrCleared {
+		t.Fatal("failed cold prerequisites must export operator-encrypted logs and clear both retained buffers")
 	}
 }

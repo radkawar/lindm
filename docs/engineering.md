@@ -4189,6 +4189,10 @@ The host observer also locks its address space before the cold launcher runs.
 If the guest fails before it can create its export directory, bounded stdout and
 stderr leave only as `cold-launch-stdout.age` and `cold-launch-stderr.age` in the
 private lab evidence directory, encrypted to the explicit operator recipient.
+Web and license prerequisite failures likewise retain bounded
+`cold-web-and-licenses-stdout.age` and `cold-web-and-licenses-stderr.age` before
+cleanup. Decrypt them with the off-server lab operator identity; the public
+record still reports failure, never a successful build or lifecycle proof.
 These files are never release, server backup or support bundle inputs.
 Custodians are operator fixtures, **not independent human custodians**.
 Result scope is `production-cold-release-build-only` and
