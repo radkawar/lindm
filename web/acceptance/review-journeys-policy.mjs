@@ -174,7 +174,7 @@ export async function configureFleet(ctx) {
   if (await proposal.getByText(/Resolve the problem before this device changes\./).count())
     await proposal
       .getByRole("row")
-      .filter({ has: proposal.getByRole("link", { name: device.Hostname, exact: true }) })
+      .filter({ has: page.getByRole("link", { name: device.Hostname, exact: true }) })
       .getByText("Needs review", { exact: true })
       .waitFor({ timeout });
   await proposal.getByRole("link", { name: device.Hostname, exact: true }).scrollIntoViewIfNeeded();
