@@ -3803,6 +3803,34 @@ enrollment, encrypted backup, signed upgrade, fresh restore, or post-restore liv
 management. The full two-OS turnkey lifecycle requires its separate final-source
 artifacts and unscoped evidence.
 
+Subsequent **specific-source** turnkey attempts at immutable
+`4ef2305c330b6bd5685025550e71e4bdeb5472f9` remain failures, not final integrated
+bundle qualification. Actual development releases `0.2.0` and `0.2.1` each
+completed two isolated equal-unsigned-digest builds and independent authenticated
+release verification. The matching lab executable was pinned to
+`5fedde2874ed39bcf9780cf639fb61d695eb7fbb9f2704667f5798e07ab20234`.
+Both fresh server guests passed ordinary four-slot FIFO admission and failed at
+their first signed installer invocation with exit 2 (176 stdout / 1686 stderr
+bytes). No owner, enrolled device, backup, upgrade, restore or live management
+passed. The private failed raw records are
+`~/work/turnkey-deploy-release/connected-ubuntu-4ef-attempt1.json` (SHA-256
+`223c960674ac68b14caaf84ef92ea88bbc4384f42185c0fd617687887bf5ee15`) and
+`connected-rhel-4ef-attempt1.json` (SHA-256
+`2cbd99f046dc71025cb5754438723a95b31242d18b0e0ef2e3b5f4551cabd559`).
+The RHEL record observes real registration, identity, repository refresh,
+unregistration and activation-key deletion; overall cleanup is not claimed
+because the failed result explicitly records `owned_cleanup_complete: false`.
+
+Source inspection establishes a caller/installer contract mismatch: the maintained
+caller supplied `--tuf-root-file`, which the real installer does not declare.
+The exact withheld stderr message was not retained and is **unobserved**.
+The corrected shared caller removes that unsupported flag; before invoking the
+signed installer it compares the independently supplied public root byte-for-byte
+with `release-root.json`, whose authenticity is still checked by independent
+release-key/key-ID bundle verification. No ignored alias or weakened trust gate
+was introduced. Corrected native execution requires new evidence; these failures
+are not rewritten as passes.
+
 Both single-host rows need connected and air-gapped acceptance. Native
 dependencies/hardening/migration invocation cannot be inferred from container
 success. Single-host capacity is a measured published limit, separate from the

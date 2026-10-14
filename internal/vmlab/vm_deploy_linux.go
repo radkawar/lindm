@@ -491,7 +491,7 @@ func installDeployRelease(ctx context.Context, guest *guestVM, options VMDeployO
 }
 
 func deployInstallerCommand(options VMDeployOptions, destination, origin, deviceOrigin, version string, airgap bool) string {
-	command := "cat | sh " + nativeQuote(destination+"/install.sh") + " --custody-passphrase-fd 0 --release-key-file /root/lindm-deploy-input/release-key --release-key-id " + nativeQuote(options.ReleaseKeyID) + " --origin " + nativeQuote(origin) + " --device-origin " + nativeQuote(deviceOrigin) + " --tls-cert-file /root/lindm-deploy-input/tls.crt --tls-key-file /root/lindm-deploy-input/tls.key --tls-ca-file /root/lindm-deploy-input/tls-ca.crt --backup-recipient-file /root/lindm-deploy-input/backup-recipient --tuf-root-file /root/lindm-deploy-input/tuf-root --setup-code-file /root/lindm-deploy-input/setup-code"
+	command := "cmp -s /root/lindm-deploy-input/tuf-root " + nativeQuote(destination+"/release-root.json") + " && cat | sh " + nativeQuote(destination+"/install.sh") + " --custody-passphrase-fd 0 --release-key-file /root/lindm-deploy-input/release-key --release-key-id " + nativeQuote(options.ReleaseKeyID) + " --origin " + nativeQuote(origin) + " --device-origin " + nativeQuote(deviceOrigin) + " --tls-cert-file /root/lindm-deploy-input/tls.crt --tls-key-file /root/lindm-deploy-input/tls.key --tls-ca-file /root/lindm-deploy-input/tls-ca.crt --backup-recipient-file /root/lindm-deploy-input/backup-recipient --setup-code-file /root/lindm-deploy-input/setup-code"
 	if airgap {
 		command += " --airgap"
 	}
