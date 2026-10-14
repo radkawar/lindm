@@ -4219,6 +4219,17 @@ connection failure is refused. It names only the fixed attempted operation.
 This failed full lane is retained, not promoted to enrollment/restore
 qualification.
 
+`native-ubuntu-attempt9.json` repeated those installer, credential and browser
+successes and passed all seven real runtime SQL gates: required SCRAM-PLUS,
+then six privilege denials with SQLSTATE `42501`. It failed at public trust
+export because the lab requested an `execution-delegation.dsse.json` file the
+installer does not produce. The installer writes the signed envelope inside
+the typed `execution-delegation.json` request. The lane now transfers that
+actual artifact; offline recovery parses it and verifies the unchanged signed
+envelope against the execution root's quorum and validity window. Missing or
+malformed requests and insufficient signatures fail closed. This remains a
+failed full lane, not an enrollment, upgrade or restore qualification.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

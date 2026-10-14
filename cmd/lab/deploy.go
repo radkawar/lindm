@@ -161,7 +161,7 @@ func signDeployRecovery(ctx context.Context, repository, private, identity, lind
 	if err := protojson.Unmarshal(rootBody, root); err != nil {
 		return "", "", err
 	}
-	delegationBody, err := os.ReadFile(filepath.Join(private, "execution-delegation.dsse.json"))
+	delegationBody, err := os.ReadFile(filepath.Join(private, "execution-delegation.json"))
 	if err != nil {
 		return "", "", err
 	}
@@ -170,7 +170,7 @@ func signDeployRecovery(ctx context.Context, repository, private, identity, lind
 		return "", "", err
 	}
 	delegation := new(agentv1.ExecutionDelegation)
-	if err := verifyDeployDelegation(ctx, authority, root, delegationBody, delegation); err != nil {
+	if err := verifyDeployDelegationRequest(ctx, authority, root, delegationBody, delegation); err != nil {
 		return "", "", err
 	}
 	if delegation.GetVersion() == ^uint64(0) || delegation.GetMinimumRecoveryEpoch() == ^uint64(0) {
@@ -214,12 +214,16 @@ func signDeployRecovery(ctx context.Context, repository, private, identity, lind
 	return checkpoint, updatePath, nil
 }
 
-func verifyDeployDelegation(ctx context.Context, authority *trust.Authority, root *agentv1.ExecutionRoot, envelope []byte, declaration *agentv1.ExecutionDelegation) error {
+func verifyDeployDelegationRequest(ctx context.Context, authority *trust.Authority, root *agentv1.ExecutionRoot, requestBody []byte, declaration *agentv1.ExecutionDelegation) error {
+	request := new(agentv1.UpdateExecutionTrustRequest)
+	if err := protojson.Unmarshal(requestBody, request); err != nil {
+		return errors.New("deploy: installed execution delegation request is invalid")
+	}
 	keys := make([]ed25519.PublicKey, 0, len(root.GetKeys()))
 	for _, key := range root.GetKeys() {
 		keys = append(keys, ed25519.PublicKey(key.GetPublicKey()))
 	}
-	if err := authority.Verify(ctx, envelope, declaration, int(root.GetThreshold()), keys...); err != nil {
+	if err := authority.Verify(ctx, request.GetDelegationEnvelope(), declaration, int(root.GetThreshold()), keys...); err != nil {
 		return err
 	}
 	now := time.Now()

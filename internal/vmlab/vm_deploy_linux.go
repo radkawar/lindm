@@ -356,7 +356,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		}); runErr != nil {
 			return runErr
 		}
-		for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "execution-delegation.dsse.json", "recovery-delegation.dsse.json", "execution-update.json", "security-checkpoint.dsse.json", "transport-ca.crt"} {
+		for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "execution-delegation.json", "recovery-delegation.dsse.json", "execution-update.json", "security-checkpoint.dsse.json", "transport-ca.crt"} {
 			if err := copyDeployEvidence(ctx, filepath.Join(private, name), filepath.Join(options.EvidenceDirectory, name), 8<<20, ""); err != nil {
 				return err
 			}
@@ -561,7 +561,7 @@ func deployInstallerCommand(options VMDeployOptions, destination, origin, device
 }
 
 func exportDeployOfflineCustody(ctx context.Context, guest *guestVM, private string, digest *string) error {
-	for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "execution-delegation.dsse.json"} {
+	for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "execution-delegation.json"} {
 		data, err := serverGuestCommand(ctx, guest, "transfer public deployment trust", "cat "+nativeQuote("/etc/lindm/"+name), nil)
 		if err != nil {
 			return err
