@@ -155,11 +155,17 @@ export function LocalForm({
         id="local-password"
         type="password"
         autoComplete={enrollment || setup ? "new-password" : "current-password"}
+        aria-describedby={setup ? "setup-password-help" : undefined}
         required
         value={password}
         disabled={busy}
         onChange={(event) => setPassword(event.target.value)}
       />
+      {setup ? (
+        <p id="setup-password-help" className="text-sm text-muted-foreground">
+          Use at least 12 bytes. Have a security key or passkey ready for the next step.
+        </p>
+      ) : null}
       {emergency ? (
         <>
           <Label htmlFor="incident-reason">Reason for emergency sign-in (required)</Label>

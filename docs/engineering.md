@@ -1595,10 +1595,10 @@ Copy rules also reject “Manage your…”, “Welcome to…”, “Lorem” an
 in the existing visible-copy scope; they do not detect every generic phrase or
 phrases split across text nodes.
 
-Every run also records seven seeded, authenticated administrator walkthroughs:
+Every run also records seeded, authenticated administrator walkthroughs:
 Engineering laptop onboarding, a Finance baseline with impact preview, a lost
 laptop, critical-CVE exposure and patching, remote help, a limited-access helpdesk
-hire, and recovery-key reveals last week. `task-audit.html` and `task-audit.json`
+hire, recovery-key reveals last week, and running the organisation. `task-audit.html` and `task-audit.json`
 show each captured step, its task-shaped/partly/API-shaped assessment, generic
 material and proposed remedy. These are authored draft assessments for owner
 editing, not automated usability scores. Walkthrough screenshots join the owner
@@ -1607,8 +1607,8 @@ shortcuts. Any runner failure or unexpected administrator RPC HTTP error fails
 the review, even if a later read succeeds. Diagnostic records contain only bounded
 operation names, status codes and machine reasons, never request bodies or secrets.
 
-The seven walks run once in light desktop mode; they do not multiply the route
-matrix into seven claims of native end-to-end qualification. A walk reports
+The walks run once in light desktop mode; they do not multiply the route
+matrix into claims of native end-to-end qualification. A walk reports
 **blocked**, not completed, when the actual UI cannot finish its job or a native
 installation, user consent, second approver or real device execution is required.
 An explicitly recorded product/prerequisite blocker is not itself a browser
@@ -1616,6 +1616,20 @@ runner failure. Read the task outcomes alongside the machine gate: a green route
 review never means every administrator job succeeded. Fixture observations and
 provisioned accounts are synthetic; do not describe simulated device membership
 as a newly enrolled laptop or a queued action as a completed patch.
+
+The organisation walk saves a narrow custom role, creates and disables a disposable
+administrator, searches accounts by username, reviews the configured sign-in source,
+creates a paused webhook and a weekly inventory schedule, downloads published
+filtered audit evidence and its signature, reviews server status, and creates then
+revokes a read-only assistant token. It restores the initial assistant-access setting.
+It does not send events to an external receiver, change the identity provider, or
+claim that a downloaded signature has been verified. The separate first-run fixture
+review covers setup-code refusal, cancelled passkey continuation and owner creation.
+First-run setup identifies lindm and states the password length and authenticator
+prerequisites before submission; authentication and one-time setup authority are unchanged.
+Accounts keep role, device scope, sign-in state and Edit together on narrow screens;
+their one-time handoff has separate copy actions for the secret and enrollment address.
+Server status puts failed checks, attention and missing evidence before confirmed checks.
 
 The same run emits `edit-sheet.html`, linked from the contact sheet,
 `edit-sheet.json` (run-bound screen/evidence manifest) and

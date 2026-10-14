@@ -31,6 +31,17 @@ const COMPONENTS: Record<string, string> = {
   job_queue: "Delivery and report work",
 };
 
+// Put decisions and missing evidence before confirmed checks. Preserve server
+// order within each state so repeated refreshes do not move equivalent checks.
+const CHECK_PRIORITY: Record<ServerStatusState, number> = {
+  [ServerStatusState.FAILED]: 0,
+  [ServerStatusState.ATTENTION]: 1,
+  [ServerStatusState.UNKNOWN]: 2,
+  [ServerStatusState.UNSPECIFIED]: 2,
+  [ServerStatusState.INACTIVE]: 3,
+  [ServerStatusState.OK]: 4,
+};
+
 function statePresentation(state: ServerStatusState): { label: string; tone: StatusTone } {
   switch (state) {
     case ServerStatusState.OK:
@@ -170,9 +181,11 @@ export function ServerStatusPage({ canReviewInstallation }: { canReviewInstallat
                 Evidence from this server
               </h2>
               <ul>
-                {response.checks.map((check) => (
-                  <EvidenceRow key={check.component} check={check} />
-                ))}
+                {[...response.checks]
+                  .sort((a, b) => CHECK_PRIORITY[a.state] - CHECK_PRIORITY[b.state])
+                  .map((check) => (
+                    <EvidenceRow key={check.component} check={check} />
+                  ))}
               </ul>
             </section>
           ) : (

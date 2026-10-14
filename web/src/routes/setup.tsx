@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { BrandLogo } from "@/components/ui/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { RpcError } from "@/components/ui/rpc-error";
@@ -27,6 +28,7 @@ function SetupRoute() {
     <main id="main" className="mx-auto flex min-h-svh w-full max-w-lg items-center px-4 py-8">
       <Card className="w-full">
         <CardHeader>
+          <BrandLogo stacked className="mx-auto mb-4" />
           <CardTitle>
             <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
               Set up your owner account

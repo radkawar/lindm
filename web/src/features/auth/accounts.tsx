@@ -81,6 +81,13 @@ export function Accounts({
   const [enrollment, setEnrollment] = useState<AccountEnrollment | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RpcFailure | null>(null);
+  const [search, setSearch] = useState("");
+  const matchingAccounts =
+    accounts.data?.accounts
+      .filter((account) =>
+        account.username.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
+      )
+      .sort((a, b) => a.username.localeCompare(b.username)) ?? [];
   const csrf = session.data?.csrfToken ?? "";
   const roles = accounts.data?.roles ?? [];
   const editing = dialog
@@ -164,10 +171,41 @@ export function Accounts({
         >
           <h2 className="font-semibold">Save this enrollment secret now</h2>
           <p className="max-w-3xl text-sm">
-            Send the secret privately to the account holder. Ask them to open /enroll. The console
-            never shows this secret again.
+            Send the secret privately to the account holder with the enrollment address below. The
+            console never shows this secret again.
           </p>
           <code className="border bg-background p-3 break-all select-all">{enrollment.secret}</code>
+          <p className="break-all text-sm">Enrollment address: {window.location.origin}/enroll</p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(enrollment.secret).then(
+                  () =>
+                    toast.success(
+                      "Enrollment secret copied. Share it privately, then clear the clipboard.",
+                    ),
+                  () => toast.error("Could not copy. Select the secret and copy it manually."),
+                );
+              }}
+            >
+              Copy enrollment secret
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/enroll`).then(
+                  () => toast.success("Enrollment address copied"),
+                  () =>
+                    toast.error(
+                      "Could not copy. Select the enrollment address and copy it manually.",
+                    ),
+                );
+              }}
+            >
+              Copy enrollment address
+            </Button>
+          </div>
           <p className="text-sm">
             Expires: <Timestamp value={enrollment.expiresAt} missing="Unknown" />
           </p>
@@ -189,6 +227,37 @@ export function Accounts({
           {accounts.data ? <p>Showing the accounts from the last refresh.</p> : null}
         </RpcError>
       ) : null}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="grid w-full gap-2 sm:max-w-sm">
+          <Label htmlFor="account-search">Find an account</Label>
+          <Input
+            id="account-search"
+            type="search"
+            placeholder="Search by username"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {accounts.data ? (
+            <p role="status" className="text-xs text-muted-foreground">
+              {matchingAccounts.length} of {accounts.data.accounts.length} accounts
+            </p>
+          ) : null}
+        </div>
+        <a href="#identity-settings-heading" className="text-sm underline underline-offset-4">
+          Review sign-in source
+        </a>
+      </div>
+      {accounts.data && accounts.data.accounts.length > 0 && matchingAccounts.length === 0 ? (
+        <EmptyState
+          title="No accounts match this search"
+          description="Search for another username, or clear the search to see all accounts."
+          action={
+            <Button variant="outline" onClick={() => setSearch("")}>
+              Clear search
+            </Button>
+          }
+        />
+      ) : null}
       {!accounts.isError && accounts.data?.accounts.length === 0 ? (
         <EmptyState
           title="No local accounts"
@@ -200,57 +269,63 @@ export function Accounts({
           }
         />
       ) : null}
-      {accounts.data && accounts.data.accounts.length > 0 ? (
-        <Table>
+      {accounts.data && matchingAccounts.length > 0 ? (
+        <Table aria-label="Local accounts">
           <TableHeader>
             <TableRow>
               <TableHead>Username</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Device access</TableHead>
-              <TableHead>Sign-in</TableHead>
+              <TableHead className="hidden md:table-cell">Role</TableHead>
+              <TableHead className="hidden md:table-cell">Device access</TableHead>
+              <TableHead className="hidden md:table-cell">Sign-in</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[...accounts.data.accounts]
-              .sort((a, b) => a.username.localeCompare(b.username))
-              .map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-medium whitespace-normal break-words">
-                    {account.username}
-                    {account.id === principal.id ? (
-                      <span className="font-normal text-muted-foreground"> (you)</span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell>
-                    {account.breakGlass ? "Emergency owner" : roleLabel(account.role)}
-                    {account.role && !roles.includes(account.role) ? (
-                      <span className="text-muted-foreground"> (role removed)</span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="whitespace-normal">
-                    {scopeSummary(account.scopes)}
-                  </TableCell>
-                  <TableCell className="min-w-48 whitespace-normal">
+            {matchingAccounts.map((account) => (
+              <TableRow key={account.id} className="align-top">
+                <TableCell className="max-w-0 font-medium whitespace-normal break-words md:max-w-none">
+                  {account.username}
+                  {account.id === principal.id ? (
+                    <span className="font-normal text-muted-foreground"> (you)</span>
+                  ) : null}
+                  <div className="mt-2 grid gap-2 text-xs font-normal md:hidden">
+                    <p>
+                      {account.breakGlass ? "Emergency owner" : roleLabel(account.role)}
+                      {account.role && !roles.includes(account.role) ? " (role removed)" : ""}
+                    </p>
+                    <p>{scopeSummary(account.scopes)}</p>
                     <AccountState account={account} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      aria-haspopup="dialog"
-                      aria-label={`Edit ${account.username}`}
-                      onClick={() => {
-                        setError(null);
-                        setDialog({ edit: account.id });
-                      }}
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  {account.breakGlass ? "Emergency owner" : roleLabel(account.role)}
+                  {account.role && !roles.includes(account.role) ? (
+                    <span className="text-muted-foreground"> (role removed)</span>
+                  ) : null}
+                </TableCell>
+                <TableCell className="hidden whitespace-normal md:table-cell">
+                  {scopeSummary(account.scopes)}
+                </TableCell>
+                <TableCell className="hidden min-w-48 whitespace-normal md:table-cell">
+                  <AccountState account={account} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="outline"
+                    aria-haspopup="dialog"
+                    aria-label={`Edit ${account.username}`}
+                    onClick={() => {
+                      setError(null);
+                      setDialog({ edit: account.id });
+                    }}
+                  >
+                    Edit
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       ) : null}

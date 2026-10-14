@@ -81,7 +81,16 @@ export async function reviewSetup({
     await page.goto(`${fixture.origin}/setup`);
     await record("first-run", theme, viewport, async (require) => {
       await page.getByRole("heading", { name: "Set up your owner account", exact: true }).waitFor();
+      require(await page
+        .getByRole("img", { name: "lindm", exact: true })
+        .isVisible(), "First-run setup does not identify the console");
       await page.getByLabel("Setup code", { exact: true }).waitFor();
+      require(await page
+        .getByText(
+          "Use at least 12 bytes. Have a security key or passkey ready for the next step.",
+          { exact: true },
+        )
+        .isVisible(), "Setup password and authenticator prerequisites are absent");
       require(await page
         .getByRole("button", { name: "Create owner account", exact: true })
         .isEnabled(), "Owner setup action is unavailable");
