@@ -14,7 +14,7 @@ import (
 )
 
 func TestDeployInstallerDiagnosticsAreEncryptedRawStreams(t *testing.T) {
-	for _, label := range []string{"first", "cold-launch"} {
+	for _, label := range []string{"first", "cold-launch", "first-journal"} {
 		t.Run(label, func(t *testing.T) {
 			checkDeployDiagnosticsAreEncryptedRawStreams(t, label)
 		})

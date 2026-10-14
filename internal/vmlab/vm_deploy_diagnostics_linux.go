@@ -39,6 +39,13 @@ func executeDeployInstaller(ctx context.Context, guest *guestVM, options VMDeplo
 	if diagnosticErr != nil || diagnostic.ExitCode != 0 {
 		captureErr = errors.Join(captureErr, errors.New("lab database failure observer did not complete"))
 	}
+	journal, journalErr := guest.runResult(ctx, "sudo -n env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service", nil, deployInstallerDiagnosticLimit, time.Minute)
+	defer clear(journal.Stdout)
+	defer clear(journal.Stderr)
+	captureErr = errors.Join(captureErr, writeDeployInstallerDiagnostics(recipient, options.EvidenceDirectory, filepath.Base(destination)+"-journal", journal.Stdout, journal.Stderr))
+	if journalErr != nil || journal.ExitCode != 0 {
+		captureErr = errors.Join(captureErr, errors.New("lab private service journal observer did not complete"))
+	}
 	if err != nil {
 		return errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
 	}

@@ -4122,6 +4122,19 @@ or an explicit CLI migration-configuration argument.
 This failed source observation is retained; no browser, enrollment or lifecycle
 qualification is claimed.
 
+The complete selector repair landed as `1e715c84b` after a zero-finding security
+reassessment. A fresh literal cold build produced authenticated `0.2.2` and
+`0.2.3` SDKs from that exact revision; `cold-release-attempt9.json` SHA-256 is
+`285684961b6b85fbcd4c5c7aa20d2371397af2d7f030e914585a596e47bd8919`.
+Fresh `native-ubuntu-attempt6.json` still failed before the browser, now with
+the fixed `systemctl failed (output withheld; inspect private service journal):
+exit status 1` label. Its record SHA-256 is
+`2456f71a3f17c5eeac62a704fd16fc6d789b7a18a0bead0292d6158422e095ae`.
+The failed lane now seals the bounded, last 200 combined runtime/migrator
+journal entries directly to the lab operator before closing its owned guest.
+Journal output is never printed, written as plaintext, placed in product
+artifacts, or treated as lifecycle qualification.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
