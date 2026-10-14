@@ -1,8 +1,10 @@
 name: Check
 
-# Keep hosted runs opt-in while this repository is private. The owner enables
-# push/pull_request triggers and branch protection at the public release.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -62,7 +64,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Install native package test tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync
       - run: make bootstrap
       - run: make test audit
 
@@ -87,7 +89,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Install native enrollment artifact tools
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes gnupg gpgv cloud-image-utils apt-utils dpkg-dev rpm rpm2cpio cpio createrepo-c systemd rsync
       - name: Require Docker Compose
         run: docker compose version
       - run: make bootstrap

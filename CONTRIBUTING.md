@@ -33,7 +33,7 @@ On Ubuntu 24.04, install the native package and fixture tools:
 sudo apt-get update
 sudo apt-get install --no-install-recommends --yes \
   build-essential git make gnupg gpgv cloud-image-utils apt-utils dpkg-dev \
-  rpm rpm2cpio cpio createrepo-c systemd
+  rpm rpm2cpio cpio createrepo-c systemd rsync
 make bootstrap
 ```
 
@@ -133,9 +133,8 @@ checks can skip on an unprivileged runner. A skipped check is not a pass. Hosted
 is not evidence for native package installation, boot, reboot, TPM, encryption,
 physical devices or the full platform matrix.
 
-While the repository is private, the committed workflow accepts only manual
-`workflow_dispatch` runs. It does not run on pushes or pull requests. The owner
-enables `push` and `pull_request` triggers and branch protection at public release.
+Hosted checks run on pushes to main and pull requests that target main.
+Use `workflow_dispatch` for a manual run.
 No hosted release publishing job or signing secret is required.
 
 The public `ubuntu-24.04` runner has 16 GB of RAM under GitHub's
