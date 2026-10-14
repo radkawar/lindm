@@ -153,7 +153,7 @@ export function ConsoleShell({
         !(event.ctrlKey || event.metaKey) ||
         event.key.toLowerCase() !== "b" ||
         !matchMedia("(min-width: 768px)").matches ||
-        document.querySelector('[role="dialog"]') ||
+        document.querySelector('[role="dialog"][data-open]') ||
         document.fullscreenElement
       )
         return;

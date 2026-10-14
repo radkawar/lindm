@@ -151,6 +151,8 @@ The icon control and Control/Command-B fold the page column away, retain the rai
 announce the change and return focus before hiding a focused link. The preference
 is local and keyed by public issuer/subject identity, never by a session token.
 The shortcut does not intercept typing, modal dialogs or fullscreen assistance.
+The modal guard checks Base UI's actual `data-open` state: closed `keepMounted`
+task dialogs remain in the DOM and must not disable page-navigation shortcuts.
 Mobile uses one closable drawer: current pages, Related work, other areas, account.
 The shell preserves the skip link, area/page/record breadcrumbs and light/dark toggle.
 The toggle stores a theme only after an explicit user choice. With no stored choice,
