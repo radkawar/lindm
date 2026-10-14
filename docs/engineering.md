@@ -528,6 +528,12 @@ Permission, timeout and native-command failures remain visible as warnings with
 their reported collection status. Do not invent stderr or a cause when the API
 does not include it.
 
+Device action refusals and agent-update observations use plain copy for the
+reported prerequisite, result and failed step. Unknown codes remain unknown and
+point to Details; they are not shown as successful or expanded into an invented
+cause. Original reason, phase, result and native verification codes remain in the
+same collapsed Details disclosure for support.
+
 Profiles name root-local approvals by identity: a local user's approved home
 root and a package's approved source. Published host inventory therefore carries
 the executor's `ApprovedConfigurationObservation` (its configured

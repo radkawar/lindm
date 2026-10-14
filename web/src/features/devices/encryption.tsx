@@ -41,6 +41,7 @@ import {
 } from "./action-display";
 import { deviceActionsQueryOptions, deviceEncryptionQueryOptions } from "./action-queries";
 import { Fact, ObservedTime } from "./observations";
+import { nativeActionReason } from "./native-status-copy";
 
 // One sentence answering "can this disk be unlocked if the passphrase is lost?",
 // from the escrow record and the latest observation of the escrowed volume.
@@ -164,6 +165,7 @@ export function DeviceEncryptionPanel({
     !escrow && canPermission(principal, actionPermissions.escrowRotate) ? secondary[0] : null;
   const menu = primary ? secondary.slice(1) : secondary;
   const details = [
+    { label: "Unsupported reason code", value: observed?.reason },
     ...(multipleVolumes
       ? volumeOptions.map((volume) => ({ label: `${volume.label} LUKS UUID`, value: volume.value }))
       : []),
@@ -329,9 +331,7 @@ export function DeviceEncryptionPanel({
                   )}
                 </Fact>
                 {observed.supported ? null : (
-                  <Fact label="Encryption actions">
-                    Not supported{observed.reason ? `: ${observed.reason}` : ""}
-                  </Fact>
+                  <Fact label="Encryption actions">{nativeActionReason(observed.reason)}</Fact>
                 )}
                 {observed.recoveryEnvironment ? (
                   <Fact label="Boot">

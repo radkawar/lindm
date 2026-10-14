@@ -34,6 +34,7 @@ import {
 import { DeviceActionDialog } from "./action-menu";
 import { deviceActionQueryOptions, deviceActionsQueryOptions } from "./action-queries";
 import { Fact, ObservedClock, ObservedTime } from "./observations";
+import { nativeActionReason, nativeVerificationEvidence } from "./native-status-copy";
 
 const failureLabels: Partial<Record<DeviceActionFailure, string>> = {
   [DeviceActionFailure.PRECONDITION]: "The device wasn't ready for this action",
@@ -501,14 +502,14 @@ export function DeviceActionResult({
           ) : null}
           {status.before && !status.before.supported ? (
             <Fact label="Not supported on this device">
-              {status.before.reason || "The device reported no reason."}
+              {nativeActionReason(status.before.reason)}
             </Fact>
           ) : null}
           <Fact label="Verified">
             {status.verification?.verified ? "Verified by device" : "Not verified"}
           </Fact>
           {status.verification?.evidence ? (
-            <Fact label="Details">{status.verification.evidence}</Fact>
+            <Fact label="Details">{nativeVerificationEvidence(status.verification.evidence)}</Fact>
           ) : null}
           {action.spec?.action.case === "restart" || action.spec?.action.case === "shutdown" ? (
             <>
@@ -551,6 +552,8 @@ export function DeviceActionResult({
         items={[
           { label: "Action ID", value: action.actionId },
           { label: "Closed reason", value: action.closedReason },
+          { label: "Unsupported reason code", value: status?.before?.reason },
+          { label: "Native verification evidence", value: status?.verification?.evidence },
           {
             label: "Failure code",
             value: status ? DeviceActionFailure[status.failure] : undefined,

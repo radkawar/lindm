@@ -5,6 +5,7 @@ import type { AgentUpdateStatus } from "../../../gen/lindm/agent/v1/update_pb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Fact, ObservedTime } from "./observations";
+import { agentUpdateReason, agentUpdateState, nativeUpdateStep } from "./native-status-copy";
 
 export function DeviceAgentUpdate({
   status,
@@ -35,8 +36,8 @@ export function DeviceAgentUpdate({
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Fact label="Automatic updates">{status.enabled ? "On" : "Off"}</Fact>
               <Fact label="Version">{status.version || "Not reported"}</Fact>
-              <Fact label="Phase">{status.phase || "Unknown"}</Fact>
-              <Fact label="Last result">{status.lastOutcome || "Unknown"}</Fact>
+              <Fact label="Phase">{agentUpdateState(status.phase)}</Fact>
+              <Fact label="Last result">{agentUpdateState(status.lastOutcome)}</Fact>
               <Fact label="Reported">
                 <ObservedTime value={status.observedAt} />
               </Fact>
@@ -49,15 +50,23 @@ export function DeviceAgentUpdate({
               <Fact label="Last checked for updates">
                 <ObservedTime value={status.lastMetadataAt} />
               </Fact>
-              <Fact label="Reason">{status.reason || "Not reported"}</Fact>
+              <Fact label="Reason">{agentUpdateReason(status.reason)}</Fact>
             </dl>
-            <TechnicalDetails items={[{ label: "Transaction ID", value: status.transactionId }]} />
+            <TechnicalDetails
+              items={[
+                { label: "Transaction ID", value: status.transactionId },
+                { label: "Phase code", value: status.phase },
+                { label: "Result code", value: status.lastOutcome },
+                { label: "Reason code", value: status.reason },
+                { label: "Failed step code", value: diagnostic?.phase },
+              ]}
+            />
             {diagnostic ? (
               <section className="space-y-3" aria-label="Last update failure">
                 <h4 className="text-sm font-medium">Last update failure</h4>
                 <dl className="grid gap-4 sm:grid-cols-3">
                   <Fact label="Package manager">{diagnostic.manager || "Unknown"}</Fact>
-                  <Fact label="Failed step">{diagnostic.phase || "Unknown"}</Fact>
+                  <Fact label="Failed step">{nativeUpdateStep(diagnostic.phase)}</Fact>
                   <Fact label="Exit code">
                     {diagnostic.exitCode === -1 ? "Not available" : diagnostic.exitCode}
                   </Fact>
