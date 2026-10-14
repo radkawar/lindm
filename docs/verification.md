@@ -697,7 +697,7 @@ the dispatch lane's systemd service evidence.
 | Fedora 43           | gated                                                       | gated                                                            | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                                                                                    | pass     | pass                                                                                                             | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | pass                                                                                                                                    | x86_64 pass; aarch64 gated                                                      | pass                                                               | pass                                                                                                                                                                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
 | Fedora 44           | gated                                                       | gated                                                            | x86_64 [pass][r5]; aarch64 [pass][r1]                                                  | x86_64 pass; aarch64 [pass (Bare VM; exact console clipboard; signed own-server RPM; real console Enrolled; owned cleanup)][r6] | pass                  | gated                         | pass                 | gated               | pass                            | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r19]; aarch64 [pass][r9]                 | x86_64 pass; aarch64 [pass (subset)][r9]                                                                                                                                | pass     | x86_64 [pass][r12]; aarch64 [pass (Secure Boot off)][r20]                                                        | x86_64 pass; aarch64 gated                                                                 | gated                                                                                       | x86_64 [pass (selected phases)][r12]; aarch64 pass                                                                                      | x86_64 pass; aarch64 gated                                                      | x86_64 [pass][r7]; aarch64 pass                                    | x86_64 [pass (GNOME; Tier 1 clipboard, keyboard, displays, messages; HIDDEN cursor on GNOME 50)][r14]; aarch64 [pass (GNOME, Secure Boot off)][r21]                                    | pass (native feed matching; not complete device coverage) | [pass][r22]                                                        | gated           |
 | RHEL 9              | x86_64 [pass (historical-install-audit)][r3]; aarch64 gated | gated                                                            | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 [pass (signed PACKAGES; entitled git; console unregister gate; same-policy registration retry)][r18]; aarch64 [pass (eight kinds)][r8]                           | pass     | x86_64 [pass (golden: Secure Boot off, TPM2, prompted cold unlocks)][r23]; aarch64 pass                          | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 [pass (lock, release, account disable and quarantine; GDM Wayland; Secure Boot on)][r23]; aarch64 pass                           | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r23]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 [pass][r24]; aarch64 [pass (registered; 11 scenarios)][r22] | gated           |
-| RHEL 10             | gated                                                       | gated                                                            | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 [fail (signed PACKAGES; entitled git; console unregister gate; same-policy registration retry)][r18]; aarch64 [pass (registered; all eight resource kinds)][r25] | pass     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r23]; aarch64 pass                                                 | pass                                                                                       | gated                                                                                       | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r23]; aarch64 pass                                        | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r23]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 pass; aarch64 [pass (registered; 11 scenarios)][r22]        | gated           |
+| RHEL 10             | gated                                                       | gated                                                            | pass                                                                                   | pass                                                                                                                            | pass                  | gated                         | pass                 | gated               | gated                           | x86_64 [pass][r1]; aarch64 pass                                                         | x86_64 [pass][r1]; aarch64 pass                        | x86_64 [pass (signed PACKAGES; entitled git; console unregister gate; same-policy registration retry)][r18]; aarch64 [pass (registered; all eight resource kinds)][r25] | pass     | x86_64 [pass (scenarios 1-5; Secure Boot on)][r23]; aarch64 pass                                                 | pass                                                                                       | gated                                                                                       | x86_64 [pass (live-root report-loss; server OUTCOME_UNKNOWN; Secure Boot on)][r23]; aarch64 pass                                        | pass                                                                            | x86_64 [pass (unregistered vendor KVM image)][r23]; aarch64 pass   | x86_64 pass; aarch64 —                                                                                                                                                                 | pass (partial-feed matching)                              | x86_64 pass; aarch64 [pass (registered; 11 scenarios)][r22]        | gated           |
 | Rocky Linux 9       | gated                                                       | gated                                                            | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                                                                                           | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                   | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (partial-feed matching)                              | pass                                                               | gated           |
 | Rocky Linux 10      | gated                                                       | gated                                                            | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | x86_64 pass; aarch64 [pass][r1]                        | x86_64 pass; aarch64 [pass (seven kinds)][r2]                                                                                                                           | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                   | pass                                                                                       | gated                                                                                       | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                              | pass (partial-feed matching)                              | pass                                                               | gated           |
 | AlmaLinux 9         | gated                                                       | gated                                                            | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | [pass][r1]                                             | x86_64 pass; aarch64 [pass (eight kinds)][r8]                                                                                                                           | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                   | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
@@ -2945,7 +2945,7 @@ no proof and stay `existing_package_unverified`.
 
 On 2026-10-14, the maintained `lab vm enroll-from-console` lane, with the
 qualification-only `-package-source-fixture` option, passed on fresh local
-x86_64 KVM Debian 12, Debian 13 and RHEL 9.8 guests. This is **installation of
+x86_64 KVM Debian 12, Debian 13, RHEL 9.8 and RHEL 10.2 guests. This is **installation of
 real vendor packages**, not the signed `lindm-resource-proof` adoption fixture
 above. Chromium copied the production console enrollment command; the normal
 installer installed the development-signed `lindm-agent` package and enrolled
@@ -2971,6 +2971,7 @@ Private records are under `~/.cache/lindm-pkg-source-proof/`:
 | Debian 12, `debian12-06/proof.json` | `git 1:2.39.5-0+deb12u3`, `htop 3.2.2-2` | `51aca7e9601e2467c40e5090f7a6e8c68232d21fcd6c8098e1126df10a625afc` |
 | Debian 13, `debian13-06/proof.json` | `git 1:2.47.3-0+deb13u1`, `htop 3.4.1-5` | `88862596af329f87011926c1044a1b14b7f83e64e79dcd48ce1bba2da33977e7` |
 | RHEL 9.8, `rhel9-05/proof.json`     | `git 0:2.52.0-1.el9`                     | `85ea162b67c7306dc6d8efe11e14a3820d69c589e08ce5ce5bb1aa5108f9fc2e` |
+| RHEL 10.2, `rhel10-04/proof.json`   | `git 0:2.52.0-1.el10`                    | `f1832d5ca1f5b1f54c9405d52232eced5f40051a6a370f7da81dff64adaef7df` |
 
 Debian's retained provider-isolated `sources.list` and independently hashed
 `InRelease` files prove all three official pockets were actually loaded:
@@ -2984,7 +2985,7 @@ symlink); its observed SHA-256 on both was
 The receipts include public key fingerprints, protected-file custody and
 nonsecret executor/agent state-directory paths.
 
-RHEL used only the registry-selected entitled
+RHEL 9.8 used only the registry-selected entitled
 `rhel-9-for-x86_64-baseos-rpms` and `rhel-9-for-x86_64-appstream-rpms`, with
 device-local RHSM credentials. A refreshed `dnf repoquery`, disabling all
 other repositories and refusing unavailable selected repositories, found
@@ -2993,9 +2994,9 @@ installed `redhat-release` was `9.8-1.0.el9`; the full public
 `RPM-GPG-KEY-redhat-release` file's SHA-256 was
 `0db3dc1b6228f29d60f37c5ad91d9f4cd3547895e8ebedb242469b1c0a0cdf08`.
 This full-file receipt is distinct from the selected release-key-2 authority;
-RHEL 10's installed bundle was not observed by this proof.
+the independently observed RHEL 10.2 bundle receipt is recorded below.
 
-After unregistering RHEL, the **same** signed version 2 and applied digest
+After unregistering RHEL 9.8, the **same** signed version 2 and applied digest
 `PMtfS6BQZvBE3tPrlpcoqDWKZmTkbSwmsJADdxDtwbI=` reported packages `UNAVAILABLE`
 with `rhsm_registration_required`. The actual assigned `git` server resource
 row became `BLOCKED` with that reason and an attested admission refusal.
@@ -3065,6 +3066,58 @@ admission queue and the maintained `enroll-from-console` command, supply
 only. Debian used `OVMF_CODE_4M.secboot.fd` with plain `OVMF_VARS_4M.fd`,
 package `ovmf` version `2024.02-2ubuntu0.10`, without `-secure-boot`.
 
+RHEL 10.2's `rhel10-04` rerun passed from the rebased landed
+multi-signature verifier `e423ed9cd`. It used exactly
+`rhel-10-for-x86_64-baseos-rpms` and `rhel-10-for-x86_64-appstream-rpms`,
+with device-local RHSM certificate/key references and no local package-provider
+opt-in. The public redacted definitions in
+`rhel10-04/lindm-cloud-init-1038674817.json` have decoded SHA-256
+`691c77c94c462d6ca24a7304680daeb2e15bd6a2ca339268d5ab70bd6c39b89c`.
+The installed `redhat-release` was `10.2-17.el10`; the actual full vendor-key
+bundle SHA-256 was
+`d5ddf4a09b2dccc41c27e06f70dc7b2009704723115b5f824873b8d5133f84e2`.
+Only pinned release key 2 supplied package authority. Native preparation and
+installation committed `git 0:2.52.0-1.el10` with the unchanged native
+signature/digest verification flags, followed by attested `SUCCEEDED`,
+`CONVERGED`, approved-source/database/version/configuration/manifest checks and
+independent `rpm -q`. The fresh official-only `htop` query again found none;
+no EPEL or `htop` installation is claimed.
+
+Unregistering RHEL 10.2 preserved signed version 2, its acceptance time and
+applied digest `vL7cJkCdNk8SRONRDv4dFLcBacaxtLZeY+Uhd/Z6d0M=`, but changed
+Packages to `UNAVAILABLE` with `rhsm_registration_required`. The assigned
+`git` row became `BLOCKED` with an attested admission refusal, and Chromium's
+real Services tab displayed **“Register this device with Red Hat”** in
+light/dark desktop/mobile captures. The light desktop screenshot
+`rhel10-04/console/chromium-enrollment-status-device-redhat-registration-light-desktop.png`
+has SHA-256
+`9d427bf91bb3cd63af8d7bbc6eb04cf561b59873f3bfdade0fb9ea4431ed7cc8`.
+The same profile assignment `7f3abe73-37e0-4d35-9e6c-a49fca80d709`
+recovered after registration: gate action `404c4481-e282-4170-8196-1a776d5054d4`,
+sequence 3, became new action `a98ce727-e588-4d98-a5da-eb7852195f3b`,
+sequence 4, with a read-only native `CONVERGED` re-verification. Its verification
+time `1791957984.621347000` and attestation `1791957984.630613000`
+are strictly after the captured registration completion
+`1791957650.240630164`. This proves managed-provenance recovery, not unmanaged
+package adoption.
+
+Both passing-run RHSM consumers, `86780407-fe70-49bf-910e-e803afea87b3`
+and `278cd7fe-9d5b-46d7-bd71-9ca947053125`, were unregistered and their
+activation keys deleted. Exact-UUID API reconciliation independently observed
+both absent; the private run retains `consumer-api-cleanup-original.json` and
+`consumer-api-cleanup-retry.json`. Guest and console cleanup both completed.
+The passing record binds source SHA-256
+`5cafe4b5666167f6815f5f92e133e04ef2b33493e2cc9bf412ca880616d0a275`,
+agent binary `58b6d0f51180339ef39d0862ca4035cd32c854d19e4042056533aefd5459afc4`,
+matching unsigned RPM
+`bfd76fd4a6a224625a1e8a3d2081802e28eb127251f742641d59187af72a80d1`,
+exercised development-signed RPM
+`5095cfc131e83be0137f8312b3a46816ff6196b733f085cd7a5366a3ea65ff10`,
+and server binary
+`470edcb9fa3617afcf44f19f98dfe6294a44d9ab900f1a1d3bf74fe785bab7d9`.
+The exact maintained FIFO invocation is `native-command-rhel10-04.json`,
+SHA-256 `be6f430511e1f8c025abbc587c08d45eae574b7d5c33da2053ccccb1d4ab349c`.
+
 Earlier actual failures remain private evidence, not passing qualification:
 RHEL `-02` returned attested `preparation_precondition_failed` (no native
 root-cause journal then); RHEL `-03` installed `git` but timed out on a stale
@@ -3102,6 +3155,16 @@ refuses. No PQ key was imported and no approved key changed. Parser regressions
 cover both signature layouts and these refusal cases; adding them does not
 constitute an exercised native installation.
 
+`PackageSourceParity` independently reviewed the parser and all affected DNF,
+Zypper and provenance callsites read-only, with no findings; its review did not
+run tests or a native lane. The private review receipt
+`rhel10-multisignature-review.json` has SHA-256
+`14d844858579946241cf23fbec6d9f44db9e6d9870e3496807f5f49c0009a57b`.
+The normal landing gate for `e423ed9cd` passed its race tests of packageprovider,
+vmlab and their affected dependents. The separate passing RHEL 10.2 record above
+is the native installation/commit qualification of that verifier; the earlier
+Debian/RHEL 9 records do not qualify this parser change.
+
 All three attempt-owned registrations were unregistered and their activation
 keys deleted. Exact-UUID Red Hat API reconciliation independently observed
 consumers `8b6eeb6e-b0f3-4f0f-b041-a4d0e522cc4d`,
@@ -3123,9 +3186,9 @@ and `TestAPTPreparationRechecksCopiedKeyringDigest`. The proof worker did not
 rerun those source-unit checks.
 
 These are separate from the native package evidence above. Not exercised:
-successful RHEL 10 installation/registration recovery, aarch64, physical hardware, TPM/Secure Boot, unmanaged-package
-adoption, complete resource-kind qualification, or offline vendor-package
-installation. The guests were networked, no-desktop KVM VMs; Debian used UEFI
+aarch64, physical hardware, TPM/Secure Boot, unmanaged-package adoption, complete
+resource-kind qualification, or offline vendor-package installation. The guests
+were networked, no-desktop KVM VMs; Debian used UEFI
 setup mode with Secure Boot disabled, RHEL used SeaBIOS, and all lacked a TPM.
 
 ##### Secret-delivered password hash and managed local-admin password

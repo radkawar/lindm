@@ -12683,6 +12683,22 @@
       "scope": "signed PACKAGES; entitled git; console unregister gate; same-policy registration retry",
       "reference": "#registry-package-source-native-parity",
       "mainlineRevision": "04a970f0d6960a83f1f66d60e64a903ba06ccaa2"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "rhel-10.2-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-pkg-source-proof/rhel10-04/proof.json",
+      "sha256": "f1832d5ca1f5b1f54c9405d52232eced5f40051a6a370f7da81dff64adaef7df",
+      "recorded": "2026-10-14T06:06:32.464418865Z",
+      "revision": "e423ed9cd810aa373692027ff6a1d5ece5fbe9b5-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "signed PACKAGES; entitled git; console unregister gate; same-policy registration retry",
+      "reference": "#registry-package-source-native-parity",
+      "mainlineRevision": "e423ed9cd810aa373692027ff6a1d5ece5fbe9b5"
     }
   ]
 }

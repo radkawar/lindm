@@ -376,10 +376,24 @@ by `10101` and no certificate/key contents. It records `sslverifystatus`,
 `metadata_expire` and `enabled_metadata`, without `ui_repoid_vars` on that guest.
 The parser regression protects these observed fields, not successful native
 package execution.
-These are implementation/security regressions, not live entitlement, package
-transaction or SELinux qualification. Existing RHEL native records below remain
-the only qualification claims; parent-run source-parity proof must be recorded
-separately in [verification](../verification.md).
+These fixtures are implementation/security regressions, not live entitlement,
+package transaction or SELinux qualification.
+
+The maintained registry-source lane passed separately on RHEL 9.8 and RHEL 10.2
+x86_64 ([native parity record](../verification.md#registry-package-source-native-parity)).
+RHEL 10.2's `~/.cache/lindm-pkg-source-proof/rhel10-04/proof.json` has SHA-256
+`f1832d5ca1f5b1f54c9405d52232eced5f40051a6a370f7da81dff64adaef7df`.
+It installed actual entitled `git 0:2.52.0-1.el10` from the exact registry
+BaseOS/AppStream source with device-local RHSM credentials and the signed
+Packages grant, without local provider opt-in. Native signature/digest checking
+remained enabled through the committed installation. The same signed policy
+then refused the unregistered device with `rhsm_registration_required`, visibly
+showed **Register this device with Red Hat** on the Services tab, and recovered
+with a new postregistration attested read-only convergence of the same assignment.
+Both RHSM consumers were unregistered, their activation keys deleted, and exact
+UUID API reconciliation observed both absent. These connected x86_64 results do
+not qualify aarch64, EUS/E4S, Satellite, offline vendor packages or unmanaged
+package adoption.
 
 ### Package resources (DNF4)
 
