@@ -28,7 +28,7 @@ func (s *demoSeed) proposeAdvisoryAcceptance(ctx context.Context, d *simulatedDe
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		finding, freshness, err := s.affectedFinding(ctx, d)
+		finding, freshness, err := s.demoFinding(ctx, d, false)
 		if finding != nil {
 			request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: d.id, FindingId: finding.GetId(), ExpiresAt: timestamppb.New(time.Now().Add(7 * 24 * time.Hour)), Reason: "Review the isolated management-network exposure before the scheduled patch window"}
 			if _, err := s.owner.Admin.CreateApproval(ctx, connect.NewRequest(&adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}})); err != nil {
@@ -50,9 +50,9 @@ func (s *demoSeed) proposeAdvisoryAcceptance(ctx context.Context, d *simulatedDe
 	}
 }
 
-// affectedFinding returns d's first AFFECTED finding, or nil with the
-// evaluation's freshness when the listing holds none.
-func (s *demoSeed) affectedFinding(ctx context.Context, d *simulatedDevice) (*adminv1.AdvisoryFinding, *adminv1.AdvisoryFreshness, error) {
+// demoFinding returns the first affected finding, including accepted findings
+// only for evidence setup that must not depend on whether a risk was accepted.
+func (s *demoSeed) demoFinding(ctx context.Context, d *simulatedDevice, includeAccepted bool) (*adminv1.AdvisoryFinding, *adminv1.AdvisoryFreshness, error) {
 	var freshness *adminv1.AdvisoryFreshness
 	for token := ""; ; {
 		response, err := s.owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: d.id, PageSize: 200, PageToken: token}))
@@ -61,7 +61,8 @@ func (s *demoSeed) affectedFinding(ctx context.Context, d *simulatedDevice) (*ad
 		}
 		freshness = response.Msg.GetFreshness()
 		for _, finding := range response.Msg.GetFindings() {
-			if finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {
+			if finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED ||
+				(includeAccepted && finding.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_ACCEPTED) {
 				return finding, freshness, nil
 			}
 		}

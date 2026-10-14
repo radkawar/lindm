@@ -6,6 +6,7 @@ import { journeys as lostDevice } from "./review-journeys-lost-device.mjs";
 import { journeys as policy } from "./review-journeys-policy.mjs";
 import { journeys as provisioning } from "./review-journeys-provision.mjs";
 import { journeys as security } from "./review-journeys-security.mjs";
+import { journeys as vulnerability } from "./review-journeys-vulnerability.mjs";
 
 const order = [
   "baseline",
@@ -29,7 +30,15 @@ const escape = (value) =>
 // These are administrator task walks through the real seeded console, not native
 // device qualification. A prerequisite or product blocker remains a recorded
 // blocker; a screenshot never turns a request into an observed device effect.
-export async function taskWalkthroughs({ page, config, visit, settle, screenshot, protectSecret }) {
+export async function taskWalkthroughs({
+  page,
+  driver,
+  config,
+  visit,
+  settle,
+  screenshot,
+  protectSecret,
+}) {
   const definitions = [
     ...administration,
     ...enrollment,
@@ -37,6 +46,7 @@ export async function taskWalkthroughs({ page, config, visit, settle, screenshot
     ...policy,
     ...provisioning,
     ...security,
+    ...vulnerability,
   ];
   if (
     definitions.length !== order.length ||
@@ -104,6 +114,8 @@ export async function taskWalkthroughs({ page, config, visit, settle, screenshot
     };
     try {
       const outcome = await definition.run({
+        driver,
+        protectSecret,
         page,
         config,
         visit: (path) => visit(page, path),

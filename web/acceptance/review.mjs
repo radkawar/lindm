@@ -1132,6 +1132,7 @@ async function main() {
     }
     report.walkthroughs = await taskWalkthroughs({
       page: requester,
+      driver,
       config,
       visit,
       settle,

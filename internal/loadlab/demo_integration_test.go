@@ -683,3 +683,84 @@ func TestDemoOrganizationResourceConvergence(t *testing.T) {
 		t.Fatalf("converge: %v; state read: %v", err, readErr)
 	}
 }
+
+// Interactive seeding accepts Fedora's only fixture finding before the
+// asynchronous refused-scan setup starts. Acceptance must not stall that setup.
+func TestInteractiveDemoRefusedScanAfterAcceptedFinding(t *testing.T) {
+	repository, binary := os.Getenv("LINDM_CONSOLE_REPOSITORY"), os.Getenv("LINDM_CONSOLE_LINDMD")
+	if repository == "" || binary == "" {
+		t.Fatal("set LINDM_CONSOLE_REPOSITORY and LINDM_CONSOLE_LINDMD for the console lab regression")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Minute)
+	defer cancel()
+	fixture, err := devlab.OpenLocalConsoleAuthorityFixture(ctx, repository, binary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := fixture.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	source, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	demo, presence, err := SeedDemo(ctx, fixture, DemoOptions{
+		SourceDirectory: source, FixtureFeeds: true, BackgroundPackageFailure: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := presence.Stop(); err != nil {
+			t.Error(err)
+		}
+	})
+	owner, err := fixture.OpenOwnerSession(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, stop := context.WithTimeout(context.Background(), 15*time.Second)
+		defer stop()
+		if err := owner.Close(cleanup); err != nil {
+			t.Error(err)
+		}
+	})
+	var deviceID string
+	for _, device := range demo.Devices {
+		if device.Hostname == "fedora-ws-03" {
+			deviceID = device.ID
+		}
+	}
+	if deviceID == "" {
+		t.Fatal("refused-scan fixture device is missing")
+	}
+	first, err := owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Msg.GetTotals().GetAccepted() == 0 {
+		t.Fatal("regression prerequisite: the only fixture finding must already have an accepted exception")
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	for {
+		result, err := owner.Admin.ListDeviceFindings(ctx, connect.NewRequest(&adminv1.ListDeviceFindingsRequest{DeviceId: deviceID}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.Msg.GetFreshness().GetReason() == "package_collection_failed" {
+			if len(result.Msg.GetFindings()) == 0 || result.Msg.GetFindings()[0].GetException() == nil {
+				t.Fatal("refused scan lost the retained finding or its accepted exception")
+			}
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("accepted exception stalled the background refused scan", ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}

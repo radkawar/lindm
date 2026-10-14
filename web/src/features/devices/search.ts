@@ -23,6 +23,8 @@ export type DeviceSearch = ListSearch & {
   hostnameSearch?: string;
   sort?: DeviceSortColumn;
   order?: "asc" | "desc";
+  advisoryId?: string;
+  advisorySeverity?: string;
 };
 
 export function parseDeviceSearch(search: Partial<DeviceSearch> & SearchSchemaInput): DeviceSearch {
@@ -34,6 +36,8 @@ export function parseDeviceSearch(search: Partial<DeviceSearch> & SearchSchemaIn
     ...parseListSearch(search),
     filter: typeof search.filter === "string" ? search.filter : "",
     hostnameSearch: typeof search.hostnameSearch === "string" ? search.hostnameSearch : "",
+    advisoryId: typeof search.advisoryId === "string" ? search.advisoryId : "",
+    advisorySeverity: typeof search.advisorySeverity === "string" ? search.advisorySeverity : "",
     ...(sort ? { sort, order: search.order === "desc" ? "desc" : "asc" } : {}),
   };
 }

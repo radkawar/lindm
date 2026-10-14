@@ -1639,6 +1639,17 @@ revocation for a separate offline fixture device, then opens device-scoped audit
 history. The offline lock remains blocked; revocation is not a disk wipe or a
 local account lock. Single-eligible-admin reveal behavior remains covered by
 `internal/device/reveal_approval_integration_test.go`, not this multi-admin demo.
+
+The vulnerability walkthrough opens an advisory's named affected-device list,
+reviews a maintenance window and Patch now, then proposes a time-limited exception.
+A second test-owned administrator enrolls through the UI and approves the proposal;
+the requester applies it and checks the recorded acceptance on the device.
+The existing device list carries an exact advisory and severity filter. Its
+actor-, scope- and filter-bound cursor preserves the normal list authorization
+and pagination contract. Current findings without active exceptions match the
+advisory summary's affected population; unknown exposure is not a clear result.
+Patch requests and accepted exceptions remain distinct from native remediation.
+
 A walk reports
 **blocked**, not completed, when the actual UI cannot finish its job or a native
 installation, user consent, second approver or real device execution is required.

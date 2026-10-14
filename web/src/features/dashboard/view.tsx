@@ -164,31 +164,33 @@ export function DashboardView() {
   const next =
     canApprove && approvals && (approvals.pendingApprovals > 0n || approvals.readyToRun > 0n)
       ? "approvals"
-      : canFixCoverage && uncovered > 0n
-        ? "coverage"
-        : contact && contact.staleDevices > 0n && staleFilter
-          ? "contact"
-          : compliance &&
-              (compliance.attentionResources > 0n ||
-                compliance.staleResources > 0n ||
-                compliance.unknownResources > 0n)
-            ? "profiles"
-            : findings &&
-                (findings.partialDevices > 0n ||
-                  findings.criticalFindings > 0n ||
-                  findings.highFindings > 0n ||
-                  findings.mediumFindings > 0n ||
-                  findings.lowFindings > 0n ||
-                  findings.otherFindings > 0n)
-              ? "findings"
-              : patch &&
-                  (patch.securityPendingDevices > 0n ||
-                    patch.rebootRequiredDevices > 0n ||
-                    patch.staleDevices > 0n ||
-                    patch.unknownDevices > 0n ||
-                    patch.failedRunDevices > 0n)
-                ? "patch"
-                : "devices";
+      : findings && findings.criticalFindings > 0n
+        ? "findings"
+        : canFixCoverage && uncovered > 0n
+          ? "coverage"
+          : contact && contact.staleDevices > 0n && staleFilter
+            ? "contact"
+            : compliance &&
+                (compliance.attentionResources > 0n ||
+                  compliance.staleResources > 0n ||
+                  compliance.unknownResources > 0n)
+              ? "profiles"
+              : findings &&
+                  (findings.partialDevices > 0n ||
+                    findings.criticalFindings > 0n ||
+                    findings.highFindings > 0n ||
+                    findings.mediumFindings > 0n ||
+                    findings.lowFindings > 0n ||
+                    findings.otherFindings > 0n)
+                ? "findings"
+                : patch &&
+                    (patch.securityPendingDevices > 0n ||
+                      patch.rebootRequiredDevices > 0n ||
+                      patch.staleDevices > 0n ||
+                      patch.unknownDevices > 0n ||
+                      patch.failedRunDevices > 0n)
+                  ? "patch"
+                  : "devices";
 
   return (
     <section
@@ -313,12 +315,46 @@ export function DashboardView() {
                 </WorkItem>
               ) : null}
               <WorkItem
+                title="Security findings"
+                primary={next === "findings"}
+                action={
+                  <Link
+                    to="/advisories"
+                    hash="advisory-findings"
+                    className={queueLinkClass(next === "findings")}
+                  >
+                    {findings && findings.criticalFindings > 0n
+                      ? "Review critical findings"
+                      : "Review advisory evidence"}{" "}
+                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
+                  </Link>
+                }
+              >
+                {findings ? (
+                  <>
+                    <p>
+                      <strong className="font-semibold tabular-nums">
+                        {plural(findings.criticalFindings, "critical finding", "critical findings")}
+                      </strong>{" "}
+                      · {plural(findings.highFindings, "high finding", "high findings")}.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Counts findings on{" "}
+                      {plural(findings.evaluatedDevices, "checked device", "checked devices")}. This
+                      count excludes accepted findings. Zero findings does not mean no exposure.
+                    </p>
+                  </>
+                ) : (
+                  <Unavailable section="Advisory summary" />
+                )}
+              </WorkItem>
+              <WorkItem
                 title={
                   !findings
                     ? "Vulnerability coverage"
                     : uncovered > 0n
-                      ? `${plural(uncovered, "device has", "devices have")} no vulnerability coverage`
-                      : "Every active device has vulnerability coverage"
+                      ? `${plural(uncovered, "device has", "devices have")} unknown exposure`
+                      : "Vulnerability coverage"
                 }
                 primary={next === "coverage"}
                 action={
@@ -337,7 +373,7 @@ export function DashboardView() {
                 {findings ? (
                   <p className="text-xs text-muted-foreground">
                     {uncovered > 0n
-                      ? `No advisory source has checked these devices' packages. Their exposure is unknown. ${canFixCoverage ? "Open Advisories to check the cause and add coverage." : "Open Advisories to check the cause. Ask an administrator with fleet-wide access to add coverage."}`
+                      ? `Current inventory or advisory sources cannot establish exposure on these devices. ${canFixCoverage ? "Open Advisories to check the cause." : "Open Advisories to check the cause. Ask an administrator with fleet-wide access to resolve it."}`
                       : `Coverage checks only some packages on ${plural(findings.partialDevices, "device", "devices")}.`}
                   </p>
                 ) : (
@@ -434,34 +470,6 @@ export function DashboardView() {
                   </>
                 ) : (
                   <Unavailable section="Profile item summary" />
-                )}
-              </WorkItem>
-              <WorkItem
-                title="Security findings"
-                primary={next === "findings"}
-                action={
-                  <Link to="/advisories" className={queueLinkClass(next === "findings")}>
-                    Review advisory evidence{" "}
-                    <ArrowUpRightIcon aria-hidden="true" className="size-4" />
-                  </Link>
-                }
-              >
-                {findings ? (
-                  <>
-                    <p>
-                      <strong className="font-semibold tabular-nums">
-                        {plural(findings.criticalFindings, "critical finding", "critical findings")}
-                      </strong>{" "}
-                      · {plural(findings.highFindings, "high finding", "high findings")}.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Counts findings on{" "}
-                      {plural(findings.evaluatedDevices, "checked device", "checked devices")}. This
-                      count excludes accepted findings. Zero findings does not mean no exposure.
-                    </p>
-                  </>
-                ) : (
-                  <Unavailable section="Advisory summary" />
                 )}
               </WorkItem>
               <WorkItem

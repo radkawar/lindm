@@ -85,13 +85,13 @@ export function AdvisoryFleet() {
           canReviewSources={canReviewSources}
         />
       ) : null}
-      <Card>
+      <Card id="advisory-findings" className="scroll-mt-4">
         <CardHeader>
           <CardTitle>
             <h2>Across your devices</h2>
           </CardTitle>
           <CardDescription>
-            Accepting a finding hides it; it doesn't fix the device.
+            Open an advisory to see affected devices. An accepted risk is not a package fix.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
@@ -134,21 +134,35 @@ export function AdvisoryFleet() {
                   </dd>
                 </div>
               </dl>
-              <Table>
-                <TableHeader>
+              <Table className="max-sm:block max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_td]:block max-sm:[&_td]:whitespace-normal">
+                <TableHeader className="max-sm:sr-only">
                   <TableRow>
                     <TableHead>Advisory</TableHead>
                     <TableHead>Severity</TableHead>
                     <TableHead>Affected devices</TableHead>
-                    <TableHead>Accepted</TableHead>
+                    <TableHead>Devices with accepted risk</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {summary.data.advisories.map((advisory) => {
                     return (
-                      <TableRow key={advisory.advisoryId}>
+                      <TableRow key={`${advisory.advisoryId}/${advisory.severity}`}>
                         <TableCell>
-                          <p>{advisory.advisoryId}</p>
+                          <Link
+                            to="/devices"
+                            search={{
+                              pageSize: 50,
+                              pageToken: "",
+                              advisoryId: advisory.advisoryId,
+                              advisorySeverity: advisory.severity,
+                              sort: "hostname",
+                              order: "asc",
+                            }}
+                            className="font-medium underline underline-offset-4"
+                            aria-label={`View affected devices for ${advisory.advisoryId}`}
+                          >
+                            {advisory.advisoryId}
+                          </Link>
                           {advisory.cves.length ? (
                             <p className="text-xs text-muted-foreground">
                               {advisory.cves.join(", ")}
@@ -156,15 +170,26 @@ export function AdvisoryFleet() {
                           ) : null}
                         </TableCell>
                         <TableCell>
+                          <span className="text-xs text-muted-foreground sm:hidden">
+                            Severity:{" "}
+                          </span>
                           <Severity value={advisory.severity} />
                         </TableCell>
                         <TableCell>
+                          <span className="text-xs text-muted-foreground sm:hidden">
+                            Affected devices:{" "}
+                          </span>
                           <AffectedDevices
                             affected={advisory.affectedDevices}
                             unconfirmed={advisory.unknownDevices}
                           />
                         </TableCell>
-                        <TableCell>{advisory.acceptedDevices.toString()}</TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground sm:hidden">
+                            Devices with accepted risk:{" "}
+                          </span>
+                          {advisory.acceptedDevices.toString()}
+                        </TableCell>
                       </TableRow>
                     );
                   })}

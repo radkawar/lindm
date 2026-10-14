@@ -170,7 +170,7 @@ const actionSummaries: Record<DeviceActionKind, string> = {
   shutdown: "Shut down the device.",
   refreshInventory: "Collect a fresh inventory from this device.",
   localAdminPasswordRotate: "Set a new password for the managed local admin account.",
-  patchNow: "Install OS updates now. Results appear in Patch status.",
+  patchNow: "Start OS updates now. This does not schedule a maintenance window.",
 };
 
 // Where a requested inventory refresh stands as of its last poll. Polling stops
@@ -1378,8 +1378,8 @@ export function DeviceActionForm({
                     </>
                   ) : null}
                   <p className="text-sm text-muted-foreground">
-                    This action only starts the device&apos;s native update run. Its result,
-                    installed updates and any pending reboot appear in Patch status on this device.
+                    An accepted request is not proof that updates installed. Check Patch status on
+                    the Inventory tab, then request fresh inventory and review Findings.
                   </p>
                 </>
               ) : null}

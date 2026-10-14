@@ -20,6 +20,8 @@ export function devicesQueryOptions(lifetime: AuthLifetime, search: DeviceSearch
           filter: deviceFilter(search),
           sort: deviceSort(search),
           hostnameSearch: search.hostnameSearch ?? "",
+          advisoryId: search.advisoryId ?? "",
+          advisorySeverity: search.advisorySeverity ?? "",
         },
         { signal: AbortSignal.any([signal, lifetime.signal]) },
       );

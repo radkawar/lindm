@@ -23,6 +23,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Retain Go 1.26.9 and Node 24.21.0 at their latest patch releases. Hold TypeScript at 6.0.3 for the ESLint parser's supported peer range and Sigstore at its Go-1.26-compatible v1.10.11 maintenance release.
 - Bound golden-schema initialization queueing by the calling test and start the unchanged migration/snapshot deadline after lock admission, so waiting packages retain their actual work budget.
 - Serialize golden integration-schema migration, PostgreSQL snapshot and removal across package processes to avoid exhausting shared relation locks, without serializing normal test cases or restarting the fixture.
+- Connect dashboard security findings to named, scope-filtered advisory exposure. Keep accepted risks and unknown coverage separate, link findings to patch review and maintenance policies, explain native patch-status and reboot reasons without showing raw codes as primary text, and verify time-limited risk exceptions through independent approval in the console walkthrough.
+- Let the interactive demo complete its refused package-scan state after a finding's risk was accepted, instead of waiting for a finding that acceptance removed from the open population.
 - Replace advisory fixtures with unclear redistribution grants with independently authored regression data. Keep explicitly licensed vendor data and native comparator fixtures under their own terms.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.

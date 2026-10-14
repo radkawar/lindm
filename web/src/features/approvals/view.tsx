@@ -755,7 +755,13 @@ function ApprovalCard({
           </dd>
         </div>
         <div>
-          <dt>{unexpired ? "Expires: " : "Expired: "}</dt>
+          <dt>
+            {approval.payload.case === "acceptAdvisoryFinding"
+              ? "Approval deadline: "
+              : unexpired
+                ? "Expires: "
+                : "Expired: "}
+          </dt>
           <dd>
             <Timestamp value={approval.expiresAt} />
           </dd>
@@ -809,6 +815,21 @@ function ApprovalCard({
           <p>
             Risk acceptance expires: <Timestamp value={approval.payload.value.expiresAt} />
           </p>
+          <p>
+            {approval.state === ApprovalState.PENDING
+              ? "Approval permits the requester to accept this risk. Approval alone does not change the finding."
+              : approval.state === ApprovalState.APPROVED
+                ? "The requester must select Accept approved risk to apply this exception."
+                : "Review the device findings to check the recorded exception and current exposure."}
+          </p>
+          <Link
+            to="/devices/$deviceId"
+            params={{ deviceId: approval.payload.value.deviceId }}
+            search={{ tab: "findings" }}
+            className="underline underline-offset-4"
+          >
+            Review findings on {approval.deviceHostname || "this device"}
+          </Link>
         </div>
       ) : null}
       {/* An open destructive request's consequence line already names its

@@ -56,7 +56,7 @@ func (s *demoSeed) packageFailureInBackground(presence context.Context, devices 
 
 // denyPackageScan leaves d's real-feed findings standing on a device that is
 // no longer fully checked. After the server's own evaluation reports an
-// AFFECTED finding, the host reports a later package collection its collector
+// affected or accepted finding, the host reports a later package collection its collector
 // was refused (PERMISSION_DENIED: the failure the native lifecycle lane
 // induces with a systemd InaccessiblePaths drop-in on the package database
 // tool). The server keeps the last successful snapshot and its findings and
@@ -69,13 +69,14 @@ func (s *demoSeed) denyPackageScan(ctx context.Context, d *simulatedDevice) erro
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		finding, freshness, err := s.affectedFinding(wait, d)
+		// An active exception changes a finding to ACCEPTED, not to absent.
+		finding, freshness, err := s.demoFinding(wait, d, true)
 		if finding != nil {
 			break
 		}
 		select {
 		case <-wait.Done():
-			return errors.Join(fmt.Errorf("wait for an AFFECTED finding on %s before its refused package scan (last freshness %v %q): %w", d.demo.hostname, freshness.GetState(), freshness.GetReason(), wait.Err()), err)
+			return errors.Join(fmt.Errorf("wait for an affected or accepted finding on %s before its refused package scan (last freshness %v %q): %w", d.demo.hostname, freshness.GetState(), freshness.GetReason(), wait.Err()), err)
 		case <-ticker.C:
 		}
 	}

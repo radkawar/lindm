@@ -6,6 +6,7 @@ package device
 
 import (
 	"crypto/sha256"
+	"net/http"
 	"testing"
 	"time"
 
@@ -18,8 +19,10 @@ import (
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
+	authv1 "lindm/gen/lindm/auth/v1"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	resourcev1 "lindm/gen/lindm/resource/v1"
+	"lindm/internal/advisory"
 	"lindm/internal/identity"
 )
 
@@ -140,6 +143,12 @@ func TestListDevicesPostureNeverFabricatesUnreportedState(t *testing.T) {
 func TestListDevicesFindingsMatchFreshEvaluationMinusExceptions(t *testing.T) {
 	parallelDeviceIntegration(t)
 	f := newEnrolled(t, 0)
+	// Create the evaluator before publishing the externally configured test feed.
+	var err error
+	f.svc.Advisories, err = advisory.New(f.ctx, f.svc.Pool, nil, &http.Client{Timeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
 	feedRevision, setID := uuid.NewString(), uuid.NewString()
 	fleetSummaryExec(t, f, `INSERT INTO advisory_feeds(id,distro,release,source_url,config_bytes,revision,expires_at,checked_at)
  VALUES('posture-feed','ubuntu','24.04','https://example.test/feed','',$1,CURRENT_TIMESTAMP+interval '1 day',CURRENT_TIMESTAMP)`, feedRevision)
@@ -169,6 +178,7 @@ func TestListDevicesFindingsMatchFreshEvaluationMinusExceptions(t *testing.T) {
 	if got := listedPosture(t, f).GetFindings(); !proto.Equal(got, want) {
 		t.Fatalf("findings = %v, want %v (accepted exception excluded)", got, want)
 	}
+	checkAdvisoryDeviceDrilldown(t, f, setID)
 	fleetSummaryExec(t, f, "UPDATE advisory_exceptions SET accepted_at=CURRENT_TIMESTAMP-interval '2 hours',expires_at=CURRENT_TIMESTAMP-interval '1 hour' WHERE finding_id=$1", keys[1])
 	want.High++
 	if got := listedPosture(t, f).GetFindings(); !proto.Equal(got, want) {
@@ -182,5 +192,57 @@ func TestListDevicesFindingsMatchFreshEvaluationMinusExceptions(t *testing.T) {
 	fleetSummaryExec(t, f, "UPDATE advisory_evaluations SET expires_at=CURRENT_TIMESTAMP-interval '1 hour' WHERE device_id=$1", f.deviceID)
 	if got := listedPosture(t, f).GetFindings(); got != nil {
 		t.Fatalf("expired evaluation still reported findings: %v", got)
+	}
+}
+
+// The drilldown must use the summary's fresh/open population, before pagination.
+func checkAdvisoryDeviceDrilldown(t *testing.T, f *enrolledFixture, setID string) {
+	t.Helper()
+	fleetSummaryExec(t, f, `INSERT INTO advisory_set_advisories(set_id,advisory_id,severity,findings)
+ SELECT set_id,advisory_id,severity,count(*)::integer FROM advisory_set_findings WHERE set_id=$1
+ GROUP BY set_id,advisory_id,severity`, setID)
+	request := &adminv1.ListDevicesRequest{
+		PageSize: 1, AdvisoryId: "POSTURE-1", AdvisorySeverity: "high",
+		Sort: &adminv1.DeviceSort{Field: adminv1.DeviceSortField_DEVICE_SORT_FIELD_HOSTNAME},
+	}
+	owner, _ := identity.PrincipalFromContext(f.ownerCtx)
+	principal := scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{f.deviceID}})
+	ctx := identity.WithPrincipal(f.ctx, principal)
+	page := deviceProjectionPage(t, f.svc, ctx, request)
+	if len(page.GetDevices()) != 1 || page.GetDevices()[0].GetId() != f.deviceID || page.GetNextPageToken() != "" {
+		t.Fatalf("scoped advisory drilldown: %v", page)
+	}
+	summary, err := f.svc.ListAdvisorySummary(ctx, connect.NewRequest(&adminv1.ListAdvisorySummaryRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var affected uint64
+	for _, row := range summary.Msg.GetAdvisories() {
+		if row.GetAdvisoryId() == request.AdvisoryId && row.GetSeverity() == request.AdvisorySeverity {
+			affected = row.GetAffectedDevices()
+		}
+	}
+	if affected != uint64(len(page.GetDevices())) {
+		t.Fatalf("summary/drilldown disagree: summary=%d list=%d", affected, len(page.GetDevices()))
+	}
+	for _, change := range []func(*adminv1.ListDevicesRequest){
+		func(r *adminv1.ListDevicesRequest) { r.AdvisoryId = "OTHER" },
+		func(r *adminv1.ListDevicesRequest) { r.AdvisorySeverity = "critical" },
+		func(r *adminv1.ListDevicesRequest) { r.PageToken += ".tampered" },
+	} {
+		changed := proto.CloneOf(request)
+		changed.PageToken = page.GetPageToken()
+		change(changed)
+		if _, err := f.svc.ListDevices(ctx, connect.NewRequest(changed)); connect.CodeOf(err) != connect.CodeInvalidArgument {
+			t.Fatalf("advisory cursor accepted a changed binding: %v", err)
+		}
+	}
+	hidden := identity.WithPrincipal(f.ctx, scopedReader(owner, &authv1.DeviceScope{DeviceIds: []string{uuid.NewString()}}))
+	if got := deviceProjectionPage(t, f.svc, hidden, request); len(got.GetDevices()) != 0 {
+		t.Fatalf("advisory filter bypassed scope: %v", got)
+	}
+	request.AdvisoryId = "NO-SUCH-ADVISORY"
+	if got := deviceProjectionPage(t, f.svc, ctx, request); len(got.GetDevices()) != 0 {
+		t.Fatalf("unmatched advisory invented devices: %v", got)
 	}
 }

@@ -141,7 +141,15 @@ function plural(count: number, noun: string) {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
+function DeviceCell({
+  device,
+  column,
+  findings = false,
+}: {
+  device: Device;
+  column: ColumnId;
+  findings?: boolean;
+}) {
   switch (column) {
     case "hostname":
       return (
@@ -149,6 +157,7 @@ function DeviceCell({ device, column }: { device: Device; column: ColumnId }) {
           <Link
             to="/devices/$deviceId"
             params={{ deviceId: device.id }}
+            search={findings ? { tab: "findings" } : {}}
             className="font-medium text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:underline"
           >
             {device.hostname.trim() ||
@@ -374,6 +383,22 @@ export function DevicesView({
           </Button>
         }
       />
+      {search.advisoryId ? (
+        <div className="grid gap-2 border-l-4 border-warning bg-muted/30 p-4 text-sm">
+          <h2 className="font-semibold">Affected devices: {search.advisoryId}</h2>
+          <p>
+            {search.advisorySeverity} severity. These devices have current findings without an
+            active risk acceptance. Open a device to review its packages and update options.
+          </p>
+          <p className="text-muted-foreground">
+            Devices with unknown exposure are not included. An empty list does not prove the fleet
+            is clear.
+          </p>
+          <Link to="/advisories" hash="advisory-findings" className="underline underline-offset-4">
+            Back to advisories and coverage
+          </Link>
+        </div>
+      ) : null}
       <DeviceFilters search={search} onSearch={onSearch} />
       {failure ? (
         <RpcError failure={failure} title="Device list unavailable">
@@ -455,14 +480,26 @@ export function DevicesView({
         ) : null}
         {data?.devices.length === 0 ? (
           <EmptyState
-            title={search.filter ? "No devices matched these filters" : "No devices enrolled yet"}
+            title={
+              search.advisoryId
+                ? "No current affected devices matched this advisory"
+                : search.filter
+                  ? "No devices matched these filters"
+                  : "No devices enrolled yet"
+            }
             description={
-              search.filter
-                ? "Clear the filters, or check the hostname, operating system and labels you entered."
-                : "Enrolled and pending devices appear here. Create an enrollment token to add one."
+              search.advisoryId
+                ? "Accepted risks and devices with unknown exposure are not included. Review advisory coverage, or clear additional device filters."
+                : search.filter
+                  ? "Clear the filters, or check the hostname, operating system and labels you entered."
+                  : "Enrolled and pending devices appear here. Create an enrollment token to add one."
             }
             action={
-              search.filter ? (
+              search.advisoryId ? (
+                <Link to="/advisories" className={buttonVariants({ variant: "outline" })}>
+                  Review advisory coverage
+                </Link>
+              ) : search.filter ? (
                 <Button
                   variant="outline"
                   onClick={() => onSearch({ ...search, filter: "", pageToken: "" })}
@@ -484,7 +521,7 @@ export function DevicesView({
               <li key={device.id} className="grid gap-2 px-4 py-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <span className="min-w-0 [overflow-wrap:anywhere]">
-                    <DeviceCell device={device} column="hostname" />
+                    <DeviceCell device={device} column="hostname" findings={!!search.advisoryId} />
                   </span>
                   {renderRevoke && canRevoke ? (
                     <DeviceRevokeDialog device={device}>{renderRevoke(device)}</DeviceRevokeDialog>
@@ -582,7 +619,11 @@ export function DevicesView({
                               : "px-3"
                         }
                       >
-                        <DeviceCell device={device} column={column.id} />
+                        <DeviceCell
+                          device={device}
+                          column={column.id}
+                          findings={!!search.advisoryId}
+                        />
                       </TableCell>
                     ))}
                     {renderRevoke && canRevoke ? (
@@ -664,10 +705,12 @@ export function DevicesView({
           </div>
         </div>
       </div>
-      <details className="border bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Export devices</summary>
-        <DeviceExport key={`${search.filter ?? ""}:${search.pageSize}`} search={search} />
-      </details>
+      {!search.advisoryId ? (
+        <details className="border bg-card">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Export devices</summary>
+          <DeviceExport key={`${search.filter ?? ""}:${search.pageSize}`} search={search} />
+        </details>
+      ) : null}
     </section>
   );
 }

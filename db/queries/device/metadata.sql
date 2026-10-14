@@ -106,6 +106,19 @@ WITH keyed AS (
       -- Patch bucket as the fleet summary counts it: active devices only.
       AND (cardinality(sqlc.arg('patch_buckets')::text[]) = 0
           OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, sqlc.arg('patch_stale_after_seconds')::integer) = ANY(sqlc.arg('patch_buckets')::text[])))
+      -- Same current evaluation and active-exception population as ListAdvisorySummary.
+      AND (sqlc.arg('advisory_id')::text = '' OR (d.state = 'active' AND EXISTS (
+          SELECT 1 FROM advisory_device_status s
+          JOIN advisory_set_findings f ON f.set_id = s.finding_set_id
+          WHERE s.device_id = d.id AND NOT s.unknown
+            AND f.advisory_id = sqlc.arg('advisory_id')::text
+            AND f.severity = sqlc.arg('advisory_severity')::text
+            AND NOT EXISTS (
+                SELECT 1 FROM advisory_exceptions x
+                WHERE x.device_id = d.id AND x.finding_id = f.finding_key
+                  AND x.expires_at > CURRENT_TIMESTAMP
+            )
+      )))
 ), page AS MATERIALIZED (
     SELECT k.*
     FROM keyed k

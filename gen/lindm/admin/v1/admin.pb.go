@@ -582,8 +582,12 @@ type ListDevicesRequest struct {
 	Sort      *DeviceSort            `protobuf:"bytes,4,opt,name=sort,proto3" json:"sort,omitempty"`
 	// Case-insensitive literal substring of the hostname; empty disables it.
 	HostnameSearch string `protobuf:"bytes,5,opt,name=hostname_search,json=hostnameSearch,proto3" json:"hostname_search,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Current affected devices for this exact advisory and vendor severity.
+	// Active exceptions exclude only the findings they accept. Empty disables it.
+	AdvisoryId       string `protobuf:"bytes,6,opt,name=advisory_id,json=advisoryId,proto3" json:"advisory_id,omitempty"`
+	AdvisorySeverity string `protobuf:"bytes,7,opt,name=advisory_severity,json=advisorySeverity,proto3" json:"advisory_severity,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ListDevicesRequest) Reset() {
@@ -647,6 +651,20 @@ func (x *ListDevicesRequest) GetSort() *DeviceSort {
 func (x *ListDevicesRequest) GetHostnameSearch() string {
 	if x != nil {
 		return x.HostnameSearch
+	}
+	return ""
+}
+
+func (x *ListDevicesRequest) GetAdvisoryId() string {
+	if x != nil {
+		return x.AdvisoryId
+	}
+	return ""
+}
+
+func (x *ListDevicesRequest) GetAdvisorySeverity() string {
+	if x != nil {
+		return x.AdvisorySeverity
 	}
 	return ""
 }
@@ -2518,14 +2536,18 @@ const file_lindm_admin_v1_admin_proto_rawDesc = "" +
 	"\x06medium\x18\x03 \x01(\rR\x06medium\x12\x10\n" +
 	"\x03low\x18\x04 \x01(\rR\x03low\x12\x14\n" +
 	"\x05other\x18\x05 \x01(\rR\x05other\x12\x18\n" +
-	"\apartial\x18\x06 \x01(\bR\apartial\"\x81\x02\n" +
+	"\apartial\x18\x06 \x01(\bR\apartial\"\x85\x04\n" +
 	"\x12ListDevicesRequest\x12%\n" +
 	"\tpage_size\x18\x01 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\tpageToken\x124\n" +
 	"\x06filter\x18\x03 \x01(\v2\x1c.lindm.admin.v1.DeviceFilterR\x06filter\x12.\n" +
 	"\x04sort\x18\x04 \x01(\v2\x1a.lindm.admin.v1.DeviceSortR\x04sort\x125\n" +
-	"\x0fhostname_search\x18\x05 \x01(\tB\f\xbaH\tr\a\x18\xfd\x01\xba\x01\x01\x00R\x0ehostnameSearch\"\xd6\x01\n" +
+	"\x0fhostname_search\x18\x05 \x01(\tB\f\xbaH\tr\a\x18\xfd\x01\xba\x01\x01\x00R\x0ehostnameSearch\x12-\n" +
+	"\vadvisory_id\x18\x06 \x01(\tB\f\xbaH\tr\a\x18\x80\x01\xba\x01\x01\x00R\n" +
+	"advisoryId\x128\n" +
+	"\x11advisory_severity\x18\a \x01(\tB\v\xbaH\br\x06\x18@\xba\x01\x01\x00R\x10advisorySeverity:\x98\x01\xbaH\x94\x01\x1a\x91\x01\n" +
+	"\x1blist_devices.advisory_scope\x126advisory_id and advisory_severity must be set together\x1a:(this.advisory_id == '') == (this.advisory_severity == '')\"\xd6\x01\n" +
 	"\x13ListDevicesResponse\x120\n" +
 	"\adevices\x18\x01 \x03(\v2\x16.lindm.admin.v1.DeviceR\adevices\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12\x1d\n" +

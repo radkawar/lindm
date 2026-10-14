@@ -11,8 +11,10 @@ import {
 import { OSUpdateBackend } from "../../../gen/lindm/resource/v1/observations_pb";
 import { UpdateSelection } from "../../../gen/lindm/resource/v1/software_pb";
 import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { TechnicalDetails } from "@/components/ui/technical-details";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Fact, ObservedTime } from "./observations";
+import { patchRunRebootReason, patchStatusUnavailableReason } from "./patch-status-copy";
 
 const backendLabels: Record<OSUpdateBackend, string> = {
   [OSUpdateBackend.OS_UPDATE_BACKEND_UNSPECIFIED]: "Not reported",
@@ -111,7 +113,12 @@ function LastRun({ run }: { run: PatchRunSummary | undefined }) {
         </Fact>
         <Fact label="Reboot reason">
           {run.rebootReason ? (
-            <span className="font-mono text-xs">{run.rebootReason}</span>
+            <div className="grid gap-2">
+              <span>{patchRunRebootReason(run.rebootReason)}</span>
+              <TechnicalDetails
+                items={[{ label: "Reboot reason code", value: run.rebootReason }]}
+              />
+            </div>
           ) : (
             "None reported"
           )}
@@ -193,11 +200,14 @@ export function DevicePatchStatus({ status }: { status: PatchStatusObservation |
                       : "Patched"}
               </StatusBadge>
               {!available ? (
-                <span className="break-all font-mono text-xs text-muted-foreground">
-                  {status.reason || "No reason reported"}
+                <span className="text-sm text-muted-foreground">
+                  {patchStatusUnavailableReason(status.reason)}
                 </span>
               ) : null}
             </div>
+            {!available && status.reason ? (
+              <TechnicalDetails items={[{ label: "Update status reason", value: status.reason }]} />
+            ) : null}
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Fact label="Computed">
                 <ObservedTime value={status.observedAt} />

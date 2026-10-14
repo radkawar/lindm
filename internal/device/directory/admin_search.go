@@ -46,7 +46,7 @@ func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.
 		return nil, core.MapErr(err)
 	}
 	defer s.Release()
-	page, err := s.searchDevicePage(ctx, actor, deviceQuery{filter: req.Msg.GetFilter(), sort: req.Msg.GetSort(), hostnameSearch: req.Msg.GetHostnameSearch()}, req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED)
+	page, err := s.searchDevicePage(ctx, actor, deviceQuery{filter: req.Msg.GetFilter(), sort: req.Msg.GetSort(), hostnameSearch: req.Msg.GetHostnameSearch(), advisoryID: req.Msg.GetAdvisoryId(), advisorySeverity: req.Msg.GetAdvisorySeverity()}, req.Msg.GetPageToken(), core.PageLimit(req.Msg.GetPageSize()), adminv1.DeviceExportFormat_DEVICE_EXPORT_FORMAT_UNSPECIFIED)
 	if err != nil {
 		return nil, core.MapErr(err)
 	}
@@ -88,9 +88,11 @@ type deviceSearchPage struct {
 
 // deviceQuery is one device list or export request's filter, order and search.
 type deviceQuery struct {
-	filter         *adminv1.DeviceFilter
-	sort           *adminv1.DeviceSort
-	hostnameSearch string
+	filter           *adminv1.DeviceFilter
+	sort             *adminv1.DeviceSort
+	hostnameSearch   string
+	advisoryID       string
+	advisorySeverity string
 }
 
 // complianceByRank is device_compliance_rank (migration 00041) as the API enum.
@@ -158,7 +160,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 	_, _ = binding.Write(encoded)
 	_, _ = binding.Write([]byte{byte(format)})
 	// Length-prefixed so filter, order and search bytes cannot alias.
-	for _, part := range [][]byte{order, []byte(query.hostnameSearch)} {
+	for _, part := range [][]byte{order, []byte(query.hostnameSearch), []byte(query.advisoryID), []byte(query.advisorySeverity)} {
 		_, _ = binding.Write(binary.BigEndian.AppendUint32(nil, uint32(len(part))))
 		_, _ = binding.Write(part)
 	}
@@ -184,6 +186,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter, PatchStaleAfterSeconds: inventory.PatchStaleAfterSeconds,
 			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
 			AgentRelease: filter.GetAgentRelease(), HostnameSearch: query.hostnameSearch,
+			AdvisoryID: query.advisoryID, AdvisorySeverity: query.advisorySeverity,
 			ComplianceRanks: complianceRanks(filter.GetCompliance()), PatchBuckets: patchBuckets(filter.GetPatchStates()),
 			SortField: int32(query.sort.GetField()), Descending: query.sort.GetDescending(),
 		}

@@ -281,20 +281,33 @@ WITH keyed AS (
       -- Patch bucket as the fleet summary counts it: active devices only.
       AND (cardinality($16::text[]) = 0
           OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, $1::integer) = ANY($16::text[])))
+      -- Same current evaluation and active-exception population as ListAdvisorySummary.
+      AND ($17::text = '' OR (d.state = 'active' AND EXISTS (
+          SELECT 1 FROM advisory_device_status s
+          JOIN advisory_set_findings f ON f.set_id = s.finding_set_id
+          WHERE s.device_id = d.id AND NOT s.unknown
+            AND f.advisory_id = $17::text
+            AND f.severity = $18::text
+            AND NOT EXISTS (
+                SELECT 1 FROM advisory_exceptions x
+                WHERE x.device_id = d.id AND x.finding_id = f.finding_key
+                  AND x.expires_at > CURRENT_TIMESTAMP
+            )
+      )))
 ), page AS MATERIALIZED (
     SELECT k.id, k.state, k.current_generation_id, k.hostname, k.os_id, k.os_version, k.architecture, k.enrolled_at, k.last_seen_at, k.open_snapshot_id, k.reserved_inventory_bytes, k.published_sequence, k.host_received_at, k.package_attempt_received_at, k.snapshot_received_at, k.revoked_at, k.revoked_by, k.revoke_reason, k.metadata, k.owner_principal_id, k.sort_last, k.sort_key
     FROM keyed k
-    WHERE NOT $17::boolean
-       OR k.sort_last > $18::boolean
-       OR (k.sort_last = $18::boolean AND (
-           (NOT $2::boolean AND (k.sort_key, k.id) > ($19::text COLLATE "C", $20::uuid))
-           OR ($2::boolean AND (k.sort_key, k.id) < ($19::text COLLATE "C", $20::uuid))))
+    WHERE NOT $19::boolean
+       OR k.sort_last > $20::boolean
+       OR (k.sort_last = $20::boolean AND (
+           (NOT $2::boolean AND (k.sort_key, k.id) > ($21::text COLLATE "C", $22::uuid))
+           OR ($2::boolean AND (k.sort_key, k.id) < ($21::text COLLATE "C", $22::uuid))))
     ORDER BY k.sort_last,
         CASE WHEN NOT $2::boolean THEN k.sort_key END COLLATE "C",
         CASE WHEN $2::boolean THEN k.sort_key END COLLATE "C" DESC,
         CASE WHEN NOT $2::boolean THEN k.id END,
         CASE WHEN $2::boolean THEN k.id END DESC
-    LIMIT $21::int
+    LIMIT $23::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
     d.state, d.enrolled_at, d.last_seen_at, d.published_sequence, d.sort_last, d.sort_key::text AS sort_key,
@@ -374,6 +387,8 @@ type SearchDevicesParams struct {
 	MetadataFilter         []byte
 	ComplianceRanks        []int32
 	PatchBuckets           []string
+	AdvisoryID             string
+	AdvisorySeverity       string
 	HasCursor              bool
 	CursorLast             bool
 	CursorKey              string
@@ -444,6 +459,8 @@ func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([
 		arg.MetadataFilter,
 		arg.ComplianceRanks,
 		arg.PatchBuckets,
+		arg.AdvisoryID,
+		arg.AdvisorySeverity,
 		arg.HasCursor,
 		arg.CursorLast,
 		arg.CursorKey,

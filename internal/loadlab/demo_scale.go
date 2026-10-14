@@ -206,7 +206,7 @@ func (s *demoSeed) awaitScaleFindings(ctx context.Context) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		finding, freshness, err := s.affectedFinding(ctx, device)
+		finding, freshness, err := s.demoFinding(ctx, device, false)
 		if err == nil && finding != nil {
 			return nil
 		}

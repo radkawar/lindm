@@ -252,6 +252,11 @@ message DeviceFindingCounts {
 }
 
 message ListDevicesRequest {
+  option (buf.validate.message).cel = {
+    id: "list_devices.advisory_scope"
+    message: "advisory_id and advisory_severity must be set together"
+    expression: "(this.advisory_id == '') == (this.advisory_severity == '')"
+  };
   uint32 page_size = 1 [(buf.validate.field).uint32.lte = 200];
   string page_token = 2 [(buf.validate.field).string.max_len = 512];
   DeviceFilter filter = 3;
@@ -259,6 +264,16 @@ message ListDevicesRequest {
   // Case-insensitive literal substring of the hostname; empty disables it.
   string hostname_search = 5 [(buf.validate.field).string = {
     max_len: 253
+    not_contains: "\000"
+  }];
+  // Current affected devices for this exact advisory and vendor severity.
+  // Active exceptions exclude only the findings they accept. Empty disables it.
+  string advisory_id = 6 [(buf.validate.field).string = {
+    max_len: 128
+    not_contains: "\000"
+  }];
+  string advisory_severity = 7 [(buf.validate.field).string = {
+    max_len: 64
     not_contains: "\000"
   }];
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Fragment, useDeferredValue, useMemo, useState } from "react";
 import {
   AdvisoryFindingState,
@@ -38,6 +39,7 @@ import { usePrincipal } from "@/hooks/use-permissions";
 import { toRpcFailure } from "@/lib/errors";
 import { canPermission } from "@/lib/permissions";
 import { formatTimestamp } from "@/lib/time";
+import { deviceQueryOptions } from "@/features/devices/queries";
 import { AcceptanceForm } from "./acceptance-form";
 import {
   AdvisoryPaging,
@@ -57,6 +59,7 @@ function packageVersion(version: string) {
 export function DeviceFindings({ deviceId }: { deviceId: string }) {
   const lifetime = useAuthLifetime();
   const principal = usePrincipal();
+  const device = useQuery(deviceQueryOptions(lifetime, deviceId));
   const [pageToken, setPageToken] = useState("");
   const [accepting, setAccepting] = useState<AdvisoryFinding | null>(null);
   const [sort, setSort] = useState(DeviceFindingSort.SEVERITY);
@@ -93,7 +96,14 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
     freshness !== undefined &&
     unexpired(freshness.inventoryExpiresAt, now) &&
     unexpired(freshness.feedExpiresAt, now);
-  const state = current ? findingStateLabel(freshness.state) : "Unknown";
+  const state = current
+    ? !filtered &&
+      freshness.state !== AdvisoryFindingState.PARTIAL &&
+      totals?.open === 0n &&
+      totals.accepted > 0n
+      ? "Accepted"
+      : findingStateLabel(freshness.state)
+    : "Unknown";
   const partial = current && freshness.state === AdvisoryFindingState.PARTIAL;
   return (
     <Card className="min-w-0" aria-busy={findings.isFetching}>
@@ -126,7 +136,29 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           >
             {findings.isFetching ? "Refreshing…" : "Refresh"}
           </Button>
+          {device.data?.callerPermissions.includes("inventory.manage") ? (
+            <Link
+              to="/devices/$deviceId"
+              params={{ deviceId }}
+              search={{ tab: "findings", action: "refreshInventory" }}
+              className="text-sm underline underline-offset-4"
+            >
+              Request fresh inventory
+            </Link>
+          ) : null}
         </div>
+        {canPermission(principal, "profiles.manage") ? (
+          <p className="text-sm text-muted-foreground">
+            <Link
+              to="/profiles/new"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Schedule updates
+            </Link>
+            : choose OS update policy, set a maintenance window, then roll out the profile to the
+            affected devices.
+          </p>
+        ) : null}
         {totals ? (
           <p className="text-sm" data-finding-totals>
             <strong className="font-semibold tabular-nums">
@@ -251,9 +283,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           />
         ) : null}
         {findings.data?.findings.length ? (
-          <Table>
+          <Table className="max-sm:block max-sm:[&_tbody]:block max-sm:[&_tr]:block max-sm:[&_td]:block max-sm:[&_td]:whitespace-normal">
             <TableCaption className="sr-only">Security findings on this device</TableCaption>
-            <TableHeader>
+            <TableHeader className="max-sm:sr-only">
               <TableRow>
                 <TableHead>Advisory</TableHead>
                 <TableHead>Package</TableHead>
@@ -283,7 +315,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                   canPermission(principal, "advisory_exceptions.manage");
                 return (
                   <Fragment key={finding.id}>
-                    <TableRow data-finding-row className="align-top">
+                    <TableRow data-finding-row className="align-top max-sm:py-3">
                       <TableCell className="whitespace-normal">
                         {finding.sourceUrl ? (
                           <a
@@ -315,19 +347,25 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                         </span>
                       </TableCell>
                       <TableCell className="whitespace-normal [overflow-wrap:anywhere]">
+                        <span className="text-xs text-muted-foreground sm:hidden">Package: </span>
                         {finding.packageName}
                         {finding.architecture ? (
                           <span className="text-muted-foreground"> · {finding.architecture}</span>
                         ) : null}
                       </TableCell>
                       <TableCell className="whitespace-normal font-mono text-xs [overflow-wrap:anywhere]">
+                        <span className="font-sans text-xs text-muted-foreground sm:hidden">
+                          Installed → fixed:{" "}
+                        </span>
                         {packageVersion(finding.installedVersion) || "Unknown"} →{" "}
                         {packageVersion(finding.fixedVersion) || "no fix yet"}
                       </TableCell>
                       <TableCell>
+                        <span className="text-xs text-muted-foreground sm:hidden">Severity: </span>
                         <Severity value={finding.severity} badge={false} />
                       </TableCell>
                       <TableCell>
+                        <span className="text-xs text-muted-foreground sm:hidden">State: </span>
                         <StatusBadge
                           className="h-auto whitespace-normal"
                           status={
@@ -342,16 +380,29 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                         </StatusBadge>
                       </TableCell>
                       <TableCell>
-                        {canAccept ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            aria-haspopup="dialog"
-                            onClick={() => setAccepting(finding)}
-                          >
-                            {finding.exception ? "Renew acceptance" : "Accept this risk"}
-                          </Button>
-                        ) : null}
+                        <div className="grid gap-2">
+                          {label.startsWith("Affected") &&
+                          device.data?.callerPermissions.includes("remote_execution.run") ? (
+                            <Link
+                              to="/devices/$deviceId"
+                              params={{ deviceId }}
+                              search={{ tab: "findings", action: "patchNow" }}
+                              className="text-sm font-medium underline underline-offset-4"
+                            >
+                              Patch now
+                            </Link>
+                          ) : null}
+                          {canAccept ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              aria-haspopup="dialog"
+                              onClick={() => setAccepting(finding)}
+                            >
+                              {finding.exception ? "Renew acceptance" : "Accept this risk"}
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                     {finding.exception ? (
@@ -389,8 +440,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
               <DialogHeader>
                 <DialogTitle>Accept risk: {accepting.advisoryId}</DialogTitle>
                 <DialogDescription>
-                  {accepting.packageName} {packageVersion(accepting.installedVersion)} on this
-                  device. Severity: <Severity value={accepting.severity} badge={false} />.
+                  {accepting.packageName} {packageVersion(accepting.installedVersion)} on{" "}
+                  {device.data?.device?.hostname || "this device"}. Severity:{" "}
+                  <Severity value={accepting.severity} badge={false} />.
                 </DialogDescription>
               </DialogHeader>
               <AcceptanceForm

@@ -56,6 +56,23 @@ export async function reviewAdvisoryControls(page, route) {
 }
 
 async function proposalForm(page) {
+  if ((page.viewportSize()?.width ?? 1440) < 640) {
+    const clipped = await page
+      .locator("[data-finding-row]")
+      .first()
+      .evaluate((row) => {
+        const container = row.closest('[data-slot="table-container"]');
+        return container && container.scrollWidth > container.clientWidth + 1;
+      });
+    if (clipped)
+      return [
+        {
+          message:
+            "Mobile findings must show severity, state and risk actions without sideways scrolling",
+          elements: [],
+        },
+      ];
+  }
   const accepted = page.locator("tr").filter({ hasText: "Risk accepted by" });
   if ((await accepted.count()) === 0)
     return [{ message: "No real accepted finding is visible", elements: [] }];

@@ -205,6 +205,32 @@ export function DeviceActionStatusPage({
           ) : query.data ? (
             <DeviceActionResult action={query.data} linked={false} />
           ) : null}
+          {kind === "patchNow" ? (
+            <div className="grid gap-2 border-l-4 border-warning bg-muted/30 p-4 text-sm">
+              <h2 className="font-semibold">Verify the update result</h2>
+              <p>
+                A started update run is not proof that the device fixed a vulnerability. Check the
+                reported run and installed packages, then request fresh inventory and review the
+                finding again.
+              </p>
+              <Link
+                to="/devices/$deviceId"
+                params={{ deviceId }}
+                search={{ tab: "inventory" }}
+                className="underline underline-offset-4"
+              >
+                Review patch status and packages
+              </Link>
+              <Link
+                to="/devices/$deviceId"
+                params={{ deviceId }}
+                search={{ tab: "findings" }}
+                className="underline underline-offset-4"
+              >
+                Review security findings
+              </Link>
+            </div>
+          ) : null}
           <Link
             to="/devices/$deviceId"
             params={{ deviceId }}

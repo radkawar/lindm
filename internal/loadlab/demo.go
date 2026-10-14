@@ -1225,7 +1225,7 @@ func (s *demoSeed) acceptFinding(ctx context.Context, d *simulatedDevice) error 
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 	for {
-		finding, freshness, err := s.affectedFinding(ctx, d)
+		finding, freshness, err := s.demoFinding(ctx, d, false)
 		if err == nil && finding != nil {
 			request := &adminv1.AcceptAdvisoryFindingRequest{RequestId: uuid.NewString(), DeviceId: d.id, FindingId: finding.GetId(), ExpiresAt: timestamppb.New(time.Now().Add(30 * 24 * time.Hour)), Reason: "Synthetic review exception; no production risk acceptance"}
 			approval, err := s.approver.Approve(ctx, s.owner, &adminv1.CreateApprovalRequest{LifetimeSeconds: 3600, Payload: &adminv1.CreateApprovalRequest_AcceptAdvisoryFinding{AcceptAdvisoryFinding: request}})
