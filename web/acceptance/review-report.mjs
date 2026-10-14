@@ -62,9 +62,9 @@ export function contactSheet(report) {
       (session) =>
         `<li>${escape(session.theme)} ${escape(session.viewport)}: ${Object.entries(session.checks)
           .map(([name, check]) => `${escape(name)} ${check.findings.length ? "fail" : "pass"}`)
-          .join(
-            ", ",
-          )}${session.screenshots?.toast ? ` · <a href="${escape(session.screenshots.toast)}">toast</a>` : ""}</li>`,
+          .join(", ")}${Object.entries(session.screenshots ?? {})
+          .map(([name, path]) => ` · <a href="${escape(path)}">${escape(name)}</a>`)
+          .join("")}</li>`,
     )
     .join("");
   const failures = report.failures.map((line) => `<li>${escape(line)}</li>`).join("");

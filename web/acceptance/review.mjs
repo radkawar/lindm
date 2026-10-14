@@ -687,8 +687,16 @@ async function reviewRoute(page, route, theme, viewport) {
     const { state, settled } = await visit(page, target.url);
     const expected = new URL(`${config.origin}${target.url}`).pathname;
     if (state.path !== expected || state.routeError) {
+      const diagnostic = state.routeError
+        ? (await page.locator("main [role=alert]").first().innerText()).slice(0, 400)
+        : state.path;
+      const image = await screenshot(
+        page,
+        `${slug(`${route.path}-${target.label}-${theme}-${viewport.name}-route-error`)}.png`,
+        true,
+      );
       record.errors.push(
-        `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : state.path}`,
+        `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : "a different route"}: ${diagnostic}; see ${image}`,
       );
       continue;
     }
@@ -824,8 +832,6 @@ async function main() {
       report.results.push(entry);
     }
   }
-  if (report.results.some((entry) => !entry.passed))
-    throw new Error("directory_authorization_review_failed");
   const driver = new ChromiumDriver();
   await driver.open({ ignoreHTTPSErrors: true, actionTimeoutMs: 30_000, classicScrollbars: true });
   try {
@@ -874,13 +880,10 @@ async function main() {
     for (const [index, { theme, viewport }] of combos.entries()) {
       const page = pages[index];
       await visit(page, "/dashboard");
-      const entry = report.results.find(
-        (result) =>
-          result.route === "/dashboard" &&
-          result.theme === theme &&
-          result.viewport === viewport.name,
-      );
-      if (!entry) throw new Error("dashboard_shell_review_entry_missing");
+      // Shell evidence is independent of a successful dashboard matrix visit.
+      // A route error stays in its route record; it must not prevent the remaining
+      // authenticated journeys from recording their own results.
+      const entry = sessions[index];
       const shell = await reviewShell({
         page,
         prefix: `dashboard-${theme}-${viewport.name}`,
@@ -891,7 +894,6 @@ async function main() {
       });
       entry.checks.shell = { findings: shell.findings };
       Object.assign(entry.screenshots, shell.screenshots);
-      entry.passed = entry.passed && shell.findings.length === 0;
       for (const finding of shell.findings)
         report.failures.push(`/dashboard ${theme} ${viewport.name} shell: ${finding.message}`);
     }
@@ -1184,14 +1186,6 @@ async function main() {
   } finally {
     await driver.close();
   }
-  for (const route of report.routes) {
-    if (route.missing)
-      report.failures.push(
-        `${route.path}: no seeded value for $${route.missing}; route not visited`,
-      );
-    else if (route.visits === 0) report.failures.push(`${route.path}: route not visited`);
-    for (const error of route.errors) report.failures.push(`${route.path}: ${error}`);
-  }
   report.pov = {
     contracts: routeContracts,
     destructive: destructiveCoverage(report.results, themes, viewports),
@@ -1218,7 +1212,19 @@ try {
   );
   report.passed = false;
 } finally {
+  for (const route of report.routes) {
+    if (route.missing)
+      report.failures.push(
+        `${route.path}: no seeded value for $${route.missing}; route not visited`,
+      );
+    else if (route.visits === 0) report.failures.push(`${route.path}: route not visited`);
+    for (const error of route.errors) report.failures.push(`${route.path}: ${error}`);
+  }
   report.finishedAt = new Date().toISOString();
+  if (report.failures.length) {
+    report.passed = false;
+    exitCode = 1;
+  }
   if (config?.evidenceDirectory) {
     // An edit sheet that the importer would refuse is a review failure, recorded
     // in the report rather than discovered by the owner after annotating.

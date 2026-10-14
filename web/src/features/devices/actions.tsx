@@ -246,7 +246,7 @@ export function DeviceRestrictions({
                   size="sm"
                   variant="outline"
                   aria-haspopup="dialog"
-                  aria-label={actionLabels[kind]}
+                  aria-label={`${restriction.expiredRelease ? "Undo again" : "Undo"} ${restriction.kind === "lock" ? "account lock" : "network quarantine"}`}
                   onClick={() => setRelease(kind)}
                 >
                   {restriction.expiredRelease ? "Undo again" : "Undo"}

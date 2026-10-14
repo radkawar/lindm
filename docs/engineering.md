@@ -1255,6 +1255,18 @@ artifact. All three use real enrollment instructions, not mocked readiness.
 Scenario failures identify the last operation and exception class without retaining
 browser call logs that may include credentials or commands.
 
+Route-load failures retain a bounded error message and masked screenshot. They
+remain review failures even if a later navigation succeeds. Failed supplemental
+directory checks do not abort the independent route matrix or registered task
+walks. Serial shell checks attach to session evidence, not to the existence of
+a successful dashboard capture. The contact sheet links every session screenshot,
+and route failures remain in the final report even if a later runner step throws.
+
+Undo controls include their visible **Undo** or **Undo again** text and the
+named lock or quarantine in their accessible name. An expired request therefore
+keeps the same visible and spoken next action; this does not send a new request
+or change the required review and confirmation.
+
 Bundled help uses consecutive physical viewports of at most 8192 CSS pixels in
 height, then restores the requested viewport. The report records each part's
 offset and height; the contact sheet links every part in order. This retains the

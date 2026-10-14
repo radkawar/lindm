@@ -36,7 +36,9 @@ export async function check({ page, demo, visit, settle, require, capture, step 
       "The undo request expired before the device received it, so the account lock remains active.",
     ), `Lock restriction reads ${JSON.stringify(text)}`);
   require((
-    await restriction.getByRole("button", { name: "Undo account lock" }).innerText()
+    await restriction
+      .getByRole("button", { name: "Undo again account lock", exact: true })
+      .innerText()
   ).trim() === "Undo again", "Lock restriction does not offer 'Undo again'");
 
   step("expired undo row reads expired");
