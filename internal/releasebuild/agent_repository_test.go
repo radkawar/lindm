@@ -224,3 +224,56 @@ func TestCanonicalBundleNormalizesWritableAncillaryMetadataWithoutChangingBytes(
 		}
 	}
 }
+
+// An offline bundle stages a server release's files with private modes, but
+// the lindmd provenance binds the embedded agent repository's tree digest,
+// modes included; import failed "canonical agent repository provenance
+// mismatch" for every bundle. Canonicalization restores the protected modes
+// without touching bytes, so the signed digest verifies again.
+func TestCanonicalizeEmbeddedRepositoryRestoresTheProvenanceDigest(t *testing.T) {
+	release := t.TempDir()
+	bundle := filepath.Join(release, "agent-repository")
+	for name, content := range map[string]string{"release.json": "{}", "repo/apt/dists/stable/InRelease": "signed", "repo/apt/pool/a.deb": "package"} {
+		path := filepath.Join(bundle, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := normalizeAgentRepository(bundle); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := treeDigest(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := filepath.WalkDir(bundle, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.IsDir() {
+			return err
+		}
+		return os.Chmod(path, 0600)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if staged, err := treeDigest(bundle); err != nil || staged == canonical {
+		t.Fatalf("staged modes did not change the provenance digest: %v", err)
+	}
+	if err := CanonicalizeEmbeddedRepository(release); err != nil {
+		t.Fatal(err)
+	}
+	if restored, err := treeDigest(bundle); err != nil || restored != canonical {
+		t.Fatalf("canonical digest not restored: %v", err)
+	}
+	if err := CanonicalizeEmbeddedRepository(t.TempDir()); err != nil {
+		t.Fatalf("agent-only release: %v", err)
+	}
+	linked := t.TempDir()
+	if err := os.Symlink(bundle, filepath.Join(linked, "agent-repository")); err != nil {
+		t.Fatal(err)
+	}
+	if err := CanonicalizeEmbeddedRepository(linked); err == nil {
+		t.Fatal("followed a linked embedded repository")
+	}
+}

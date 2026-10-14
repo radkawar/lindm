@@ -143,6 +143,11 @@ func (i *Importer) Import(ctx context.Context, directory string) (result *Result
 	if err != nil {
 		return nil, err
 	}
+	// Staging keeps signed bytes, not modes; the release provenance binds the
+	// embedded agent repository's canonical modes.
+	if err := releasebuild.CanonicalizeEmbeddedRepository(staged.Path(releaseDir)); err != nil {
+		return nil, fmt.Errorf("canonicalize staged release: %w", err)
+	}
 	release, err := releasebuild.Verify(ctx, staged.Path(releaseDir), i.cfg.ReleasePublicKey, i.cfg.ReleaseKeyID)
 	if err != nil {
 		return nil, fmt.Errorf("verify staged release attestations: %w", err)

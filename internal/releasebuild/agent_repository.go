@@ -159,3 +159,24 @@ func normalizeAgentRepository(bundle string) error {
 		return os.Chmod(path, 0444)
 	})
 }
+
+// CanonicalizeEmbeddedRepository restores the protected modes of a server
+// release's embedded agent repository (directory/agent-repository) after a
+// transport that keeps bytes but not modes, such as an offline bundle's
+// staging. The release provenance digest binds those modes, so Verify must see
+// the canonical tree; bytes still have to match. A release without the
+// directory is unchanged.
+func CanonicalizeEmbeddedRepository(directory string) error {
+	bundle := filepath.Join(directory, "agent-repository")
+	info, err := os.Lstat(bundle)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("releasebuild: embedded agent repository is not a directory")
+	}
+	return normalizeAgentRepository(bundle)
+}
