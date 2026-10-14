@@ -17,3 +17,4 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Generate Authenticode test binaries from project-authored PE bytes and temporary test certificates.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.
 - Distinguish maintainer-local, hash-referenced lab evidence, dirty-source records and scoped passes from clean-release qualification.
+- Keep README screenshots proportional and the thumbnail row within GitHub's desktop and mobile columns.

@@ -13,7 +13,7 @@ It uses each distribution's native package and system tools. You run the server 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/console-dashboard-dark.webp">
-  <img src="docs/images/console-dashboard-light.webp" alt="Dashboard with work that needs review and the latest recorded activity." width="1440" height="1000">
+  <img src="docs/images/console-dashboard-light.webp" alt="Dashboard with work that needs review and the latest recorded activity." width="100%">
 </picture>
 
 Screenshots use demo data.
@@ -30,9 +30,22 @@ Screenshots use demo data.
 - A signed audit log and exports.
 - An MCP server for AI assistants.
 
-| Device page                                                                                                                                                                                                                                                     | Rollouts                                                                                                                                                                                                                           | Remote assistance                                                                                                                                                                                                                                   |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/console-device-dark.webp"><img src="docs/images/console-device-light.webp" alt="Device overview with security posture, reported state and management actions." width="320"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/console-rollouts-dark.webp"><img src="docs/images/console-rollouts-light.webp" alt="Rollout stages, progress and device results." width="320"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/console-assistance-dark.webp"><img src="docs/images/console-assistance-light.webp" alt="Remote assistance page with an ended demo session record." width="320"></picture> |
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/console-device-dark.webp">
+    <img src="docs/images/console-device-light.webp" alt="Device overview with security posture, reported state and management actions." width="32%">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/console-rollouts-dark.webp">
+    <img src="docs/images/console-rollouts-light.webp" alt="Rollout stages, progress and device results." width="32%">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/console-assistance-dark.webp">
+    <img src="docs/images/console-assistance-light.webp" alt="Remote assistance page with an ended demo session record." width="32%">
+  </picture>
+</p>
+
+Device page · Rollouts · Remote assistance
 
 ## Distributions
 

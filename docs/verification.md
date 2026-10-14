@@ -54,6 +54,15 @@ It contains the exact commands, sanitized capture recipes, browser version,
 routes, dimensions, original and optimized hashes, byte sizes and redaction notes.
 That retained JSON is not included in a clone.
 
+The README image layout was rendered by GitHub's Markdown API and wrapped in
+`github-markdown-css` 5.9.0, with repository images resolved from the worktree.
+Chromium screenshots at 880px and 400px in light and dark themes showed no page
+overflow, no image distortion and one equal-height thumbnail row.
+The maintainer-local record
+`~/.cache/lindm-readme-gfm-20261014/layout-proof.json` has SHA-256
+`13eea9760c47515300974d2a01e83ec005773ee4734ef898d18f0136c93aad04`.
+It records the checked README hash, image geometry and all four screenshot hashes.
+
 ## Device integration performance
 
 The race-enabled `internal/device` package passed twice on the loaded development
