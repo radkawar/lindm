@@ -1,6 +1,6 @@
 module lindm
 
-go 1.26.9
+go 1.27.0
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
@@ -32,7 +32,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1
-	github.com/sigstore/sigstore v1.10.11
+	github.com/sigstore/sigstore v1.11.0
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	github.com/yuin/goldmark v1.8.6
 	go.yaml.in/yaml/v3 v3.0.5
