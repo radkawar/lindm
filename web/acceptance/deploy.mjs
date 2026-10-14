@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { chromium } from "playwright";
 import { ChromiumDriver, UI } from "./drivers.mjs";
+import { submitReviewedDeviceAction, waitForSettledActionHistory } from "./deploy-actions.mjs";
 import { enroll, signIn, signOut, createGrant, confirmEnrolledDevice } from "./journey.mjs";
 import {
   privateDirectory,
@@ -110,6 +111,7 @@ async function managedRefresh(ui) {
   // Capture the IDs present before issuance. An older completed refresh can
   // never satisfy this run, including when a backup restored its history.
   await driver.goto(`${config.origin}/devices/${encodeURIComponent(config.deviceId)}?tab=actions`);
+  await waitForSettledActionHistory(driver);
   const previous = await driver.observe(() =>
     [...document.querySelectorAll("[data-device-action-row]")].map((row) => row.dataset.actionId),
   );
@@ -121,13 +123,13 @@ async function managedRefresh(ui) {
     { label: "Reason", dialog: true },
     "Maintained deployment lifecycle same-device live inventory proof",
   );
-  await ui.click({ role: "button", text: "Review action", dialog: true });
-  await ui.click({ role: "button", text: "Send action", dialog: true });
+  await submitReviewedDeviceAction(ui);
   const deadline = Date.now() + 420_000;
   while (Date.now() < deadline) {
     await driver.goto(
       `${config.origin}/devices/${encodeURIComponent(config.deviceId)}?tab=actions`,
     );
+    await waitForSettledActionHistory(driver);
     const observed = await driver.observe((old) => {
       const rows = [...document.querySelectorAll("[data-device-action-row]")];
       const candidates = rows.filter(

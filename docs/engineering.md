@@ -4439,6 +4439,21 @@ the approved TUF root SHA-256 is
 This is production-cold-release-build-only evidence, not native lifecycle
 qualification; SDK12 and earlier failed installation observations remain scoped.
 
+`native-ubuntu-attempt14.json`, record SHA-256
+`16de37c6c142627a2dd330184c729cf439a314095e005d4e6855dc8c418f3a5b`,
+then used those untouched SDK13 packages. Native installation, first-owner
+password/passkey setup, actual SCRAM-PLUS admission, encrypted custody, integration
+secret decryption, Ready embedded agent repositories and console-copied native
+enrollment passed. The managed-action phase failed: the browser clicked Send action
+and immediately navigated, observed no action history, and timed out. Backup,
+upgrade and restore were not exercised; the source-scoped deployment ledger entry
+is **FAIL**, not a lifecycle qualification. The maintained browser proof now waits
+for the real form's visible server acknowledgement before any navigation and for
+settled action history before both its old-ID snapshot and every completion
+snapshot. Its same-device, newly issued action, completed result and fresh inventory
+requirements are unchanged. Focused real Chromium regressions cover missing and
+asynchronous acknowledgements and asynchronously rendered old-row/empty histories.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

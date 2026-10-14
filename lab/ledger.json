@@ -13579,6 +13579,21 @@
       "verified": true,
       "manifestSha256": "77aec62dd581c197960eadf38b1ee98379e9076e480a979a1f39a640e3dc5705",
       "mainlineRevision": "820ee6b51cd43aeb464c9178ebec1ab64097371c"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt14.json",
+      "sha256": "16de37c6c142627a2dd330184c729cf439a314095e005d4e6855dc8c418f3a5b",
+      "recorded": "2026-10-14T20:14:32.335835632Z",
+      "revision": "76e4fc64fdad5982854d8ce04a465dfb413ef65a-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "specific-source-a7389d51f",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "76e4fc64fdad5982854d8ce04a465dfb413ef65a"
     }
   ]
 }
