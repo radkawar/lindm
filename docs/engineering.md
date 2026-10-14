@@ -2119,9 +2119,11 @@ probe peer, so it needs two) and admits them all at once or not at all; the
 memory guard covers the sum of its guests. Taking leases one at a time was a
 hold-and-wait deadlock: two pair lanes on a three-slot host could each hold one
 slot forever. Waiting lanes are served strictly first come, first served: each
-holds a flocked `waiter-<arrival>-<pid>-<guests>.lock` ticket (locked before it
+holds a flocked `waiter-<arrival>-<pid>.<sequence>-<guests>.lock` ticket (locked before it
 is published), and only the oldest live waiter is admitted, so no younger lane
-of any size takes the slots or memory a waiting multi-guest head needs. The
+of any size takes the slots or memory a waiting multi-guest head needs; waiters
+behind the head only check the queue, never taking the admission guard or
+probing slots, so the head is never crowded out. The
 guest limit in force is the one the most recently started lane of that host
 recorded in the lease directory's `capacity` file, re-read on every admission
 check: a waiter started before `max_guests` changed admits by the new limit

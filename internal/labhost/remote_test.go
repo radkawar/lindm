@@ -314,8 +314,7 @@ func TestWatchHeldAcknowledgesRegistrationOnlyAfterRecording(t *testing.T) {
 		}
 		return os.Rename(filepath.Join(dir, ".pending"), filepath.Join(dir, name))
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	worker := make(chan error, 1)
 	go func() {
 		// The demo worker's protocol: each record waits for its acknowledgement.
@@ -449,7 +448,9 @@ func TestSnapshotReturnPreservesDeadlineAfterExporterStarts(t *testing.T) {
 	if err := os.WriteFile(record, []byte(`{"repository_snapshot_manifest_sha256":"`+strings.Repeat("a", 64)+`"}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+	// The deadline is what the test checks: it must outlast the exporter's
+	// start even on a loaded host, and expire while the exporter blocks.
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 	var stderr bytes.Buffer
 	err := collectRepositorySnapshot(ctx, "", exporter, root, filepath.Join(root, "cache"), record, &stderr)

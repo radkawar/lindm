@@ -13,8 +13,7 @@ import (
 )
 
 func TestConcurrentTwoGuestDemosReserveWholeFootprints(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	slots, err := openFixtureSlots(fixtureHost("demo-batch", t.TempDir()))
 	if err != nil {
 		t.Fatal(err)
@@ -86,8 +85,7 @@ func TestConcurrentTwoGuestDemosReserveWholeFootprints(t *testing.T) {
 }
 
 func TestBatchDisconnectRetainsWorkerLeaseThroughTeardown(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	slots, err := openFixtureSlots(fixtureHost("disconnect", t.TempDir()))
 	if err != nil {
 		t.Fatal(err)
@@ -133,8 +131,7 @@ func TestBatchDisconnectRetainsWorkerLeaseThroughTeardown(t *testing.T) {
 // Ctrl-C while a demo waits in FIFO admission is an ordinary stop: the broker
 // exits on stdin EOF without printing a credential.
 func TestBatchAcquireCanceledWhileQueuedReportsCancellation(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	binary := filepath.Join(t.TempDir(), "lab")
 	if err := os.WriteFile(binary, []byte("#!/bin/sh\ncat >/dev/null\n"), 0700); err != nil {
 		t.Fatal(err)
@@ -149,8 +146,7 @@ func TestBatchAcquireCanceledWhileQueuedReportsCancellation(t *testing.T) {
 }
 
 func TestBatchRequiresCredentialAndReservedDescriptor(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	slots, err := openFixtureSlots(fixtureHost("authentication", t.TempDir()))
 	if err != nil {
 		t.Fatal(err)

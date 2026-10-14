@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -157,6 +158,25 @@ const admissionBusy = "another admission is in progress"
 // sum of the requested guests. A nil result with a nil error carries the reason
 // admission must wait. An empty ticket queues behind every live waiter.
 func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (_ []*Lease, wait string, resultErr error) {
+	capacity, err := s.currentCapacity()
+	if err != nil {
+		return nil, "", err
+	}
+	if guests == 0 || guests > capacity {
+		return nil, "", fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, capacity)
+	}
+	// A waiter behind older ones waits without the admission guard or a look
+	// at the slots: with many waiters polling, taking the guard (and briefly
+	// each slot's flock, to count them) on every poll kept the guard busy and
+	// slots locked whenever the head tried, so the head starved. A ticket's
+	// owner holds its flock while it waits, so this probe never mistakes a
+	// live ticket for a stale one.
+	if older, demand, err := s.olderWaiters(ticket); err != nil || older != 0 {
+		if err != nil {
+			return nil, "", err
+		}
+		return nil, fmt.Sprintf("behind %d older waiters (%d guests)", older, demand), nil
+	}
 	guard, err := s.openName(".admission.lock")
 	if err != nil {
 		return nil, "", err
@@ -166,13 +186,6 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 	if err != nil || !locked {
 		return nil, admissionBusy, err
 	}
-	capacity, err := s.currentCapacity()
-	if err != nil {
-		return nil, "", err
-	}
-	if guests == 0 || guests > capacity {
-		return nil, "", fmt.Errorf("lab hosts: lane needs %d guests but the host admits %d", guests, capacity)
-	}
 	active, err := s.Count()
 	if err != nil {
 		return nil, "", err
@@ -181,8 +194,8 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 	if err != nil {
 		return nil, "", err
 	}
-	if older != 0 {
-		return nil, fmt.Sprintf("behind %d older waiters (%d guests); %d of %d slots held", older, demand, active, capacity), nil
+	if older != 0 { // a waiter that queued before the guard was taken
+		return nil, fmt.Sprintf("behind %d older waiters (%d guests)", older, demand), nil
 	}
 	if active > capacity-guests {
 		return nil, fmt.Sprintf("%d of %d slots held; %d needed", active, capacity, guests), nil
@@ -243,13 +256,20 @@ func (s *Slots) tryAcquireN(ctx context.Context, guests uint32, ticket string) (
 
 const waiterPrefix = "waiter-"
 
+// ticketSequence numbers this process's waiter tickets.
+var ticketSequence atomic.Uint64
+
 // queue publishes a first-come ticket held by an exclusive flock while the
-// caller waits. Names sort by arrival; the demanded guests are in the name.
+// caller waits. Names (waiter-<arrival ns>-<pid>.<sequence>-<guests>.lock)
+// sort by arrival; the demanded guests are in the name.
 // The ticket is locked under a private name before it is renamed into the
 // queue, so a reader never mistakes a just-created ticket for a stale one.
 // A ticket whose holder died loses its flock and is swept by later readers.
 func (s *Slots) queue(guests uint32) (string, func() error, error) {
-	name := fmt.Sprintf("%s%020d-%010d-%d.lock", waiterPrefix, time.Now().UnixNano(), os.Getpid(), guests)
+	// The sequence keeps tickets of one process's concurrent waiters apart
+	// when they read the same clock tick (they then collided on one ticket
+	// file, and the second waiter failed with "waiter ticket is held").
+	name := fmt.Sprintf("%s%020d-%010d.%d-%d.lock", waiterPrefix, time.Now().UnixNano(), os.Getpid(), ticketSequence.Add(1), guests)
 	pending := filepath.Join(s.directory, "pending-"+name)
 	file, err := s.openName("pending-" + name)
 	if err != nil {
@@ -271,7 +291,9 @@ func (s *Slots) queue(guests uint32) (string, func() error, error) {
 }
 
 // olderWaiters counts live tickets queued before ticket and the guests they
-// demand. The caller holds the admission lock.
+// demand, removing tickets whose holder died. It needs no admission lock: a
+// ticket is named only once its owner holds its flock, so a ticket whose
+// flock is free is stale for good.
 func (s *Slots) olderWaiters(ticket string) (waiters, guests uint32, err error) {
 	entries, err := os.ReadDir(s.directory)
 	if err != nil {

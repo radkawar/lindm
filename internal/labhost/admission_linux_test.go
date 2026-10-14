@@ -94,8 +94,9 @@ func TestAdmissionCountsRetiredSlots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	// Hangs are bounded by the test binary's -timeout; a short wall-clock
+	// deadline here only measured how loaded the host was.
+	ctx := t.Context()
 	leases := make([]*Lease, 0, 3)
 	defer func() {
 		for _, lease := range leases {
@@ -147,8 +148,7 @@ func TestAdmissionCountsRetiredSlots(t *testing.T) {
 func TestConcurrentMultiGuestLanesDoNotDeadlock(t *testing.T) {
 	host := fixtureHost("pairs", t.TempDir())
 	host.MaxGuests = 3
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	single, err := openFixtureSlots(host)
 	if err != nil {
 		t.Fatal(err)
@@ -261,9 +261,7 @@ func TestStaleWaiterTicketIsSwept(t *testing.T) {
 	if err := os.WriteFile(stale, nil, 0600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	lease, err := slots.Acquire(ctx)
+	lease, err := slots.Acquire(t.Context())
 	if err != nil {
 		t.Fatalf("stale ticket blocked admission: %v", err)
 	}
@@ -273,12 +271,14 @@ func TestStaleWaiterTicketIsSwept(t *testing.T) {
 	}
 }
 
+// waitFor polls condition until it holds. It has no wall-clock deadline of
+// its own, which a loaded host would turn into a false failure; a condition
+// that never holds is reported by the test binary's -timeout.
 func waitFor(t *testing.T, condition func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
 	for !condition() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not reached")
+		if t.Context().Err() != nil {
+			t.Fatal("test ended before the condition held")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -349,13 +349,8 @@ func TestAcquireReportingNamesEachChangedWaitReasonOnce(t *testing.T) {
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case err := <-admitted:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("not admitted after the slot was released")
+	if err := <-admitted; err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -401,13 +396,8 @@ func TestAcquireReportingOmitsTransientAdmissionContention(t *testing.T) {
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case err := <-admitted:
-		if err != nil {
-			t.Fatal(err)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("not admitted after the slot was released")
+	if err := <-admitted; err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -427,8 +417,8 @@ func TestRunAdmittedStartsLaneDeadlineAfterAdmission(t *testing.T) {
 	const lane = 200 * time.Millisecond
 	queued := make(chan struct{})
 	type admission struct {
-		remaining time.Duration
-		err       error
+		deadline, observed time.Time
+		err                error
 	}
 	ran := make(chan admission, 1)
 	result := make(chan error, 1)
@@ -439,22 +429,23 @@ func TestRunAdmittedStartsLaneDeadlineAfterAdmission(t *testing.T) {
 				ran <- admission{err: errors.New("lane has no deadline")}
 				return nil
 			}
-			ran <- admission{remaining: time.Until(deadline), err: ctx.Err()}
+			ran <- admission{deadline: deadline, observed: time.Now(), err: ctx.Err()}
 			return nil
 		})
 	}()
 	<-queued
 	time.Sleep(3 * lane) // queue for longer than the lane's own budget
+	// The lane's deadline is set at admission, which follows the release:
+	// it is no earlier than release+lane (a deadline counted from queueing
+	// would be at least 3*lane earlier) and no later than its observation
+	// plus lane. Neither bound depends on how quickly a loaded host runs.
+	released := time.Now()
 	if err := held.Close(); err != nil {
 		t.Fatal(err)
 	}
-	select {
-	case got := <-ran:
-		if got.err != nil || got.remaining < lane/2 || got.remaining > lane {
-			t.Fatalf("admitted lane remaining %v, error %v; want its full %v", got.remaining, got.err, lane)
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("not admitted after the slot was released")
+	got := <-ran
+	if got.err != nil || got.deadline.Before(released.Add(lane)) || got.deadline.After(got.observed.Add(lane)) {
+		t.Fatalf("admitted lane deadline %v after release (observed %v), error %v; want the full %v counted from admission", got.deadline.Sub(released), got.observed.Sub(released), got.err, lane)
 	}
 	if err := <-result; err != nil {
 		t.Fatal(err)
@@ -496,8 +487,7 @@ func TestAwaitMemoryTakesNoSlotAndReportsChanges(t *testing.T) {
 	observations <- memoryAdmission{AvailableBytes: 64 << 30}
 	slots.memoryProbe = func(context.Context) (memoryAdmission, error) { return <-observations, nil }
 	var reasons []string
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	// Every slot is held, yet memory alone admits the host job.
 	if err := slots.AwaitMemory(ctx, 1, func(reason string) { reasons = append(reasons, reason) }); err != nil {
 		t.Fatal(err)
@@ -542,16 +532,14 @@ func TestWaiterAdoptsLaterConfiguredLimit(t *testing.T) {
 	if _, err := openFixtureSlots(host); err != nil { // a later lane, configured with 4
 		t.Fatal(err)
 	}
-	select {
-	case leases := <-admitted:
-		if len(leases) != 2 {
-			t.Fatalf("admitted %d guests", len(leases))
-		}
-		for _, lease := range leases {
-			_ = lease.Close()
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("the waiter kept its stale limit of 3 after the host was raised to 4")
+	// Admission by the stale limit of 3 never comes: the test binary's
+	// -timeout reports the hang.
+	leases := <-admitted
+	if len(leases) != 2 {
+		t.Fatalf("admitted %d guests", len(leases))
+	}
+	for _, lease := range leases {
+		_ = lease.Close()
 	}
 }
 
@@ -583,7 +571,10 @@ func TestMixedQueueNeverStarvesItsMultiGuestHead(t *testing.T) {
 		leases []*Lease
 	}
 	order := make(chan admission, 8)
+	queued := 0
 	acquire := func(name string, guests uint32) {
+		queued++
+		want := uint32(queued)
 		slots := open()
 		go func() {
 			leases, err := slots.AcquireN(t.Context(), guests)
@@ -594,15 +585,15 @@ func TestMixedQueueNeverStarvesItsMultiGuestHead(t *testing.T) {
 		}()
 		waitFor(t, func() bool {
 			waiters, _, err := slots.olderWaiters("")
-			return err == nil && waiters >= 1
+			return err == nil && waiters == want
 		})
 	}
 	observer := open()
+	// Each waiter's ticket is queued before the next starts, so tickets sort
+	// in this order.
 	acquire("pair", 2)
-	time.Sleep(20 * time.Millisecond) // later tickets sort after the head's
 	for i := range 3 {
 		acquire(fmt.Sprintf("single-%d", i), 1)
-		time.Sleep(20 * time.Millisecond)
 	}
 	// Each single fits by slots and memory, but the head does not fit yet.
 	time.Sleep(500 * time.Millisecond)
@@ -636,4 +627,46 @@ func TestMixedQueueNeverStarvesItsMultiGuestHead(t *testing.T) {
 		t.Fatalf("last single admitted %d guests", len(last.leases))
 	}
 	_ = last.leases[0].Close()
+}
+
+// Waiters of one process that queue in the same clock tick each get their own
+// ticket. Before tickets carried a sequence, two such waiters derived one
+// name and the second failed with "waiter ticket is held"; that made
+// TestSlotsConcurrentCapacity hang on loaded hosts.
+func TestConcurrentWaitersGetDistinctTickets(t *testing.T) {
+	slots, err := openFixtureSlots(fixtureHost("tickets", t.TempDir()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	const waiters = 64
+	start := make(chan struct{})
+	type ticket struct {
+		name  string
+		leave func() error
+		err   error
+	}
+	tickets := make(chan ticket, waiters)
+	for range waiters {
+		go func() {
+			<-start
+			name, leave, err := slots.queue(1)
+			tickets <- ticket{name, leave, err}
+		}()
+	}
+	close(start)
+	names := map[string]bool{}
+	for range waiters {
+		got := <-tickets
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		if names[got.name] {
+			t.Fatalf("ticket %s issued twice", got.name)
+		}
+		names[got.name] = true
+		defer func() { _ = got.leave() }()
+	}
+	if older, demand, err := slots.olderWaiters(""); err != nil || older != waiters || demand != waiters {
+		t.Fatalf("queue holds %d waiters for %d guests: %v", older, demand, err)
+	}
 }

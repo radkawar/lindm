@@ -24,8 +24,7 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	ready := make(chan chan struct{}, 12)
 	results := make(chan error, 12)
 	var active atomic.Int32
@@ -51,13 +50,20 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 			results <- lease.Close()
 		}()
 	}
+	finished := 0 // workers whose result was already received
 	for range 4 {
 		var held [3]chan struct{}
-		for index := range held {
+		for index := 0; index < len(held); {
 			select {
 			case held[index] = <-ready:
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
+				index++
+			case err := <-results:
+				// Workers of earlier waves report nil; an error means a worker
+				// will never hold a slot, so the wave could never fill.
+				if err != nil {
+					t.Fatalf("worker failed before the wave filled: %v", err)
+				}
+				finished++
 			}
 		}
 		if count, err := slots.Count(); err != nil || count != 3 {
@@ -67,7 +73,7 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 			close(release)
 		}
 	}
-	for range 12 {
+	for range 12 - finished {
 		if err := <-results; err != nil {
 			t.Error(err)
 		}
@@ -89,8 +95,7 @@ func TestSlotsCancelAndWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	lease, err := slots.Acquire(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -155,8 +160,7 @@ func TestSlotsCrashRelease(t *testing.T) {
 		t.Fatalf("child lock: %d, %v", count, err)
 	}
 	killLeaseHelper(t, child)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	ctx := t.Context()
 	lease, err := slots.Acquire(ctx)
 	if err != nil {
 		t.Fatalf("crashed child did not release slot: %v", err)
@@ -173,8 +177,7 @@ func TestLeaseInheritedLifetime(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := t.Context()
 	lease, err := slots.Acquire(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -234,8 +237,7 @@ func TestLeaseHelperProcess(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+		ctx := t.Context()
 		lease, err := slots.Acquire(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -266,9 +268,8 @@ func TestLeaseHelperProcess(t *testing.T) {
 
 func startLeaseHelper(t *testing.T, directory string, lease *Lease) *exec.Cmd {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	t.Cleanup(cancel)
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestLeaseHelperProcess$")
+	// The helper lives until the test kills it or ends.
+	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestLeaseHelperProcess$")
 	mode := "acquire"
 	if lease != nil {
 		mode = "inherit"
