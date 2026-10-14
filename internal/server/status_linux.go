@@ -53,7 +53,9 @@ func operationalProbe(pool, adminPool *pgxpool.Pool, resources *config.Resources
 		checks := []*adminv1.ServerStatusCheck{
 			databaseStatus(ctx, databasePing, "database", databasePrefer, now),
 			databaseStatus(ctx, adminDatabasePing, "admin_database", adminDatabasePrefer, now),
-			certificateStatus("https_certificate", resources.ServerCertificate.Leaf, now),
+			certificateStatus("https_certificate", resources.AdminServerCertificate.Leaf, now),
+			consoleCAStatus(resources, now),
+			certificateStatus("device_https_certificate", resources.ServerCertificate.Leaf, now),
 			certificateStatus("device_ca", resources.DeviceCACertificate, now),
 			backupStatus(now, backupIdentity, func() (serverops.BackupHealth, error) {
 				if backupIdentityErr != nil {
@@ -134,6 +136,22 @@ func certificateStatus(component string, cert *x509.Certificate, now time.Time) 
 		check.State = statusAttention
 		check.Summary = "The loaded certificate expires within 30 days."
 		check.NextAction = "Renew the certificate before its expiry."
+	}
+	return check
+}
+
+func consoleCAStatus(resources *config.Resources, now time.Time) *adminv1.ServerStatusCheck {
+	check := certificateStatus("console_ca", resources.AdminCACertificate, now)
+	if resources.AdminCACertificate == nil && resources.Proto.GetAdminCaFile() == "" {
+		check.State = statusInactive
+		check.Summary = "No private console certificate authority is configured."
+		check.NextAction = "A publicly trusted console certificate needs no custom CA import. Manual shared-TLS deployments use their configured issuer."
+		return check
+	}
+	check.NextAction += " If the console uses a private CA, import the console CA printed by the installer, not the device CA. Turnkey installs use /etc/lindm/console-ca.crt."
+	if cert := resources.AdminCACertificate; cert != nil {
+		digest := sha256.Sum256(cert.Raw)
+		check.Detail = fmt.Sprintf("Console CA public certificate SHA-256: %x. Turnkey browser trust uses ECDSA P-256/SHA-256; Go device transport stays Ed25519 with separate device trust.", digest)
 	}
 	return check
 }

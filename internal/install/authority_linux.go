@@ -6,11 +6,10 @@ package install
 
 import (
 	"context"
+	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,12 +69,18 @@ func executionAuthority(ctx context.Context, o Options, deployment string, uid, 
 	if err != nil {
 		return err
 	}
+	console, err := os.ReadFile("/etc/lindm/console-ca.crt")
+	if err != nil {
+		return err
+	}
+	// Both per-origin roots are quorum-signed, never merged: an approved console
+	// issuer must not become authority for the independent device TLS endpoint.
 	device, err := os.ReadFile("/etc/lindm/device-ca.crt")
 	if err != nil {
 		return err
 	}
 	digest := sha256.Sum256(rootJSON)
-	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: deployment, EnrollmentOrigin: o.Origin, DeviceOrigin: o.DeviceOrigin, TransportCaPem: transport, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: releaseRoot, NotBefore: root.NotBefore, ExpiresAt: root.ExpiresAt}
+	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: deployment, EnrollmentOrigin: o.Origin, DeviceOrigin: o.DeviceOrigin, TransportCaPem: transport, ConsoleCaPem: console, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: releaseRoot, NotBefore: root.NotBefore, ExpiresAt: root.ExpiresAt}
 	encoded, err := a.Sign(ctx, bundle, private[:2]...)
 	if err != nil {
 		return err
@@ -128,13 +133,11 @@ func executionAuthority(ctx context.Context, o Options, deployment string, uid, 
 	return custody.export(o, deployment, root, gid)
 }
 
-func writeKey(path string, key ed25519.PrivateKey, uid, gid int) error {
-	der, err := x509.MarshalPKCS8PrivateKey(key)
+func writeKey(path string, key crypto.Signer, uid, gid int) error {
+	encoded, err := privateKeyPEM(key)
 	if err != nil {
 		return err
 	}
-	defer clear(der)
-	encoded := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
 	defer clear(encoded)
 	return newFile(path, encoded, uid, gid, 0600)
 }

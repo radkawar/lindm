@@ -26,6 +26,7 @@ type Bootstrap struct {
 	Root           *agentv1.ExecutionRoot
 	Bundle         *agentv1.BootstrapBundle
 	TransportRoots *x509.CertPool
+	ConsoleRoots   *x509.CertPool
 	DeviceCA       *x509.Certificate
 }
 
@@ -71,6 +72,10 @@ func (a *Authority) VerifyBootstrap(ctx context.Context, rootJSON, envelope []by
 	if now.Before(bundle.GetNotBefore().AsTime()) || !now.Before(bundle.GetExpiresAt().AsTime()) || bundle.GetNotBefore().AsTime().Before(root.GetNotBefore().AsTime()) || bundle.GetExpiresAt().AsTime().After(root.GetExpiresAt().AsTime()) {
 		return nil, errors.New("bootstrap validity exceeds current root authority")
 	}
+	console, err := parseCAs(bundle.GetConsoleCaPem(), now, x509.ExtKeyUsageServerAuth)
+	if err != nil {
+		return nil, err
+	}
 	transport, err := parseCAs(bundle.GetTransportCaPem(), now, x509.ExtKeyUsageServerAuth)
 	if err != nil {
 		return nil, err
@@ -82,7 +87,7 @@ func (a *Authority) VerifyBootstrap(ctx context.Context, rootJSON, envelope []by
 	if len(device) != 1 {
 		return nil, errors.New("bootstrap requires one device certificate authority")
 	}
-	tlsKeys := make(map[[32]byte]struct{}, len(transport)+1)
+	tlsKeys := make(map[[32]byte]struct{}, len(transport)+len(console)+1)
 	roots := x509.NewCertPool()
 	for _, cert := range transport {
 		roots.AddCert(cert)
@@ -93,66 +98,84 @@ func (a *Authority) VerifyBootstrap(ctx context.Context, rootJSON, envelope []by
 		return nil, errors.New("device and transport trust must use distinct keys")
 	}
 	tlsKeys[deviceKey] = struct{}{}
+	consoleRoots := x509.NewCertPool()
+	for _, cert := range console {
+		consoleRoots.AddCert(cert)
+		key := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
+		if key == deviceKey {
+			return nil, errors.New("device and console trust must use distinct keys")
+		}
+		// Explicit shared-issuer fixtures may pin the same CA in both server
+		// domains; the pools remain separately authorized by signed fields.
+		tlsKeys[key] = struct{}{}
+	}
 	for key := range executionKeys {
 		if _, exists := tlsKeys[key]; exists {
 			return nil, errors.New("execution and TLS trust must use distinct keys")
 		}
 	}
-	release, err := metadata.Root().FromBytes(bundle.GetReleaseRootJson())
+	if err := verifyBootstrapReleaseRoot(bundle.GetReleaseRootJson(), executionKeys, tlsKeys, now); err != nil {
+		return nil, err
+	}
+	return &Bootstrap{Root: root, Bundle: bundle, TransportRoots: roots, ConsoleRoots: consoleRoots, DeviceCA: device[0]}, nil
+}
+
+func verifyBootstrapReleaseRoot(encoded []byte, executionKeys, tlsKeys map[[32]byte]struct{}, now time.Time) error {
+	release, err := metadata.Root().FromBytes(encoded)
 	if err != nil {
-		return nil, errors.New("invalid TUF release root")
+		return errors.New("invalid TUF release root")
 	}
 	if release.Signed.Type != metadata.ROOT || release.Signed.Version < 1 || !now.Before(release.Signed.Expires) {
-		return nil, errors.New("TUF release root is not currently valid")
+		return errors.New("TUF release root is not currently valid")
 	}
 	releaseKeys := make(map[string][32]byte, len(release.Signed.Keys))
 	for id, key := range release.Signed.Keys {
 		if key == nil {
-			return nil, errors.New("missing TUF release key")
+			return errors.New("missing TUF release key")
 		}
 		public, err := key.ToPublicKey()
 		if err != nil {
-			return nil, errors.New("invalid TUF release key")
+			return errors.New("invalid TUF release key")
 		}
 		if err := pki.ValidatePublicKey(public); err != nil {
-			return nil, err
+			return err
 		}
 		der, err := x509.MarshalPKIXPublicKey(public)
 		if err != nil {
-			return nil, errors.New("invalid TUF release key")
+			return errors.New("invalid TUF release key")
 		}
 		digest := sha256.Sum256(der)
 		if _, exists := executionKeys[digest]; exists {
-			return nil, errors.New("release and execution trust must use distinct keys")
+			return errors.New("release and execution trust must use distinct keys")
 		}
 		if _, exists := tlsKeys[digest]; exists {
-			return nil, errors.New("release and TLS trust must use distinct keys")
+			return errors.New("release and TLS trust must use distinct keys")
 		}
 		releaseKeys[id] = digest
 	}
 	for _, role := range []string{"root", "targets", "snapshot", "timestamp"} {
 		definition, exists := release.Signed.Roles[role]
 		if !exists || definition == nil || definition.Threshold < 1 {
-			return nil, errors.New("invalid TUF release role")
+			return errors.New("invalid TUF release role")
 		}
 		unique := make(map[[32]byte]struct{}, len(definition.KeyIDs))
 		for _, id := range definition.KeyIDs {
 			key, exists := releaseKeys[id]
 			if !exists {
-				return nil, errors.New("unknown TUF release role key")
+				return errors.New("unknown TUF release role key")
 			}
 			unique[key] = struct{}{}
 		}
 		if definition.Threshold > len(unique) {
-			return nil, errors.New("unsatisfiable TUF release role quorum")
+			return errors.New("unsatisfiable TUF release role quorum")
 		}
 	}
 	// Validate nullable role/key objects before invoking the maintained
 	// verifier; malformed metadata must return an error rather than panic.
 	if err := release.VerifyDelegate(metadata.ROOT, release); err != nil {
-		return nil, errors.New("invalid TUF release root signature")
+		return errors.New("invalid TUF release root signature")
 	}
-	return &Bootstrap{Root: root, Bundle: bundle, TransportRoots: roots, DeviceCA: device[0]}, nil
+	return nil
 }
 
 func parseCAs(encoded []byte, now time.Time, usage x509.ExtKeyUsage) ([]*x509.Certificate, error) {

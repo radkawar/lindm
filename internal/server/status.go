@@ -25,7 +25,7 @@ import (
 
 const statusCadence = time.Minute
 
-var statusComponents = [...]string{"database", "admin_database", "https_certificate", "device_ca", "backups", "server_release_feed", "agent_repository", "advisory_feeds", "disk", "job_queue"}
+var statusComponents = [...]string{"database", "admin_database", "https_certificate", "console_ca", "device_https_certificate", "device_ca", "backups", "server_release_feed", "agent_repository", "advisory_feeds", "disk", "job_queue"}
 
 type statusProbe func(context.Context, time.Time) []*adminv1.ServerStatusCheck
 

@@ -76,6 +76,11 @@ message BootstrapBundle {
   }];
   google.protobuf.Timestamp not_before = 10 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expires_at = 11 [(buf.validate.field).required = true];
+  // Administrative enrollment and native-download HTTPS trust, never device transport.
+  bytes console_ca_pem = 12 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 65536
+  }];
   option (buf.validate.message).cel = {
     id: "bootstrap.validity"
     message: "bootstrap validity must be increasing"

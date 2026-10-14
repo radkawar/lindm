@@ -13,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -33,10 +32,13 @@ type Resources struct {
 	Proto    *configv1.ServerConfig
 	Database *pgxpool.Config
 	// AdminDatabase is the separate console/identity pool (same credential).
-	AdminDatabase     *pgxpool.Config
-	ServerCertificate tls.Certificate
-	// Enrollment HTTPS trust is selected from verified server certificate
-	// material, not from the independently provisioned device-client CA.
+	AdminDatabase          *pgxpool.Config
+	ServerCertificate      tls.Certificate
+	AdminServerCertificate tls.Certificate
+	// AdminCACertificate is the approved console CA, nil for shared TLS.
+	AdminCACertificate *x509.Certificate
+	// Enrollment HTTPS trust is the console-origin native-download issuer,
+	// separate from the signed bootstrap's device transport trust.
 	EnrollmentTLSCAPEM          string
 	EnrollmentTLSCASHA256       string
 	EnrollmentTLSUnavailable    bool
@@ -127,15 +129,8 @@ func (d *Document) Resolve() (*Resources, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load tls certificate: %w", err)
 	}
-	publicURL, err := url.Parse(cfg.GetPublicUrl())
-	if err != nil {
-		return nil, fmt.Errorf("parse public_url: %w", err)
-	}
-	if err := result.ServerCertificate.Leaf.VerifyHostname(publicURL.Hostname()); err != nil {
-		return nil, fmt.Errorf("tls certificate does not cover public_url: %w", err)
-	}
-	if !pki.PermitsUsage(result.ServerCertificate.Leaf, x509.ExtKeyUsageServerAuth) {
-		return nil, errors.New("tls certificate must permit server authentication")
+	if err := d.resolveListenerTLS(result); err != nil {
+		return nil, err
 	}
 	ca, err := keyPair(base, cfg.GetDeviceCa().GetCertificateFile(), cfg.GetDeviceCa().GetPrivateKeyFile())
 	if err != nil {

@@ -176,6 +176,10 @@ message PrepareBootstrapResponse {
   bool provisioning_token = 10;
   bytes provisioning_retrieval_proof = 11 [(buf.validate.field).bytes.max_len = 16384];
   OfflineEnrollmentRequestFile offline_request = 12;
+  bytes console_ca_pem = 13 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 65536
+  }];
 }
 
 message InstallEnrollmentRequest {
@@ -243,6 +247,10 @@ message GetConnectionResponse {
   // Protected executor memory has crossed the live-root erase gate. Relays
   // must only report through the pinned usable session; never renew/acquire.
   bool device_action_report_only = 20;
+  bytes console_ca_pem = 21 [(buf.validate.field).bytes = {
+    min_len: 64
+    max_len: 65536
+  }];
 }
 
 message RetrievalPublicData {

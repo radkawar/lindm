@@ -160,6 +160,12 @@ func TestExecutionSigningRejectsReservedKeys(t *testing.T) {
 			f.publish(t)
 			return executionFixturePrivateKey(t, f.document.base, "transport-extra.key")
 		}},
+		{name: "additional console CA", key: func(t *testing.T, f *executionConfigFixture) ed25519.PrivateKey {
+			writeCertificate(t, f.document.base, "console-extra", true, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
+			f.bundle.ConsoleCaPem = append(bytes.Clone(f.bundle.ConsoleCaPem), executionConfigFile(t, f.document.base, "console-extra.crt")...)
+			f.publish(t)
+			return executionFixturePrivateKey(t, f.document.base, "console-extra.key")
+		}},
 		{name: "device CA", key: func(t *testing.T, f *executionConfigFixture) ed25519.PrivateKey {
 			return executionFixturePrivateKey(t, f.document.base, "device.key")
 		}},

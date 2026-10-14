@@ -13,28 +13,38 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/gen/lindm/agent/v1/agentv1connect"
 	"lindm/internal/agent/statefs"
+	"lindm/internal/agent/testfixture"
 )
 
 type recordingHandler struct {
 	agentv1connect.UnimplementedExecutorServiceHandler
-	uid uint32
-	ok  bool
+	uid        uint32
+	ok         bool
+	bootstrap  *agentv1.PrepareBootstrapResponse
+	connection *agentv1.GetConnectionResponse
+}
+
+func newRecordingHandler(t *testing.T) *recordingHandler {
+	t.Helper()
+	fixture := testfixture.NewBootstrap(t, time.Now().UTC(), "https://console.example.test", "https://device.example.test")
+	return &recordingHandler{bootstrap: fixture.Prepare(), connection: fixture.Connection()}
 }
 
 func (h *recordingHandler) PrepareBootstrap(ctx context.Context, _ *connect.Request[agentv1.PrepareBootstrapRequest]) (*connect.Response[agentv1.PrepareBootstrapResponse], error) {
 	h.capture(ctx)
-	return connect.NewResponse(&agentv1.PrepareBootstrapResponse{}), nil
+	return connect.NewResponse(proto.CloneOf(h.bootstrap)), nil
 }
 func (h *recordingHandler) InstallEnrollment(context.Context, *connect.Request[agentv1.InstallEnrollmentRequest]) (*connect.Response[agentv1.InstallEnrollmentResponse], error) {
 	return connect.NewResponse(&agentv1.InstallEnrollmentResponse{}), nil
 }
 func (h *recordingHandler) GetConnection(context.Context, *connect.Request[agentv1.GetConnectionRequest]) (*connect.Response[agentv1.GetConnectionResponse], error) {
-	return connect.NewResponse(&agentv1.GetConnectionResponse{}), nil
+	return connect.NewResponse(proto.CloneOf(h.connection)), nil
 }
 func (h *recordingHandler) SignTLSClientMessage(context.Context, *connect.Request[agentv1.SignTLSClientMessageRequest]) (*connect.Response[agentv1.SignTLSClientMessageResponse], error) {
 	return connect.NewResponse(&agentv1.SignTLSClientMessageResponse{}), nil
@@ -156,7 +166,7 @@ func TestSocketUsesPeerCredentialsAndMethodACL(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	handler := &recordingHandler{}
+	handler := newRecordingHandler(t)
 	errc := make(chan error, 1)
 	go func() {
 		errc <- Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: networkUID, NetworkGID: networkGID}, handler)
@@ -220,8 +230,9 @@ func TestProductionDialRejectsNonRootExecutor(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+	handler := newRecordingHandler(t)
 	go func() {
-		_ = Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: uint32(os.Geteuid()), NetworkGID: uint32(os.Getegid())}, &recordingHandler{})
+		_ = Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: uint32(os.Geteuid()), NetworkGID: uint32(os.Getegid())}, handler)
 	}()
 	client, cleanup, err := Dial(waitSocket(t, filepath.Join(dir, "executor.sock")))
 	if err != nil {
@@ -243,8 +254,9 @@ func TestWrongUIDIsDeniedOnSocket(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+	handler := newRecordingHandler(t)
 	go func() {
-		_ = Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: uint32(os.Geteuid()) + 1, NetworkGID: uint32(os.Getegid())}, &recordingHandler{})
+		_ = Serve(ctx, ListenConfig{Directory: dir, SocketName: "executor.sock", NetworkUID: uint32(os.Geteuid()) + 1, NetworkGID: uint32(os.Getegid())}, handler)
 	}()
 	client, cleanup, err := dial(waitSocket(t, filepath.Join(dir, "executor.sock")), func(net.Conn) error { return nil })
 	if err != nil {

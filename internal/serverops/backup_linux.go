@@ -299,6 +299,9 @@ func (r *resourceSet) inventory(message protoreflect.Message) error {
 		if field.Kind() == protoreflect.StringKind && value.String() != "" && (field.Name() == "directory" || strings.HasSuffix(string(field.Name()), "_directory")) {
 			failure = r.tree(r.reference(value.String()))
 		}
+		// Includes nested tls/admin_tls pairs and the public admin_ca_file.
+		// Keep the common copy boundary so their original ownership and modes
+		// are retained alongside database and integration credentials.
 		if field.Kind() == protoreflect.StringKind && value.String() != "" && strings.HasSuffix(string(field.Name()), "_file") {
 			failure = r.copy(r.reference(value.String()))
 		}

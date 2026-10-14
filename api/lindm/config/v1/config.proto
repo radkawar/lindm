@@ -47,6 +47,11 @@ message ServerConfig {
     message: "directory mappings must match the selected authority source"
     expression: "!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)"
   };
+  option (buf.validate.message).cel = {
+    id: "admin_tls.ca"
+    message: "administrative TLS and its CA file must be configured together"
+    expression: "has(this.admin_tls) == has(this.admin_ca_file)"
+  };
 
   string deployment_id = 1 [
     (buf.validate.field).string.uuid = true,
@@ -59,6 +64,7 @@ message ServerConfig {
   ListenerConfig admin_listener = 3 [(buf.validate.field).required = true];
   ListenerConfig device_listener = 4 [(buf.validate.field).required = true];
   DatabaseConfig database = 5 [(buf.validate.field).required = true];
+  // Device transport identity; also serves the console when admin_tls is absent.
   TLSConfig tls = 6 [(buf.validate.field).required = true];
   DeviceCAConfig device_ca = 7 [(buf.validate.field).required = true];
   AuthenticationConfig authentication = 8 [(buf.validate.field).required = true];
@@ -106,6 +112,12 @@ message ServerConfig {
   // Offline bundle import authority and the served native repository root.
   // Absent disables `lindmd bundle-import` and the /offline/ handler.
   OfflineBundleConfig offline_bundles = 23;
+  // Independent console identity and approved public CA. Both must be present,
+  // or both absent to intentionally share the existing TLS identity.
+  // Console leaves, including shared TLS, cannot use Ed25519 public keys or
+  // issuer signatures unsupported by browsers. Device TLS remains independent.
+  TLSConfig admin_tls = 25;
+  optional string admin_ca_file = 26 [(buf.validate.field).string.(lindm.validation.v1.file_reference) = true];
   option (buf.validate.message).cel = {
     id: "offline_bundles.release_repository"
     message: "offline bundle import requires a signing release repository"

@@ -34,7 +34,7 @@ func TestDatabaseCredentialPreservesLoadedContractAndTLSBase(t *testing.T) {
 	base := databaseFixture(t)
 	writeCertificate(t, base, "root", true, nil, nil)
 	writeCertificate(t, base, "client", false, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil)
-	writeCertificate(t, base, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
+	writeBrowserCertificate(t, base, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
 	writeCertificate(t, base, "device", true, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil)
 	cfg := executionSigningSchemaConfig()
 	cfg.ExecutionBootstrap, cfg.ExecutionSigning = nil, nil

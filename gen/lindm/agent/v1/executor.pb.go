@@ -281,6 +281,7 @@ type PrepareBootstrapResponse struct {
 	ProvisioningToken          bool                          `protobuf:"varint,10,opt,name=provisioning_token,json=provisioningToken,proto3" json:"provisioning_token,omitempty"`
 	ProvisioningRetrievalProof []byte                        `protobuf:"bytes,11,opt,name=provisioning_retrieval_proof,json=provisioningRetrievalProof,proto3" json:"provisioning_retrieval_proof,omitempty"`
 	OfflineRequest             *OfflineEnrollmentRequestFile `protobuf:"bytes,12,opt,name=offline_request,json=offlineRequest,proto3" json:"offline_request,omitempty"`
+	ConsoleCaPem               []byte                        `protobuf:"bytes,13,opt,name=console_ca_pem,json=consoleCaPem,proto3" json:"console_ca_pem,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -395,6 +396,13 @@ func (x *PrepareBootstrapResponse) GetProvisioningRetrievalProof() []byte {
 func (x *PrepareBootstrapResponse) GetOfflineRequest() *OfflineEnrollmentRequestFile {
 	if x != nil {
 		return x.OfflineRequest
+	}
+	return nil
+}
+
+func (x *PrepareBootstrapResponse) GetConsoleCaPem() []byte {
+	if x != nil {
+		return x.ConsoleCaPem
 	}
 	return nil
 }
@@ -653,7 +661,8 @@ type GetConnectionResponse struct {
 	ObservedBootId string `protobuf:"bytes,19,opt,name=observed_boot_id,json=observedBootId,proto3" json:"observed_boot_id,omitempty"`
 	// Protected executor memory has crossed the live-root erase gate. Relays
 	// must only report through the pinned usable session; never renew/acquire.
-	DeviceActionReportOnly bool `protobuf:"varint,20,opt,name=device_action_report_only,json=deviceActionReportOnly,proto3" json:"device_action_report_only,omitempty"`
+	DeviceActionReportOnly bool   `protobuf:"varint,20,opt,name=device_action_report_only,json=deviceActionReportOnly,proto3" json:"device_action_report_only,omitempty"`
+	ConsoleCaPem           []byte `protobuf:"bytes,21,opt,name=console_ca_pem,json=consoleCaPem,proto3" json:"console_ca_pem,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -826,6 +835,13 @@ func (x *GetConnectionResponse) GetDeviceActionReportOnly() bool {
 		return x.DeviceActionReportOnly
 	}
 	return false
+}
+
+func (x *GetConnectionResponse) GetConsoleCaPem() []byte {
+	if x != nil {
+		return x.ConsoleCaPem
+	}
+	return nil
 }
 
 type RetrievalPublicData struct {
@@ -2192,7 +2208,7 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x12provisioning_token\x18\x05 \x01(\bR\x11provisioningToken\x12g\n" +
 	"\x15offline_authorization\x18\x06 \x01(\v22.lindm.agent.v1.OfflineEnrollmentAuthorizationFileR\x14offlineAuthorization:\x9f\x05\xbaH\x9b\x05\x1a\xf8\x01\n" +
 	"\x1aprepare_bootstrap.material\x12Pnew provisioning requires both trust documents; resume may omit both but not one\x1a\x87\x01(this.execution_root_json.size() == 0) == (this.bootstrap_envelope.size() == 0) && (this.resume || this.execution_root_json.size() > 0)\x1a\x9d\x03\n" +
-	"\x17prepare_bootstrap.grant\x12Ofresh provisioning requires either a credential or signed offline authorization\x1a\xb0\x02has(this.offline_authorization) ? (!this.provisioning_token && this.pending_grant == '') : ((!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256))))\"\x8d\x05\n" +
+	"\x17prepare_bootstrap.grant\x12Ofresh provisioning requires either a credential or signed offline authorization\x1a\xb0\x02has(this.offline_authorization) ? (!this.provisioning_token && this.pending_grant == '') : ((!this.resume && this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256) || (this.resume && (this.pending_grant.size() == 0 || (this.pending_grant.size() >= 32 && this.pending_grant.size() <= 256))))\"\xc0\x05\n" +
 	"\x18PrepareBootstrapResponse\x121\n" +
 	"\x0finstallation_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x0einstallationId\x12D\n" +
 	"\x19enrollment_transaction_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\x17enrollmentTransactionId\x12$\n" +
@@ -2206,7 +2222,8 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\x12provisioning_token\x18\n" +
 	" \x01(\bR\x11provisioningToken\x12K\n" +
 	"\x1cprovisioning_retrieval_proof\x18\v \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x1aprovisioningRetrievalProof\x12U\n" +
-	"\x0foffline_request\x18\f \x01(\v2,.lindm.agent.v1.OfflineEnrollmentRequestFileR\x0eofflineRequest\"\x82\x02\n" +
+	"\x0foffline_request\x18\f \x01(\v2,.lindm.agent.v1.OfflineEnrollmentRequestFileR\x0eofflineRequest\x121\n" +
+	"\x0econsole_ca_pem\x18\r \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x04R\fconsoleCaPem\"\x82\x02\n" +
 	"\x18InstallEnrollmentRequest\x12K\n" +
 	"\tdevice_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\bdeviceId\x12c\n" +
 	"\x15enrollment_generation\x18\x02 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\x14enrollmentGeneration\x124\n" +
@@ -2223,7 +2240,7 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\n" +
 	"enrollment\x18\x01 \x01(\v2).lindm.agent.v1.InstallEnrollmentResponseB\x06\xbaH\x03\xc8\x01\x01R\n" +
 	"enrollment\"\x16\n" +
-	"\x14GetConnectionRequest\"\xdf\a\n" +
+	"\x14GetConnectionRequest\"\x92\b\n" +
 	"\x15GetConnectionResponse\x12#\n" +
 	"\rdeployment_id\x18\x01 \x01(\tR\fdeploymentId\x12\x1b\n" +
 	"\tdevice_id\x18\x02 \x01(\tR\bdeviceId\x123\n" +
@@ -2246,7 +2263,8 @@ const file_lindm_agent_v1_executor_proto_rawDesc = "" +
 	"\tretrieval\x18\x11 \x01(\v2#.lindm.agent.v1.RetrievalPublicDataR\tretrieval\x128\n" +
 	"\x05prior\x18\x12 \x01(\v2\".lindm.agent.v1.PriorTLSCredentialR\x05prior\x12(\n" +
 	"\x10observed_boot_id\x18\x13 \x01(\tR\x0eobservedBootId\x129\n" +
-	"\x19device_action_report_only\x18\x14 \x01(\bR\x16deviceActionReportOnly\"\x8e\x01\n" +
+	"\x19device_action_report_only\x18\x14 \x01(\bR\x16deviceActionReportOnly\x121\n" +
+	"\x0econsole_ca_pem\x18\x15 \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x04R\fconsoleCaPem\"\x8e\x01\n" +
 	"\x13RetrievalPublicData\x12.\n" +
 	"\x13issuance_request_id\x18\x01 \x01(\tR\x11issuanceRequestId\x12'\n" +
 	"\x0fretrieval_proof\x18\x02 \x01(\fR\x0eretrievalProof\x12\x1e\n" +

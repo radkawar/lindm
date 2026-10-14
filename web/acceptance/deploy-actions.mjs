@@ -5,7 +5,12 @@
 export async function submitReviewedDeviceAction(ui) {
   await ui.click({ role: "button", text: "Review action", dialog: true });
   await ui.click({ role: "button", text: "Send action", dialog: true });
-  await ui.wait({ text: "Action sent to device" });
+  // Sonner nests the same text in its list item, content and title. An unscoped
+  // text query is ambiguous even with one toast; keep duplicate-toast rejection.
+  await ui.wait({
+    css: '[data-sonner-toast][data-type="success"][data-visible="true"]:not([data-removed="true"]) [data-title]',
+    text: "Action sent to device",
+  });
 }
 
 // Navigation resolves at DOMContentLoaded, before React's history query. Taking

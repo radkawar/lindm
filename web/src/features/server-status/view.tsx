@@ -21,8 +21,10 @@ import { RecoveryCustodyTask } from "./custody-task";
 const COMPONENTS: Record<string, string> = {
   database: "Device database connection",
   admin_database: "Console database connection",
-  https_certificate: "Server HTTPS certificate",
-  device_ca: "Device certificate authority",
+  https_certificate: "Console HTTPS certificate",
+  console_ca: "Console certificate authority",
+  device_https_certificate: "Device HTTPS certificate",
+  device_ca: "Device client certificate authority",
   backups: "Encrypted backups",
   server_release_feed: "Offline server release notices",
   agent_repository: "Agent installation",

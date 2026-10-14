@@ -122,7 +122,7 @@ func beginInstallation(o Options, version string) (*installState, error) {
 	if err := directory("/etc/lindm", 0, 0, 0755); err != nil {
 		return nil, err
 	}
-	state := &installState{Origin: o.Origin, DeviceOrigin: o.DeviceOrigin, TLSCA: "/etc/lindm/transport-ca.crt", LocalDatabase: o.DatabaseURL == "", Pending: &installationProgress{Binding: binding, Version: version, Deployment: uuid.NewString(), GeneratedCustodians: len(o.ExecutionRootRecipients) < 3}}
+	state := &installState{Origin: o.Origin, DeviceOrigin: o.DeviceOrigin, TLSCA: "/etc/lindm/console-ca.crt", LocalDatabase: o.DatabaseURL == "", Pending: &installationProgress{Binding: binding, Version: version, Deployment: uuid.NewString(), GeneratedCustodians: len(o.ExecutionRootRecipients) < 3}}
 	if err := writeInstallationState(state); err != nil {
 		return nil, err
 	}

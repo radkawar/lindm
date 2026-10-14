@@ -7,6 +7,8 @@ package install
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -296,7 +298,7 @@ func plusCertificates(t *testing.T, root string, database bool, signature x509.S
 			t.Fatal("postgres_plus_database_authority")
 		}
 		ca = certificate
-		if err := issueServerCertificate(filepath.Join(root, "server"), "PLUS regression PostgreSQL", []string{"localhost", "127.0.0.1"}, ca, key, 0, 0); err != nil {
+		if err := issueAdminServerCertificate(filepath.Join(root, "server"), "PLUS regression PostgreSQL", []string{"localhost", "127.0.0.1"}, ca, key, 0, 0); err != nil {
 			t.Fatal("postgres_plus_database_leaf")
 		}
 	} else {
@@ -306,7 +308,7 @@ func plusCertificates(t *testing.T, root string, database bool, signature x509.S
 		}
 		defer clear(key)
 		ca = certificate
-		if err := issueServerCertificate(filepath.Join(root, "server"), "PLUS regression PostgreSQL", []string{"localhost", "127.0.0.1"}, ca, key, 0, 0); err != nil {
+		if err := issueAdminServerCertificate(filepath.Join(root, "server"), "PLUS regression PostgreSQL", []string{"localhost", "127.0.0.1"}, ca, key, 0, 0); err != nil {
 			t.Fatal("postgres_plus_negative_leaf")
 		}
 	}
@@ -318,8 +320,12 @@ func plusCertificates(t *testing.T, root string, database bool, signature x509.S
 		t.Fatal("postgres_plus_leaf_pair")
 	}
 	leaf, err := x509.ParseCertificate(pair.Certificate[0])
-	if err != nil || leaf.SignatureAlgorithm != signature || leaf.PublicKeyAlgorithm != x509.Ed25519 {
+	if err != nil || leaf.SignatureAlgorithm != signature || leaf.PublicKeyAlgorithm != x509.ECDSA {
 		t.Fatal("postgres_plus_leaf_algorithm")
+	}
+	public, ok := leaf.PublicKey.(*ecdsa.PublicKey)
+	if !ok || public.Curve != elliptic.P256() {
+		t.Fatal("postgres_plus_leaf_curve")
 	}
 }
 

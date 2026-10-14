@@ -25,7 +25,7 @@ const assistanceTestSession = "5a7df67f-8c0c-4404-95a0-828d7e3a1989"
 // The relay hands each server response to the root exactly once, so a failed
 // server exchange can never refresh the root's reauthorization window.
 func TestAssistanceRelayDeliversDirectivesOnce(t *testing.T) {
-	root := &assistanceRoot{}
+	root := &assistanceRoot{pins: originConnectionPins(t)}
 	server := &assistanceServer{directives: []*agentv1.AssistanceDirective{assistanceTestDirective(false)}}
 	loop := &assistanceLoop{
 		executor: root, gate: make(authorityGate, 1),
@@ -85,12 +85,15 @@ func assistanceTestDirective(terminate bool) *agentv1.AssistanceDirective {
 
 type assistanceRoot struct {
 	agentv1connect.ExecutorServiceClient
+	pins     *agentv1.GetConnectionResponse
 	received [][]*agentv1.AssistanceDirective
 	reports  []*agentv1.AssistanceReport
 }
 
 func (r *assistanceRoot) connection() *agentv1.GetConnectionResponse {
-	return &agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewAfter: timestamppb.New(time.Now().Add(time.Hour))}
+	connection := proto.CloneOf(r.pins)
+	connection.RenewAfter = timestamppb.New(time.Now().Add(time.Hour))
+	return connection
 }
 
 func (r *assistanceRoot) GetConnection(context.Context, *connect.Request[agentv1.GetConnectionRequest]) (*connect.Response[agentv1.GetConnectionResponse], error) {
@@ -131,7 +134,7 @@ func TestAssistanceRelayPreservesFileAuthorityAndInputEpochWithoutRenewal(t *tes
 		Deadline:  timestamppb.New(time.Now().Add(time.Minute)),
 		Policy:    &agentv1.AssistanceFilePolicy{MaxFileBytes: 1024, MaxSessionBytes: 4096, AllowedMimeTypes: []string{"text/plain"}, AllowedExtensions: []string{".txt"}},
 	}}
-	root := &assistanceRoot{reports: []*agentv1.AssistanceReport{{
+	root := &assistanceRoot{pins: originConnectionPins(t), reports: []*agentv1.AssistanceReport{{
 		SessionId: assistanceTestSession, Phase: agentv1.AssistancePhase_ASSISTANCE_PHASE_ACTIVE,
 		OfferSdp:   "v=0",
 		InputState: &agentv1.AssistanceInputState{Epoch: 2, Paused: true},

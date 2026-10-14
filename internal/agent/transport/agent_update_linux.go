@@ -55,12 +55,10 @@ func agentUpdateCycle(parent context.Context, executor agentv1connect.ExecutorSe
 	if connection.GetDeviceActionReportOnly() {
 		return time.Minute, nil
 	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(connection.GetTransportCaPem()) {
-		return time.Minute, errors.New("update transport has no protected TLS roots")
+	client, err := newAgentUpdateClient(connection)
+	if err != nil {
+		return time.Minute, err
 	}
-	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 15 * time.Second, MaxResponseHeaderBytes: 16 << 10, DisableCompression: true}
-	client := &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("update repository redirect rejected") }}
 	defer client.CloseIdleConnections()
 	answer := &agentv1.ExchangeAgentUpdateRequest{}
 	for {
@@ -92,6 +90,17 @@ func agentUpdateCycle(parent context.Context, executor agentv1connect.ExecutorSe
 		}
 		answer = fetchAgentUpdateChunk(ctx, client, response.GetRepositoryUrl(), fetch)
 	}
+}
+
+// Public update repositories are authorized by signed configuration and use
+// only the console roots authenticated by the protected bootstrap.
+func newAgentUpdateClient(connection *agentv1.GetConnectionResponse) (*http.Client, error) {
+	roots := x509.NewCertPool()
+	if len(connection.GetConsoleCaPem()) < 64 || len(connection.GetConsoleCaPem()) > 65536 || !roots.AppendCertsFromPEM(connection.GetConsoleCaPem()) {
+		return nil, errors.New("update transport has no protected console TLS roots")
+	}
+	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: roots}, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 15 * time.Second, MaxResponseHeaderBytes: 16 << 10, DisableCompression: true}
+	return &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("update repository redirect rejected") }}, nil
 }
 
 func fetchAgentUpdateChunk(ctx context.Context, client *http.Client, base string, fetch *agentv1.AgentUpdateFetch) *agentv1.ExchangeAgentUpdateRequest {

@@ -69,8 +69,8 @@ func recoveryRun(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if cfg.GetServerUrl() != bootstrap.Bundle.GetEnrollmentOrigin() || !bytes.Equal(document.ServerCA, bootstrap.Bundle.GetTransportCaPem()) {
-		return errors.New("recovery endpoint does not match authenticated bootstrap transport")
+	if cfg.GetServerUrl() != bootstrap.Bundle.GetEnrollmentOrigin() || !bytes.Equal(document.ServerCA, bootstrap.Bundle.GetConsoleCaPem()) {
+		return errors.New("recovery endpoint does not match authenticated bootstrap console trust")
 	}
 	clock := recovery.NewClock()
 	client, closeClient, err := transport.NewRecoveryClient(cfg.GetServerUrl(), document.ServerCA, clock.Bounds)

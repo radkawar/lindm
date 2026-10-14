@@ -63,6 +63,7 @@ func newFixture(t *testing.T, now time.Time) fixture {
 	bundle := &agentv1.BootstrapBundle{
 		BundleId: uuid.NewString(), DeploymentId: deployment.String(), EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example",
 		TransportCaPem: testCA(t, testKey(t), now, x509.ExtKeyUsageServerAuth), DeviceCaPem: devicePEM, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:],
+		ConsoleCaPem:    testCA(t, testKey(t), now, x509.ExtKeyUsageServerAuth),
 		ReleaseRootJson: testReleaseRoot(t, testKey(t), now.Add(24*time.Hour)), NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(2 * time.Hour)),
 	}
 	envelope, err := authority.Sign(t.Context(), bundle, key)

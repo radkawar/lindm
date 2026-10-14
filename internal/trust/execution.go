@@ -30,6 +30,7 @@ const (
 	reservedDeviceCA
 	reservedRelease
 	reservedAdditional
+	reservedConsole
 )
 
 // ExecutionVerifier checks execution authority against the separately provisioned
@@ -47,7 +48,7 @@ type ExecutionVerifier struct {
 }
 
 // NewExecutionVerifier takes a Bootstrap previously returned by VerifyBootstrap.
-// Reserved transport, device CA, and release public keys are copied as
+// Reserved transport, console, device CA, and release public keys are copied as
 // fingerprints; subsequent mutation of the supplied bootstrap cannot change
 // this verifier's trust domains. Additional reservations cover deployment-local
 // keys such as a server TLS leaf. Bootstrap execution-root fingerprints are
@@ -69,6 +70,7 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap, additionalReserve
 		kind    reservedDomain
 	}{
 		{bootstrap.Bundle.GetTransportCaPem(), reservedTransport},
+		{bootstrap.Bundle.GetConsoleCaPem(), reservedConsole},
 		{bootstrap.Bundle.GetDeviceCaPem(), reservedDeviceCA},
 	} {
 		encoded := domain.encoded
@@ -135,7 +137,7 @@ func (a *Authority) NewExecutionVerifier(bootstrap *Bootstrap, additionalReserve
 }
 
 // OnlineKeySeparated reports whether public lies outside this verifier's pinned
-// transport, device CA, release, and bootstrap execution-root domains and its
+// transport, console, device CA, release, and bootstrap execution-root domains and its
 // additional reservations. It is only a key-domain check: it does not admit a
 // delegation or authorize issuance. A rotated current root is not part of this
 // pinned bootstrap domain and must be excluded by admission before any signing.
@@ -165,7 +167,7 @@ func (v *ExecutionVerifier) TrustDomainDigest() [sha256.Size]byte {
 func executionDomainDigest(reserved map[[sha256.Size]byte]reservedDomain) [sha256.Size]byte {
 	digests := make([][sha256.Size + 1]byte, 0, len(reserved))
 	for digest, domains := range reserved {
-		pinned := domains & (reservedTransport | reservedDeviceCA | reservedRelease)
+		pinned := domains & (reservedTransport | reservedConsole | reservedDeviceCA | reservedRelease)
 		if pinned == 0 {
 			continue
 		}

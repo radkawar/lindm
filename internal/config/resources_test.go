@@ -3,7 +3,10 @@
 package config
 
 import (
+	"crypto"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -254,7 +257,7 @@ func TestResolveDeviceCAUsage(t *testing.T) {
 			dir := databaseFixture(t)
 			writeCertificate(t, dir, "root", true, nil, nil)
 			writeCertificate(t, dir, "client", false, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil)
-			writeCertificate(t, dir, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
+			writeBrowserCertificate(t, dir, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
 			writeCertificate(t, dir, "device", true, test.usage, test.unknown)
 			writeFixtureFile(t, dir, "oidc-secret", []byte("isolated-test-credential"))
 			document := &Document{base: dir, Proto: &configv1.ServerConfig{
@@ -302,15 +305,29 @@ func databaseFixture(t *testing.T) string {
 
 func writeCertificate(t *testing.T, dir, name string, ca bool, usage []x509.ExtKeyUsage, unknown []asn1.ObjectIdentifier) *x509.Certificate {
 	t.Helper()
-	public, private, err := ed25519.GenerateKey(rand.Reader)
+	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return writeCertificateWithKey(t, dir, name, ca, usage, unknown, private)
+}
+
+func writeBrowserCertificate(t *testing.T, dir, name string, ca bool, usage []x509.ExtKeyUsage, unknown []asn1.ObjectIdentifier) *x509.Certificate {
+	t.Helper()
+	private, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return writeCertificateWithKey(t, dir, name, ca, usage, unknown, private)
+}
+
+func writeCertificateWithKey(t *testing.T, dir, name string, ca bool, usage []x509.ExtKeyUsage, unknown []asn1.ObjectIdentifier, private crypto.Signer) *x509.Certificate {
+	t.Helper()
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: name}, DNSNames: []string{"localhost"}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour), BasicConstraintsValid: true, IsCA: ca, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: usage, UnknownExtKeyUsage: unknown}
 	if ca {
 		template.KeyUsage |= x509.KeyUsageCertSign
 	}
-	der, err := x509.CreateCertificate(rand.Reader, template, template, public, private)
+	der, err := x509.CreateCertificate(rand.Reader, template, template, private.Public(), private)
 	if err != nil {
 		t.Fatal(err)
 	}

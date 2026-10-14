@@ -205,9 +205,12 @@ without a usable certificate. The existing approval inbox binds an independent
 human decision to that exact reservation and rechecks current authorization.
 
 1. The installer verifies a signed package and a deployment bootstrap bundle acquired
-   through a trusted channel. It pins deployment identity, server trust, initial
-   execution-trust root/quorum and version, and the separate release-update root.
-   The root executor imports these into its own protected store. Never trust a key
+   through a trusted channel. It pins deployment identity, initial execution-trust
+   root/quorum and version, and the separate release-update root. The signed
+   `console_ca_pem` authorizes enrollment and public package downloads;
+   `transport_ca_pem` authorizes the device origin. Clients keep the pools separate
+   even when both origins have the same DNS name. The root executor imports these
+   into its own protected store. Never trust a key
    fetched from the same unauthenticated endpoint or chosen by the network process.
 2. The agent generates its private device key locally, preferably non-exportable in a
    qualified TPM. Software-key devices remain explicitly distinguishable.

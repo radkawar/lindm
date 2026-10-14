@@ -10,27 +10,37 @@ import (
 	"net/url"
 )
 
-// resolveEnrollmentTLS selects only a CA which actually verifies the configured
-// administrative TLS certificate and both advertised hostnames. Outbound trust
-// material is a candidate pool, never proof that an unrelated device CA is the
-// HTTPS issuer. Failure disables native enrollment instructions, not air-gap use.
+// resolveEnrollmentTLS projects the approved HTTPS issuer for native package
+// downloads from public_url. This is console-origin download trust, not the
+// device transport pin. Failure disables native enrollment instructions, not
+// air-gap use; unrelated outbound or device-client CAs never authorize it.
 func (d *Document) resolveEnrollmentTLS(resources *Resources) error {
-	leaf := resources.ServerCertificate.Leaf
+	pair := resources.AdminServerCertificate
+	if d.Proto.GetAdminTls() == nil && len(pair.Certificate) == 0 {
+		pair = resources.ServerCertificate
+	}
+	leaf := pair.Leaf
 	intermediates := x509.NewCertPool()
 	var candidates []*x509.Certificate
-	for _, der := range resources.ServerCertificate.Certificate[1:] {
+	signed := resources.ExecutionBootstrap != nil
+	if !signed && resources.AdminCACertificate != nil {
+		candidates = append(candidates, resources.AdminCACertificate)
+	}
+	for _, der := range pair.Certificate[1:] {
 		certificate, err := x509.ParseCertificate(der)
 		if err != nil {
 			return err
 		}
 		intermediates.AddCert(certificate)
-		candidates = append(candidates, certificate)
+		if !signed {
+			candidates = append(candidates, certificate)
+		}
 	}
 	var bundles [][]byte
 	if resources.ExecutionBootstrap != nil {
-		bundles = append(bundles, resources.ExecutionBootstrap.TransportCAPEM)
+		bundles = append(bundles, resources.ExecutionBootstrap.ConsoleCAPEM)
 	}
-	if name := d.Proto.GetTrustedCaFile(); name != "" {
+	if name := d.Proto.GetTrustedCaFile(); !signed && name != "" {
 		encoded, err := readFile(reference(d.base, name), false)
 		if err != nil {
 			return err
@@ -55,25 +65,15 @@ func (d *Document) resolveEnrollmentTLS(resources *Resources) error {
 			intermediates.AddCert(certificate)
 		}
 	}
-	public, err := url.Parse(d.Proto.GetPublicUrl())
+	endpoint, err := url.Parse(d.Proto.GetPublicUrl())
 	if err != nil {
 		return err
 	}
-	options := x509.VerifyOptions{DNSName: public.Hostname(), Intermediates: intermediates, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
-	if device := d.Proto.GetDevicePublicUrl(); device != "" {
-		origin, err := url.Parse(device)
-		if err != nil {
-			return err
-		}
-		if err := leaf.VerifyHostname(origin.Hostname()); err != nil {
-			resources.EnrollmentTLSUnavailable = true
-			return nil
-		}
-	}
+	options := x509.VerifyOptions{DNSName: endpoint.Hostname(), Intermediates: intermediates, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
 	// Prefer an explicit deployment CA even when the server OS also trusts it:
 	// a bare enrolling machine need not share the server's local trust store.
 	for _, candidate := range candidates {
-		if !candidate.IsCA || candidate.CheckSignatureFrom(candidate) != nil {
+		if !candidate.IsCA || (candidate != resources.AdminCACertificate && candidate.CheckSignatureFrom(candidate) != nil) {
 			continue
 		}
 		roots := x509.NewCertPool()
@@ -87,9 +87,11 @@ func (d *Document) resolveEnrollmentTLS(resources *Resources) error {
 		resources.EnrollmentTLSCASHA256 = hex.EncodeToString(digest[:])
 		return nil
 	}
-	options.Roots = nil
-	if _, err := leaf.Verify(options); err == nil {
-		return nil
+	if !signed {
+		options.Roots = nil
+		if _, err := leaf.Verify(options); err == nil {
+			return nil
+		}
 	}
 	resources.EnrollmentTLSUnavailable = true
 	return nil

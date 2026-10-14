@@ -99,11 +99,7 @@ func probeUnattendedExhaustion(ctx context.Context, public *devlab.AgentFixture,
 	if err != nil {
 		return "", err
 	}
-	roots := x509.NewCertPool()
-	if !roots.AppendCertsFromPEM(verified.Bundle.GetTransportCaPem()) {
-		return "", errors.New("isolated provisioning transport roots invalid")
-	}
-	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, ResponseHeaderTimeout: 15 * time.Second}
+	transport := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: verified.ConsoleRoots}, ResponseHeaderTimeout: 15 * time.Second}
 	defer transport.CloseIdleConnections()
 	client := enrollmentv1connect.NewEnrollmentServiceClient(&http.Client{Transport: transport, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, verified.Bundle.GetEnrollmentOrigin())
 	_, key, err := ed25519.GenerateKey(rand.Reader)

@@ -38,9 +38,10 @@ type ServerConfig struct {
 	AdminListener  *ListenerConfig        `protobuf:"bytes,3,opt,name=admin_listener,json=adminListener,proto3" json:"admin_listener,omitempty"`
 	DeviceListener *ListenerConfig        `protobuf:"bytes,4,opt,name=device_listener,json=deviceListener,proto3" json:"device_listener,omitempty"`
 	Database       *DatabaseConfig        `protobuf:"bytes,5,opt,name=database,proto3" json:"database,omitempty"`
-	Tls            *TLSConfig             `protobuf:"bytes,6,opt,name=tls,proto3" json:"tls,omitempty"`
-	DeviceCa       *DeviceCAConfig        `protobuf:"bytes,7,opt,name=device_ca,json=deviceCa,proto3" json:"device_ca,omitempty"`
-	Authentication *AuthenticationConfig  `protobuf:"bytes,8,opt,name=authentication,proto3" json:"authentication,omitempty"`
+	// Device transport identity; also serves the console when admin_tls is absent.
+	Tls            *TLSConfig            `protobuf:"bytes,6,opt,name=tls,proto3" json:"tls,omitempty"`
+	DeviceCa       *DeviceCAConfig       `protobuf:"bytes,7,opt,name=device_ca,json=deviceCa,proto3" json:"device_ca,omitempty"`
+	Authentication *AuthenticationConfig `protobuf:"bytes,8,opt,name=authentication,proto3" json:"authentication,omitempty"`
 	// Additional outbound trust roots; empty uses the system trust store.
 	TrustedCaFile string `protobuf:"bytes,9,opt,name=trusted_ca_file,json=trustedCaFile,proto3" json:"trusted_ca_file,omitempty"`
 	// Deployment cap on retained package-snapshot bytes, including opaque batch
@@ -77,8 +78,14 @@ type ServerConfig struct {
 	// Offline bundle import authority and the served native repository root.
 	// Absent disables `lindmd bundle-import` and the /offline/ handler.
 	OfflineBundles *OfflineBundleConfig `protobuf:"bytes,23,opt,name=offline_bundles,json=offlineBundles,proto3" json:"offline_bundles,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Independent console identity and approved public CA. Both must be present,
+	// or both absent to intentionally share the existing TLS identity.
+	// Console leaves, including shared TLS, cannot use Ed25519 public keys or
+	// issuer signatures unsupported by browsers. Device TLS remains independent.
+	AdminTls      *TLSConfig `protobuf:"bytes,25,opt,name=admin_tls,json=adminTls,proto3" json:"admin_tls,omitempty"`
+	AdminCaFile   *string    `protobuf:"bytes,26,opt,name=admin_ca_file,json=adminCaFile,proto3,oneof" json:"admin_ca_file,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ServerConfig) Reset() {
@@ -270,6 +277,20 @@ func (x *ServerConfig) GetOfflineBundles() *OfflineBundleConfig {
 		return x.OfflineBundles
 	}
 	return nil
+}
+
+func (x *ServerConfig) GetAdminTls() *TLSConfig {
+	if x != nil {
+		return x.AdminTls
+	}
+	return nil
+}
+
+func (x *ServerConfig) GetAdminCaFile() string {
+	if x != nil && x.AdminCaFile != nil {
+		return *x.AdminCaFile
+	}
+	return ""
 }
 
 type ReleaseRepositoryConfig struct {
@@ -2189,7 +2210,7 @@ var File_lindm_config_v1_config_proto protoreflect.FileDescriptor
 
 const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
-	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xd6\x1d\n" +
+	"\x1clindm/config/v1/config.proto\x12\x0flindm.config.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1clindm/advisory/v1/feed.proto\x1a\x1flindm/agent/v1/assistance.proto\x1a'lindm/agent/v1/connectivity_guard.proto\x1a!lindm/auth/v1/authorization.proto\x1a&lindm/validation/v1/string_rules.proto\"\xd5\x1f\n" +
 	"\fServerConfig\x12S\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB.\xbaH+r)Z$00000000-0000-0000-0000-000000000000\xb0\x01\x01R\fdeploymentId\x12+\n" +
 	"\n" +
@@ -2220,17 +2241,21 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\n" +
 	"assistance\x18\x18 \x01(\v2!.lindm.config.v1.AssistanceConfigR\n" +
 	"assistance\x12M\n" +
-	"\x0foffline_bundles\x18\x17 \x01(\v2$.lindm.config.v1.OfflineBundleConfigR\x0eofflineBundles:\xe7\x0f\xbaH\xe3\x0f\x1a\xb2\x01\n" +
+	"\x0foffline_bundles\x18\x17 \x01(\v2$.lindm.config.v1.OfflineBundleConfigR\x0eofflineBundles\x127\n" +
+	"\tadmin_tls\x18\x19 \x01(\v2\x1a.lindm.config.v1.TLSConfigR\badminTls\x122\n" +
+	"\radmin_ca_file\x18\x1a \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01H\x02R\vadminCaFile\x88\x01\x01:\xe7\x10\xbaH\xe3\x10\x1a\xb2\x01\n" +
 	"\x12listeners.distinct\x124administrative and device listeners must be distinct\x1af!has(this.admin_listener) || !has(this.device_listener) || this.admin_listener != this.device_listener\x1a\x82\x02\n" +
 	"\x1bprofiling.distinct_listener\x12&profiling must use a separate listener\x1a\xba\x01!has(this.profiling) || ((!has(this.admin_listener) || this.profiling.listener != this.admin_listener) && (!has(this.device_listener) || this.profiling.listener != this.device_listener))\x1a\x8f\x01\n" +
 	"\x1bexecution_signing.bootstrap\x121execution signing requires an execution bootstrap\x1a=!has(this.execution_signing) || has(this.execution_bootstrap)\x1a\xa1\x01\n" +
 	"!execution_bootstrap.device_origin\x12=execution bootstrap requires an explicit public device origin\x1a=!has(this.execution_bootstrap) || has(this.device_public_url)\x1a\xdb\x01\n" +
 	"!execution_bootstrap.initial_owner\x12:initial execution delegation requires local authentication\x1az!has(this.execution_bootstrap) || !has(this.execution_bootstrap.initial_delegation_file) || has(this.authentication.local)\x1a\xb6\x04\n" +
-	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)\x1a\xe9\x01\n" +
+	"\x14authorization.source\x12;directory mappings must match the selected authority source\x1a\xe0\x03!has(this.authorization) || this.authorization.group_bindings.all(b, has(this.authentication.keycloak) ? b.group.startsWith('/') && size(b.group) > 1 : has(this.authentication.entra) ? b.group.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') && b.group != '00000000-0000-0000-0000-000000000000' : has(this.authentication.okta) ? b.group.matches('^00g[A-Za-z0-9]{17}$') : has(this.authentication.google) ? b.group.matches('^[A-Za-z0-9_-]{1,256}$') : false)\x1a~\n" +
+	"\fadmin_tls.ca\x12>administrative TLS and its CA file must be configured together\x1a.has(this.admin_tls) == has(this.admin_ca_file)\x1a\xe9\x01\n" +
 	"\"offline_bundles.release_repository\x12;offline bundle import requires a signing release repository\x1a\x85\x01!has(this.offline_bundles) || (has(this.release_repository) && has(this.release_repository.signing) && has(this.execution_bootstrap))\x1a\xed\x01\n" +
 	"\x1dconnectivity_probes.authority\x12]native connectivity confirmation requires configured signing and at least four approved peers\x1amthis.connectivity_probes.size() == 0 || (has(this.execution_signing) && this.connectivity_probes.size() >= 4)B\x19\n" +
 	"\x17_inventory_budget_bytesB\x14\n" +
-	"\x12_device_public_urlJ\x04\b\x15\x10\x16R\x17enrollment_instructions\"\xd6\x02\n" +
+	"\x12_device_public_urlB\x10\n" +
+	"\x0e_admin_ca_fileJ\x04\b\x15\x10\x16R\x17enrollment_instructions\"\xd6\x02\n" +
 	"\x17ReleaseRepositoryConfig\x12'\n" +
 	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\x12C\n" +
 	"\asigning\x18\x02 \x01(\v2).lindm.config.v1.ReleaseRepositorySigningR\asigning\x12P\n" +
@@ -2470,29 +2495,30 @@ var file_lindm_config_v1_config_proto_depIdxs = []int32{
 	30, // 15: lindm.config.v1.ServerConfig.connectivity_probes:type_name -> lindm.agent.v1.ConnectivityProbeTarget
 	26, // 16: lindm.config.v1.ServerConfig.assistance:type_name -> lindm.config.v1.AssistanceConfig
 	3,  // 17: lindm.config.v1.ServerConfig.offline_bundles:type_name -> lindm.config.v1.OfflineBundleConfig
-	4,  // 18: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
-	2,  // 19: lindm.config.v1.ReleaseRepositoryConfig.native_repositories:type_name -> lindm.config.v1.NativeRepositoriesConfig
-	31, // 20: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
-	10, // 21: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	16, // 22: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
-	17, // 23: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
-	18, // 24: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
-	19, // 25: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
-	20, // 26: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
-	22, // 27: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
-	21, // 28: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
-	23, // 29: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
-	24, // 30: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
-	32, // 31: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
-	28, // 32: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
-	33, // 33: lindm.config.v1.AssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
-	27, // 34: lindm.config.v1.AssistanceConfig.recording:type_name -> lindm.config.v1.AssistanceRecordingConfig
-	10, // 35: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
-	36, // [36:36] is the sub-list for method output_type
-	36, // [36:36] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	13, // 18: lindm.config.v1.ServerConfig.admin_tls:type_name -> lindm.config.v1.TLSConfig
+	4,  // 19: lindm.config.v1.ReleaseRepositoryConfig.signing:type_name -> lindm.config.v1.ReleaseRepositorySigning
+	2,  // 20: lindm.config.v1.ReleaseRepositoryConfig.native_repositories:type_name -> lindm.config.v1.NativeRepositoriesConfig
+	31, // 21: lindm.config.v1.AdvisoryConfig.feeds:type_name -> lindm.advisory.v1.FeedSource
+	10, // 22: lindm.config.v1.ProfilingConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	16, // 23: lindm.config.v1.AuthenticationConfig.local:type_name -> lindm.config.v1.LocalAuthentication
+	17, // 24: lindm.config.v1.AuthenticationConfig.keycloak:type_name -> lindm.config.v1.KeycloakDirectory
+	18, // 25: lindm.config.v1.AuthenticationConfig.entra:type_name -> lindm.config.v1.EntraDirectory
+	19, // 26: lindm.config.v1.AuthenticationConfig.okta:type_name -> lindm.config.v1.OktaDirectory
+	20, // 27: lindm.config.v1.AuthenticationConfig.google:type_name -> lindm.config.v1.GoogleDirectory
+	22, // 28: lindm.config.v1.AuthenticationConfig.scim:type_name -> lindm.config.v1.SCIMConfig
+	21, // 29: lindm.config.v1.KeycloakDirectory.upstream:type_name -> lindm.config.v1.KeycloakBrokerUpstream
+	23, // 30: lindm.config.v1.SCIMConfig.connectors:type_name -> lindm.config.v1.SCIMConnector
+	24, // 31: lindm.config.v1.SCIMConnector.correlations:type_name -> lindm.config.v1.SCIMCorrelation
+	32, // 32: lindm.config.v1.BreakGlassPolicy.max_session_lifetime:type_name -> google.protobuf.Duration
+	28, // 33: lindm.config.v1.AssistanceConfig.relay:type_name -> lindm.config.v1.AssistanceRelayConfig
+	33, // 34: lindm.config.v1.AssistanceConfig.policy_ceiling:type_name -> lindm.agent.v1.AssistancePolicy
+	27, // 35: lindm.config.v1.AssistanceConfig.recording:type_name -> lindm.config.v1.AssistanceRecordingConfig
+	10, // 36: lindm.config.v1.AssistanceRelayConfig.listener:type_name -> lindm.config.v1.ListenerConfig
+	37, // [37:37] is the sub-list for method output_type
+	37, // [37:37] is the sub-list for method input_type
+	37, // [37:37] is the sub-list for extension type_name
+	37, // [37:37] is the sub-list for extension extendee
+	0,  // [0:37] is the sub-list for field type_name
 }
 
 func init() { file_lindm_config_v1_config_proto_init() }

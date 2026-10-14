@@ -441,9 +441,14 @@ func (p *controlPlane) deviceMux(resources *config.Resources) (*http.ServeMux, e
 // which requires a client certificate issued by the device CA.
 func tlsServers(requestContext context.Context, resources *config.Resources, adminMux, deviceMux http.Handler) (admin, deviceServer *http.Server) {
 	admin = httpServer(config.Address(resources.Proto.GetAdminListener()), adminMux, requestContext)
+	adminCertificate := resources.AdminServerCertificate
+	if resources.Proto.GetAdminTls() == nil && len(adminCertificate.Certificate) == 0 {
+		// Intentional manually assembled shared-TLS fixtures need no override.
+		adminCertificate = resources.ServerCertificate
+	}
 	admin.TLSConfig = &tls.Config{
 		MinVersion:   tls.VersionTLS13,
-		Certificates: []tls.Certificate{resources.ServerCertificate},
+		Certificates: []tls.Certificate{adminCertificate},
 	}
 	deviceServer = httpServer(config.Address(resources.Proto.GetDeviceListener()), deviceMux, requestContext)
 	deviceRoots := x509.NewCertPool()

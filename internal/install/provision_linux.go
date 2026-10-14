@@ -101,6 +101,8 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 		AdminListener: &configv1.ListenerConfig{Address: "0.0.0.0", Port: uint32(o.AdminPort)}, DeviceListener: &configv1.ListenerConfig{Address: "0.0.0.0", Port: uint32(o.DevicePort)},
 		Database: &configv1.DatabaseConfig{UrlFile: "/etc/lindm/database-url", MaxConnections: 16},
 		Tls:      &configv1.TLSConfig{CertificateFile: "/etc/lindm/server.crt", PrivateKeyFile: "/etc/lindm/server.key"}, DeviceCa: &configv1.DeviceCAConfig{CertificateFile: "/etc/lindm/device-ca.crt", PrivateKeyFile: "/etc/lindm/device-ca.key"},
+		AdminTls:           &configv1.TLSConfig{CertificateFile: "/etc/lindm/admin.crt", PrivateKeyFile: "/etc/lindm/admin.key"},
+		AdminCaFile:        proto.String("/etc/lindm/console-ca.crt"),
 		Authentication:     &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Local{Local: &configv1.LocalAuthentication{}}},
 		ExecutionBootstrap: &configv1.ExecutionBootstrapConfig{RootFile: "/etc/lindm/execution-root.json", BootstrapFile: "/etc/lindm/bootstrap.dsse.json", InitialDelegationFile: proto.String("/etc/lindm/execution-delegation.json")},
 		Integrations:       &configv1.IntegrationsConfig{EncryptionKeyFile: nativeIntegrationKey},

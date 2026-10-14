@@ -12,7 +12,7 @@ import (
 )
 
 func printConsoleTrust(output io.Writer) error {
-	file, err := os.Open("/etc/lindm/transport-ca.crt")
+	file, err := os.Open("/etc/lindm/console-ca.crt")
 	if err != nil {
 		return err
 	}
@@ -24,6 +24,6 @@ func printConsoleTrust(output io.Writer) error {
 	if readErr != nil {
 		return readErr
 	}
-	_, err = fmt.Fprintf(output, "Console CA file: /etc/lindm/transport-ca.crt\nConsole CA SHA256 (file bytes): %x\nUse the approved administrator-workstation trust process; never bypass browser certificate verification.\n", hash.Sum(nil))
+	_, err = fmt.Fprintf(output, "Console CA file: /etc/lindm/console-ca.crt\nConsole CA SHA256 (file bytes): %x\nImport this console CA, not the device CA, with the approved administrator-workstation trust process; never bypass browser certificate verification.\n", hash.Sum(nil))
 	return err
 }

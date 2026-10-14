@@ -48,11 +48,15 @@ func connectServers(executor agentv1connect.ExecutorServiceClient, connection *a
 	if err := checkOrigin(connection.GetDeviceOrigin()); err != nil {
 		return nil, err
 	}
-	roots := x509.NewCertPool()
-	if len(connection.GetTransportCaPem()) == 0 || len(connection.GetTransportCaPem()) > 65536 || !roots.AppendCertsFromPEM(connection.GetTransportCaPem()) {
-		return nil, errors.New("invalid pinned transport trust")
+	deviceRoots := x509.NewCertPool()
+	if len(connection.GetTransportCaPem()) < 64 || len(connection.GetTransportCaPem()) > 65536 || !deviceRoots.AppendCertsFromPEM(connection.GetTransportCaPem()) {
+		return nil, errors.New("invalid pinned device transport trust")
 	}
-	publicTransport := newHTTPTransport(&tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13})
+	consoleRoots := x509.NewCertPool()
+	if len(connection.GetConsoleCaPem()) < 64 || len(connection.GetConsoleCaPem()) > 65536 || !consoleRoots.AppendCertsFromPEM(connection.GetConsoleCaPem()) {
+		return nil, errors.New("invalid pinned console transport trust")
+	}
+	publicTransport := newHTTPTransport(&tls.Config{RootCAs: consoleRoots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13})
 	result := &connections{publicTransport: publicTransport}
 	result.enrollment = enrollmentv1connect.NewEnrollmentServiceClient(newHTTPClient(publicTransport), connection.GetEnrollmentOrigin(), connect.WithReadMaxBytes(1<<20))
 	if len(connection.GetCertificatePem()) == 0 {
@@ -64,7 +68,7 @@ func connectServers(executor agentv1connect.ExecutorServiceClient, connection *a
 		return nil, err
 	}
 	result.deviceTransport = newHTTPTransport(&tls.Config{
-		RootCAs: roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13,
+		RootCAs: deviceRoots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13,
 		GetClientCertificate: func(handshake *tls.CertificateRequestInfo) (*tls.Certificate, error) {
 			signer, err := localrpc.NewTLSSigner(handshake.Context(), executor, leaf)
 			if err != nil {

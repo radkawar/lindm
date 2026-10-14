@@ -588,6 +588,14 @@ go run ./cmd/lab console -repo . -lindmd artifacts/bin/lindmd-ui \
   -devices 300 -packages 200 -assignment-percent 20 -enrollment-workers 8
 ```
 
+Development trust created before the split console pin is repaired automatically
+by `devenv trust` and authority-fixture readers. They verify the original quorum,
+re-sign only the missing console field with the existing HTTPS issuer, and keep
+execution/release keys and device trust unchanged. Replacement is a synced,
+owner-private atomic rename under the fixture lock; a landing also holds the host
+integration lock. Tampered, expired or otherwise invalid material fails closed.
+This repair exists only in the development harness, not the production installer.
+
 This uses protected development trust and running PostgreSQL, but not Keycloak or
 the shared `:18444` listener. The fixture owns a database and dynamic loopback HTTPS
 origin, populates real enrollment/inventory/service RPC paths, prints a one-time
@@ -4497,6 +4505,25 @@ settled action history before both its old-ID snapshot and every completion
 snapshot. Its same-device, newly issued action, completed result and fresh inventory
 requirements are unchanged. Focused real Chromium regressions cover missing and
 asynchronous acknowledgements and asynchronously rendered old-row/empty histories.
+
+`native-ubuntu-attempt15.json`, record SHA-256
+`07e0fd537a8f6c78ae62b98c10405a75bd9c75c1c111314afd18ef1fdc0d4fc2`,
+also failed after Send action; no newly completed action, fresh inventory, backup,
+upgrade or restore was established. The generic success-message locator matched
+Sonner's nested title and content ambiguously; the observer now scopes the visible
+success title while still refusing duplicate toasts. The exact Native15 exception
+is not retained in its redacted result, so that causal attribution is an inference,
+not evidence of an executor failure.
+
+The owner then found SDK13's generated Ed25519 console certificate unusable in a
+stock browser. Earlier native browser observations injected ECDSA bring-own lab
+certificates: they did not qualify installer-generated browser TLS, despite using
+private NSS trust and no TLS bypass. The default native lanes now fetch the actual
+installed console CA through pinned guest SSH, import it into child-private NSS,
+and require the installed P-256/SHA-256 admin certificate to be served over verified
+HTTPS. They separately record the unchanged Ed25519 device identity and require
+both authentic CAs to survive upgrade and restore. No historical fixture-TLS
+observation or production-cold-build record is promoted to that qualification.
 
 #### Durable laboratory custody escrow
 

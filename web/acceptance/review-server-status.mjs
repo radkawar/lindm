@@ -38,6 +38,8 @@ export function fixtureResponse(schema, variant, now) {
     ["database", "The verified database connection answered."],
     ["admin_database", "The console database connection answered."],
     ["https_certificate", "The loaded certificate expires within 30 days."],
+    ["console_ca", "The loaded certificate is within its validity period."],
+    ["device_https_certificate", "The loaded certificate is within its validity period."],
     ["device_ca", "The loaded certificate is within its validity period."],
     ["backups", "The latest backup attempt failed."],
     ["server_release_feed", "An authenticated import offers a server security update."],
@@ -171,6 +173,16 @@ export async function reviewServerStatus({
         } else {
           require((await page.locator('section[aria-labelledby="status-evidence"] li').count()) ===
             response.checks.length, "The page omitted a server check");
+          for (const label of [
+            "Console HTTPS certificate",
+            "Console certificate authority",
+            "Device HTTPS certificate",
+            "Device client certificate authority",
+          ]) {
+            require(await page
+              .getByRole("heading", { name: label, exact: true })
+              .isVisible(), `Status does not distinguish ${label}`);
+          }
           if (variant === "known") {
             require((await page
               .locator('section[aria-labelledby="status-evidence"]')

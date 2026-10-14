@@ -97,7 +97,9 @@ func TestBootstrapTrustBindings(t *testing.T) {
 	digest := sha256.Sum256(rootJSON)
 	transport := testCA(t, testKey(t), now, x509.ExtKeyUsageServerAuth)
 	device := testCA(t, testKey(t), now, x509.ExtKeyUsageClientAuth)
-	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: root.GetDeploymentId(), EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example", TransportCaPem: transport, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: testReleaseRoot(t, testKey(t), now.Add(time.Hour)), NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(time.Hour))}
+	consoleKey := testKey(t)
+	console := testCA(t, consoleKey, now, x509.ExtKeyUsageServerAuth)
+	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: root.GetDeploymentId(), EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example", TransportCaPem: transport, ConsoleCaPem: console, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: testReleaseRoot(t, testKey(t), now.Add(time.Hour)), NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(time.Hour))}
 	for _, test := range []struct {
 		name   string
 		change func(*agentv1.BootstrapBundle)
@@ -105,6 +107,16 @@ func TestBootstrapTrustBindings(t *testing.T) {
 		valid  bool
 	}{
 		{name: "valid independent trust", at: now, valid: true},
+		{name: "explicit shared server issuer", at: now, valid: true, change: func(b *agentv1.BootstrapBundle) { b.ConsoleCaPem = transport }},
+		{name: "invalid console CA", at: now, change: func(b *agentv1.BootstrapBundle) { b.ConsoleCaPem = bytes.Repeat([]byte("invalid"), 12) }},
+		{name: "wrong console CA usage", at: now, change: func(b *agentv1.BootstrapBundle) { b.ConsoleCaPem = device }},
+		{name: "console reuses device CA key", at: now, change: func(b *agentv1.BootstrapBundle) {
+			b.DeviceCaPem = testCA(t, consoleKey, now, x509.ExtKeyUsageClientAuth)
+		}},
+		{name: "console reuses execution key", at: now, change: func(b *agentv1.BootstrapBundle) { b.ConsoleCaPem = testCA(t, key, now, x509.ExtKeyUsageServerAuth) }},
+		{name: "release reuses console key", at: now, change: func(b *agentv1.BootstrapBundle) {
+			b.ReleaseRootJson = testReleaseRoot(t, consoleKey, now.Add(time.Hour))
+		}},
 		{name: "expired at exact boundary", at: now.Add(time.Hour)},
 		{name: "wrong deployment", at: now, change: func(b *agentv1.BootstrapBundle) { b.DeploymentId = uuid.NewString() }},
 		{name: "wrong root version", at: now, change: func(b *agentv1.BootstrapBundle) { b.ExecutionRootVersion = 2 }},
@@ -172,6 +184,72 @@ func TestBootstrapTrustBindings(t *testing.T) {
 				t.Fatal("bootstrap changed its pinned device authority")
 			}
 		})
+	}
+}
+
+func TestBootstrapMissingConsoleCAFailsClosed(t *testing.T) {
+	f := newExecutionFixture(t, 1)
+	bundle := proto.CloneOf(f.bootstrap.Bundle)
+	bundle.ConsoleCaPem = nil
+	if _, err := f.authority.Sign(t.Context(), bundle, f.keys...); err == nil {
+		t.Fatal("signed bootstrap without required console trust")
+	}
+	// Authenticate the old-shaped payload with the real fixture root signer,
+	// bypassing only producer schema validation, not DSSE verification.
+	payload, err := (proto.MarshalOptions{Deterministic: true}).Marshal(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, ok := f.keys[0].Public().(ed25519.PublicKey)
+	if !ok {
+		t.Fatal("execution fixture signer is not Ed25519")
+	}
+	id, err := KeyID(public)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := dsse.NewEnvelopeSigner(&edSigner{edVerifier: edVerifier{public: public, id: id}, private: f.keys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	envelope, err := signer.SignPayload(t.Context(), BootstrapType, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.authority.VerifyBootstrap(t.Context(), f.rootJSON, encoded, f.now); err == nil {
+		t.Fatal("accepted authenticated bootstrap missing console CA")
+	}
+}
+
+func TestBootstrapConsoleSignedDeviceHostnameCertificateIsRejected(t *testing.T) {
+	f := newExecutionFixture(t, 1)
+	consoleCA := decodeCertificate(t, f.bootstrap.Bundle.GetConsoleCaPem())
+	key := testKey(t)
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(2), DNSNames: []string{"devices.example"},
+		NotBefore: f.now.Add(-time.Minute), NotAfter: f.now.Add(time.Hour),
+		BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, consoleCA, key.Public(), f.reserved[3])
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options := x509.VerifyOptions{Roots: f.bootstrap.ConsoleRoots, DNSName: "devices.example", CurrentTime: f.now, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	if _, err := certificate.Verify(options); err != nil {
+		t.Fatalf("console-signed adversarial fixture is not a valid same-DNS certificate: %v", err)
+	}
+	options.Roots = f.bootstrap.TransportRoots
+	if _, err := certificate.Verify(options); err == nil {
+		t.Fatal("device roots accepted console-signed device-hostname certificate")
 	}
 }
 

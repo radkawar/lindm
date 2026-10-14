@@ -14,6 +14,7 @@ import {
   LocalLoginRequestSchema,
 } from "../../../gen/lindm/auth/v1/auth_pb";
 import { beginEnrollment, beginLogin, beginSetup, finishAuthentication } from "./local-api";
+import { consoleSetupDNSWarning } from "./setup-origin";
 
 export function LocalForm({
   enrollment = false,
@@ -33,6 +34,7 @@ export function LocalForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RpcFailure | null>(null);
   const [notice, setNotice] = useState("");
+  const dnsWarning = setup ? consoleSetupDNSWarning(window.location.hostname) : null;
   const active = useRef<AbortController | null>(null);
   useEffect(() => () => active.current?.abort(), []);
 
@@ -192,6 +194,18 @@ export function LocalForm({
         <p className="text-sm text-muted-foreground">
           If you stop, continue with the same setup code, username and password.
         </p>
+      ) : null}
+      {setup ? (
+        <p className="text-sm text-muted-foreground">
+          If this console uses a private CA, import the console CA printed by the installer, not the
+          device CA. A publicly trusted console certificate needs no custom CA import.
+        </p>
+      ) : null}
+      {dnsWarning ? (
+        <Alert id="setup-dns-warning">
+          <AlertTitle>Console DNS name required</AlertTitle>
+          <AlertDescription>{dnsWarning}</AlertDescription>
+        </Alert>
       ) : null}
       {notice ? (
         <Alert>

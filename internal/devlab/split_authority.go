@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -47,7 +46,7 @@ type ControlPlaneHandle struct {
 	AdminPort            uint16 `json:"admin_port"`
 	DeviceOrigin         string `json:"device_origin"`
 	DatabaseName         string `json:"database_name"`
-	TransportCAPEM       []byte `json:"transport_ca_pem"`
+	ConsoleCAPEM         []byte `json:"console_ca_pem"`
 	ExecutionRootJSON    []byte `json:"execution_root_json"`
 	BootstrapEnvelope    []byte `json:"bootstrap_envelope"`
 	AccountID            string `json:"account_id"`
@@ -103,9 +102,13 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	if err != nil {
 		return nil, fmt.Errorf("read exported agent fixture: %w", err)
 	}
-	ca, err := os.ReadFile(filepath.Join(f.transportTrustDirectory(), "transport-ca.crt"))
+	authority, err := trust.New()
 	if err != nil {
-		return nil, fmt.Errorf("read exported transport CA: %w", err)
+		return nil, err
+	}
+	bootstrap, err := authority.VerifyBootstrap(ctx, material.ExecutionRootJSON, material.BootstrapEnvelope, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("verify exported console trust: %w", err)
 	}
 	enrollment, err := f.CreateAcceptanceEnrollment(ctx, username, "owner")
 	if err != nil {
@@ -132,7 +135,7 @@ func (f *AuthorityFixture) ExportControlPlane(ctx context.Context, username stri
 	}
 	handle := &ControlPlaneHandle{
 		ConsoleOrigin: f.ConsoleOrigin, AdminPort: uint16(port), DeviceOrigin: f.DeviceOrigin,
-		DatabaseName: f.DatabaseName, TransportCAPEM: ca,
+		DatabaseName: f.DatabaseName, ConsoleCAPEM: bytes.Clone(bootstrap.Bundle.GetConsoleCaPem()),
 		ExecutionRootJSON: material.ExecutionRootJSON, BootstrapEnvelope: material.BootstrapEnvelope,
 		AccountID: account.id, Username: account.username, Password: bytes.Clone(account.password),
 		WebAuthnCredentialID: credentialID, WebAuthnPrivateKey: privateKey, WebAuthnCounter: account.counter,
@@ -167,7 +170,18 @@ func connectAuthorityFixture(ctx context.Context, handle *ControlPlaneHandle, st
 	if err != nil || id == uuid.Nil || strings.TrimSpace(handle.Username) == "" || len(handle.Password) == 0 || handle.WebAuthnCounter == 0 || handle.WebAuthnCounter == ^uint32(0) || handle.DatabaseName == "" {
 		return nil, errors.New("control-plane handle requires an enrolled account credential and database identity")
 	}
-	tlsConfig, err := trustClientPEM(handle.TransportCAPEM)
+	authority, err := trust.New()
+	if err != nil {
+		return nil, err
+	}
+	bootstrap, err := authority.VerifyBootstrap(ctx, handle.ExecutionRootJSON, handle.BootstrapEnvelope, time.Now())
+	if err != nil {
+		return nil, fmt.Errorf("verify connected authority bootstrap: %w", err)
+	}
+	if bootstrap.Bundle.GetEnrollmentOrigin() != handle.ConsoleOrigin || bootstrap.Bundle.GetDeviceOrigin() != handle.DeviceOrigin || !bytes.Equal(bootstrap.Bundle.GetConsoleCaPem(), handle.ConsoleCAPEM) {
+		return nil, errors.New("control-plane handle differs from signed console trust")
+	}
+	tlsConfig, err := trustClientPEM(bootstrap.Bundle.GetConsoleCaPem())
 	if err != nil {
 		return nil, fmt.Errorf("trust connected authority: %w", err)
 	}

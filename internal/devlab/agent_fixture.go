@@ -68,7 +68,10 @@ func readAgentFixture(ctx context.Context, repoRoot string, checkServer bool) (*
 		}
 		verified, err := authority.VerifyBootstrap(ctx, execution, bundle, time.Now())
 		if err != nil {
-			return err
+			verified, bundle, err = refreshDevelopmentBootstrap(ctx, authority, dir, execution, bundle)
+			if err != nil {
+				return err
+			}
 		}
 		if checkServer {
 			document, err := config.Load(filepath.Join(fixture, "server.json"))
@@ -87,7 +90,7 @@ func readAgentFixture(ctx context.Context, repoRoot string, checkServer bool) (*
 		if err != nil {
 			return err
 		}
-		if verified.Bundle.GetEnrollmentOrigin() != consoleOrigin || verified.Bundle.GetDeviceOrigin() != "https://localhost:18445" || !bytes.Equal(verified.Bundle.GetTransportCaPem(), transport) || !bytes.Equal(verified.Bundle.GetDeviceCaPem(), device) {
+		if verified.Bundle.GetEnrollmentOrigin() != consoleOrigin || verified.Bundle.GetDeviceOrigin() != "https://localhost:18445" || !bytes.Equal(verified.Bundle.GetTransportCaPem(), transport) || !bytes.Equal(verified.Bundle.GetConsoleCaPem(), transport) || !bytes.Equal(verified.Bundle.GetDeviceCaPem(), device) {
 			return errors.New("existing agent trust does not bind the development fixture")
 		}
 		result = &AgentFixture{ExecutionRootJSON: execution, BootstrapEnvelope: bundle}

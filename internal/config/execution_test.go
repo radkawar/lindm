@@ -51,6 +51,22 @@ func TestExecutionBootstrapBindsDeploymentAndTransport(t *testing.T) {
 			f.bundle.TransportCaPem = executionConfigFile(t, f.document.base, "other-transport.crt")
 			f.publish(t)
 		}},
+		{name: "console pin cannot verify admin server", change: func(t *testing.T, f *executionConfigFixture) {
+			f.bundle.ConsoleCaPem = executionConfigFile(t, f.document.base, "transport.crt")
+			f.publish(t)
+		}},
+		{name: "admin TLS leaf holds execution root key", change: func(t *testing.T, f *executionConfigFixture) {
+			consoleCA, err := keyPair(f.document.base, "console-ca.crt", "console-ca.key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeListenerCertificate(t, f.document.base, "admin", consoleCA, f.rootKey, func(c *x509.Certificate) {
+				c.IsCA = false
+				c.KeyUsage = x509.KeyUsageDigitalSignature
+				c.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+				c.DNSNames = []string{"localhost"}
+			})
+		}},
 		{name: "device hostname absent from server certificate", change: func(t *testing.T, f *executionConfigFixture) {
 			f.document.Proto.DevicePublicUrl = proto.String("https://devices.example")
 			f.bundle.DeviceOrigin = f.document.Proto.GetDevicePublicUrl()
@@ -114,12 +130,29 @@ func newExecutionConfigFixture(t *testing.T) *executionConfigFixture {
 		t.Fatal(err)
 	}
 	writeExecutionServerCertificate(t, dir, transport, serverKey)
+	writeBrowserCertificate(t, dir, "console-ca", true, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
+	consoleCA, err := keyPair(dir, "console-ca.crt", "console-ca.key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	consoleSigner, ok := consoleCA.PrivateKey.(crypto.Signer)
+	if !ok {
+		t.Fatal("console fixture has no private signer")
+	}
+	writeListenerCertificate(t, dir, "admin", consoleCA, consoleSigner, func(c *x509.Certificate) {
+		c.IsCA = false
+		c.KeyUsage = x509.KeyUsageDigitalSignature
+		c.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		c.DNSNames = []string{"localhost"}
+	})
 	writeFixtureFile(t, dir, "oidc-secret", []byte("isolated-test-credential"))
 	deployment := uuid.NewString()
 	document := &Document{base: dir, Proto: &configv1.ServerConfig{
 		DeploymentId: deployment, PublicUrl: "https://localhost:7444", DevicePublicUrl: proto.String("https://localhost:7445"),
 		Database:           &configv1.DatabaseConfig{UrlFile: "database-url", MaxConnections: 2},
 		Tls:                &configv1.TLSConfig{CertificateFile: "server.crt", PrivateKeyFile: "server.key"},
+		AdminTls:           &configv1.TLSConfig{CertificateFile: "admin.crt", PrivateKeyFile: "admin.key"},
+		AdminCaFile:        proto.String("console-ca.crt"),
 		DeviceCa:           &configv1.DeviceCAConfig{CertificateFile: "device.crt", PrivateKeyFile: "device.key"},
 		Authentication:     &configv1.AuthenticationConfig{Primary: &configv1.AuthenticationConfig_Keycloak{Keycloak: &configv1.KeycloakDirectory{ClientSecretFile: "oidc-secret", DirectoryClientSecretFile: "oidc-secret"}}},
 		ExecutionBootstrap: &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"},
@@ -171,7 +204,7 @@ func newExecutionConfigFixture(t *testing.T) *executionConfigFixture {
 		document: document, authority: authority, root: root, rootKey: private, releaseKey: releasePrivate, transport: transport,
 		bundle: &agentv1.BootstrapBundle{
 			BundleId: uuid.NewString(), DeploymentId: deployment, EnrollmentOrigin: document.Proto.GetPublicUrl(), DeviceOrigin: document.Proto.GetDevicePublicUrl(),
-			TransportCaPem: executionConfigFile(t, dir, "transport.crt"), DeviceCaPem: executionConfigFile(t, dir, "device.crt"),
+			TransportCaPem: executionConfigFile(t, dir, "transport.crt"), ConsoleCaPem: executionConfigFile(t, dir, "console-ca.crt"), DeviceCaPem: executionConfigFile(t, dir, "device.crt"),
 			ExecutionRootVersion: 1, ReleaseRootJson: releaseJSON, NotBefore: root.GetNotBefore(), ExpiresAt: root.GetExpiresAt(),
 		},
 	}

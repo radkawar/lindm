@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import { consoleSetupDNSWarning } from "../src/features/auth/setup-origin.ts";
+
+// Can also be run on an IP-origin setup page without attempting a passkey ceremony.
+export async function reviewSetupDNSWarning(page, require) {
+  const hostname = await page.evaluate(() => window.location.hostname);
+  const warning = consoleSetupDNSWarning(hostname);
+  const alert = page.locator("#setup-dns-warning");
+  if (warning) {
+    require(await alert.isVisible(), "IP-origin setup omitted the DNS requirement warning");
+    require((await alert.innerText()).includes(warning), "IP-origin setup lost DNS remediation");
+  } else {
+    require((await alert.count()) === 0, "DNS-origin setup incorrectly displayed an IP warning");
+  }
+}
 // Real first-run browser ceremonies with signed or deliberately absent publication.
 // No HTTP/RPC interception or fabricated authentication/readiness response.
 export async function reviewSetup({
@@ -91,6 +105,13 @@ export async function reviewSetup({
           { exact: true },
         )
         .isVisible(), "Setup password and authenticator prerequisites are absent");
+      require(await page
+        .getByText(
+          "If this console uses a private CA, import the console CA printed by the installer, not the device CA. A publicly trusted console certificate needs no custom CA import.",
+          { exact: true },
+        )
+        .isVisible(), "Setup does not distinguish private console trust from device trust and public CA trust");
+      await reviewSetupDNSWarning(page, require);
       require(await page
         .getByRole("button", { name: "Create owner account", exact: true })
         .isEnabled(), "Owner setup action is unavailable");

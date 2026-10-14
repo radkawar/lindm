@@ -67,6 +67,7 @@ type VMDeployResult struct {
 	Enrollment                       *VMConsoleEnrollmentResult   `json:"enrollment,omitempty"`
 	Browser                          []*deploylab.BrowserEvidence `json:"browser"`
 	EvidenceFiles                    []string                     `json:"evidence_files"`
+	TLS                              []*VMDeployTLSEvidence       `json:"tls"`
 	RuntimeSQLGates                  []VMDeploySQLGate            `json:"runtime_sql_gates"`
 	DatabaseCredentialGates          []string                     `json:"database_credential_gates"`
 	IntegrationDestinationID         string                       `json:"integration_destination_id,omitempty"`
@@ -138,14 +139,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		return result, err
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(private)) }()
-	files, err := deploylab.CertificateFiles()
-	if err != nil {
-		return result, err
-	}
-	caPath := filepath.Join(private, "transport-ca.crt")
-	if err := os.WriteFile(caPath, files["transport-ca.crt"], 0600); err != nil {
-		return result, err
-	}
+	caPath := filepath.Join(private, "console-ca.crt")
 	custodyPassphrase := []byte(rand.Text() + rand.Text())
 	defer clear(custodyPassphrase)
 	if err := encryptDeployEvidence(options.CustodyEscrowRecipientFile, filepath.Join(options.EvidenceDirectory, "source-custody-passphrase.age"), custodyPassphrase); err != nil {
@@ -227,7 +221,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			err = errors.Join(err, releaseConsoleEnrollmentRedHat(ctx, server, options.LabBinary, registration))
 		}()
 	}
-	if err := prepareDeployInputs(ctx, server, options, files); err != nil {
+	if err := prepareDeployInputs(ctx, server, options); err != nil {
 		return result, err
 	}
 	if err := op("install signed turnkey bundle", "command", func() error {
@@ -245,6 +239,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	result.DatabaseCredentialGates = append(result.DatabaseCredentialGates, "installed")
 	admin.activate(server)
 	device.activate(server)
+	if err := op("verify installer-generated browser TLS", "harness", func() error {
+		return observeDeployTLS(ctx, server, &request, "installed", nil, &result.TLS)
+	}); err != nil {
+		return result, err
+	}
 	if err := completeDeployOwner(ctx, server, &request, func() error { return browser("setup", "") }); err != nil {
 		return result, err
 	}
@@ -331,6 +330,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		result.IntegrationSecretGates = append(result.IntegrationSecretGates, "upgraded")
 		admin.activate(server)
 		device.activate(server)
+		if err := op("prove upgrade retained console and device transport CAs", "harness", func() error {
+			return observeDeployTLS(ctx, server, &request, "upgraded", result.TLS[0], &result.TLS)
+		}); err != nil {
+			return err
+		}
 		if err := browser("manage", enrolled.DeviceID); err != nil {
 			return err
 		}
@@ -393,7 +397,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 				callbackErr = errors.Join(callbackErr, releaseConsoleEnrollmentRedHat(ctx, restored, options.LabBinary, restoreRegistration))
 			}()
 		}
-		if runErr := prepareDeployInputs(ctx, restored, options, files); runErr != nil {
+		if runErr := prepareDeployInputs(ctx, restored, options); runErr != nil {
 			return runErr
 		}
 		freshCustodyPassphrase := []byte(rand.Text() + rand.Text())
@@ -491,6 +495,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		result.RestoreCustodyConfirmationSHA256 = request.CustodySHA256
 		admin.activate(restored)
 		device.activate(restored)
+		if runErr := op("prove restore recovered console and device transport CAs", "harness", func() error {
+			return observeDeployTLS(ctx, restored, &request, "restored", result.TLS[0], &result.TLS)
+		}); runErr != nil {
+			return runErr
+		}
 		if runErr := browser("custody", ""); runErr != nil {
 			return runErr
 		}
@@ -517,14 +526,9 @@ func prepareDeployEntitlement(ctx context.Context, guest *guestVM, options VMDep
 	return registerConsoleEnrollmentRedHat(ctx, guest, VMConsoleEnrollmentOptions{LabBinary: options.LabBinary, RedHatTokenFile: options.RedHatTokenFile}, *evidence)
 }
 
-func prepareDeployInputs(ctx context.Context, guest *guestVM, options VMDeployOptions, files map[string][]byte) error {
+func prepareDeployInputs(ctx context.Context, guest *guestVM, options VMDeployOptions) error {
 	if _, err := serverGuestCommand(ctx, guest, "create protected deployment inputs", "install -d -m 0700 /root/lindm-deploy-input", nil); err != nil {
 		return err
-	}
-	for name, body := range map[string][]byte{"tls.crt": files["server.crt"], "tls.key": files["server.key"], "tls-ca.crt": files["transport-ca.crt"]} {
-		if err := uploadDeployFile(ctx, guest, "/root/lindm-deploy-input/"+name, bytes.NewReader(body)); err != nil {
-			return err
-		}
 	}
 	for name, path := range map[string]string{"release-key": options.ReleasePublicKey, "backup-recipient": options.BackupRecipientFile, "tuf-root": options.TUFRootFile, "lab-helper": options.LabBinary} {
 		if err := uploadDeployPath(ctx, guest, path, "/root/lindm-deploy-input/"+name); err != nil {
@@ -553,7 +557,7 @@ func installDeployRelease(ctx context.Context, guest *guestVM, options VMDeployO
 }
 
 func deployInstallerCommand(options VMDeployOptions, destination, origin, deviceOrigin, version string, airgap bool) string {
-	command := "cmp -s /root/lindm-deploy-input/tuf-root " + nativeQuote(destination+"/release-root.json") + " && cat | sh " + nativeQuote(destination+"/install.sh") + " --custody-passphrase-fd 0 --release-key-file /root/lindm-deploy-input/release-key --release-key-id " + nativeQuote(options.ReleaseKeyID) + " --origin " + nativeQuote(origin) + " --device-origin " + nativeQuote(deviceOrigin) + " --tls-cert-file /root/lindm-deploy-input/tls.crt --tls-key-file /root/lindm-deploy-input/tls.key --tls-ca-file /root/lindm-deploy-input/tls-ca.crt --backup-recipient-file /root/lindm-deploy-input/backup-recipient --setup-code-file /root/lindm-deploy-input/setup-code"
+	command := "cmp -s /root/lindm-deploy-input/tuf-root " + nativeQuote(destination+"/release-root.json") + " && cat | sh " + nativeQuote(destination+"/install.sh") + " --custody-passphrase-fd 0 --release-key-file /root/lindm-deploy-input/release-key --release-key-id " + nativeQuote(options.ReleaseKeyID) + " --origin " + nativeQuote(origin) + " --device-origin " + nativeQuote(deviceOrigin) + " --backup-recipient-file /root/lindm-deploy-input/backup-recipient --setup-code-file /root/lindm-deploy-input/setup-code"
 	if airgap {
 		command += " --airgap"
 	}

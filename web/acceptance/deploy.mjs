@@ -3,11 +3,9 @@
 
 // Real visible setup, clipboard and management controls. TLS uses a private NSS
 // CA store, never ignoreHTTPSErrors or a certificate-verification bypass.
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { chromium } from "playwright";
+import { launchTrustedDeploymentBrowser } from "./deploy-browser.mjs";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import { submitReviewedDeviceAction, waitForSettledActionHistory } from "./deploy-actions.mjs";
 import { enroll, signIn, signOut, createGrant, confirmEnrolledDevice } from "./journey.mjs";
@@ -19,7 +17,6 @@ import {
 } from "./private-files.mjs";
 
 process.umask(0o077);
-const exec = promisify(execFile);
 let config;
 let driver;
 const result = { passed: false, screenshots: [], password_and_passkey: false, operations: [] };
@@ -70,32 +67,10 @@ async function capture(name) {
 }
 
 async function openTrustedBrowser() {
-  const home = join(config.privateDirectory, "browser-home");
-  const store = join(home, ".pki", "nssdb");
-  await privateDirectory(store);
-  // The caller supplies the exact CA generated for this owned deployment. This
-  // changes only the child's HOME, never the workstation's certificate store.
-  try {
-    await exec("certutil", ["-L", "-d", `sql:${store}`], { timeout: 10_000 });
-  } catch {
-    await exec("certutil", ["-N", "--empty-password", "-d", `sql:${store}`], { timeout: 10_000 });
-  }
-  await exec(
-    "certutil",
-    ["-A", "-d", `sql:${store}`, "-n", "lindm-owned-deployment", "-t", "C,,", "-i", config.caFile],
-    { timeout: 10_000 },
-  );
+  const { browser, context } = await launchTrustedDeploymentBrowser(config);
   driver = new ChromiumDriver();
-  driver.browser = await chromium.launch({
-    headless: true,
-    channel: config.phase === "tls" ? "chromium" : undefined,
-    timeout: 30_000,
-    env: { ...process.env, HOME: home },
-  });
-  driver.context = await driver.browser.newContext({
-    viewport: { width: 1440, height: 1000 },
-    ignoreHTTPSErrors: false,
-  });
+  driver.browser = browser;
+  driver.context = context;
   driver.page = await driver.context.newPage();
   driver.page.setDefaultTimeout(30_000);
   result.browser_version = driver.browser.version();

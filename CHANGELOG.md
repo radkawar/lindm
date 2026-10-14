@@ -17,6 +17,9 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Make **v0.1.0** the browser-compatible managed-upgrade baseline. Earlier shared-TLS installs are refused before upgrade changes: install fresh and re-enroll devices. Use an independent P-256/SHA-256 console CA and leaf, retain Ed25519 device transport and client/signing authorities, and sign separate per-origin console and device HTTPS roots into new bootstrap bundles. Native deployment proof now imports the actual installed console CA instead of supplying laboratory certificates.
+- Reject Ed25519 console certificates, generate P-256 database leaves, name the console CA in setup and status, and warn that first-owner passkeys require a DNS console URL rather than an IP address.
+
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.
 - Install the real software TPM for hosted integration tests and retain separate query-cost diagnostics for 10,000-device impact report pages and rollout saves, without changing deadlines or assertions.

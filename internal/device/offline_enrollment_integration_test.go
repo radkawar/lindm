@@ -68,7 +68,7 @@ func newOfflineFixture(t *testing.T) *offlineFixture {
 	}
 	digest := sha256.Sum256(f.rootJSON)
 	transportCA, _ := testCA(t, now.Add(48*time.Hour))
-	bootstrap := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: f.service.DeploymentID.String(), EnrollmentOrigin: "https://offline-admin.example", DeviceOrigin: "https://offline-device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transportCA.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.service.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
+	bootstrap := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: f.service.DeploymentID.String(), EnrollmentOrigin: "https://offline-admin.example", DeviceOrigin: "https://offline-device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transportCA.Raw}), ConsoleCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transportCA.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.service.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
 	f.bootstrap = sign(bootstrap, f.rootKey)
 	store, err := executionauthority.New(t.Context(), f.service.Pool, executionauthority.Config{RootJSON: f.rootJSON, BootstrapEnvelope: f.bootstrap, TLSPublicKey: ed25519Key(t).Public()})
 	if err != nil {

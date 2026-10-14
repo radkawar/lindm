@@ -66,7 +66,7 @@ func TestResolveAssistanceRelay(t *testing.T) {
 			dir := databaseFixture(t)
 			writeCertificate(t, dir, "root", true, nil, nil)
 			writeCertificate(t, dir, "client", false, []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}, nil)
-			writeCertificate(t, dir, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
+			writeBrowserCertificate(t, dir, "server", false, []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, nil)
 			writeCertificate(t, dir, "device", true, nil, nil)
 			writeFixtureFile(t, dir, "oidc-secret", []byte("isolated-test-credential"))
 			cfg := &configv1.ServerConfig{

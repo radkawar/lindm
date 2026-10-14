@@ -301,7 +301,7 @@ func newReplayFixture(t *testing.T) *replayFixture {
 	deviceCAKey := replayKey(t)
 	deviceCA, certificate := replayCA(t, deviceCAKey, now, x509.ExtKeyUsageClientAuth)
 	f.deviceCA = certificate
-	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: root.GetDeploymentId(), EnrollmentOrigin: "https://enrollment.example", DeviceOrigin: "https://device.example", TransportCaPem: transport, DeviceCaPem: deviceCA, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: replayReleaseRoot(t, now), NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(time.Hour))}
+	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: root.GetDeploymentId(), EnrollmentOrigin: "https://enrollment.example", DeviceOrigin: "https://device.example", TransportCaPem: transport, ConsoleCaPem: transport, DeviceCaPem: deviceCA, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: replayReleaseRoot(t, now), NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(time.Hour))}
 	bootstrap, err := authority.VerifyBootstrap(t.Context(), rootJSON, f.sign(bundle, rootKey), now)
 	if err != nil {
 		t.Fatal(err)

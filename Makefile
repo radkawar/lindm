@@ -155,7 +155,7 @@ browser-baseline:
 	./node_modules/.bin/playwright install chromium
 
 check-web: acceptance-build
-	node --test test/tooling/enrollment-snippets.test.mjs
+	node --test test/tooling/enrollment-snippets.test.mjs web/acceptance/deploy-actions.test.mjs web/acceptance/deploy-browser.test.mjs
 	artifacts/bin/lab acceptance -web-only -evidence "$(ACCEPTANCE_EVIDENCE)" $(ACCEPTANCE_FLAGS)
 
 acceptance: acceptance-build

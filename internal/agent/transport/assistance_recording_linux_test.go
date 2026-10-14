@@ -58,7 +58,7 @@ func newRecordingRelay(root *recordingRoot, server *recordingServer) *recordingR
 // failures without a receipt and turns an explicit refusal into a final one.
 func TestRecordingRelayAcknowledgesOnlyServerOutcomes(t *testing.T) {
 	chunk := &agentv1.AssistanceRecordingChunk{RecordingId: recordingTestID, Sequence: 0, EncapsulatedKey: bytes.Repeat([]byte{1}, 1120), Ciphertext: bytes.Repeat([]byte{2}, 32)}
-	root := &recordingRoot{chunks: []*agentv1.AssistanceRecordingChunk{chunk}}
+	root := &recordingRoot{assistanceRoot: assistanceRoot{pins: originConnectionPins(t)}, chunks: []*agentv1.AssistanceRecordingChunk{chunk}}
 	server := &recordingServer{}
 	relay := newRecordingRelay(root, server)
 	if _, err := relay.cycle(t.Context()); err != nil {

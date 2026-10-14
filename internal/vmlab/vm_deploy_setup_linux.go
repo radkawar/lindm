@@ -47,6 +47,7 @@ type VMDeploySetupResult struct {
 	DatabaseCredentialGate bool                       `json:"database_credential_gate"`
 	RuntimeSQLGates        []VMDeploySQLGate          `json:"runtime_sql_gates"`
 	Browser                *deploylab.BrowserEvidence `json:"browser,omitempty"`
+	TLS                    []*VMDeployTLSEvidence     `json:"tls"`
 	RecoveryCustodySHA256  string                     `json:"off_server_recovery_custody_sha256,omitempty"`
 	EvidenceFiles          []string                   `json:"evidence_files"`
 	CustodianIdentity      string                     `json:"custodian_identity"`
@@ -77,14 +78,7 @@ func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options V
 		return result, err
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(private)) }()
-	files, err := deploylab.CertificateFiles()
-	if err != nil {
-		return result, err
-	}
-	request, err := prepareDeploySetupBrowser(options, private, files)
-	if err != nil {
-		return result, err
-	}
+	request := prepareDeploySetupBrowser(options, private)
 	defer func() { request.Password, request.SetupCode = "", "" }()
 	passphrase := []byte(rand.Text() + rand.Text())
 	defer clear(passphrase)
@@ -129,7 +123,7 @@ func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options V
 			}()
 		}
 	}
-	if err := runDeploySetupOwner(ctx, guest, common, options.Browser, result, &request, files, passphrase, admin, device, options.Airgap); err != nil {
+	if err := runDeploySetupOwner(ctx, guest, common, options.Browser, result, &request, passphrase, admin, device, options.Airgap); err != nil {
 		return result, err
 	}
 	if err := exportDeployOfflineCustody(ctx, guest, private, &result.RecoveryCustodySHA256); err != nil {
@@ -177,12 +171,8 @@ func validateDeploySetupOptions(manifest *labv1.ImageManifest, options VMDeployS
 	return nil
 }
 
-func prepareDeploySetupBrowser(options VMDeploySetupOptions, private string, files map[string][]byte) (deploylab.BrowserRequest, error) {
-	ca := filepath.Join(private, "transport-ca.crt")
-	if err := os.WriteFile(ca, files["transport-ca.crt"], 0600); err != nil {
-		return deploylab.BrowserRequest{}, err
-	}
-	return deploylab.BrowserRequest{Phase: "setup", Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: ca, PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), ResultPath: filepath.Join(options.EvidenceDirectory, "browser-setup.json")}, nil
+func prepareDeploySetupBrowser(options VMDeploySetupOptions, private string) deploylab.BrowserRequest {
+	return deploylab.BrowserRequest{Phase: "setup", Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: filepath.Join(private, "console-ca.crt"), PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), ResultPath: filepath.Join(options.EvidenceDirectory, "browser-setup.json")}
 }
 
 func deployServerHardware(airgap bool) *VMHardwareOptions {
@@ -224,8 +214,8 @@ func observeDeploySetup(result *VMDeploySetupResult, name, kind string, run func
 	return err
 }
 
-func runDeploySetupOwner(ctx context.Context, guest *guestVM, common VMDeployOptions, browser func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error), result *VMDeploySetupResult, request *deploylab.BrowserRequest, files map[string][]byte, passphrase []byte, admin, device *deployRoute, airgap bool) error {
-	if err := prepareDeployInputs(ctx, guest, common, files); err != nil {
+func runDeploySetupOwner(ctx context.Context, guest *guestVM, common VMDeployOptions, browser func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error), result *VMDeploySetupResult, request *deploylab.BrowserRequest, passphrase []byte, admin, device *deployRoute, airgap bool) error {
+	if err := prepareDeployInputs(ctx, guest, common); err != nil {
 		return err
 	}
 	if err := observeDeploySetup(result, "install signed turnkey bundle", "command", func() error {
@@ -243,6 +233,11 @@ func runDeploySetupOwner(ctx context.Context, guest *guestVM, common VMDeployOpt
 	result.DatabaseCredentialGate = true
 	admin.activate(guest)
 	device.activate(guest)
+	if err := observeDeploySetup(result, "verify installer-generated browser TLS", "harness", func() error {
+		return observeDeployTLS(ctx, guest, request, "installed", nil, &result.TLS)
+	}); err != nil {
+		return err
+	}
 	if err := completeDeployOwner(ctx, guest, request, func() error {
 		return observeDeploySetup(result, "browser setup", "harness", func() error {
 			observed, err := browser(ctx, *request)

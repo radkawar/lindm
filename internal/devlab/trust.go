@@ -29,8 +29,8 @@ import (
 	"lindm/internal/trust"
 )
 
-// Trust generates development-only execution/release roots and a signed bootstrap
-// bundle. It never changes existing trust or imports it into the production server.
+// Trust generates development-only roots without rotating existing identities.
+// An authenticated bootstrap missing the console field is re-signed in place.
 func Trust(ctx context.Context, repoRoot string) error {
 	return locked(ctx, repoRoot, func(root string) (err error) {
 		fixture := FixturePath(root)
@@ -116,7 +116,9 @@ func Trust(ctx context.Context, repoRoot string) error {
 			return err
 		}
 		digest := sha256.Sum256(files["execution-root.json"])
-		bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: execution.GetDeploymentId(), EnrollmentOrigin: document.Proto.GetPublicUrl(), DeviceOrigin: "https://localhost:18445", TransportCaPem: transport, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: files["release-root.json"], NotBefore: execution.GetNotBefore(), ExpiresAt: execution.GetExpiresAt()}
+		// This development fixture explicitly shares its HTTPS issuer between
+		// origins; each domain is still independently pinned by the signed bundle.
+		bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: execution.GetDeploymentId(), EnrollmentOrigin: document.Proto.GetPublicUrl(), DeviceOrigin: "https://localhost:18445", TransportCaPem: transport, ConsoleCaPem: transport, DeviceCaPem: device, ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: files["release-root.json"], NotBefore: execution.GetNotBefore(), ExpiresAt: execution.GetExpiresAt()}
 		files["bootstrap.dsse.json"], err = authority.Sign(ctx, bundle, keys[:2]...)
 		if err != nil {
 			return err
@@ -139,21 +141,34 @@ func Trust(ctx context.Context, repoRoot string) error {
 }
 
 func verifyDevelopmentTrust(ctx context.Context, authority *trust.Authority, dir string) error {
-	if _, err := custody.Owned(dir, true); err != nil {
+	files, err := readDevelopmentTrustFiles(dir)
+	if err != nil {
 		return err
+	}
+	verified, err := authority.VerifyBootstrap(ctx, files["execution-root.json"], files["bootstrap.dsse.json"], time.Now())
+	if err != nil {
+		_, _, err = refreshDevelopmentBootstrap(ctx, authority, dir, files["execution-root.json"], files["bootstrap.dsse.json"])
+		return err
+	}
+	return verifyDevelopmentTrustKeys(files, verified)
+}
+
+func readDevelopmentTrustFiles(dir string) (map[string][]byte, error) {
+	if _, err := custody.Owned(dir, true); err != nil {
+		return nil, err
 	}
 	files := make(map[string][]byte)
 	for _, name := range []string{"execution-root.json", "bootstrap.dsse.json", "release-root.json", "release-key.pem", "execution-key-0.pem", "execution-key-1.pem", "execution-key-2.pem"} {
 		content, err := readOwned(filepath.Join(dir, name))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		files[name] = content
 	}
-	verified, err := authority.VerifyBootstrap(ctx, files["execution-root.json"], files["bootstrap.dsse.json"], time.Now())
-	if err != nil {
-		return err
-	}
+	return files, nil
+}
+
+func verifyDevelopmentTrustKeys(files map[string][]byte, verified *trust.Bootstrap) error {
 	if !bytes.Equal(verified.Bundle.GetReleaseRootJson(), files["release-root.json"]) {
 		return errors.New("development release root differs from signed bootstrap")
 	}

@@ -117,7 +117,7 @@ func newNativeConnectivityGuard(ctx context.Context, document *config.Document, 
 		return fail(errors.Join(connectivityguard.ErrConflict, err))
 	}
 	roots := x509.NewCertPool()
-	if len(connection.GetTransportCaPem()) == 0 || len(connection.GetTransportCaPem()) > 65536 || !roots.AppendCertsFromPEM(connection.GetTransportCaPem()) {
+	if len(connection.GetTransportCaPem()) < 64 || len(connection.GetTransportCaPem()) > 65536 || !roots.AppendCertsFromPEM(connection.GetTransportCaPem()) {
 		return fail(connectivityguard.ErrConflict)
 	}
 	tlsConfig := &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, GetClientCertificate: func(handshake *tls.CertificateRequestInfo) (*tls.Certificate, error) {

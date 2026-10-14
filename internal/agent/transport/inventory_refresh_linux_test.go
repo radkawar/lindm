@@ -86,7 +86,8 @@ func newRefreshTransportFixture(t *testing.T) *refreshTransportFixture {
 	now := timestamppb.Now()
 	digest := sha256.Sum256([]byte("signed refresh intent"))
 	f.status = &agentv1.DeviceActionStatus{ActionId: uuid.NewString(), IntentSha256: digest[:], State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: now, StartedAt: now, Before: &agentv1.DeviceActionObservation{ObservedAt: now, Supported: true}, RefreshInventory: true}
-	f.connection = &agentv1.GetConnectionResponse{DeploymentId: uuid.NewString(), DeviceId: uuid.NewString(), EnrollmentGeneration: uuid.NewString(), SessionEpoch: 1, SessionEpochUsable: true, RenewAfter: timestamppb.New(time.Now().Add(time.Hour))}
+	f.connection = originConnectionPins(t)
+	f.connection.DeviceId, f.connection.EnrollmentGeneration = uuid.NewString(), uuid.NewString()
 	dir := t.TempDir()
 	if err := os.Chmod(dir, 0700); err != nil {
 		t.Fatal(err)

@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentv1 "lindm/gen/lindm/agent/v1"
+	"lindm/internal/agent/testfixture"
 )
 
 func pendingState(t *testing.T) *agentv1.ExecutorJournalState {
@@ -33,9 +34,11 @@ func pendingState(t *testing.T) *agentv1.ExecutorJournalState {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Journal tests exercise durable typed storage, not bootstrap verification.
-	// Signature/trust validation is a separate executor admission boundary.
-	return &agentv1.ExecutorJournalState{FormatVersion: 1, InstallationId: uuid.NewString(), ExecutionRootJson: []byte("root-bytes"), BootstrapEnvelope: []byte("envelope-bytes"), BootstrapVerifiedAt: timestamppb.New(time.Now().UTC()), EnrollmentTransactionId: uuid.NewString(), IdentityPrivateKey: key, EnrollmentCsrPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr}), PendingGrant: "test-only-grant-with-at-least-32-characters"}
+	// Storage tests retain the complete signed bootstrap envelope, including both
+	// origin roots. Executor admission and each reload still perform verification.
+	now := time.Now().UTC()
+	fixture := testfixture.NewBootstrap(t, now, "https://console.example.test", "https://device.example.test")
+	return &agentv1.ExecutorJournalState{FormatVersion: 1, InstallationId: uuid.NewString(), ExecutionRootJson: fixture.RootJSON, BootstrapEnvelope: fixture.Envelope, BootstrapVerifiedAt: timestamppb.New(now), EnrollmentTransactionId: uuid.NewString(), IdentityPrivateKey: key, EnrollmentCsrPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csr}), PendingGrant: "test-only-grant-with-at-least-32-characters"}
 }
 
 func protectedDirectory(t *testing.T) string {

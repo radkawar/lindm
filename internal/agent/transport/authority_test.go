@@ -31,7 +31,7 @@ func TestConcurrentEstablishmentDoesNotFenceInventory(t *testing.T) {
 	}{{"renewal-exclusion", false}, {"canceled-waiter", true}} {
 		t.Run(tc.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				root := &establishmentRaceRoot{entered: make(chan struct{}), release: make(chan struct{}), renewAfter: time.Now().Add(time.Hour)}
+				root := &establishmentRaceRoot{pins: originConnectionPins(t), entered: make(chan struct{}), release: make(chan struct{}), renewAfter: time.Now().Add(time.Hour)}
 				gate := make(authorityGate, 1)
 				connection, err := root.GetConnection(t.Context(), connect.NewRequest(&agentv1.GetConnectionRequest{}))
 				if err != nil {
@@ -76,6 +76,7 @@ func TestConcurrentEstablishmentDoesNotFenceInventory(t *testing.T) {
 // Cached transports isolate this interleaving from sockets and cryptography.
 type establishmentRaceRoot struct {
 	agentv1connect.ExecutorServiceClient
+	pins             *agentv1.GetConnectionResponse
 	mu               sync.Mutex
 	entered, release chan struct{}
 	paused, pending  bool
@@ -85,7 +86,10 @@ type establishmentRaceRoot struct {
 func (r *establishmentRaceRoot) GetConnection(context.Context, *connect.Request[agentv1.GetConnectionRequest]) (*connect.Response[agentv1.GetConnectionResponse], error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return connect.NewResponse(&agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewalPending: r.pending, RenewAfter: timestamppb.New(r.renewAfter)}), nil
+	connection := proto.CloneOf(r.pins)
+	connection.RenewalPending = r.pending
+	connection.RenewAfter = timestamppb.New(r.renewAfter)
+	return connect.NewResponse(connection), nil
 }
 
 func (*establishmentRaceRoot) GetAgentUpdate(context.Context, *connect.Request[agentv1.GetAgentUpdateRequest]) (*connect.Response[agentv1.GetAgentUpdateResponse], error) {

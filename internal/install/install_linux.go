@@ -134,6 +134,9 @@ func Run(ctx context.Context, o Options) (err error) {
 			}
 			return continueInstallation(ctx, &o, release, packagePath, &state, nil)
 		}
+		if err := requireBrowserCompatibleUpgrade(); err != nil {
+			return err
+		}
 		return upgradeRelease(ctx, o, manifest.GetVersion(), packagePath, release)
 	}
 	return installFresh(ctx, &o, release, packagePath, manifest.GetVersion())
@@ -292,6 +295,7 @@ func publicOrigins(o *Options) error {
 	if parsed[0] == nil {
 		return errors.New("console HTTPS origin required")
 	}
+	warnConsoleDNSRequirement(parsed[0].Hostname(), os.Stderr)
 	if o.AdminPort < 1024 || o.AdminPort > 65535 || o.DevicePort < 1024 || o.DevicePort > 65535 || o.AdminPort == o.DevicePort {
 		return errors.New("distinct unprivileged listener ports required")
 	}

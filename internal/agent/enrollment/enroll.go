@@ -3,7 +3,7 @@
 //go:build linux
 
 // Package enrollment performs the public enrollment exchange using only the
-// HTTPS origin and transport trust authenticated by the root executor.
+// HTTPS origin and console trust authenticated by the root executor.
 package enrollment
 
 import (
@@ -42,8 +42,8 @@ func Enroll(ctx context.Context, pins *agentv1.PrepareBootstrapResponse) (*enrol
 		return nil, errors.New("invalid enrollment origin")
 	}
 	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(pins.GetTransportCaPem()) {
-		return nil, errors.New("invalid transport trust")
+	if len(pins.GetConsoleCaPem()) < 64 || len(pins.GetConsoleCaPem()) > 65536 || !pool.AppendCertsFromPEM(pins.GetConsoleCaPem()) {
+		return nil, errors.New("invalid console transport trust")
 	}
 	httpClient := &http.Client{
 		Timeout: 30 * time.Second,
@@ -52,7 +52,7 @@ func Enroll(ctx context.Context, pins *agentv1.PrepareBootstrapResponse) (*enrol
 		},
 		Transport: &http.Transport{
 			DialContext:            (&net.Dialer{Timeout: 10 * time.Second}).DialContext,
-			TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: pool},
+			TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: pool},
 			TLSHandshakeTimeout:    10 * time.Second,
 			ResponseHeaderTimeout:  15 * time.Second,
 			MaxResponseHeaderBytes: 16 << 10,

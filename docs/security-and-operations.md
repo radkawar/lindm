@@ -1864,16 +1864,33 @@ native server and encrypted-backup timer, checks actual verified HTTPS readiness
 and prints one console origin and the setup code. Runtime state is separate at
 `/var/lib/lindmd`; root operational metadata is at `/var/lib/lindmd-operations`.
 
-The automatically generated private console CA is not silently trusted by a
+The console uses an independent ECDSA P-256/SHA-256 CA and server certificate.
+Browsers cannot use the generated Ed25519 device transport identity. Go agents
+can, so device TLS, device-client CA and execution signing authorities remain
+unchanged. New quorum-signed bootstrap bundles pin the HTTPS roots separately.
+`console_ca_pem` authorizes enrollment and native downloads at the console origin;
+`transport_ca_pem` authorizes only the device origin. Neither pool falls back to
+the other: a public or organization console issuer is not a device trust anchor.
+The console-copied bootstrap and package download command trusts the console CA.
+
+The private console CA at `/etc/lindm/console-ca.crt` is not silently trusted by a
 remote browser. Transfer its displayed CA-file SHA-256 and certificate through
 the authenticated operator channel and use the approved workstation trust
-process; never bypass a certificate warning or disable HTTPS verification.
+process. Do not import the device CA instead, bypass a certificate warning or
+disable HTTPS verification. Publicly trusted console certificates need no custom
+CA import. Generated console and database leaf keys use P-256; their private CA
+keys are sealed directly to the PKI custodian, never written as plaintext files.
 Bring-own TLS is explicit: `--tls-cert-file`, `--tls-key-file`, and `--tls-ca-file`
-provide a protected key, chain covering both console/device names and independently
-approved roots. The listeners remain unprivileged (18444/18445 by default);
+provide a protected key, chain covering the console DNS name and independently
+approved console roots. They do not replace device transport trust. Ed25519
+console keys and certificate signatures are refused. The listeners remain
+unprivileged (18444/18445 by default);
 `--admin-port`, `--device-port` and `--device-origin` are explicit overrides.
 An origin without an explicit port uses console port 18444; an explicit public
 proxy port is preserved. Console and device listener ports must remain distinct.
+A console IP-address `public_url` cannot be a WebAuthn relying-party ID. Use a
+stable DNS name and matching certificate before first-owner password and passkey
+setup. The installer and first-run page warn about IP-address console URLs.
 
 For explicit ACME, use the maintained distro Certbot client on the certificate
 custodian, with its dependencies carried in the custodian's authenticated private
@@ -1882,18 +1899,19 @@ OS closure. A connected HTTP-01 issuance is:
 ```sh
 certbot certonly --standalone --preferred-challenges http \
   --server "$ACME_DIRECTORY" --non-interactive --agree-tos \
-  --email "$ACME_EMAIL" --domain "$ADMIN_DNS" --domain "$DEVICE_DNS"
+  --email "$ACME_EMAIL" --key-type ecdsa --elliptic-curve secp256r1 --domain "$ADMIN_DNS"
 ```
 
 The custodian supplies those actual directory/account/DNS values and authorizes
-the terms; both names must resolve to its temporary port-80 challenge listener.
+the terms; the console name must resolve to its temporary port-80 challenge listener.
 Copy the resulting full chain and private key into root-owned non-symlink 0600
 files under root-only ancestry, and separately authenticate the issuer root file.
 Pass those files through the three bring-own TLS flags above. Never use Certbot's
 `live/` symlinks directly as installer inputs or download a replacement trust root
-from the unverified server. Renewal must preserve both names and the bootstrap's
-admitted root trust; validate `lindmd check-config` as the runtime identity before
-an explicit restart. The installer does not silently contact an ACME service.
+from the unverified server. Renewal must preserve the console name and the
+bootstrap's admitted console root; validate `lindmd check-config` as the runtime
+identity before an explicit restart. Do not edit signed bootstrap bytes to change
+an issuer root. The installer does not silently contact an ACME service.
 An isolated site uses its local PKI or an explicitly reachable internal ACME
 custodian; public ACME is not an air-gap fallback.
 
@@ -2136,6 +2154,11 @@ managed upgrade baseline. Pre-turnkey manual/lab installations are refused with 
 named unmanaged-installation error: no silent adoption, rekey or configuration
 overwrite occurs. Use a fresh turnkey instance and reenroll devices; no historical
 automatic migration or pre-baseline backup reader is offered.
+The **v0.1.0 browser-compatible console** is the managed TLS upgrade boundary.
+Earlier shared-TLS turnkey laboratory installs are also refused before upgrade
+changes: "This installation predates the browser-compatible console certificate.
+Install fresh and re-enroll devices." There is no external pre-boundary installed
+base. Existing device mTLS is not weakened or silently rekeyed.
 The new schema compatibility, first-run, recovery, status and custody migrations
 are versions 49–53. They follow the already-landed MCP migration 48 without
 renumbering existing history. Online status/custody expansions retain floor 51;

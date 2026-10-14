@@ -231,7 +231,7 @@ func nativeOriginalRecoveryScenario(ctx context.Context, options VMDeviceActions
 	}
 	runtime.BootstrapVerifiedAt = timestamppb.New(bootstrapVerifiedAt)
 	guest := platform.ForManifest(options.RecoveryManifest.GetDistribution(), options.RecoveryManifest.GetVersion()).Lab.Guest
-	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetTransportCaPem(), options.Ukify, guest)
+	artifact, err := buildActionRecoveryArtifact(ctx, vm, workDir, signer, evidence.Boot, runtime, material.ExecutionRootJSON, material.BootstrapEnvelope, bootstrap.Bundle.GetConsoleCaPem(), options.Ukify, guest)
 	if err != nil {
 		return evidence, err
 	}

@@ -266,7 +266,7 @@ func finishUpgrade(ctx context.Context, lease *serverops.UpgradeLease, state *in
 }
 
 func ready(ctx context.Context, o Options) error {
-	ca, err := os.ReadFile("/etc/lindm/transport-ca.crt")
+	ca, err := os.ReadFile("/etc/lindm/console-ca.crt")
 	if err != nil {
 		return err
 	}

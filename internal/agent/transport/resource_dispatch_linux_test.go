@@ -487,7 +487,7 @@ func newDispatchFixture(t *testing.T) *dispatchFixture {
 		entered: make(chan struct{}), exited: make(chan struct{}),
 	}
 	f.work = &devicev1.ResourceWork{ActionId: "11111111-1111-4111-8111-111111111111", IntentEnvelope: f.intent}
-	f.connection = &agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewAfter: timestamppb.New(time.Now().Add(time.Hour))}
+	f.connection = originConnectionPins(t)
 	f.loop = &managementLoop{
 		executor: &dispatchExecutor{f: f}, gate: make(authorityGate, 1),
 		cache: connectionCache{connection: proto.CloneOf(f.connection), servers: &connections{device: &dispatchServer{f: f}}},

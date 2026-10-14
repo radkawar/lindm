@@ -98,8 +98,8 @@ message ServerRecoveryCustodyExport {
   }];
 }
 
-// Sealed to the PKI custodian only. Supplied trust never imports its private CA
-// key. BYOT plus an external database legitimately has no generated private key.
+// Sealed to the PKI custodian only. Supplied console trust never imports its
+// private CA key. Generated device transport authority remains independent.
 message ServerRecoveryPKIExport {
   string deployment_id = 1 [(buf.validate.field).string.uuid = true];
   string public_url = 2 [(buf.validate.field).string.uri = true];
@@ -111,6 +111,8 @@ message ServerRecoveryPKIExport {
   bytes transport_private_key_pem = 5 [(buf.validate.field).bytes.max_len = 16384];
   bytes database_ca_pem = 6 [(buf.validate.field).bytes.max_len = 1048576];
   bytes database_private_key_pem = 7 [(buf.validate.field).bytes.max_len = 16384];
+  bytes console_ca_pem = 8 [(buf.validate.field).bytes.max_len = 1048576];
+  bytes console_private_key_pem = 9 [(buf.validate.field).bytes.max_len = 16384];
 }
 
 // The restored server retains its fresh database CA, rather than substituting

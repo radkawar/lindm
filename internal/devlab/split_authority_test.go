@@ -100,7 +100,7 @@ func TestOpenSplitAuthorityRejectsInvalidDeviceBeforeResources(t *testing.T) {
 func TestControlPlaneHandleJSONRoundTrip(t *testing.T) {
 	handle := ControlPlaneHandle{
 		ConsoleOrigin: "https://localhost:24444", AdminPort: 24444, DeviceOrigin: "https://192.0.2.20:24445",
-		DatabaseName: "split-fixture", TransportCAPEM: []byte("public CA"), ExecutionRootJSON: []byte(`{"public":"root"}`),
+		DatabaseName: "split-fixture", ConsoleCAPEM: []byte("public CA"), ExecutionRootJSON: []byte(`{"public":"root"}`),
 		BootstrapEnvelope: []byte(`{"public":"bootstrap"}`), AccountID: "00000000-0000-4000-8000-000000000001",
 		Username: "remote-owner", Password: []byte("test-only-password"),
 		WebAuthnCredentialID: []byte("test-credential"), WebAuthnPrivateKey: []byte("test-key"), WebAuthnCounter: 1,

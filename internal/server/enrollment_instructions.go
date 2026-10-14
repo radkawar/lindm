@@ -54,7 +54,7 @@ func enrollmentInstructions(resources *config.Resources, native *nativeRepositor
 	case cfg.GetDevicePublicUrl() == "":
 		response.Readiness = enrollmentNotReady("device_origin_missing", "Configure the device HTTPS public origin and restart lindmd.")
 	case resources.EnrollmentTLSUnavailable:
-		response.Readiness = enrollmentNotReady("https_trust_unavailable", "Provide the administrative HTTPS CA in the TLS certificate chain or trustedCaFile, with a certificate covering both public origins, then restart lindmd.")
+		response.Readiness = enrollmentNotReady("https_trust_unavailable", "Provide the administrative HTTPS CA through adminCaFile, the administrative TLS chain or trustedCaFile, with a certificate covering publicUrl, then restart lindmd.")
 	}
 	origin := strings.TrimSuffix(cfg.GetPublicUrl(), "/")
 	if native.apt.err == nil {

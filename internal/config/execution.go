@@ -3,8 +3,11 @@
 package config
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/url"
@@ -26,6 +29,7 @@ type ExecutionBootstrap struct {
 	Envelope          []byte
 	ReleaseRootJSON   []byte
 	TransportCAPEM    []byte
+	ConsoleCAPEM      []byte
 	InitialDelegation *agentv1.UpdateExecutionTrustRequest
 }
 
@@ -60,28 +64,55 @@ func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap
 	if !verified.DeviceCA.Equal(resources.DeviceCACertificate) {
 		return nil, nil, errors.New("execution bootstrap device CA differs from server configuration")
 	}
-	intermediates := x509.NewCertPool()
-	for _, encoded := range resources.ServerCertificate.Certificate[1:] {
-		certificate, err := x509.ParseCertificate(encoded)
-		if err != nil {
-			return nil, nil, fmt.Errorf("parse server TLS intermediate: %w", err)
+	if resources.AdminCACertificate != nil {
+		// Explicit console download trust must also be owner-authorized for
+		// agents enrolling through the signed administrative origin.
+		found := false
+		for encoded := verified.Bundle.GetConsoleCaPem(); len(encoded) != 0; {
+			block, rest := pem.Decode(encoded)
+			if block == nil {
+				break
+			}
+			encoded = rest
+			if block.Type == "CERTIFICATE" && bytes.Equal(block.Bytes, resources.AdminCACertificate.Raw) {
+				found = true
+				break
+			}
 		}
-		intermediates.AddCert(certificate)
+		if !found {
+			return nil, nil, errors.New("execution bootstrap console pins omit admin_ca_file")
+		}
 	}
-	for _, origin := range []string{d.Proto.GetPublicUrl(), d.Proto.GetDevicePublicUrl()} {
-		endpoint, err := url.Parse(origin)
+	// Each advertised origin is authorized only by its own signed CA domain.
+	for _, endpoint := range [...]struct {
+		origin string
+		pair   *tls.Certificate
+		roots  *x509.CertPool
+	}{
+		{d.Proto.GetDevicePublicUrl(), &resources.ServerCertificate, verified.TransportRoots},
+		{d.Proto.GetPublicUrl(), &resources.AdminServerCertificate, verified.ConsoleRoots},
+	} {
+		intermediates := x509.NewCertPool()
+		for _, encoded := range endpoint.pair.Certificate[1:] {
+			certificate, err := x509.ParseCertificate(encoded)
+			if err != nil {
+				return nil, nil, fmt.Errorf("parse server TLS intermediate: %w", err)
+			}
+			intermediates.AddCert(certificate)
+		}
+		origin, err := url.Parse(endpoint.origin)
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse execution bootstrap origin: %w", err)
 		}
-		if _, err := resources.ServerCertificate.Leaf.Verify(x509.VerifyOptions{
-			Roots: verified.TransportRoots, Intermediates: intermediates,
-			DNSName: endpoint.Hostname(), CurrentTime: now,
+		if _, err := endpoint.pair.Leaf.Verify(x509.VerifyOptions{
+			Roots: endpoint.roots, Intermediates: intermediates,
+			DNSName: origin.Hostname(), CurrentTime: now,
 			KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		}); err != nil {
-			return nil, nil, fmt.Errorf("server TLS does not satisfy execution bootstrap transport pins: %w", err)
+			return nil, nil, fmt.Errorf("server TLS at %s does not satisfy execution bootstrap origin pins: %w", endpoint.origin, err)
 		}
 	}
-	verifier, err := authority.NewExecutionVerifier(verified, resources.ServerCertificate.Leaf.PublicKey)
+	verifier, err := authority.NewExecutionVerifier(verified, resources.ServerCertificate.Leaf.PublicKey, resources.AdminServerCertificate.Leaf.PublicKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("execution bootstrap reuses a server TLS key: %w", err)
 	}
@@ -96,7 +127,7 @@ func (d *Document) executionBootstrap(resources *Resources) (*ExecutionBootstrap
 			return nil, nil, err
 		}
 	}
-	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope, ReleaseRootJSON: verified.Bundle.GetReleaseRootJson(), TransportCAPEM: verified.Bundle.GetTransportCaPem(), InitialDelegation: initial}, verifier, nil
+	return &ExecutionBootstrap{RootJSON: root, Envelope: envelope, ReleaseRootJSON: verified.Bundle.GetReleaseRootJson(), TransportCAPEM: verified.Bundle.GetTransportCaPem(), ConsoleCAPEM: verified.Bundle.GetConsoleCaPem(), InitialDelegation: initial}, verifier, nil
 }
 
 // Loading a signed request is not admission. The authority store verifies its

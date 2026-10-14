@@ -49,6 +49,7 @@ func (s *Service) getConnection(ctx context.Context, req *agentv1.GetConnectionR
 		DeploymentId: loaded.bootstrap.Root.GetDeploymentId(), DeviceId: loaded.state.GetDeviceId(),
 		EnrollmentGeneration: loaded.state.GetEnrollmentGeneration(), EnrollmentOrigin: loaded.bootstrap.Bundle.GetEnrollmentOrigin(),
 		DeviceOrigin: loaded.bootstrap.Bundle.GetDeviceOrigin(), TransportCaPem: bytes.Clone(loaded.bootstrap.Bundle.GetTransportCaPem()),
+		ConsoleCaPem:        bytes.Clone(loaded.bootstrap.Bundle.GetConsoleCaPem()),
 		CredentialKind:      agentv1.TLSCredentialKind_TLS_CREDENTIAL_KIND_ED25519,
 		CertificateNotAfter: protoTimestamp(loaded.cert.NotAfter), RenewAfter: loaded.state.GetRenewAfter(),
 		IdentityExpired: !certUsable(loaded.cert, now), RenewalPending: loaded.renewal != nil,

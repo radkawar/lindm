@@ -513,8 +513,8 @@ func (x *ServerRecoveryCustodyExport) GetArtifacts() []*ServerRecoveryCustodyArt
 	return nil
 }
 
-// Sealed to the PKI custodian only. Supplied trust never imports its private CA
-// key. BYOT plus an external database legitimately has no generated private key.
+// Sealed to the PKI custodian only. Supplied console trust never imports its
+// private CA key. Generated device transport authority remains independent.
 type ServerRecoveryPKIExport struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	DeploymentId           string                 `protobuf:"bytes,1,opt,name=deployment_id,json=deploymentId,proto3" json:"deployment_id,omitempty"`
@@ -524,6 +524,8 @@ type ServerRecoveryPKIExport struct {
 	TransportPrivateKeyPem []byte                 `protobuf:"bytes,5,opt,name=transport_private_key_pem,json=transportPrivateKeyPem,proto3" json:"transport_private_key_pem,omitempty"`
 	DatabaseCaPem          []byte                 `protobuf:"bytes,6,opt,name=database_ca_pem,json=databaseCaPem,proto3" json:"database_ca_pem,omitempty"`
 	DatabasePrivateKeyPem  []byte                 `protobuf:"bytes,7,opt,name=database_private_key_pem,json=databasePrivateKeyPem,proto3" json:"database_private_key_pem,omitempty"`
+	ConsoleCaPem           []byte                 `protobuf:"bytes,8,opt,name=console_ca_pem,json=consoleCaPem,proto3" json:"console_ca_pem,omitempty"`
+	ConsolePrivateKeyPem   []byte                 `protobuf:"bytes,9,opt,name=console_private_key_pem,json=consolePrivateKeyPem,proto3" json:"console_private_key_pem,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -603,6 +605,20 @@ func (x *ServerRecoveryPKIExport) GetDatabaseCaPem() []byte {
 func (x *ServerRecoveryPKIExport) GetDatabasePrivateKeyPem() []byte {
 	if x != nil {
 		return x.DatabasePrivateKeyPem
+	}
+	return nil
+}
+
+func (x *ServerRecoveryPKIExport) GetConsoleCaPem() []byte {
+	if x != nil {
+		return x.ConsoleCaPem
+	}
+	return nil
+}
+
+func (x *ServerRecoveryPKIExport) GetConsolePrivateKeyPem() []byte {
+	if x != nil {
+		return x.ConsolePrivateKeyPem
 	}
 	return nil
 }
@@ -884,7 +900,7 @@ const file_lindm_agent_v1_server_recovery_proto_rawDesc = "" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10\x03R\n" +
 	"identities\x12W\n" +
 	"\tartifacts\x18\x06 \x03(\v2-.lindm.agent.v1.ServerRecoveryCustodyArtifactB\n" +
-	"\xbaH\a\x92\x01\x04\b\x04\x10\x04R\tartifacts\"\x9b\x03\n" +
+	"\xbaH\a\x92\x01\x04\b\x04\x10\x04R\tartifacts\"\x8e\x04\n" +
 	"\x17ServerRecoveryPKIExport\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12'\n" +
 	"\n" +
@@ -893,7 +909,9 @@ const file_lindm_agent_v1_server_recovery_proto_rawDesc = "" +
 	"\x10transport_ca_pem\x18\x04 \x01(\fB\v\xbaH\bz\x06\x10\x01\x18\x80\x80@R\x0etransportCaPem\x12D\n" +
 	"\x19transport_private_key_pem\x18\x05 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x16transportPrivateKeyPem\x121\n" +
 	"\x0fdatabase_ca_pem\x18\x06 \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80@R\rdatabaseCaPem\x12B\n" +
-	"\x18database_private_key_pem\x18\a \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x15databasePrivateKeyPem\"\xe8\x05\n" +
+	"\x18database_private_key_pem\x18\a \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x15databasePrivateKeyPem\x12/\n" +
+	"\x0econsole_ca_pem\x18\b \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80@R\fconsoleCaPem\x12@\n" +
+	"\x17console_private_key_pem\x18\t \x01(\fB\t\xbaH\x06z\x04\x18\x80\x80\x01R\x14consolePrivateKeyPem\"\xe8\x05\n" +
 	"\x1dServerRecoveryDatabaseCustody\x125\n" +
 	"\x12database_ca_sha256\x18\x01 \x01(\fB\a\xbaH\x04z\x02h R\x10databaseCaSha256\x12|\n" +
 	"\x0fsealed_pki_path\x18\x02 \x01(\tBT\xbaHQrO2M^/var/lib/lindmd-operations/database-custody/[0-9a-f]{64}/sealed-pki-ca\\.age$R\rsealedPkiPath\x123\n" +

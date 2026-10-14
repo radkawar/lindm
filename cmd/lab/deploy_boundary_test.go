@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Lab-only encrypted escrow and frozen historical verification must never enter
+// Lab-only escrow, fixture trust repair and historical verification never enter
 // customer executable dependency closures. Reuse the maintained go-list guard
 // rather than inspecting only a direct source import.
 func TestDeployHelpersStayOutsideProductExecutables(t *testing.T) {
@@ -20,7 +20,7 @@ func TestDeployHelpersStayOutsideProductExecutables(t *testing.T) {
 			}
 			for line := range strings.Lines(string(output)) {
 				path := strings.TrimSpace(line)
-				if path == "lindm/internal/vmlab" || path == "lindm/cmd/lab" {
+				if path == "lindm/internal/vmlab" || path == "lindm/internal/devlab" || path == "lindm/cmd/lab" {
 					t.Errorf("%s imports %s: development helpers must not enter product executables", entrypoint, path)
 				}
 			}

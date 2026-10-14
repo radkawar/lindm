@@ -46,11 +46,12 @@ func newExecutionFixture(t *testing.T, count int) executionFixture {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(rootJSON)
-	f.reserved = []ed25519.PrivateKey{testKey(t), testKey(t), testKey(t)}
+	f.reserved = []ed25519.PrivateKey{testKey(t), testKey(t), testKey(t), testKey(t)}
 	bundle := &agentv1.BootstrapBundle{
 		BundleId: uuid.NewString(), DeploymentId: f.root.GetDeploymentId(),
 		EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example",
 		TransportCaPem:       testCA(t, f.reserved[0], f.now, x509.ExtKeyUsageServerAuth),
+		ConsoleCaPem:         testCA(t, f.reserved[3], f.now, x509.ExtKeyUsageServerAuth),
 		DeviceCaPem:          testCA(t, f.reserved[1], f.now, x509.ExtKeyUsageClientAuth),
 		ExecutionRootVersion: 1, ExecutionRootSha256: digest[:],
 		ReleaseRootJson: testReleaseRoot(t, f.reserved[2], f.now.Add(time.Hour)),
@@ -273,5 +274,22 @@ func TestExecutionTrustDomainDigestPreservesRoles(t *testing.T) {
 	}
 	if other.TrustDomainDigest() == f.verifier.TrustDomainDigest() {
 		t.Fatal("swapping transport and device CA roles preserved the durable domain pin")
+	}
+}
+
+func TestExecutionTrustDomainDigestPreservesConsoleRole(t *testing.T) {
+	f := newExecutionFixture(t, 2)
+	swapped := proto.CloneOf(f.bootstrap.Bundle)
+	swapped.ConsoleCaPem, swapped.TransportCaPem = swapped.TransportCaPem, swapped.ConsoleCaPem
+	verified, err := f.authority.VerifyBootstrap(t.Context(), f.rootJSON, executionSign(t, f.authority, swapped, f.keys...), f.now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := f.authority.NewExecutionVerifier(verified)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if other.TrustDomainDigest() == f.verifier.TrustDomainDigest() {
+		t.Fatal("swapping console and device transport roles preserved the durable domain pin")
 	}
 }

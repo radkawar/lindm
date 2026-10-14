@@ -26,7 +26,7 @@ import (
 // calling anything once the root reports acknowledgment and re-registers only
 // after renewal changes the certificate or the previous attempt failed.
 func TestEncryptionKeyRegistersOncePerCertificate(t *testing.T) {
-	root := &encryptionKeyRoot{certificate: bytes.Repeat([]byte{1}, sha256.Size)}
+	root := &encryptionKeyRoot{pins: originConnectionPins(t), certificate: bytes.Repeat([]byte{1}, sha256.Size)}
 	server := &encryptionKeyServer{root: root}
 	loop := root.loop(server)
 	cycles := func(m *managementLoop, n int) {
@@ -73,6 +73,7 @@ func TestEncryptionKeyRegistersOncePerCertificate(t *testing.T) {
 
 type encryptionKeyRoot struct {
 	agentv1connect.ExecutorServiceClient
+	pins                      *agentv1.GetConnectionResponse
 	certificate, acknowledged []byte
 	prepares, acks            int
 }
@@ -85,7 +86,10 @@ func (r *encryptionKeyRoot) loop(server devicev1connect.DeviceServiceClient) *ma
 }
 
 func (r *encryptionKeyRoot) connection() *agentv1.GetConnectionResponse {
-	return &agentv1.GetConnectionResponse{SessionEpoch: 1, SessionEpochUsable: true, RenewAfter: timestamppb.New(time.Now().Add(time.Hour)), CertificateSha256: bytes.Clone(r.certificate)}
+	connection := proto.CloneOf(r.pins)
+	connection.RenewAfter = timestamppb.New(time.Now().Add(time.Hour))
+	connection.CertificateSha256 = bytes.Clone(r.certificate)
+	return connection
 }
 
 // Each certificate carries its own recipient key, as renewal guarantees.

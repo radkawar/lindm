@@ -60,13 +60,16 @@ func TestDeploySetupAirgapHardwareAndInstaller(t *testing.T) {
 		if strings.Contains(command, " --airgap") != airgap {
 			t.Fatalf("installer mode differs from guest network policy for airgap=%t", airgap)
 		}
-		for _, required := range []string{"--custody-passphrase-fd 0", "--release-key-file", "--release-key-id", "--tls-ca-file", "--backup-recipient-file", "cmp -s /root/lindm-deploy-input/tuf-root", "/root/signed-release/release-root.json", "--setup-code-file", "/usr/bin/lindmd version"} {
+		for _, required := range []string{"--custody-passphrase-fd 0", "--release-key-file", "--release-key-id", "--backup-recipient-file", "cmp -s /root/lindm-deploy-input/tuf-root", "/root/signed-release/release-root.json", "--setup-code-file", "/usr/bin/lindmd version"} {
 			if !strings.Contains(command, required) {
 				t.Errorf("airgap=%t omitted existing protected native installer input %q", airgap, required)
 			}
 		}
 		if strings.Contains(command, "--tuf-root-file") {
 			t.Fatal("maintained installer caller passed a flag absent from the real installer")
+		}
+		if strings.Contains(command, "--tls-") || strings.Contains(command, "/tls.") || strings.Contains(command, "/tls-ca.") {
+			t.Fatal("default native proof bypasses generated TLS with a laboratory certificate")
 		}
 	}
 }

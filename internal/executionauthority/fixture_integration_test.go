@@ -67,6 +67,7 @@ func newFixture(t *testing.T, rootVersion uint64) *fixture {
 		BundleId: uuid.NewString(), DeploymentId: f.root.GetDeploymentId(),
 		EnrollmentOrigin: "https://admin.example", DeviceOrigin: "https://device.example",
 		TransportCaPem:  caPEM(t, newKey(t), f.now, x509.ExtKeyUsageServerAuth),
+		ConsoleCaPem:    caPEM(t, newKey(t), f.now, x509.ExtKeyUsageServerAuth),
 		DeviceCaPem:     caPEM(t, newKey(t), f.now, x509.ExtKeyUsageClientAuth),
 		ReleaseRootJson: releaseRoot(t, newKey(t), f.now.Add(24*time.Hour)),
 		NotBefore:       timestamppb.New(f.now.Add(-time.Minute)), ExpiresAt: timestamppb.New(f.now.Add(12 * time.Hour)),

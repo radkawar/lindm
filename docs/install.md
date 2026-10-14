@@ -1,6 +1,7 @@
 # Install lindm
 
 Use a dedicated Ubuntu 24.04 or RHEL 9 x86 server. Give the server a stable DNS name.
+An IP-address URL cannot be a WebAuthn relying-party ID. Use the DNS name for first-owner password and passkey setup.
 The browser and managed devices must reach its HTTPS listeners.
 For RHEL, retain the required Red Hat subscription or an entitled offline repository.
 
@@ -38,6 +39,11 @@ repositories. For RHEL, keep its entitlement available.
 The root-only file `/var/lib/lindmd-operations/setup/code` also holds the code.
 Database URLs and the integrations encryption key stay root-owned and private.
 Native services receive temporary systemd credentials, not ownership of those files.
+
+The console has its own browser-compatible certificate. For a private CA, import
+`/etc/lindm/console-ca.crt` on the administrator's computer and check the fingerprint
+printed by the installer. Do not import the device CA instead. Publicly trusted
+console certificates do not need a custom CA import.
 
 To use an existing PostgreSQL database, provide protected runtime and migration
 URL files. Each connection must verify the database certificate. See the
@@ -100,9 +106,11 @@ the installer admits its schema compatibility. The native package version, not
 the last-ready marker, determines whether this is a rollback. Schema preflight
 and an encrypted backup remain mandatory; rollback never runs schema Down.
 
-The first turnkey release starts managed upgrades. Pre-turnkey manual and lab
-installations need a fresh server and device re-enrollment. Keep their data and
-keys until you approve retention.
+Version **v0.1.0** starts the browser-compatible managed-upgrade baseline.
+Pre-turnkey installations and earlier shared-TLS laboratory installs need a fresh
+server and device re-enrollment. The installer refuses them before upgrade changes:
+"This installation predates the browser-compatible console certificate. Install
+fresh and re-enroll devices." Keep their data and keys until you approve retention.
 
 Run the documented restore drill before relying on backups. A stale restore stays
 fenced until its signed recovery checkpoint reconciles security state.

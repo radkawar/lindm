@@ -76,7 +76,7 @@ func newDeviceActionFixtureCapabilities(t *testing.T, capabilities []string) *de
 	}
 	rootDigest := sha256.Sum256(rootJSON)
 	transport, _ := testCA(t, now.Add(48*time.Hour))
-	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: s.DeploymentID.String(), EnrollmentOrigin: "https://admin.example", DeviceOrigin: "https://device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transport.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: rootDigest[:], NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
+	bundle := &agentv1.BootstrapBundle{BundleId: uuid.NewString(), DeploymentId: s.DeploymentID.String(), EnrollmentOrigin: "https://admin.example", DeviceOrigin: "https://device.example", TransportCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transport.Raw}), ConsoleCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: transport.Raw}), DeviceCaPem: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: s.CA.Raw}), ReleaseRootJson: dispatchReleaseRoot(t, now), ExecutionRootVersion: 1, ExecutionRootSha256: rootDigest[:], NotBefore: timestamppb.New(now.Add(-time.Hour)), ExpiresAt: timestamppb.New(now.Add(12 * time.Hour))}
 	store, err := executionauthority.New(t.Context(), s.Pool, executionauthority.Config{RootJSON: rootJSON, BootstrapEnvelope: sign(bundle, roots...), TLSPublicKey: ed25519Key(t).Public()})
 	if err != nil {
 		t.Fatal(err)

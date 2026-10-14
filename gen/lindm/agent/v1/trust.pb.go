@@ -181,8 +181,10 @@ type BootstrapBundle struct {
 	ReleaseRootJson      []byte                 `protobuf:"bytes,9,opt,name=release_root_json,json=releaseRootJson,proto3" json:"release_root_json,omitempty"`
 	NotBefore            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=not_before,json=notBefore,proto3" json:"not_before,omitempty"`
 	ExpiresAt            *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	// Administrative enrollment and native-download HTTPS trust, never device transport.
+	ConsoleCaPem  []byte `protobuf:"bytes,12,opt,name=console_ca_pem,json=consoleCaPem,proto3" json:"console_ca_pem,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *BootstrapBundle) Reset() {
@@ -288,6 +290,13 @@ func (x *BootstrapBundle) GetNotBefore() *timestamppb.Timestamp {
 func (x *BootstrapBundle) GetExpiresAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *BootstrapBundle) GetConsoleCaPem() []byte {
+	if x != nil {
+		return x.ConsoleCaPem
 	}
 	return nil
 }
@@ -595,7 +604,7 @@ const file_lindm_agent_v1_trust_proto_rawDesc = "" +
 	"\x04keys\x18\x06 \x03(\v2\x1c.lindm.agent.v1.ExecutionKeyB\n" +
 	"\xbaH\a\x92\x01\x04\b\x01\x10\x10R\x04keys:\xb0\x02\xbaH\xac\x02\x1a^\n" +
 	"\x17execution_root.validity\x12 root validity must be increasing\x1a!this.expires_at > this.not_before\x1a\xc9\x01\n" +
-	"\x15execution_root.quorum\x123threshold must not exceed the number of unique keys\x1a{this.threshold <= uint(this.keys.size()) && this.keys.all(k, this.keys.filter(other, other.key_id == k.key_id).size() == 1)\"\xdd\x05\n" +
+	"\x15execution_root.quorum\x123threshold must not exceed the number of unique keys\x1a{this.threshold <= uint(this.keys.size()) && this.keys.all(k, this.keys.filter(other, other.key_id == k.key_id).size() == 1)\"\x90\x06\n" +
 	"\x0fBootstrapBundle\x12%\n" +
 	"\tbundle_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bbundleId\x12-\n" +
 	"\rdeployment_id\x18\x02 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x129\n" +
@@ -610,7 +619,8 @@ const file_lindm_agent_v1_trust_proto_rawDesc = "" +
 	"not_before\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\tnotBefore\x12A\n" +
 	"\n" +
-	"expires_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt:c\xbaH`\x1a^\n" +
+	"expires_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\texpiresAt\x121\n" +
+	"\x0econsole_ca_pem\x18\f \x01(\fB\v\xbaH\bz\x06\x10@\x18\x80\x80\x04R\fconsoleCaPem:c\xbaH`\x1a^\n" +
 	"\x12bootstrap.validity\x12%bootstrap validity must be increasing\x1a!this.expires_at > this.not_before\"\xff\x02\n" +
 	"\rRenewalIntent\x12-\n" +
 	"\rdeployment_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\fdeploymentId\x12%\n" +

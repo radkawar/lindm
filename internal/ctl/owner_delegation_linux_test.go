@@ -137,7 +137,7 @@ func newOwnerFixture(t *testing.T) ownerFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bundle := &agentv1.BootstrapBundle{BundleId: ownerTestID, DeploymentId: ownerTestID, EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example", TransportCaPem: ca(3, x509.ExtKeyUsageServerAuth), DeviceCaPem: ca(4, x509.ExtKeyUsageClientAuth), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: releaseJSON, NotBefore: timestamppb.New(f.now.Add(-time.Minute)), ExpiresAt: timestamppb.New(f.now.Add(time.Hour))}
+	bundle := &agentv1.BootstrapBundle{BundleId: ownerTestID, DeploymentId: ownerTestID, EnrollmentOrigin: "https://enroll.example", DeviceOrigin: "https://devices.example", TransportCaPem: ca(3, x509.ExtKeyUsageServerAuth), ConsoleCaPem: ca(3, x509.ExtKeyUsageServerAuth), DeviceCaPem: ca(4, x509.ExtKeyUsageClientAuth), ExecutionRootVersion: 1, ExecutionRootSha256: digest[:], ReleaseRootJson: releaseJSON, NotBefore: timestamppb.New(f.now.Add(-time.Minute)), ExpiresAt: timestamppb.New(f.now.Add(time.Hour))}
 	bootstrapEnvelope := ownerSign(t, f.authority, bundle, keys...)
 	bootstrap, err := f.authority.VerifyBootstrap(t.Context(), rootJSON, bootstrapEnvelope, f.now)
 	if err != nil {

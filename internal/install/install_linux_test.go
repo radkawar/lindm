@@ -6,6 +6,7 @@ package install
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"lindm/internal/platform"
 )
@@ -142,6 +144,9 @@ func TestGeneratedAuthorityKeysSeparateAndConstrained(t *testing.T) {
 		t.Fatal("CA private authority reused")
 	}
 	for _, ca := range []*x509.Certificate{first, second} {
+		if ca.PublicKeyAlgorithm != x509.Ed25519 || ca.SignatureAlgorithm != x509.PureEd25519 {
+			t.Fatal("device signing authority must remain Ed25519")
+		}
 		if !ca.IsCA || !ca.BasicConstraintsValid || !ca.MaxPathLenZero || ca.KeyUsage != x509.KeyUsageCertSign|x509.KeyUsageCRLSign {
 			t.Fatal("generated CA constraints differ from admission policy")
 		}
@@ -158,8 +163,173 @@ func TestGeneratedAuthorityKeysSeparateAndConstrained(t *testing.T) {
 	if block == nil || block.Type != "PRIVATE KEY" || len(rest) != 0 {
 		t.Fatal("custody does not contain exact PKCS8 PEM")
 	}
+	defer clear(block.Bytes)
 	if _, err := x509.ParsePKCS8PrivateKey(block.Bytes); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGeneratedConsoleTLSUsesBrowserCompatibleAlgorithms(t *testing.T) {
+	ca, key, err := newTLSCertificateAuthority("console authority")
+	if err != nil {
+		t.Fatal(err)
+	}
+	public, ok := ca.PublicKey.(*ecdsa.PublicKey)
+	if !ok || public.Curve != elliptic.P256() || key.Curve != elliptic.P256() ||
+		ca.PublicKeyAlgorithm != x509.ECDSA || ca.SignatureAlgorithm != x509.ECDSAWithSHA256 {
+		t.Fatal("console CA must use P-256 and SHA-256")
+	}
+	if !ca.IsCA || !ca.BasicConstraintsValid || !ca.MaxPathLenZero ||
+		ca.KeyUsage != x509.KeyUsageCertSign|x509.KeyUsageCRLSign ||
+		!ca.NotAfter.Equal(ca.NotBefore.Add(time.Minute).AddDate(10, 0, 0)) {
+		t.Fatal("console CA constraints or lifetime changed")
+	}
+	if err := ca.CheckSignatureFrom(ca); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := privateKeyPEM(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(encoded)
+	block, rest := pem.Decode(encoded)
+	if block == nil || block.Type != "PRIVATE KEY" || len(rest) != 0 {
+		t.Fatal("console custody must contain exact PKCS8 PEM")
+	}
+	defer clear(block.Bytes)
+	recovered, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recoveredKey, ok := recovered.(*ecdsa.PrivateKey)
+	if !ok || !recoveredKey.Equal(key) {
+		t.Fatal("console custody key does not match its authority")
+	}
+	path := filepath.Join(t.TempDir(), "server")
+	hosts := []string{"console.example", "127.0.0.1", "::1", "console-alt.example"}
+	if err := issueAdminServerCertificate(path, "console server", hosts, ca, key, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	pair, err := tls.LoadX509KeyPair(path+".crt", path+".key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafKey, ok := pair.PrivateKey.(*ecdsa.PrivateKey)
+	if !ok || leafKey.Curve != elliptic.P256() {
+		t.Fatal("server TLS private key must use P-256")
+	}
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafPublic, ok := leaf.PublicKey.(*ecdsa.PublicKey)
+	if !ok || leafPublic.Curve != elliptic.P256() ||
+		leaf.PublicKeyAlgorithm != x509.ECDSA || leaf.SignatureAlgorithm != x509.ECDSAWithSHA256 {
+		t.Fatal("server TLS certificate must use P-256 and SHA-256")
+	}
+	if leaf.IsCA || !leaf.BasicConstraintsValid || leaf.KeyUsage != x509.KeyUsageDigitalSignature ||
+		len(leaf.ExtKeyUsage) != 1 || leaf.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth ||
+		leaf.NotAfter.Sub(leaf.NotBefore) != 397*24*time.Hour+time.Minute ||
+		len(leaf.DNSNames) != 2 || len(leaf.IPAddresses) != 2 {
+		t.Fatal("server TLS usages, SANs or lifetime changed")
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(ca)
+	for _, host := range hosts {
+		if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: host, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: "other.example"}); err == nil {
+		t.Fatal("server TLS accepted a host outside its SANs")
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: hosts[0], CurrentTime: leaf.NotAfter.Add(time.Second)}); err == nil {
+		t.Fatal("expired server TLS certificate accepted")
+	}
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: hosts[0], KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}}); err == nil {
+		t.Fatal("server TLS certificate accepted for device client authentication")
+	}
+}
+
+func TestGeneratedDeviceTransportRemainsEd25519(t *testing.T) {
+	ca, key, err := newCertificateAuthority("device transport authority")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clear(key)
+	if ca.PublicKeyAlgorithm != x509.Ed25519 || ca.SignatureAlgorithm != x509.PureEd25519 {
+		t.Fatal("device transport authority must remain Ed25519")
+	}
+	path := filepath.Join(t.TempDir(), "server")
+	if err := issueServerCertificate(path, "device server", []string{"device.example"}, ca, key, os.Getuid(), os.Getgid()); err != nil {
+		t.Fatal(err)
+	}
+	pair, err := tls.LoadX509KeyPair(path+".crt", path+".key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	leafKey, ok := pair.PrivateKey.(ed25519.PrivateKey)
+	if !ok {
+		t.Fatal("device server private key must remain Ed25519")
+	}
+	defer clear(leafKey)
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if leaf.PublicKeyAlgorithm != x509.Ed25519 || leaf.SignatureAlgorithm != x509.PureEd25519 {
+		t.Fatal("device server certificate must remain Ed25519")
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(ca)
+	if _, err := leaf.Verify(x509.VerifyOptions{Roots: roots, DNSName: "device.example", KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestConsoleBYORejectsEd25519LeafOrIssuer(t *testing.T) {
+	for _, edIssuer := range []bool{false, true} {
+		for _, edLeaf := range []bool{false, true} {
+			var ca *x509.Certificate
+			var key crypto.Signer
+			if edIssuer {
+				certificate, private, err := newCertificateAuthority("BYO Ed25519 issuer")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer clear(private)
+				ca, key = certificate, private
+			} else {
+				certificate, private, err := newTLSCertificateAuthority("BYO ECDSA issuer")
+				if err != nil {
+					t.Fatal(err)
+				}
+				ca, key = certificate, private
+			}
+			issue := issueAdminServerCertificate
+			if edLeaf {
+				issue = issueServerCertificate
+			}
+			path := filepath.Join(t.TempDir(), "server")
+			if err := issue(path, "BYO console", []string{"console.example"}, ca, key, os.Getuid(), os.Getgid()); err != nil {
+				t.Fatal(err)
+			}
+			pair, err := tls.LoadX509KeyPair(path+".crt", path+".key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if private, ok := pair.PrivateKey.(ed25519.PrivateKey); ok {
+				defer clear(private)
+			}
+			leaf, err := x509.ParseCertificate(pair.Certificate[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = validateConsoleTLSLeaf(leaf)
+			if (err != nil) != (edIssuer || edLeaf) {
+				t.Fatalf("BYO browser algorithm admission mismatch: Ed25519 issuer=%t leaf=%t: %v", edIssuer, edLeaf, err)
+			}
+		}
 	}
 }
 
@@ -198,23 +368,22 @@ func TestDatabaseAuthoritySupportsCertificateBoundSCRAM(t *testing.T) {
 		t.Fatal("database custody key does not match its authority")
 	}
 	path := filepath.Join(t.TempDir(), "postgresql")
-	if err := issueServerCertificate(path, "database server", []string{"localhost", "127.0.0.1", "::1"}, ca, key, os.Getuid(), os.Getgid()); err != nil {
+	if err := issueAdminServerCertificate(path, "database server", []string{"localhost", "127.0.0.1", "::1"}, ca, key, os.Getuid(), os.Getgid()); err != nil {
 		t.Fatal(err)
 	}
 	pair, err := tls.LoadX509KeyPair(path+".crt", path+".key")
 	if err != nil {
 		t.Fatal(err)
 	}
-	leafKey, ok := pair.PrivateKey.(ed25519.PrivateKey)
-	if !ok {
-		t.Fatal("database server private key unexpectedly changed")
+	leafKey, ok := pair.PrivateKey.(*ecdsa.PrivateKey)
+	if !ok || leafKey.Curve != elliptic.P256() {
+		t.Fatal("database server private key must use P-256")
 	}
-	defer clear(leafKey)
 	leaf, err := x509.ParseCertificate(pair.Certificate[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if leaf.SignatureAlgorithm != x509.ECDSAWithSHA256 {
+	if leaf.PublicKeyAlgorithm != x509.ECDSA || leaf.SignatureAlgorithm != x509.ECDSAWithSHA256 {
 		t.Fatal("database server certificate lacks a SCRAM-PLUS-compatible hash")
 	}
 	roots := x509.NewCertPool()

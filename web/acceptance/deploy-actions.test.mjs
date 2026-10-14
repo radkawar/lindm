@@ -28,21 +28,48 @@ test("a Send action click without an acknowledgement cannot admit navigation", a
   });
 });
 
-test("submission admits navigation only after visible asynchronous acknowledgement", async () => {
+test("submission waits for the visible Sonner title without matching its text-bearing ancestors", async () => {
   await browser(async (driver) => {
     await driver.page.setContent(`
       <div role="dialog">
         <button>Review action</button>
         <button onclick="setTimeout(() => {
           document.body.dataset.submission='accepted';
-          const acknowledgement = document.createElement('p');
-          acknowledgement.textContent='Action sent to device';
+          const acknowledgement = document.createElement('ol');
+          acknowledgement.innerHTML='<li data-sonner-toast data-type=success data-visible=true><div data-content><div data-title>Action sent to device</div></div></li>';
           document.body.append(acknowledgement);
         }, 100)">Send action</button>
       </div>
     `);
     await submitReviewedDeviceAction(new UI(driver, 2_000));
     assert.equal(await driver.observe(() => document.body.dataset.submission), "accepted");
+    await assert.rejects(driver.find({ text: "Action sent to device" }), /ambiguous_ui_locator/);
+  });
+});
+
+test("multiple visible success acknowledgements remain ambiguous", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <div role="dialog"><button>Review action</button><button>Send action</button></div>
+      <ol>
+        <li data-sonner-toast data-type="success" data-visible="true"><div data-content><div data-title>Action sent to device</div></div></li>
+        <li data-sonner-toast data-type="success" data-visible="true"><div data-content><div data-title>Action sent to device</div></div></li>
+      </ol>
+    `);
+    await assert.rejects(submitReviewedDeviceAction(new UI(driver, 300)), /ambiguous_ui_locator/);
+  });
+});
+
+test("unrelated or removed acknowledgements cannot admit navigation", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <div role="dialog"><button>Review action</button><button>Send action</button></div>
+      <p role="status">Action sent to device</p>
+      <ol>
+        <li data-sonner-toast data-type="success" data-visible="true" data-removed="true"><div data-title>Action sent to device</div></li>
+      </ol>
+    `);
+    await assert.rejects(submitReviewedDeviceAction(new UI(driver, 300)), /ui_condition_timeout/);
   });
 });
 

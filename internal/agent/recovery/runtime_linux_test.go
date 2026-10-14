@@ -192,7 +192,9 @@ func newRecoveryRunnerFixtureAt(t *testing.T, at time.Time) (*runner, *recoveryT
 	}
 	// Already-trusted constructor material: bootstrap authentication itself is
 	// covered by trust's tests, rather than mocked as a network observation.
-	bootstrap := &trust.Bootstrap{Root: root, Bundle: &agentv1.BootstrapBundle{DeploymentId: root.GetDeploymentId(), TransportCaPem: ca, DeviceCaPem: ca, ReleaseRootJson: release}}
+	// This execution-verifier-only fixture intentionally shares its test CA for
+	// console and transport; network origin isolation is exercised by transport.
+	bootstrap := &trust.Bootstrap{Root: root, Bundle: &agentv1.BootstrapBundle{DeploymentId: root.GetDeploymentId(), TransportCaPem: ca, ConsoleCaPem: ca, DeviceCaPem: ca, ReleaseRootJson: release}}
 	verifier, err := authority.NewExecutionVerifier(bootstrap)
 	if err != nil {
 		t.Fatal(err)

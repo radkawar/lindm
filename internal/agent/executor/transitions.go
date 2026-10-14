@@ -142,7 +142,8 @@ func bootstrapResponse(b *bound, resumed bool) *agentv1.PrepareBootstrapResponse
 		CsrPem: bytes.Clone(b.state.GetEnrollmentCsrPem()), PendingGrant: b.state.GetPendingGrant(),
 		DeploymentId: b.bootstrap.Root.GetDeploymentId(), EnrollmentOrigin: b.bootstrap.Bundle.GetEnrollmentOrigin(),
 		DeviceOrigin: b.bootstrap.Bundle.GetDeviceOrigin(), TransportCaPem: bytes.Clone(b.bootstrap.Bundle.GetTransportCaPem()),
-		Resumed: resumed,
+		ConsoleCaPem: bytes.Clone(b.bootstrap.Bundle.GetConsoleCaPem()),
+		Resumed:      resumed,
 	}
 }
 
