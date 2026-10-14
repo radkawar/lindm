@@ -145,6 +145,11 @@ checks can skip on an unprivileged runner. A skipped check is not a pass. Hosted
 is not evidence for native package installation, boot, reboot, TPM, encryption,
 physical devices or the full platform matrix.
 
+Every push to `main` gets an independent hosted CI run, including when an earlier
+run is still active. A later main push cannot replace a pending verification.
+Pull-request runs remain grouped by their pull-request ref so a new commit cancels
+obsolete checks for that same pull request.
+
 Hosted checks run on pushes to main and pull requests that target main.
 Use `workflow_dispatch` for a manual run.
 No hosted release publishing job or signing secret is required.

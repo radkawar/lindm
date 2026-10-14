@@ -16,6 +16,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Run every pushed-main CI workflow independently so a later push cannot replace a pending verification; continue canceling obsolete pull-request runs.
 - Upgrade Go and npm dependencies and pinned GitHub Actions, regenerate Connect code and bundled dependency notices, and migrate the TURN relay to v5 without enabling TCP relay allocations.
 - Exempt only Dependabot's canonical commit author from DCO trailers; human coauthors and all other required checks remain enforced.
 - Retain Go 1.26.9 and Node 24.21.0 at their latest patch releases. Hold TypeScript at 6.0.3 for the ESLint parser's supported peer range and Sigstore at its Go-1.26-compatible v1.10.11 maintenance release.
