@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -149,5 +150,61 @@ func TestInstallerSnapshotsAreOptionalButRequestedInputsFailClosed(t *testing.T)
 		if err := exportInstallerSnapshots(t.Context(), t.TempDir(), "production", &inputs, &sums); err == nil {
 			t.Fatal("requested offline add-on accepted missing cache or authenticated snapshot")
 		}
+	}
+}
+
+func TestInstallerSnapshotPreservesPublicModesUnderPrivateUmask(t *testing.T) {
+	script, err := os.ReadFile("../../deploy/server/install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var copyCommand string
+	for _, line := range strings.Split(string(script), "\n") {
+		if strings.HasPrefix(line, "cp -R ") {
+			if copyCommand != "" {
+				t.Fatal("installer snapshot has multiple recursive copies")
+			}
+			copyCommand = line
+		}
+	}
+	if copyCommand == "" || !strings.Contains(copyCommand, "--no-dereference") || !strings.Contains(copyCommand, "--no-preserve=ownership") {
+		t.Fatal("installer snapshot lost its no-follow or ownership boundary")
+	}
+	directory := t.TempDir()
+	source, work := filepath.Join(directory, "source"), filepath.Join(directory, "work")
+	repository := filepath.Join(source, "agent-repository")
+	for _, name := range []string{repository, filepath.Join(work, "bundle")} {
+		if err := os.MkdirAll(name, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chmod(repository, 0755); err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]os.FileMode{"agent-repository/release.json": 0644, "lindm-install": 0755}
+	for name, mode := range files {
+		path := filepath.Join(source, name)
+		if err := os.WriteFile(path, []byte("public fixture\n"), mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command := exec.CommandContext(t.Context(), "sh", "-eu", "-c", "umask 077; "+copyCommand+"\nchmod -R go-w -- \"$work/bundle\"")
+	command.Env = append(os.Environ(), "bundle="+source, "work="+work)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("native installer snapshot: %v: %s", err, output)
+	}
+	files["agent-repository"] = 0755
+	for name, mode := range files {
+		info, err := os.Stat(filepath.Join(work, "bundle", name))
+		if err != nil || info.Mode().Perm() != mode {
+			t.Fatalf("private snapshot changed authenticated public mode: %s: %v", name, err)
+		}
+	}
+	info, err := os.Stat(work)
+	if err != nil || info.Mode().Perm() != 0700 {
+		t.Fatalf("snapshot lost private ancestry: %v", err)
 	}
 }

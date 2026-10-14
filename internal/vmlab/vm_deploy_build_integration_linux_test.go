@@ -7,9 +7,13 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+
+	"lindm/internal/releasebuild"
 )
 
 // This verifies already-built real signed exports after private transport. It
@@ -76,5 +80,43 @@ func TestColdProductionExportsVerifyAfterPrivateTransport(t *testing.T) {
 	options.Revision = strings.Repeat("0", 40)
 	if err := verifyColdReleaseExports(t.Context(), &result, options); err == nil {
 		t.Fatal("signed export accepted a different source revision")
+	}
+	script, err := os.ReadFile("../../deploy/server/install.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var copyCommand string
+	for _, line := range strings.Split(string(script), "\n") {
+		if strings.HasPrefix(line, "cp -R ") {
+			copyCommand = line
+		}
+	}
+	if copyCommand == "" {
+		t.Fatal("missing actual installer snapshot command")
+	}
+	for _, preserve := range []bool{false, true} {
+		t.Run("snapshot_preserves_mode_"+strconv.FormatBool(preserve), func(t *testing.T) {
+			work := t.TempDir()
+			snapshot := filepath.Join(work, "bundle")
+			if err := os.Mkdir(snapshot, 0700); err != nil {
+				t.Fatal(err)
+			}
+			statement := copyCommand
+			if !preserve {
+				statement = strings.Replace(statement, "--preserve=mode ", "", 1)
+			}
+			command := exec.CommandContext(t.Context(), "sh", "-eu", "-c", "umask 077; "+statement+"\nchmod -R go-w -- \"$work/bundle\"")
+			command.Env = append(os.Environ(), "bundle="+filepath.Join(directory, "first"), "work="+work)
+			if output, err := command.CombinedOutput(); err != nil {
+				t.Fatalf("copy actual signed export: %v: %s", err, output)
+			}
+			_, err := releasebuild.Verify(t.Context(), snapshot, filepath.Join(directory, "keys/attestation.pub"), original.ReleaseKeyID)
+			if preserve && err != nil {
+				t.Fatalf("preserved public snapshot failed unchanged verification: %v", err)
+			}
+			if !preserve && (err == nil || !strings.Contains(err.Error(), "canonical agent repository provenance mismatch")) {
+				t.Fatalf("private umask control did not reproduce native provenance failure: %v", err)
+			}
+		})
 	}
 }

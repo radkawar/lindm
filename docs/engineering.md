@@ -4024,6 +4024,17 @@ This maintained regression verifies both signed releases and source pins, reject
 a different source revision, and checks unchanged custody modes and signed bytes.
 It does not alter the original SDK record or qualify installation or lifecycle.
 
+The second native Ubuntu attempt reached the Go verifier and failed with
+`canonical agent repository provenance mismatch`. The wrapper's private umask
+had stripped the signed public repository modes during its immutable copy.
+The wrapper now preserves public modes, never source ownership, within its
+existing root-owned 0700 ancestry. The unchanged verifier still checks the exact
+signed repository provenance. The real-export regression copies an authenticated
+bundle using the actual wrapper statement: preserving modes verifies; the old
+private-umask copy must reproduce the provenance failure. These copy checks do not
+qualify a full installation. The failed 805 bundles must be rebuilt and signed
+again with the corrected wrapper before native qualification.
+
 The shared maintained installer caller retains independent release-key/key-ID
 verification and compares the supplied public TUF root with the authenticated
 bundled `release-root.json`. It does not pass the unsupported installer flag

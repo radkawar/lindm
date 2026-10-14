@@ -69,7 +69,7 @@ actual=${actual%% *}
 [ "$actual" = "$pin" ] || { printf '%s\n' 'Independent release key pin mismatch.' >&2; exit 1; }
 # Copy first; all later checks and transactions use only this immutable snapshot.
 mkdir "$work/bundle"
-cp -R --no-dereference --no-preserve=ownership -- "$bundle/." "$work/bundle/"
+cp -R --no-dereference --preserve=mode --no-preserve=ownership -- "$bundle/." "$work/bundle/"
 chmod -R go-w -- "$work/bundle"
 bad_entry=$(find "$work/bundle" ! -type d ! -type f -print -quit)
 [ -z "$bad_entry" ] || { printf '%s\n' 'Bundle links and special files are forbidden.' >&2; exit 1; }
