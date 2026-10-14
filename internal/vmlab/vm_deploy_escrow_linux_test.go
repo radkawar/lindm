@@ -143,13 +143,8 @@ func TestDeployDatabaseCredentialGateRequiresRootOwnerAndNativeHandoff(t *testin
 		`test "$(stat -c %u:%g:%a:%h "$path")" = 0:0:600:1`,
 		"for account in lindmd lindmd-migrate",
 		`if runuser -u "$account" -- test -r "$path"; then exit 1; fi`,
-		"database-url:/etc/lindm/database-url",
-		"database-url:/etc/lindm/migrate/database-url",
 		"/etc/lindm/integrations.key",
 		`test "$(stat -c %s /etc/lindm/integrations.key)" = 32`,
-		"integrations-key:/etc/lindm/integrations.key",
-		`test "$database_credential" = true`,
-		`test "$integration_credential" = true`,
 		"systemctl is-active --quiet lindmd.service",
 	} {
 		if !strings.Contains(deployDatabaseCredentialsCommand, guard) {
@@ -159,7 +154,7 @@ func TestDeployDatabaseCredentialGateRequiresRootOwnerAndNativeHandoff(t *testin
 }
 
 func TestDeployCredentialFailureNeverRelaysNativeOutput(t *testing.T) {
-	for _, label := range []string{"secret_symlink", "secret_regular_file", "secret_owner_mode_links", "service_can_read_at_rest", "integration_key_length", "runtime_credential_handoff", "migration_credential_handoff", "runtime_service_inactive"} {
+	for _, label := range []string{"secret_symlink", "secret_regular_file", "secret_owner_mode_links", "service_can_read_at_rest", "integration_key_length", "runtime_service_inactive"} {
 		if !strings.Contains(deployDatabaseCredentialsCommand, "gate="+label) {
 			t.Fatalf("credential probe does not set fixed label %q", label)
 		}
@@ -171,5 +166,37 @@ func TestDeployCredentialFailureNeverRelaysNativeOutput(t *testing.T) {
 		if got := deployCredentialFailure([]byte(unsafe)); got != "unclassified" {
 			t.Fatal("native credential output was relayed instead of a fixed class")
 		}
+	}
+}
+
+func TestDeployCredentialSourcesRequireExactNativeTuples(t *testing.T) {
+	expected := [][2]string{{"database-url", "/etc/lindm/database-url"}, {"integrations-key", "/etc/lindm/integrations.key"}}
+	for _, test := range []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"canonical", `{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url"],["integrations-key","/etc/lindm/integrations.key"]]}`, true},
+		{"reverse order", `{"type":"a(ss)","data":[["integrations-key","/etc/lindm/integrations.key"],["database-url","/etc/lindm/database-url"]]}`, true},
+		{"printer unsupported", "LoadCredential=[unprintable]\n", false},
+		{"wrong property type", `{"type":"as","data":[["database-url","/etc/lindm/database-url"],["integrations-key","/etc/lindm/integrations.key"]]}`, false},
+		{"wrong source", `{"type":"a(ss)","data":[["database-url","/etc/lindm/migrate/database-url"],["integrations-key","/etc/lindm/integrations.key"]]}`, false},
+		{"duplicate", `{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url"],["database-url","/etc/lindm/database-url"]]}`, false},
+		{"missing", `{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url"]]}`, false},
+		{"extra", `{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url"],["integrations-key","/etc/lindm/integrations.key"],["extra","/private/other"]]}`, false},
+		{"extra tuple field", `{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url","ignored"],["integrations-key","/etc/lindm/integrations.key"]]}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := deployCredentialSourcesMatch([]byte(test.body), expected); got != test.want {
+				t.Fatalf("credential tuple verification = %v, want %v", got, test.want)
+			}
+		})
+	}
+	migrator := [][2]string{{"database-url", "/etc/lindm/migrate/database-url"}}
+	if !deployCredentialSourcesMatch([]byte(`{"type":"a(ss)","data":[["database-url","/etc/lindm/migrate/database-url"]]}`), migrator) {
+		t.Fatal("single migration handoff rejected")
+	}
+	if deployCredentialSourcesMatch([]byte(`{"type":"a(ss)","data":[["database-url","/etc/lindm/database-url"]]}`), migrator) {
+		t.Fatal("runtime source admitted for migration handoff")
 	}
 }

@@ -6,6 +6,7 @@ package vmlab
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"path/filepath"
@@ -36,20 +37,6 @@ done
 done
 gate=integration_key_length
 test "$(stat -c %s /etc/lindm/integrations.key)" = 32
-database_credential=false
-integration_credential=false
-gate=runtime_credential_handoff
-for credential in $(systemctl show --value -p LoadCredential lindmd.service); do
-case "$credential" in
-database-url:/etc/lindm/database-url) database_credential=true ;;
-integrations-key:/etc/lindm/integrations.key) integration_credential=true ;;
-*) exit 1 ;;
-esac
-done
-test "$database_credential" = true
-test "$integration_credential" = true
-gate=migration_credential_handoff
-test "$(systemctl show --value -p LoadCredential lindmd-migrate.service)" = database-url:/etc/lindm/migrate/database-url
 gate=runtime_service_inactive
 systemctl is-active --quiet lindmd.service`
 
@@ -60,10 +47,26 @@ func proveDeployDatabaseCredentials(ctx context.Context, guest *guestVM) error {
 	if err != nil {
 		return errors.New("deploy native credential proof transport failed")
 	}
-	if output.ExitCode == 0 {
-		return nil
+	if output.ExitCode != 0 {
+		return errors.New("deploy native credential proof failed: " + deployCredentialFailure(output.Stdout))
 	}
-	return errors.New("deploy native credential proof failed: " + deployCredentialFailure(output.Stdout))
+	for _, handoff := range []struct {
+		unit     string
+		expected [][2]string
+	}{
+		{"lindmd_2eservice", [][2]string{{"database-url", "/etc/lindm/database-url"}, {"integrations-key", "/etc/lindm/integrations.key"}}},
+		{"lindmd_2dmigrate_2eservice", [][2]string{{"database-url", "/etc/lindm/migrate/database-url"}}},
+	} {
+		command := "busctl --system --json=short --timeout=5s --auto-start=no get-property org.freedesktop.systemd1 /org/freedesktop/systemd1/unit/" + handoff.unit + " org.freedesktop.systemd1.Service LoadCredential"
+		property, propertyErr := guest.runResult(ctx, command, nil, 4096, time.Minute)
+		valid := propertyErr == nil && property.ExitCode == 0 && deployCredentialSourcesMatch(property.Stdout, handoff.expected)
+		clear(property.Stdout)
+		clear(property.Stderr)
+		if !valid {
+			return errors.New("deploy native credential source property did not match expected handoff")
+		}
+	}
+	return nil
 }
 
 func deployCredentialFailure(output []byte) string {
@@ -78,15 +81,40 @@ func deployCredentialFailure(output []byte) string {
 		return "service_can_read_at_rest"
 	case "integration_key_length\n":
 		return "integration_key_length"
-	case "runtime_credential_handoff\n":
-		return "runtime_credential_handoff"
-	case "migration_credential_handoff\n":
-		return "migration_credential_handoff"
 	case "runtime_service_inactive\n":
 		return "runtime_service_inactive"
 	default:
 		return "unclassified"
 	}
+}
+
+func deployCredentialSourcesMatch(body []byte, expected [][2]string) bool {
+	var property struct {
+		Type string     `json:"type"`
+		Data [][]string `json:"data"`
+	}
+	if json.Unmarshal(body, &property) != nil || property.Type != "a(ss)" || len(property.Data) != len(expected) {
+		return false
+	}
+	var seen uint8
+	for _, credential := range property.Data {
+		if len(credential) != 2 {
+			return false
+		}
+		matched := false
+		for i, source := range expected {
+			bit := uint8(1 << i)
+			if credential[0] == source[0] && credential[1] == source[1] && seen&bit == 0 {
+				seen |= bit
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+	return true
 }
 
 // This is a real PostgreSQL runtime connection with unchanged verify-full and

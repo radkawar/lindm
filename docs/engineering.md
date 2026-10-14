@@ -4159,6 +4159,19 @@ not native output or secret values. All original custody assertions remain.
 This is installer-success evidence inside a failed full lane, not a lifecycle
 qualification or a completed browser/restore drill.
 
+Fresh setup-only `diagnostic-ubuntu-attempt4.json` repeated the actual installer
+success and classified the independent probe failure as
+`runtime_credential_handoff`. All preceding persistent-file ownership, mode,
+link-count, service-unreadability and integration-key-length checks passed.
+A separate owned transient-unit observation found that this host's
+`systemctl show` prints `LoadCredential=[unprintable]`, even with `--value`.
+The real D-Bus property is available through `busctl --json=short` as `a(ss)`.
+The maintained proof now checks those authoritative tuples, requiring the exact
+two runtime sources and the one distinct migrator source. Missing, duplicated,
+additional, misrouted or malformed tuples fail closed; the old text-printer
+assumption is removed. This correction changes only the lab, not signed SDKs or
+the installer's custody policy.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
