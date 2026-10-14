@@ -211,47 +211,8 @@ func (v *guestVM) prepareHardware(ctx context.Context) error {
 	if !v.hardware.TPM {
 		return nil
 	}
-	if err := os.Mkdir(filepath.Join(v.dir, "tpm"), 0700); err != nil {
-		return err
-	}
-	return v.startTPM(ctx)
-}
-
-// startTPM starts swtpm on the guest's persistent TPM state directory. QEMU
-// shuts the emulated TPM down when it powers off, which ends swtpm, so a cold
-// boot of the same guest needs a new instance on the same state.
-func (v *guestVM) startTPM(ctx context.Context) error {
-	if err := os.Remove(filepath.Join(v.dir, "tpm.sock")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	var err error
-	v.tpm, err = startEncryptedProcess(ctx, v.dir, "swtpm", "socket", "--tpm2", "--tpmstate", "dir=tpm", "--ctrl", "type=unixio,path=tpm.sock,mode=0600", "--flags", "not-need-init")
-	if err != nil {
-		return err
-	}
-	ready, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	ticker := time.NewTicker(20 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		info, err := os.Lstat(filepath.Join(v.dir, "tpm.sock"))
-		if err == nil {
-			if info.Mode()&os.ModeSocket == 0 {
-				return errors.New("swtpm control path is not a Unix socket")
-			}
-			return nil
-		}
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("inspect swtpm control socket: %w", err)
-		}
-		select {
-		case <-ready.Done():
-			return fmt.Errorf("swtpm readiness: %w", ready.Err())
-		case <-v.tpm.done:
-			return fmt.Errorf("swtpm exited before readiness: %s", v.tpm.log.diagnostic(v.dir))
-		case <-ticker.C:
-		}
-	}
+	// startProcess starts swtpm on this persistent TPM state for each QEMU.
+	return os.Mkdir(filepath.Join(v.dir, "tpm"), 0700)
 }
 
 // configuredVMArguments uses JSON block nodes so filenames cannot become QEMU
@@ -337,11 +298,7 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 		args = append(args, "-netdev", string(netdev), "-device", "virtio-net-pci,netdev=net1,id=nic1,mac="+h.dataLink.MAC)
 	}
 	if h.TPM {
-		device := "tpm-tis"
-		if h.Architecture == "aarch64" {
-			device = "tpm-tis-device"
-		}
-		args = append(args, "-chardev", "socket,id=tpm,path=tpm.sock", "-tpmdev", "emulator,id=tpm0,chardev=tpm", "-device", device+",tpmdev=tpm0")
+		args = append(args, swtpmArguments(h.Architecture, guestTPMControlFD)...)
 	}
 	if h.Desktop {
 		args = append(args, vmDisplayArguments(h)...)

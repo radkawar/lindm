@@ -2113,11 +2113,19 @@ cannot be retroactively leased.
 A host-local flock slot is held for the entire lane through VM/fixture teardown.
 Remote workers take the same locks over SSH on the target, not on the controller.
 Kernel locks release after process death, QEMU helpers have parent-death killing,
-and SSH stdin closure cancels the worker before its cleanup/lease release. Full
+swtpm ends with its QEMU, and SSH stdin closure cancels the worker before its cleanup/lease release. Full
 hosts queue for at most 12 hours, printing each changed wait reason; the lane's
 3-hour deadline starts only at admission, so queue time never shortens a lane
 (remote workers apply the same split on the target). Agents do not coordinate
 by `pgrep`.
+
+swtpm cannot use parent-death killing: its AppArmor profile makes its exec a
+secure exec, which clears the signal, so swtpm used to outlive SIGKILLed lab
+runs. Each QEMU therefore starts first on one end of a TPM control socketpair
+(`-chardev socket,fd=N`). Its swtpm starts on the other end
+(`--ctrl type=unixio,clientfd=3 --terminate`) only after QEMU has queued its
+data channel, so swtpm exits when that channel closes: QEMU powered off, crashed
+or died with the lab process (`internal/vmlab/swtpm_linux.go`).
 
 Admission also samples native `MemAvailable` and `pswpout`: available memory must
 cover the configured per-guest RAM ceiling plus 8 GiB of headroom, with no

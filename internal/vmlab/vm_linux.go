@@ -341,18 +341,30 @@ func newSeededGuestVM(ctx context.Context, base *os.File, workDir string, allowR
 	return vm, nil
 }
 
+// guestTPMControlFD is QEMU's TPM control descriptor, after the base image.
+const guestTPMControlFD = 4
+
 // startProcess also serves a powered-off owner-trust transition. The same
-// verified base descriptor, overlay, TPM, SSH keys and storage identities survive.
-func (vm *guestVM) startProcess(ctx context.Context, args []string) error {
-	// Not labexec: QEMU's Pdeathsig must be bound to a thread locked for the VM's lifetime.
+// verified base descriptor, overlay, TPM, SSH keys and storage identities
+// survive; each QEMU gets its own swtpm on the TPM state.
+func (vm *guestVM) startProcess(ctx context.Context, args []string) (err error) {
 	vm.cmd = exec.CommandContext(ctx, "qemu-system-"+vm.hardware.Architecture, args...)
 	vm.cmd.Dir = vm.dir
 	vm.cmd.ExtraFiles = []*os.File{vm.base}
+	var control *swtpmControl
+	if vm.hardware.TPM {
+		if control, err = newSwtpmControl(); err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, control.close()) }()
+		vm.cmd.ExtraFiles = append(vm.cmd.ExtraFiles, control.qemu)
+	}
 	vm.cmd.Stdout, vm.cmd.Stderr = vm.log, vm.log
 	if vm.hardware.bootDiagnostics != nil {
 		vm.cmd.Stdout = vm.hardware.bootDiagnostics
 	}
 	vm.cmd.WaitDelay = 2 * time.Second
+	// Not labexec: QEMU's Pdeathsig must be bound to a thread locked for the VM's lifetime.
 	vm.cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 	vm.waitErr = nil
 	started := make(chan error, 1)
@@ -372,6 +384,15 @@ func (vm *guestVM) startProcess(ctx context.Context, args []string) error {
 		return fmt.Errorf("start QEMU: %w", err)
 	}
 	vm.done = done
+	if control != nil {
+		if vm.tpm, err = control.start(ctx, ctx, vm.dir, done); err != nil {
+			if killErr := vm.cmd.Process.Kill(); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
+				err = errors.Join(err, killErr)
+			}
+			<-done
+			return err
+		}
+	}
 	return nil
 }
 

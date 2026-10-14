@@ -260,40 +260,17 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 	if err = checkVMAcceleration(hardware); err != nil {
 		return err
 	}
-	for _, name := range []string{"serial.sock", "tpm.sock", "qmp.sock"} {
+	for _, name := range []string{"serial.sock", "qmp.sock"} {
 		if err = os.Remove(filepath.Join(v.dir, name)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
+	var control *swtpmControl
 	if hardware.TPM {
-		processContext := ctx
-		if v.persistentLock != nil {
-			processContext = context.WithoutCancel(ctx)
-		}
-		v.tpm, err = startEncryptedProcess(processContext, v.dir, "swtpm", "socket", "--tpm2", "--tpmstate", "dir=tpm", "--ctrl", "type=unixio,path=tpm.sock,mode=0600", "--flags", "not-need-init")
-		if err != nil {
+		if control, err = newSwtpmControl(); err != nil {
 			return err
 		}
-		defer func() {
-			if err != nil {
-				err = errors.Join(err, v.tpm.stop())
-				v.tpm = nil
-			}
-		}()
-		ready, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		for {
-			if _, statErr := os.Stat(filepath.Join(v.dir, "tpm.sock")); statErr == nil {
-				break
-			}
-			select {
-			case <-ready.Done():
-				return fmt.Errorf("swtpm socket: %w", ready.Err())
-			case <-v.tpm.done:
-				return fmt.Errorf("swtpm exited: %s", v.tpm.log.diagnostic(v.dir))
-			case <-time.After(20 * time.Millisecond):
-			}
-		}
+		defer func() { err = errors.Join(err, control.close()) }()
 	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
@@ -352,12 +329,13 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		args = append(args, "-drive", "if=none,id="+id+",format=qcow2,file="+id+".qcow2")
 	}
 	args = append(args, vmStorageArguments(hardware, nodes, 1)...)
-	if hardware.TPM {
-		device := "tpm-tis"
-		if hardware.Architecture == "aarch64" {
-			device = "tpm-tis-device"
+	if control != nil {
+		// QEMU's descriptors are the repository media, if any, then this.
+		fd := 3
+		if v.repositoryMedia != nil {
+			fd++
 		}
-		args = append(args, "-chardev", "socket,id=tpm,path=tpm.sock", "-tpmdev", "emulator,id=tpm0,chardev=tpm", "-device", device+",tpmdev=tpm0")
+		args = append(args, swtpmArguments(hardware.Architecture, fd)...)
 	}
 	if hardware.Desktop {
 		args = append(args, vmDisplayArguments(hardware)...)
@@ -389,9 +367,18 @@ func (v *EncryptedVM) start(ctx context.Context, installer string) (err error) {
 		// Cancellation starts graceful Stop; it must not SIGKILL QEMU first.
 		processContext = context.WithoutCancel(ctx)
 	}
-	p, err := startEncryptedProcessFiles(processContext, v.dir, mediaFiles, emulator, args...)
+	files := mediaFiles
+	if control != nil {
+		files = append(files, control.qemu)
+	}
+	p, err := startEncryptedProcessFiles(processContext, v.dir, files, emulator, args...)
 	if err != nil {
 		return err
+	}
+	if control != nil {
+		if v.tpm, err = control.start(ctx, processContext, v.dir, p.done); err != nil {
+			return errors.Join(err, p.stop())
+		}
 	}
 	v.guest = &guestVM{dir: v.dir, cmd: p.cmd, done: p.done, log: p.log, address: address, config: v.config, hardware: hardware, firmware: v.firmware, tpm: v.tpm, diagnosticsDir: v.diagnosticsDir}
 	return nil

@@ -70,15 +70,14 @@ func (vm *guestVM) coldBootOwnerFirmware(ctx context.Context, firmware Encrypted
 	}
 	poweredOff = time.Now().UTC()
 	if vm.tpm != nil {
-		// The powered-off QEMU ended its swtpm; boot on the same TPM state.
+		// The powered-off QEMU ended its swtpm; startProcess starts another on
+		// the same TPM state.
 		select {
 		case <-vm.tpm.done:
 		case <-time.After(30 * time.Second):
 			return poweredOff, errors.Join(errors.New("swtpm did not exit after guest poweroff"), vm.tpm.stop())
 		}
-		if err := vm.startTPM(ctx); err != nil {
-			return poweredOff, fmt.Errorf("restart swtpm for owner-enrolled cold boot: %w", err)
-		}
+		vm.tpm = nil
 	}
 	if vm.client != nil {
 		_ = vm.client.Close()
