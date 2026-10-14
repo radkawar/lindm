@@ -25,13 +25,19 @@ import (
 
 func TestAuditExportIndependentVerificationAndCheckpoints(t *testing.T) {
 	s, ctx, pool, actor := reportFixture(t)
+	head, err := reportdb.New(pool).GetAuditHead(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Owner setup is audited too. Keep the genesis rows and two seeded events.
+	limit := uint32(head.Sequence) + 2
 	target := uuid.New()
 	for i := 0; i < 5; i++ {
 		if _, err := pool.Exec(ctx, `INSERT INTO audit_events(actor_id,action,resource_id,reason,target_device_id,details) VALUES($1,'report.test',$2,'independent chain evidence',$3,'{"mode":"view","duration_seconds":"900"}')`, actor, uuid.NewString(), target); err != nil {
 			t.Fatal(err)
 		}
 	}
-	request := &integrationsv1.CreateAuditExportRequest{RequestId: uuid.NewString(), AfterHash: make([]byte, 32), MaxEvents: 2, RetentionDays: 7, Reason: "archive audit evidence"}
+	request := &integrationsv1.CreateAuditExportRequest{RequestId: uuid.NewString(), AfterHash: make([]byte, 32), MaxEvents: limit, RetentionDays: 7, Reason: "archive audit evidence"}
 	created, err := s.CreateAuditExport(ctx, connect.NewRequest(request))
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +130,7 @@ func TestAuditExportIndependentVerificationAndCheckpoints(t *testing.T) {
 	if !structured {
 		t.Fatal("export omitted structured audit event")
 	}
-	if sequence != 2 || sequence != manifest.FinalSequence || !bytes.Equal(previous, manifest.FinalHash) {
+	if sequence != uint64(limit) || sequence != manifest.FinalSequence || !bytes.Equal(previous, manifest.FinalHash) {
 		t.Fatal("independent final checkpoint mismatch")
 	}
 	if _, err := VerifyReportArtifact(bytes.NewReader(content), envelope, s.fingerprint[:], nil); err != nil {

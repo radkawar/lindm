@@ -66,6 +66,12 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot, packages, jsonO
 	}); err != nil {
 		return err
 	}
+	// Native-server regressions need checkout-owned execution/release roots too.
+	// Trust validates existing custody and bindings, or creates development-only
+	// material for a fresh clone. It takes the fixture lock itself.
+	if err := Trust(ctx, root); err != nil {
+		return fmt.Errorf("prepare development integration trust: %w", err)
+	}
 	work, err := os.MkdirTemp("", "lindm-integration-")
 	if err != nil {
 		return err

@@ -19,6 +19,10 @@ func TestConfigRejectsReplaceableParentAndHardlink(t *testing.T) {
 	if err := os.Mkdir(parent, 0777); err != nil {
 		t.Fatal(err)
 	}
+	// Mkdir applies the caller's umask; this fixture must remain replaceable.
+	if err := os.Chmod(parent, 0777); err != nil {
+		t.Fatal(err)
+	}
 	file := filepath.Join(parent, "agent.json")
 	if err := os.WriteFile(file, []byte("{}"), 0644); err != nil {
 		t.Fatal(err)

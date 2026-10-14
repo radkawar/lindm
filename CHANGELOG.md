@@ -10,6 +10,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Contribution, private security disclosure and community conduct guides, with issue and pull request templates.
 - GitHub Actions checks for lint, generated output, unit tests, container integration and the Chromium console journey.
 - Public platform status and operator documentation for self-built, operator-signed releases.
+- Require DCO trailers for each new commit's author and recorded coauthors in public CI.
 
 ### Changed
 
@@ -18,3 +19,6 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Capture tracked source deletions before git stages them, so a release snapshot matches the working tree.
 - Distinguish maintainer-local, hash-referenced lab evidence, dirty-source records and scoped passes from clean-release qualification.
 - Keep README screenshots proportional and the thumbnail row within GitHub's desktop and mobile columns.
+- Make configuration-permission, Git remote and native GPG test fixtures independent of the caller's umask, Git defaults and temporary-path length.
+- Prepare checkout-owned development trust for container integration without a maintainer cache.
+- Preserve first-owner audit records when testing bounded exports, and release only each acquired test lease in concurrent capacity checks.

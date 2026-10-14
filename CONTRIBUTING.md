@@ -57,9 +57,11 @@ make test-integration
   tests, checks generated documents and audits dependencies.
 - `make test-integration` starts the checkout-owned Docker Compose PostgreSQL and
   Keycloak fixture, applies explicit migrations and runs the real OIDC smoke and
-  integration-tagged tests. It also builds a release-stamped server for native-server
-  regressions. The fixture uses loopback ports 15432 and 18443. Keep these ports free;
-  do not stop someone else's fixture to claim them.
+  integration-tagged tests. It prepares checkout-owned development execution and
+  release roots for native-server regressions and builds a release-stamped server.
+  It validates existing fixture trust rather than replacing it. These keys are not
+  production trust. The fixture uses loopback ports 15432 and 18443. Keep these ports
+  free; do not stop someone else's fixture to claim them.
 - `make build` writes server, agent and lab binaries into `artifacts/bin`.
 - For a focused loop, run commands such as
   `go test -race ./internal/agent/inventory ./internal/trust` or
@@ -81,6 +83,7 @@ For console changes, install the locked browser and run the real Chromium journe
 ```sh
 ./node_modules/.bin/playwright install --with-deps chromium
 make dev-up
+make dev-trust
 make check-web ACCEPTANCE_FLAGS="-engines chromium"
 make dev-down
 ```
@@ -127,7 +130,7 @@ P/L requirements if applicable, and the actual commands you exercised. State fai
 skips and unsupported environments. Link evidence without exposing tokens, credentials,
 private device data or recovery secrets. Never claim a planned check passed.
 
-Hosted CI runs lint and generated-output checks, unit and dependency checks, real
+Hosted CI checks author and coauthor DCO trailers, lint and generated output, unit and dependency checks, real
 PostgreSQL/Keycloak integration, and the Chromium web-only journey. Root/capability
 checks can skip on an unprivileged runner. A skipped check is not a pass. Hosted CI
 is not evidence for native package installation, boot, reboot, TPM, encryption,

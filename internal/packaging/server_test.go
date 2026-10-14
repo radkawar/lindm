@@ -178,10 +178,16 @@ func TestServerSignedNativeReproducibilityAndAPT(t *testing.T) {
 
 func TestAPTPublicationSeparatesNativeArchitectures(t *testing.T) {
 	requireNativeTools(t, "dpkg-deb", "gpg", "gpgconf", "gpg-connect-agent", "gpgv", "apt-ftparchive", "gzip")
-	work := t.TempDir()
-	if err := os.Chmod(work, 0o700); err != nil {
+	// GnuPG agent sockets require a short private parent path.
+	work, err := os.MkdirTemp("", "pkg-apt-")
+	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(work); err != nil {
+			t.Error(err)
+		}
+	})
 	ctx := context.Background()
 	key, guard, err := generateDevelopmentSigner(ctx, work)
 	if err != nil {

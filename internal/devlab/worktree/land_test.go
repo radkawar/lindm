@@ -110,7 +110,7 @@ func TestLandCommitsPushesAndRollsBack(t *testing.T) {
 	repo := fixtureRepository(t)
 	ctx := context.Background()
 	remote := filepath.Join(t.TempDir(), "remote.git")
-	gitT(t, repo.Main, "init", "--quiet", "--bare", remote)
+	gitT(t, repo.Main, "init", "--quiet", "--bare", "--initial-branch="+Trunk, remote)
 	gitT(t, repo.Main, "remote", "add", "lindm", remote)
 	gitT(t, repo.Main, "push", "--quiet", "--set-upstream", "lindm", Trunk)
 	path, err := repo.Add(ctx, "feature", "HEAD", io.Discard)

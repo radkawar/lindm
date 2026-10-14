@@ -26,8 +26,7 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	ready := make(chan struct{}, 12)
-	release := make(chan struct{})
+	ready := make(chan chan struct{}, 12)
 	results := make(chan error, 12)
 	var active atomic.Int32
 	for range 12 {
@@ -42,7 +41,8 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 				results <- errors.Join(errors.New("slot capacity exceeded"), lease.Close())
 				return
 			}
-			ready <- struct{}{}
+			release := make(chan struct{})
+			ready <- release
 			select {
 			case <-release:
 			case <-ctx.Done():
@@ -52,9 +52,10 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 		}()
 	}
 	for range 4 {
-		for range 3 {
+		var held [3]chan struct{}
+		for index := range held {
 			select {
-			case <-ready:
+			case held[index] = <-ready:
 			case <-ctx.Done():
 				t.Fatal(ctx.Err())
 			}
@@ -62,12 +63,8 @@ func TestSlotsConcurrentCapacity(t *testing.T) {
 		if count, err := slots.Count(); err != nil || count != 3 {
 			t.Fatalf("held slots: %d, %v", count, err)
 		}
-		for range 3 {
-			select {
-			case release <- struct{}{}:
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
-			}
+		for _, release := range held {
+			close(release)
 		}
 	}
 	for range 12 {
