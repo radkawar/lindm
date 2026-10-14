@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the ended remote-assistance record states duration and the
 // support reason, with one expandable section. Read-only.
 export const task = {

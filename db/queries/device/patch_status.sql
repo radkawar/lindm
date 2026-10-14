@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: UpsertHostPatchStatus :exec
 -- Projection of the validated NativeDetails.patch_status of the generation's
 -- latest admitted host observation, written in the same transaction.

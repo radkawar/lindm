@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 12: /no-such-page rendered a bare "Not Found" with no
 // shell or link home. An unknown address now renders "Page not found" inside
 // the signed-in console shell (sidebar navigation intact) with a link to the

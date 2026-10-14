@@ -1,18 +1,25 @@
 # Linux MDM product specification
 
-Status: release-scoped implementation contract. Enrollment, inventory, profile catalog
-and signed local service execution have exercised implementations; production
-dispatch and the revised authentication modes are not yet qualified. No release is
-certified. See the [evidence ledger](implementation-plan.md#2-evidence-ledger).
+Status: this document defines the release contract.
+Lindm is a development preview, not a production-ready release.
+Enrollment, inventory, profile catalog and signed local service execution have exercised implementations.
+Use the [evidence ledger](implementation-plan.md#2-evidence-ledger) for qualified Tier 1 x86_64 operations and remaining gates.
+Arm64 release qualification awaits the lab, despite partial native passes.
+Recorded passes do not certify the complete release.
+
 Research baseline: 2026-10-08. Working name: `lindm`.
+
+**Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
+The repository does not include these records or provide public downloads.
 
 ## 1. Product outcome
 
-A self-hosted, single-tenant Linux device-management product with the usability of
-SimpleMDM: enroll a device, assign understandable policies and software, see whether
-those policies actually took effect, and safely manage the device through retirement.
-Desktop experience is the priority. Company-owned servers are also in the commercial
-launch scope and share the management core, not the desktop assumptions.
+Lindm manages Linux devices for one organization on its own server.
+The usability goal follows SimpleMDM: enroll devices, assign clear policies and software, and verify their effects.
+Administrators must manage devices safely through retirement.
+Desktop experience is the priority.
+Company-owned servers share the management core, but not desktop assumptions.
+They remain in the commercial launch scope.
 
 The commercial launch contract is the **entire** requirement set below (P01–P21) on
 every Tier 1 and Tier 2 distribution in [supported OS tiers](#supported-os-tiers),

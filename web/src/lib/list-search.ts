@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { SearchSchemaInput } from "@tanstack/react-router";
 
 export const PAGE_SIZES = [50, 100, 200] as const;

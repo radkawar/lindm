@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Inspect real seeded proposals without approving, rejecting, or accepting risk.
 // Filling review reasons makes the missing-evidence safety boundary observable
 // rather than passing merely because both controls start disabled on empty input.

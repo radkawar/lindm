@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Advisory source copy and per-advisory device column: each incomplete source
 // explains its gap once (in its own card, never again in the banner or a
 // remedy line), remedies use admin terms with a docs link, server-config keys

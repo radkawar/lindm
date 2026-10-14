@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Command dev lands work in the shared main checkout and keeps it usable:
 // land, gate-commit, status, protect and private worktrees. It imports only
 // development tooling packages (see boundary_test.go), never product code, so

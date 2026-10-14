@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package nativehelper launches closed native resource transactions in separate

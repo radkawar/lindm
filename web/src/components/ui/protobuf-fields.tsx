@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Project additions: Apache-2.0; shadcn-derived portions: MIT.
+// Copyright (c) 2023 shadcn; see web/LICENSE.shadcn for the retained MIT notice.
+
 import type { DescMessage } from "@bufbuild/protobuf";
 import { useState } from "react";
 

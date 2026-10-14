@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package devlab provisions real, loopback-only development dependencies.
 // Explicit disposable authority fixtures may start an isolated lindmd; no
 // development authorization bypasses are imported into the server.

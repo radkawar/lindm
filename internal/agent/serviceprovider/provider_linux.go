@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package serviceprovider manages existing canonical system services over a

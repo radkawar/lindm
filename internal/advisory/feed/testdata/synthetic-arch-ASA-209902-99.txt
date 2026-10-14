@@ -1,0 +1,15 @@
+SYNTHETIC advisory: ASA-209902-99
+SPDX-License-Identifier: Apache-2.0
+Copyright 2026 lindm contributors
+
+Date: 2099-02-12
+Group: AVG-99001
+Package: synthetic-arch-radio
+Severity: High
+Issue: CVE-2099-99010
+
+This independently authored example describes a fictional package and issue.
+The affected package build is 4:8.3-7.
+The fixed package build is 4:8.3-8.
+Both builds use upstream version 8.3; the package revision carries the fix.
+This text explains the JSON boundary case; no parser reads it as vendor proof.

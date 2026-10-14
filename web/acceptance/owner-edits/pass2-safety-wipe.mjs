@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (Safety → Wipe): the wipe mode follows the chosen target, so an
 // in-use volume is never paired with offline mode; the review names the
 // hostname, device path and size; and Request approval is the primary action

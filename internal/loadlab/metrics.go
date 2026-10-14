@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package loadlab measures disposable real-process control-plane capacity. It is
 // not an agent: synthetic devices keep signing keys in memory, never execute host
 // operations, and can only connect to an owned devlab authority fixture.

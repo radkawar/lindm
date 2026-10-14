@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real stock console scenarios and a deliberately absent signed artifact.
 // Missing repository configuration alone is not an installation failure.
 import { ChromiumDriver, UI } from "./drivers.mjs";

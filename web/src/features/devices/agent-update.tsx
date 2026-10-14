@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import type { AgentUpdateStatus } from "../../../gen/lindm/agent/v1/update_pb";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

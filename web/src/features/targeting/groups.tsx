@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create } from "@bufbuild/protobuf";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";

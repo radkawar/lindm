@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package passwordprovider manages closed local PAM policy controls through

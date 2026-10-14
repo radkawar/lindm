@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- An empty poll may finish at this snapshot. Any head or open action requires
 -- the normal locked dispatch path, including its fresh actor authorization.
 -- name: HasResourceWork :one

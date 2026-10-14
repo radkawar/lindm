@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createRegistry, type DescMessage, type MessageShape } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { audit_reason } from "../../../gen/lindm/validation/v1/string_rules_pb";

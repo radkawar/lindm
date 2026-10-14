@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Replay ledger for signed offline bundles. A sequence is admitted once per

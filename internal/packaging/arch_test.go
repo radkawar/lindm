@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package packaging
@@ -186,8 +188,8 @@ func assertArchArchive(t *testing.T, artifact Artifact, staged []stagedFile) {
 	if info["pkgver"][0] != "0.1.0-1" || info["arch"][0] != "x86_64" || strings.Join(info["backup"], ",") != "etc/xdg/autostart/lindm-session.desktop,etc/lindm/executor.json,etc/lindm/agent.json" {
 		t.Fatalf("incorrect package identity/config preservation: %+v", info)
 	}
-	if strings.Join(info["license"], ",") != "UNLICENSED" || len(info["url"]) != 0 {
-		t.Fatalf("package invents license or project URL: %+v", info)
+	if strings.Join(info["license"], ",") != "Apache-2.0" || len(info["url"]) != 0 {
+		t.Fatalf("incorrect project license or invented project URL: %+v", info)
 	}
 	for _, dependency := range platform.BackendPacman.ResourceDependencies() {
 		if !slices.Contains(info["depend"], dependency) {

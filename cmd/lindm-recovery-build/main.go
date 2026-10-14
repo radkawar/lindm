@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // lindm-recovery-build builds a signed recovery UKI, or a measured-BLS recovery
 // initramfs for the vendor kernel, from explicitly approved release
 // ingredients. It never stages boot files or touches firmware/TPM state.

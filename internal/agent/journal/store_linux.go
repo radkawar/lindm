@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package journal owns the executor's protected authority, execution trust,
 // kind/key execution floors and typed native ownership ledger. Admission
 // reserves complete action and ownership lifecycles; revisions survive release.

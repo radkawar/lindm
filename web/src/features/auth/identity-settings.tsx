@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Timestamp } from "@/components/ui/timestamp";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import { RpcError } from "@/components/ui/rpc-error";

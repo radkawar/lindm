@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 findings 20-24 (two-person approvals): the risk form takes a
 // duration from now, so no past expiry can be proposed (the server also
 // refuses one); after proposing, the form offers the approval inbox, not

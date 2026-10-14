@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- One definition each for a device's worst profile-item state and its patch

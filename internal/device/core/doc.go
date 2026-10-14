@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package core is the device identity and enrollment domain and the
 // foundation every other device package builds on.
 //

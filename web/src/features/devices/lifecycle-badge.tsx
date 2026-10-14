@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { DeviceState } from "../../../gen/lindm/admin/v1/admin_pb";
 import { StatusBadge } from "@/components/ui/status-badge";
 

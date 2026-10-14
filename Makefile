@@ -47,6 +47,7 @@ bootstrap: tools
 # worktree and land; dev land reruns generate-code (the buf/sqlc part) under
 # the landing lock, so generated output derives from main plus the landing.
 generate: generate-code
+	$(MAKE) generate-licenses
 	go run ./cmd/devenv generate-docs
 
 generate-code: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
@@ -54,6 +55,11 @@ generate-code: $(BUF) $(SQLC) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect
 	$(BUF) generate
 	$(SQLC) generate
 	node internal/agent/desktop/keysymdata/generate.mjs
+	node test/tooling/license-headers.mjs generated
+
+.PHONY: generate-licenses
+generate-licenses: web-assets
+	node test/tooling/generate-license-notices.mjs
 
 web-assets:
 	npm run build:web

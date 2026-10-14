@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 set -eu
 # lint-staged runs with --no-stash: its backup stash lives in refs/stash, which
 # every git worktree shares, so concurrent commits race and pop each other's

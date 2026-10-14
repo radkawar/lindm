@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, Profiles list and detail: no page-size control when every
 // profile fits on one page; the "publishing doesn't change devices" hint at most
 // once per screen and linking to Rollouts; publishers named, not "Another

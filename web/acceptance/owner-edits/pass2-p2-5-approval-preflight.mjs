@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 5: the freshness refusal arrived only after Send, and an
 // approved restart was refused for stale inventory, wasting the approval. The
 // review's server checks now gate the approval request too, and the fix offers

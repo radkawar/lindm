@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 11: a wrong password or unknown username at sign-in said
 // "Sign-in required — Your session could not authorize this request." Both now
 // say "Username or password is incorrect." with the same server reason, so the

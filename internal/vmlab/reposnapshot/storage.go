@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package reposnapshot captures bounded authenticated native repository closures.
 package reposnapshot
 

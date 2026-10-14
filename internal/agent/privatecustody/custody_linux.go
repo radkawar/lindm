@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package privatecustody encrypts bounded private native evidence with a durable
 // installation key outside SQLite. It does not authorize effects or export keys.
 package privatecustody

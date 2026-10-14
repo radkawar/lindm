@@ -1,8 +1,34 @@
 # Distro support and lifecycle verification
 
-Status: qualification plan. **No matrix cell is certified.** Installation, unit tests,
-containers, simulations and a source-code review cannot substitute for the required
-machine evidence. All supported claims are capability-specific.
+Status: v0.1 preview and capability-specific qualification evidence.
+No complete release matrix cell is certified.
+Installation, unit tests and code review do not replace the required machine evidence.
+
+## Read the evidence correctly
+
+The lab ledger records maintainer-run evidence, not GitHub Actions results.
+Paths under `~/.cache`, `$HOME/.cache`, `/home/r/.cache` or `~/lab-evidence` identify maintainer-local files.
+These files are not included in a clone or available through those paths on your machine.
+The adjacent SHA-256 values identify the exact retained records.
+They do not prove that a public reader can retrieve or independently reproduce the records.
+Keep the paths and hashes when you cite evidence.
+
+Check the latest verdict, recorded scope, image, architecture and source revision for each capability.
+A passing subset does not qualify the full lane or distribution.
+Historical failures and superseded passes remain in the ledger.
+VM evidence does not qualify physical hardware or destructive recovery behavior.
+The x86_64 Tier 1 rows remain preview where required gates are missing.
+Full arm64 release qualification remains pending lab work, despite individual native passes.
+
+The 2026-10-13 source audit examined commit `be49850ddda9211ff21ba76063a8ecd9a7faeed9`.
+Its ledger had 820 historical entries; 503 revision values contained `dirty`.
+Those revisions identify a base plus uncommitted changes, not a reproducible clean checkout.
+A release claim needs the clean source commit and artifact provenance, or the complete authenticated source delta.
+
+The audit found 111 scoped passes among 482 latest recorded platform/architecture/cell keys.
+Scopes include resource subsets and successful refusal scenarios.
+A passed refusal does not prove that the refused operation is supported.
+These counts describe that audit snapshot, not a live total or v0.1 release qualification.
 
 ## Device integration performance
 
@@ -2034,9 +2060,11 @@ There are currently **no Q cells**.
 
 The code column separates implementation from platform evidence. `N24`/`N26`
 identify Ubuntu 24.04/26.04 and `N43`/`N44` identify Fedora 43/44 x86_64 cloud
-guests. `N26` and `N43` currently cover baseline host/native-package `inspect`
-only, not the expanded inventory-depth contract or a successful packaged
-lifecycle. Existing `N24`/`N44` service evidence includes provider, packaged
+guests. The original `N26`/`N43` inventory notation described baseline `inspect`
+evidence only. Later ledger entries record packaged lifecycle passes for both
+releases; consult the current [Tier capability matrix](#tier-capability-matrix).
+Those later passes do not qualify every inventory field or a complete release.
+Existing `N24`/`N44` service evidence includes provider, packaged
 local execution/history and connected dispatch; continuous-compliance additions
 have their own evidence. `Na` marks the 2026-10-10 aarch64 Debian 12/13, Leap 16.0
 and Tumbleweed 20261007 records (inventory, packaged lifecycle, connected service
@@ -3883,18 +3911,24 @@ exact response/list/retry checks. Declarative apply separately compares exact
 canonical database microseconds so unchanged desired expiry never reissues an
 approval; one-microsecond changes remain changes.
 
-`go test -race ./internal/advisory/...` checks 43 native dpkg, 91 RPM and 46 libalpm
-upstream comparison vectors plus genuine pinned vendor data. Source URLs, digests,
-licenses and extraction provenance accompany `internal/advisory/feed/testdata`.
+`go test -race ./internal/advisory/...` exercises 43 native dpkg, 91 RPM and 46
+libalpm upstream comparison vectors. Licensed original Ubuntu/Red Hat/SUSE/Alma
+records and independently authored synthetic Debian/Arch/Fedora/Rocky fixtures exercise
+the parser. Source URLs, licenses, byte digests and the full replacement coverage
+map accompany `internal/advisory/feed/testdata`. Synthetic files use Apache-2.0;
+explicit upstream licenses still govern original records and comparator vectors.
 The PostgreSQL lane is `go test -race -tags=integration ./internal/advisory/...`,
-using isolated `testdb` schemas and `LINDM_TEST_DATABASE_URL_FILE`. It exercises
-Ubuntu/Fedora/Debian/Rocky/Alma/SLES/Leap/Arch backports and genuine Red Hat
-mainstream, EUS/module and E4S fixes. Controlled installed versions and enabled
-repository fixtures are boundary regressions, not claims of historical VM installs.
-Debian source/binary-version divergence, undetermined/not-affected/open-no-DSA,
-nullable publication dates, module mismatch and signed-snapshot age persistence
-have dedicated cases. Existing atomic publication, unchanged-byte reconfiguration,
-fresh/stale inventory/feed, scoped counts, pagination and exception replay remain.
+using isolated `testdb` schemas and `LINDM_TEST_DATABASE_URL_FILE`. It retains native
+backport boundaries, Debian source/binary divergence and open/undetermined/not-affected
+states, Arch status/publication joins, Fedora product/architecture exclusion,
+Red Hat mainstream/EUS/module/E4S cases, nullable dates and signed-snapshot age.
+Controlled installed versions and repositories are boundary inputs, not historical
+VM installs. Publication, unchanged-byte configuration, freshness, scoped counts,
+pagination, exception replay, worker leases and persisted finding-set assertions remain.
+The fixture replacement has not been verified here. Real-feed native proof remains
+in [`lab/ledger.json`](../lab/ledger.json), the
+[Debian/EL/Ubuntu matrix](#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12),
+and [rolling advisory source evidence](#rolling-advisory-source-evidence).
 
 Retained Red Hat and SUSE detached signatures are checked against pinned genuine
 vendor keys. Negatives mutate the decoded RSA signature integer and rearmor it;
@@ -3906,19 +3940,21 @@ from the deterministic retained-record/archive-container tests.
 
 The real-inventory replay is `go test -race -tags=integration ./internal/device
 -run 'TestAdvisoriesMatchRecordedNativeInventory|TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry'`.
-It publishes the retained generated-schema PackageBatch fixtures through the real
-device begin/put/commit RPCs, ingests pinned vendor subsets and reads admin findings
-from PostgreSQL. `internal/advisory/testdata/provenance.txt` binds the exact selected
-records to native-oracle runs, full observation hashes and pinned image/agent hashes:
-Ubuntu noble's installed OpenSSH `1:9.6p1-3ubuntu13.19` is beyond USN-6859-1's
-backported `.3` fix; Fedora 44's actual sudo `0:1.9.17-7.p2.fc44` is affected by
-FEDORA-2026-7d4732cbab until `0:1.9.17-10.p2.fc44`. The maintained `lab vm inspect
--inventory-record NEW_FILE` runs independently matched all 664/427 native package
-records respectively. These are x86_64 KVM/SeaBIOS VM observations, not physical
-hardware or desktop-session certification. Receipt/collection timestamps are
-controlled only in deterministic replay, never substituted for the recorded package
-versions. Selected advisory subsets still report UNKNOWN for incomplete coverage;
-the fixed Ubuntu packages do not imply that the entire device is clean.
+It publishes unchanged native PackageBatch observations through the real device
+begin/put/commit RPCs and reads persisted admin findings from PostgreSQL.
+Ubuntu and Red Hat advisory inputs retain their licensed original records.
+Fedora uses independently authored synthetic updateinfo, not vendor proof.
+`internal/advisory/testdata/provenance.txt` binds native package bytes to the
+original oracle runs, full observation hashes and pinned image/agent hashes.
+Ubuntu noble's installed OpenSSH `1:9.6p1-3ubuntu13.19` exceeds USN-6859-1's `.3` fix.
+Fedora's actual sudo `0:1.9.17-7.p2.fc44` receives a fictional test assessment,
+`FEDORA-2099-abcdef1234` / `CVE-2099-99020`, with fix `0:8.4.2-12.p3.fc44`.
+That assessment preserves affected-finding RPC coverage; it proves no real exposure.
+The original `lab vm inspect -inventory-record NEW_FILE` runs independently matched
+all 664/427 native package records. These x86_64 KVM/SeaBIOS observations do not
+certify physical hardware or desktop sessions. Replay controls receipt/collection
+timestamps but never rewrites recorded package versions. Selected advisory inputs
+still report UNKNOWN for incomplete coverage; fixed packages do not prove device safety.
 The console must display both independent freshness clocks and distinguish
 accepted risk from a native fix. A third retained replay binds actual RHEL 9.8
 `openssl-libs` `1:3.5.5-2.el9_8` and native module/platform evidence to the maintained
@@ -7736,13 +7772,14 @@ and absent-upstream-CLI fallback. These unit fixtures are not native qualificati
 Before is the actual missing-publication baseline under
 `~/.cache/lindm-ste-20261013/before/screenshots/`. After is the actual signed Ready
 fixture under `~/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/`:
+These screenshots are maintainer-local evidence, not public download links.
 
-| Variant       | Before                                                                                                                                      | After                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Light desktop | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-desktop.png) | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-desktop.png) |
-| Dark desktop  | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-desktop.png)  | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-desktop.png)  |
-| Light mobile  | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-mobile.png)  | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-mobile.png)  |
-| Dark mobile   | [Baseline](file:///home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-mobile.png)   | [Ready](file:///home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-mobile.png)   |
+| Variant       | Before                                                                                                                     | After                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Light desktop | `/home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-desktop.png` | `/home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-desktop.png` |
+| Dark desktop  | `/home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-desktop.png`  | `/home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-desktop.png`  |
+| Light mobile  | `/home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-light-mobile.png`  | `/home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-light-mobile.png`  |
+| Dark mobile   | `/home/r/.cache/lindm-ste-20261013/before/screenshots/settings-missing-publication-repository-readiness-dark-mobile.png`   | `/home/r/.cache/lindm-repo-zero-config-Y5NS4nh3/native-browser/chromium-grant-settings-agent-repository-dark-mobile.png`   |
 
 The exercised baseline `before/report.json` has SHA-256
 `d9199bfb80541ce6f4596199221c5f494eca1329029994f76f59e2372f3315c0`:

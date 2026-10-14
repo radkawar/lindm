@@ -1,0 +1,18 @@
+SPDX-License-Identifier: Apache-2.0
+Authored for lindm; independently constructed synthetic PE32+ test data.
+Source: test/tooling/generate-authenticode-fixtures.mjs
+Generate: node test/tooling/generate-authenticode-fixtures.mjs
+Requirements: Node, OpenSSL, sbsigntool (sbsign).
+No vendor firmware or executable bytes are included.
+The x86 instructions and PE fields are authored from the file-format contract.
+Two unrelated ephemeral test keys sign the same image; private keys are removed.
+Certificates are fictional test trust, not project release or operational keys.
+Signatures/certificates change on regeneration; the unsigned input is deterministic.
+Test mutations retain fixed PE offset 0x80 and section data through offset 0x500.
+Tool output does not imply qualification of a real EFI loader or platform.
+
+c4d6faa3ba4abbb1aebeb6136e6285154d1b91bb9cdad9c17402101e10164933  unsigned.efi
+0f79c5a81f08ecaddb5cca1014974aae2ca927969a91b7752d8cb8e75be2220a  signed.efi
+e9a8ed172d6ae76cd898c2259d990898190f438b3756ae33fb531fdcfe57f305  other-signed.efi
+815a9c89d7a0cf53c931713fb9b906e7babc5265ed6ca7b6c8b01793ea63b184  signer.pem
+6915f2f8e61d4c7f26b1cf5f691304ad2af63485b570f6efa80f183a1994f9ad  other.pem

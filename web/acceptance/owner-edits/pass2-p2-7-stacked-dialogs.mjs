@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 7: on the device page, Patch now opened over a hidden
 // Assign profile dialog that was still in the DOM, and Review action validated
 // the hidden dialog's fields. Closed dialogs unmount their content: the check

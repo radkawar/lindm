@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useSyncExternalStore } from "react";
 import type { SetResourceAssignmentRequest } from "../../../gen/lindm/admin/v1/assignments_pb";
 import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";

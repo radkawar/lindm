@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package deploylab owns isolated single-host deployment proofs. It never uses
 // or resets shared devlab services, stores production credentials, or qualifies
 // local browser/WebAuthn authentication merely from an HTTPS readiness probe.

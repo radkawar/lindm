@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # No installation or upgrade starts/enables services, performs DDL or bootstraps
 # an owner. Operator config, credentials, Unix accounts and database survive purge.
 set -eu

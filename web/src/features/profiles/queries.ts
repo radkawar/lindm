@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { queryOptions } from "@tanstack/react-query";
 import type { ApprovedReferenceKind } from "../../../gen/lindm/admin/v1/approved_references_pb";
 import { adminClient } from "@/lib/rpc";

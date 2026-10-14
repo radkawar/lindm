@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertRecoveryEnrollmentGrant :exec
 INSERT INTO enrollment_recovery_grants(grant_id, device_id, expected_generation_id, expected_revoked_at)
 VALUES(sqlc.arg('grant_id'), sqlc.arg('device_id'), sqlc.arg('expected_generation_id'), sqlc.narg('expected_revoked_at'));

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createRegistry, toBinary, type DescMessage, type MessageShape } from "@bufbuild/protobuf";
 import { pathToString } from "@bufbuild/protobuf/reflect";
 import { createValidator, ValidationError, type Violation } from "@bufbuild/protovalidate";

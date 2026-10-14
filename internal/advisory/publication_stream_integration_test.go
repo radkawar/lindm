@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -289,21 +291,21 @@ type streamPublicationFixture struct {
 func newStreamPublicationFixture(t *testing.T) *streamPublicationFixture {
 	t.Helper()
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	f := &streamPublicationFixture{pool: pool, service: s, source: source, original: doc}
 	for _, claim := range doc.Advisories {
-		if claim.PackageName == "sudo" && claim.Architecture == "x86_64" {
+		if claim.PackageName == "synthetic-rpm-tool" && claim.Architecture == "x86_64" {
 			f.template = claim
 			break
 		}
 	}
 	if f.template == nil {
-		t.Fatal("vendor fixture has no x86_64 sudo claim")
+		t.Fatal("synthetic fixture has no x86_64 package claim")
 	}
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC().Add(-time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	f.deviceID = seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	f.deviceID = seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	f.before = f.feed(t)
 	f.findings = f.listFindings(t)
 	if len(f.findings.Findings) != 1 || f.findings.Findings[0].State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED {

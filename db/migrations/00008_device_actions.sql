@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Imperative actions never reconcile or reissue effects after start authority.
 CREATE TABLE device_actions (

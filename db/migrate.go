@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package db owns embedded schema migrations and read-only startup compatibility
 // checks. Serving traffic never applies migrations or creates version tables.
 package db

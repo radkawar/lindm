@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 4: after approving the pending device, Enrollment still said
 // "1 device waiting for approval / Awaiting approval", even after Refresh. The
 // server reported an approved reservation as still pending: the device only

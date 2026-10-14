@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Root-local approvals each generation's latest accepted host observation
 -- reports (lindm.agent.v1.ApprovedConfigurationObservation). Kinds: 1 approved

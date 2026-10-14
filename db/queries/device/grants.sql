@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertEnrollmentGrant :exec
 INSERT INTO enrollment_grants (
     id,

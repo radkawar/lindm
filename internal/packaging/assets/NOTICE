@@ -1,0 +1,129 @@
+lindm
+
+Project-authored software is licensed under the Apache License, Version 2.0
+(see LICENSE). Third-party works retain their original licenses. This notice
+provides attribution, not permission to relicense upstream works or use their
+trademarks, and does not imply endorsement or production qualification.
+
+COPIED SOURCE AND BUNDLED FONT
+
+shadcn/ui: Copyright (c) 2023 shadcn. MIT License.
+Source: https://github.com/shadcn-ui/ui
+Copied portions: web/src/components/ui, web/src/hooks/use-mobile.ts,
+web/src/styles/shadcn.css and the block-derived console layout. Local changes
+include the documented preset, formatting, accessibility, RTL and CSP changes.
+The full copyright and permission notice and detailed provenance are retained
+in web/LICENSE.shadcn. Project additions do not replace the upstream MIT grant.
+
+IBM Plex Sans: Copyright 2019 IBM Corp. All rights reserved.
+SIL Open Font License 1.1; full text and reserved-name terms: web/LICENSE.fonts.
+Source: https://github.com/IBM/plex
+Font distribution: pinned @fontsource-variable/ibm-plex-sans package.
+License: https://openfontlicense.org/open-font-license-official-text/
+
+libxkbcommon xkbcommon-1.11.0: graphical keysym table derived from src/keysym-utf.c.
+Source: https://github.com/xkbcommon/libxkbcommon/tree/xkbcommon-1.11.0
+Original mapping attribution: Markus G. Kuhn, University of Cambridge,
+April 2001; initial mapping by Richard Verhoeven.
+The graphical table is identified upstream as public domain; surrounding copied
+source includes separately licensed MIT/X11 portions and their copyright notices.
+The original source and complete upstream notice collection are retained in
+internal/agent/desktop/keysymdata/{keysym-utf.c,LICENSE}; generated Go/TypeScript
+tables retain source SHA-256 and provenance references. No upstream notices are
+removed or replaced by the project license.
+
+COMMUNITY CONTENT
+
+CODE_OF_CONDUCT.md adapts Contributor Covenant 2.1 by replacing its reporting
+contact method with this repository's private advisory reporting action.
+Contributor Covenant contributors; Creative Commons Attribution 4.0
+International (CC-BY-4.0).
+Original fixed source: https://github.com/EthicalSource/contributor_covenant/blob/cd7fcf684249786b7f7d47ba49c23a6bcb3233eb/content/version/2/1/code_of_conduct.md
+Original grant: https://github.com/EthicalSource/contributor_covenant/blob/cd7fcf684249786b7f7d47ba49c23a6bcb3233eb/LICENSE.md
+License text: https://creativecommons.org/licenses/by/4.0/legalcode
+
+ADVISORY AND NATIVE COMPARATOR FIXTURES
+
+The following data are separate fixtures, not project-authored advisory findings.
+Full per-document source URLs, hashes and change status are recorded in the
+referenced provenance files under internal/advisory/feed/testdata. In-memory test
+mutations and synthetic transport wrappers are local changes, not vendor records.
+
+Red Hat, Inc., Red Hat Product Security: original redhat-*.json CSAF advisory/VEX
+fixtures and their detached signature/checksum companions, acquired under
+Creative Commons Attribution 4.0 International (CC-BY-4.0).
+Source: https://security.access.redhat.com/data/csaf/v2/
+License: https://creativecommons.org/licenses/by/4.0/legalcode
+Attribution/source manifests: redhat-provenance.txt and redhat-*-provenance.txt.
+Original vendor copyright/disclaimer text remains in the documents. Red Hat public
+keys are vendor verification material, not official lindm signing keys.
+
+Canonical Ltd and contributors: Ubuntu OSV security-notice fixtures,
+including ubuntu-USN-6859-1.json and the retained Ubuntu notice fixtures.
+Creative Commons Attribution-ShareAlike 4.0 International (CC-BY-SA-4.0).
+Source: https://github.com/canonical/ubuntu-security-notices
+License: https://github.com/canonical/ubuntu-security-notices/blob/main/LICENSE
+License text: https://creativecommons.org/licenses/by-sa/4.0/legalcode
+Individual notices retain their source URL and vendor attribution; provenance.txt
+records original acquisition and transformations. The ShareAlike terms continue
+to govern adaptations of this data, independently of the software license.
+
+SUSE Product Security Team: original suse-*.json CSAF and suse-*.xml OVAL fixture
+families and their retained signature/checksum/key companions. CC-BY-4.0.
+Source: https://ftp.suse.com/pub/projects/security/
+Published grants: https://ftp.suse.com/pub/projects/security/csaf/LICENSE
+and https://ftp.suse.com/pub/projects/security/oval/LICENSE
+License text: https://creativecommons.org/licenses/by/4.0/legalcode
+Exact source URLs and unchanged vendor notices: suse-provenance.txt.
+
+AlmaLinux OS: Copyright (c) 2023 AlmaLinux OS. MIT License.
+Fixture: alma-ALSA-2024-6783.json; source and retained full MIT notice in
+provenance.txt. Source: https://github.com/AlmaLinux/osv-database
+License: https://github.com/AlmaLinux/osv-database/blob/master/LICENSE
+RHEL-derived advisory text is additionally attributed to Red Hat RHSA-2024:6783
+under CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/).
+
+Debian dpkg contributors: dpkg-versions.txt contains unchanged extracted test
+vectors (not the upstream Perl implementation), GPL-2.0-or-later.
+Source: https://github.com/guillemj/dpkg/blob/f4941036b04e787c2803d6359802d6725d2476c6/scripts/t/Dpkg_Version.t
+RPM contributors: rpm-versions.txt contains test vectors extracted with macro
+wrappers/separators removed (not native implementation code), GPL-2.0.
+Source: https://github.com/rpm-software-management/rpm/blob/5dae33c3d0c51c97d5834fe2ecf768b6f5483b81/tests/rpmvercmp.at
+Grant: https://github.com/rpm-software-management/rpm/blob/5dae33c3d0c51c97d5834fe2ecf768b6f5483b81/COPYING
+Pacman Development Team (2009-2024), Dan McGee (2008): arch-vercmptest.txt
+retains the original upstream shell test source and GPL-2.0-or-later notice.
+Source: https://gitlab.archlinux.org/pacman/pacman/-/blob/138cbae58448b7fde90335526add3029875784ee/test/util/vercmptest.sh
+GPL version 2 text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+A complete copy is retained in internal/advisory/feed/testdata/LICENSE.GPL-2.0.
+These comparator fixtures are separate testdata, not linked into shipped Go
+executables or the bundled console. Their upstream terms are not changed to
+Apache-2.0. Exact extraction provenance is retained in provenance.txt and
+arch-provenance.txt.
+
+Unclear-grant Debian tracker/DSA, Arch advisory, Rocky OSV and Fedora
+repository/advisory specimens were replaced with independently authored
+synthetic-* fixtures.
+These authored regression data are Apache-2.0, not genuine downloaded vendor
+records or evidence of vendor coverage. Their provenance files identify the
+replacement scope. Independently authored authenticode fixture bytes and ephemeral
+self-signed test certificates are likewise not vendor PE binaries or signing keys;
+see internal/agent/recoveryboot/testdata/authenticode/provenance.txt.
+
+DEPENDENCY REDISTRIBUTION TEXTS
+
+internal/packaging/assets/THIRD-PARTY-LICENSES contains original complete license,
+copyright and upstream NOTICE texts collected deterministically from pinned
+Go product-package dependencies, the Go standard library/toolchain, non-dev npm
+lock dependencies, copied UI/font sources and keysym sources. Each original file
+has its package/version identity, source reference and SHA-256. It conservatively
+includes a dependency graph rather than claiming linker-level reachability.
+Regenerate the text bundle and authoritative LICENSE/NOTICE asset copies with
+node test/tooling/generate-license-notices.mjs after pinned dependencies are
+installed and web assets exist. Initial collection may take an explicit audited
+Go product-module list as its sole argument. Version-pinned upstream legal files
+omitted by some npm publications are retained, with immutable source URLs, in
+test/tooling/upstream-license-texts.json; this is not a generic inferred grant.
+Native packages install LICENSE, NOTICE and THIRD-PARTY-LICENSES under their
+/usr/share/doc/<product>/ directory; OCI and release exports retain these texts.
+Build tools, operating-system runtime packages and operator-supplied CA bundles
+retain their own licenses and redistribution requirements.

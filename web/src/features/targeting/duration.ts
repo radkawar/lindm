@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Exact whole-unit durations for saved rollout settings: "90 seconds" → "1 minute 30 seconds".
 export function formatSeconds(total: number) {
   const units: [number, string][] = [

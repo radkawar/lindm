@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Command lindmctl manages a lindm server through browser-authorized CLI sessions.
 package main
 

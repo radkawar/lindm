@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -22,12 +24,12 @@ import (
 func TestIdenticalPackageSetsShareOneFindingSet(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	vulnerable := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
-	fixed := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	vulnerable := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
+	fixed := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-12.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	first := seedInventory(t, pool, "fedora", "44", vulnerable)
 	second := seedInventory(t, pool, "fedora", "44", vulnerable)
 	clear := seedInventory(t, pool, "fedora", "44", fixed)
@@ -104,11 +106,11 @@ convert_to($3::text,'UTF8')||'\x00'::bytea||convert_to($4::text,'UTF8')||'\x00':
 func TestConcurrentColdEvaluationBuildsOneSet(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	vulnerable := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	vulnerable := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	devices := make([]uuid.UUID, 3*evaluationWorkers)
 	for i := range devices {
 		devices[i] = seedInventory(t, pool, "fedora", "44", vulnerable)
@@ -134,11 +136,11 @@ func TestConcurrentColdEvaluationBuildsOneSet(t *testing.T) {
 func TestEvaluatorSkipsBusyDevice(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	device := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	device := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	updater, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)

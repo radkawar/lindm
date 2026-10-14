@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package advisory owns vendor advisory publication, native package matching and
 // expiring risk acceptance. It never installs software or treats absent evidence
 // as proof that a device is healthy.

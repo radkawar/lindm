@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package device
@@ -125,6 +127,8 @@ func TestAdvisoryAcceptanceFreshActorScopeAndDurableRetry(t *testing.T) {
 	}
 }
 
+// PackageBatch bytes are unchanged native observations. Fedora advisory input is
+// independently authored synthetic data, not evidence of a real vulnerability.
 func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 	parallelDeviceIntegration(t)
 	for _, test := range []struct {
@@ -160,8 +164,8 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 		},
 		{
 			name: "fedora44", distro: "fedora", release: "44", manager: "rpm",
-			packages: "fedora44-packages.json", feed: "fedora44-sudo.xml",
-			sourceURL:     "https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/f7508933e5ed78ccc41d1cea6dc7d5f93d998b7fe97e7c9e84268e2ce8aadcac-updateinfo.xml.zst",
+			packages: "fedora44-packages.json", feed: "synthetic-fedora44-updateinfo.xml",
+			sourceURL:     "https://fixtures.example.invalid/fedora44/synthetic-updateinfo.xml",
 			packageDigest: "4748213c95a0da8b071f5603adba4c4582466247aa44d75c49c59818f68b927d",
 			format:        advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, wantFindings: 1,
 		},
@@ -284,12 +288,12 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 				reason = "feed_partial_coverage"
 			}
 			if response.Msg.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || response.Msg.Freshness.Reason != reason {
-				t.Fatalf("selected real advisory subset claimed whole-device coverage: %v", response.Msg.Freshness)
+				t.Fatalf("partial advisory input claimed whole-device coverage: %v", response.Msg.Freshness)
 			}
 			if test.distro == "fedora" {
 				finding := response.Msg.Findings[0]
-				if finding.AdvisoryId != "FEDORA-2026-7d4732cbab" || finding.InstalledVersion != "0:1.9.17-7.p2.fc44" || finding.FixedVersion != "0:1.9.17-10.p2.fc44" || len(finding.Cves) != 1 || finding.Cves[0] != "CVE-2026-96512" {
-					t.Fatalf("recorded Fedora sudo exposure: %v", finding)
+				if finding.AdvisoryId != "FEDORA-2099-abcdef1234" || finding.InstalledVersion != "0:1.9.17-7.p2.fc44" || finding.FixedVersion != "0:8.4.2-12.p3.fc44" || len(finding.Cves) != 1 || finding.Cves[0] != "CVE-2099-99020" {
+					t.Fatalf("synthetic assessment of recorded Fedora package: %v", finding)
 				}
 			}
 			if test.release == "26.04" {

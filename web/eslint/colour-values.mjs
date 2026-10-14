@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Shared by the TypeScript ESLint rule and the standalone CSS scanner.
 // Inspect style syntax, not prose or identifiers that happen to name a colour.
 const namedColours = new Set(

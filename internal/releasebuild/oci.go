@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -13,11 +15,13 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"lindm/internal/packaging"
 )
 
 // OCI images contain the static executable and an explicitly supplied, pinned
 // CA bundle recorded in provenance/SBOM. Ambient host roots are never copied.
-func buildOCI(binary, caBundle, destination, product, arch string, epoch int64, bundle ...string) (err error) {
+func buildOCI(binary, caBundle, destination, product, arch string, epoch int64, licenses string, bundle ...string) (err error) {
 	work, err := os.MkdirTemp(filepath.Dir(destination), "oci-")
 	if err != nil {
 		return err
@@ -28,7 +32,11 @@ func buildOCI(binary, caBundle, destination, product, arch string, epoch int64, 
 		return err
 	}
 	layer := filepath.Join(work, "layer.tar")
-	entries := []tarInput{{source: binary, name: "usr/bin/" + product, mode: 0555}, {source: caBundle, name: "etc/ssl/certs/ca-certificates.crt", mode: 0444}}
+	entries := make([]tarInput, 0, 5)
+	entries = append(entries, tarInput{source: binary, name: "usr/bin/" + product, mode: 0555}, tarInput{source: caBundle, name: "etc/ssl/certs/ca-certificates.crt", mode: 0444})
+	for _, name := range packaging.LicenseNames() {
+		entries = append(entries, tarInput{source: filepath.Join(licenses, name), name: "usr/share/doc/" + product + "/" + name, mode: 0444})
+	}
 	if len(bundle) != 0 && bundle[0] != "" {
 		err := filepath.WalkDir(bundle[0], func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {

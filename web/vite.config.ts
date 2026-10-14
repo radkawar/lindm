@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig } from "vite";
+import { projectLicense } from "../test/tooling/project-license.mjs";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 
@@ -14,6 +17,13 @@ export default defineConfig({
       autoCodeSplitting: true,
       routesDirectory: "./src/routes",
       generatedRouteTree: "./src/routeTree.gen.ts",
+      routeTreeFileHeader: [
+        `// SPDX-License-Identifier: ${projectLicense}`,
+        "",
+        "/* eslint-disable */",
+        "// @ts-nocheck",
+        "// noinspection JSUnusedGlobalSymbols",
+      ],
     }),
     tailwindcss(),
   ],

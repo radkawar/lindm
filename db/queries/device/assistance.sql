@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertAssistanceSession :exec
 INSERT INTO assistance_sessions (
     id,

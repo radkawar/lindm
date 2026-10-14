@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (safety): the recovery-key reveal page leads with the reveal,
 // not an unrelated rotation history card, and a revealed key reads aloud in
 // 4-character groups while Copy yields the raw key, with a visible countdown

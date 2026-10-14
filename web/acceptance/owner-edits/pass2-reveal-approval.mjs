@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner decision (pass 2): a reveal needs a second approver whenever another
 // enabled admin could approve it; a sole admin reveals alone. The seeded demo
 // has two admins (the review owner plus the seeded admin), so the console must

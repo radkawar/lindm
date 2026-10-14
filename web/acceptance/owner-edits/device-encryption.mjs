@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the route device's Encryption tab leads with one recoverability
 // verdict, it says in words whether lindm's recovery key is on the volume (slot numbers only in Details, agreeing with the escrow record), a single volume has
 // no picker, Reveal is a real button and sizes avoid raw byte counts. Read-only:

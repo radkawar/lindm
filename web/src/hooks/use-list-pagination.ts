@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useRef } from "react";
 import type { PageSize } from "@/lib/list-search";
 

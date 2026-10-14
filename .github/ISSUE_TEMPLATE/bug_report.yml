@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible non-security problem in the v0.1 preview.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a vulnerability or community safety report, use this repository's
+        **Security → Advisories → Report a vulnerability** private reporting action.
+        Read SECURITY.md. Do not post passwords, enrollment tokens, recovery keys,
+        private device data or unredacted fixture logs here.
+        v0.1 is a preview, not a production-ready release.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: State the exact lindm version or source commit.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: State Linux distribution and version, architecture, affected component, and self-built deployment or dev-fixture setup. For console bugs, include browser and version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Give the smallest safe reproduction on systems you own. State the commands or UI actions and necessary prerequisites.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and observed behavior
+      description: Explain what should happen and what actually happens. Distinguish refusal, failure, skip and unsupported environment.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Include relevant error messages, test commands and outcomes. Remove credentials and private identifiers. Do not claim a check passed if it did not run.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public report safety
+      options:
+        - label: This is not a vulnerability or community safety report, and I removed sensitive data.
+          required: true

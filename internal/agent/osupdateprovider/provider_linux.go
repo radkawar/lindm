@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package osupdateprovider is the os.update.v1 native resource provider. It

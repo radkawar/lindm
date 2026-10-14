@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package firewallprovider manages only dedicated nftables inet tables. It never

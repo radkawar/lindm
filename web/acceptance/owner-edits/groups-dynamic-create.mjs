@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner tasks (pass 2, Groups items 33-34): creating a dynamic group needs no
 // blank technical field, refuses mistakes in words, and leaves a read view with
 // the member count and names plus Edit. State-moving: creates one group.

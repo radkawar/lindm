@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Popup stability for `lab console review`: opening a dropdown, picker, menu or
 // popover must float over the page, never move the page's content. Each visible
 // popup trigger on the captured state is opened with real input; on-screen boxes

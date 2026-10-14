@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Device } from "../../../gen/lindm/admin/v1/admin_pb";
 
 // Operating system as administrators name it (registry display name); the

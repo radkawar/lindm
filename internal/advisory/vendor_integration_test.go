@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -25,16 +27,16 @@ import (
 	"lindm/internal/testdb"
 )
 
-// Vendor statements are genuine pinned fixtures; installed boundary versions and
-// enabled repository evidence here are controlled database fixtures, not VM claims.
+// Licensed upstream records and authored synthetic fixtures share the parser.
+// Installed boundaries and repository evidence are controlled inputs, not VM claims.
 func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 	for _, test := range []struct {
 		name, distro, release, stream, file, url, packageName, manager, old, fixed, cve, module string
 		format                                                                                  advisoryv1.FeedFormat
 	}{
 		{"sles", "sles", "15.6", "", "suse-suse-su-2024_2275-1.json", "https://ftp.suse.com/pub/projects/security/csaf/suse-su-2024_2275-1.json", "openssh", "rpm", "9.6p1-150600.6.2.1", "9.6p1-150600.6.3.1", "CVE-2024-6387", "", advisoryv1.FeedFormat_FEED_FORMAT_SUSE_CSAF},
-		{"arch", "arch", "rolling", "", "arch-backport.json", "https://security.archlinux.org/issues/all.json", "wpa_supplicant", "pacman", "2:2.9-7", "2:2.9-8", "CVE-2021-0326", "", advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON},
-		{"debian-tracker", "debian", "12", "", "debian-tracker-subset.json", "https://security-tracker.debian.org/tracker/data/json", "openssh-server", "dpkg", "1:9.2p1-2+deb12u2", "1:9.2p1-2+deb12u3", "CVE-2024-6387", "", advisoryv1.FeedFormat_FEED_FORMAT_DEBIAN_TRACKER_JSON},
+		{"arch", "arch", "rolling", "", "synthetic-arch-backport.json", "https://security.archlinux.org/issues/all.json", "synthetic-arch-radio", "pacman", "4:8.3-7", "4:8.3-8", "CVE-2099-99010", "", advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON},
+		{"debian-tracker", "debian", "12", "", "synthetic-debian-tracker-subset.json", "https://security-tracker.debian.org/tracker/data/json", "synthetic-deb-client", "dpkg", "3:7.4-2+deb12u2", "3:7.4-2+deb12u3", "CVE-2099-99001", "", advisoryv1.FeedFormat_FEED_FORMAT_DEBIAN_TRACKER_JSON},
 		{"rhel-standard", "rhel", "9", "standard", "redhat-rhsa-2024_6783.json", "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_6783.json", "openssl-libs", "rpm", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", "CVE-2024-6119", "", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF},
 		{"rhel-e4s", "rhel", "8.6", "e4s", "redhat-rhsa-2024_7846.json", "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_7846.json", "openssl-libs", "rpm", "1:1.1.1k-13.el8_6", "1:1.1.1k-14.el8_6", "CVE-2024-5535", "", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF},
 		{"rhel-eus-module", "rhel", "8.8", "eus", "redhat-rhsa-2024_1880.json", "https://security.access.redhat.com/data/csaf/v2/advisories/2024/rhsa-2024_1880.json", "nodejs", "rpm", "1:18.19.0-1.module+el8.8.0+21592+14a8b93e", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "CVE-2023-46809", "18", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF},
@@ -49,7 +51,7 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 			p := &inventoryv1.Package{Name: test.packageName, Version: test.old, Architecture: "x86_64", Manager: test.manager}
 			if test.manager == "dpkg" {
 				p.Architecture = "amd64"
-				p.SourceName, p.SourceVersion = "openssh", test.old
+				p.SourceName, p.SourceVersion = "synthetic-deb-source", test.old
 				// Deliberately newer binary version: source advisories must use the
 				// native source version, not the binary's sortable version string.
 				p.Version = "9:99.0-1"
@@ -90,7 +92,7 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 					if test.module != "" && !slices.Equal(finding.GetCves(), []string{"CVE-2023-46809", "CVE-2024-21892", "CVE-2024-22019"}) {
 						t.Fatalf("matching CVEs overwritten within one advisory: %v", finding)
 					}
-					if test.manager == "dpkg" && (finding.GetPublishedAt() != nil || slices.Contains(finding.GetCves(), "CVE-2024-6409")) {
+					if test.manager == "dpkg" && (finding.GetPublishedAt() != nil || slices.Contains(finding.GetCves(), "CVE-2099-99002")) {
 						t.Fatalf("Debian unknown date or not-affected status fabricated: %v", finding)
 					}
 				}
@@ -117,11 +119,11 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 func TestAdvisoryDebianUndeterminedRemainsUnknown(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	source := &advisoryv1.FeedSource{Id: "debian", Distro: "debian", Release: "12", Format: advisoryv1.FeedFormat_FEED_FORMAT_DEBIAN_TRACKER_JSON, Url: "https://security-tracker.debian.org/tracker/data/json", MaxAgeSeconds: 86400}
-	s, doc := launchVendor(t, pool, source, "debian-tracker-subset.json")
+	s, doc := launchVendor(t, pool, source, "synthetic-debian-tracker-subset.json")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "debian", "12", &inventoryv1.Package{Name: "libjs-angularjs", Version: "1.8.3-1+deb12u1", Architecture: "all", Manager: "dpkg", SourceName: "angular.js", SourceVersion: "1.8.3-1+deb12u1"})
+	id := seedInventory(t, pool, "debian", "12", &inventoryv1.Package{Name: "synthetic-deb-widget-common", Version: "6.2-1+deb12u1", Architecture: "all", Manager: "dpkg", SourceName: "synthetic-deb-widget", SourceVersion: "6.2-1+deb12u1"})
 	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +135,7 @@ func TestAdvisoryDebianUndeterminedRemainsUnknown(t *testing.T) {
 
 func TestAdvisorySignedSnapshotAgeAndManifestPersist(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	// Controlled publication inputs test age/provenance persistence, not a claim
 	// that Fedora signs CSAF. Genuine signatures have separate acquisition tests.
 	doc.SnapshotAt = timestamppb.New(time.Now().UTC().Truncate(time.Microsecond).Add(-48 * time.Hour))
@@ -148,7 +150,7 @@ func TestAdvisorySignedSnapshotAgeAndManifestPersist(t *testing.T) {
 	if len(status.GetFeeds()) != 1 || !proto.Equal(status.Feeds[0].GetSnapshotAt(), doc.SnapshotAt) || len(status.Feeds[0].GetArtifacts()) != 1 || !proto.Equal(status.Feeds[0].Artifacts[0], doc.Artifacts[0]) || status.Feeds[0].ExpiresAt.AsTime().After(time.Now()) {
 		t.Fatalf("signed source freshness/provenance lost: %v", status)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-12.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_stale" {
 		t.Fatalf("recent fetch renewed an old signed snapshot: %v %v", out, err)
@@ -206,11 +208,11 @@ func TestAdvisoryArchAbsentVersionIsNativeRollingEvidence(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pool, _ := testdb.Open(t)
 			source := &advisoryv1.FeedSource{Id: "arch", Distro: "arch", Release: "rolling", Architecture: "x86_64", Format: advisoryv1.FeedFormat_FEED_FORMAT_ARCH_JSON, Url: "https://security.archlinux.org/issues/all.json", MaxAgeSeconds: 86400}
-			s, doc := launchVendor(t, pool, source, "arch-backport.json")
+			s, doc := launchVendor(t, pool, source, "synthetic-arch-backport.json")
 			if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 				t.Fatal(err)
 			}
-			id := seedInventory(t, pool, "arch", "rolling", &inventoryv1.Package{Name: "wpa_supplicant", Version: "2:2.9-7", Architecture: "any", Manager: "pacman"})
+			id := seedInventory(t, pool, "arch", "rolling", &inventoryv1.Package{Name: "synthetic-arch-radio", Version: "4:8.3-7", Architecture: "any", Manager: "pacman"})
 			mustExec(t, t.Context(), pool, "UPDATE devices SET os_version='' WHERE id=$1", id)
 			mustExec(t, t.Context(), pool, "UPDATE host_observations SET os_version_status=$2,os_version_value='' WHERE generation_id=(SELECT current_generation_id FROM devices WHERE id=$1)", id, int16(test.status))
 			if test.stale {
@@ -220,7 +222,7 @@ func TestAdvisoryArchAbsentVersionIsNativeRollingEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if len(out.GetFindings()) != 1 || !slices.Contains(out.Findings[0].GetCves(), "CVE-2021-0326") || out.Findings[0].GetFixedVersion() != "2:2.9-8" {
+			if len(out.GetFindings()) != 1 || !slices.Contains(out.Findings[0].GetCves(), "CVE-2099-99010") || out.Findings[0].GetFixedVersion() != "4:8.3-8" {
 				t.Fatalf("native rolling inventory lost its known package finding: %v", out)
 			}
 			if out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != test.reason {

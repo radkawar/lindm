@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 set -eu
 # Gate the commits being pushed, not this working tree; git's ref lines
 # arrive on stdin.

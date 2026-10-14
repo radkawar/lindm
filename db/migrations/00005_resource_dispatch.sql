@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Device-owned immutable desired heads and exact signed execution leases.
 CREATE TABLE resource_assignments (

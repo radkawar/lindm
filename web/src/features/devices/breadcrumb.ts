@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery } from "@tanstack/react-query";
 import { useBreadcrumbTitle } from "@/components/layout/breadcrumb-title";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Code, ConnectError } from "@connectrpc/connect";
 import { toRpcFailure } from "@/lib/errors";
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute } from "@tanstack/react-router";
 import { ProfileDetailView } from "@/features/profiles/detail";
 import { useProfileBreadcrumbTitle } from "@/features/profiles/breadcrumb";

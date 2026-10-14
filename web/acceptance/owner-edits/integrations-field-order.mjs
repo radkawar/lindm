@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, Integrations): the Signing secret field sat below the
 // reason and Create button. Every destination form ends with reason, then submit.
 // Read-only: opens the Add and Edit dialogs without submitting.

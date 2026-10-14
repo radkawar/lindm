@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { describe, it } from "node:test";
 import { RuleTester } from "eslint";
 import tseslint from "typescript-eslint";

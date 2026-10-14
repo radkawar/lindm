@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, createRegistry, getOption } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";

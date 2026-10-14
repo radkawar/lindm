@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockAdvisoryFeedConfiguration :exec
 -- Feed configuration and device evaluation serialize on this key. Configuration
 -- changes the enabled feed set under the exclusive lock; an evaluation reads

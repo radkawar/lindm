@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package lindm.lab.v1;
@@ -184,7 +186,8 @@ message MatrixLedgerEntry {
     defined_only: true
     not_in: [0]
   }];
-  // Evidence file path as recorded on the recording machine.
+  // Maintainer-local evidence path on the recording machine, not a public URL
+  // or a checked-in artifact. sha256 identifies the retained record's exact bytes.
   string evidence = 6 [(buf.validate.field).string = {
     min_len: 1
     max_len: 4096

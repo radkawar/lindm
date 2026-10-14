@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { useQuery } from "@tanstack/react-query";
 import {

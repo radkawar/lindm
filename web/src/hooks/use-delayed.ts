@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, useState } from "react";
 
 // Typing pause before a picker asks the server for its search.

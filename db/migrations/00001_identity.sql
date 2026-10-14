@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Identity, session, lineage, and audit schema.
 -- Device queries may insert into audit_events and list by (occurred_at, id).
 -- Do not delete principals; actor_id is ON DELETE RESTRICT.

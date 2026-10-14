@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute, type SearchSchemaInput } from "@tanstack/react-router";
 import { SecretsView } from "@/features/secrets/view";
 import { secretsQueryOptions } from "@/features/secrets/queries";

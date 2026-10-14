@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -19,8 +21,8 @@ import (
 
 func TestImportSnapshotFreshnessAndMonotonicity(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
-	raw, err := os.ReadFile("feed/testdata/fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
+	raw, err := os.ReadFile("feed/testdata/synthetic-fedora44-updateinfo.xml")
 	if err != nil {
 		t.Fatal(err)
 	}

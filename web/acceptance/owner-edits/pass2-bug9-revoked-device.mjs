@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 9: a revoked device is read-only. Its page carries a
 // "Revoked on <date> by <person>" banner, offers no Actions menu or Assign
 // profile, and every mutating tab's controls are disabled. Encryption keeps

@@ -1,0 +1,78 @@
+[
+  {
+    "name": "AVG-99002",
+    "packages": [
+      "synthetic-arch-editor"
+    ],
+    "status": "Unknown",
+    "severity": "Unknown",
+    "type": "synthetic parser case",
+    "affected": "8.0.1224-1",
+    "fixed": "8.0.1225-1",
+    "ticket": null,
+    "issues": [
+      "CVE-2099-99100",
+      "CVE-2099-99101",
+      "CVE-2099-99102",
+      "CVE-2099-99103",
+      "CVE-2099-99104",
+      "CVE-2099-99105",
+      "CVE-2099-99106",
+      "CVE-2099-99107",
+      "CVE-2099-99108",
+      "CVE-2099-99109",
+      "CVE-2099-99110",
+      "CVE-2099-99111",
+      "CVE-2099-99112"
+    ],
+    "advisories": []
+  },
+  {
+    "name": "AVG-99003",
+    "packages": [
+      "synthetic-arch-reader"
+    ],
+    "status": "Vulnerable",
+    "severity": "High",
+    "type": "synthetic parser case",
+    "affected": "6.5.28-6",
+    "fixed": null,
+    "ticket": null,
+    "issues": [
+      "CVE-2099-99011"
+    ],
+    "advisories": []
+  },
+  {
+    "name": "AVG-99004",
+    "packages": [
+      "synthetic-arch-desktop"
+    ],
+    "status": "Not affected",
+    "severity": "Unknown",
+    "type": "synthetic parser case",
+    "affected": "62.1-1",
+    "fixed": "62.1.1-1",
+    "ticket": null,
+    "issues": [
+      "CVE-2099-99012"
+    ],
+    "advisories": []
+  },
+  {
+    "name": "AVG-99005",
+    "packages": [
+      "synthetic-arch-compressor"
+    ],
+    "status": "Fixed",
+    "severity": "High",
+    "type": "synthetic parser case",
+    "affected": "3:6.2.12-2",
+    "fixed": "3:6.2.12-3",
+    "ticket": null,
+    "issues": [
+      "CVE-2099-99013"
+    ],
+    "advisories": []
+  }
+]

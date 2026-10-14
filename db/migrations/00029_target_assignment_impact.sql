@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Short-lived review evidence, never an assignment or native execution head.
 CREATE TABLE target_assignment_impact_reports (

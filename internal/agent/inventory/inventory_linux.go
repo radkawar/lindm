@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package inventory collects bounded local Linux evidence. It does not enroll a

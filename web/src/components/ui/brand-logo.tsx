@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { cn } from "cn";
 
 // Owner-selected C5 monoline. The Inter 600 wordmark is outlined, not rendered text.

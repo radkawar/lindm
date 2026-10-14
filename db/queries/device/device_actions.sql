@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertDeviceAction :exec
 INSERT INTO device_actions (id, device_id, generation_id, capability, luks_uuids, request_id, request_digest, request_document, actor_id, authorization_version, approval_id, intent_envelope, intent_document, issued_at, expires_at)
 VALUES (sqlc.arg('id'), sqlc.arg('device_id'), sqlc.arg('generation_id'), sqlc.arg('capability'), sqlc.arg('luks_uuids'), sqlc.arg('request_id'), sqlc.arg('request_digest'), sqlc.arg('request_document'), sqlc.arg('actor_id'), sqlc.arg('authorization_version'), sqlc.narg('approval_id'), sqlc.arg('intent_envelope'), sqlc.arg('intent_document'), sqlc.arg('issued_at'), sqlc.arg('expires_at'));

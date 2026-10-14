@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // This module drives visible controls only. No RPC client, request interception,
 // cookie import, synthetic WebAuthn API or alternate application implementation.
 

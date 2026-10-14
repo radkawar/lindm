@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package packaging
@@ -118,7 +120,7 @@ fi
 Version: %s
 Release: %s
 Summary: %s
-License: UNLICENSED
+License: Apache-2.0
 ExclusiveArch: %s
 %s
 

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Catalog publication does not activate resources. Immutable protobuf resource
 -- records retain all typed desired dimensions, ownership and verification policy.
 -- +goose Up

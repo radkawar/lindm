@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /accounts is a read view. Each account is a row (role, device
 // access, plain sign-in state) and changes start only from its Edit dialog; the
 // seeded approver reads as Admin, not a second owner; local sign-in hides the

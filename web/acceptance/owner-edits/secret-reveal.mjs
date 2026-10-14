@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner tasks on a secret's page: no raw profile-reference JSON, only guidance
 // to choose it in a profile; a single-spaced, forgiving typed confirmation that
 // still names the secret; Reveal secret and Request approval are not

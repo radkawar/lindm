@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package identity is the admin session boundary.
 //
 // Local login requires password plus WebAuthn; optional external login uses

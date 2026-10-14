@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # git recreates the files a checkout changes writable; make the shared main
 # checkout's tracked files read-only again. Private worktrees stay writable.
 exec "$(dirname "$0")/protect"

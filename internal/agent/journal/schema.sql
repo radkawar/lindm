@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Protected authority and trust retain independent revisions. Resource actions,
 -- monotonic kind/key floors and capacity accounting commit in one transaction.
 -- Only this schema is supported; older journals hold for re-provisioning.

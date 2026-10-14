@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+
 import { resolve, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { ChromiumDriver, WebDriver, UI } from "./drivers.mjs";

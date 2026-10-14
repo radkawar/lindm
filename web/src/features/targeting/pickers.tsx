@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createContext, useContext, type ReactNode } from "react";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";

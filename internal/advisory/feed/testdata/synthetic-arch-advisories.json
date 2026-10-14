@@ -1,0 +1,11 @@
+[
+  {
+    "name": "ASA-209902-99",
+    "date": "2099-02-12",
+    "group": "AVG-99001",
+    "package": "synthetic-arch-radio",
+    "severity": "High",
+    "type": "synthetic parser case",
+    "reference": "https://fixtures.example.invalid/arch/ASA-209902-99"
+  }
+]

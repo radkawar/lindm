@@ -1,0 +1,21 @@
+<update from="fixtures@example.invalid" status="stable" type="unspecified" version="2.0">
+    <id>FEDORA-2099-abcdef5678</id>
+    <title>Synthetic foreign-release update</title>
+    <issued date="2026-01-02 12:00:00"/>
+    <updated date="2026-01-03 12:00:00"/>
+    <rights>Copyright 2026 lindm contributors. SPDX-License-Identifier: Apache-2.0</rights>
+    <release>Fedora 45</release>
+    <severity>None</severity>
+    <summary>Synthetic nonsecurity update for a different release.</summary>
+    <description>This fictional record must not enter Fedora 44 findings.</description>
+    <references/>
+    <pkglist>
+      <collection short="F45">
+        <name>Fedora 45</name>
+        <package name="synthetic-rpm-loader" version="6.1" release="7" epoch="0" arch="src"/>
+        <package name="synthetic-rpm-loader-ia32" version="6.1" release="7" epoch="0" arch="x86_64"/>
+        <package name="synthetic-rpm-loader-x64" version="6.1" release="7" epoch="0" arch="x86_64"/>
+        <package name="synthetic-rpm-loader-aa64" version="6.1" release="7" epoch="0" arch="aarch64"/>
+      </collection>
+    </pkglist>
+  </update>

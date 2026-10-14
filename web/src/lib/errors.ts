@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Code, ConnectError } from "@connectrpc/connect";
 import { ViolationsSchema } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import { DeviceActionSchema, type DeviceAction } from "../../gen/lindm/admin/v1/device_actions_pb";

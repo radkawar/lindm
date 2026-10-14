@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the route device's Actions tab lists each past action as one
 // collapsed line (what, by whom, when, outcome) that expands to the full result,
 // and remote assistance has its own tab instead of sitting below the history.

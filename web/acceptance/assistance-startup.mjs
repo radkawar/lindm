@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Startup evidence is a closed vocabulary, never an exception message, stack,
 // launch command, environment or credential-bearing observation. A failure
 // once the console is loaded adds only a bounded observation of what the page

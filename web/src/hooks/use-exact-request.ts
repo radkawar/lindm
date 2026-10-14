@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";

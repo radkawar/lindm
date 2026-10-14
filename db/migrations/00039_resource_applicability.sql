@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Applicability is evaluated against the device's recorded platform facts:
 -- 8 = not applicable to this device (never dispatched, excluded from

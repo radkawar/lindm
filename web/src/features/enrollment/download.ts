@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Only explicit user-initiated file delivery. The URL is an opaque local Blob
 // handle, never a credential-bearing network URL; it is immediately revoked.
 export function downloadEnrollmentFile(name: string, content: string): void {

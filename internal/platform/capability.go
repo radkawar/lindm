@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package platform
 
 // Capability is one gated product capability. Capability names are also the

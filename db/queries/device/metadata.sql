@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockInventoryMetadata :exec
 SELECT singleton FROM inventory_metadata_lock WHERE singleton FOR UPDATE;
 

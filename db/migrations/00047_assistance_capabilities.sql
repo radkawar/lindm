@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Only bounded capability/display projection and operation identity are durable.
 -- Clipboard and notification text, including read results, never enter SQL.

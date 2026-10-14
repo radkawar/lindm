@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /audit opens on human decisions, not read-only or system churn.
 // Read-only: switches quick views and restores the default view afterwards.
 export const task = {

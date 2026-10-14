@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (Safety → Approvals): an empty decision reason explains why
 // Approve and Reject are disabled; a risk acceptance whose finding the device
 // no longer reports reads as Invalid with no way to approve it, even with a

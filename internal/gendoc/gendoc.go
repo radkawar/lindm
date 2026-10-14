@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package gendoc renders Markdown blocks generated from declarative registries
 // and keeps them in sync between explicit markers in hand-written documents.
 // Rendered tables are already in Prettier's canonical form so the formatter and

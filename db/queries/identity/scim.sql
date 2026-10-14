@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockSCIMConfiguration :exec
 SELECT pg_advisory_xact_lock(741916423);
 

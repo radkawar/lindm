@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package packageprovider reconciles native APT, DNF, pacman and zypper packages

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Audit search metadata is separate from the original hash-bound audit payload.
 -- +goose Up
 -- +goose StatementBegin

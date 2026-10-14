@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -275,7 +277,7 @@ func TestOCITrustBytesSupportTLSAndAreBoundByVerifier(t *testing.T) {
 		t.Fatal(err)
 	}
 	image := filepath.Join(directory, "image.tar")
-	if err := buildOCI(binary, caPath, image, "lindmd", "amd64", 1760000000); err != nil {
+	if err := buildOCI(binary, caPath, image, "lindmd", "amd64", 1760000000, filepath.Join("..", "packaging", "assets")); err != nil {
 		t.Fatal(err)
 	}
 	artifact := &releasev1.ReleaseArtifact{Product: "lindmd", Architecture: "amd64"}

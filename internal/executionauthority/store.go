@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package executionauthority persists quorum-authorized public execution trust.
 // It never holds signing keys or treats administrator/device hints as signatures.
 package executionauthority

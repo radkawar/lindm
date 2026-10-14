@@ -1,90 +1,64 @@
-Debian security-tracker JSON fixture provenance
+SYNTHETIC Debian security-tracker fixture provenance
+===================================================
 
-Authoritative export: https://security-tracker.debian.org/tracker/data/json
-Acquired over certificate-verified HTTPS on 2026-10-09 at approximately 23:08 UTC.
-Original response: 82397615 bytes.
-Original response SHA-256:
-24149e2be1e07c38c81bbe57f93e5151839f152e9a75926ee0ab1d06dd45d649
-Observed response headers:
-  Date: Fri, 09 Oct 2026 23:07:00 GMT
-  Last-Modified: Fri, 09 Oct 2026 21:41:59 GMT
-  Age: 2660
-  Cache-Control: max-age=3600, stale-while-revalidate=60
-  Content-Type: application/json
-  Content-Length: 82397615
+synthetic-debian-tracker-subset.json is independently authored for lindm.
+Copyright 2026 lindm contributors. SPDX-License-Identifier: Apache-2.0
+SHA256: 43e03fbf230a25f87054e765a136a57826e30b9da215884d3a071ce05e44c47e
+No original vendor record, description or vulnerability assertion remains in it.
+The prior tracker subset was removed because an explicit dataset grant was unclear.
+A software license for the tracker does not establish a license for its data.
 
-Retained fixture: debian-tracker-subset.json (6640 bytes)
-SHA-256: 02e84a980e3834906ca41fbbd5ec456cdb19c97e6f77341d263cb37198dc910a
-This is intentionally a subset, not the full export. Each retained issue value
-is copied byte-for-byte from the original response (including all releases and
-repository versions); only surrounding source-package dictionaries were rebuilt,
-with a terminal newline. No status, version, urgency, description or date was
-manufactured. The original full response is not committed.
-
-Selected source-package/issue pairs:
-  openssh / CVE-2024-6387: bookworm resolved, fixed 1:9.2p1-2+deb12u3.
-  openssh / CVE-2024-6409: resolved with fixed_version "0" (not affected).
-  openssh / CVE-2026-59995: bookworm open, no-DSA Minor issue, postponed.
-  angular.js / CVE-2026-27970: bookworm undetermined.
-  adduser / TEMP-0331720-9168FE: provisional tracker identifier, not a CVE.
-  389-ds-base / CVE-2016-5416: bookworm open with unimportant urgency.
-
-Backport corroboration:
-https://www.debian.org/security/2024/dsa-5724
-redirects to the actual announcement:
-https://lists.debian.org/debian-security-announce/2024/msg00135.html
-DSA-5724-1, July 01 2024, states that stable/bookworm CVE-2024-6387 is
-fixed in 1:9.2p1-2+deb12u3. This is a Debian revision backport, not an upstream
-OpenSSH semantic-version range. The parser uses the export's source package
-openssh and fixed_version, never the newer repositories entries. Native installed
-predecessor/successor versions in tests are explicit test inputs, not extra vendor
-records. Matchers must use inventory SourceName and SourceVersion for binaries
-such as openssh-server; no binary name/version map is inferred from this export.
-
-Not-affected corroboration:
-https://security-tracker.debian.org/tracker/CVE-2024-6409
-states "openssh <not-affected> (Exploitable issue in RHEL9 packaged versions)".
-A resolved fixed_version of "0" is a not-affected assertion for this record, not a
-literal installed-version threshold and not evidence that the entire package is
-safe from other issues. No architecture scope is published in this JSON export.
-
-Vendor semantics and release mapping:
+Schema references, not copied fixture sources:
 https://security-team.debian.org/security_tracker.html
+https://security-tracker.debian.org/tracker/data/json
 https://www.debian.org/releases/
-https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/lib/python/security_db.py
-The source's calculateJson method selects source_package_status/source_packages,
-produces open/resolved/undetermined, emits fixed_version only for resolved entries,
-and chooses base/security/LTS repository states. Package versions in repositories
-are archive observations, not the first version fixing a vulnerability.
-11=bullseye, 12=bookworm, 13=trixie are explicit numeric release mappings. Mutable
-stable/oldstable aliases and future testing releases are not inferred. This
-acquired export contains bookworm, trixie, forky and sid, not bullseye. A mapped
-release missing entirely from the input must fail rather than become a clean feed.
 
-No-DSA, ignored and postponed annotations describe the vendor's update policy,
-not non-vulnerability: open entries remain affected without a known fix.
-Historical low/medium/high urgency is retained through the shared normalizer;
-not yet assigned/end-of-life becomes unknown severity. Unimportant is retained as
-negligible, not treated as a blanket clean assertion: the vendor also uses it for
-packages not covered by security support. Undetermined is an explicit unknown
-assessment, not an open confirmed vulnerability or a safe package. Unknown status
-and unsupported constraint fields fail closed. Provisional TEMP identifiers are
-preserved as advisory IDs without inventing CVE aliases.
+Fictional coverage map
+----------------------
+synthetic-deb-source / CVE-2099-99001:
+  bookworm resolved; first fix 3:7.4-2+deb12u3; archive/security versions are newer.
+  trixie resolved; first fix 3:8.1-7; archive/security versions are newer.
+  forky and sid records exercise ignoring unconfigured suites.
+synthetic-deb-source / CVE-2099-99002:
+  resolved fixed_version "0" means not affected, not an installed threshold.
+synthetic-deb-source / CVE-2099-99003:
+  bookworm/trixie open without a fixed boundary; nodsa and postponed annotations
+  do not authorize a clean assessment. Future-suite fixed versions do not leak.
+synthetic-deb-widget / CVE-2099-99004:
+  undetermined remains an unknown assessment without a fabricated fixed version.
+synthetic-deb-account / TEMP-0999001-ABCDEF:
+  provisional strict-format identifier with a low-severity fix 8.77; no CVE alias.
+  The record deliberately has no description and carries a fictional bug number.
+synthetic-deb-directory / CVE-2099-99005:
+  open with unimportant urgency remains affected, normalized to negligible severity.
 
-Coverage and time caveats:
-The full export is much broader than the DSA-only OSV records, but does not prove
-complete inventory coverage. It emits tracked issues for source packages in
-supported releases, not an authenticated package universe or inventory-specific
-binary/source mapping; removed/untracked source packages and unsupported suites
-cannot be declared clean by absence. Both full exports and selected imports remain
-partial coverage in this implementation. No current export can certify the
-absence of undiscovered or not-yet-triaged vulnerabilities.
-The JSON has no publication date, modification date, generated-at timestamp,
-snapshot signature or acquisition timestamp. Advisory published_at remains absent;
-neither the CVE year, DSA announcement date nor acquisition clock is substituted.
-HTTPS authenticates acquisition but does not make a previously cached vendor
-export current. Local checked_at/max_age measures local acquisition age only;
-HTTP Last-Modified/Age observed above are distinct transport metadata and are not
-record publication dates. Air-gap custody and capture age require separate trusted
-operator evidence. These fixtures establish parser behavior, not current live
-vulnerability coverage, signature verification, or executed test results.
+All package names, issue identifiers, package versions, descriptions and bug numbers
+are fictional. Debian release codenames and field/status/urgency names retain schema
+identity. No bullseye entry exists: release 11 must fail rather than imply clean.
+The document has no publication/modification/acquisition timestamps or signatures.
+Parser-generated tracker URLs reflect schema rules, not real vendor pages for these
+fictional issues. The fixture does not prove current vulnerability coverage.
+
+Preserved parser and evaluator assertions
+-----------------------------------------
+feed/debian_tracker_test.go checks six bookworm assessments; source-only identity;
+missing architecture/date; CVE and provisional-ID handling; Debian 12/13 first-fix
+selection; dpkg epoch, revision and tilde ordering; exact distro/release/architecture
+scope; partial coverage; and raw source digest identity.
+
+Malformed-input cases retain array/null/empty roots, empty/null issues, missing
+releases, unsupported statuses, absent/empty/invalid fixes, contradictory open or
+undetermined fixes, unknown constraint fields, missing repositories, duplicate
+packages/issues, invalid issue IDs, truncation, trailing objects, oversized records,
+unsupported/missing suites and a foreign distro.
+
+feed/acquire_test.go retains HTTPS acquisition, expected-byte identity and complete
+transport ownership. advisory/vendor_integration_test.go retains source/binary
+version divergence, not-affected exclusion, open/undetermined behavior, null dates
+and persisted partial coverage. These are controlled database inputs, not native
+installations or live vendor matching proof.
+
+The companion synthetic Debian OSV source-only fixture is documented in provenance.txt.
+The production tracker endpoint, release mapping and native comparator are unchanged.
+Real-feed qualification records remain in lab/ledger.json and the Debian matrix
+section of docs/verification.md; repository synthetic data is not that evidence.

@@ -672,12 +672,21 @@ Arch Linux ARM compatibility is invented. Actual fetched-byte hashes and the
 separate native qualification boundary are in
 [verification](../verification.md#rolling-advisory-source-evidence).
 
+Checked-in issue/status/ASA fixtures now use independently authored **synthetic**
+data under Apache-2.0 because the original advisory-data grant was unclear.
+Fictional IDs, package revisions and text preserve status, native ordering and
+publication-join assertions. The separate upstream version vectors keep their
+original GPL-2.0-or-later license. See
+[fixture provenance](../../internal/advisory/feed/testdata/arch-provenance.txt).
+Synthetic data does not replace the real-feed evidence above or the native
+qualification records in [`lab/ledger.json`](../../lab/ledger.json).
+
 The registry uses that canonical issue-export path, not the `/all.json` redirect.
 The native lane independently hashes the actual response URL and compares it to
 each published artifact URL and digest. An attempt through the old alias failed
 that exact provenance check despite publishing 2,512 records; it is retained as
-a failure, not excused by accepting a URL mismatch. Historical feed fixture
-provenance retains both the originally requested and final URLs.
+a failure, not excused by accepting a URL mismatch. The original acquisition
+record retains requested/final URLs; current synthetic fixtures make no such claim.
 
 The maintained native lane is `lab matrix run -platform arch -cells advisories
 -architecture x86_64 -repo "$FIXTURE" -evidence NEW_DIRECTORY`. It needs the

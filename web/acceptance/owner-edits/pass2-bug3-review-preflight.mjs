@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 3: a restart was refused with "Inventory needs refreshing"
 // only after Send, although the device had checked in a minute earlier, and Send
 // stayed enabled beside the refusal. The review now runs the server's create

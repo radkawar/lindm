@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package jobs supervises the control plane's background jobs across replicated
 // lindmd instances. Exclusive jobs run on at most one instance at a time under a
 // PostgreSQL session advisory lock held by a dedicated coordination session;

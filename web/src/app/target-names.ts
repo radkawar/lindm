@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery } from "@tanstack/react-query";
 import type { TargetRef } from "../../gen/lindm/policy/v1/targeting_pb";
 import { deviceQueryOptions } from "@/features/devices/queries";

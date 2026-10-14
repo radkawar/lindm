@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -70,5 +72,55 @@ func TestSourceDigestRefusesLinksAndHonorsCancellation(t *testing.T) {
 	cancel()
 	if _, err := SourceDigest(ctx, source); err == nil {
 		t.Fatal("ignored cancellation")
+	}
+}
+
+func TestSourceCaptureHonorsUnstagedTrackedDeletion(t *testing.T) {
+	source := t.TempDir()
+	if output, err := exec.CommandContext(t.Context(), "git", "init", "--quiet", source).CombinedOutput(); err != nil {
+		t.Fatalf("initialize source: %v: %s", err, output)
+	}
+	for _, name := range []string{"current.go", "retired.json"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte(name), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if output, err := exec.CommandContext(t.Context(), "git", "-C", source, "add", "--all").CombinedOutput(); err != nil {
+		t.Fatalf("track source: %v: %s", err, output)
+	}
+	original, err := SourceDigest(t.Context(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(source, "retired.json")); err != nil {
+		t.Fatal(err)
+	}
+	unstaged, err := SourceDigest(t.Context(), source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unstaged == original {
+		t.Fatal("removing tracked source did not change its digest")
+	}
+	capture := filepath.Join(t.TempDir(), "capture")
+	if err := os.Mkdir(capture, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshot(t.Context(), source, capture); err != nil {
+		t.Fatal(err)
+	}
+	captured, err := treeDigest(capture)
+	if err != nil || captured != unstaged {
+		t.Fatalf("unstaged removal digest %s differs from captured tree %s: %v", unstaged, captured, err)
+	}
+	if _, err := os.Stat(filepath.Join(capture, "retired.json")); !os.IsNotExist(err) {
+		t.Fatalf("removed source remains in capture: %v", err)
+	}
+	if output, err := exec.CommandContext(t.Context(), "git", "-C", source, "add", "--all").CombinedOutput(); err != nil {
+		t.Fatalf("stage source removal: %v: %s", err, output)
+	}
+	staged, err := SourceDigest(t.Context(), source)
+	if err != nil || staged != unstaged {
+		t.Fatalf("staging the same removal changed source digest: %v", err)
 	}
 }

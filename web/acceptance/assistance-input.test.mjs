@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Runs production input logic with Node's built-in TypeScript stripping and test runner.
 import assert from "node:assert/strict";
 import test from "node:test";

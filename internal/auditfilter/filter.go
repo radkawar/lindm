@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package auditfilter normalizes shared audit selections for SQL and cursor
 // binding. Schema validation belongs to the RPC validators; category membership
 // is captured by the database's audit_action_category function, except the

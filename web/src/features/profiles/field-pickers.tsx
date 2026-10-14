@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createContext, useContext, type ReactNode } from "react";
 import { type PickerSlot } from "@/components/ui/search-picker";
 

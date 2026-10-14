@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertAdminRequest :exec
 INSERT INTO device_admin_requests (
     actor_id,

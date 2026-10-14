@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Pinned upstream: https://github.com/xkbcommon/libxkbcommon/tree/xkbcommon-1.11.0
 // keysym-utf.c's graphical mapping table is public domain (Markus G. Kuhn).
 // Keep the unmodified upstream source and LICENSE alongside this generator.

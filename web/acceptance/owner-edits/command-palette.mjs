@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the command palette finds actions, not only pages and devices, and
 // never describes its own implementation. Read-only: it opens the wipe review and
 // the one-time code dialog without choosing a target or creating a code.

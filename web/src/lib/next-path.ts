@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Where to go after sign-in. Only a same-origin console path is accepted:
 // never a scheme, another host ("//host"), a backslash form, the sign-in page
 // itself or a server-handled /auth endpoint.

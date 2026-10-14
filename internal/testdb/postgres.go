@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package testdb isolates PostgreSQL integration cases in disposable schemas.
 // Tests use the application's migration runner, not a second SQL-file parser.
 package testdb

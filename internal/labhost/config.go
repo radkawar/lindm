@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package labhost owns lab host configuration, capacity selection, process-held
 // leases and maintained local/SSH host preparation and dispatch. Guest scenario
 // implementations and their lifecycle assertions belong to the VM lab.

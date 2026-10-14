@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Advisory coverage banner: /advisories opens with why devices are unchecked,
 // grouped by cause with a remedy each; every Incomplete source names what is
 // missing; source URLs stay in collapsed Details; no "No CVEs listed" filler.

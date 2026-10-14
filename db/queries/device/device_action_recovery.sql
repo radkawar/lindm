@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertDeviceActionRecovery :exec
 INSERT INTO device_action_recovery (action_id, credential_id, certificate_id, session_epoch, public_key, handoff_proof, handoff_document, credential_envelope, credential_sha256, credential_document, boot_grant_envelope, root_json, delegation_envelope, expires_at)
 VALUES (sqlc.arg('action_id'), sqlc.arg('credential_id'), sqlc.arg('certificate_id'), sqlc.arg('session_epoch'), sqlc.arg('public_key'), sqlc.arg('handoff_proof'), sqlc.arg('handoff_document'), sqlc.arg('credential_envelope'), sqlc.arg('credential_sha256'), sqlc.arg('credential_document'), sqlc.arg('boot_grant_envelope'), sqlc.arg('root_json'), sqlc.arg('delegation_envelope'), sqlc.arg('expires_at'));

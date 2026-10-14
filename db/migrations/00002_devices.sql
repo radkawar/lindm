@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Device enrollment, certificates, inventory, and admin idempotency.

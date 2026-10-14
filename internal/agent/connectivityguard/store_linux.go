@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package connectivityguard owns one root-only, durable firewall rollback slot.

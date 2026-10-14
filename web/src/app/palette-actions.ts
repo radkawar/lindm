@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { UseNavigateResult } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {

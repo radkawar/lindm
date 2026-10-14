@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { equals } from "@bufbuild/protobuf";
 import { Link } from "@tanstack/react-router";
 import { createContext, Fragment, useContext, type ReactNode } from "react";

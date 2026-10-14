@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package resourceprovider is the agent's per-kind resource provider contract:
 // the executor-side Provider (Observe -> Plan -> Apply -> Verify), the uniform
 // input every kind's root-helper half receives (NativeEnv), and the closed

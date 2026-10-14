@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package transport runs the unprivileged agent network process. Identity keys,
 // signing authority, session epochs and rotation intent stay in the executor.
 package transport

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package ctl implements the browser-authorized administrative client and offline
 // owner delegation signing. It owns pinned transport and private CLI credentials,
 // not server authorization policy.

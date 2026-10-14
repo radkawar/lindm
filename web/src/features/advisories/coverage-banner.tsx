@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, toJsonString } from "@bufbuild/protobuf";
 import { Link } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";

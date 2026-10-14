@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package targeting owns bounded server-side membership, immutable resolution
 // previews and rollout gates. It grants neither RBAC membership nor native effect
 // authority. Callers must AuthorizeFresh before opening their transaction, then

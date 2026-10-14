@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # Make the shared main checkout's tracked regular files, and the directories
 # holding them, read-only (a-w) again
 # after git rewrote some (a merge, pull or checkout recreates the files it

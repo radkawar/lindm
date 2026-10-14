@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Delivered rows are the bulk of the table; the console summary counts recent
 -- deliveries per destination and reads the latest delivery time from this index.

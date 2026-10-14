@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package webauthnlab implements a laboratory-only P-256 software authenticator.
 // It produces real WebAuthn registration and signed assertion responses, not
 // verifier mocks. It provides no hardware protection or evidence of human presence

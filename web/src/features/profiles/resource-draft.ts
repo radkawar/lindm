@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { type DescField, type JsonObject, type JsonValue } from "@bufbuild/protobuf";
 import { ResourceDesiredStateSchema } from "../../../gen/lindm/resource/v1/resource_pb";
 import { ResourceKindSchema } from "../../../gen/lindm/resource/v1/identity_pb";

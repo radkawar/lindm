@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+
 // Console UI review runner for `lab console review` (docs/engineering.md).
 // Private JSON-file API like run.mjs: credentials arrive in a 0600 config file and
 // are never printed, persisted or placed in evidence. Sign-in uses the real

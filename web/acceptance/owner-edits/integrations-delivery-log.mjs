@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, Integrations): the delivery log listed every webhook
 // delivery ("SOC webhook · Delivered · 1 · None"). Failures are listed by
 // default and delivered events are counted per destination, expandable.

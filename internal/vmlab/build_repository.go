@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package vmlab
 
 // VMBuildRepository selects compilation inputs without rebinding the development

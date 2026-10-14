@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create } from "@bufbuild/protobuf";
 import { DeviceScopeSchema, type DeviceScope } from "../../../gen/lindm/auth/v1/authorization_pb";
 import { SuggestionField } from "../../../gen/lindm/admin/v1/suggestions_pb";

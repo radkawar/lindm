@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { timestampDate, type Timestamp } from "@bufbuild/protobuf/wkt";
 
 // The console has one time format: "Oct 12, 10:18 AM BST" (the year only when it

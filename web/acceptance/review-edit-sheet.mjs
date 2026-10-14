@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createHash, randomUUID } from "node:crypto";
 
 const escape = (value) =>

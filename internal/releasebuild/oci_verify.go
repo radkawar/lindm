@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -14,6 +16,7 @@ import (
 	"slices"
 
 	releasev1 "lindm/gen/lindm/release/v1"
+	"lindm/internal/packaging"
 )
 
 // External OCI descriptor schema; release exports deliberately use one static,
@@ -196,8 +199,8 @@ func verifyOCIConfig(configJSON []byte, product, architecture, layerDigest strin
 	return nil
 }
 
-// verifyOCILayer streams the next archive member as the described layer: exactly
-// the product binary and the pinned CA bundle, with the descriptor's digest.
+// verifyOCILayer streams the product binary, pinned CA bundle and complete
+// redistribution texts, binding every member to the descriptor's digest.
 func verifyOCILayer(archive *tar.Reader, descriptor imageDescriptor, product, caPin string, bundle ...string) error {
 	layerName, err := descriptorPath(descriptor, "application/vnd.oci.image.layer.v1.tar")
 	if err != nil {
@@ -236,6 +239,18 @@ func verifyOCILayer(archive *tar.Reader, descriptor imageDescriptor, product, ca
 			if hex.EncodeToString(sum[:]) != caPin {
 				return errors.New("releasebuild: actual OCI CA differs from SBOM/provenance")
 			}
+		}
+	}
+	for _, name := range packaging.LicenseNames() {
+		header, err := layer.Next()
+		if err != nil {
+			return err
+		}
+		if header.Name != "usr/share/doc/"+product+"/"+name || header.Typeflag != tar.TypeReg || header.Mode != 0444 || header.Uid != 0 || header.Gid != 0 || header.Size <= 0 || header.Size > 1<<20 {
+			return errors.New("releasebuild: OCI redistribution text missing or invalid")
+		}
+		if _, err := io.Copy(io.Discard, layer); err != nil {
+			return err
 		}
 	}
 	if len(bundle) != 0 && bundle[0] != "" {

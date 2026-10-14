@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package offlinebundle builds, verifies and imports signed air-gap bundles.
 //
 // A bundle is a directory with a fixed layout: release/ (a verified release

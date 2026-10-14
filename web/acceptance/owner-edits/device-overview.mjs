@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the route device's Overview opens with a security posture summary
 // whose rows each open their tab, the header carries at most two buttons, users
 // and interfaces live under Inventory, and a confirmed account lock reads as plain

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2 findings 48): an http:// address and a 5-character secret
 // gave no visible error; a failing destination showed a raw reason code and no
 // health. Each field explains its rule before submit, and every destination

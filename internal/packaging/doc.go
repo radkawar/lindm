@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package packaging builds signed native lindm-agent, lindmd and lindmctl artifacts.

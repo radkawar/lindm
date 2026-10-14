@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { type DescEnum, type JsonObject, type JsonValue } from "@bufbuild/protobuf";
 import type { QualifiedResourceKind } from "../../../gen/lindm/admin/v1/profiles_pb";
 import {

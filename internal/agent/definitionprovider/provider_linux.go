@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package definitionprovider owns a closed systemd definition surface: UTC daily

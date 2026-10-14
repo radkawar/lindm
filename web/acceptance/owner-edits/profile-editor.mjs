@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, Profile editor: the draft leads and the version picker is a
 // compact secondary control; "Start over" sits in the editor header; no
 // "N of 64 settings" counter; a new setting starts as "Choose a setting type";

@@ -2,7 +2,12 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: lindm
 
 Files: *
-Copyright: Lindm
-License: UNLICENSED
- No public software license has been selected for this internal
- development package. It is not licensed for redistribution.
+Copyright: lindm contributors
+License: Apache-2.0
+ The complete Apache License, Version 2.0 is installed alongside this file
+ as LICENSE. Attribution and upstream exceptions are described in NOTICE.
+ .
+ Copied source, bundled fonts and linked dependencies retain their original
+ terms. Their complete copyright, permission and license texts are installed
+ alongside this file as THIRD-PARTY-LICENSES; that file records package versions,
+ original file identities and source-text SHA-256 digests.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -50,9 +52,14 @@ func bundleForProduct(product, bundle string) string {
 	return ""
 }
 
-func exportRelease(ctx context.Context, exported string, request Request, signer *releaseSigner, sourceDigest string, first, second *buildOutput, bundle string) (*releasev1.ReleaseManifest, error) {
+func exportRelease(ctx context.Context, exported string, request Request, signer *releaseSigner, sourceDigest string, first, second *buildOutput, bundle, licenses string) (*releasev1.ReleaseManifest, error) {
 	if err := compareBuilds(first, second); err != nil {
 		return nil, err
+	}
+	for _, name := range packaging.LicenseNames() {
+		if err := copyNew(filepath.Join(licenses, name), filepath.Join(exported, name), 0o644); err != nil {
+			return nil, err
+		}
 	}
 	var bundleDigest string
 	if bundle != "" {

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- The rows a single-host (local accounts) deployment last served by the release
 -- before c793dfef holds. Its permission vocabulary had remote_assistance.run,
 -- which granted both viewing and controlling a device.

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Content-addressed advisory finding sets. Matching depends only on the feed

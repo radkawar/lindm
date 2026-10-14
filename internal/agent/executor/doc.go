@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package executor is the agent's root-owned authority boundary. Service
 // implements the local ExecutorService. The unprivileged network agent reaches
 // it only through localrpc. It holds the device identity and TLS keys and the

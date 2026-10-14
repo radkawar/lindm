@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -34,10 +36,10 @@ import (
 func TestVendorBackportsPersistWithoutUpstreamFalsePositives(t *testing.T) {
 	cases := []struct{ distro, release, file, name, manager, old, fixed, source string }{
 		{"ubuntu", "24.04", "ubuntu-USN-6859-1.json", "openssh-server", "dpkg", "1:9.6p1-3ubuntu13.2", "1:9.6p1-3ubuntu13.3", "openssh"},
-		{"debian", "12", "debian-DSA-5724-1.json", "openssh-server", "dpkg", "1:9.2p1-2+deb12u2", "1:9.2p1-2+deb12u3", "openssh"},
-		{"rocky", "9", "rocky-RLSA-2024-6783.json", "openssl", "rpm", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", ""},
+		{"debian", "12", "synthetic-debian-DSA-99001-1.json", "synthetic-deb-client", "dpkg", "3:7.4-2+deb12u2", "3:7.4-2+deb12u3", "synthetic-deb-source"},
+		{"rocky", "9", "synthetic-rocky-RLSA-2099-99030.json", "synthetic-rocky-library", "rpm", "2:6.2.1-13.el9_4", "2:6.2.1-14.el9_4", ""},
 		{"almalinux", "9", "alma-ALSA-2024-6783.json", "openssl-libs", "rpm", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", ""},
-		{"fedora", "44", "fedora44-sudo.xml", "sudo", "rpm", "0:1.9.17-9.p2.fc44", "0:1.9.17-10.p2.fc44", ""},
+		{"fedora", "44", "synthetic-fedora44-updateinfo.xml", "synthetic-rpm-tool", "rpm", "0:8.4.2-11.p3.fc44", "0:8.4.2-12.p3.fc44", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.distro, func(t *testing.T) {
@@ -87,26 +89,26 @@ func TestVendorBackportsPersistWithoutUpstreamFalsePositives(t *testing.T) {
 
 func TestDeviceFindingsSortFiltersTotals(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "sudo-devel", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "synthetic-rpm-tool-devel", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	all, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), Sort: adminv1.DeviceFindingSort_DEVICE_FINDING_SORT_PACKAGE}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(all.Findings) != 2 || all.Findings[0].PackageName != "sudo" || all.Findings[1].PackageName != "sudo-devel" {
+	if len(all.Findings) != 2 || all.Findings[0].PackageName != "synthetic-rpm-tool" || all.Findings[1].PackageName != "synthetic-rpm-tool-devel" {
 		t.Fatalf("package order: %v", all.Findings)
 	}
 	if all.GetTotals().GetOpen() != 2 || all.GetTotals().GetAccepted() != 0 {
 		t.Fatalf("totals: %v", all.GetTotals())
 	}
-	filtered, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PackagePrefix: "SUDO-D"}, true, []byte("[]"))
+	filtered, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PackagePrefix: "SYNTHETIC-RPM-TOOL-D"}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(filtered.Findings) != 1 || filtered.Findings[0].PackageName != "sudo-devel" || filtered.GetTotals().GetOpen() != 1 {
+	if len(filtered.Findings) != 1 || filtered.Findings[0].PackageName != "synthetic-rpm-tool-devel" || filtered.GetTotals().GetOpen() != 1 {
 		t.Fatalf("package prefix filter: %v", filtered)
 	}
 	advisory := all.Findings[0].AdvisoryId
@@ -132,22 +134,22 @@ func TestDeviceFindingsSortFiltersTotals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(second.Findings) != 1 || second.Findings[0].PackageName != "sudo-devel" || second.NextPageToken != "" {
+	if len(second.Findings) != 1 || second.Findings[0].PackageName != "synthetic-rpm-tool-devel" || second.NextPageToken != "" {
 		t.Fatalf("second page: %v", second)
 	}
 	// A token is bound to its sort and filters.
-	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken, PackagePrefix: "sudo"}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
+	if _, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1, PageToken: first.NextPageToken, PackagePrefix: "synthetic-rpm-tool"}, true, []byte("[]")); !errors.Is(err, ErrConflict) {
 		t.Fatalf("token reused with different filters: %v", err)
 	}
 }
 
 func TestAdvisoryFreshnessExceptionsScopeAndRevision(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "sudo-devel", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}, &inventoryv1.Package{Name: "synthetic-rpm-tool-devel", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}
 	first, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
@@ -290,11 +292,11 @@ func TestAdvisoryImportPinAndFailedPublicationPreserveFeed(t *testing.T) {
 
 func TestAdvisoryOfflineImportCannotEstablishCurrentCoverage(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-12.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}
 	before, err := listEvaluated(t, s, request, true, []byte("[]"))
 	if err != nil {
@@ -303,7 +305,7 @@ func TestAdvisoryOfflineImportCannotEstablishCurrentCoverage(t *testing.T) {
 	if before.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR {
 		t.Fatalf("controlled complete feed did not establish native fix: %v", before)
 	}
-	raw, err := os.ReadFile("feed/testdata/fedora44-sudo.xml")
+	raw, err := os.ReadFile("feed/testdata/synthetic-fedora44-updateinfo.xml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,11 +365,11 @@ func TestFeedConfigurationChangeReparsesUnchangedSourceBytes(t *testing.T) {
 
 func TestUncoveredMultilibArchitectureIsUnknown(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "i686", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "i686", Manager: "rpm"})
 	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
@@ -387,7 +389,7 @@ func TestEvaluatorRechecksFeedlessDevicesAfterExternalConfiguration(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	before, err := listEvaluated(t, server, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
@@ -398,7 +400,7 @@ func TestEvaluatorRechecksFeedlessDevicesAfterExternalConfiguration(t *testing.T
 	if attempted, err := server.EvaluatePending(t.Context(), evaluationBatch); err != nil || attempted != 0 {
 		t.Fatalf("unchanged feed-less device evaluated again: %d %v", attempted, err)
 	}
-	external, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	external, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := external.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +424,7 @@ func TestEvaluationWaitsForConcurrentFeedConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	tx, err := pool.Begin(t.Context())
 	if err != nil {
 		t.Fatal(err)
@@ -432,7 +434,7 @@ func TestEvaluationWaitsForConcurrentFeedConfiguration(t *testing.T) {
 	if err := q.LockAdvisoryFeedConfiguration(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	source := &advisoryv1.FeedSource{Id: "fedora-44", Distro: "fedora", Release: "44", Architecture: "x86_64", Url: "https://vendor.example/fedora44-sudo.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, MaxAgeSeconds: 86400}
+	source := &advisoryv1.FeedSource{Id: "fedora-44", Distro: "fedora", Release: "44", Architecture: "x86_64", Url: "https://vendor.example/synthetic-fedora44-updateinfo.xml", Format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, MaxAgeSeconds: 86400}
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
 	if err != nil {
 		t.Fatal(err)
@@ -469,18 +471,18 @@ func TestEvaluationWaitsForConcurrentFeedConfiguration(t *testing.T) {
 // does.
 func TestRPMSigningKeyRowsDoNotMakeCoverageUnknown(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	sudo := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	sudo := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	key := &inventoryv1.Package{Name: "gpg-pubkey", Version: "0:7db87c81-4ab02935", Manager: "rpm"}
 	keyed := seedInventory(t, pool, "fedora", "44", sudo, key)
 	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: keyed.String()}, true, []byte("[]"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED || len(out.Findings) != 1 || out.Findings[0].PackageName != "sudo" {
+	if out.Freshness.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED || len(out.Findings) != 1 || out.Findings[0].PackageName != "synthetic-rpm-tool" {
 		t.Fatalf("signing key row changed device exposure: %v", out)
 	}
 	unarchitected := seedInventory(t, pool, "fedora", "44", sudo, &inventoryv1.Package{Name: "gpg-pubkey-helper", Version: "0:1.0-1.fc44", Manager: "rpm"})
@@ -495,7 +497,7 @@ func TestRPMSigningKeyRowsDoNotMakeCoverageUnknown(t *testing.T) {
 
 func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -536,7 +538,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 		t.Fatalf("scoped rejection metadata or current coverage lost: %v", status)
 	}
 	id := seedInventory(t, pool, "fedora", "44",
-		&inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"},
+		&inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"},
 		&inventoryv1.Package{Name: "openssl", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm", SourceName: "openssl", SourceVersion: "1:3.0.7-27.el9_4"},
 		&inventoryv1.Package{Name: "openssl-libs", Version: "1:3.0.7-27.el9_4", Architecture: "x86_64", Manager: "rpm", SourceName: "openssl", SourceVersion: "1:3.0.7-27.el9_4"})
 	request := &adminv1.ListDeviceFindingsRequest{DeviceId: id.String(), PageSize: 1}
@@ -557,7 +559,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 		if finding.State != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
 			t.Fatalf("device uncertainty did not dominate finding state: %v", finding)
 		}
-		if finding.PackageName == "sudo" {
+		if finding.PackageName == "synthetic-rpm-tool" {
 			if finding.Reason != "" || finding.FixedVersion == "" {
 				t.Fatalf("valid unrelated finding mislabeled as rejected: %v", finding)
 			}
@@ -587,7 +589,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 			t.Fatalf("risk acceptance overrode rejected-source uncertainty: %v", finding)
 		}
 	}
-	unrelated := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	unrelated := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-12.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	unaffected, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: unrelated.String()}, true, []byte("[]"))
 	if err != nil || unaffected.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_CLEAR || len(unaffected.GetFindings()) != 0 {
 		t.Fatalf("scoped rejection contaminated unrelated device: %v %v", unaffected, err)
@@ -604,7 +606,7 @@ func TestAdvisoryRejectedRecordsStayScopedAndDurable(t *testing.T) {
 
 func TestAdvisoryUnscopedRejectionAndManifestCapacity(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	doc.RejectedRecords = []*advisoryv1.RejectedRecord{{Id: "malformed-record", Reason: "advisory: package identity unavailable", Unscoped: true}}
 	// Publication must not assert complete coverage even if its caller leaves
 	// CompleteSnapshot set on a record with no trustworthy package scope.
@@ -615,7 +617,7 @@ func TestAdvisoryUnscopedRejectionAndManifestCapacity(t *testing.T) {
 	if err != nil || len(status.GetFeeds()) != 1 || status.Feeds[0].Fresh || len(status.Feeds[0].RejectedRecords) != 1 {
 		t.Fatalf("unscoped rejection asserted complete coverage: %v %v", status, err)
 	}
-	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-10.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	id := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-12.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	out, err := listEvaluated(t, s, &adminv1.ListDeviceFindingsRequest{DeviceId: id.String()}, true, []byte("[]"))
 	if err != nil || out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN || out.GetFreshness().GetReason() != "feed_partial_coverage" || len(out.GetFindings()) != 0 {
 		t.Fatalf("unscoped rejection cleared a device: %v %v", out, err)
@@ -646,7 +648,7 @@ func TestAdvisoryUncheckedGroupsMatchDeviceFreshness(t *testing.T) {
 		t.Fatal(err)
 	}
 	ubuntu := &inventoryv1.Package{Name: "openssh-server", Version: "1:9.6p1-3ubuntu13.3", Manager: "dpkg", Architecture: "amd64", SourceName: "openssh", SourceVersion: "1:9.6p1-3ubuntu13.3"}
-	debian := &inventoryv1.Package{Name: "openssh-server", Version: "1:9.2p1-2+deb12u3", Manager: "dpkg", Architecture: "amd64", SourceName: "openssh", SourceVersion: "1:9.2p1-2+deb12u3"}
+	debian := &inventoryv1.Package{Name: "synthetic-deb-client", Version: "3:7.4-2+deb12u3", Manager: "dpkg", Architecture: "amd64", SourceName: "synthetic-deb-source", SourceVersion: "3:7.4-2+deb12u3"}
 	type device struct {
 		id              uuid.UUID
 		osID, osVersion string
@@ -704,7 +706,7 @@ func TestAdvisoryUncheckedGroupsMatchDeviceFreshness(t *testing.T) {
 
 func TestAdvisoryRejectedRecordLegacyAssessmentRemainsUnknown(t *testing.T) {
 	pool, _ := testdb.Open(t)
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	// Simulate the fields an older server understands. The new rejection flag
 	// and manifest are not needed to preserve the existing unknown assessment.
 	doc.Advisories = []*advisoryv1.Advisory{{Id: "rejected-record", PackageName: "openssl", SourceUrl: source.Url, AssessmentUnknown: true}}

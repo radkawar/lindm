@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute } from "@tanstack/react-router";
 import { IntegrationsView } from "@/features/integrations/view";
 import { canPermission } from "@/lib/permissions";

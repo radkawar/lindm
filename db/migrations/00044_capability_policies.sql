@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Device management capability policies (lindm.admin.v1.CapabilityPolicy). A
 -- device's effective grant is the deployment policy united with every static or

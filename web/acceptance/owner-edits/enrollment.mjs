@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /enrollment leads with devices waiting for approval, lists only
 // active one-time codes by default and keeps history and offline enrollment one
 // step away. Read-only: expands and collapses the history, opens and closes the

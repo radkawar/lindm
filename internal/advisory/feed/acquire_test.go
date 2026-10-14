@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package feed
 
 import (
@@ -18,8 +20,8 @@ import (
 
 func TestAcquireMatchesParseStreamInput(t *testing.T) {
 	osv := fixture(t, "ubuntu-USN-6859-1.json")
-	tracker := fixture(t, "debian-tracker-subset.json")
-	updateinfo := fixture(t, "fedora44-sudo.xml")
+	tracker := fixture(t, "synthetic-debian-tracker-subset.json")
+	updateinfo := fixture(t, "synthetic-fedora44-updateinfo.xml")
 	updateDigest := sha256.Sum256(updateinfo)
 	var corrupt atomic.Bool
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

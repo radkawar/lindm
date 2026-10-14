@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import type { CapabilityPolicyScope } from "../../../gen/lindm/admin/v1/capabilities_pb";

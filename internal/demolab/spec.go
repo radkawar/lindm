@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package demolab loads declarative organization demos and admits only qualified
 // release/architecture capabilities. It neither provisions devices nor manufactures
 // qualification evidence; execution and ledger acquisition belong to the caller.

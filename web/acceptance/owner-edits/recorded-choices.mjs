@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: values that already exist are chosen, not typed. The device's
 // Packages filter offers the package managers its latest list reports; the
 // Local admin account is chosen from the device's reported accounts with root

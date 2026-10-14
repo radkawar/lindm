@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ManagementCapability } from "../../gen/lindm/agent/v1/management_capability_pb";
 import {
   CapabilityStatus,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { InterfaceSelector } from "../../gen/lindm/resource/v1/common_pb";
 import { ResourceKind, type ResourceRef } from "../../gen/lindm/resource/v1/identity_pb";
 import type { FirewallZoneDesired } from "../../gen/lindm/resource/v1/network_pb";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 14: a reveal refused with "Verify your identity —
 // Complete step-up verification before submitting again" and offered no way
 // to do it; only signing out and in again worked. The refusal now carries an

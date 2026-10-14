@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 findings 40 and 42: the create page states its purpose once,
 // and after Publish the outcome replaces the form where the editor starts
 // instead of a greyed form with "Profile published" below the fold. Publishes

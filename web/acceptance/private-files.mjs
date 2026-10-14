@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { constants } from "node:fs";
 import { open, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { dirname, resolve } from "node:path";

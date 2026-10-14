@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The demo uses the console's customer installer, not a second package recipe.
 import { enrollmentInstallScript } from "../src/features/enrollment/snippets.ts";
 

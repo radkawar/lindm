@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { toJsonString } from "@bufbuild/protobuf";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { ListDeviceStorageTargetsResponse } from "../../../gen/lindm/admin/v1/device_actions_pb";

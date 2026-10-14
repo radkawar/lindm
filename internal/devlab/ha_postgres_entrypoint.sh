@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # HA laboratory PostgreSQL node. Runs as root only to install mounted inputs,
 # then drops to the image's postgres account. LINDM_HA_ROLE selects the initial
 # primary (synchronous commit to the named standby) or a standby cloned from it

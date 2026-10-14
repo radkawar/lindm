@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: CountVisibleOpenApprovals :one
 -- Exact ListVisibleApprovals visibility over unexpired open records: pending
 -- ones, and the actor's own approved requests that only they can run.

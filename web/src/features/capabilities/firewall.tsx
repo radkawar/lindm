@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, fromJsonString, toJsonString } from "@bufbuild/protobuf";
 import { useId } from "react";
 import {

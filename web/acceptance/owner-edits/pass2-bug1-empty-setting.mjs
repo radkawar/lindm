@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 1: a draft with an empty firewall zone (no interface, source
 // network or rule) published as a new version. Adding one to the seeded profile
 // and pressing Publish must mark that setting, not just the page, and must leave

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createContext, useContext } from "react";
 import { TriangleAlert } from "lucide-react";
 import {

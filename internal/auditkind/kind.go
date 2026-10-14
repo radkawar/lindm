@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package auditkind is the registry of audit event kinds: every action code the
 // server writes to audit_events.action. Audit write helpers take a Kind, which
 // only this package constructs, so All enumerates every kind a server can record

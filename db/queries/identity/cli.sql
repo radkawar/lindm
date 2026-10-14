@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockCLIAdmission :exec
 SELECT pg_advisory_xact_lock(812494232);
 

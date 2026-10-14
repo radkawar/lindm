@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { getOption } from "@bufbuild/protobuf";
 import { field as validationRules } from "@bufbuild/protovalidate/gen/buf/validate/validate_pb.js";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } from "react";

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { DevicesView } from "@/features/devices/view";
 import { parseDeviceSearch } from "@/features/devices/search";

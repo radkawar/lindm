@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -69,12 +71,12 @@ func TestCanonicalExportRequiresUnsignedAgreementAndSnapshotsObservations(t *tes
 	second := &buildOutput{observation: observation(), artifacts: []builtArtifact{{artifact: &releasev1.ReleaseArtifact{Path: artifact.Path, UnsignedSha256: sum, Sha256: strings.Repeat("f", 64)}}}}
 	request := Request{Version: "1.2.3", Revision: "signature-boundary-fixture", SourceDateEpoch: 1760000000, AttestationSigner: key}
 	second.observation.UnsignedSha256[artifact.Path] = strings.Repeat("0", 64)
-	if _, err := exportRelease(t.Context(), t.TempDir(), request, signer, sum, first, second, ""); err == nil {
+	if _, err := exportRelease(t.Context(), t.TempDir(), request, signer, sum, first, second, "", filepath.Join("..", "packaging", "assets")); err == nil {
 		t.Fatal("published signed canonical bytes before unsigned builds agreed")
 	}
 	second.observation.UnsignedSha256[artifact.Path] = sum
 	output := t.TempDir()
-	manifest, err := exportRelease(t.Context(), output, request, signer, sum, first, second, "")
+	manifest, err := exportRelease(t.Context(), output, request, signer, sum, first, second, "", filepath.Join("..", "packaging", "assets"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +115,7 @@ func TestOCIEmbedsIdenticalCanonicalBundleAndRejectsSubstitution(t *testing.T) {
 	var digest string
 	for _, name := range []string{"first.oci.tar", "second.oci.tar"} {
 		path := filepath.Join(directory, name)
-		if err := buildOCI(binary, ca, path, "lindmd", "amd64", 1760000000, bundle); err != nil {
+		if err := buildOCI(binary, ca, path, "lindmd", "amd64", 1760000000, filepath.Join("..", "packaging", "assets"), bundle); err != nil {
 			t.Fatal(err)
 		}
 		got, _, err := digestFile(path)

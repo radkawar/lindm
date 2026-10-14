@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package spool is the unprivileged network process's durable observation queue.
 // It stores no protected identity keys, grants, trust roots or executor journal
 // state. The caller opens it as the fixed network UID that owns the directory.

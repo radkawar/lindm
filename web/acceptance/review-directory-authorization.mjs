@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ChromiumDriver } from "./drivers.mjs";
 
 // Only transport routing is replaced: every page, RPC and cookie comes from the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: the wipe form states its consequences before any input, names stale
 // storage by its age, says what is missing instead of showing a disabled Review
 // button, and continues by itself once a requested inventory refresh lands. It

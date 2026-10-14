@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Dynamic targeting is not an RBAC membership source. Static targeting reuses

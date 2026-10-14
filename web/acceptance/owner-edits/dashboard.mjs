@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Dashboard decision queue: grouped activity with real outcome words, a
 // dedicated vulnerability-coverage item linking to /advisories, and no
 // supporting-evidence accordion. Read-only.

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- The remote-assistance setting each device's executor reports with every
 -- assistance sync, using lindm.agent.v1.AssistanceEnablement numbers. No row: the

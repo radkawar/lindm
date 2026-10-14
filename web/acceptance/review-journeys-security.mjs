@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Whole-job UI evidence for the synthetic console fixture, not native qualification.
 // Only this module's explicit UI requests mutate state. Never reveal a key, wipe,
 // revoke a device, answer local consent, or call an RPC from these journeys.

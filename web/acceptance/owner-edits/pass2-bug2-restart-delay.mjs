@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 2: a restart delay of "abc" surfaced a raw protobuf encoder
 // error, and -5 / 99999999 passed review with no range shown. The field states
 // its proto range, names each invalid value beside the field, and review stays

@@ -1,11 +1,16 @@
 # Packaged agent and native enrollment contract
 
-Status: G2 internal qualification is complete (`cb97712`); G3 execution-trust
-rotation and signed durable service execution extend that packaged agent.
-The evidence ledger records exercised native runs and remaining gates, not a release
-claim. This document refines [architecture](architecture.md) and
-[verification](verification.md); it does not reduce the confirmed launch matrix or
-replace its desktop/physical acceptance.
+Status: G2 internal qualification is complete (`cb97712`).
+G3 adds execution-trust rotation and signed durable service execution to that packaged agent.
+Lindm remains a development preview, not a production-ready release.
+The ledger qualifies Tier 1 x86_64 operations within their recorded scope.
+Arm64 release qualification awaits the lab, despite partial native passes.
+
+This document refines [architecture](architecture.md) and [verification](verification.md).
+It does not reduce the launch matrix or replace desktop and physical acceptance.
+
+**Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
+The repository does not include these records or provide public downloads.
 
 ## 1. Process and source boundaries
 
@@ -113,6 +118,15 @@ provider and physical qualification.
 
 ### Enrollment history and onboarding instructions
 
+Use the authenticated console to obtain installation instructions for your device's OS and architecture.
+Follow the [installation runbook](security-and-operations.md#enrollment-installation-from-your-server) to verify the package and deployment trust.
+Keep enrollment credentials in protected files.
+Run the enrollment command as root.
+Confirm **Enrolled** in the console.
+A successful submission can still require approval; it does not prove completed enrollment.
+
+The following API details define authorization and history behavior.
+
 `ListEnrollmentGrants` accepts bounded `page_size` (at most 200), `page_token` and an
 optional `view` (`ACTIVE`: unused, unexpired and not revoked; `INACTIVE`: every other
 grant; unset lists all) and returns `grants`, `next_page_token` and whole-history
@@ -175,8 +189,9 @@ requires signed repository metadata as well as signed packages. See the
 [install runbook](security-and-operations.md#enrollment-installation-from-your-server)
 and [threat model](architecture.md#trust-bootstrap-from-the-customers-server).
 
-After verified package installation and protected placement of the authenticated
-deployment material, the one-time grant path is:
+Install the verified package first.
+Place the authenticated deployment material in its protected paths.
+For a one-time grant, run:
 
 ```sh
 /usr/libexec/lindm/lindm-agent bootstrap \
@@ -185,21 +200,27 @@ deployment material, the one-time grant path is:
   -grant /run/lindm-enrollment/grant
 ```
 
-Keep the grant file root-only; `-grant -` accepts protected standard input.
-Never substitute a bearer value into the command line or environment.
-Unattended enrollment instead uses `-provisioning-token-file FILE` as below;
-that flag does not accept standard input. Missing deployment onboarding settings
-must remain visible to the operator rather than producing fabricated commands.
+Keep the grant file root-only.
+Use `-grant -` for protected standard input.
+Never put a bearer value in a command argument or environment variable.
+For unattended enrollment, use `-provisioning-token-file FILE` as described below.
+That flag does not accept standard input.
+Missing deployment settings must produce a visible error, not fabricated commands.
 
 ### Unattended enrollment and approval
 
-Create a provisioning token in Enrollment with a bounded lifetime/use count and
-fixed metadata, groups and profile revisions. Its secret is displayed once; a lost
-issuance response cannot recover it from the server. Revoke and replace an
-unrecoverable secret instead of retrying with a different request ID blindly.
-Only a credential hash is retained. Tokens expire within 24 hours and permit at
-most 10,000 distinct reservations. Keep the first-boot seed and downloaded token
-file private; a short server lifetime is not forensic erasure of installer copies.
+Create a provisioning token in Enrollment.
+Set a bounded lifetime and use count.
+Set fixed metadata, groups and profile revisions.
+The console displays the secret once.
+A lost issuance response cannot recover it from the server.
+Revoke an unrecoverable token.
+
+Create a replacement instead of blindly retrying with a different request ID.
+The server retains only a credential hash.
+Tokens expire within 24 hours and permit at most 10,000 distinct reservations.
+Keep the first-boot seed and downloaded token file private.
+A short server lifetime does not remove retained installer copies.
 
 After installing the verified agent and deployment bootstrap material, a
 root-owned first-boot service runs:

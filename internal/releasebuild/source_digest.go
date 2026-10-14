@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -82,6 +84,21 @@ func sourcePaths(ctx context.Context, repository string) ([]string, error) {
 	if len(paths) > 100000 {
 		return nil, errors.New("releasebuild: source file count exceeds bound")
 	}
+	removed, err := command(ctx, repository, nil, "git", "ls-files", "--deleted", "-z")
+	if err != nil {
+		return nil, fmt.Errorf("releasebuild: list source deletions: %w", err)
+	}
+	var removedPaths map[string]struct{}
+	if len(removed) > 0 {
+		names := strings.Split(strings.TrimSuffix(string(removed), "\x00"), "\x00")
+		if len(names) > 100000 {
+			return nil, errors.New("releasebuild: source deletion count exceeds bound")
+		}
+		removedPaths = make(map[string]struct{}, len(names))
+		for _, name := range names {
+			removedPaths[name] = struct{}{}
+		}
+	}
 	// Match filepath.WalkDir's component ordering, not flat path ordering.
 	sort.Slice(paths, func(i, j int) bool { return sourcePathLess(paths[i], paths[j]) })
 	kept := paths[:0]
@@ -93,6 +110,11 @@ func sourcePaths(ctx context.Context, repository string) ([]string, error) {
 		previous = name
 		if !filepath.IsLocal(name) {
 			return nil, errors.New("releasebuild: invalid source path")
+		}
+		// Cached entries include unstaged deletions. Later disappearance still fails
+		// the digest/capture filesystem checks rather than becoming a silent omission.
+		if _, removed := removedPaths[name]; removed {
+			continue
 		}
 		ignored := false
 		for _, prefix := range []string{".git/", ".cache/", ".tools/", "artifacts/", "node_modules/", "web/dist/"} {

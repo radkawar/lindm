@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package device composes the lindm server's device-facing and admin-facing
 // RPC surfaces from the device domain packages:
 //   - core: device identity, enrollment, sessions, renewal, execution trust and

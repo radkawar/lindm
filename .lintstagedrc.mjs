@@ -1,4 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+
 export default {
+  "*": () => "node test/tooling/license-headers.mjs check",
   "*.{md,json,jsonc,yaml,yml,js,mjs,ts,tsx,css,html}": "prettier --check",
   "*.md": "markdownlint",
   "*.{ts,tsx}": "eslint --no-warn-ignored --max-warnings=0",

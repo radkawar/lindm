@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { randomUUID } from "node:crypto";
 
 // Real administrator UI only. Names carry context; identity is never typed or

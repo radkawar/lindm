@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 7: on a scrolled page a modal rendered half: the top of the
 // page stayed unblurred, the sidebar moved down and the dialog was drawn over
 // the content. The owner reviews through full-page captures of headless

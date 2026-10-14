@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockReleaseControl :exec
 SELECT id FROM release_control_lock WHERE id = true FOR UPDATE;
 

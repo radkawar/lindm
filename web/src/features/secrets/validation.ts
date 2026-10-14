@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { FieldHints } from "@/lib/validation";
 
 // Material rules are regular expressions; show what to enter instead of the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package reports owns bounded durable report artifacts and independently signed
 // audit exports. It does not establish archive signing-key trust or retain reports
 // past their configured expiry; audit chain evidence itself is append-only.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package localrpc is the agent's local Connect transport over Unix sockets.
 // It serves and dials two separate sockets. The root executor socket carries
 // ExecutorService for the unprivileged network agent; Serve admits only the

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package nativeexec is the agent's only native process runner. Every caller
 // gets the same policy: argv only (never a shell), an absolute executable that
 // passes a custody check, a fixed clean environment plus explicitly allowlisted

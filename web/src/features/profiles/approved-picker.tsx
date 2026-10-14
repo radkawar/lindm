@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ApprovedReferenceKind } from "../../../gen/lindm/admin/v1/approved_references_pb";

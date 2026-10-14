@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -57,7 +59,7 @@ func TestDeviceFindingsReadLatencyAndMatchPlan(t *testing.T) {
 	}
 	t.Cleanup(pool.Close)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +192,7 @@ type planNode struct {
 func TestKernelScaleSourceRecordsPageAndAdmit(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}

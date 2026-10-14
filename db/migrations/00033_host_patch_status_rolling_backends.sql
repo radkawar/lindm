@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Rolling distributions report OS-update backends PACMAN (4, Arch Linux) and
 -- ZYPPER (5, openSUSE Tumbleweed). The original bound admitted only APT and

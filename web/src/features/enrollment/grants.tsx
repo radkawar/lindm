@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";

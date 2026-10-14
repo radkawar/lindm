@@ -981,6 +981,18 @@ Fedora uses repository **updateinfo**, not Red Hat CSAF/VEX. The adapter require
 Parser architecture acceptance is not machine qualification. Stale or absent feed
 coverage must not become a clean exposure report.
 
+Checked-in updateinfo and repomd fixtures are independently authored **synthetic**
+schema examples under Apache-2.0. No explicit grant for the former dataset bytes
+was confirmed. Fedora's conditional FPCA policy does not establish that grant.
+Fictional advisory IDs, CVEs, versions and text preserve parser/evaluator coverage.
+The unchanged native sudo inventory replay and demo require that real package
+name, but their synthetic assessment proves no vendor vulnerability or fix.
+See [fixture provenance](../../internal/advisory/feed/testdata/provenance.txt).
+Production fetches remain unchanged. Existing real-feed records in
+[`lab/ledger.json`](../../lab/ledger.json) and the
+[verification ledger](../verification.md#l11-distro-advisory-classification) remain
+separate from these parser fixtures.
+
 Native `rpm --query --all` lists each imported signing key as a `gpg-pubkey`
 record with no ARCH tag; inventory preserves it with an empty architecture,
 matching the independent native oracle. Matching treats exactly that identity

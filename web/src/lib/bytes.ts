@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Human sizes for primary text (docs/design.md, "Numbers and units"): binary
 // units, three significant figures at most. Exact byte counts belong in a
 // technical-details disclosure, never in primary text.

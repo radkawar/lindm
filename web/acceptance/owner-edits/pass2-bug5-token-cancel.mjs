@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 5: the provisioning token dialog's Cancel was zero-size or
 // covered at the bottom of the expanded dialog, so only Esc closed it. With the
 // optional settings expanded, on a scrolled page, at desktop and phone widths,

@@ -368,6 +368,15 @@ backport regressions are controlled applicability tests, not historical Debian
 installations. Ubuntu USNs and malformed Ubuntu OSV purl handling do not substitute
 for Debian tracker coverage.
 
+The checked-in Debian DSA/OSV and tracker cases are independently authored
+**synthetic** data under Apache-2.0. Fictional packages, versions and strict-format
+issue IDs preserve parser/evaluator boundaries without copying unlicensed vendor
+prose. Release codenames and schema fields remain real identities. See the
+[coverage provenance](../../internal/advisory/feed/testdata/debian-tracker-provenance.txt).
+These fixtures do not prove vendor vulnerabilities. Production fetches remain
+unchanged; use [the real-feed matrix ledger](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12)
+and [`lab/ledger.json`](../../lab/ledger.json) for native qualification.
+
 A complete 2026-10-10 census of the separate canonical Debian OSV export
 (`https://osv-vulnerabilities.storage.googleapis.com/Debian/all.zip`) inspected
 70,305 records and found a maximum of 838 distinct CVEs in `DLA-4008-1`

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package packaging
@@ -69,7 +71,12 @@ type payloadFile struct {
 
 func (p product) payloadFiles() ([]payloadFile, error) {
 	if p.name == CLIPackageName {
-		return []payloadFile{{rel: "usr/share/doc/lindmctl/copyright", mode: 0o644, name: "copyright"}}, nil
+		return []payloadFile{
+			{rel: "usr/share/doc/lindmctl/copyright", mode: 0o644, name: "copyright"},
+			{rel: "usr/share/doc/lindmctl/LICENSE", mode: 0o644, name: "LICENSE"},
+			{rel: "usr/share/doc/lindmctl/NOTICE", mode: 0o644, name: "NOTICE"},
+			{rel: "usr/share/doc/lindmctl/THIRD-PARTY-LICENSES", mode: 0o644, name: "THIRD-PARTY-LICENSES"},
+		}, nil
 	}
 	if p.name == ServerPackageName {
 		return []payloadFile{
@@ -78,6 +85,9 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 			{rel: "usr/lib/sysusers.d/lindmd.conf", mode: 0o644, name: "server-sysusers.conf"},
 			{rel: p.lifecycle[1:], mode: 0o755, name: p.lifecycleAsset},
 			{rel: "usr/share/doc/lindmd/copyright", mode: 0o644, name: "copyright"},
+			{rel: "usr/share/doc/lindmd/LICENSE", mode: 0o644, name: "LICENSE"},
+			{rel: "usr/share/doc/lindmd/NOTICE", mode: 0o644, name: "NOTICE"},
+			{rel: "usr/share/doc/lindmd/THIRD-PARTY-LICENSES", mode: 0o644, name: "THIRD-PARTY-LICENSES"},
 		}, nil
 	}
 	config, err := AgentConfigJSON()
@@ -100,6 +110,9 @@ func (p product) payloadFiles() ([]payloadFile, error) {
 		{rel: "usr/lib/sysusers.d/lindm.conf", mode: 0o644, name: "sysusers.conf"},
 		{rel: p.lifecycle[1:], mode: 0o755, name: p.lifecycleAsset},
 		{rel: "usr/share/doc/lindm-agent/copyright", mode: 0o644, name: "copyright"},
+		{rel: "usr/share/doc/lindm-agent/LICENSE", mode: 0o644, name: "LICENSE"},
+		{rel: "usr/share/doc/lindm-agent/NOTICE", mode: 0o644, name: "NOTICE"},
+		{rel: "usr/share/doc/lindm-agent/THIRD-PARTY-LICENSES", mode: 0o644, name: "THIRD-PARTY-LICENSES"},
 		{rel: "etc/lindm/executor.json", mode: 0o640, conf: true, body: config},
 		{rel: "etc/lindm/agent.json", mode: 0o644, conf: true, body: config},
 	}, nil

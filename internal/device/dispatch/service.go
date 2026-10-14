@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package dispatch delivers root-authorized work to devices: profiles,
 // targeting and resource assignments, resource execution dispatch, and device
 // actions including wipe, recovery boot and inventory refresh. Both kinds share

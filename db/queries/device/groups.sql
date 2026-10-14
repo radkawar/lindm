@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: UpsertDeviceGroup :execrows
 INSERT INTO device_groups (id, name) VALUES (sqlc.arg('id'), sqlc.arg('name'))
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name

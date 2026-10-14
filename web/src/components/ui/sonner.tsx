@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Project additions: Apache-2.0; shadcn-derived portions: MIT.
+// Copyright (c) 2023 shadcn; see web/LICENSE.shadcn for the retained MIT notice.
+
 // Upstream: https://ui.shadcn.com (MIT). Theme uses local CSS tokens, not next-themes.
 import type { CSSProperties } from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";

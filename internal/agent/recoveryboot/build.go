@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package recoveryboot builds closed recovery images and stages a single
 // original-device handoff: a signed UKI through systemd-boot, or an unsigned
 // initramfs with the vendor kernel through GRUB whose integrity the server

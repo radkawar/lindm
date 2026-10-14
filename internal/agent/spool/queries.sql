@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertScope :exec
 INSERT INTO scope (
     id, deployment, device, generation, host_allocated, package_allocated,

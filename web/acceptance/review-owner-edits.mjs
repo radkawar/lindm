@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner edit-pass acceptance (docs/design.md "Required design review"): each
 // imported owner task's observable acceptance criterion, checked against the
 // seeded demo fleet through the real console. A pass establishes that criterion

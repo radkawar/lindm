@@ -117,7 +117,10 @@ the complete vendor payload. Its generator and two complete definitions
 test/object/state, retain original vendor XML fragments without rewriting.
 Only the enclosing section assembly and selection are local. Projection SHA256:
 c9c3e7e57b424f0bc16df400831fc7e5be1344da6ae899b87dd73d53a6ad2b42
-SUSE OVAL license: https://ftp.suse.com/pub/projects/security/oval/LICENSE
+SUSE OVAL license: CC-BY-4.0, https://ftp.suse.com/pub/projects/security/oval/LICENSE
+License terms: https://creativecommons.org/licenses/by/4.0/legalcode
+The selected original fragments retain SUSE's license; Apache-2.0 applies only
+to lindm-authored sources, not a relicensing of this projected vendor dataset.
 Vendor: SUSE Product Security Team. Attribution and research do not turn this
 projection into a signed snapshot or native qualification record.
 

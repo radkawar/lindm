@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package assistance implements consented remote assistance: administrator
 // session creation, join, answer and stop, request readiness, and the
 // device-side assistance sync that relays the signalling of an accepted session

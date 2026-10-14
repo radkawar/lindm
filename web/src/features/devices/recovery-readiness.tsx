@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { RecoveryReadiness } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import { RecoveryBootMode } from "../../../gen/lindm/agent/v1/device_actions_pb";
 import { StatusBadge } from "@/components/ui/status-badge";

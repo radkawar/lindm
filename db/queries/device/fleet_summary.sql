@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: FleetSummaryCounts :one
 SELECT CURRENT_TIMESTAMP::timestamptz AS observed_at,
  count(*)::bigint AS total_devices,

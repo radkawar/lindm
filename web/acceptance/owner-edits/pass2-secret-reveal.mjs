@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 47: a revealed secret has Copy (raw value) and a visible
 // auto-hide countdown, like the recovery-key reveal.
 //

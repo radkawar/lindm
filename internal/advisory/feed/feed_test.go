@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package feed
 
 import (
@@ -37,9 +39,9 @@ func source(distro, release string, format advisoryv1.FeedFormat) *advisoryv1.Fe
 	return &advisoryv1.FeedSource{Id: "test", Distro: distro, Release: release, Url: "https://vendor.example/advisory", Format: format, MaxAgeSeconds: 3600}
 }
 
-// Fixtures are actual fetched vendor records; only the installed predecessor and
-// successor versions below are test inputs. Same-upstream revision changes prove
-// that native backports, rather than a generic upstream fixed version, govern.
+// Retained licensed vendor records and independently authored synthetic fixtures
+// exercise the same native backport boundaries. Controlled predecessor/successor
+// versions are test inputs, not evidence that those builds exist in a repository.
 func TestVendorBackports(t *testing.T) {
 	for _, test := range []struct {
 		file, digest, distro, release, arch, name, before, fixed, after string
@@ -47,9 +49,9 @@ func TestVendorBackports(t *testing.T) {
 		sourcePackage                                                   bool
 	}{
 		{"ubuntu-USN-6859-1.json", "e179d515688434574c1835bbff757f0839e37e08fd8d3301168513cbcbdd2f4e", "ubuntu", "24.04", "", "openssh-server", "1:9.6p1-3ubuntu13.2", "1:9.6p1-3ubuntu13.3", "1:9.6p1-3ubuntu13.4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, false},
-		{"debian-DSA-5724-1.json", "26841e28408b0912ae777691790b8e966492d9b6fc92c42aa3eab648a92b7e58", "debian", "12", "", "openssh", "1:9.2p1-2+deb12u2", "1:9.2p1-2+deb12u3", "1:9.2p1-2+deb12u4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, true},
-		{"fedora44-sudo.xml", "3ed801b9bccd9f65bbba7d04421fb0395549cd4f076699fedc5f1d7915476d0f", "fedora", "44", "x86_64", "sudo", "0:1.9.17-9.p2.fc44", "0:1.9.17-10.p2.fc44", "0:1.9.17-11.p2.fc44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, false},
-		{"rocky-RLSA-2024-6783.json", "2be38769894ce8b419202930dd5fbdd1e2c64db48ae3f6de7e9d2c39f5e524db", "rocky", "9", "", "openssl", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", "1:3.0.7-29.el9_4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, false},
+		{"synthetic-debian-DSA-99001-1.json", "228d3e9c63610162bb21ef042596596274e80a4802714ea4c4184774d83db48c", "debian", "12", "", "synthetic-deb-source", "3:7.4-2+deb12u2", "3:7.4-2+deb12u3", "3:7.4-2+deb12u4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, true},
+		{"synthetic-fedora44-updateinfo.xml", "073edc4209285ce5edb8ab70ff0644a7a11c53897326e11680ff8008b5797a16", "fedora", "44", "x86_64", "synthetic-rpm-tool", "0:8.4.2-11.p3.fc44", "0:8.4.2-12.p3.fc44", "0:8.4.2-13.p3.fc44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, false},
+		{"synthetic-rocky-RLSA-2099-99030.json", "2ef0fbee82dbd3389348f81299b2db3c8ee42b0ee243146b6df0466286741c3b", "rocky", "9", "", "synthetic-rocky-library", "2:6.2.1-13.el9_4", "2:6.2.1-14.el9_4", "2:6.2.1-15.el9_4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, false},
 		{"alma-ALSA-2024-6783.json", "23b2a57735fdb26997c6251c9d27c1f5d3c59b18102ee0d12ca7550dde52bd9c", "almalinux", "9", "", "openssl-libs", "1:3.0.7-27.el9_4", "1:3.0.7-28.el9_4", "1:3.0.7-29.el9_4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON, false},
 	} {
 		t.Run(test.distro, func(t *testing.T) {
@@ -83,8 +85,8 @@ func TestVendorBackports(t *testing.T) {
 			if found.GetFixedVersion() != test.fixed || found.GetSourcePackage() != test.sourcePackage {
 				t.Fatalf("wrong normalized package: %v", found)
 			}
-			if test.distro == "fedora" && (len(found.GetCves()) != 1 || found.GetCves()[0] != "CVE-2026-96512") {
-				t.Fatalf("lost vendor-disclosed sudo CVE: %v", found.GetCves())
+			if test.distro == "fedora" && (len(found.GetCves()) != 1 || found.GetCves()[0] != "CVE-2099-99020") {
+				t.Fatalf("lost description-only synthetic CVE: %v", found.GetCves())
 			}
 			for _, comparison := range []struct {
 				version string
@@ -103,7 +105,7 @@ func TestVendorBackports(t *testing.T) {
 // (distro=bookworm, observed in the 2026-10-12 all.zip); another codename is a
 // different product.
 func TestDebianOSVCodenameQualifier(t *testing.T) {
-	dsa := fixture(t, "debian-DSA-5724-1.json")
+	dsa := fixture(t, "synthetic-debian-DSA-99001-1.json")
 	for _, test := range []struct {
 		distro string
 		ok     bool
@@ -118,7 +120,7 @@ func TestDebianOSVCodenameQualifier(t *testing.T) {
 
 func TestUnsupportedInputsFailClosed(t *testing.T) {
 	ubuntu := fixture(t, "ubuntu-USN-6859-1.json")
-	fedora := fixture(t, "fedora44-sudo.xml")
+	fedora := fixture(t, "synthetic-fedora44-updateinfo.xml")
 	for _, test := range []struct {
 		name   string
 		input  []byte
@@ -130,7 +132,7 @@ func TestUnsupportedInputsFailClosed(t *testing.T) {
 		{"missing-source-map", bytes.ReplaceAll(ubuntu, []byte("arch=source"), []byte("arch=amd64")), source("ubuntu", "24.04", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)},
 		{"conflicting-release", bytes.ReplaceAll(ubuntu, []byte("distro=noble"), []byte("distro=jammy")), source("ubuntu", "24.04", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)},
 		{"foreign-product", ubuntu, source("debian", "12", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)},
-		{"rhel-not-rocky", fixture(t, "rocky-RLSA-2024-6783.json"), source("rhel", "9.4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)},
+		{"rhel-not-rocky", fixture(t, "synthetic-rocky-RLSA-2099-99030.json"), source("rhel", "9.4", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)},
 		{"xml-product", bytes.ReplaceAll(fedora, []byte("Fedora 44"), []byte("Fedora 43")), source("fedora", "44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO)},
 		{"xml-module", bytes.Replace(fedora, []byte(`<name>Fedora 44</name>`), []byte(`<name>Fedora 44</name><module name="nodejs" stream="22"/>`), 1), source("fedora", "44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO)},
 		{"xml-unknown-architecture", bytes.ReplaceAll(fedora, []byte(`arch="x86_64"`), []byte(`arch="unknown"`)), source("fedora", "44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO)},
@@ -152,7 +154,7 @@ func TestUnsupportedInputsFailClosed(t *testing.T) {
 }
 
 func TestCompressedRawImportsPreserveDigest(t *testing.T) {
-	raw := fixture(t, "fedora44-sudo.xml")
+	raw := fixture(t, "synthetic-fedora44-updateinfo.xml")
 	var gzipBuffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&gzipBuffer)
 	if _, err := gzipWriter.Write(raw); err != nil {
@@ -232,9 +234,9 @@ func TestOSVArchiveCoverageAndRejection(t *testing.T) {
 }
 
 func TestHTTPSFetchAndRepomdIntegrity(t *testing.T) {
-	// The transport envelope is synthetic; the advisory payload is the original
-	// Fedora node. This proves network/raw-import equivalence, not live-feed reachability.
-	raw := fixture(t, "fedora44-sudo.xml")
+	// The transport envelope and advisory payload are independently authored.
+	// This proves network/raw-import equivalence, not live-feed reachability.
+	raw := fixture(t, "synthetic-fedora44-updateinfo.xml")
 	digest := sha256.Sum256(raw)
 	var calls atomic.Int64
 	var corrupt atomic.Bool
@@ -318,12 +320,12 @@ func TestProductAndRepositoryBindings(t *testing.T) {
 	if minor := source("almalinux", "10.1", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP); Applies(minor, "almalinux", "10.2", "aarch64") {
 		t.Fatal("explicit minor feed applied to another minor")
 	}
-	location, checksum, err := updateLocation("https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", fixture(t, "fedora44-repomd.xml"))
+	location, checksum, err := updateLocation("https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/repodata/repomd.xml", fixture(t, "synthetic-fedora44-repomd.xml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(location, "f7508933e5ed78ccc41d1cea6dc7d5f93d998b7fe97e7c9e84268e2ce8aadcac-updateinfo.xml.zst") || hex.EncodeToString(checksum) != "f7508933e5ed78ccc41d1cea6dc7d5f93d998b7fe97e7c9e84268e2ce8aadcac" {
-		t.Fatal("lost genuine Fedora metadata checksum/location")
+	if !strings.HasSuffix(location, "073edc4209285ce5edb8ab70ff0644a7a11c53897326e11680ff8008b5797a16-synthetic-updateinfo.xml") || hex.EncodeToString(checksum) != "073edc4209285ce5edb8ab70ff0644a7a11c53897326e11680ff8008b5797a16" {
+		t.Fatal("lost synthetic metadata checksum/location")
 	}
 	for _, href := range []string{"https://evil.example/feed", "repodata/../feed", "repodata/feed?override=1"} {
 		input := fmt.Sprintf(`<repomd xmlns="http://linux.duke.edu/metadata/repo"><data type="updateinfo"><checksum type="sha256">%s</checksum><location href="%s"/></data></repomd>`, strings.Repeat("a", 64), href)
@@ -352,10 +354,10 @@ func TestCanceledFetch(t *testing.T) {
 }
 
 func TestVendorMixedProductContainer(t *testing.T) {
-	// Only the wrapper is synthetic; both nodes are unchanged contiguous
-	// captures from the same actual Fedora44 updateinfo response.
-	raw := append([]byte("<updates>"), fixture(t, "fedora44-sudo.xml")...)
-	raw = append(raw, fixture(t, "fedora45-shim.xml")...)
+	// Both authored nodes and the wrapper are synthetic. Their exact product
+	// labels exercise exclusion of a foreign release from a shared container.
+	raw := append([]byte("<updates>"), fixture(t, "synthetic-fedora44-updateinfo.xml")...)
+	raw = append(raw, fixture(t, "synthetic-fedora45-updateinfo.xml")...)
 	raw = append(raw, []byte("</updates>")...)
 	config := source("fedora", "44", advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO)
 	config.Architecture = "x86_64"
@@ -367,7 +369,7 @@ func TestVendorMixedProductContainer(t *testing.T) {
 		t.Fatal("matching product omitted")
 	}
 	for _, advisory := range doc.GetAdvisories() {
-		if advisory.GetId() != "FEDORA-2026-7d4732cbab" {
+		if advisory.GetId() != "FEDORA-2099-abcdef1234" {
 			t.Fatal("foreign release mixed into configured product")
 		}
 	}

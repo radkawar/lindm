@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: CreateDestination :one
 INSERT INTO integration_destinations(id, display_name, kind, endpoint, pinned_ca_pem, enabled, secret_ciphertext)
 VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package labexec runs host tools for the lab, development-fixture, packaging
 // and release harnesses. Every child gets its own process group. Cancellation
 // or a deadline kills the whole group, optionally after a graceful signal and a

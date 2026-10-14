@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertDevice :exec
 INSERT INTO devices (id, state, enrolled_at)
 VALUES (sqlc.arg('id'), 'pending', sqlc.arg('enrolled_at'));

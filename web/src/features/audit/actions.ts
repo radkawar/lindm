@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import actionNames from "./action-names.json";
 
 // Administrator-facing names for recorded audit action codes. action-names.json

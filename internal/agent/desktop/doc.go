@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package desktop is the unprivileged per-user remote-assistance session
 // helper started as `lindm-agent session` from a systemd user unit.
 //

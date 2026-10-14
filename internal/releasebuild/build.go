@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package releasebuild produces and verifies locally reproducible release exports.
@@ -165,7 +167,7 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 	if err := os.Mkdir(bundle, 0700); err != nil {
 		return nil, err
 	}
-	manifest, err = exportRelease(ctx, bundle, request, signer, sourceDigest, first, second, "")
+	manifest, err = exportRelease(ctx, bundle, request, signer, sourceDigest, first, second, "", filepath.Join(source, "internal", "packaging", "assets"))
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +201,7 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 		if err := os.Mkdir(exported, 0700); err != nil {
 			return nil, err
 		}
-		manifest, err = exportRelease(ctx, exported, request, signer, sourceDigest, first, second, bundle)
+		manifest, err = exportRelease(ctx, exported, request, signer, sourceDigest, first, second, bundle, filepath.Join(source, "internal", "packaging", "assets"))
 		if err != nil {
 			return nil, err
 		}
@@ -405,7 +407,7 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 			if product != "lindm-agent" {
 				name := product + "_" + request.Version + "_" + arch + ".oci.tar"
 				path := filepath.Join(packageDir, name)
-				if err := buildOCI(binary, filepath.Join(checkout, capturedCAPath), path, product, arch, request.SourceDateEpoch, bundleForProduct(product, bundle)); err != nil {
+				if err := buildOCI(binary, filepath.Join(checkout, capturedCAPath), path, product, arch, request.SourceDateEpoch, filepath.Join(checkout, "internal", "packaging", "assets"), bundleForProduct(product, bundle)); err != nil {
 					return err
 				}
 				sum, size, err := digestFile(path)

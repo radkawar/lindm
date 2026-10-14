@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (2026-10-12), Audit log: compact filters, one time-range
 // control, Details reachable at desktop and phone widths, human event names for
 // every kind (device actions name their kind), no sign-out in Human actions.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (UI pass 2, items 36–38): device list search is case-insensitive
 // and matches any part of a hostname; sorting is server-side across all pages
 // with devices lacking the value last; the CSV export uses human values.

@@ -1,13 +1,17 @@
 # Platform engineering guide
 
-These pages explain how lindm implements each Linux family, which native details
-must survive refactoring, and where evidence stops. They are engineering references,
-not a support announcement. **No complete release matrix cell is certified.** A
-passing package install, inventory comparison or service scenario qualifies only
-that recorded operation, image and architecture—not every resource on that family.
-The authoritative gates and evidence ledger remain
-[verification](../verification.md#1-launch-platform-qualification) and the
-[implementation plan](../implementation-plan.md).
+These pages explain how lindm implements each Linux family and which native details must survive refactoring.
+They describe evidence limits, not production support.
+Lindm remains a development preview.
+The ledger qualifies Tier 1 x86_64 operations only within each recorded scope.
+Arm64 release qualification awaits the lab, despite partial native passes.
+A package installation, inventory comparison or service scenario does not qualify every resource on that family.
+
+Use [verification](../verification.md#1-launch-platform-qualification) and the
+[implementation plan](../implementation-plan.md) for authoritative gates and evidence.
+
+**Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
+The repository does not include these records or provide public downloads.
 
 ## Support status matrix
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package packagepin shares native package ownership framing between the
 // provider and the durable ownership journal. Native policy parsing remains
 // manager-specific; a malformed owner marker always claims the resource.

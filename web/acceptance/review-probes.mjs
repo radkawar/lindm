@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // In-page probes for `lab console review`. Playwright serializes installProbes
 // into each loaded document through the DevTools protocol (not a script tag), so
 // the console's Content-Security-Policy stays unchanged. Probes only observe the

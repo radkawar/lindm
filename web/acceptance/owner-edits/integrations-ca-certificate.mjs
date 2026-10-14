@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, Integrations): a destination's CA certificate was shown in
 // full as an editable PEM. The Edit dialog shows subject, expiry and SHA-256
 // fingerprint; PEM input appears only after Replace certificate. Read-only.

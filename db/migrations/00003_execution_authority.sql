@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Public execution authority only. No execution signing keys belong in this schema.
 -- Histories are append-only: capacity exhaustion refuses admission, never prunes
 -- the evidence needed for exact retries or authenticated root catch-up.

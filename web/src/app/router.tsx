@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { bindRouter, queryClient } from "./query";
 import { routeTree } from "../routeTree.gen";

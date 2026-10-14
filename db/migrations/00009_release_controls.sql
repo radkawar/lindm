@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- A singleton row establishes one lock order for global release policy/publication.
 CREATE TABLE release_control_lock (id boolean PRIMARY KEY CHECK (id));

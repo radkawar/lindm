@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner tasks (pass 2, Groups): one device multi-select with removable chips,
 // a plain rule builder with a live match count, no group IDs and no
 // "Once sent, edits are locked". Read-only: dialogs are closed without saving.

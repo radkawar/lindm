@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";

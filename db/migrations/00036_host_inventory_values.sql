@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Searchable values derived from each generation's latest accepted host
 -- observation (host_observations.details is an opaque protobuf). Kinds: 1 local

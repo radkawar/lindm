@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -25,7 +27,7 @@ import (
 func TestReplicaClaimsAreDisjointUntilExpiry(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	pkg := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	pkg := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	const batch = 3
 	all := make([]uuid.UUID, 2*batch)
 	for i := range all {
@@ -75,7 +77,7 @@ func TestReplicaClaimsAreDisjointUntilExpiry(t *testing.T) {
 func TestReplicasEvaluateColdFleetOnce(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	first, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	first, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := first.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +85,7 @@ func TestReplicasEvaluateColdFleetOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pkg := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	pkg := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	devices := make([]uuid.UUID, 6*evaluationWorkers)
 	for i := range devices {
 		devices[i] = seedInventory(t, pool, "fedora", "44", pkg)
@@ -149,11 +151,11 @@ WHERE r.sequence>$1 AND r.previous_hash<>p.row_hash`, start).Scan(&broken); err 
 func TestFindingSetBuildDefersToAnotherInstance(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx := t.Context()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	device := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"})
+	device := seedInventory(t, pool, "fedora", "44", &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"})
 	_, err := s.evaluateOnce(ctx, device)
 	missing, ok := errors.AsType[*missingFindingSet](err)
 	if !ok {

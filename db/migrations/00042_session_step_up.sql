@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- In-page step-up: a signed-in local administrator re-verifies with password
 -- and passkey without starting a new session. The session records when, and

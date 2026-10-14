@@ -1,0 +1,20 @@
+[
+  {
+    "name": "AVG-99001",
+    "packages": [
+      "synthetic-arch-radio"
+    ],
+    "status": "Fixed",
+    "severity": "High",
+    "type": "synthetic parser case",
+    "affected": "4:8.3-7",
+    "fixed": "4:8.3-8",
+    "ticket": "999001",
+    "issues": [
+      "CVE-2099-99010"
+    ],
+    "advisories": [
+      "ASA-209902-99"
+    ]
+  }
+]

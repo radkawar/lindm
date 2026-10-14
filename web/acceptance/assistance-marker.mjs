@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Native GTK marker contract (internal/vmlab/assistance_fixture.py): 14 bytes,
 // MSB first, row-major in 8 rows of 14 bits. Bytes are 0xa7, head (0 or 1),
 // then the 12-byte fixture nonce. Each bit occupies two horizontal cells:

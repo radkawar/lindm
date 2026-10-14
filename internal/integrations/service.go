@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package integrations owns encrypted destinations and transactional audit-event
 // delivery. It provides at-least-once transport with stable deduplication IDs, not
 // remote exactly-once execution. Domain audit creation and report chains live elsewhere.

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertProvisioningToken :exec
 INSERT INTO provisioning_tokens (id, token_hash, created_by, authorization_version, created_at, expires_at, max_uses, approval_required, assignment, reason, name)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11);

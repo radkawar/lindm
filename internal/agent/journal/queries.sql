@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: ReadState :one
 SELECT revision, state FROM executor_state WHERE id = 1;
 

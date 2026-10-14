@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package recoverycustody anchors one signed recovery action in a TPM2 persistent

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: SuggestDeviceValues :many
 -- One device column selected by field: 'os_id', 'os_version' or 'architecture'.
 SELECT v.value::text AS value, count(*)::bigint AS count

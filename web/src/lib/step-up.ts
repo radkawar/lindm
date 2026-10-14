@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, fromJson, toJson, type JsonValue } from "@bufbuild/protobuf";
 import {
   LocalStepUpRequestSchema,

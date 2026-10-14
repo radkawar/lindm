@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
 # Fixed package lifecycle for lindm-agent. Verbs are closed. This is not a
 # shell provider: it does not evaluate package-manager data, and it never
 # deletes the lindm account, the executor journal, or the observation spool.

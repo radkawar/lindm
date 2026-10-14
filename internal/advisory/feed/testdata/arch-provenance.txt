@@ -1,59 +1,56 @@
-Arch Linux advisory and native version fixtures
-=============================================
-Retrieved over verified HTTPS on 2026-10-10. These are retained vendor observations,
-not evidence of acquisition freshness for a later offline import. No package
-transaction, installed host inventory or live advisory refresh is claimed here.
+Arch fixture provenance
+=======================
 
-Arch issue export:
-  Requested https://security.archlinux.org/all.json
-  Final URL https://security.archlinux.org/issues/all.json
-  Original response: 898937 bytes
-  SHA-256: 0eb3e86e8f94aa05374e30d1feb3e59bdfe99f2f52f62176ca522fbe3c546950
-  Observed statuses: Fixed 2151, Not affected 193, Vulnerable 85, Unknown 15.
+Advisory data below are independently authored SYNTHETIC schema examples for lindm.
+Copyright 2026 lindm contributors. SPDX-License-Identifier: Apache-2.0
+No vendor advisory prose or original record bytes remain in these four files.
+The former Arch issue, state, publication and ASA text specimens were removed
+because their endpoints did not establish an explicit advisory-data grant.
+Schema references: https://security.archlinux.org/issues/all.json
+                   https://security.archlinux.org/advisories.json
+The production vendor endpoint, publication enrichment and comparator are unchanged.
 
-arch-backport.json:
-  SHA-256: 5dea1441db2bf97d37d68182ed68dfb283bdb3d03d77b36914f30088fb144a4e
-  Exact AVG-1530 JSON object bytes selected from that response, surrounded by
-  '[' and ']\n' to retain the vendor array format. Object keys, whitespace,
-  values and order are not reserialized or changed.
-  Package wpa_supplicant, affected 2:2.9-7, fixed 2:2.9-8,
-  CVE-2021-0326, High, Fixed; reference ASA-202102-25.
-  This is a genuine same-upstream pkgrel backport, not a fabricated semver case.
+synthetic-arch-backport.json
+  SHA256: 0010d5e7403b7fbe36fdc10fc58b248dae51e988de8d117fe0ff3015c4d4a49e
+  Fictional AVG-99001, synthetic-arch-radio, CVE-2099-99010, ASA-209902-99.
+  Fixed/High assessment; affected 4:8.3-7, fixed 4:8.3-8.
+  A same-upstream pkgrel boundary and nonzero epoch exercise native backports.
+  Publication, architecture and source/binary mapping are absent in the issue JSON.
 
-arch-statuses.json:
-  SHA-256: f8317483839bb9cb7610671ff658660b1a6c9bdb6ca134a26aa06e471b79e033
-  Exact selected object byte spans in original response order, joined with ','
-  and surrounded by '[' and ']\n'. Selection is only by these AVG identifiers:
-  AVG-2843: vim, Unknown, affected 9.0.1224-1, fixed field 9.0.1225-1.
-    A populated fixed field must not override Unknown assessment status.
-  AVG-2907: djvulibre, Vulnerable, affected 3.5.28-6, no fixed version.
-  AVG-2737: gnome-remote-desktop, Not affected; its fixed field does not make it
-    a vulnerability. No general clean-package assertion follows this one CVE.
-  AVG-2821: zlib, Fixed, 1:1.2.12-2 -> 1:1.2.12-3, CVE-2022-37434.
-    Another real epoch/pkgrel fix; no published ASA or date in the issue export.
+synthetic-arch-statuses.json
+  SHA256: ae63865941e79a29591b61c547669f2a346af1cecadf7ebbe2a1547a7c814908
+  AVG-99002 / synthetic-arch-editor: Unknown with populated fixed field.
+    Thirteen fictional CVEs retain the multi-issue shape; no fixed claim follows.
+  AVG-99003 / synthetic-arch-reader: Vulnerable at 6.5.28-6, null fixed field.
+    Only the exact known affected build receives a bounded unfixed assessment.
+  AVG-99004 / synthetic-arch-desktop: Not affected with populated fixed field.
+    The fixed field must not override the status or imply package-wide safety.
+  AVG-99005 / synthetic-arch-compressor: Fixed at 3:6.2.12-3 after 3:6.2.12-2.
+    Native epoch/pkgrel ordering does not require an ASA or publication timestamp.
 
-Published ASA export:
-  https://security.archlinux.org/advisories.json
-  Original response: 362301 bytes
-  SHA-256: 8b0e65d1703ebb9ce5e5eabe8eb37e4db3db786e257ecb98c15c64ab89bacc6a
-arch-advisories.json:
-  SHA-256: 5993681600011be625dc66ef766130b2a11a2f4c31222c61ecdbfe1e3fd21872
-  Exact ASA-202102-25 object byte span, wrapped in '[' and ']\n' as above.
-  Explicit group AVG-1530, package wpa_supplicant and date 2021-02-12.
-  Publication enrichment joins both group and package, never merely a CVE.
-  Missing entries leave publication absent. Calendar dates are represented at
-  UTC midnight without claiming an observed time of day. The tracker derives
-  both JSON date and Atom published from Advisory.created for published ASAs;
-  it does not expose a separate actual release-event timestamp in this export.
+synthetic-arch-advisories.json
+  SHA256: 25cd9bf8282cdda3327d439db423920042194b5d9a63b154505954e2a2337ecb
+  ASA-209902-99 joins AVG-99001 AND synthetic-arch-radio with date 2099-02-12.
+  All identifiers, dates, descriptions and reference values are fictional.
+  Tests require exact group/package joining, reject invalid dates, and never
+  manufacture a date from an unrelated package/group or from acquisition time.
 
-arch-ASA-202102-25.txt:
-  https://security.archlinux.org/ASA-202102-25/raw
-  Exact original response: 1420 bytes
-  SHA-256: b34fe7b6af96984a03793a0902a5632b547cd9109d52f0cebcd42a3d6a66bfa6
-  Authoritative text explicitly says versions before 2:2.9-8 are vulnerable,
-  upgrade to 2:2.9-8, and "The problem has been fixed upstream but no release
-  is available yet." It supplies date 2021-02-12. This document is retained as
-  independent explanatory evidence, not silently substituted into JSON input.
+synthetic-arch-ASA-209902-99.txt
+  SHA256: 40e63bbe31b7c3fb92917956d8d8bc14d3273dbc5338c32f809d06db7187c7e4
+  Independently authored explanatory counterpart for the same fictional boundary.
+  It is not parsed, downloaded vendor proof or a native installation record.
+
+Coverage map
+------------
+  feed/arch_test.go retains fixed/unknown/vulnerable/not-affected states, testing
+  and unreleased-fix conservatism, exact product/architecture scope, empty/trailing
+  document rejection, unknown constraints, malformed/duplicate package/CVE/ASA
+  rejection, invalid/equal/inverted versions and publication-join negatives.
+  advisory/vendor_integration_test.go retains persisted native backport matching
+  and unavailable rolling VERSION_ID versus timeout/stale-inventory distinction.
+  The issue fixtures remain partial. No result proves current vendor coverage.
+  Real vendor acquisitions and native qualification remain separate records in
+  lab/ledger.json and docs/verification.md, including rolling advisory evidence.
 
 Native version semantics and vectors:
   Pacman v7.0.0 commit 138cbae58448b7fde90335526add3029875784ee
@@ -109,7 +106,6 @@ Coverage and schema provenance:
   latest repository version is still below it, and derives Testing when all
   repository builds at or beyond the fix are in testing repositories.
 
-  Arch advisory facts/text remain attributed to the Arch Linux Security Team.
-  No blanket advisory-data redistribution license was established by these
-  endpoints. Review redistribution rights before public distribution, alongside
-  the retained GPL upstream vector fixture and product licensing decision.
+  The synthetic advisory fixtures above use Apache-2.0, not an inferred Arch
+  dataset license. The separately retained upstream comparator vector above
+  keeps its own GPL-2.0-or-later license and original copyright notice.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Authorization } from "@/features/auth/authorization";
 import { DirectoryGroupPicker } from "@/features/auth/directory-group-picker";

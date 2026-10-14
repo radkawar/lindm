@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockTargeting :exec
 -- Updating the fence forces REPEATABLE READ waiters to reject a stale snapshot.
 UPDATE targeting_lock SET revision=revision+1 WHERE singleton;

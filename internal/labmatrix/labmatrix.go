@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package labmatrix plans the platform × cell lab matrix and keeps its ledger.
 // It joins the declarative cell table (lab/matrix.json), the platform registry
 // and the pinned image manifests into cells, derives each cell's state from the

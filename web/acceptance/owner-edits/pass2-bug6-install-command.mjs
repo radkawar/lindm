@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // The one-time code chooser defaults to the fleet's most common OS.
 // The stock fixture now provides signed agent packages. Check its eligible
 // command, not an invented missing-publication state. review-enrollment owns

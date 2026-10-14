@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Settings reports verified repository state, not a simulated missing publication.
 // The stock fixture is Ready. Missing-artifact enrollment runs are separate.
 export const task = {

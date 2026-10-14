@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Fleet-wide package-name suggestions (SuggestValues PACKAGE_NAME) walk this
 -- index in output order: an ASCII case-insensitive prefix is a key range and

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /authorization never shows a built-in approval rule as optional.
 // Revoke and wipe (destructive actions) always need a second administrator, so
 // the editor shows them checked and locked as "Always required"; permission

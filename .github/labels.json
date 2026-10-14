@@ -1,0 +1,51 @@
+[
+  {
+    "name": "bug",
+    "color": "d73a4a",
+    "description": "An observed defect with steps or evidence to reproduce it"
+  },
+  {
+    "name": "enhancement",
+    "color": "5287da",
+    "description": "A proposed change to device management or development"
+  },
+  {
+    "name": "good first issue",
+    "color": "7057ff",
+    "description": "A scoped task with enough context for a new contributor"
+  },
+  {
+    "name": "security",
+    "color": "b60205",
+    "description": "Public security hardening only; disclose vulnerabilities privately"
+  },
+  { "name": "platform:ubuntu", "color": "5287da", "description": "Ubuntu platform work" },
+  { "name": "platform:debian", "color": "5287da", "description": "Debian platform work" },
+  { "name": "platform:fedora", "color": "5287da", "description": "Fedora platform work" },
+  {
+    "name": "platform:rhel",
+    "color": "5287da",
+    "description": "Red Hat Enterprise Linux platform work"
+  },
+  { "name": "platform:rocky", "color": "5287da", "description": "Rocky Linux platform work" },
+  { "name": "platform:almalinux", "color": "5287da", "description": "AlmaLinux platform work" },
+  { "name": "platform:mint", "color": "5287da", "description": "Linux Mint platform work" },
+  { "name": "platform:popos", "color": "5287da", "description": "Pop!_OS platform work" },
+  { "name": "platform:arch", "color": "5287da", "description": "Arch Linux platform work" },
+  { "name": "platform:omarchy", "color": "5287da", "description": "Omarchy platform work" },
+  {
+    "name": "platform:opensuse",
+    "color": "5287da",
+    "description": "openSUSE Tumbleweed platform work"
+  },
+  {
+    "name": "platform:atomic",
+    "color": "5287da",
+    "description": "Future Fedora Atomic design and qualification"
+  },
+  {
+    "name": "platform:nixos",
+    "color": "5287da",
+    "description": "Future NixOS design and qualification"
+  }
+]

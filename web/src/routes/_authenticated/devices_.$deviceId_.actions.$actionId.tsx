@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createFileRoute } from "@tanstack/react-router";
 import { useDeviceBreadcrumbTitle } from "@/features/devices/breadcrumb";
 import { DeviceActionStatusPage } from "@/features/devices/action-pages";

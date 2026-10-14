@@ -38,17 +38,21 @@ fedora44-packages.json
   Full observation SHA256: b1f784f1c16de0fd9acfcdd762bf3e1b43ef079a07c7e4c26ca473a8addce3c8
   Package collection: 2026-10-09T22:55:22.975840845Z through 2026-10-09T22:55:23.040673326Z
   Native oracle independently matched all 427 RPM package records. Retained
-  sudo is 0:1.9.17-7.p2.fc44. FEDORA-2026-7d4732cbab fixes the distro backport
-  0:1.9.17-10.p2.fc44 (CVE-2026-96512), so this actual installed package remains
-  affected without treating the unchanged upstream 1.9.17 version as proof.
+  sudo is 0:1.9.17-7.p2.fc44. The package bytes remain unchanged native input.
+  The maintained replay now uses independently authored synthetic updateinfo:
+  FEDORA-2099-abcdef1234 / CVE-2099-99020 with fictional fix 0:8.4.2-12.p3.fc44.
+  This preserves an affected finding through the real snapshot RPC path; it does
+  not prove a real sudo vulnerability, vendor fix, or current feed assessment.
+  Real-feed proof remains separate in lab/ledger.json and docs/verification.md.
   VM: x86_64 KVM, QEMU 8.2.2, SeaBIOS 1.16.3. This is emulator/VM inventory
   evidence, not physical or graphical certification.
 
 The deterministic database replay controls receipt/collection timestamps to
-exercise freshness independently of the retained package versions. Vendor feed
-subsets remain explicitly partial, so absence of a finding is never promoted to
-a whole-device clean claim. Vendor fixture provenance and native comparator test
-sources are recorded separately in ../feed/testdata/provenance.txt.
+exercise freshness independently of the retained package versions. Licensed vendor
+and authored synthetic advisory subsets remain partial, so absence of a finding
+cannot establish whole-device safety. Advisory input provenance and comparator
+sources appear separately in ../feed/testdata/provenance.txt. Synthetic advisory
+files use Apache-2.0; native inventory bytes are lindm's own recorded observations.
 
 rhel98-packages.json and rhel98-platform.json
   Retained PackageBatch SHA256: 2e98b89d9b2cf4d4911c81a1bb2680fcc93daac3cee90dc9e03478077668648b

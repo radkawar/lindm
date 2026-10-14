@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner edit pass 2026-10-12 (run 16717866-d6a9-4b6f-b59f-399eedc25b8a) and later
 // owner reports: one module per imported task. Each exports `task` (name,
 // screenId when it came from the edit sheet, route, priority, acceptance) and

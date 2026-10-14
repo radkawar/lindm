@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package packaging
@@ -71,7 +73,7 @@ func buildArch(ctx context.Context, work, payload, version string, arch Architec
 	}
 	pkgver := version + "-" + archRelease
 	var info strings.Builder
-	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = UNLICENSED\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", p.name, p.name, pkgver, p.summary, epoch, size, arch.Arch)
+	fmt.Fprintf(&info, "pkgname = %s\npkgbase = %s\nxdata = pkgtype=pkg\npkgver = %s\npkgdesc = %s\nbuilddate = %d\npackager = Lindm Packaging <packaging@lindm.invalid>\nsize = %d\narch = %s\nlicense = Apache-2.0\ndepend = systemd\ndepend = glibc\ndepend = coreutils\ndepend = sh\n", p.name, p.name, pkgver, p.summary, epoch, size, arch.Arch)
 	if p.name == PackageName {
 		for _, dependency := range platform.BackendPacman.ResourceDependencies() {
 			fmt.Fprintf(&info, "depend = %s\n", dependency)

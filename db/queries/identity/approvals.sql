@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertApproval :one
 INSERT INTO approval_requests (id, requester_id, requester_version, action, permission, device_id, mutation_id, payload, payload_sha256, created_at, expires_at)
 VALUES (sqlc.arg(id), sqlc.arg(requester_id), sqlc.arg(requester_version), sqlc.arg(action), sqlc.arg(permission), sqlc.narg(device_id), sqlc.arg(mutation_id), sqlc.arg(payload), sqlc.arg(payload_sha256), statement_timestamp(), statement_timestamp() + make_interval(secs => sqlc.arg(lifetime_seconds)::int))

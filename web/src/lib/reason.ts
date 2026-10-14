@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 export const REASON_MAX_UNITS = 512;
 
 export function reasonError(value: string): string {

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /devices shows encryption, pending updates and open findings for
 // every row, a relative "Last inventory" without sequence numbers, the paging
 // explanation in a focusable pager tooltip, and no Custom attributes accordion

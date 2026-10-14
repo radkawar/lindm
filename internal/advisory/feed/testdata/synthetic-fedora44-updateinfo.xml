@@ -1,0 +1,146 @@
+<update from="fixtures@example.invalid" status="stable" type="security" version="2.0">
+    <id>FEDORA-2099-abcdef1234</id>
+    <title>Synthetic package revision update</title>
+    <issued date="2026-01-02 12:00:00"/>
+    <updated date="2026-01-03 12:00:00"/>
+    <rights>Copyright 2026 lindm contributors. SPDX-License-Identifier: Apache-2.0</rights>
+    <release>Fedora 44</release>
+    <severity>Important</severity>
+    <summary>Synthetic package revision fixes a fictional issue.</summary>
+    <description>Synthetic parser case for CVE-2099-99020.</description>
+    <references/>
+    <pkglist>
+      <collection short="F44">
+        <name>Fedora 44</name>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="src" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.src.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.src.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debugsource" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-devel" version="8.4.2" release="12.p3.fc44" epoch="0" arch="i686" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.i686.rpm">
+          <filename>synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.i686.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debugsource" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-devel" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debugsource" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-devel" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debugsource" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-devel" version="8.4.2" release="12.p3.fc44" epoch="0" arch="ppc64le" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.ppc64le.rpm">
+          <filename>synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.ppc64le.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-debuginfo-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debugsource" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-debugsource-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-debuginfo-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-logsrvd" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-logsrvd-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin-debuginfo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-debuginfo-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-python-plugin" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-python-plugin-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="synthetic-rpm-tool-devel" version="8.4.2" release="12.p3.fc44" epoch="0" arch="s390x" src="https://fixtures.example.invalid/rpm/synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.s390x.rpm">
+          <filename>synthetic-rpm-tool-devel-8.4.2-12.p3.fc44.s390x.rpm</filename>
+        </package>
+        <package name="sudo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="x86_64" src="https://fixtures.example.invalid/rpm/sudo-8.4.2-12.p3.fc44.x86_64.rpm">
+          <filename>sudo-8.4.2-12.p3.fc44.x86_64.rpm</filename>
+        </package>
+        <package name="sudo" version="8.4.2" release="12.p3.fc44" epoch="0" arch="aarch64" src="https://fixtures.example.invalid/rpm/sudo-8.4.2-12.p3.fc44.aarch64.rpm">
+          <filename>sudo-8.4.2-12.p3.fc44.aarch64.rpm</filename>
+        </package>
+      </collection>
+    </pkglist>
+  </update>

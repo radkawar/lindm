@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { journeys as provisioning } from "./review-journeys-provision.mjs";
 import { journeys as security } from "./review-journeys-security.mjs";
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Fragment, useDeferredValue, useMemo, useState } from "react";
 import {

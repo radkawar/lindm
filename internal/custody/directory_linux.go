@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package custody defines the filesystem boundary used by privileged agent
 // readers, native providers and local tooling: the directory predicate for
 // agent configuration and runtime paths, a strict no-follow walk for

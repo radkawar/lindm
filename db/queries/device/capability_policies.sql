@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Scope kinds: 1 deployment, 2 static group, 3 dynamic group. group_id is the
 -- nil UUID at deployment scope.
 

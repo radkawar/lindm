@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a scoped improvement to the v0.1 preview.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Read CONTRIBUTING.md and the relevant docs before proposing a change.
+        Use private GitHub advisory reporting for vulnerabilities or community safety
+        incidents, not this public form. Keep credentials and private device data out.
+  - type: textarea
+    id: need
+    attributes:
+      label: User need
+      description: State the operator's task and the limitation in current behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest complete change and how an operator would use it. Link related documentation or P/L requirements if applicable.
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Compatibility and security boundaries
+      description: State affected platforms, privileges, authority or custody changes, and migration or rollback implications. State unknowns rather than inventing guarantees.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and evidence
+      description: Describe alternatives, relevant observed behavior and the real verification needed to accept this change.

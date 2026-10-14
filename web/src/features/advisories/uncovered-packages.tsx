@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AdvisoryFindingState } from "../../../gen/lindm/admin/v1/advisories_pb";

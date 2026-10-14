@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: GetDeploymentID :one
 SELECT deployment_id FROM deployment_identity WHERE id = true;
 

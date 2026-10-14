@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { queryOptions } from "@tanstack/react-query";
 import type { DeviceActionKind } from "../../../gen/lindm/admin/v1/device_actions_pb";
 import type { AuthLifetime } from "@/lib/auth-lifetime";

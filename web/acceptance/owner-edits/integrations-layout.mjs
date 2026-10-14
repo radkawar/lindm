@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, Integrations): the page was ~9,000 px tall. Destinations,
 // schedules and reports are rows, create/edit open dialogs and delivery history
 // is collapsed into per-destination counts. Read-only: opens and closes a dialog.

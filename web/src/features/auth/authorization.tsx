@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { clone, create } from "@bufbuild/protobuf";
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";

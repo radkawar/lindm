@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: CountOpenAuthFlows :one
 SELECT count(*)::bigint AS open_count
 FROM auth_flows

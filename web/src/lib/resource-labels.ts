@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { ResourceKind } from "../../gen/lindm/resource/v1/identity_pb";
 import {
   ResourceFeature,

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /approvals lists open requests first, nearest expiry first, with
 // decided ones collapsed under "Recent decisions"; destructive requests carry a
 // red one-line consequence; undecided fields are hidden; a requester sees why

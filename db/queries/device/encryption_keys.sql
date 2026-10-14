@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertDeviceEncryptionKey :execrows
 -- Either uniqueness (one key per identity, one identity per key) leaves the
 -- existing registration untouched; the caller distinguishes replay from conflict.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package config loads the protobuf configuration contract and resolves local
 // resources. Schema validation is deterministic; resource checks happen here.
 package config

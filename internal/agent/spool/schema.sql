@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Unprivileged observation spool. Bounded metadata, counters and receipts only.
 -- Package batch bytes live in owned collection directories, never in this database.
 -- Only the current schema is supported; unexpected versions require recovery.

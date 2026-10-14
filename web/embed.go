@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package web serves the built console without a separate frontend runtime.
 package web
 

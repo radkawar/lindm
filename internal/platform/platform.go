@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package platform is the single declarative registry of the Linux releases
 // lindm recognizes. Each row records the os-release identity it matches, its
 // support tier, native tooling facts, provider quirks and explicit capability

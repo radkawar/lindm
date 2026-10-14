@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package policy retains immutable resource profile revisions and resolves
 // assignments into deterministic previews. Catalog publication is separate
 // from assignment activation and native execution.

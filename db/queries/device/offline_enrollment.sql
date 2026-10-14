@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertOfflineEnrollmentAuthorization :exec
 INSERT INTO offline_enrollment_authorizations (id, token_id, actor_id, request_sha256, authorization_envelope, expires_at)
 VALUES ($1, $2, $3, $4, $5, $6);

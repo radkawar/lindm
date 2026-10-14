@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, finding 10: forms showed raw validator text ("metadata.labels[4]:
 // does not match regex pattern … [string.pattern]", "[string.ip]") and accepted
 // values until submit. Each form now names the problem in words beside the field,

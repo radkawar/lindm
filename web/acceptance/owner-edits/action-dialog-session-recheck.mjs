@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // ui-review found the device page's action dialogs (Refresh inventory, Patch now,
 // Shut down device) intermittently ignoring Escape for over 2 s under load; the
 // next dialog check then met the old dialog with focus outside it. The open

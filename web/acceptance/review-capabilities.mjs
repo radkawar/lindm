@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real seeded capability policies and executor reports (loadlab demo agents).
 // Editors are opened and reviewed for their consequence text, never saved.
 const devices = [

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, bug 8: choosing a profile in the New rollout form collapsed the
 // sidebar's Fleet navigation group. The check drives the Profile picker with
 // real pointer and keyboard input on the scrolled rollouts page (the form opens

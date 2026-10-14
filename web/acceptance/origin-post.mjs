@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // This diagnostic is separate from authentication qualification. It deliberately
 // submits an invalid, secret-free message through the console's own loaded auth
 // client. It neither removes the UI capability guard nor installs a credential API.

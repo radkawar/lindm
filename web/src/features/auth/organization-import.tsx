@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, fromJsonString } from "@bufbuild/protobuf";
 import { timestampNow, type Timestamp as ProtoTimestamp } from "@bufbuild/protobuf/wkt";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

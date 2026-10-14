@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Expiring work claims distribute pending advisory evaluations across replicas.
 -- A claim is an efficiency boundary only: each evaluation still binds its device

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- A NULL runtime definition means configuration is the bootstrap authority.
 -- Once written, even an empty policy is authoritative across all server restarts.

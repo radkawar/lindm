@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertManagedSecret :exec
 INSERT INTO managed_secrets (id, purpose, subject_binding_id, display_name, current_version, request_id, created_by)
 VALUES (sqlc.arg(id), sqlc.arg(purpose), sqlc.arg(subject_binding_id), sqlc.arg(display_name), 1, sqlc.arg(request_id), sqlc.arg(created_by));

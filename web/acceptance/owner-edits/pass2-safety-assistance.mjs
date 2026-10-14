@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (safety): while a remote-assistance request waits, the viewer
 // describes what the user sees (the agent's consent notification and reason)
 // instead of an empty black screen; once the admin stops a request nobody

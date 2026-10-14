@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, Integrations): "Rotate signing secret" was disabled with
 // "Old secret stops working: Not recorded". Rotate is available for a webhook
 // with a secret and states the overlap consequence before confirming.

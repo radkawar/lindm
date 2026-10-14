@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useSyncExternalStore } from "react";
 import type { ProfileRevision } from "../../../gen/lindm/admin/v1/profiles_pb";
 import { getAuthLifetime, subscribeAuthLifetime, type AuthLifetime } from "@/lib/auth-lifetime";

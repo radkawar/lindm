@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Static contact sheet for `lab console review`: one row per route and variant,
 // with light/dark desktop/mobile captures side by side. Reads only the sanitized report.
 

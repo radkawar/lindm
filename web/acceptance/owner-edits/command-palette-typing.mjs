@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (ui-pass-2 item 51): Control/Command+K while typing in a form field
 // does not open the command palette over the form. Read-only: types nothing.
 export const task = {

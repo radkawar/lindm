@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { type JsonObject } from "@bufbuild/protobuf";
 
 // EncryptionComplianceDesired: require_luks_root is always true, and

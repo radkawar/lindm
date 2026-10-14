@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: an advisory whose source publishes no severity (real Ubuntu OSV
 // records in the seed's vendor feeds) reads as an honest neutral "Not rated by
 // the source", not as an error-looking "Not published" status. Read-only.

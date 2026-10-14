@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 package releasebuild
@@ -200,7 +202,7 @@ func TestOCIArchiveIsDeterministicAndBindsBinary(t *testing.T) {
 	caBundle, _, _ := testCABundle(t)
 	first, second := filepath.Join(directory, "first.tar"), filepath.Join(directory, "second.tar")
 	for _, path := range []string{first, second} {
-		if err := buildOCI(binary, caBundle, path, "lindmd", "arm64", 1760000000); err != nil {
+		if err := buildOCI(binary, caBundle, path, "lindmd", "arm64", 1760000000, filepath.Join("..", "packaging", "assets")); err != nil {
 			t.Fatal(err)
 		}
 	}

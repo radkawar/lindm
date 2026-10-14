@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+
 import { startupFailure, startupStage } from "./assistance-startup.mjs";
 
 // Static dependencies of the runner can fail before its command loop exists.

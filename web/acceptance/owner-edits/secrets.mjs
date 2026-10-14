@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task: /secrets lists first, creates in a dialog with no preselected
 // purpose, offers Rotate/Delete/Where it's used on each row, and names the
 // blast radius before deletion. Read-only: dialogs open and close, nothing is

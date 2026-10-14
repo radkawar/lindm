@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package feed imports distro-authoritative advisory documents and compares native
 // package versions. It does not infer binary-to-source mappings, infer module
 // streams, authenticate air-gap custody, or decide whether an inventory is clean.

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: GetAuthority :one
 SELECT * FROM execution_authority WHERE id = true;
 

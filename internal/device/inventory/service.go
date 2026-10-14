@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package inventory owns what devices report about themselves: host
 // observations, package snapshots and their quotas and receipts, storage
 // targets, recovery readiness, advisory findings, and the admin reads over

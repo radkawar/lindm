@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package escrow owns server custody of device-escrowed secrets (recovery keys
 // and managed local-admin passwords) and of administrator-managed secret
 // material: device-to-server RSA-OAEP transport decryption and per-record

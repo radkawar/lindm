@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2 findings 49): "View export and download evidence" from the
 // audit export dialog landed at the top of /integrations. The link now lands on
 // the export's report row and focuses it. Moves state: queues one audit export.

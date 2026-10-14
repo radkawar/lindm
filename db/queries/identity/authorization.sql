@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: ReadRuntimeAuthorization :one
 SELECT digest, definition, revision, updated_at FROM authorization_policy WHERE id = true;
 

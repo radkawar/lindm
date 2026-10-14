@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Names identify declarative enrollment objects without exposing bearer material.
 -- Expiry/consumption never renews a credential implicitly; explicit revocation

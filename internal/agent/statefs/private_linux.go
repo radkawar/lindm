@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package statefs checks filesystem boundaries shared by the privileged identity
 // journal and the separately owned, unprivileged observation spool.
 package statefs

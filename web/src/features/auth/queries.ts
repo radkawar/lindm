@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import { toJsonString } from "@bufbuild/protobuf";
 import { SessionPrincipalSchema } from "../../../gen/lindm/auth/v1/auth_pb";

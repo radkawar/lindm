@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package protodata checks bounded, closed protobuf payloads used for authority
 // and protected state. These finite schemas intentionally contain no maps.
 package protodata

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 ALTER TABLE approval_requests DROP CONSTRAINT approval_requests_action_known;
 ALTER TABLE approval_requests DROP CONSTRAINT approval_requests_action_permission;

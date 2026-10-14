@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding #6: a new action refused because another is still open
 // read "Something went wrong". The server now names the blocking action
 // (kind, send time, expiry) and the review says so in plain words.

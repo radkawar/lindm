@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- A requester may withdraw their own pending request. Withdrawal is not a
 -- decision: no approver is recorded and the withdrawal reason is kept in

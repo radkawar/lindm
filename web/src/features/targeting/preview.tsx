@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, createRegistry, toJsonString } from "@bufbuild/protobuf";
 import { createValidator } from "@bufbuild/protovalidate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";

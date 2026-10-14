@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner edit pass 2 (fleet screens): dashboard, device list, device header,
 // Overview, Inventory, Encryption, Actions/History and Findings items from the
 // owner's 2026-10-12 feedback. Read-only: tabs are opened, the accept-risk

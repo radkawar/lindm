@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: DeleteHostApprovedReferences :exec
 -- Clears a generation's reports before its latest accepted observation's.
 DELETE FROM host_approved_references

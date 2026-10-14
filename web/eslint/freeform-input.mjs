@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // lindm/freeform-input: a text-like console input is either an explicitly
 // declared free-text value (data-freeform="<why the value is genuinely new>") or
 // it should be a SearchPicker/SelectField over real server values. The type

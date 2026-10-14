@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { SearchSchemaInput } from "@tanstack/react-router";
 import { parseListSearch, type ListSearch } from "@/lib/list-search";
 import { usableUuid } from "./model";

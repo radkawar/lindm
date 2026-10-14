@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: DeviceInScope :one
 SELECT EXISTS (
     SELECT 1 FROM devices d

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Palette contrast complements axe's rendered-text checks. Read the browser's
 // resolved semantic variables in the active theme, not a copied palette fixture.
 const surfaces = ["background", "card", "popover", "muted", "secondary", "sidebar"];

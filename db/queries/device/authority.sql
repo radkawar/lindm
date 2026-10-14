@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Authority writes serialize after GetDeviceForUpdate. Read-only polling may
 -- read authority in a REPEATABLE READ, READ ONLY transaction instead.
 -- name: GetGenerationAuthority :one

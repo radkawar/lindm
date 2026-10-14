@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- Sealed deliveries minted with one resource action. Only HPKE ciphertext and
 -- identifiers are stored; replays return these exact bytes in ordinal order.
 -- name: InsertResourceActionSecret :exec

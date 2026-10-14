@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package resource owns the closed resource vocabulary, canonical identity and
 // cross-kind semantic claims. It does not select or execute native providers,
 // grant authority, acquire ownership, or claim platform qualification.

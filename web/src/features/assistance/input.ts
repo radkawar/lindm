@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Input capture for the authenticated "lindm-input" data channel. Every press
 // carries the selected display and its generation so queued coordinates AND
 // keyboard events cannot cross a switch. Release remains safe across generations.

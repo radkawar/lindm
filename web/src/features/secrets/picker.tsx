@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import type { SecretSummary } from "../../../gen/lindm/admin/v1/secrets_pb";

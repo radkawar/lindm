@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createContext, useContext } from "react";
 import type { SessionPrincipal } from "../../gen/lindm/auth/v1/auth_pb";
 

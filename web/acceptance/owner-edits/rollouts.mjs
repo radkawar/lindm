@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2, items 25-32, 50, bug 8): /rollouts has one "Roll out"
 // flow. Rollouts carry real names and live device results, controls are
 // secondary buttons with their own confirmation, and New rollout is a dialog

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package labhost
 
 // Python is part of the supported Ubuntu host base and is pinned by the

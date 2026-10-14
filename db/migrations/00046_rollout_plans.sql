@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- One reviewed StartRollout request: the exact request bytes (the single
 -- approval's payload), the assignment it saves when started and its status.

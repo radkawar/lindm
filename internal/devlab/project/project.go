@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package project names a checkout's development Docker Compose project. It
 // is the one definition shared by the fixture lifecycle (devlab), which runs
 // the project, and the worktree tooling, which must recognize it running; it

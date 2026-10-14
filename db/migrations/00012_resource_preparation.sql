@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Keep the one-open-effect fence while an ungranted package staging unit is
 -- being cancelled. closed_at, not the requested closure reason, is terminal.

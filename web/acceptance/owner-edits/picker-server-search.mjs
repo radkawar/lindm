@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner report: pickers over paged lists searched only the loaded page, so on the
 // scale seed (120 device groups) typing a group that was not among the first 50
 // read "No matching options". Device group and dynamic group pickers now ask the

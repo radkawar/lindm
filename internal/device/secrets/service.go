@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package secrets owns server-side secret custody: the managed secret store
 // and its sealed delivery to resources, device encryption keys, recovery-key
 // escrow with signed receipts, and local-admin passwords (LAPS).

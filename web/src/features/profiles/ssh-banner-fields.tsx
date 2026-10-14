@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { type JsonObject } from "@bufbuild/protobuf";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";

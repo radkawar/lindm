@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package vmlab verifies pinned official images and runs isolated native-agent
 // observations in disposable VMs. It does not certify complete native lifecycles.
 package vmlab

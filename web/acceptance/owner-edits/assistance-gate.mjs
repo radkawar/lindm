@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner report 2026-10-12 #4: a headless RHEL server with remote assistance turned
 // off offered a request, and the refused request then read "Ended" with facts that
 // never happened. The console offers the request only where the server knows of no

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package osupdate is the root runner behind the packaged
 // lindm-os-update{,-now,-status}.service units (`lindm-agent os-update
 // run|run-now|status`). It drives the distribution's own update tooling:

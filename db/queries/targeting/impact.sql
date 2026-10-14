@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: ImpactIsolation :one
 SELECT current_setting('transaction_isolation')::text AS isolation;
 

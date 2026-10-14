@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Shared steps for owner-edit checks that need a real second approver or an
 // in-page step-up: create an Admin in Accounts, approve one request as that
 // admin in its own browser (own virtual passkey), read the approval ID a reveal

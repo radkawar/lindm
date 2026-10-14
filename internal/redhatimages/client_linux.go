@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package redhatimages acquires official RHEL KVM images and Binary DVD installer
 // media and manages disposable laboratory registration resources through Red Hat's
 // authenticated APIs. It never accepts subscription terms or treats authenticated

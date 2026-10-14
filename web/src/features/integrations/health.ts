@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { StatusTone } from "@/components/ui/status-badge";
 import type { Destination, DeliverySummary } from "../../../gen/lindm/integrations/v1/delivery_pb";
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 finding 13: a deep link opened while signed out landed on / and
 // the destination was lost after sign-in. Signed out, the console now keeps the
 // requested path in the sign-in URL; once a session exists the home route opens

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package devlab
 
 import (
@@ -54,11 +56,10 @@ func (o *consoleDemoOrigin) close() error {
 	return err
 }
 
-// consoleDemoFeed is one checked-in vendor fixture served as
-// /feeds/<release>/<name> for the registry row release. Signed documents also
-// serve their vendor .sha256 and .asc proofs. The repository feed is the
-// complete updateinfo of the fixture-owned controlled Fedora repository: the
-// recorded vendor node inside an <updates> root.
+// consoleDemoFeed serves one licensed upstream or authored synthetic fixture as
+// /feeds/<release>/<name> for the registry row release. Signed upstream documents
+// also serve their vendor .sha256 and .asc proofs. The synthetic Fedora node
+// inside an <updates> root covers only the fixture-owned controlled repository.
 type consoleDemoFeed struct {
 	release, name, fixture string
 	format                 advisoryv1.FeedFormat
@@ -66,15 +67,15 @@ type consoleDemoFeed struct {
 	signed, repository     bool
 }
 
-// Single notices are partial vendor snapshots, so their devices' findings stay
-// UNKNOWN (feed_partial_coverage). The Fedora controlled repository is the one
-// complete source: only Fedora devices can report AFFECTED. Provenance is
-// recorded in internal/advisory/feed/testdata/provenance.txt.
+// Single notices remain partial, so their devices' findings stay UNKNOWN
+// (feed_partial_coverage). Only the synthetic Fedora repository is complete.
+// Its fictional assessment exercises AFFECTED on native sudo inventory; it is
+// not vendor vulnerability proof. Provenance lives in the feed testdata directory.
 func consoleDemoFeeds() []consoleDemoFeed {
 	return []consoleDemoFeed{
 		{release: "ubuntu-24.04", name: "USN-6859-1.json", fixture: "ubuntu-USN-6859-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
-		{release: "debian-12", name: "DSA-5724-1.json", fixture: "debian-DSA-5724-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
-		{release: "fedora-44", name: "updateinfo.xml", fixture: "fedora44-sudo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true},
+		{release: "debian-12", name: "synthetic-DSA-99001-1.json", fixture: "synthetic-debian-DSA-99001-1.json", format: advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON},
+		{release: "fedora-44", name: "synthetic-updateinfo.xml", fixture: "synthetic-fedora44-updateinfo.xml", format: advisoryv1.FeedFormat_FEED_FORMAT_RPM_UPDATEINFO, repository: true},
 		{release: "rhel-9", name: "rhsa-2024_6783.json", fixture: "redhat-rhsa-2024_6783.json", format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, stream: "standard", signed: true},
 	}
 }
@@ -112,7 +113,7 @@ func consoleDemoFixtureFeeds(repository, origin string) (map[string][]byte, *con
 // ConfigureConsoleDemo enables the demo's vendor feeds plus an owned webhook
 // sink and assistance relay. Non-nil advisories are real registry-derived
 // feeds refreshed through the revalidating cache in cacheDir. Nil advisories
-// serve the small checked-in vendor fixtures (consoleDemoFeeds) from the
+// serve the licensed upstream and authored synthetic fixtures (consoleDemoFeeds) from the
 // owned origin instead, so the first refresh takes seconds. Only that origin
 // uses the ephemeral CA. Call once, before enrolling demo devices.
 func (f *AuthorityFixture) ConfigureConsoleDemo(ctx context.Context, advisories *configv1.AdvisoryConfig, cacheDir string) (*ConsoleDemo, error) {

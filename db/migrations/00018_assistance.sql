@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Graphical remote assistance invitations. One row is one single-use support
 -- session; SDP is signaling state, never credentials. State and end_cause use

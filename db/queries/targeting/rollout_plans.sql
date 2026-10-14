@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: InsertPlannedRollout :execrows
 INSERT INTO resource_rollouts(id,definition,creator_id,stage_started_at,paused,pause_reason,name) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING;
 

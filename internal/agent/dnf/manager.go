@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package dnf identifies installed native DNF managers. Identity is not a claim
 // of transaction capabilities: callers must separately qualify store/replay and
 // other required operations. DNF4 transactions must never use DNF5 semantics.

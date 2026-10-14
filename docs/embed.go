@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package docs serves bundled reference documents, not deployment files or live evidence.
 package docs
 

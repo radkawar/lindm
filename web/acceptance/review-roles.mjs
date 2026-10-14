@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Role-scoped console walkthrough: as the owner, an approver (admin) and a
 // helpdesk account scoped to the `engineering` label, nothing the console offers
 // is then refused. Each visible navigation item opens without an access refusal,

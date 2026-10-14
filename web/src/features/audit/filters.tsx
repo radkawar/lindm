@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { FilterPanel } from "@/components/ui/filter-panel";

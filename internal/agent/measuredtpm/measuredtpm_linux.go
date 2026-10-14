@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build linux
 
 // Package measuredtpm is the root executor's TPM side of measured Boot Loader

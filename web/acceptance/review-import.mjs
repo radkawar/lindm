@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: Apache-2.0
+
 // Local owner-authored annotations -> private, actionable task records. No network,
 // issue tracker mutation, inferred approval or model-generated owner feedback.
 import { lstat, mkdir } from "node:fs/promises";

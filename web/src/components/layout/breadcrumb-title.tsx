@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { createContext, useContext, useEffect } from "react";
 
 // Detail pages name their record (hostname, profile or secret name) in the shell

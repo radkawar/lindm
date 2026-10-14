@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: Apache-2.0
+// Project additions: Apache-2.0; shadcn-derived portions: MIT.
+// Copyright (c) 2023 shadcn; see web/LICENSE.shadcn for the retained MIT notice.
+
 import { RevealApprovalRule, type RevealApproval } from "../../../gen/lindm/admin/v1/secrets_pb";
 
 // The server decides on every reveal whether a second admin must approve it;

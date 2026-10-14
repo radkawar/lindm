@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, fromJsonString } from "@bufbuild/protobuf";
 import type { SearchSchemaInput } from "@tanstack/react-router";
 import {

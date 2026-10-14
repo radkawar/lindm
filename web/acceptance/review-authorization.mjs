@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real disposable UI-review server only. The policy recovery case drops a real
 // committed response, never fabricates policy or account issuance responses.
 export async function reviewAuthorization({

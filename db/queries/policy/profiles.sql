@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: ReserveProfileRequest :execrows
 INSERT INTO profile_requests (request_id, actor_id, request_digest, profile_id, revision_id, audit_id)
 VALUES ($1, $2, $3, $4, $5, $6)

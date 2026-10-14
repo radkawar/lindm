@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, ui-pass-2 item 29: a device whose settings came from a rollout
 // read "None. The profile was removed." with the raw reason
 // target_preview_activation. Read-only: runs before checks that reassign the

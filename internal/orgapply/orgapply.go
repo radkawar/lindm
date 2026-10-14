@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package orgapply plans and applies declarative organizations through the product
 // AdminService. It never accesses a database, retries mutations, logs secrets, or
 // turns CLI credentials into browser authority. Omission never deletes objects.

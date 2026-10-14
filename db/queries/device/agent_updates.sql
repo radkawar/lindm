@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: GetAgentUpdateReport :one
 SELECT * FROM device_agent_update_reports WHERE generation_id = sqlc.arg('generation_id');
 

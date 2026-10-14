@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+
 # Explicitly authorized host setup, not a browser acceptance result. Invoke via
 # lab hosts baseline-browser so before/after output survives partial failure.
 set -euo pipefail

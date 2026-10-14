@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package permissionupgrade maps permission names an earlier release could
 // persist or configure to their current, meaning-preserving equivalents. It is
 // applied only to state an earlier release wrote: the persisted runtime

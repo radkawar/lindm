@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package rpcreason owns the Lindm-Reason Connect metadata key: the stable,
 // machine-readable reason every lindm RPC denial carries next to its Connect
 // code. Servers build denials with Error (or Set on a richer error); clients

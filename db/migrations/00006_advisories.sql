@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Advisory feeds are published atomically. Evaluations refer to the exact feed

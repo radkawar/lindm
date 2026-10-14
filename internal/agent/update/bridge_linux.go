@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package update owns privileged agent-only update selection and native recovery.
 // It never opens a network socket. Unprivileged transport answers bounded,
 // executor-selected fetch requests; only the TUF client grants target authority.

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC; Copyright 2026 lindm contributors; SPDX-License-Identifier: Apache-2.0 -->
+<repomd xmlns="http://linux.duke.edu/metadata/repo">
+  <revision>1</revision>
+  <data type="primary"><checksum type="sha256">0000000000000000000000000000000000000000000000000000000000000000</checksum><location href="repodata/synthetic-primary.xml"/></data>
+  <data type="updateinfo"><checksum type="sha256">073edc4209285ce5edb8ab70ff0644a7a11c53897326e11680ff8008b5797a16</checksum><location href="repodata/073edc4209285ce5edb8ab70ff0644a7a11c53897326e11680ff8008b5797a16-synthetic-updateinfo.xml"/></data>
+</repomd>

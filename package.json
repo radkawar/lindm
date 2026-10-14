@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "license": "Apache-2.0",
   "description": "Single-tenant Linux device management control plane and agent",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "check": "npm run format:check && npm run lint:docs && npm run lint:web && npm run typecheck:web",
+    "check": "npm run lint:licenses && npm run format:check && npm run lint:docs && npm run lint:web && npm run typecheck:web",
     "build:web": "vite build --config web/vite.config.ts && npm run typecheck:web",
     "typecheck:web": "tsc -p web/tsconfig.json",
     "lint:web": "eslint web/src --max-warnings=0 && node web/eslint/scan-css-colours.mjs",
@@ -16,6 +17,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint:docs": "markdownlint \"**/*.md\" --ignore \"**/node_modules/**\"",
+    "lint:licenses": "node test/tooling/license-headers.mjs check",
     "audit:dependencies": "npm audit --audit-level=low",
     "hooks:install": "git config --local core.hooksPath .githooks"
   },

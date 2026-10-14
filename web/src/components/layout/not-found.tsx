@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Link, useLocation } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 

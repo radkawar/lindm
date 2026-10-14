@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Deployment-global secret custody. Each immutable version is an AES-256-GCM

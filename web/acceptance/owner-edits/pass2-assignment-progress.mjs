@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2, item 1: profile assignments on the live demo device never left
 // "Pending / No changes sent yet" because the demo device never asked for
 // resource work. State-changing: assigns the organization's "Contractors" profile

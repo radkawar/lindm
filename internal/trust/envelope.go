@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package trust validates domain-separated agent authority using standard DSSE.
 package trust
 

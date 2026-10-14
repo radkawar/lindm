@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real profile publication and reload, never an intercepted RPC or native SSH
 // claim. Every capture uses the full shared console review checks.
 export async function reviewSSHBanner({

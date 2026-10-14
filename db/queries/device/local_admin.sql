@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockLocalAdminPolicy :one
 SELECT * FROM local_admin_password_policies WHERE device_id = $1 FOR UPDATE;
 

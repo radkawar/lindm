@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package releaseupdate publishes TUF repositories and verifies agent updates.
 // It has no implicit network transport and never executes native packages.
 package releaseupdate

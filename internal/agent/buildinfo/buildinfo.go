@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package buildinfo reports the agent build identity used as packaging evidence.
 // Version is the packaging linker stamp:
 //

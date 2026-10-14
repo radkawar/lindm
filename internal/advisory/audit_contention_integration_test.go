@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build integration
 
 package advisory
@@ -21,11 +23,11 @@ func TestEvaluationWaitsForAuditHeadWithoutRestarting(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 	defer cancel()
-	s, source, doc := vendorService(t, pool, "fedora", "44", "fedora44-sudo.xml")
+	s, source, doc := vendorService(t, pool, "fedora", "44", "synthetic-fedora44-updateinfo.xml")
 	if err := s.publish(ctx, source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	pkg := &inventoryv1.Package{Name: "sudo", Version: "0:1.9.17-9.p2.fc44", Architecture: "x86_64", Manager: "rpm"}
+	pkg := &inventoryv1.Package{Name: "synthetic-rpm-tool", Version: "0:8.4.2-11.p3.fc44", Architecture: "x86_64", Manager: "rpm"}
 	warm := seedInventory(t, pool, "fedora", "44", pkg)
 	if _, err := s.Evaluate(ctx, warm); err != nil {
 		t.Fatal(err)

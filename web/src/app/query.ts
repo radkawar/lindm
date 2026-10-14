@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { Code } from "@connectrpc/connect";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import type { AnyRouter } from "@tanstack/react-router";

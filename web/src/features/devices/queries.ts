@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { queryOptions } from "@tanstack/react-query";
 import { adminClient } from "@/lib/rpc";
 import type { AuthLifetime } from "@/lib/auth-lifetime";

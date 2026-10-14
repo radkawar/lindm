@@ -357,6 +357,16 @@ with none; Rocky Linux 9 2,433 with 430 rejected (356 SIG products such as
 188 SIG rejections. Rocky stays registry-partial (source-like package mappings),
 so its evaluations remain `feed_partial_coverage`, never complete.
 
+The checked-in Rocky advisory is independently authored **synthetic** data under
+Apache-2.0. Its fictional ID, package, versions and text replace the former record
+because no explicit grant for all Rocky additions or the exact OSV data was confirmed.
+The original page's Red Hat CC-BY-4.0 attribution alone does not establish that grant.
+The AlmaLinux fixture retains its explicit MIT license and Red Hat CC-BY-4.0 attribution.
+See [fixture provenance](../../internal/advisory/feed/testdata/provenance.txt).
+Production fetches remain unchanged. Native real-feed proof remains separate in
+[`lab/ledger.json`](../../lab/ledger.json) and the
+[Debian/EL/Ubuntu matrix](../verification.md#debian-el-and-ubuntu-2204-matrix-completion-2026-10-12).
+
 ## Remote assistance capability roadmap
 
 AlmaLinux and Rocky Linux each require their own desktop/portal qualification;

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { colourProperty, rawColour, rawTailwindColour } from "./colour-values.mjs";
 
 function name(node) {

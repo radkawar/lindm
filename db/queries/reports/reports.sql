@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: GetAuditHead :one
 SELECT * FROM report_audit_head WHERE singleton;
 

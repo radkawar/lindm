@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { create, fromJson, type JsonObject } from "@bufbuild/protobuf";
 import { Trash2Icon } from "lucide-react";
 import { ProfileResourceSchema } from "../../../gen/lindm/policy/v1/profile_pb";

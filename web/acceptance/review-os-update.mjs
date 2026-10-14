@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Real profile authoring, never an intercepted or synthetic mutation response.
 // The draft is deliberately not published or assigned by a visual review.
 export async function reviewOSUpdate({ pages, combos, config, screenshot, axe, probe, settle }) {

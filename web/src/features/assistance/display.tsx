@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { Code } from "@connectrpc/connect";
 import type { ReactNode } from "react";

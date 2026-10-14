@@ -1,8 +1,13 @@
 # Security, deployment and operations
 
-Status: required design and acceptance targets, not measured service guarantees.
-See [architecture](architecture.md) for identity, authorization, protocol and journal
-invariants, and [verification](verification.md) for the required evidence.
+Status: this page defines security requirements and acceptance targets, not measured service guarantees.
+Lindm remains a development preview, not a production-ready release.
+Use the [verification ledger](verification.md) for qualified Tier 1 x86_64 operations and their limits.
+Arm64 release qualification awaits the lab, despite partial native passes.
+See [architecture](architecture.md) for identity, authorization, protocol and journal invariants.
+
+**Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
+The repository does not include these records or provide public downloads.
 
 ## 1. Threat model
 
@@ -72,15 +77,16 @@ session for initial installation or expose local configuration directories.
 Documents are the startup-verified snapshot; replacing referenced files requires
 restarting the server and passing the same verification again.
 
-**Delivery is not initial trust.** The administrator obtains the command through
-the authenticated console, providing the new machine an independent trusted
-channel for the package signing-key fingerprint, execution-root SHA-256 and any
-private server CA certificate/fingerprint. The command verifies these pins before
-writing repository trust or bootstrapping. It uses HTTPS with hostname and chain
-verification throughout. The agent verifies the downloaded DSSE bundle against the
-authenticated execution root, including expiry and exact deployment bindings.
-Never replace this with HTTP, disabled certificate checks, a short OpenPGP key ID
-or a root fetched and trusted solely because it signs its own bundle.
+**Delivery is not initial trust.** Obtain the command through the authenticated console.
+Use an independent trusted channel to provide the device with the complete package signing-key fingerprint and execution-root SHA-256.
+Include any private server CA certificate and its fingerprint.
+The command verifies these pins before installing repository trust or starting enrollment.
+It verifies the HTTPS hostname and certificate chain throughout.
+The agent verifies the DSSE bundle against the authenticated execution root, including expiry and exact deployment bindings.
+
+Never use HTTP or disable certificate checks.
+Never use a short OpenPGP key ID.
+Never trust a downloaded root merely because it signs its own bundle.
 
 #### Prepare the server's installation repository
 
@@ -228,24 +234,30 @@ used.
 
 #### Copy and run the enrollment command
 
-1. Open **Settings › Agent repository** and confirm **Ready** for the target OS
-   and architecture. A stock authenticated release needs no repository setup.
-   Resolve any reported HTTPS, execution-bootstrap or artifact verification failure.
-2. Choose **Enroll**, issue a single-use code and select the target OS. The platform
-   registry selects APT, DNF, zypper or a separately available pacman path. A gated
-   platform explains its missing packaging prerequisite instead of guessing.
-3. Copy the one command to the bare target machine and run it with administrative
-   privileges. It authenticates server and signer trust, adds only this server's
-   repository, installs the agent, checks bootstrap trust and enrolls using the
-   protected code file. Expand **What this does** before running if needed.
-4. Confirm the device is **Enrolled** in the console. Command acceptance or package
-   installation alone is not proof of completed enrollment.
+1. Open **Settings › Agent repository**.
+   Confirm **Ready** for the target OS and architecture.
+   A stock authenticated release needs no repository setup.
+   Resolve any HTTPS, execution-bootstrap or artifact verification failure.
+2. Select **Enroll**.
+   Issue a single-use code.
+   Select the target OS.
+   The platform registry selects APT, DNF, zypper or a separately available pacman path.
+   A gated platform explains its missing packaging prerequisite.
+3. Read **What this does** before running the command.
+   Copy the command privately to the target device.
+   Run it with administrative privileges.
+   It verifies server and signer trust before adding this server's repository.
+   It installs the agent and checks bootstrap trust.
+   It enrolls the device using a protected code file.
+4. Confirm **Enrolled** in the console.
+   Command acceptance or package installation alone does not prove completed enrollment.
 
 Keep the shown-once command private: it contains the bearer enrollment code.
-Do not paste it into tickets, shared shell transcripts or chat, and do not save
-the code in images or browser storage. Revoke an exposed unused code and issue
-a new one. A trust or signature failure requires correcting configuration or
-publication, never disabling checks.
+Never paste it into tickets, shared shell transcripts or chat.
+Never save the code in images or browser storage.
+Revoke an exposed unused code.
+Issue a new code.
+A trust or signature failure requires corrected configuration or publication, never disabled checks.
 
 Before installing, verify the downloaded primary signing key's complete fingerprint
 against the authoritative deployment value. APT must use a dedicated `Signed-By`
@@ -270,26 +282,28 @@ success; removal does not promise forensic erasure of installer/WAL copies.
 
 #### Automatic enrollment from an installer
 
-For machines installed unattended, issue a **provisioning token** instead of a
-single-use code; keep **Require another admin to approve each device** selected
-unless the site explicitly accepts direct enrollment.
+For unattended device installation, issue a **provisioning token** instead of a single-use code.
+Keep **Require another admin to approve each device** selected unless the site explicitly accepts direct enrollment.
 
-1. In the token result, choose the **Installer format** (cloud-init, Kickstart,
-   Ubuntu autoinstall or AutoYaST), then the **Operating system**. Only releases
-   whose installation media support that format are listed; the registry, not the
-   package family, decides. NixOS shows its design-only gate.
-2. Copy the one snippet and merge it into the complete installer configuration
-   (cloud-init user-data, the Kickstart profile, the autoinstall configuration or the
-   AutoYaST profile). It contains the reusable token and every trust pin; nothing
-   from lindm may be preinstalled in the image or installer.
-3. Make sure the machine reaches this server's HTTPS origin where the snippet runs:
-   in the installer for Kickstart and AutoYaST (Kickstart needs an active installer
-   network, e.g. `network --activate`), on the installed system's first boot for
-   cloud-init and autoinstall. Name resolution must work there too.
-4. After the first boot the device appears under **Devices waiting to enroll**.
-   Another admin approves it in the approval inbox; the token's creator executes the
-   approval. The device's provisioning unit is waiting for at most an hour and
-   completes once approved. Confirm the device is **Enrolled**.
+1. Select the **Installer format** in the token result.
+   Supported formats include cloud-init, Kickstart, Ubuntu autoinstall and AutoYaST.
+   Select the **Operating system**.
+   The registry lists only releases whose installation media support that format.
+   NixOS shows its design-only gate.
+2. Copy the snippet privately.
+   Merge it into the complete configuration for the selected installer.
+   The snippet contains the reusable token and every trust pin.
+   Do not preinstall lindm in the image or installer.
+3. Provide working name resolution and access to this server's HTTPS origin where the snippet runs.
+   Kickstart and AutoYaST run it in the installer.
+   Kickstart requires an active installer network, such as `network --activate`.
+   Cloud-init and autoinstall run it on the installed system's first boot.
+4. Find the device under **Devices waiting to enroll** after first boot.
+   Obtain approval from another administrator through the approval inbox.
+   Execute that approval as the token's creator.
+   The provisioning unit waits at most one hour.
+   It completes after approval.
+   Confirm **Enrolled** in the console.
 
 Kickstart fails the installation on any install or trust error. AutoYaST only
 reports a failed chroot script, so when an AutoYaST device does not appear, read

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package secretseal seals purpose-typed secret material to one device's
 // attested HPKE recipient key and opens it on that device. It fixes the suite
 // to DHKEM(X25519, HKDF-SHA256), HKDF-SHA256 and ChaCha20-Poly1305 in base mode

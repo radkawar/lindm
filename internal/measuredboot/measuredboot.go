@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package measuredboot verifies measured Boot Loader Spec recovery boots.
 //
 // A stock shim+GRUB chain boots a vendor-signed kernel with an unsigned lindm

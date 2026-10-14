@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // DOM contracts establish structural coverage, never design quality or approval.
 // Every generated route must have an explicit entry; new routes fail closed.
 const structural = { mode: "structural", page: "", minimumMetrics: 0 };

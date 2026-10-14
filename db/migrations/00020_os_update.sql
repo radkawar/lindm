@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 -- Patch now starts one native update run outside the maintenance window.
 ALTER TABLE device_actions DROP CONSTRAINT device_actions_capability_check;

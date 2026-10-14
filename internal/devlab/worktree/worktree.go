@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package worktree manages private lindm git worktrees beside the main
 // checkout (<main>.worktrees/<name>): creation with a lockfile-checked shared
 // npm install, status listing, and pruning that archives unmerged work first

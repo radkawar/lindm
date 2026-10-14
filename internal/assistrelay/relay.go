@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package assistrelay runs the embedded relay-only TURN service used by
 // graphical remote assistance and mints per-session TURN REST credentials.
 //

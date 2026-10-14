@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 import { useState, type ReactNode } from "react";
 import {
   CollectionStatus,

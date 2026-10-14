@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- +goose Up
 
 -- Forward-only cutover: legacy readers keep the exact advisory_records columns,

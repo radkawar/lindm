@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package admissiondetail attaches a closed, actionable snake_case detail code
 // to a provider refusal without changing its sentinel classification.
 package admissiondetail

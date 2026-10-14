@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Command devenv maintains the development environment: the real
 // PostgreSQL/Keycloak fixture, gates that build product code (signoff,
 // pre-push, test-integration), Markdown generated from the platform registry

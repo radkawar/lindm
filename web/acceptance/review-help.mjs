@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Bundled references can exceed Chromium's practical single-image capture size.
 // Keep complete document evidence in consecutive bounded images, not a truncated
 // "full page" or a larger timeout for one enormous raster.

@@ -1,3 +1,5 @@
+-- SPDX-License-Identifier: Apache-2.0
+
 -- name: LockBundleLedger :exec
 SELECT pg_advisory_xact_lock(7340843010195847517);
 

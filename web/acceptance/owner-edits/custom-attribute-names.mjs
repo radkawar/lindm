@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner task (pass 2 items 35 and 10): a custom attribute has a display name
 // and a key derived from it, one human type name in the form and the table,
 // and field errors in words before anything is sent. State-moving: creates

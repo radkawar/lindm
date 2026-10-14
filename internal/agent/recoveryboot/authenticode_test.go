@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package recoveryboot
 
 import (
@@ -15,9 +17,9 @@ import (
 	"github.com/foxboron/go-uefi/authenticode"
 )
 
-// The fixtures are a minimal PE32+ EFI application signed by sbsigntool 0.9.4
-// (`sbsign --key KEY --cert signer.pem`), plus the same image signed by an
-// unrelated key. Private keys are not retained.
+// The fixtures are independently authored PE32+ EFI test images. Their generator
+// and byte hashes are recorded in testdata/authenticode/provenance.txt.
+// sbsign signs the image with two ephemeral, unrelated keys; private keys are removed.
 const authenticodeFixtures = "testdata/authenticode"
 
 func readFixture(t *testing.T, name string) []byte {

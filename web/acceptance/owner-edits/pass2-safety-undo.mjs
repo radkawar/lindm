@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Owner pass 2 (safety): Overview "Undo" next to Accounts locked opens a
 // confirmation naming the device and the effect, asks for a reason, and sends
 // nothing until the admin reviews and sends. Read-only: the dialog is reviewed

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 // Package directory implements the administrative directory over enrolled
 // devices: approvals, device groups, metadata and attribute definitions,
 // search and the fleet summary.

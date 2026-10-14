@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 package localrpc
 
 // Packaged session-helper socket. The directory is root:root 0755 and the
