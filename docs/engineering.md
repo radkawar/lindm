@@ -1298,6 +1298,20 @@ header and response visible while the replacement arrives. Generic screen
 settling does not establish that the requested search or sort response arrived;
 a readiness timeout fails the scenario instead of accepting stale evidence.
 
+Review checks associate status timestamps with their component identity, not
+their decision-priority row position. Management-address checks edit the row
+just appended by **Add address**, preserving existing saved addresses.
+Clipboard tools remain absent before consent and after the session ends; the
+visible post-consent section must retain its level-two heading. Toast dismissal
+keeps a 24 CSS-pixel target without changing its placement or action.
+Journey checks target the primary profile-creation link when an empty-state call
+to action repeats it, and require visible enrollment summaries rather than hidden
+mobile-table duplicates. Recovery audits select the configured device by its
+stable ID and hostname; they do not infer a different device from row order.
+Scrolled-dialog checks center controls hidden beneath the sticky header before
+the real pointer click. Palette shortcuts distinguish active dialogs from
+retained closed portals, and the owner regression exercises both states.
+
 Server status adds explicitly labelled **synthetic transport** captures for known,
 unknown, stale, failed-read and retained-evidence failed-read states on
 `/settings/status`, in all four theme/viewport appearances. These fixtures load

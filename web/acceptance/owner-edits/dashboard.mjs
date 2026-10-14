@@ -9,11 +9,11 @@ export const task = {
   route: "/dashboard",
   priority: "high",
   acceptance:
-    "With the seeded demo fleet: activity shows at most one row per action kind with counts and outcome words; a needs-review item reads '7 devices have no vulnerability coverage' with a link that explains why and how to fix; no 'Supporting fleet evidence' section remains.",
+    "With the seeded demo fleet: activity shows at most one row per action kind with counts and outcome words; a needs-review item counts devices with unknown exposure and links to its coverage explanation and remedy; no 'Supporting fleet evidence' section remains.",
 };
 
 const outcomeWord = /\b\d+ (succeeded|failed|unknown|expired|running|waiting|cancelled)\b/;
-const coverageTitle = /^\d+ devices? (has|have) no vulnerability coverage$/;
+const coverageTitle = /^\d+ devices? (has|have) unknown exposure$/;
 
 export async function check({ page, visit, settle, require, capture, step }) {
   step("open dashboard");

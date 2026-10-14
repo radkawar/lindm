@@ -34,7 +34,11 @@ export function Toaster(props: ToasterProps) {
         } as CSSProperties
       }
       toastOptions={{
-        classNames: { toast: "cn-toast", description: "text-inherit!" },
+        classNames: {
+          toast: "cn-toast",
+          description: "text-inherit!",
+          closeButton: "size-6!",
+        },
       }}
       closeButton
       {...props}

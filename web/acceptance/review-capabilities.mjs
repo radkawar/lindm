@@ -95,8 +95,12 @@ export async function reviewCapabilities({
           1
         )
           fail("The all-devices editor omits the firewall settings");
+        const addresses = form.getByLabel("IP address", { exact: true });
+        const savedAddressCount = await addresses.count();
         await form.getByRole("button", { name: "Add address", exact: true }).click();
-        await form.getByLabel("IP address", { exact: true }).fill("192.0.2.10");
+        if ((await addresses.count()) !== savedAddressCount + 1)
+          fail("Add address did not append exactly one management address");
+        await addresses.nth(savedAddressCount).fill("192.0.2.10");
         await countsDevices(form, fail);
         const text = await form.innerText();
         for (const expected of ["What happens when you save", "a connectivity check"])

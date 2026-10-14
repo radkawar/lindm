@@ -226,28 +226,37 @@ export async function reviewServerStatus({
               rows.map((row) => {
                 const metadata = row.querySelector(":scope > div > dl");
                 const bounds = metadata?.getBoundingClientRect();
-                return [...(metadata?.children ?? [])].map((field) => ({
-                  label: field.querySelector("dt")?.textContent?.trim(),
-                  value: field.querySelector("dd")?.textContent?.trim(),
-                  contained: [...field.querySelectorAll("time > span")].every((span) => {
-                    const rect = span.getBoundingClientRect();
-                    return (
-                      rect.left >= Math.max(bounds.left, 0) - 1 &&
-                      rect.right <= Math.min(bounds.right, document.documentElement.clientWidth) + 1
-                    );
-                  }),
-                }));
+                return {
+                  component: row
+                    .querySelector('[data-slot="technical-details"] dd')
+                    ?.textContent?.trim(),
+                  fields: [...(metadata?.children ?? [])].map((field) => ({
+                    label: field.querySelector("dt")?.textContent?.trim(),
+                    value: field.querySelector("dd")?.textContent?.trim(),
+                    contained: [...field.querySelectorAll("time > span")].every((span) => {
+                      const rect = span.getBoundingClientRect();
+                      return (
+                        rect.left >= Math.max(bounds.left, 0) - 1 &&
+                        rect.right <=
+                          Math.min(bounds.right, document.documentElement.clientWidth) + 1
+                      );
+                    }),
+                  })),
+                };
               }),
             );
           require(fields.length === response.checks.length &&
-            fields.every(
-              (row, position) =>
+            new Set(fields.map((row) => row.component)).size === response.checks.length &&
+            fields.every(({ component, fields: row }) => {
+              const check = response.checks.find((item) => item.component === component);
+              return (
+                check &&
                 row.map((field) => field.label).join(",") ===
-                  (response.checks[position].expiresAt
-                    ? "Checked,Evidence,Expires"
-                    : "Checked,Evidence") && row.every((field) => field.value),
-            ), "Check, evidence and expiry times must remain separate labeled fields with visible values");
-          require(fields.every((row) =>
+                  (check.expiresAt ? "Checked,Evidence,Expires" : "Checked,Evidence") &&
+                row.every((field) => field.value)
+              );
+            }), "Check, evidence and expiry times must remain separate labeled fields with visible values");
+          require(fields.every(({ fields: row }) =>
             row.every((field) => field.contained),
           ), "A status timestamp overflows its metadata region or the visible page");
         }

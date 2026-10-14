@@ -15,8 +15,8 @@ export const task = {
 };
 
 const timeout = 30_000;
-// One statement of the publish/rollout relationship, in old or new wording.
-const HINT = /Publishing (saves the profile|doesn't change devices)/g;
+// One explicit statement of the publish/rollout relationship.
+const HINT = /Publishing does not change devices/g;
 const GENERIC_PUBLISHER = /^(You|Another administrator|The system)$/;
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 

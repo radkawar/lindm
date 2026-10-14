@@ -104,6 +104,7 @@ export async function reviewEnrollmentFixtures({
             "package-source-prerequisite-blocked.png",
             true,
           );
+          entry.screenshots.full = entry.screenshots.blocked;
         }
         results.push(entry);
       }

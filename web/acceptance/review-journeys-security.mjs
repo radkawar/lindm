@@ -142,7 +142,11 @@ async function recoveryAudit(ctx) {
     "Keep the visible dates and timezone beside restored views.",
     "Reloading the actual bookmarked route preserves the recovery-reveal category and exact UTC dates.",
   );
-  const hostname = routeDevice(ctx.config).Hostname;
+  const device = ctx.config.demo?.Devices?.find(
+    (entry) => entry.ID === ctx.config.demo?.Routes?.DeviceID,
+  );
+  requireState(device?.Hostname, "recovery_audit_device_missing");
+  const hostname = device.Hostname;
   for (const choice of [
     { label: "Actor", name: "console-owner", slug: "actor" },
     { label: "Device", name: hostname, slug: "device" },

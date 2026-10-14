@@ -1075,13 +1075,14 @@ async function main() {
             ? `assistance: ${where} exposes a remote screen region before anything is shared`
             : `assistance: ${where} remote screen lacks its named accessible region`,
         );
-      if (
-        state !== "ended" &&
-        (await page.getByRole("heading", { name: "Clipboard", level: 2, exact: true }).count()) !==
-          1
-      )
+      const clipboardHeadings = await page
+        .getByRole("heading", { name: "Clipboard", level: 2, exact: true })
+        .count();
+      if (clipboardHeadings !== (waiting || state === "ended" ? 0 : 1))
         report.failures.push(
-          `assistance: ${where} clipboard section skips the page heading hierarchy`,
+          waiting
+            ? `assistance: ${where} exposes clipboard tools before consent`
+            : `assistance: ${where} clipboard section skips the page heading hierarchy`,
         );
       if (state !== "ended") {
         if (

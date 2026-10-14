@@ -657,8 +657,8 @@ async function helpdesk(ctx) {
   await ctx.visit("/accounts");
   const row = page.getByRole("row").filter({ hasText: username });
   await visible(row);
-  await visible(row.getByText("Waiting for enrollment", { exact: true }));
-  await visible(row.getByText("Limited to 1 group", { exact: true }));
+  await visible(row.getByText("Waiting for enrollment", { exact: true }).filter({ visible: true }));
+  await visible(row.getByText("Limited to 1 group", { exact: true }).filter({ visible: true }));
   await row.getByRole("button", { name: `Edit ${username}`, exact: true }).click();
   const editDialog = page.getByRole("dialog", { name: `Edit ${username}`, exact: true });
   await visible(editDialog);

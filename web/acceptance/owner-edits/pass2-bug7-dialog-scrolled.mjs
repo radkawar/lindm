@@ -158,15 +158,17 @@ async function scrolledModal({ page, origin, item, require, capture }) {
   await trigger.waitFor({ timeout });
   await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => {});
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  // Real pointer input at the trigger: Playwright's own scroll-into-view treats
-  // anything in the sticky header as hidden behind the page's scroll padding.
+  // Real pointer input avoids Playwright's sticky-header scroll-padding issue.
+  // Account controls can be inside the viewport but covered by that header.
   await trigger.evaluate((node) => {
     const rect = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
     if (
       rect.top < 0 ||
       rect.bottom > window.innerHeight ||
       rect.left < 0 ||
-      rect.right > window.innerWidth
+      rect.right > window.innerWidth ||
+      !(hit === node || node.contains(hit))
     )
       node.scrollIntoView({ block: "center", inline: "nearest" });
   });

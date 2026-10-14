@@ -10,7 +10,11 @@ const timeout = 30_000;
 // The empty stock console is a real prerequisite case, not an intercepted RPC.
 export async function packageSourcePrerequisite(page, screenshot) {
   await openNavigationPage(page, "Profiles");
-  await page.getByRole("link", { name: "Create profile", exact: true }).click();
+  await page
+    .getByRole("main")
+    .getByRole("link", { name: "Create profile", exact: true })
+    .first()
+    .click();
   await page.getByRole("combobox", { name: "Setting type", exact: true }).click();
   await page.getByRole("option", { name: "Package", exact: true }).click();
   await page.getByRole("button", { name: /^Approved package source / }).click();
@@ -51,7 +55,11 @@ export async function configureFleet(ctx) {
   };
   const group = await createGroup(ctx, "configure-fleet", "Fleet pilot", devices);
   await openNavigationPage(page, "Profiles");
-  await page.getByRole("link", { name: "Create profile", exact: true }).click();
+  await page
+    .getByRole("main")
+    .getByRole("link", { name: "Create profile", exact: true })
+    .first()
+    .click();
   const another = page.getByRole("button", { name: "Create another profile", exact: true });
   if (await another.isVisible()) await another.click();
   const profileName = `Fleet baseline review ${randomUUID().slice(0, 8)}`;

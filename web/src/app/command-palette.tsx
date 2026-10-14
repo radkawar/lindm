@@ -78,7 +78,7 @@ export function CommandPalette({
       )
         return;
       // A shortcut must not stack a second modal over navigation or a task dialog.
-      if (!open && document.querySelector('[role="dialog"]')) return;
+      if (!open && document.querySelector('[role="dialog"][data-open]')) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         // Typing in a form field keeps the shortcut out of the way; the palette's own
         // search box still closes it.

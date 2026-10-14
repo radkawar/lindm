@@ -9,22 +9,27 @@ export const task = {
   route: "/dashboard",
   priority: "normal",
   acceptance:
-    "Typing 'wipe' lists 'Wipe device…'; choosing it and a device opens that device's wipe review; 'enrollment code' lists 'Create enrollment code', which opens the one-time code dialog; 'Create secret' opens the Create secret dialog; an unmatched search names what was searched; no 'first 200' text.",
+    "Keyboard search and page-navigation shortcuts work beside retained closed enrollment dialogs but never stack over or change navigation behind an open task dialog. Typing 'wipe' lists 'Wipe device…'; choosing it and a device opens that device's wipe review; 'enrollment code' lists 'Create enrollment code', which opens the one-time code dialog; 'Create secret' opens the Create secret dialog; an unmatched search names what was searched; no 'first 200' text.",
 };
 
 const NOTHING = "zz-no-such-command";
 
-// Opens the palette and types into its search box. Ctrl+K is deliberately ignored
-// while a form field has focus (owner item 51), and a just-closed dialog returns
-// focus asynchronously, so wait until focus has left any text field first.
+// A chosen command navigates before its old popup finishes closing. Wait for
+// that popup and asynchronous focus restoration before reopening; retained
+// closing options are not the next search's live choices.
 async function search(page, text) {
+  await page
+    .getByRole("dialog", { name: "Search console" })
+    .waitFor({ state: "hidden", timeout: 10_000 });
   await page.waitForFunction(
     () => !document.activeElement?.matches("input, textarea, select, [contenteditable]"),
     null,
     { timeout: 10_000 },
   );
   await page.keyboard.press("Control+k");
-  const dialog = page.getByRole("dialog", { name: "Search console" });
+  const dialog = page
+    .getByRole("dialog", { name: "Search console" })
+    .and(page.locator("[data-open]"));
   const box = dialog.getByRole("combobox");
   await box.waitFor({ timeout: 10_000 });
   await box.pressSequentially(text);
@@ -41,6 +46,27 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await heading.waitFor({ timeout: 30_000 });
   const hostname = (await heading.innerText()).trim();
   require(hostname !== "", "Route device has no hostname heading");
+
+  step("search beside retained closed enrollment dialogs");
+  await visit("/enrollment");
+  await page.getByRole("button", { name: "Create one-time code", exact: true }).click();
+  const retained = page.getByRole("dialog", { name: "Enroll one device now", exact: true });
+  await retained.waitFor({ state: "visible", timeout: 30_000 });
+  await page.keyboard.press("Escape");
+  await retained.waitFor({ state: "hidden", timeout: 10_000 });
+  require((await page.locator('[role="dialog"][data-closed]').count()) >
+    0, "The closed enrollment-dialog shortcut case was not exercised");
+  const pageToggle = page.locator('header button[aria-label="Toggle page navigation"]');
+  for (const shortcut of ["Control+b", "Meta+b"]) {
+    const before = await pageToggle.getAttribute("aria-expanded");
+    await pageToggle.focus();
+    await page.keyboard.press(shortcut);
+    require((await pageToggle.getAttribute("aria-expanded")) !==
+      before, `${shortcut} does not toggle navigation beside retained closed dialogs`);
+    await page.keyboard.press(shortcut);
+    require((await pageToggle.getAttribute("aria-expanded")) ===
+      before, `${shortcut} does not restore navigation beside retained closed dialogs`);
+  }
 
   step("search for wipe");
   let dialog = await search(page, "wipe");
@@ -74,6 +100,16 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await page.waitForURL(/\/enrollment/, { timeout: 15_000 });
   const issue = page.getByRole("dialog", { name: "Enroll one device now" });
   await issue.waitFor({ timeout: 30_000 });
+  await issue.locator('[data-slot="dialog-close"]').focus();
+  await page.keyboard.press("Control+k");
+  require((await page.getByRole("dialog", { name: "Search console" }).count()) ===
+    0, "Keyboard search stacked a second modal over an open enrollment dialog");
+  const expanded = await pageToggle.getAttribute("aria-expanded");
+  for (const shortcut of ["Control+b", "Meta+b"]) {
+    await page.keyboard.press(shortcut);
+    require((await pageToggle.getAttribute("aria-expanded")) ===
+      expanded, `${shortcut} changed navigation behind an open enrollment dialog`);
+  }
   await capture("enrollment-code-dialog");
   await page.keyboard.press("Escape");
   await issue.waitFor({ state: "hidden", timeout: 10_000 });
