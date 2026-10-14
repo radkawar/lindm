@@ -164,6 +164,12 @@ func productionSigningSourceFixture(t *testing.T) string {
 
 func TestProductionSigningCaptureHashesActualOnceCapturedPublicBytes(t *testing.T) {
 	repository := productionSigningSourceFixture(t)
+	readonlyModes := map[string]os.FileMode{"a.c": 0444, "a-/file.go": 0555}
+	for name, mode := range readonlyModes {
+		if err := os.Chmod(filepath.Join(repository, name), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
 	expected, err := releasebuild.SourceDigest(t.Context(), repository)
 	if err != nil {
 		t.Fatal(err)
@@ -181,6 +187,15 @@ func TestProductionSigningCaptureHashesActualOnceCapturedPublicBytes(t *testing.
 	if archiveSHA != hex.EncodeToString(sum[:]) {
 		t.Fatal("source transfer archive digest differs from actual captured bytes")
 	}
+	for name, mode := range readonlyModes {
+		info, err := os.Stat(filepath.Join(repository, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != mode {
+			t.Fatalf("capture changed original %s mode: got %o want %o", name, info.Mode().Perm(), mode)
+		}
+	}
 	if err := os.WriteFile(filepath.Join(repository, "a/file.go"), []byte("changed checkout after capture\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -195,6 +210,12 @@ func TestProductionSigningCaptureHashesActualOnceCapturedPublicBytes(t *testing.
 			t.Fatal(err)
 		}
 		names = append(names, header.Name)
+		if header.Mode&0022 != 0 {
+			t.Fatalf("archive member %s permits nonowner writes: mode %o", header.Name, header.Mode)
+		}
+		if originalMode, ok := readonlyModes[header.Name]; ok && header.Mode != int64(originalMode) {
+			t.Fatalf("archive member %s mode=%o want original=%o", header.Name, header.Mode, originalMode)
+		}
 		captured, err := io.ReadAll(reader)
 		if err != nil {
 			t.Fatal(err)
@@ -206,11 +227,43 @@ func TestProductionSigningCaptureHashesActualOnceCapturedPublicBytes(t *testing.
 			t.Fatal("source archive includes nonregular input")
 		}
 	}
+	for name := range readonlyModes {
+		if !slices.Contains(names, name) {
+			t.Fatalf("readonly source missing from archive: %s", name)
+		}
+	}
 	for _, name := range names {
 		for _, prefix := range productionSigningSourceExclusions {
 			if strings.HasPrefix(name, prefix) {
 				t.Fatalf("transferred excluded cache/artifact: %s", name)
 			}
+		}
+	}
+	guestRoot := filepath.Dir(archive)
+	script := strings.Replace(productionSigningVerifySource, "root = pathlib.Path('/home/lindm-lab/production-signing')", "root = pathlib.Path(sys.argv[3])", 1)
+	command := exec.CommandContext(t.Context(), "python3", "-", archiveSHA, sourceSHA, guestRoot)
+	command.Stdin = strings.NewReader(script)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("verify and extract private guest source: %v: %s", err, output)
+	}
+	for name, originalMode := range readonlyModes {
+		target := filepath.Join(guestRoot, "source", name)
+		info, err := os.Stat(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != originalMode|0200 {
+			t.Fatalf("private guest copy %s mode=%o want=%o", name, info.Mode().Perm(), originalMode|0200)
+		}
+		if err := os.WriteFile(target, []byte("generated derived output\n"), 0600); err != nil {
+			t.Fatalf("overwrite private guest copy %s: %v", name, err)
+		}
+		original, err := os.Stat(filepath.Join(repository, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if original.Mode().Perm() != originalMode {
+			t.Fatalf("guest extraction changed original %s mode: %o", name, original.Mode().Perm())
 		}
 	}
 }

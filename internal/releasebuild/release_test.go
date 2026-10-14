@@ -173,6 +173,131 @@ func TestExportVerificationRejectsTamperWrongKeyAndSwappedStatements(t *testing.
 	}
 }
 
+func TestPrepareWritableBuildSourceRejectsLinkedDocument(t *testing.T) {
+	source := t.TempDir()
+	outside := filepath.Join(t.TempDir(), "protected-document")
+	original := []byte("outside private builder\n")
+	if err := writeNew(outside, original, 0444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(outside, 0444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(source, "linked-document")); err != nil {
+		t.Fatal(err)
+	}
+	if err := prepareWritableBuildSource(source); err == nil {
+		t.Fatal("accepted linked source document")
+	}
+	info, err := os.Stat(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0444 {
+		t.Fatalf("outside document mode changed to %o", info.Mode().Perm())
+	}
+	data, err := os.ReadFile(outside)
+	if err != nil || !bytes.Equal(data, original) {
+		t.Fatalf("outside document changed: %v", err)
+	}
+}
+
+func TestIndependentSourceCopiesMakeReadOnlyFilesOwnerWritable(t *testing.T) {
+	source := t.TempDir()
+	files := []struct {
+		name string
+		mode os.FileMode
+	}{
+		{name: "THIRD-PARTY-LICENSES", mode: 0444},
+		{name: "executable-document", mode: 0555},
+	}
+	original := []byte("immutable source document\n")
+	for _, file := range files {
+		path := filepath.Join(source, file.name)
+		if err := writeNew(path, original, file.mode); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(path, file.mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sourceDigest, err := treeDigest(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, second := filepath.Join(t.TempDir(), "first"), filepath.Join(t.TempDir(), "second")
+	for _, directory := range []string{first, second} {
+		if err := copySource(source, directory); err != nil {
+			t.Fatal(err)
+		}
+		copiedDigest, err := treeDigest(directory)
+		if err != nil || copiedDigest != sourceDigest {
+			t.Fatalf("private copy differs from original source digest: %v", err)
+		}
+		for _, file := range files {
+			info, err := os.Stat(filepath.Join(directory, file.name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := info.Mode().Perm(); got != file.mode {
+				t.Fatalf("copied %s mode = %o, want %o", file.name, got, file.mode)
+			}
+		}
+		if err := prepareWritableBuildSource(directory); err != nil {
+			t.Fatal(err)
+		}
+		for _, file := range files {
+			path := filepath.Join(directory, file.name)
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := info.Mode().Perm(), file.mode|0200; got != want {
+				t.Fatalf("%s mode = %o, want %o", path, got, want)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(data, original) {
+				t.Fatalf("%s copy content changed: %v", path, err)
+			}
+		}
+	}
+	firstDigest, err := treeDigest(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondDigest, err := treeDigest(second)
+	if err != nil || firstDigest != secondDigest {
+		t.Fatalf("private source copies differ: %v", err)
+	}
+	for _, file := range files {
+		if err := os.WriteFile(filepath.Join(first, file.name), []byte("derived document\n"), file.mode|0200); err != nil {
+			t.Fatal(err)
+		}
+		for _, directory := range []string{source, second} {
+			path := filepath.Join(directory, file.name)
+			info, err := os.Stat(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := file.mode
+			if directory == second {
+				want |= 0200
+			}
+			if got := info.Mode().Perm(); got != want {
+				t.Fatalf("%s mode changed to %o, want %o", path, got, want)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(data, original) {
+				t.Fatalf("%s was mutated with private copy: %v", path, err)
+			}
+		}
+	}
+	unchangedDigest, err := treeDigest(source)
+	if err != nil || unchangedDigest != sourceDigest {
+		t.Fatalf("original source digest changed: %v", err)
+	}
+}
+
 func TestIndependentSourceCopiesAndPayloadComparison(t *testing.T) {
 	source := t.TempDir()
 	if err := writeNew(filepath.Join(source, "source.go"), []byte("package sample\n"), 0644); err != nil {

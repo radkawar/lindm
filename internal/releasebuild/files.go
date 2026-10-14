@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"lindm/internal/agent/nativeexec"
@@ -214,6 +215,34 @@ func copySource(src, dst string) error {
 			return err
 		}
 		return copyNew(path, target, info.Mode().Perm())
+	})
+}
+
+// prepareWritableBuildSource mutates only a private builder tree after its
+// original permissions and contents have been verified against the source digest.
+func prepareWritableBuildSource(root string) error {
+	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return errors.New("releasebuild: source link or special file")
+		}
+		file, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NOFOLLOW, 0)
+		if err != nil {
+			return err
+		}
+		info, err := file.Stat()
+		if err == nil && !info.Mode().IsRegular() {
+			err = errors.New("releasebuild: source link or special file")
+		}
+		if err == nil {
+			err = file.Chmod(info.Mode().Perm() | 0200)
+		}
+		return errors.Join(err, file.Close())
 	})
 }
 

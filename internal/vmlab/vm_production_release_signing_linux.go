@@ -729,6 +729,10 @@ if source_hash.hexdigest() != sys.argv[2]:
     raise SystemExit('captured public source digest mismatch')
 if not re.search(r'^go 1\.26\.9\s*$', (source/'go.mod').read_text(), re.M) or (source/'.node-version').read_text().strip() != '24.21.0':
     raise SystemExit('captured source tool pins differ')
+# Only verified private derived copies gain owner-write; input digest modes stay unchanged.
+for target in source.rglob('*'):
+    if target.is_file():
+        os.chmod(target, (target.stat().st_mode & 0o755) | 0o200)
 for name in ['home', 'go-cache', 'go-mod', 'go-path', 'npm-cache', 'tools', 'evidence']:
     (root/name).mkdir(mode=0o700)
 print('public source archive_sha256=' + archive_sha)

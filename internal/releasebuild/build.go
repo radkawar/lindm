@@ -325,6 +325,9 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 	if captured != sourceDigest {
 		return nil, errors.New("releasebuild: copied source differs")
 	}
+	if err := prepareWritableBuildSource(checkout); err != nil {
+		return nil, err
+	}
 	for _, dir := range []string{"home", "go-cache", "go-mod", "npm-cache", "bin", "packages"} {
 		if err := os.Mkdir(filepath.Join(root, dir), 0700); err != nil {
 			return nil, err
