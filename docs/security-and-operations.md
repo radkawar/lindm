@@ -1790,10 +1790,12 @@ disabled (`off`, `false`, `no` or `0`, case-insensitive); an existing foreign se
 replaced or assumed to deny every maintainer-script invocation. Vendor
 configuration preservation remains enabled; no default `16-main` cluster is
 created or started as a side effect.
-If you create that policy before installing PostgreSQL clients, install the approved
-`postgresql-common` package before invoking the installer: it supplies `pg_conftool`
-for validating an existing policy. The installer does not replace the file to
-avoid a missing tool or an enabled policy.
+Pre-transaction validation reads the protected policy without `pg_conftool`,
+so an operator-created disabled policy works before `postgresql-common` is
+installed. A standalone, unique `create_main_cluster` assignment is required.
+Includes, duplicate creation switches and unsupported syntax fail closed rather
+than guessing an effective value. The file is not changed. The authenticated
+dependency transaction supplies PostgreSQL's native tools after start fencing.
 
 Server/device trust and deployment identity are generated automatically with
 maintained Go X.509 and existing signed execution-authority libraries. Execution

@@ -17,6 +17,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 ### Changed
 
 - Preserve existing disabled PostgreSQL cluster policies spelled `off`, `false`, `no` or `0`, while refusing enabled, empty or invalid values.
+- Validate protected PostgreSQL cluster policies before installing native tools, so fresh external-database hosts do not need a manual `postgresql-common` prerequisite. Reject ambiguous directives before package changes.
 - Run every pushed-main CI workflow independently so a later push cannot replace a pending verification; continue canceling obsolete pull-request runs.
 - Upgrade Go and npm dependencies and pinned GitHub Actions, regenerate Connect code and bundled dependency notices, and migrate the TURN relay to v5 without enabling TCP relay allocations.
 - Exempt only Dependabot's canonical commit author from DCO trailers; human coauthors and all other required checks remain enforced.

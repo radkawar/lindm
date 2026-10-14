@@ -25,7 +25,7 @@ import (
 func installDependencies(ctx context.Context, o Options, release *platform.Release) (err error) {
 	var cleanup func() error
 	if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
-		cleanup, err = prepareUbuntuDependencies(ctx)
+		cleanup, err = prepareUbuntuDependencies()
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func requiredDependencies(requested []string, release *platform.Release) error {
 
 // Preseed the distro-supported cluster switch before postgresql-common is
 // configured. Existing operator policy/configuration is never overwritten.
-func prepareUbuntuDependencies(ctx context.Context) (cleanup func() error, err error) {
+func prepareUbuntuDependencies() (cleanup func() error, err error) {
 	const configPath = "/etc/postgresql-common/createcluster.conf"
 	const policyPath = "/usr/sbin/policy-rc.d"
 	if _, err := os.Lstat(policyPath); err == nil {
@@ -127,12 +127,12 @@ func prepareUbuntuDependencies(ctx context.Context) (cleanup func() error, err e
 		return nil, err
 	}
 	if _, err := os.Lstat(configPath); err == nil {
-		if _, err := protected(configPath, false); err != nil {
+		configuration, err := protected(configPath, false)
+		if err != nil {
 			return nil, err
 		}
-		value, err := command(ctx, nil, "pg_conftool", configPath, "show", "-bs", "create_main_cluster")
-		if err != nil || !clusterCreationDisabled(string(value)) {
-			return nil, errors.New("existing PostgreSQL cluster policy is not disabled; refusing to overwrite operator configuration")
+		if !clusterPolicyDisabled(configuration) {
+			return nil, errors.New("existing PostgreSQL cluster policy is not unambiguously disabled; refusing to overwrite operator configuration")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -167,10 +167,98 @@ func prepareUbuntuDependencies(ctx context.Context) (cleanup func() error, err e
 	}, nil
 }
 
-// pg_conftool preserves boolean spelling. Accept the four disabled spellings
-// without changing an existing operator-owned configuration.
+// Accept the four disabled spellings without changing operator configuration.
 func clusterCreationDisabled(value string) bool {
 	value = strings.TrimSpace(value)
 	return value == "0" || strings.EqualFold(value, "off") ||
 		strings.EqualFold(value, "false") || strings.EqualFold(value, "no")
+}
+
+// clusterPolicyDisabled checks the bounded, root-protected pre-transaction file
+// without requiring a tool from the dependency transaction itself. It accepts
+// standalone assignments in PgCommon's documented configuration grammar.
+// Includes, duplicate creation switches and unsupported syntax fail closed: their
+// effective value cannot be established from this one protected file.
+func clusterPolicyDisabled(configuration []byte) bool {
+	found := false
+	for len(configuration) > 0 {
+		line, remaining, _ := bytes.Cut(configuration, []byte{'\n'})
+		configuration = remaining
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 || line[0] == '#' {
+			continue
+		}
+		keyEnd := 0
+		for keyEnd < len(line) && clusterPolicyKeyByte(line[keyEnd]) {
+			keyEnd++
+		}
+		if keyEnd == 0 || keyEnd == len(line) {
+			return false
+		}
+		key := line[:keyEnd]
+		if bytes.EqualFold(key, []byte("include")) ||
+			bytes.EqualFold(key, []byte("include_if_exists")) ||
+			bytes.EqualFold(key, []byte("include_dir")) {
+			return false
+		}
+		if line[keyEnd] != '=' && line[keyEnd] != ' ' && line[keyEnd] != '\t' {
+			return false
+		}
+		value := bytes.TrimSpace(line[keyEnd:])
+		if len(value) > 0 && value[0] == '=' {
+			value = bytes.TrimSpace(value[1:])
+		}
+		if len(value) == 0 {
+			return false
+		}
+		if value[0] == '\'' {
+			end := bytes.IndexByte(value[1:], '\'')
+			if end < 0 {
+				return false
+			}
+			tail := bytes.TrimSpace(value[end+2:])
+			if len(tail) != 0 && tail[0] != '#' {
+				return false
+			}
+			value = value[1 : end+1]
+			if bytes.IndexByte(value, '\\') >= 0 {
+				return false
+			}
+		} else {
+			value, _, _ = bytes.Cut(value, []byte{'#'})
+			value = bytes.TrimSpace(value)
+			if len(value) == 0 {
+				return false
+			}
+			first := value[0]
+			if first == '-' {
+				if len(value) < 2 {
+					return false
+				}
+				first = value[1]
+			}
+			if (first < 'a' || first > 'z') && (first < 'A' || first > 'Z') &&
+				(first < '0' || first > '9') {
+				return false
+			}
+			for _, character := range value {
+				if !clusterPolicyKeyByte(character) && character != ':' &&
+					character != '/' && character != '+' {
+					return false
+				}
+			}
+		}
+		if bytes.EqualFold(key, []byte("create_main_cluster")) {
+			if found || !clusterCreationDisabled(string(value)) {
+				return false
+			}
+			found = true
+		}
+	}
+	return found
+}
+
+func clusterPolicyKeyByte(value byte) bool {
+	return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z' ||
+		value >= '0' && value <= '9' || value == '_' || value == '.' || value == '-'
 }
