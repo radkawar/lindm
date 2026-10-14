@@ -43,11 +43,9 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   // The list keeps the previous page on screen (aria-busy) until the searched page
   // arrives; read rows only once the search is applied and no read is in flight.
   await page.getByRole("button", { name: `Remove hostname filter: ${query}` }).waitFor();
-  await page
-    .waitForFunction(() => !document.querySelector('main [aria-busy="true"]'), null, {
-      timeout: 30_000,
-    })
-    .catch(() => {});
+  await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'), null, {
+    timeout: 30_000,
+  });
   const found = await hostnames(table);
   const expected = devices
     .filter((device) => device.Hostname.toLowerCase().includes(part.toLowerCase()))
@@ -59,6 +57,12 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   await capture("case-insensitive hostname search");
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await settle();
+  await page.getByRole("button", { name: `Remove hostname filter: ${query}` }).waitFor({
+    state: "hidden",
+  });
+  await page.waitForFunction(() => !document.querySelector('main [aria-busy="true"]'), null, {
+    timeout: 30_000,
+  });
 
   step("server-side sort by last contact");
   const caption = await table.locator("caption").innerText();
@@ -67,6 +71,21 @@ export async function check({ page, demo, visit, settle, require, capture, step 
   for (const direction of ["ascending", "descending"]) {
     await sortButton.click();
     await settle();
+    // Navigation prefetches the sorted response while the old header and rows
+    // remain visible. The generic screen settle check does not observe aria-busy.
+    await page.waitForFunction(
+      (expected) => {
+        const button = document.querySelector(
+          'button[aria-label="Sort all devices by Last contact"]',
+        );
+        return (
+          button?.closest("th")?.getAttribute("aria-sort") === expected &&
+          !document.querySelector('main [aria-busy="true"]')
+        );
+      },
+      direction,
+      { timeout: 30_000 },
+    );
     const header = page.locator("thead th", { has: sortButton });
     require((await header.getAttribute("aria-sort")) ===
       direction, `Last contact header is not ${direction} after clicking`);

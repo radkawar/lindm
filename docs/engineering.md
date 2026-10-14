@@ -1163,6 +1163,12 @@ offset and height; the contact sheet links every part in order. This retains the
 complete reference document on desktop and mobile without a single oversized
 Chromium surface, even when a full-page capture has a smaller clip.
 
+Device-list owner checks wait for the requested sort direction and for
+`aria-busy` to clear before inspecting rows. Route prefetch keeps the previous
+header and response visible while the replacement arrives. Generic screen
+settling does not establish that the requested search or sort response arrived;
+a readiness timeout fails the scenario instead of accepting stale evidence.
+
 Runtime authorization landings additionally run
 `make ui-review UI_REVIEW_FLAGS=-directory-authorization` with the real development
 Keycloak fixture available. This adds a disposable directory-primary server, an
