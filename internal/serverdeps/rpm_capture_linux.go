@@ -251,8 +251,8 @@ maxpackages = int(m['max_packages'])
 files = []
 total = 0
 keys = [
- ('567E347AD0044ADE55BA8A5F199E2F91FD431D51', 'fd431d51', 'd4b2543626bee31d9438d4a31731aae712c072893c7aed8854f16c42fafc742b'),
- ('FCD355B305707A62DA143AB6E422397E50FE8467A2A95343D246D6276AFEDF8F', '6afedf8f', '9052b2b274842f1b4f40f6e9f4d08691fb8be1ac2483027e12cca61ec68eab8b')]
+ ('567E347AD0044ADE55BA8A5F199E2F91FD431D51', 'fd431d51', 'd4b2543626bee31d9438d4a31731aae712c072893c7aed8854f16c42fafc742b', '199e2f91fd431d51'),
+ ('FCD355B305707A62DA143AB6E422397E50FE8467A2A95343D246D6276AFEDF8F', '6afedf8f', '9052b2b274842f1b4f40f6e9f4d08691fb8be1ac2483027e12cca61ec68eab8b', 'fcd355b305707a62')]
 class NoKeyRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self, req, fp, code, msg, headers, newurl):
   raise RuntimeError('vendor key redirect forbidden')
@@ -337,7 +337,7 @@ with tempfile.TemporaryDirectory(prefix='lindm-rhel-solve-') as work:
   command(['chcon','--reference=' + native_db,str(db)])
  phase = 'native-keyring-database-init'
  keyring_command(['/usr/bin/rpm','--dbpath',str(db),'--initdb'], 'native-keyring-database-init')
- for fingerprint, keyid, keysha in keys:
+ for fingerprint, keyid, keysha, native_keyid in keys:
   phase = 'vendor-key-acquisition'
   name = 'keys/' + keyid + '.asc'
   p = root / name
@@ -418,8 +418,8 @@ with tempfile.TemporaryDirectory(prefix='lindm-rhel-solve-') as work:
    checked = command(['rpmkeys','--dbpath',str(db),'--checksig','--verbose',str(root/name)]).lower()
    signatures = [line for line in checked.splitlines() if 'signature' in line]
    signer = ''
-   for fingerprint, keyid, keysha in keys:
-    if signatures and all(line.rstrip().endswith(': ok') and ('key id ' + keyid in line or 'key id ' + fingerprint[-16:].lower() in line) for line in signatures): signer = fingerprint
+   for fingerprint, keyid, keysha, native_keyid in keys:
+    if signatures and all(line.rstrip().endswith(': ok') and ('key id ' + native_keyid in line or 'key id ' + native_keyid[8:] in line) for line in signatures): signer = fingerprint
    if not signer or 'not ok' in checked or 'nokey' in checked: raise RuntimeError('vendor signature')
    record(name, 'FILE_KIND_PACKAGE', expected, primary[p.reponame], identity, signer)
   phase = 'native-solver-version-query'

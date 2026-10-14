@@ -128,6 +128,13 @@ binds the exact acquired index and metadata bytes, whose native checksums bind
 each package. Offline installation independently verifies every RPM with an
 isolated keyring containing only exact-pinned
 [Red Hat product signing keys](https://access.redhat.com/security/team/key).
+The full independently pinned fingerprints and exact armor hashes remain the
+authority. Native signer IDs follow the key's OpenPGP version: release key 2
+uses its fingerprint's low 64 bits; release key 4 uses the high 64 bits under
+[RFC 9580 section 5.5.4.3](https://www.rfc-editor.org/rfc/rfc9580.html#section-5.5.4.3).
+[Red Hat's native key listing](https://access.redhat.com/solutions/7136467)
+records release key 4 as short ID `05707a62`; its download alias `6afedf8f` is
+not the native version-6 signer ID.
 On SELinux hosts, the newly created private parent takes the standard system
 root label from `/`, matching the existing disposable native-solver pattern.
 Its private keyring directory takes its label from the actual native RPM

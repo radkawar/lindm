@@ -41,6 +41,24 @@ func TestRPMSignatureMatchesExactVendor(t *testing.T) {
 	}
 }
 
+func TestRPMSignatureMatchesVersion6Vendor(t *testing.T) {
+	for _, test := range []struct {
+		output string
+		want   bool
+	}{
+		{"Header V6 Signature, key ID fcd355b305707a62: OK\n", true},
+		{"Header V6 Signature, key ID 05707a62: OK\n", true},
+		{"Header V6 Signature, key ID d246d6276afedf8f: OK\n", false},
+		{"Header V6 Signature, key ID 6afedf8f: OK\n", false},
+		{"Header V6 Signature, key ID 05707a62: NOKEY\n", false},
+		{"Header V4 RSA/SHA256 Signature, key ID fd431d51: OK\n", false},
+	} {
+		if got := rpmSignatureMatches(test.output, redHatRelease4); got != test.want {
+			t.Fatalf("version6 signature accepted=%t, want %t", got, test.want)
+		}
+	}
+}
+
 func TestRPMVendorAcquisitionBoundary(t *testing.T) {
 	id := "rhel-9-for-x86_64-baseos-rpms"
 	origin := "https://cdn.redhat.com/content/dist/rhel9/9/x86_64/baseos/os"

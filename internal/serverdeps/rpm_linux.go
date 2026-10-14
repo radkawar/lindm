@@ -41,6 +41,19 @@ func rpmVendorKeyDigest(fingerprint string) string {
 	}
 }
 
+// Native OpenPGP v4 key IDs use the fingerprint's low 64 bits; v6 uses the
+// high 64 bits (RFC 9580 section 5.5.4). Vendor download aliases are not key IDs.
+func rpmVendorKeyID(fingerprint string) string {
+	switch fingerprint {
+	case redHatRelease2:
+		return "199e2f91fd431d51"
+	case redHatRelease4:
+		return "fcd355b305707a62"
+	default:
+		return ""
+	}
+}
+
 func rpmTarget(m *serverdepsv1.Manifest) error {
 	if _, err := snapshotTarget(m); err != nil {
 		return err
@@ -153,7 +166,10 @@ func labelRPMDatabase(ctx context.Context, stage, directory string) error {
 }
 
 func rpmSignatureMatches(output, fingerprint string) bool {
-	keyID := strings.ToLower(fingerprint[len(fingerprint)-16:])
+	keyID := rpmVendorKeyID(fingerprint)
+	if keyID == "" {
+		return false
+	}
 	found := false
 	for _, line := range strings.Split(strings.ToLower(output), "\n") {
 		if strings.Contains(line, ": not ok") || strings.Contains(line, ": nokey") || strings.Contains(line, ": bad") {
