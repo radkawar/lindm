@@ -233,6 +233,7 @@ export function Accounts({
           <Input
             id="account-search"
             type="search"
+            data-freeform="search local account usernames"
             placeholder="Search by username"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
