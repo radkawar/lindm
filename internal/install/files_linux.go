@@ -88,22 +88,31 @@ func newDatabaseURL(path string, content []byte) error {
 }
 
 func newFile(path string, content []byte, uid, gid int, mode os.FileMode) (err error) {
-	fd, err := unix.Open(path, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL|unix.O_NOFOLLOW|unix.O_CLOEXEC, uint32(mode.Perm()))
+	// Publish complete, synced bytes with no replacement. A crash during a write
+	// must not strand a truncated credential at its final, immutable pathname.
+	f, err := os.CreateTemp(filepath.Dir(path), ".lindm-new-*")
 	if err != nil {
 		return err
 	}
-	f := os.NewFile(uintptr(fd), path)
-	defer func() { err = errors.Join(err, f.Close()) }()
+	defer func() { _ = os.Remove(f.Name()) }()
 	if err := f.Chown(uid, gid); err != nil {
-		return err
+		return errors.Join(err, f.Close())
 	}
 	if err := f.Chmod(mode.Perm()); err != nil {
+		return errors.Join(err, f.Close())
+	}
+	_, writeErr := f.Write(content)
+	if err := errors.Join(writeErr, f.Sync(), f.Close()); err != nil {
 		return err
 	}
-	if _, err := f.Write(content); err != nil {
+	if err := unix.Renameat2(unix.AT_FDCWD, f.Name(), unix.AT_FDCWD, path, unix.RENAME_NOREPLACE); err != nil {
 		return err
 	}
-	return f.Sync()
+	parent, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	return errors.Join(parent.Sync(), parent.Close())
 }
 
 func copyFileNew(src, dst string, mode os.FileMode) (err error) {

@@ -45,7 +45,7 @@ func externalDatabaseCredential(source, directory string, uid, gid int) error {
 			return err
 		}
 		destination := filepath.Join(directory, item.name)
-		err = newFile(destination, content, uid, gid, 0600)
+		err = installationFile(destination, content, uid, gid, 0600)
 		if item.secret {
 			clear(content)
 		}
@@ -56,5 +56,5 @@ func externalDatabaseCredential(source, directory string, uid, gid int) error {
 	}
 	encoded := []byte(base + "?" + strings.ReplaceAll(options.Encode(), "+", "%20") + "\n")
 	defer clear(encoded)
-	return newDatabaseURL(filepath.Join(directory, "database-url"), encoded)
+	return installationFile(filepath.Join(directory, "database-url"), encoded, 0, 0, 0600)
 }

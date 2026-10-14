@@ -120,30 +120,76 @@ func Run(ctx context.Context, o Options) (err error) {
 		return stateErr
 	}
 	if upgrade {
+		data, err := protected("/etc/lindm/install-state.json", true)
+		if err != nil {
+			return err
+		}
+		var state installState
+		if err := json.Unmarshal(data, &state); err != nil {
+			return err
+		}
+		if state.Pending != nil {
+			if err := validateInstallationResume(&state, o, manifest.GetVersion()); err != nil {
+				return err
+			}
+			return continueInstallation(ctx, &o, release, packagePath, &state, nil)
+		}
 		return upgradeRelease(ctx, o, manifest.GetVersion(), packagePath, release)
 	}
 	return installFresh(ctx, &o, release, packagePath, manifest.GetVersion())
 }
 
 func installFresh(ctx context.Context, o *Options, release *platform.Release, packagePath, version string) error {
-	if _, err := os.Stat("/etc/lindm/server.json"); err == nil {
-		return errors.New("pre-turnkey manual or laboratory deployment is not a managed upgrade baseline: install a fresh turnkey instance and reenroll; existing configuration will not be overwritten or rekeyed")
+	if o.Rollback {
+		return errors.New("rollback requires a completed managed installation")
 	}
+	if o.DatabaseURL == "" {
+		entries, err := os.ReadDir(release.Server.PostgreSQLDataDirectory)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if len(entries) != 0 {
+			return errors.New("unmanaged local database directory is not a fresh installation baseline")
+		}
+	}
+	// Validate recipient custody and admit its passphrase before committing the
+	// input binding. Invalid initial inputs must not strand a pending journal.
 	rootCustody, err := newAuthorityCustody(ctx, *o)
 	if err != nil {
 		return err
 	}
 	defer rootCustody.clear()
+	state, err := beginInstallation(*o, version)
+	if err != nil {
+		return err
+	}
+	return continueInstallation(ctx, o, release, packagePath, state, rootCustody)
+}
+
+func continueInstallation(ctx context.Context, o *Options, release *platform.Release, packagePath string, state *installState, rootCustody *authorityCustody) error {
+	if !state.Pending.IdentityReady {
+		if err := resetUnpublishedIdentity(state); err != nil {
+			return err
+		}
+		if rootCustody == nil {
+			var err error
+			rootCustody, err = newAuthorityCustody(ctx, *o)
+			if err != nil {
+				return err
+			}
+			defer rootCustody.clear()
+		}
+	}
 	if err := installDependencies(ctx, *o, release); err != nil {
 		return err
 	}
 	if err := verifyNativePackage(ctx, packagePath, release, o.Bundle); err != nil {
 		return err
 	}
-	if err := installPackage(ctx, packagePath, release, false); err != nil {
+	if err := authorizeInstallationPackage(ctx, packagePath, release, state.Pending.Version); err != nil {
 		return err
 	}
-	if err := provision(ctx, *o, release, rootCustody); err != nil {
+	if err := provision(ctx, *o, release, rootCustody, state); err != nil {
 		return err
 	}
 	if err := databasePreflight(ctx); err != nil {
@@ -167,11 +213,9 @@ func installFresh(ctx context.Context, o *Options, release *platform.Release, pa
 	if err := ready(ctx, *o); err != nil {
 		return err
 	}
-	state, err := json.Marshal(installState{Version: version, Origin: o.Origin, DeviceOrigin: o.DeviceOrigin, TLSCA: "/etc/lindm/transport-ca.crt", LocalDatabase: o.DatabaseURL == ""})
-	if err != nil {
-		return err
-	}
-	if err := newFile("/etc/lindm/install-state.json", state, 0, 0, 0600); err != nil {
+	state.Version = state.Pending.Version
+	state.Pending = nil
+	if err := writeInstallationState(state); err != nil {
 		return err
 	}
 	return displaySetup(*o)

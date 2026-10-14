@@ -84,6 +84,22 @@ Import the customer's signed release feed to learn about updates offline.
 Apply the authenticated next bundle through its installer, not by replacing the
 server executable. The upgrade requires preflight checks and an encrypted backup.
 
+If a first installation is interrupted, correct the reported problem and rerun
+the same authenticated bundle with the same origins, trust keys, recipients and
+database/TLS inputs. The protected `/etc/lindm/install-state.json` journal is
+written before package installation and provisioning. A retry retains committed
+deployment keys, custody exports, credentials and database state; do not remove
+them to make the installer run again. Only incomplete, unpublished bootstrap
+identity generation is discarded before retrying. A different bundle or changed
+provisioning inputs cannot take over an unfinished installation.
+
+An upgrade records its attempted and native-installed release separately from
+the last release that passed readiness. If a newer package fails readiness, use
+the previous release's authenticated signed bundle with `--rollback` only when
+the installer admits its schema compatibility. The native package version, not
+the last-ready marker, determines whether this is a rollback. Schema preflight
+and an encrypted backup remain mandatory; rollback never runs schema Down.
+
 The first turnkey release starts managed upgrades. Pre-turnkey manual and lab
 installations need a fresh server and device re-enrollment. Keep their data and
 keys until you approve retention.

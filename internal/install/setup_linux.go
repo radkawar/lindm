@@ -31,6 +31,16 @@ func issueSetup(ctx context.Context) (err error) {
 	if err := writeConfig(path, d.Proto, 0, 0); err != nil {
 		return err
 	}
-	_, err = command(ctx, nil, "/usr/bin/lindmd", "setup-code", "-config", path, "-output", "/var/lib/lindmd-operations/setup/code")
-	return err
+	output := filepath.Join(stage, "code")
+	if _, err = command(ctx, nil, "/usr/bin/lindmd", "setup-code", "-config", path, "-output", output); err != nil {
+		return err
+	}
+	code, err := protected(output, true)
+	if err != nil {
+		return err
+	}
+	defer clear(code)
+	// Issuance invalidates prior unconsumed codes. Publish only the complete new
+	// code, including when a previous invocation stopped after issuance.
+	return replaceInstallationState("/var/lib/lindmd-operations/setup/code", code)
 }

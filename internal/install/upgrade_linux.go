@@ -30,6 +30,7 @@ import (
 type installState struct {
 	Version, Origin, DeviceOrigin, TLSCA string
 	LocalDatabase                        bool
+	Pending                              *installationProgress
 }
 
 func upgradeRelease(ctx context.Context, o Options, version, packagePath string, release *platform.Release) (err error) {
