@@ -401,12 +401,9 @@ func (p *controlPlane) adminMux(pool *pgxpool.Pool, resources *config.Resources)
 		// imports; packages authenticate natively with client-pinned keys.
 		mux.Handle("/offline/", http.StripPrefix("/offline/", offlineHandler))
 	}
-	if p.deliveries != nil {
-		path, handler = p.deliveries.AdminHandler()
-		mux.Handle(path, p.auth.RequireSession(handler))
-		path, handler = p.reporting.AdminHandler()
-		mux.Handle(path, p.auth.RequireSession(handler))
-	}
+	deliveryPath, deliveryHandler, reportPath, reportHandler := p.integrationHandlers()
+	mux.Handle(deliveryPath, p.auth.RequireSession(deliveryHandler))
+	mux.Handle(reportPath, p.auth.RequireSession(reportHandler))
 	path, handler = p.devices.EnrollmentHandler()
 	mux.Handle(path, handler)
 	path, handler = p.devices.RecoveryHandler()

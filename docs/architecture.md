@@ -2624,6 +2624,14 @@ stale. A bounded deadline scanner emits stale transitions once; superseded
 assignment heads no longer emit. Dependency UUIDs are normalized beside the
 immutable resource protobuf for identical report/event dependency propagation.
 
+Both integration and report RPC services remain mounted behind the normal
+session guard without integration configuration. Authenticated calls then return
+Connect `FailedPrecondition` with reason `integrations_unconfigured`; they never
+fall through to the console's GET-only handler. The Integrations page presents
+a neutral setup state and the protected 32-byte key/configuration/restart steps
+instead of starting its destination, delivery and report panels. Local console,
+device-action/held-demo and HA fixtures provision their own private key at creation.
+
 Destination credentials are AES-256-GCM encrypted under a separately protected
 deployment key. Destination updates use version comparison, actor-scoped mutation
 receipts and fresh unrestricted `integrations.manage` transaction fences. Workers

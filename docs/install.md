@@ -65,6 +65,23 @@ The setup code cannot replace a password or passkey after setup completes. If it
 expiry interrupts setup, use the protected setup-code procedure in the runbook.
 Never disable TLS or package verification to complete enrollment.
 
+## Set up integrations and reports
+
+The turnkey installer does not enable integrations by default. **Integrations**
+shows **Integrations are not set up** until the server administrator:
+
+1. Creates a cryptographically random encryption key containing exactly 32 raw
+   bytes (not hexadecimal or base64), in a protected file readable by `lindmd`.
+2. Sets `integrations.encryptionKeyFile` to that file's path in
+   `/etc/lindm/server.json`.
+3. Backs up the key securely with the deployment's recovery material, then
+   restarts `lindmd`.
+
+This enables destinations, delivery history and signed reports together. Never
+replace a deployed key to resolve a setup problem: existing destination
+credentials depend on it. After setup, add a webhook or TLS syslog destination
+and configure report schedules in the console.
+
 ## Keep the service recoverable
 
 Check **Server status** after installation and each upgrade. Resolve database,

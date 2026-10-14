@@ -304,7 +304,7 @@ func openAuthorityFixtureWithOptions(ctx context.Context, repository, binary str
 	cfg.TrustedCaFile = filepath.Join(shared, "transport-ca.crt")
 	cfg.DevicePublicUrl = proto.String(deviceOrigin)
 	cfg.ExecutionBootstrap = &configv1.ExecutionBootstrapConfig{RootFile: "execution-root.json", BootstrapFile: "bootstrap.dsse.json"}
-	if mode == authorityLocalConsole || mode == authorityHA {
+	if mode == authorityLocalConsole || mode == authorityDeviceActions || mode == authorityHA {
 		if err := f.configureConsoleIntegrations(cfg); err != nil {
 			return nil, err
 		}

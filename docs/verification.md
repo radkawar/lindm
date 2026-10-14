@@ -30,6 +30,56 @@ Scopes include resource subsets and successful refusal scenarios.
 A passed refusal does not prove that the refused operation is supported.
 These counts describe that audit snapshot, not a live total or v0.1 release qualification.
 
+## Integrations route and setup-state regression (2026-10-14)
+
+The held-demo constructor used `authorityDeviceActions`, while integration key
+configuration covered only local-console and HA fixtures. Without that key,
+`lindmd` omitted both integration services and their POSTs reached the console's
+GET-only fallback. Restoring those original two conditions in a private worktree
+made the new real-process regression fail: `ListDestinations`, `ListDeliveries`,
+`SummarizeDeliveries`, `ListReportSchedules` and `ListReportArtifacts` each returned
+HTTP 405 for authenticated and anonymous requests.
+
+With the fix, `TestIntegrationHandlersUnconfigured` passed for all thirteen
+integration/report methods over Connect protobuf and JSON. The opt-in
+`TestPersistentConsoleIntegrationsConfiguredAndUnconfigured` passed against a real
+owned persistent fixture: configured reads returned 200, anonymous reads returned
+401 in both states, and unconfigured reads returned Connect `FailedPrecondition`
+with `integrations_unconfigured` (Connect maps that code to HTTP 400). Chromium
+enrolled and signed in normally, rendered every fresh panel, then rendered the
+plain setup instruction without mounting the panels after configuration removal.
+No RPC interception, session-cookie import or synthetic response was used.
+
+Reproduce after `make acceptance-build` with protected development trust and
+PostgreSQL available:
+
+```sh
+LINDM_CONSOLE_REPOSITORY=/path/to/protected-repository \
+LINDM_CONSOLE_LINDMD="$PWD/artifacts/bin/lindmd" \
+LINDM_CONSOLE_EVIDENCE="$PWD/artifacts/integrations405" \
+go test -tags='integration consolelab' ./internal/devlab \
+  -run '^TestPersistentConsoleIntegrationsConfiguredAndUnconfigured$' \
+  -count=1 -timeout=30m
+```
+
+A separate fresh `lab console -demo -feeds fixtures` build rendered its SOC
+webhook, delivery log, weekly compliance schedule and published audit/compliance
+reports without UI errors; all five initial RPCs returned 200. Maintainer-local
+evidence is under
+`/home/r/dev/minor/lindm.worktrees/integrations405/artifacts/integrations405/`:
+
+- `seeded-demo/configured-integrations.png`, SHA-256
+  `0dc63caf0fd1d4f7114b2f2555046cfa00faabbbbf6e3ab20f2eaa6d71705938`.
+- `seeded-demo/configured-result.json`, SHA-256
+  `c687f59f4d7a0d56467f9cad0043f4e6cfa0ec721c9854219335c2d81ae151b6`.
+- `integrations-3502657077/unconfigured-integrations.png`, SHA-256
+  `806e9755ce5bda5fba85de3b48086d8679f52c53f500ed5386a765c5d0f8b6ce`.
+- `integrations-3502657077/unconfigured-result.json`, SHA-256
+  `0a3abffa4db2171d564503916f486e967c08a8887a235c43d02a8e0d9f70949b`.
+
+The fresh demo uses synthetic device inventory, not native device qualification.
+The owner demo was not restarted or probed after its teardown was announced.
+
 ## README screenshots
 
 The README images show synthetic demo data from the actual console.
