@@ -123,10 +123,17 @@ export function DeviceDetailView({
     const button = tabButtons.current[detailTabs.findIndex((item) => item.id === activeTab)];
     const strip = button?.parentElement;
     if (!button || !strip) return;
-    const selected = button.getBoundingClientRect();
-    const viewport = strip.getBoundingClientRect();
-    if (selected.left < viewport.left) strip.scrollLeft += selected.left - viewport.left;
-    else if (selected.right > viewport.right) strip.scrollLeft += selected.right - viewport.right;
+    function revealSelectedTab() {
+      if (!button || !strip) return;
+      const selected = button.getBoundingClientRect();
+      const viewport = strip.getBoundingClientRect();
+      if (selected.left < viewport.left) strip.scrollLeft += selected.left - viewport.left;
+      else if (selected.right > viewport.right) strip.scrollLeft += selected.right - viewport.right;
+    }
+    revealSelectedTab();
+    const resize = new ResizeObserver(revealSelectedTab);
+    resize.observe(strip);
+    return () => resize.disconnect();
   }, [activeTab, device?.id]);
   // The server answers NotFound alike for a missing device and one outside the
   // caller's scope; only a fleet-wide reader knows the device does not exist.

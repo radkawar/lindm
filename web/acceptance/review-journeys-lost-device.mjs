@@ -80,6 +80,16 @@ async function approve(page, origin, heading) {
   await card.getByText("Approved", { exact: true }).waitFor();
 }
 
+async function waitForSelectedTabInView(page) {
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[role="tab"][aria-selected="true"]');
+    if (!button) return false;
+    const bounds = button.getBoundingClientRect();
+    const strip = button.parentElement.getBoundingClientRect();
+    return bounds.left >= strip.left - 1 && bounds.right <= strip.right + 1;
+  });
+}
+
 async function lostDevice(ctx) {
   const { page, config } = ctx;
   const route = config.demo.Devices.find((device) => device.ID === config.demo.Routes.DeviceID);
@@ -87,19 +97,24 @@ async function lostDevice(ctx) {
   requireState(route && offline, "lost_device_fixture_missing");
   const driver = new ChromiumDriver();
   try {
-    await page.setViewportSize({ width: 390, height: 844 });
     for (const theme of ["light", "dark"]) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await ctx.visit(`/devices/${route.ID}?tab=assistance`);
+      await page
+        .getByRole("tab", { name: "Remote assistance", exact: true, selected: true })
+        .waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await waitForSelectedTabInView(page);
+      await capture(
+        ctx,
+        `device-tabs-resized-${theme}-mobile`,
+        "The selected Remote assistance tab stays visible when the desktop page changes to a mobile viewport without navigation.",
+      );
       await ctx.visit(`/devices/${route.ID}?tab=assistance`);
       const selected = page.getByRole("tab", { name: "Remote assistance", exact: true });
       await selected.waitFor();
-      await page.waitForFunction(() => {
-        const button = document.querySelector('[role="tab"][aria-selected="true"]');
-        if (!button) return false;
-        const bounds = button.getBoundingClientRect();
-        const strip = button.parentElement.getBoundingClientRect();
-        return bounds.left >= strip.left - 1 && bounds.right <= strip.right + 1;
-      });
+      await waitForSelectedTabInView(page);
       requireState(
         (await selected.getAttribute("aria-selected")) === "true",
         "device_deep_link_tab_not_selected",
