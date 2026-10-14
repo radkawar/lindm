@@ -15,15 +15,32 @@ key=''
 pin=''
 origin=''
 recipient=''
+# Match Go's public flag spellings and retain the final occurrence, including
+# an explicit empty value. Consume separated values rather than parsing them
+# again as flags; leave the original argument vector intact for the verifier.
 previous=''
 for value in "$@"; do
-  case "$previous" in
-    --release-key-file) key=$value ;;
-    --release-key-id) pin=$value ;;
-    --origin) origin=$value ;;
-    --backup-recipient-file) recipient=$value ;;
+  if [ -n "$previous" ]; then
+    case "$previous" in
+      release-key-file) key=$value ;;
+      release-key-id) pin=$value ;;
+      origin) origin=$value ;;
+      backup-recipient-file) recipient=$value ;;
+    esac
+    previous=''
+    continue
+  fi
+  case "$value" in
+    --release-key-file|-release-key-file) previous=release-key-file ;;
+    --release-key-id|-release-key-id) previous=release-key-id ;;
+    --origin|-origin) previous=origin ;;
+    --backup-recipient-file|-backup-recipient-file) previous=backup-recipient-file ;;
+    --release-key-file=*|-release-key-file=*) key=${value#*=} ;;
+    --release-key-id=*|-release-key-id=*) pin=${value#*=} ;;
+    --origin=*|-origin=*) origin=${value#*=} ;;
+    --backup-recipient-file=*|-backup-recipient-file=*) recipient=${value#*=} ;;
+    --) break ;;
   esac
-  previous=$value
 done
 prompt() {
   [ -r /dev/tty ] && [ -w /dev/tty ] || { printf '%s\n' 'Explicit flags required without a private terminal.' >&2; exit 1; }
