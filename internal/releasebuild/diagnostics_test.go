@@ -94,16 +94,35 @@ func TestCleanupRejectsReplacedWorkInode(t *testing.T) {
 
 func TestMismatchEvidenceRetainsBothObservedInputs(t *testing.T) {
 	work := t.TempDir()
+	if err := os.Chmod(work, 0700); err != nil {
+		t.Fatal(err)
+	}
+	owned, err := os.Lstat(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join(t.TempDir(), "operator's-output")
+	if err := os.Mkdir(parent, 0700); err != nil {
+		t.Fatal(err)
+	}
 	observations := []*releasev1.BuildObservation{
 		{SourceSha256: "source", UnsignedSha256: map[string]string{"artifact": "first"}, BinarySha256: map[string]string{"lindmd/amd64": "binary-first"}, ConsoleSha256: map[string]string{"index.html": "console-first"}, ToolVersions: map[string]string{"go": "observed-go"}},
 		{SourceSha256: "source", UnsignedSha256: map[string]string{"artifact": "second"}, BinarySha256: map[string]string{"lindmd/amd64": "binary-second"}, ConsoleSha256: map[string]string{"index.html": "console-second"}, ToolVersions: map[string]string{"go": "observed-go"}},
 	}
 	cause := errors.New("unsigned payload differs")
-	err := retainFailure(work, &buildOutput{observation: observations[0]}, &buildOutput{observation: observations[1]}, cause)
-	if !errors.Is(err, cause) || !strings.Contains(err.Error(), "reproducibility-failure.json") {
-		t.Fatalf("missing retained failure location: %v", err)
+	moved, err := retainMismatch(t.Context(), work, owned, parent, &buildOutput{observation: observations[0]}, &buildOutput{observation: observations[1]}, cause)
+	if !moved || !errors.Is(err, cause) || !strings.Contains(err.Error(), "reproducibility-failure.json") || !strings.Contains(err.Error(), "regular-file bytes") || !strings.Contains(err.Error(), "Remove with:") || !strings.Contains(err.Error(), "'\\''") {
+		t.Fatalf("missing retained failure location/size/removal instructions: %v", err)
 	}
-	data, err := os.ReadFile(filepath.Join(work, "reproducibility-failure.json"))
+	if _, err := os.Lstat(work); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("mismatch build still occupies system temporary staging")
+	}
+	entries, err := os.ReadDir(parent)
+	if err != nil || len(entries) != 1 || !strings.HasPrefix(entries[0].Name(), "reproducibility-mismatch-") {
+		t.Fatalf("missing named operator evidence: %v %v", entries, err)
+	}
+	retained := filepath.Join(parent, entries[0].Name())
+	data, err := os.ReadFile(filepath.Join(retained, "reproducibility-failure.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +130,7 @@ func TestMismatchEvidenceRetainsBothObservedInputs(t *testing.T) {
 	if err := protojson.Unmarshal(data, &evidence); err != nil {
 		t.Fatal(err)
 	}
-	if len(evidence.Builds) != 2 || evidence.Builds[0].BinarySha256["lindmd/amd64"] != "binary-first" || evidence.Builds[1].ConsoleSha256["index.html"] != "console-second" || evidence.Builds[0].ToolVersions["go"] != "observed-go" || evidence.RetainedWorkDirectory != work {
+	if len(evidence.Builds) != 2 || evidence.Builds[0].BinarySha256["lindmd/amd64"] != "binary-first" || evidence.Builds[1].ConsoleSha256["index.html"] != "console-second" || evidence.Builds[0].ToolVersions["go"] != "observed-go" || evidence.RetainedWorkDirectory != retained {
 		t.Fatal("failure evidence lost actual build observations")
 	}
 }

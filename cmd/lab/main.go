@@ -140,6 +140,9 @@ func runUnscheduled(ctx context.Context, args []string, stdout, stderr io.Writer
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "deploy-setup" {
 		return runDeploySetupAdmitted(ctx, args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "vm" && args[1] == "production-release-signing" {
+		return runVMProductionReleaseSigning(ctx, args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "vm" && args[1] == "server" {
 		return runVMServer(ctx, args[2:], stdout, stderr)
 	}

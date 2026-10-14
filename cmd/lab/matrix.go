@@ -234,7 +234,12 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	}
 	path := expandHome(*evidence)
 	if info, statErr := os.Stat(path); statErr == nil {
-		sum, err := matrixImportEvidenceSHA256(path, *cell, *scope)
+		var sum string
+		if *cell == "production-release-signing" {
+			sum, err = productionSigningEvidenceSHA256(path, *scope, *manifest)
+		} else {
+			sum, err = matrixImportEvidenceSHA256(path, *cell, *scope)
+		}
 		if err != nil {
 			return err
 		}
@@ -244,6 +249,9 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 		entry.Sha256, entry.Verified = sum, true
 		entry.Recorded = timestamppb.New(info.ModTime())
 	} else if errors.Is(statErr, os.ErrNotExist) || errors.Is(statErr, os.ErrPermission) {
+		if *cell == "production-release-signing" {
+			return errors.New("production signing import requires readable tests-only evidence and reverified test evidence hashes")
+		}
 		if *digest == "" {
 			return fmt.Errorf("evidence %s is not readable here; -sha256 is required", path)
 		}
@@ -382,19 +390,20 @@ type matrixRun struct {
 // a private directory beside its record; SSH hosts return it, whereas a path
 // inside the remote run directory was deleted with the run.
 var laneInputs = map[string][]string{
-	"deploy":              {"repo", "lab", "deploy", "redhat-token-file", "evidence", "record"},
-	"inspect":             {"agent", "diagnostics", "record"},
-	"lifecycle":           {"repo", "build-repo", "packages", "redhat-token-file", "diagnostics", "record"},
-	"dispatch":            {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
-	"resources":           {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
-	"encrypted":           {"record"},
-	"device-actions":      {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "diagnostics", "record"},
-	"updates":             {"repo", "build-repo", "lab", "diagnostics", "record"},
-	"assistance":          {"repo", "build-repo", "lab", "lindmd", "evidence"},
-	"enroll-from-console": {"console-browser", "redhat-token-file", "diagnostics", "record"},
-	"services":            {"record"},
-	"advisories":          {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "diagnostics", "record"},
-	"airgap":              {"repo", "build-repo", "lab", "lindmd", "airgap", "diagnostics", "record"},
+	"deploy":                     {"repo", "lab", "deploy", "redhat-token-file", "evidence", "record"},
+	"production-release-signing": {"repo", "lab", "diagnostics", "record"},
+	"inspect":                    {"agent", "diagnostics", "record"},
+	"lifecycle":                  {"repo", "build-repo", "packages", "redhat-token-file", "diagnostics", "record"},
+	"dispatch":                   {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
+	"resources":                  {"repo", "build-repo", "lindmd", "redhat-token-file", "diagnostics", "record"},
+	"encrypted":                  {"record"},
+	"device-actions":             {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "recovery-manifest", "diagnostics", "record"},
+	"updates":                    {"repo", "build-repo", "lab", "diagnostics", "record"},
+	"assistance":                 {"repo", "build-repo", "lab", "lindmd", "evidence"},
+	"enroll-from-console":        {"console-browser", "redhat-token-file", "diagnostics", "record"},
+	"services":                   {"record"},
+	"advisories":                 {"repo", "build-repo", "lab", "lindmd", "redhat-token-file", "diagnostics", "record"},
+	"airgap":                     {"repo", "build-repo", "lab", "lindmd", "airgap", "diagnostics", "record"},
 	// Provisioning needs no registration: the snippet alone installs from the
 	// lindm repository, skipping prerequisites the installed system already has.
 	"provision-cloud-init":  {"provision-browser", "record"},
@@ -757,6 +766,14 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 		entry.RecoveryRepositoryClosureSha256 = c.Recovery.Image.GetRepositorySnapshotManifestSha256()
 		entry.RecoveryRepositoryMetadataSha256 = c.Recovery.Image.GetRepositorySnapshotRepomdSha256()
 	}
+	if c.Spec.GetLane() == "production-release-signing" {
+		entry.Scope = productionSigningScope
+		if verdict == labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
+			if _, err := productionSigningEvidenceSHA256(record, entry.Scope, c.Manifest.Image.GetId()); err != nil {
+				return fmt.Errorf("%s: invalid tests-only evidence: %w", name, err)
+			}
+		}
+	}
 	if c.Spec.GetLane() == "advisories" && verdict == labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
 		entry.Scope, err = advisoryRecordScope(record)
 		if err != nil {
@@ -828,6 +845,9 @@ func retainMatrixManifest(source, destination, expected string) (err error) {
 func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	lane := c.Spec.GetLane()
 	args := append([]string{"vm", lane}, c.Spec.GetArgs()...)
+	if lane == "production-release-signing" {
+		args = append(args, "-work-dir", r.evidence)
+	}
 	// A release (or guest architecture) without the owned-boot UKI fixture
 	// qualifies recovery only through measured GRUB; vmlab refuses the owned
 	// fixture for it.

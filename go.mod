@@ -7,6 +7,7 @@ require (
 	buf.build/go/protovalidate v1.4.0
 	connectrpc.com/connect v1.21.0
 	connectrpc.com/validate v0.7.0
+	filippo.io/age v1.3.2
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/foxboron/go-uefi v0.0.0-20251010190908-d29549a44f29
@@ -48,7 +49,6 @@ require (
 require (
 	cel.dev/cel-go v0.32.0 // indirect
 	cel.dev/expr v0.25.3 // indirect
-	filippo.io/age v1.3.2 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect

@@ -6,7 +6,6 @@ package releasebuild
 
 import (
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -86,18 +85,18 @@ func consoleDigests(root string) (map[string]string, error) {
 	return result, err
 }
 
-func retainFailure(work string, first, second *buildOutput, cause error) error {
-	evidence := &releasev1.ReleaseBuildFailure{Reason: cause.Error(), RetainedWorkDirectory: work, Builds: []*releasev1.BuildObservation{first.observation, second.observation}}
+func writeFailureEvidence(work, retainedDirectory string, first, second *buildOutput, cause error) error {
+	evidence := &releasev1.ReleaseBuildFailure{Reason: cause.Error(), RetainedWorkDirectory: retainedDirectory, Builds: []*releasev1.BuildObservation{first.observation, second.observation}}
 	encoded, err := (protojson.MarshalOptions{UseProtoNames: true, Indent: "  "}).Marshal(evidence)
 	if err != nil {
-		return errors.Join(cause, err)
+		return err
 	}
 	if len(encoded) > maxDocument {
-		return errors.Join(cause, errors.New("releasebuild: failure evidence exceeds bound"))
+		return errors.New("releasebuild: failure evidence exceeds bound")
 	}
 	path := filepath.Join(work, "reproducibility-failure.json")
 	if err := writeNew(path, encoded, 0600); err != nil {
-		return errors.Join(cause, err)
+		return err
 	}
-	return fmt.Errorf("%w; both clean build artifacts and bounded source/toolchain/binary/console/unsigned digest evidence retained at %s", cause, path)
+	return nil
 }

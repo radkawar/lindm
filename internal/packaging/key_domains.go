@@ -30,7 +30,7 @@ func validatePublicExclusions(ctx context.Context, work string, key SigningKey) 
 	if len(key.RejectPublicKeySHA256) == 0 {
 		return nil
 	}
-	exported, _, err := runTool(ctx, work, toolCmd{Name: "gpg", Args: []string{"--no-options", "--batch", "--homedir", key.Home, "--export", key.Fingerprint}, ExtraEnv: gpgEnv(key.Home)})
+	exported, _, err := runTool(ctx, work, toolCmd{Name: "gpg", Args: []string{"--no-options", "--require-secmem", "--batch", "--homedir", key.Home, "--export", key.Fingerprint}, ExtraEnv: gpgEnv(key.Home)})
 	if err != nil {
 		return err
 	}

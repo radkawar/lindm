@@ -8,6 +8,13 @@
       "lane": "deploy"
     },
     {
+      "name": "production-release-signing",
+      "title": "Production release signing tests only (not lifecycle)",
+      "capabilities": ["packages"],
+      "image": "MATRIX_IMAGE_CLOUD",
+      "lane": "production-release-signing"
+    },
+    {
       "name": "inventory",
       "title": "Inventory",
       "capabilities": ["inventory"],

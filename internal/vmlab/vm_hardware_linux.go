@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,11 +31,15 @@ import (
 type VMHardwareOptions struct {
 	Architecture string
 	Accelerator  string
-	Firmware     *EncryptedFirmwareOptions
-	TPM          bool
-	StorageBus   string
-	ExtraDisks   int
-	Desktop      bool
+	// Zero retains the provider's 2048 MiB/two-CPU defaults. Explicit sizes
+	// remain bounded guest allocations, never derived from all host RAM.
+	MemoryMiB  uint32
+	CPUs       uint32
+	Firmware   *EncryptedFirmwareOptions
+	TPM        bool
+	StorageBus string
+	ExtraDisks int
+	Desktop    bool
 	// DisplayHeads reserves real virtio-gpu scanouts; zero retains one head.
 	// Assistance activates the second head through its private VNC endpoint.
 	DisplayHeads int
@@ -109,6 +114,15 @@ func resolveVMHardware(options *VMHardwareOptions, hostArch string) (VMHardwareO
 			firmware := *options.Firmware
 			h.Firmware = &firmware
 		}
+	}
+	if h.MemoryMiB == 0 {
+		h.MemoryMiB = 2048
+	}
+	if h.CPUs == 0 {
+		h.CPUs = 2
+	}
+	if h.MemoryMiB < 256 || h.MemoryMiB > 65536 || h.CPUs > 64 {
+		return h, errors.New("VM resources require 256-65536 MiB and 1-64 CPUs")
 	}
 	if h.Architecture == "" {
 		h.Architecture = "x86_64"
@@ -256,7 +270,14 @@ func configuredVMArguments(h VMHardwareOptions, dir, port string, allowReboot bo
 	if h.bootDiagnostics != nil {
 		serial = "stdio"
 	}
-	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", serial, "-monitor", "none", "-qmp", "unix:qmp.sock,server=on,wait=off", "-machine", machine, "-cpu", cpu, "-m", "2048", "-smp", "2"}
+	memory, cpus := h.MemoryMiB, h.CPUs
+	if memory == 0 {
+		memory = 2048
+	}
+	if cpus == 0 {
+		cpus = 2
+	}
+	args := []string{"-no-user-config", "-nodefaults", "-display", "none", "-serial", serial, "-monitor", "none", "-qmp", "unix:qmp.sock,server=on,wait=off", "-machine", machine, "-cpu", cpu, "-m", strconv.FormatUint(uint64(memory), 10), "-smp", strconv.FormatUint(uint64(cpus), 10)}
 	if h.offlineRTCEnabled() {
 		args = append(args, "-rtc", "base=utc,clock=host")
 	}

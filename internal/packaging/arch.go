@@ -260,7 +260,7 @@ func signArchFile(ctx context.Context, work, path string, key SigningKey, epoch 
 	if err != nil {
 		return err
 	}
-	if _, _, err := runTool(ctx, work, toolCmd{Name: "gpg", Args: []string{"--no-options", "--batch", "--no-tty", "--faked-system-time", fmt.Sprintf("%d!", signingEpoch), "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--no-armor", "--detach-sign", "--output", path + ".sig", path}, ExtraEnv: gpgEnv(key.Home)}); err != nil {
+	if _, _, err := runTool(ctx, work, toolCmd{Name: "gpg", Args: []string{"--no-options", "--require-secmem", "--batch", "--no-tty", "--faked-system-time", fmt.Sprintf("%d!", signingEpoch), "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--no-armor", "--detach-sign", "--output", path + ".sig", path}, ExtraEnv: gpgEnv(key.Home), Files: passphraseFiles(key)}); err != nil {
 		return err
 	}
 	return os.Chmod(path+".sig", 0o644)

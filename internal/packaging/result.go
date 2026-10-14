@@ -4,6 +4,8 @@
 
 package packaging
 
+import "os"
+
 // Format selects a native package.
 type Format string
 
@@ -33,10 +35,12 @@ type SigningKey struct {
 	Home        string
 	Fingerprint string
 	Custody     Custody
-	// PassphraseFile is required for production custody. Development keys may
-	// leave it empty; signing then uses an empty passphrase file created in
-	// the private work directory. The file contents are never logged.
+	// PassphraseFile retains the protected-file API for existing lab callers.
+	// PassphraseFD is the memory-only alternative, exclusive with PassphraseFile:
+	// a bounded sealed memfd kept locked for the complete signing lifecycle.
+	// ImportProductionSigner owns its descriptor until the returned cleanup runs.
 	PassphraseFile string
+	PassphraseFD   *os.File `json:"-"`
 	// RejectFingerprints are execution, TLS, and TUF fingerprints.
 	RejectFingerprints []string
 	// RejectPathPrefixes are additional homes that must not sign packages.

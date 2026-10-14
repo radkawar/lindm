@@ -36,7 +36,6 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
-	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	releasev1 "lindm/gen/lindm/release/v1"
@@ -103,10 +102,14 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 	if request.PackageSigner.Custody != packaging.Custody(request.AttestationSigner.Custody) {
 		return nil, errors.New("releasebuild: package and attestation custody must agree")
 	}
+	if request.PackageSigner.PassphraseFD != nil && request.PackageSigner.PassphraseFile != "" {
+		return nil, errors.New("releasebuild: package passphrase file and descriptor are mutually exclusive")
+	}
 	signer, err := loadSigner(request.AttestationSigner)
 	if err != nil {
 		return nil, err
 	}
+	defer signer.close()
 	var caBundle []byte
 	if !agentOnly {
 		var caDigest string
@@ -129,11 +132,7 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 	if _, err := os.Lstat(output); !errors.Is(err, os.ErrNotExist) {
 		return nil, errors.New("releasebuild: output must not exist")
 	}
-	work, err := os.MkdirTemp(filepath.Dir(output), ".lindm-release-")
-	if err != nil {
-		return nil, err
-	}
-	ownedWork, err := os.Lstat(work)
+	work, ownedWork, err := createBuildWork()
 	if err != nil {
 		return nil, err
 	}
@@ -143,6 +142,10 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 			err = errors.Join(err, cleanupBuildWork(work, ownedWork))
 		}
 	}()
+	trustedPublic := filepath.Join(work, "trusted-attestation.pub")
+	if err := writeNew(trustedPublic, signer.public, 0644); err != nil {
+		return nil, err
+	}
 	source, sourceDigest, err := captureBuildSource(ctx, work, request.Repository, caBundle)
 	if err != nil {
 		return nil, err
@@ -160,13 +163,14 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 		return nil, err
 	}
 	if err := compareBuilds(first, second); err != nil {
-		retainWork = true
-		return nil, retainFailure(work, first, second, err)
+		retainWork, err = retainMismatch(ctx, work, ownedWork, filepath.Dir(output), first, second, err)
+		return nil, err
 	}
 	// Native signing may vary between builds. Only after independently built
 	// unsigned agent archives agree can either server consume canonical bytes.
 	bundle := filepath.Join(work, "agent-repository")
-	manifest, err = exportCanonicalAgentRepository(ctx, bundle, &request, signer, sourceDigest, first, second, filepath.Join(source, "internal", "packaging", "assets"))
+	licenses := filepath.Join(work, "first", "source", "internal", "packaging", "assets")
+	manifest, err = exportCanonicalAgentRepository(ctx, bundle, &request, signer, sourceDigest, first, second, licenses)
 	if err != nil {
 		return nil, err
 	}
@@ -181,14 +185,14 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 			}
 		}
 		if err := compareBuilds(first, second); err != nil {
-			retainWork = true
-			return nil, retainFailure(work, first, second, err)
+			retainWork, err = retainMismatch(ctx, work, ownedWork, filepath.Dir(output), first, second, err)
+			return nil, err
 		}
 		exported = filepath.Join(work, "export")
 		if err := os.Mkdir(exported, 0700); err != nil {
 			return nil, err
 		}
-		manifest, err = exportRelease(ctx, exported, request, signer, sourceDigest, first, second, bundle, filepath.Join(source, "internal", "packaging", "assets"))
+		manifest, err = exportRelease(ctx, exported, request, signer, sourceDigest, first, second, bundle, licenses)
 		if err != nil {
 			return nil, err
 		}
@@ -201,13 +205,7 @@ func buildRelease(ctx context.Context, request Request, agentOnly bool) (manifes
 			}
 		}
 	}
-	if err := syncDirectory(exported); err != nil {
-		return nil, err
-	}
-	if err := unix.Renameat2(unix.AT_FDCWD, exported, unix.AT_FDCWD, output, unix.RENAME_NOREPLACE); err != nil {
-		return nil, err
-	}
-	if err := syncDirectory(filepath.Dir(output)); err != nil {
+	if err := publishExport(ctx, exported, output, trustedPublic, signer.id, !agentOnly && request.Installer != nil); err != nil {
 		return nil, err
 	}
 	return manifest, nil
@@ -338,6 +336,9 @@ func cleanBuild(ctx context.Context, work, label, source, sourceDigest string, r
 		return nil, err
 	}
 	result := &buildOutput{observation: observation}
+	if err := bootstrapBuildSource(ctx, checkout, environment, request.tools); err != nil {
+		return nil, err
+	}
 	if err := buildProducts(ctx, root, request, result, []string{"lindm-agent"}, ""); err != nil {
 		return nil, err
 	}
@@ -350,12 +351,6 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 	observation := result.observation
 	var npmBOM []byte
 	if bundle != "" {
-		if _, err := runNPM(ctx, checkout, environment, request.tools, "ci", "--ignore-scripts", "--no-audit", "--no-fund"); err != nil {
-			return err
-		}
-		if _, err := runNPM(ctx, checkout, environment, request.tools, "run", "build:web"); err != nil {
-			return err
-		}
 		var err error
 		observation.ConsoleTreeSha256, err = treeDigest(filepath.Join(checkout, "web", "dist"))
 		if err != nil {
@@ -404,7 +399,11 @@ func buildProducts(ctx context.Context, root string, request Request, result *bu
 			if product == "lindmd" {
 				args = append(args, "-agent-repository", bundle)
 			}
-			nativeJSON, err := command(ctx, checkout, hostEnvironment, helper, args...)
+			var files []*os.File
+			if request.PackageSigner.PassphraseFD != nil {
+				files = []*os.File{request.PackageSigner.PassphraseFD}
+			}
+			nativeJSON, err := commandWithFiles(ctx, checkout, hostEnvironment, files, helper, args...)
 			if err != nil {
 				return err
 			}
@@ -503,10 +502,13 @@ func packageArgs(request Request, product, arch, binary, packageDir string) []st
 	}
 	args := []string{"packages", packageCommand, binaryFlag, binary, "-version", request.Version, "-arch", arch, "-output", packageDir, "-source-date-epoch", fmt.Sprint(request.SourceDateEpoch), "-signer-home", request.PackageSigner.Home, "-fingerprint", request.PackageSigner.Fingerprint}
 	args = append(args, "-formats", strings.Join(nativeFormats(arch, product), ","))
+	if request.PackageSigner.PassphraseFD != nil {
+		args = append(args, "-passphrase-fd", "3")
+	} else if request.PackageSigner.PassphraseFile != "" {
+		args = append(args, "-passphrase-file", request.PackageSigner.PassphraseFile)
+	}
 	if request.PackageSigner.Custody == packaging.CustodyDevelopment {
 		args = append(args, "-development-key")
-	} else {
-		args = append(args, "-passphrase-file", request.PackageSigner.PassphraseFile)
 	}
 	for _, value := range request.PackageSigner.RejectPublicKeySHA256 {
 		args = append(args, "-reject-spki-sha256", value)

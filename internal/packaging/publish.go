@@ -267,11 +267,12 @@ func signAPTRelease(ctx context.Context, work string, key SigningKey, pass, rele
 	inRelease := filepath.Join(distDir, "InRelease")
 	detached := filepath.Join(distDir, "Release.gpg")
 	for _, mode := range [][]string{{"--clearsign", "--output", inRelease}, {"--detach-sign", "--armor", "--output", detached}} {
-		args := append([]string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!"}, mode...)
+		args := append([]string{"--no-options", "--require-secmem", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!"}, mode...)
 		if _, _, err := runTool(ctx, work, toolCmd{
 			Name:     "gpg",
 			Args:     append(args, releasePath),
 			ExtraEnv: gpgEnv(key.Home),
+			Files:    passphraseFiles(key),
 		}); err != nil {
 			return "", err
 		}
@@ -499,30 +500,9 @@ func PublishRPM(ctx context.Context, req RPMRequest) (result *RPMRepository, err
 	}); err != nil {
 		return nil, err
 	}
-	repomd := filepath.Join(repo, "repodata", "repomd.xml")
-	if _, err := os.Stat(repomd); err != nil {
-		return nil, fmt.Errorf("%w: createrepo_c did not write repomd.xml", ErrArtifact)
-	}
-	signature := repomd + ".asc"
-	if _, _, err := runTool(ctx, work, toolCmd{
-		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--detach-sign", "--armor", "--output", signature, repomd},
-		ExtraEnv: gpgEnv(key.Home),
-	}); err != nil {
-		return nil, err
-	}
-	if err := os.Chmod(signature, 0o644); err != nil {
-		return nil, err
-	}
-	binaryKey, armorKey, err := exportPublicKeys(ctx, work, key, repo)
+	binaryKey, armorKey, err := signRPMRepositoryMetadata(ctx, work, repo, key, pass)
 	if err != nil {
 		return nil, err
-	}
-	if _, _, err := runTool(ctx, work, toolCmd{
-		Name: "gpgv",
-		Args: []string{"--keyring", binaryKey, signature, repomd},
-	}); err != nil {
-		return nil, fmt.Errorf("%w: repomd signature verification failed", ErrArtifact)
 	}
 	if err := guard.close(ctx, work); err != nil {
 		return nil, err
@@ -546,4 +526,36 @@ func PublishRPM(ctx context.Context, req RPMRequest) (result *RPMRepository, err
 		RepoMetadataSigned: true,
 		Tools:              []ToolVersion{toolVersion(ctx, work, "createrepo_c", "--version")},
 	}, nil
+}
+
+// signRPMRepositoryMetadata authenticates generated repodata and verifies it
+// before publication. The caller retains the signer-home guard throughout.
+func signRPMRepositoryMetadata(ctx context.Context, work, repo string, key SigningKey, pass string) (string, string, error) {
+	repomd := filepath.Join(repo, "repodata", "repomd.xml")
+	if _, err := os.Stat(repomd); err != nil {
+		return "", "", fmt.Errorf("%w: createrepo_c did not write repomd.xml", ErrArtifact)
+	}
+	signature := repomd + ".asc"
+	if _, _, err := runTool(ctx, work, toolCmd{
+		Name:     "gpg",
+		Args:     []string{"--no-options", "--require-secmem", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", pass, "--homedir", key.Home, "--local-user", key.Fingerprint + "!", "--detach-sign", "--armor", "--output", signature, repomd},
+		ExtraEnv: gpgEnv(key.Home),
+		Files:    passphraseFiles(key),
+	}); err != nil {
+		return "", "", err
+	}
+	if err := os.Chmod(signature, 0o644); err != nil {
+		return "", "", err
+	}
+	binaryKey, armorKey, err := exportPublicKeys(ctx, work, key, repo)
+	if err != nil {
+		return "", "", err
+	}
+	if _, _, err := runTool(ctx, work, toolCmd{
+		Name: "gpgv",
+		Args: []string{"--keyring", binaryKey, signature, repomd},
+	}); err != nil {
+		return "", "", fmt.Errorf("%w: repomd signature verification failed", ErrArtifact)
+	}
+	return binaryKey, armorKey, nil
 }

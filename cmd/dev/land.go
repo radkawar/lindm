@@ -46,7 +46,7 @@ protect again however they end (commit, refusal, rollback, interrupt).
                merged record by record, so proto/SQL and ledger landings
                compose. Run the quick gate on the
                touched files: go build ./..., golangci-lint run (default and
-               integration tags) and fmt on touched packages, buf format/lint
+               integration,production_signing tags) and fmt on touched packages, buf format/lint
                when protos changed, prettier and markdownlint on touched
                docs/web files, generate-docs -check, and race tests of the
                touched packages and every module package whose build or
@@ -273,7 +273,7 @@ func quickGate(ctx context.Context, root string, files []string) error {
 	if len(packages) != 0 {
 		steps = append(steps,
 			append([]string{lint, "run", "--allow-parallel-runners"}, packages...),
-			append([]string{lint, "run", "--allow-parallel-runners", "--build-tags", "integration"}, packages...),
+			append([]string{lint, "run", "--allow-parallel-runners", "--build-tags", "integration,production_signing"}, packages...),
 		)
 	}
 	if len(protos) != 0 {

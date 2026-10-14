@@ -12,6 +12,21 @@ GO_PACKAGES := $(addsuffix /...,$(addprefix ./,$(GO_DIRS)))
 # Clean-worktree gates pass --allow-parallel-runners with their own cache.
 GOLANGCI_RUN_FLAGS ?=
 
+.PHONY: release-keys release
+RELEASE_KEYS_ARGS ?=
+RELEASE_ARGS ?=
+OFFLINE ?=
+
+release-keys:
+	mkdir -p artifacts/bin
+	go build -o artifacts/bin/release ./cmd/release
+	./artifacts/bin/release init $(RELEASE_KEYS_ARGS)
+
+release: generate-licenses
+	mkdir -p artifacts/bin
+	go build -o artifacts/bin/release ./cmd/release
+	./artifacts/bin/release build --offline "$(OFFLINE)" $(RELEASE_ARGS)
+
 tools: $(BUF) $(SQLC) $(GOLANGCI) $(GOVULNCHECK) $(TOOLS)/protoc-gen-go $(TOOLS)/protoc-gen-connect-go
 
 $(BUF): Makefile

@@ -485,6 +485,9 @@ func (in *Inputs) latest(c *Cell) (out *labv1.MatrixLedgerEntry, superseded bool
 		if e.GetPlatform() != c.Release.Key || e.GetCell() != c.Spec.GetName() || e.GetArchitecture() != c.Architecture {
 			continue
 		}
+		if c.Spec.GetLane() == "production-release-signing" && (e.GetScope() != "production-signing-tests-only" || !e.GetVerified()) {
+			continue
+		}
 		if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||
 			e.GetManifest() != c.Manifest.Image.GetId() || e.GetManifestSha256() != c.Manifest.SHA256 ||
 			e.GetRepositorySnapshotDate() != c.Manifest.Image.GetRepositorySnapshotDate()) {

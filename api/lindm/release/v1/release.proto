@@ -34,6 +34,24 @@ message ReleaseManifest {
   }];
   // Signed server release discovery is distinct from agent TUF channels.
   ServerReleaseNotice server_notice = 9;
+  // Canonical redistribution documents shipped beside the archives. Native
+  // archives carry the same documents and remain bound by each artifact hash.
+  map<string, string> license_sha256 = 10 [(buf.validate.field).map = {
+    min_pairs: 3
+    max_pairs: 3
+    keys: {
+      string: {
+        in: [
+          "LICENSE",
+          "NOTICE",
+          "THIRD-PARTY-LICENSES"
+        ]
+      }
+    }
+    values: {
+      string: {pattern: "^[a-f0-9]{64}$"}
+    }
+  }];
 }
 
 // Offline bulletin carried inside the authenticated release manifest. Import

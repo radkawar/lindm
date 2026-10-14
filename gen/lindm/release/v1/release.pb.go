@@ -36,7 +36,10 @@ type ReleaseManifest struct {
 	Custody          string                 `protobuf:"bytes,7,opt,name=custody,proto3" json:"custody,omitempty"`
 	Builds           []*BuildObservation    `protobuf:"bytes,8,rep,name=builds,proto3" json:"builds,omitempty"`
 	// Signed server release discovery is distinct from agent TUF channels.
-	ServerNotice  *ServerReleaseNotice `protobuf:"bytes,9,opt,name=server_notice,json=serverNotice,proto3" json:"server_notice,omitempty"`
+	ServerNotice *ServerReleaseNotice `protobuf:"bytes,9,opt,name=server_notice,json=serverNotice,proto3" json:"server_notice,omitempty"`
+	// Canonical redistribution documents shipped beside the archives. Native
+	// archives carry the same documents and remain bound by each artifact hash.
+	LicenseSha256 map[string]string `protobuf:"bytes,10,rep,name=license_sha256,json=licenseSha256,proto3" json:"license_sha256,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -130,6 +133,13 @@ func (x *ReleaseManifest) GetBuilds() []*BuildObservation {
 func (x *ReleaseManifest) GetServerNotice() *ServerReleaseNotice {
 	if x != nil {
 		return x.ServerNotice
+	}
+	return nil
+}
+
+func (x *ReleaseManifest) GetLicenseSha256() map[string]string {
+	if x != nil {
+		return x.LicenseSha256
 	}
 	return nil
 }
@@ -591,7 +601,7 @@ var File_lindm_release_v1_release_proto protoreflect.FileDescriptor
 
 const file_lindm_release_v1_release_proto_rawDesc = "" +
 	"\n" +
-	"\x1elindm/release/v1/release.proto\x12\x10lindm.release.v1\x1a\x1bbuf/validate/validate.proto\"\xc5\x04\n" +
+	"\x1elindm/release/v1/release.proto\x12\x10lindm.release.v1\x1a\x1bbuf/validate/validate.proto\"\xb0\x06\n" +
 	"\x0fReleaseManifest\x129\n" +
 	"\aversion\x18\x01 \x01(\tB\x1f\xbaH\x1cr\x1a2\x18^[0-9]+\\.[0-9]+\\.[0-9]+$R\aversion\x12&\n" +
 	"\brevision\x18\x02 \x01(\tB\n" +
@@ -605,7 +615,12 @@ const file_lindm_release_v1_release_proto_rawDesc = "" +
 	"productionR\acustody\x12F\n" +
 	"\x06builds\x18\b \x03(\v2\".lindm.release.v1.BuildObservationB\n" +
 	"\xbaH\a\x92\x01\x04\b\x02\x10\x02R\x06builds\x12J\n" +
-	"\rserver_notice\x18\t \x01(\v2%.lindm.release.v1.ServerReleaseNoticeR\fserverNotice\"\xa2\x03\n" +
+	"\rserver_notice\x18\t \x01(\v2%.lindm.release.v1.ServerReleaseNoticeR\fserverNotice\x12\xa6\x01\n" +
+	"\x0elicense_sha256\x18\n" +
+	" \x03(\v24.lindm.release.v1.ReleaseManifest.LicenseSha256EntryBI\xbaHF\x9a\x01C\b\x03\x10\x03\")r'R\aLICENSER\x06NOTICER\x14THIRD-PARTY-LICENSES*\x12r\x102\x0e^[a-f0-9]{64}$R\rlicenseSha256\x1a@\n" +
+	"\x12LicenseSha256Entry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa2\x03\n" +
 	"\x13ServerReleaseNotice\x12'\n" +
 	"\x0fsecurity_update\x18\x01 \x01(\bR\x0esecurityUpdate\x12\x9e\x01\n" +
 	"\fadvisory_ids\x18\x02 \x03(\tB{\xbaHx\x92\x01u\x10@\"qro2m^(CVE-[0-9]{4}-[0-9]{4,}|GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4})$R\vadvisoryIds\x12$\n" +
@@ -679,7 +694,7 @@ func file_lindm_release_v1_release_proto_rawDescGZIP() []byte {
 	return file_lindm_release_v1_release_proto_rawDescData
 }
 
-var file_lindm_release_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_lindm_release_v1_release_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_lindm_release_v1_release_proto_goTypes = []any{
 	(*ReleaseManifest)(nil),       // 0: lindm.release.v1.ReleaseManifest
 	(*ServerReleaseNotice)(nil),   // 1: lindm.release.v1.ServerReleaseNotice
@@ -687,25 +702,27 @@ var file_lindm_release_v1_release_proto_goTypes = []any{
 	(*BuildObservation)(nil),      // 3: lindm.release.v1.BuildObservation
 	(*ReleaseBuildFailure)(nil),   // 4: lindm.release.v1.ReleaseBuildFailure
 	(*SigningTrustInventory)(nil), // 5: lindm.release.v1.SigningTrustInventory
-	nil,                           // 6: lindm.release.v1.BuildObservation.ToolVersionsEntry
-	nil,                           // 7: lindm.release.v1.BuildObservation.UnsignedSha256Entry
-	nil,                           // 8: lindm.release.v1.BuildObservation.BinarySha256Entry
-	nil,                           // 9: lindm.release.v1.BuildObservation.ConsoleSha256Entry
+	nil,                           // 6: lindm.release.v1.ReleaseManifest.LicenseSha256Entry
+	nil,                           // 7: lindm.release.v1.BuildObservation.ToolVersionsEntry
+	nil,                           // 8: lindm.release.v1.BuildObservation.UnsignedSha256Entry
+	nil,                           // 9: lindm.release.v1.BuildObservation.BinarySha256Entry
+	nil,                           // 10: lindm.release.v1.BuildObservation.ConsoleSha256Entry
 }
 var file_lindm_release_v1_release_proto_depIdxs = []int32{
-	2, // 0: lindm.release.v1.ReleaseManifest.artifacts:type_name -> lindm.release.v1.ReleaseArtifact
-	3, // 1: lindm.release.v1.ReleaseManifest.builds:type_name -> lindm.release.v1.BuildObservation
-	1, // 2: lindm.release.v1.ReleaseManifest.server_notice:type_name -> lindm.release.v1.ServerReleaseNotice
-	6, // 3: lindm.release.v1.BuildObservation.tool_versions:type_name -> lindm.release.v1.BuildObservation.ToolVersionsEntry
-	7, // 4: lindm.release.v1.BuildObservation.unsigned_sha256:type_name -> lindm.release.v1.BuildObservation.UnsignedSha256Entry
-	8, // 5: lindm.release.v1.BuildObservation.binary_sha256:type_name -> lindm.release.v1.BuildObservation.BinarySha256Entry
-	9, // 6: lindm.release.v1.BuildObservation.console_sha256:type_name -> lindm.release.v1.BuildObservation.ConsoleSha256Entry
-	3, // 7: lindm.release.v1.ReleaseBuildFailure.builds:type_name -> lindm.release.v1.BuildObservation
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	2,  // 0: lindm.release.v1.ReleaseManifest.artifacts:type_name -> lindm.release.v1.ReleaseArtifact
+	3,  // 1: lindm.release.v1.ReleaseManifest.builds:type_name -> lindm.release.v1.BuildObservation
+	1,  // 2: lindm.release.v1.ReleaseManifest.server_notice:type_name -> lindm.release.v1.ServerReleaseNotice
+	6,  // 3: lindm.release.v1.ReleaseManifest.license_sha256:type_name -> lindm.release.v1.ReleaseManifest.LicenseSha256Entry
+	7,  // 4: lindm.release.v1.BuildObservation.tool_versions:type_name -> lindm.release.v1.BuildObservation.ToolVersionsEntry
+	8,  // 5: lindm.release.v1.BuildObservation.unsigned_sha256:type_name -> lindm.release.v1.BuildObservation.UnsignedSha256Entry
+	9,  // 6: lindm.release.v1.BuildObservation.binary_sha256:type_name -> lindm.release.v1.BuildObservation.BinarySha256Entry
+	10, // 7: lindm.release.v1.BuildObservation.console_sha256:type_name -> lindm.release.v1.BuildObservation.ConsoleSha256Entry
+	3,  // 8: lindm.release.v1.ReleaseBuildFailure.builds:type_name -> lindm.release.v1.BuildObservation
+	9,  // [9:9] is the sub-list for method output_type
+	9,  // [9:9] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_lindm_release_v1_release_proto_init() }
@@ -719,7 +736,7 @@ func file_lindm_release_v1_release_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_release_v1_release_proto_rawDesc), len(file_lindm_release_v1_release_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

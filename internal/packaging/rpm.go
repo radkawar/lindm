@@ -166,7 +166,7 @@ func signRPM(ctx context.Context, work, rpmPath string, key SigningKey, pass, gp
 	if err != nil {
 		return err
 	}
-	macros := fmt.Sprintf("%%_gpg_name %s!\n%%_gpg_path %s\n%%__gpg %s\n%%_gpg_passphrase_file %s\n%%__gpg_sign_cmd %%{shescape:%%{__gpg}} --no-options --batch --no-tty --faked-system-time %d! --pinentry-mode loopback --passphrase-file %%{shescape:%%{_gpg_passphrase_file}} --homedir %%{shescape:%%{_gpg_path}} --no-armor -u %%{shescape:%%{_gpg_name}} -sbo %%{shescape:%%{__signature_filename}} -- %%{shescape:%%{__plaintext_filename}}\n", key.Fingerprint, key.Home, gpg, pass, signingEpoch)
+	macros := fmt.Sprintf("%%_gpg_name %s!\n%%_gpg_path %s\n%%__gpg %s\n%%_gpg_passphrase_file %s\n%%__gpg_sign_cmd %%{shescape:%%{__gpg}} --no-options --require-secmem --batch --no-tty --faked-system-time %d! --pinentry-mode loopback --passphrase-file %%{shescape:%%{_gpg_passphrase_file}} --homedir %%{shescape:%%{_gpg_path}} --no-armor -u %%{shescape:%%{_gpg_name}} -sbo %%{shescape:%%{__signature_filename}} -- %%{shescape:%%{__plaintext_filename}}\n", key.Fingerprint, key.Home, gpg, pass, signingEpoch)
 	macroPath := filepath.Join(work, "rpmmacros")
 	if err := writeFile(macroPath, []byte(macros), 0o600, DefaultSourceDateEpoch); err != nil {
 		return err
@@ -175,6 +175,7 @@ func signRPM(ctx context.Context, work, rpmPath string, key SigningKey, pass, gp
 		Name:     "rpmsign",
 		Args:     []string{"--load", macroPath, "--addsign", rpmPath},
 		ExtraEnv: gpgEnv(key.Home),
+		Files:    passphraseFiles(key),
 	})
 	return err
 }
@@ -186,7 +187,7 @@ func signRPM(ctx context.Context, work, rpmPath string, key SigningKey, pass, gp
 func rpmSigningEpoch(ctx context.Context, work string, key SigningKey, epoch int64) (int64, error) {
 	listed, _, err := runTool(ctx, work, toolCmd{
 		Name: "gpg",
-		Args: []string{"--no-options", "--batch", "--homedir", key.Home, "--with-colons", "--list-keys", key.Fingerprint},
+		Args: []string{"--no-options", "--require-secmem", "--batch", "--homedir", key.Home, "--with-colons", "--list-keys", key.Fingerprint},
 	})
 	if err != nil {
 		return 0, err
@@ -283,7 +284,7 @@ func verifyRPMSignature(ctx context.Context, work, rpmPath string, key SigningKe
 	armor := filepath.Join(db, "verify-key.asc")
 	exported, _, err := runTool(ctx, work, toolCmd{
 		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--homedir", key.Home, "--armor", "--export", key.Fingerprint},
+		Args:     []string{"--no-options", "--require-secmem", "--batch", "--homedir", key.Home, "--armor", "--export", key.Fingerprint},
 		ExtraEnv: gpgEnv(key.Home),
 	})
 	if err != nil {

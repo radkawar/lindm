@@ -25,6 +25,12 @@ const maxArtifact = 5 << 30
 
 // command never inherits Go, npm, shell startup or signing credentials.
 func command(ctx context.Context, dir string, environment []string, name string, args ...string) ([]byte, error) {
+	return commandWithFiles(ctx, dir, environment, nil, name, args...)
+}
+
+// commandWithFiles grants only the packaging helper explicitly selected secret
+// descriptors. Compiler, npm and ordinary command calls inherit none.
+func commandWithFiles(ctx context.Context, dir string, environment []string, files []*os.File, name string, args ...string) ([]byte, error) {
 	stdout, stderr := nativeexec.NewBuffer(maxDocument), nativeexec.NewBuffer(maxDocument)
 	env := append([]string{"PATH=" + os.Getenv("PATH"), "LANG=C", "LC_ALL=C", "TZ=UTC"}, environment...)
 	bound := 15 * time.Minute
@@ -33,7 +39,7 @@ func command(ctx context.Context, dir string, environment []string, name string,
 		bound = 45 * time.Minute
 	}
 	started := time.Now()
-	err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Stdout: stdout, Stderr: stderr, Timeout: bound})
+	err := labexec.Run(ctx, labexec.Command{Path: name, Args: args, Env: env, Dir: dir, Files: files, Stdout: stdout, Stderr: stderr, Timeout: bound})
 	if err == nil && (stdout.Truncated() || stderr.Truncated()) {
 		err = errors.New("releasebuild: tool output exceeds bound")
 	}
@@ -44,6 +50,10 @@ func command(ctx context.Context, dir string, environment []string, name string,
 }
 
 func digestFile(path string) (sum string, size int64, err error) {
+	return digestBoundedFile(path, maxArtifact)
+}
+
+func digestBoundedFile(path string, bound int64) (sum string, size int64, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", 0, err
@@ -53,15 +63,15 @@ func digestFile(path string) (sum string, size int64, err error) {
 	if err != nil {
 		return "", 0, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > maxArtifact {
+	if !info.Mode().IsRegular() || info.Size() > bound {
 		return "", 0, errors.New("releasebuild: artifact is not a bounded regular file")
 	}
 	h := sha256.New()
-	size, err = io.Copy(h, io.LimitReader(f, maxArtifact+1))
+	size, err = io.Copy(h, io.LimitReader(f, bound+1))
 	if err != nil {
 		return "", 0, err
 	}
-	if size > maxArtifact {
+	if size > bound {
 		return "", 0, errors.New("releasebuild: artifact grew beyond bound")
 	}
 	return hex.EncodeToString(h.Sum(nil)), size, nil

@@ -132,14 +132,15 @@ type LaneGate struct {
 type LabLane string
 
 const (
-	LaneResources  LabLane = "resources"
-	LaneUpdates    LabLane = "updates"
-	LaneAirgap     LabLane = "airgap"
-	LaneUnattended LabLane = "unattended"
-	LaneServices   LabLane = "services"
-	LaneServer     LabLane = "server"
-	LaneDeploy     LabLane = "deploy"
-	LaneAdvisories LabLane = "advisories"
+	LaneResources                LabLane = "resources"
+	LaneUpdates                  LabLane = "updates"
+	LaneAirgap                   LabLane = "airgap"
+	LaneUnattended               LabLane = "unattended"
+	LaneServices                 LabLane = "services"
+	LaneServer                   LabLane = "server"
+	LaneDeploy                   LabLane = "deploy"
+	LaneProductionReleaseSigning LabLane = "production-release-signing"
+	LaneAdvisories               LabLane = "advisories"
 	// LaneAcceptance is the stock-image console acceptance lane and
 	// LaneEncryptedAcceptance its vendor-installer encrypted variant.
 	LaneAcceptance          LabLane = "acceptance"
@@ -156,7 +157,7 @@ const (
 // LabLanes lists every lane whose recipes are tracked per release; a lane
 // outside this list needs no per-release recipe.
 var LabLanes = []LabLane{LaneResources, LaneUpdates, LaneAirgap, LaneUnattended, LaneServices, LaneServer, LaneDeploy, LaneAdvisories, LaneAcceptance, LaneEncryptedAcceptance, LaneEnrollFromConsole,
-	LaneProvisionCloudInit, LaneProvisionAutoinstall, LaneProvisionKickstart, LaneProvisionAutoYaST}
+	LaneProvisionCloudInit, LaneProvisionAutoinstall, LaneProvisionKickstart, LaneProvisionAutoYaST, LaneProductionReleaseSigning}
 
 // ProvisionLane is the lab lane qualifying a provisioning format.
 func ProvisionLane(p Provisioning) (LabLane, bool) {
@@ -257,6 +258,9 @@ func (r *Release) LabLaneOn(l LabLane, architecture string) error {
 // LaneGateOn returns the registry's reason the lane cannot qualify the release
 // on the architecture (either spelling), or "" when it is not gated there.
 func (r *Release) LaneGateOn(l LabLane, architecture string) string {
+	if l == LaneProductionReleaseSigning && (r.Key != "ubuntu-24.04" || kernelArchitecture(architecture) != "x86_64") {
+		return "Production release signing tests are a disposable no-swap Ubuntu 24.04 x86_64 custodian qualification only; this is not a device-platform or native installer lifecycle qualification."
+	}
 	if l == LaneDeploy && (kernelArchitecture(architecture) != "x86_64" || (r.Key != "ubuntu-24.04" && r.Key != "rhel-9")) {
 		return "The turnkey native server installer supports Ubuntu 24.04 and RHEL 9 on x86_64 only; device platform support is not server installation support."
 	}

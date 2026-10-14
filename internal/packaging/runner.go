@@ -32,6 +32,7 @@ type toolCmd struct {
 	Dir      string
 	ExtraEnv []string
 	Stdin    io.Reader
+	Files    []*os.File
 	Stdout   io.Writer
 	Timeout  time.Duration
 }
@@ -94,7 +95,7 @@ func runTool(ctx context.Context, work string, cmd toolCmd) (stdout, stderr []by
 	if cmd.Stdout != nil {
 		sink = cmd.Stdout
 	}
-	runErr := labexec.Run(ctx, labexec.Command{Path: path, Args: cmd.Args, Env: env, Dir: dir, Stdin: cmd.Stdin, Stdout: sink, Stderr: errBuf, Timeout: timeout})
+	runErr := labexec.Run(ctx, labexec.Command{Path: path, Args: cmd.Args, Env: env, Dir: dir, Stdin: cmd.Stdin, Files: cmd.Files, Stdout: sink, Stderr: errBuf, Timeout: timeout})
 	stdout = outBuf.Bytes()
 	stderr = errBuf.Bytes()
 	if outBuf.Truncated() || errBuf.Truncated() {

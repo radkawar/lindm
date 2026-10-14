@@ -37,12 +37,18 @@ const statementType = "application/vnd.in-toto+json"
 const manifestType = "application/vnd.lindm.release.v1+json"
 
 // AttestationKey requires deliberate custody and an independently pinned public
-// identity. Production key generation and ambient TLS/execution key access are
-// intentionally absent. Production requires a separately authenticated inventory.
-type AttestationKey struct{ Path, KeyID, Custody, TrustInventory, TrustInventorySHA256 string }
+// identity. Production requires a separately authenticated inventory. Path uses
+// an owned purpose sidecar; PrivateKeyPEM instead accepts an unlocked custody
+// secret with an explicit Purpose. The two sources are mutually exclusive.
+type AttestationKey struct {
+	Path, KeyID, Custody, TrustInventory, TrustInventorySHA256 string
+	PrivateKeyPEM                                              []byte
+	Purpose                                                    string
+}
 type releaseSigner struct {
 	signer     signature.SignerVerifier
 	public     []byte
+	private    ed25519.PrivateKey
 	id         string
 	exclusions *signingExclusions
 }
@@ -87,6 +93,9 @@ func loadSigner(key AttestationKey) (*releaseSigner, error) {
 	if key.Custody != "production" && key.Custody != "development" {
 		return nil, errors.New("releasebuild: explicit signing custody required")
 	}
+	if (key.Path == "") == (len(key.PrivateKeyPEM) == 0) || (key.Path != "" && key.Purpose != "") {
+		return nil, errors.New("releasebuild: exactly one signing key source required")
+	}
 	exclusions := &signingExclusions{}
 	if key.Custody == "production" || key.TrustInventory != "" || key.TrustInventorySHA256 != "" {
 		var err error
@@ -99,21 +108,28 @@ func loadSigner(key AttestationKey) (*releaseSigner, error) {
 	if err != nil {
 		return nil, err
 	}
-	purpose, err := readProtected(key.Path+".purpose", 128)
-	if err != nil {
-		return nil, err
-	}
-	if string(purpose) != key.Custody+"-release-attestation\n" {
-		return nil, errors.New("releasebuild: wrong signing purpose")
-	}
-	data, err := readProtected(key.Path, 16384)
-	if err != nil {
-		return nil, err
+	data := key.PrivateKeyPEM
+	if key.Path != "" {
+		purpose, err := readProtected(key.Path+".purpose", 128)
+		if err != nil {
+			return nil, err
+		}
+		if string(purpose) != key.Custody+"-release-attestation\n" {
+			return nil, errors.New("releasebuild: wrong signing purpose")
+		}
+		data, err = readProtected(key.Path, 16384)
+		if err != nil {
+			return nil, err
+		}
+		defer clear(data)
+	} else if key.Custody != "production" || key.Purpose != "production-release-attestation" || len(data) > 16384 {
+		return nil, errors.New("releasebuild: memory key requires bounded production release-attestation purpose")
 	}
 	block, rest := pem.Decode(data)
 	if block == nil || block.Type != "PRIVATE KEY" || len(bytes.TrimSpace(rest)) != 0 {
 		return nil, errors.New("releasebuild: expected PKCS8 key only")
 	}
+	defer clear(block.Bytes)
 	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
 		return nil, err
@@ -122,6 +138,12 @@ func loadSigner(key AttestationKey) (*releaseSigner, error) {
 	if !ok {
 		return nil, errors.New("releasebuild: dedicated Ed25519 key required")
 	}
+	retained := false
+	defer func() {
+		if !retained {
+			clear(private)
+		}
+	}()
 	id, public, err := keyID(private.Public())
 	if err != nil {
 		return nil, err
@@ -133,7 +155,13 @@ func loadSigner(key AttestationKey) (*releaseSigner, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &releaseSigner{signer: signer, public: public, id: id, exclusions: exclusions}, nil
+	retained = true
+	return &releaseSigner{signer: signer, public: public, private: private, id: id, exclusions: exclusions}, nil
+}
+
+func (s *releaseSigner) close() {
+	clear(s.private)
+	s.private, s.signer = nil, nil
 }
 
 func readProtected(path string, limit int64) (data []byte, err error) {
@@ -246,15 +274,9 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 	if !bytes.Equal(payload, document) {
 		return nil, errors.New("releasebuild: manifest signature mismatch")
 	}
-	manifest := new(releasev1.ReleaseManifest)
-	if err := protojson.Unmarshal(payload, manifest); err != nil {
+	manifest, err := verifyManifestPayload(ctx, directory, payload, id)
+	if err != nil {
 		return nil, err
-	}
-	if err := protovalidate.Validate(manifest); err != nil {
-		return nil, err
-	}
-	if manifest.GetAttestationKeyId() != id {
-		return nil, errors.New("releasebuild: manifest key mismatch")
 	}
 	bundle, err := verifyEmbeddedRepository(ctx, directory, manifest, expectedKeyID)
 	if err != nil {
@@ -322,6 +344,23 @@ func Verify(ctx context.Context, directory, publicKeyPath, expectedKeyID string)
 				return nil, err
 			}
 		}
+	}
+	return manifest, nil
+}
+
+func verifyManifestPayload(ctx context.Context, directory string, payload []byte, expectedKeyID string) (*releasev1.ReleaseManifest, error) {
+	manifest := new(releasev1.ReleaseManifest)
+	if err := protojson.Unmarshal(payload, manifest); err != nil {
+		return nil, err
+	}
+	if err := protovalidate.Validate(manifest); err != nil {
+		return nil, err
+	}
+	if manifest.GetAttestationKeyId() != expectedKeyID {
+		return nil, errors.New("releasebuild: manifest key mismatch")
+	}
+	if err := verifyLicenseFiles(ctx, directory, manifest.GetLicenseSha256()); err != nil {
+		return nil, err
 	}
 	return manifest, nil
 }

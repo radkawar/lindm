@@ -17,7 +17,10 @@ import (
 // Inspect and hash the same open evidence input. Historical scoped log records
 // remain importable; first-run JSON must retain its precise restricted scope.
 func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error) {
-	if cell != "deploy" {
+	if cell == "production-release-signing" {
+		return productionSigningEvidenceSHA256(path, scope)
+	}
+	if cell != "deploy" && cell != "lifecycle" {
 		return labmatrix.FileSHA256(path)
 	}
 	file, err := os.Open(path)
@@ -32,14 +35,17 @@ func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error
 		LifecycleQualified *bool  `json:"lifecycle_qualified"`
 	}
 	decodeErr := json.NewDecoder(io.LimitReader(input, 8<<20)).Decode(&record)
-	if decodeErr != nil && (scope == "" || scope == deploylab.FirstRunInstallScope) {
+	if cell == "deploy" && decodeErr != nil && (scope == "" || scope == deploylab.FirstRunInstallScope) {
 		return "", errors.New("unscoped deploy or first-run import requires bounded readable JSON evidence; historical logs require their explicit historical scope")
 	}
 	if decodeErr == nil {
-		if record.Scope == deploylab.FirstRunInstallScope && scope != deploylab.FirstRunInstallScope {
+		if record.Scope == productionSigningScope {
+			return "", errors.New("production signing tests-only evidence cannot qualify deploy or lifecycle")
+		}
+		if cell == "deploy" && record.Scope == deploylab.FirstRunInstallScope && scope != deploylab.FirstRunInstallScope {
 			return "", errors.New("first-run setup evidence requires -scope first-run-install-only; it cannot qualify the full deploy cell")
 		}
-		if record.LifecycleQualified != nil && !*record.LifecycleQualified && scope == "" {
+		if cell == "deploy" && record.LifecycleQualified != nil && !*record.LifecycleQualified && scope == "" {
 			return "", errors.New("non-lifecycle evidence cannot be imported as an unscoped deploy result")
 		}
 	}

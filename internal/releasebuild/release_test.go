@@ -82,7 +82,7 @@ func releaseFixture(t *testing.T) (string, string, string) {
 		}
 	}
 	observation := &releasev1.BuildObservation{SourceSha256: sum, StartedAt: "2026-10-10T00:00:00Z", FinishedAt: "2026-10-10T00:00:01Z", UnsignedSha256: map[string]string{name: sum}}
-	manifest := &releasev1.ReleaseManifest{Version: "1.2.3", Revision: "fixture", SourceSha256: sum, SourceDateEpoch: 1760000000, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: key.KeyID, Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}}
+	manifest := &releasev1.ReleaseManifest{Version: "1.2.3", Revision: "fixture", SourceSha256: sum, SourceDateEpoch: 1760000000, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: key.KeyID, Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}, LicenseSha256: testLicenseDocuments(t, directory)}
 	payload, err := protojson.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)
@@ -100,8 +100,25 @@ func releaseFixture(t *testing.T) (string, string, string) {
 	return directory, filepath.Join(filepath.Dir(key.Path), "attestation.pub"), key.KeyID
 }
 
+func testLicenseDocuments(t *testing.T, directory string) map[string]string {
+	t.Helper()
+	documents := make(map[string]string, 3)
+	for _, name := range []string{"LICENSE", "NOTICE", "THIRD-PARTY-LICENSES"} {
+		path := filepath.Join(directory, name)
+		if err := writeNew(path, []byte("Signature-boundary fixture document: "+name+"\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		sum, _, err := digestBoundedFile(path, maxDocument)
+		if err != nil {
+			t.Fatal(err)
+		}
+		documents[name] = sum
+	}
+	return documents
+}
+
 func TestExportVerificationRejectsTamperWrongKeyAndSwappedStatements(t *testing.T) {
-	for _, attack := range []string{"artifact", "manifest", "sbom", "wrong-key", "wrong-domain", "linked-artifact"} {
+	for _, attack := range []string{"artifact", "manifest", "sbom", "wrong-key", "wrong-domain", "linked-artifact", "NOTICE"} {
 		t.Run(attack, func(t *testing.T) {
 			directory, public, id := releaseFixture(t)
 			manifest, err := Verify(t.Context(), directory, public, id)
@@ -112,6 +129,8 @@ func TestExportVerificationRejectsTamperWrongKeyAndSwappedStatements(t *testing.
 			switch attack {
 			case "artifact":
 				err = os.WriteFile(filepath.Join(directory, artifact.Path), []byte("tampered"), 0600)
+			case "NOTICE":
+				err = os.WriteFile(filepath.Join(directory, "NOTICE"), []byte("tampered notice"), 0600)
 			case "manifest":
 				err = os.WriteFile(filepath.Join(directory, "release.json"), []byte("{}"), 0600)
 			case "sbom":

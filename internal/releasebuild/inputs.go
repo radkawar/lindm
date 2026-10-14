@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	releasev1 "lindm/gen/lindm/release/v1"
+	"lindm/internal/pki"
 )
 
 const capturedCAPath = ".release-input/ca-certificates.crt"
@@ -216,7 +217,7 @@ func loadCABundle(path, pin string) ([]byte, string, error) {
 		if err != nil {
 			return nil, "", err
 		}
-		if !certificate.IsCA || !certificate.BasicConstraintsValid {
+		if !pki.IsReleaseCAAnchor(certificate) {
 			return nil, "", errors.New("releasebuild: OCI trust input contains a non-CA certificate")
 		}
 		count++

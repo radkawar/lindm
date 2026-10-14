@@ -10,3 +10,6 @@ web/dist/
 
 # Locally built binaries (go build ./cmd/dev at the root)
 /dev
+
+# Operator-owned encrypted signing custody and independent public trust pins.
+/release-keys/

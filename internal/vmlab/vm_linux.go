@@ -588,6 +588,9 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 	stdout, stderr := nativeexec.NewBuffer(limit), nativeexec.NewBuffer(limit)
 	session.Stdin, session.Stdout, session.Stderr = input, stdout, stderr
 	err = session.Run(command)
+	// Preserve genuine bounded bytes on transport/deadline/overflow failures
+	// too. ExitCode is still meaningful only with a nil transport error.
+	result.Stdout, result.Stderr = stdout.Bytes(), stderr.Bytes()
 	if v.captureDiagnostics {
 		defer func() {
 			var exit *ssh.ExitError
@@ -610,7 +613,6 @@ func (v *guestVM) runResult(ctx context.Context, command string, input io.Reader
 	if stdout.Truncated() || stderr.Truncated() {
 		return result, errors.New("guest operation output exceeds capacity")
 	}
-	result.Stdout, result.Stderr = stdout.Bytes(), stderr.Bytes()
 	// Do not print guest-controlled stderr: it may contain host facts or seed keys.
 	if err != nil {
 		var exit *ssh.ExitError

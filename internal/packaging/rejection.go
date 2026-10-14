@@ -246,7 +246,7 @@ func rejectionSignWrong(ctx context.Context, work string, repo *APTRepository, r
 	for _, signature := range []struct{ option, path string }{{"--clearsign", repo.InRelease}, {"--detach-sign", repo.Release + ".gpg"}} {
 		if _, _, err := runTool(ctx, work, toolCmd{
 			Name:     "gpg",
-			Args:     []string{"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", wrong.PassphraseFile, "--homedir", wrong.Home, "--local-user", wrong.Fingerprint + "!", "--armor", signature.option, "--output", signature.path, repo.Release},
+			Args:     []string{"--no-options", "--require-secmem", "--batch", "--no-tty", "--pinentry-mode", "loopback", "--passphrase-file", wrong.PassphraseFile, "--homedir", wrong.Home, "--local-user", wrong.Fingerprint + "!", "--armor", signature.option, "--output", signature.path, repo.Release},
 			ExtraEnv: gpgEnv(wrong.Home),
 		}); err != nil {
 			return err

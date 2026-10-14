@@ -86,7 +86,13 @@ func bundledNativeFixture(t *testing.T, differingRelease bool) *nativeFixture {
 		write(item.name, sign(statement, "application/vnd.in-toto+json"))
 	}
 	observation := &releasev1.BuildObservation{SourceSha256: digest, StartedAt: "2026-10-13T00:00:00Z", FinishedAt: "2026-10-13T00:00:01Z", UnsignedSha256: map[string]string{name: digest}}
-	manifest := &releasev1.ReleaseManifest{Version: "1.0.0", Revision: "signature-fixture", SourceSha256: digest, SourceDateEpoch: 1760000000, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: nativeTestDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}}
+	licenses := make(map[string]string, 3)
+	for _, document := range []string{"LICENSE", "NOTICE", "THIRD-PARTY-LICENSES"} {
+		body := []byte("Signature-boundary fixture document: " + document + "\n")
+		write(document, body)
+		licenses[document] = nativeTestDigest(body)
+	}
+	manifest := &releasev1.ReleaseManifest{Version: "1.0.0", Revision: "signature-fixture", SourceSha256: digest, SourceDateEpoch: 1760000000, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: nativeTestDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}, LicenseSha256: licenses}
 	body, err := protojson.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)

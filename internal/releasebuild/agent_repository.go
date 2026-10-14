@@ -56,10 +56,17 @@ func exportRelease(ctx context.Context, exported string, request Request, signer
 	if err := compareBuilds(first, second); err != nil {
 		return nil, err
 	}
-	for _, name := range packaging.LicenseNames() {
+	names := packaging.LicenseNames()
+	licenseHashes := make(map[string]string, len(names))
+	for _, name := range names {
 		if err := copyNew(filepath.Join(licenses, name), filepath.Join(exported, name), 0o644); err != nil {
 			return nil, err
 		}
+		sum, _, err := digestBoundedFile(filepath.Join(exported, name), maxDocument)
+		if err != nil {
+			return nil, err
+		}
+		licenseHashes[name] = sum
 	}
 	var bundleDigest string
 	if bundle != "" {
@@ -69,7 +76,7 @@ func exportRelease(ctx context.Context, exported string, request Request, signer
 			return nil, err
 		}
 	}
-	manifest := &releasev1.ReleaseManifest{Version: request.Version, Revision: request.Revision, SourceSha256: sourceDigest, SourceDateEpoch: request.SourceDateEpoch, AttestationKeyId: signer.id, Custody: request.AttestationSigner.Custody, Builds: []*releasev1.BuildObservation{proto.CloneOf(first.observation), proto.CloneOf(second.observation)}}
+	manifest := &releasev1.ReleaseManifest{Version: request.Version, Revision: request.Revision, SourceSha256: sourceDigest, SourceDateEpoch: request.SourceDateEpoch, AttestationKeyId: signer.id, Custody: request.AttestationSigner.Custody, Builds: []*releasev1.BuildObservation{proto.CloneOf(first.observation), proto.CloneOf(second.observation)}, LicenseSha256: licenseHashes}
 	if bundle != "" {
 		manifest.ServerNotice = proto.CloneOf(request.ServerNotice)
 	}

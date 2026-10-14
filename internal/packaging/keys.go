@@ -18,6 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"lindm/internal/agent/statefs"
+	"lindm/internal/custody"
 )
 
 const developmentUID = "lindm development package signing <package-signing@development.lindm.invalid>"
@@ -83,7 +84,8 @@ func readPurpose(home string) (bool, error) {
 // signerGuard owns the actual private directory inode, not a replaceable lock
 // file. Closing its descriptor releases flock only after agent shutdown.
 type signerGuard struct {
-	home *os.File
+	home       *os.File
+	passphrase []byte
 }
 
 func lockSignerHome(home string, rejected []string) (*signerGuard, error) {
@@ -109,6 +111,10 @@ func (guard *signerGuard) close(ctx context.Context, work string) error {
 		return nil
 	}
 	err := stopAgent(ctx, work, guard.home.Name())
+	if guard.passphrase != nil {
+		err = errors.Join(err, unix.Munlock(guard.passphrase), unix.Munmap(guard.passphrase))
+		guard.passphrase = nil
+	}
 	err = errors.Join(err, guard.home.Close())
 	guard.home = nil
 	return err
@@ -148,11 +154,28 @@ func (guard *signerGuard) validate(ctx context.Context, work string, key Signing
 		if development {
 			return SigningKey{}, fmt.Errorf("%w: development key cannot be used as production custody", ErrSigner)
 		}
-		if key.PassphraseFile == "" {
-			return SigningKey{}, fmt.Errorf("%w: production custody requires an explicit passphrase file", ErrSigner)
+		if err := custody.ProtectNativeSigningSecrets(); err != nil {
+			return SigningKey{}, fmt.Errorf("%w: protect production native signer: %w", ErrSigner, err)
+		}
+		if key.PassphraseFile == "" && key.PassphraseFD == nil {
+			return SigningKey{}, fmt.Errorf("%w: production custody requires an explicit protected passphrase", ErrSigner)
 		}
 	default:
 		return SigningKey{}, fmt.Errorf("%w: custody must be development or production", ErrSigner)
+	}
+	if key.PassphraseFile != "" && key.PassphraseFD != nil {
+		return SigningKey{}, fmt.Errorf("%w: passphrase file and descriptor are mutually exclusive", ErrSigner)
+	}
+	if key.PassphraseFD != nil {
+		guard.passphrase, err = lockPassphraseFD(key.PassphraseFD)
+		if err != nil {
+			return SigningKey{}, err
+		}
+	}
+	if key.Custody == CustodyProduction && key.PassphraseFD != nil {
+		if err := productionHomePurpose(ctx, work, key); err != nil {
+			return SigningKey{}, err
+		}
 	}
 	if key.PassphraseFile != "" {
 		if err := checkPassphrase(key.PassphraseFile); err != nil {
@@ -201,7 +224,7 @@ func checkPassphrase(path string) error {
 func listSecretFingerprint(ctx context.Context, work, home string) (string, error) {
 	stdout, _, err := runTool(ctx, work, toolCmd{
 		Name: "gpg",
-		Args: []string{"--no-options", "--batch", "--no-tty", "--homedir", home, "--with-colons", "--list-secret-keys"},
+		Args: []string{"--no-options", "--require-secmem", "--batch", "--no-tty", "--homedir", home, "--with-colons", "--list-secret-keys"},
 	})
 	if err != nil {
 		return "", fmt.Errorf("%w: cannot list package-signing key", ErrSigner)
@@ -278,7 +301,7 @@ func generateDevelopmentSigner(ctx context.Context, directory string) (result *S
 	_, _, err = runTool(ctx, directory, toolCmd{
 		Name: "gpg",
 		Args: []string{
-			"--no-options", "--batch", "--no-tty", "--pinentry-mode", "loopback",
+			"--no-options", "--require-secmem", "--batch", "--no-tty", "--pinentry-mode", "loopback",
 			"--passphrase-file", pass, "--homedir", home, "--quick-generate-key",
 			developmentUID, "rsa4096", "sign", "never",
 		},
@@ -312,7 +335,7 @@ func exportPublicKeys(ctx context.Context, work string, key SigningKey, dir stri
 	armorPath = filepath.Join(dir, "lindm-package-signing.asc")
 	out, _, err := runTool(ctx, work, toolCmd{
 		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--homedir", key.Home, "--export", key.Fingerprint},
+		Args:     []string{"--no-options", "--require-secmem", "--batch", "--homedir", key.Home, "--export", key.Fingerprint},
 		ExtraEnv: gpgEnv(key.Home),
 	})
 	if err != nil {
@@ -326,7 +349,7 @@ func exportPublicKeys(ctx context.Context, work string, key SigningKey, dir stri
 	}
 	armor, _, err := runTool(ctx, work, toolCmd{
 		Name:     "gpg",
-		Args:     []string{"--no-options", "--batch", "--homedir", key.Home, "--armor", "--export", key.Fingerprint},
+		Args:     []string{"--no-options", "--require-secmem", "--batch", "--homedir", key.Home, "--armor", "--export", key.Fingerprint},
 		ExtraEnv: gpgEnv(key.Home),
 	})
 	if err != nil {
@@ -376,6 +399,12 @@ func stopAgent(ctx context.Context, work, home string) error {
 }
 
 func passphraseFile(work string, key SigningKey) (string, error) {
+	if key.PassphraseFD != nil {
+		if key.PassphraseFile != "" {
+			return "", fmt.Errorf("%w: passphrase file and descriptor are mutually exclusive", ErrSigner)
+		}
+		return "/proc/self/fd/3", nil
+	}
 	if key.PassphraseFile != "" {
 		return key.PassphraseFile, nil
 	}
@@ -390,6 +419,13 @@ func passphraseFile(work string, key SigningKey) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func passphraseFiles(key SigningKey) []*os.File {
+	if key.PassphraseFD == nil {
+		return nil
+	}
+	return []*os.File{key.PassphraseFD}
 }
 
 func gpgEnv(home string) []string {

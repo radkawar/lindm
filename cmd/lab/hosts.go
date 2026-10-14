@@ -148,22 +148,25 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 	if clean[1] == "snapshot" || clean[1] == "encrypted" || clean[1] == "inspect-storage" || clean[1] == "device-actions" || clean[1] == "assistance" || provisionInstallerLane(clean[1]) {
 		memory = 4096
 	}
-	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
 		memory = 4096
+	}
+	if clean[1] == "production-release-signing" {
+		memory = 8192
 	}
 	cfg, err := labhost.Load()
 	if err != nil {
 		return err
 	}
 	requirements := &labhost.Requirements{Host: name, Architecture: arch, Vcpus: 2, MemoryMib: memory, RequireKVM: vmRequiresKVM(cfg, clean[1], labhost.FlagValue(clean, "accelerator"), arch)}
-	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
 		requirements.RequireKVM = true
 	}
 	candidates, err := labhost.Select(cfg, requirements)
 	if err != nil {
 		return err
 	}
-	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" {
+	if clean[1] == "deploy" || clean[1] == "deploy-audit" || clean[1] == "deploy-setup" || clean[1] == "production-release-signing" {
 		local := candidates[:0]
 		for _, candidate := range candidates {
 			if candidate.Transport == "local" && candidate.Runtime == "native" {
@@ -172,7 +175,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		}
 		candidates = local
 		if len(candidates) == 0 {
-			return errors.New("deploy requires a configured local native x86 KVM host; remote and container fallbacks are forbidden")
+			return errors.New("lane requires a configured local native x86 KVM host; remote and container fallbacks are forbidden")
 		}
 	}
 	chosen := candidates[0]
@@ -313,7 +316,7 @@ func vmHolds(args []string) bool {
 func vmHasHardwareFlags(command string) bool {
 	switch command {
 	case "serverdeps", "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap",
-		"provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
+		"production-release-signing", "provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.

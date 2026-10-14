@@ -86,7 +86,13 @@ func stockCacheSignedFixture(t *testing.T, directory, sourceDigest string) *rele
 		stockCacheWrite(t, directory, item.name, sign(statement, "application/vnd.in-toto+json"))
 	}
 	observation := &releasev1.BuildObservation{SourceSha256: sourceDigest, StartedAt: "2026-10-13T00:00:00Z", FinishedAt: "2026-10-13T00:00:01Z", UnsignedSha256: map[string]string{name: digest}}
-	manifest := &releasev1.ReleaseManifest{Version: "0.1.0", Revision: "console-enrollment-lab", SourceSha256: sourceDigest, SourceDateEpoch: packaging.DefaultSourceDateEpoch, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: stockCacheDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}}
+	licenses := make(map[string]string, 3)
+	for _, document := range []string{"LICENSE", "NOTICE", "THIRD-PARTY-LICENSES"} {
+		payload := []byte("Cache signature-boundary fixture document: " + document + "\n")
+		stockCacheWrite(t, directory, document, payload)
+		licenses[document] = stockCacheDigest(payload)
+	}
+	manifest := &releasev1.ReleaseManifest{Version: "0.1.0", Revision: "console-enrollment-lab", SourceSha256: sourceDigest, SourceDateEpoch: packaging.DefaultSourceDateEpoch, Artifacts: []*releasev1.ReleaseArtifact{artifact}, AttestationKeyId: stockCacheDigest(der), Custody: "development", Builds: []*releasev1.BuildObservation{observation, observation}, LicenseSha256: licenses}
 	body, err := protojson.Marshal(manifest)
 	if err != nil {
 		t.Fatal(err)

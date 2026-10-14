@@ -18,7 +18,7 @@ import (
 	"lindm/internal/packaging"
 )
 
-func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) (resultErr error) {
 	if len(args) == 0 {
 		return errors.New("packages requires keygen, build, build-server, build-cli, apt, rpm, arch or rejection-fixtures")
 	}
@@ -57,6 +57,7 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 	fingerprint := flags.String("fingerprint", "", "pinned package-signing fingerprint")
 	development := flags.Bool("development-key", false, "explicitly permit a marked development-only signer")
 	passphrase := flags.String("passphrase-file", "", "protected production signing passphrase file")
+	passphraseFD := flags.Int("passphrase-fd", -1, "inherited sealed memory-only signing passphrase descriptor")
 	record := flags.String("record", "", "write result metadata to a new private JSON file")
 	epoch := flags.Int64("source-date-epoch", 0, "deterministic native package timestamp")
 	var rejectedSPKI, rejectedFingerprints, rejectedHomes []string
@@ -86,6 +87,9 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
+	if *passphraseFD != -1 && (*passphraseFD < 3 || *passphrase != "") {
+		return errors.New("-passphrase-fd requires a descriptor >= 3 and excludes -passphrase-file")
+	}
 	if *output == "" {
 		return errors.New("-output DIR is required")
 	}
@@ -103,6 +107,10 @@ func runPackages(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		custody = packaging.CustodyDevelopment
 	}
 	signer := packaging.SigningKey{Home: *home, Fingerprint: *fingerprint, Custody: custody, PassphraseFile: *passphrase, RejectPublicKeySHA256: rejectedSPKI, RejectFingerprints: rejectedFingerprints, RejectPathPrefixes: rejectedHomes}
+	if *passphraseFD >= 3 {
+		signer.PassphraseFD = os.NewFile(uintptr(*passphraseFD), "inherited-package-passphrase")
+		defer func() { resultErr = errors.Join(resultErr, signer.PassphraseFD.Close()) }()
+	}
 	if err := createPackageOutput(*output); err != nil {
 		return err
 	}
