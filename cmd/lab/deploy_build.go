@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 
+	"lindm/internal/custody"
 	"lindm/internal/vmlab"
 )
 
@@ -34,6 +35,12 @@ func runDeployBuildAdmitted(ctx context.Context, args []string, stdout, stderr i
 		return errors.New("deploy build requires exact source revision, versions, vendor manifest, operator PUBLIC recipient, evidence and record")
 	}
 	if err := resolvePackagePaths(&options.Repository, &options.CacheDir, &options.WorkDir, &options.EvidenceDirectory, &options.OperatorRecipientFile, record); err != nil {
+		return err
+	}
+	if err := prepareDeployCustodianMemory(ctx, options.Repository); err != nil {
+		return err
+	}
+	if err := custody.LockSecretMemory(); err != nil {
 		return err
 	}
 	if err := os.Mkdir(options.EvidenceDirectory, 0700); err != nil {

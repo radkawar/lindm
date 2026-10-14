@@ -14,6 +14,15 @@ import (
 )
 
 func TestDeployInstallerDiagnosticsAreEncryptedRawStreams(t *testing.T) {
+	for _, label := range []string{"first", "cold-launch"} {
+		t.Run(label, func(t *testing.T) {
+			checkDeployDiagnosticsAreEncryptedRawStreams(t, label)
+		})
+	}
+}
+
+func checkDeployDiagnosticsAreEncryptedRawStreams(t *testing.T, label string) {
+	t.Helper()
 	identity, err := age.GenerateX25519Identity()
 	if err != nil {
 		t.Fatal(err)
@@ -24,11 +33,11 @@ func TestDeployInstallerDiagnosticsAreEncryptedRawStreams(t *testing.T) {
 		t.Fatal(err)
 	}
 	stdout, stderr := []byte("private stdout\x00"), []byte("postgres://owner:secret@example.invalid/private\n")
-	if err := writeDeployInstallerDiagnostics(recipient, directory, "first", stdout, stderr); err != nil {
+	if err := writeDeployInstallerDiagnostics(recipient, directory, label, stdout, stderr); err != nil {
 		t.Fatal(err)
 	}
 	for name, plaintext := range map[string][]byte{"stdout": stdout, "stderr": stderr} {
-		path := filepath.Join(directory, "first-"+name+".age")
+		path := filepath.Join(directory, label+"-"+name+".age")
 		body, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
@@ -49,7 +58,7 @@ func TestDeployInstallerDiagnosticsAreEncryptedRawStreams(t *testing.T) {
 			t.Fatalf("raw diagnostic bytes were not retained: %v", err)
 		}
 	}
-	if err := writeDeployInstallerDiagnostics(recipient, directory, "first", []byte("replacement"), nil); err == nil {
+	if err := writeDeployInstallerDiagnostics(recipient, directory, label, []byte("replacement"), nil); err == nil {
 		t.Fatal("existing ciphertext replaced")
 	}
 }

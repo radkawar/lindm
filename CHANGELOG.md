@@ -22,6 +22,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Keep README screenshots proportional and the thumbnail row within GitHub's desktop and mobile columns.
 - Make configuration-permission, Git remote and native GPG test fixtures independent of the caller's umask, Git defaults and temporary-path length.
 - Preserve safe backup cancellation and timeout causes without relaying PostgreSQL diagnostics; let the real archive drill retain opt-in private native-tool diagnostics.
+- Retain cold release launcher failures as lab-only encrypted diagnostics, including failures before the guest creates its custody export.
 - Prepare checkout-owned development trust for container integration without a maintainer cache.
 - Preserve first-owner audit records when testing bounded exports, and release only each acquired test lease in concurrent capacity checks.
 - Add the committer's DCO sign-off to verified maintainer landings and gate commits.

@@ -3953,6 +3953,11 @@ independent public pins, authenticated signed first/newer bundles, and bounded
 age-encrypted Make logs are copied to the private evidence directory; the
 guest-generated unlock phrase has a separate age ciphertext to the explicit lab
 operator's public recipient. Failure logs are encrypted before guest cleanup.
+The host observer also locks its address space before the cold launcher runs.
+If the guest fails before it can create its export directory, bounded stdout and
+stderr leave only as `cold-launch-stdout.age` and `cold-launch-stderr.age` in the
+private lab evidence directory, encrypted to the explicit operator recipient.
+These files are never release, server backup or support bundle inputs.
 Custodians are operator fixtures, **not independent human custodians**.
 Result scope is `production-cold-release-build-only` and
 `lifecycle_qualified: false`; these records cannot qualify deploy/lifecycle matrix

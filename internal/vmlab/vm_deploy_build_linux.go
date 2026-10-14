@@ -228,8 +228,13 @@ func buildColdReleaseGuest(ctx context.Context, guest *guestVM, result *VMDeploy
 		return err
 	}
 	child := "sudo -n prlimit --memlock=unlimited:unlimited -- runuser -u lindm-lab -- " + productionSigningEnvironment() + " " + nativeQuote(root+"/cold-lab") + " native cold-release-child -revision " + nativeQuote(options.Revision) + " -epoch " + nativeQuote(result.SourceDateEpoch) + " -first-version " + nativeQuote(options.FirstVersion) + " -newer-version " + nativeQuote(options.NewerVersion)
-	_, err := coldReleaseCommand(ctx, guest, result, "literal-make-release-keys-and-two-releases", child, nil, 3*time.Hour)
-	return err
+	output, err := coldReleaseCommand(ctx, guest, result, "literal-make-release-keys-and-two-releases", child, nil, 3*time.Hour)
+	defer clear(output.Stdout)
+	defer clear(output.Stderr)
+	if err == nil {
+		return nil
+	}
+	return errors.Join(err, writeDeployInstallerDiagnostics(options.OperatorRecipientFile, options.EvidenceDirectory, "cold-launch", output.Stdout, output.Stderr))
 }
 
 func exportColdReleases(ctx context.Context, guest *guestVM, result *VMDeployBuildResult, options VMDeployBuildOptions) error {
