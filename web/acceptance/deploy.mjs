@@ -229,8 +229,8 @@ async function confirmOffServerCustody(ui) {
 
 async function createIntegrationProof(ui) {
   await driver.goto(`${config.origin}/integrations`);
-  await ui.wait({ role: "button", text: "Add destination" });
-  await ui.click({ role: "button", text: "Add destination" });
+  await ui.wait({ role: "button", text: "Add destination", first: true });
+  await ui.click({ role: "button", text: "Add destination", first: true });
   await ui.fill({ label: "Name" }, "Restore key proof");
   await ui.fill({ label: "Address" }, "https://restore-check.invalid/events");
   await ui.click({ role: "button", text: "Generate" });
@@ -248,7 +248,7 @@ async function createIntegrationProof(ui) {
   await ui.click({ role: "checkbox", text: "Send events" });
   await ui.fill({ label: "Reason" }, "Prove encrypted destination recovery");
   await ui.click({ role: "button", text: "Create destination" });
-  await ui.wait({ role: "button", text: "Add destination" });
+  await ui.wait({ role: "button", text: "Add destination", first: true });
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     result.integration_destination_id = await driver.observe(() => {

@@ -4252,6 +4252,17 @@ envelope against the execution root's quorum and validity window. Missing or
 malformed requests and insufficient signatures fail closed. This remains a
 failed full lane, not an enrollment, upgrade or restore qualification.
 
+`native-ubuntu-attempt10.json` additionally transferred the real public trust
+artifacts and encrypted recovery export, then recorded the owner's off-server
+custody confirmation through a fresh password/passkey step-up. The full lane
+failed on the integrations page before an Add destination action. Its masked
+screenshot shows both a toolbar button and an empty-state button with that
+name. A separate real Chromium fixture reproduced the driver's ambiguous
+locator rejection; explicitly selecting the first visible matching action
+works. The deployment journey now uses that existing driver convention for
+the toolbar action. The failed full lane stays scoped to source `281123aa7`;
+it does not prove integration-secret recovery, enrollment, upgrade or restore.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
