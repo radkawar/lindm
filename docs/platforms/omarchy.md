@@ -206,22 +206,23 @@ confirmation.
 Private records under `~/.cache/lindm-desktopderiv-20261011/` (x86_64, KVM,
 Ubuntu `ovmf` 2024.02-2ubuntu0.10, Secure Boot off), each cited by SHA-256:
 
-| Lane                                  | Outcome | Record (SHA-256)                                                                                                                 |
-| ------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| inspect (967 packages matched)        | pass    | `omarchy/omarchy-x86_64-inspect-s2.json` (`126b1c842857812121b897e61d9da0cf14151afe84e4ae9df3f8d9a1e36964f8`)                    |
-| lifecycle (signed pacman 0.7.0→0.7.1) | pass    | `omarchy/omarchy-x86_64-lifecycle-s2b.json` (`552f689c0348ea9c48e57d7f06416652a05847dd59ffdca32cc757b42e1f61cd`)                 |
-| encrypted smoke (2 prompted unlocks)  | pass    | `omarchy/omarchy-x86_64-encrypted-s5.json` (`adca53b03e8a71868e10eca298bf77b2d660aded7062e82d4620383f6c7d5e4e`)                  |
-| dispatch (9 native scenarios)         | pass    | `omarchy/omarchy-x86_64-dispatch-s5.json` (`08fe06f8a3365a8be8438e039604c1a89b6edaf80aa9ebc6dfa8d24ae6b8f120`)                   |
-| dispatch power actions                | pass    | `omarchy/omarchy-x86_64-power-s5.json` (`be843e9473b34ab486c4f05ad5c9e647ae8d1fb797c509432ffdbcd4d0ee6bef`)                      |
-| device actions: encryption            | pass    | `omarchy/omarchy-x86_64-encryption-s8.json` (`972e18fed3a609c8e1b4ecb3869ab1604ed4dba9a6287bdfebe82c662079380b`)                 |
-| lock-quarantine                       | pass    | `sessions/omarchy/omarchy404-lock-quarantine-01.json` (`c5933f0fcdd35f5e54fa899d984f7a0e39901873a62d3f017259bf92080fe060`)       |
-| assistance refusals                   | pass    | `sessions/omarchy/omarchy404-assistance-03/assistance.json` (`68f21814beafbac0c9758b3f111378998ff51ef0ce23b461447de2ff5d2df2f0`) |
-| wipe live-erase                       | pass    | `omarchy/omarchy-x86_64-live-erase-fin3.json` (`f77e8c58e85f785246e25a72273e8d40a2d613d49576f9298888c3bb94935fbf`)               |
-| wipe live-report-loss                 | pass    | `omarchy/omarchy-x86_64-live-report-loss-fin3.json` (`cb029a617dfd1df7acf341a82c4723c5f73015a0f10df64b03f40c75f689a1aa`)         |
-| agent self-update                     | pass    | `omarchy/omarchy-x86_64-updates-fin4.json` (`a27d1d74c73bc7d79760a81507c25d219214bfdd4672c445da25230a12ed4917`)                  |
-| resources executor                    | pass    | `omarchy/omarchy-x86_64-resources-executor-fin3.json` (`c5838345f9b6fb51d4684f498872f9ef96b6ebc90f0ac2da11c48243bdd6c505`)       |
-| resources connected (host kinds)      | pass    | `omarchy/omarchy-x86_64-resources-connected-host-fin7.json` (`374fc4e909cbdfc5bfbd59cb53ea0a3c881224604fdcec554320d2160d79eb32`) |
-| resources connected (secret, LAPS)    | pass    | `omarchy/omarchy-x86_64-resources-connected-pw-fin7.json` (`c66ec5595adb685b15432f23953b80cd7db43a81e5cbb52b67c060b17cad0ab0`)   |
+| Lane                                  | Outcome | Record (SHA-256)                                                                                                                     |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| inspect (967 packages matched)        | pass    | `omarchy/omarchy-x86_64-inspect-s2.json` (`126b1c842857812121b897e61d9da0cf14151afe84e4ae9df3f8d9a1e36964f8`)                        |
+| lifecycle (signed pacman 0.7.0→0.7.1) | pass    | `omarchy/omarchy-x86_64-lifecycle-s2b.json` (`552f689c0348ea9c48e57d7f06416652a05847dd59ffdca32cc757b42e1f61cd`)                     |
+| encrypted smoke (2 prompted unlocks)  | pass    | `omarchy/omarchy-x86_64-encrypted-s5.json` (`adca53b03e8a71868e10eca298bf77b2d660aded7062e82d4620383f6c7d5e4e`)                      |
+| dispatch (9 native scenarios)         | pass    | `omarchy/omarchy-x86_64-dispatch-s5.json` (`08fe06f8a3365a8be8438e039604c1a89b6edaf80aa9ebc6dfa8d24ae6b8f120`)                       |
+| dispatch power actions                | pass    | `omarchy/omarchy-x86_64-power-s5.json` (`be843e9473b34ab486c4f05ad5c9e647ae8d1fb797c509432ffdbcd4d0ee6bef`)                          |
+| device actions: encryption            | pass    | `omarchy/omarchy-x86_64-encryption-s8.json` (`972e18fed3a609c8e1b4ecb3869ab1604ed4dba9a6287bdfebe82c662079380b`)                     |
+| lock-quarantine                       | pass    | `sessions/omarchy/omarchy404-lock-quarantine-01.json` (`c5933f0fcdd35f5e54fa899d984f7a0e39901873a62d3f017259bf92080fe060`)           |
+| assistance refusals                   | pass    | `sessions/omarchy/omarchy404-assistance-03/assistance.json` (`68f21814beafbac0c9758b3f111378998ff51ef0ce23b461447de2ff5d2df2f0`)     |
+| wipe live-erase                       | pass    | `omarchy/omarchy-x86_64-live-erase-fin3.json` (`f77e8c58e85f785246e25a72273e8d40a2d613d49576f9298888c3bb94935fbf`)                   |
+| wipe live-report-loss                 | pass    | `omarchy/omarchy-x86_64-live-report-loss-fin3.json` (`cb029a617dfd1df7acf341a82c4723c5f73015a0f10df64b03f40c75f689a1aa`)             |
+| agent self-update                     | pass    | `omarchy/omarchy-x86_64-updates-fin4.json` (`a27d1d74c73bc7d79760a81507c25d219214bfdd4672c445da25230a12ed4917`)                      |
+| resources executor                    | pass    | `omarchy/omarchy-x86_64-resources-executor-fin3.json` (`c5838345f9b6fb51d4684f498872f9ef96b6ebc90f0ac2da11c48243bdd6c505`)           |
+| resources connected (host kinds)      | pass    | `omarchy/omarchy-x86_64-resources-connected-host-fin7.json` (`374fc4e909cbdfc5bfbd59cb53ea0a3c881224604fdcec554320d2160d79eb32`)     |
+| resources connected (secret, LAPS)    | pass    | `omarchy/omarchy-x86_64-resources-connected-pw-fin7.json` (`c66ec5595adb685b15432f23953b80cd7db43a81e5cbb52b67c060b17cad0ab0`)       |
+| services (matrix run)                 | pass    | `omarchy/matrix-services-01/omarchy-4.0.4/services-x86_64.json` (`ba771c0d0d315711afa9ced3353ee6e4799f468f6500a5ecd9f5ba80a089b06d`) |
 
 The encryption record covers escrow, server reveal, the retired key's rejected
 boot, committed and interrupted rotation, a real TPM2 bind (`systemd-tpm2`
