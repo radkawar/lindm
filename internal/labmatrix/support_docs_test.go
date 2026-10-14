@@ -84,8 +84,11 @@ func TestRenderSupportScopedPassesCountForFeatures(t *testing.T) {
 			t.Errorf("scoped success became %q", value)
 		}
 	}
-	if !strings.Contains(body, "Findings cover packages included in the available vendor feeds.") {
-		t.Fatal("advisory coverage limitation was lost")
+	if !strings.Contains(body, "Findings cover packages in the vendor's advisory feed.") || !strings.Contains(body, "Extra assistance tools depend on the desktop.") {
+		t.Fatal("missing general feed and desktop statements")
+	}
+	if strings.Contains(supportRow(t, body)[6], "[^support-") || strings.Contains(supportRow(t, body)[7], "[^support-") {
+		t.Fatal("common feed or desktop limits created noisy row footnotes")
 	}
 }
 
@@ -223,5 +226,43 @@ func TestRenderSupportLabelsRollingReleases(t *testing.T) {
 		if got := supportRow(t, body)[0]; got != "[Fixture Linux 1](docs/platforms/fixture.md) (rolling)" {
 			t.Fatalf("rolling release label = %q", got)
 		}
+	}
+}
+
+func TestRenderSupportDoesNotDescribeProfileTestCompleteness(t *testing.T) {
+	_, cells := supportFixture()
+	supportCell(t, cells, "resources", "x86_64").Entry.Scope = "seven kinds, no firewall"
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[2]; got != "✓" {
+		t.Fatalf("profile run scope produced testing-talk footnote: %q", got)
+	}
+}
+
+func TestRenderSupportFreshInstallEnrollmentRestriction(t *testing.T) {
+	r, cells := supportFixture()
+	r.Lab.LaneGates = map[platform.LabLane]platform.LaneGate{
+		platform.LaneEnrollFromConsole: {Reason: "the console's pacman install command needs synced databases"},
+	}
+	supportCell(t, cells, "enroll-from-console", "x86_64").Entry = nil
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[1]; !strings.HasPrefix(got, "✗ [^support-") {
+		t.Fatalf("known fresh-install failure remained %q", got)
+	}
+	if !strings.Contains(body, "Console enrollment is unavailable on fresh installs without synced package databases.") {
+		t.Fatal("missing narrow fresh-install prerequisite")
+	}
+	r.Lab.LaneGates[platform.LaneEnrollFromConsole] = platform.LaneGate{Reason: "lab-only: no immutable image available"}
+	body, err = RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[1]; got != "not yet tested" {
+		t.Fatalf("lab-only restriction became product unsupported: %q", got)
 	}
 }

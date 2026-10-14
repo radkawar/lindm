@@ -120,7 +120,7 @@ func RenderSupport(cells []*Cell) (string, error) {
 		}
 		fmt.Fprintf(&b, "\narm64 builds are available for %s; their distribution pages list the tested features.\n", strings.Join(links, ", "))
 	}
-	b.WriteString("\nEncryption and wipe require an encrypted installation. TPM2 unlock needs a compatible TPM and boot setup. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent.\n")
+	b.WriteString("\nEncryption and wipe require an encrypted installation. TPM2 unlock needs a compatible TPM and boot setup. Wipe erases encryption keys, not physical drives. Assistance requires a compatible desktop and user consent. Findings cover packages in the vendor's advisory feed. Extra assistance tools depend on the desktop.\n")
 	for i, reason := range notes {
 		fmt.Fprintf(&b, "\n[^support-%d]: %s\n", i+1, reason)
 	}
@@ -140,6 +140,9 @@ func supportPassed(c *Cell) bool {
 }
 
 func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature supportFeature) (string, []string) {
+	if index == 0 && strings.Contains(r.LaneGateOn(platform.LaneEnrollFromConsole, "x86_64"), "console's pacman install command needs synced databases") {
+		return "✗", []string{"Console enrollment is unavailable on fresh installs without synced package databases."}
+	}
 	var restrictions []string
 	available := 0
 	for _, capability := range feature.capabilities {
@@ -171,12 +174,6 @@ func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature s
 		return slices.ContainsFunc(passed, func(c *Cell) bool { return strings.Contains(strings.ToLower(c.Entry.GetScope()), text) })
 	}
 	switch index {
-	case 1:
-		if scopeContains("no firewall") && !slices.ContainsFunc(passed, func(c *Cell) bool {
-			return c.Entry.GetScope() == "" || strings.Contains(strings.ToLower(c.Entry.GetScope()), "firewall with") || strings.Contains(strings.ToLower(c.Entry.GetScope()), "all kinds")
-		}) {
-			restrictions = appendUnique(restrictions, "Firewall settings were not included in these profile tests.")
-		}
 	case 2:
 		if r.Lab.TPM.Unsupported != "" {
 			restrictions = appendUnique(restrictions, "TPM2 unattended unlock is unavailable with this boot setup.")
@@ -195,14 +192,6 @@ func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature s
 	case 5:
 		if r.BaseCoverage() != nil {
 			restrictions = appendUnique(restrictions, "Findings cover upstream base packages only.")
-		} else if scopeContains("partial-feed") || scopeContains("not complete device coverage") {
-			restrictions = appendUnique(restrictions, "Findings cover packages included in the available vendor feeds.")
-		}
-	case 6:
-		for _, capability := range []platform.Capability{platform.AssistanceClipboard, platform.AssistanceKeyboard, platform.AssistanceDisplays, platform.AssistanceMessages} {
-			if r.GateReasonOn(capability, "x86_64") != "" {
-				restrictions = appendUnique(restrictions, "Extra assistance tools depend on the installed desktop; see the distribution page.")
-			}
 		}
 	}
 	return "✓", restrictions

@@ -134,10 +134,21 @@ Findings now count the vendor-feed passes, including upstream-only coverage on
 Mint and Pop!_OS. Encryption, TPM and lock/wipe retain their separately tested
 operations; profile passes count the settings actually exercised. The audit and
 source record references are in
-`~/.cache/lindm-readme-v01/correction/support-corrections.json`.
+`~/.cache/lindm-readme-v01/notes/support-corrections.json`.
 Table-row mark counts changed from 61 ✓, 29 ✗ and 54 “not yet tested” in the old
-x86_64 rows (including paired marks) to 116 ✓, 9 ✗ and 1 “not yet tested”.
-The remaining untested feature is Omarchy's console install-and-enroll flow.
+x86_64 rows (including paired marks) to 116 ✓, 10 ✗ and 0 “not yet tested”.
+Omarchy's console install-and-enroll command fails on fresh offline installs
+without synced pacman databases; the row names that prerequisite rather than
+rejecting manual agent enrollment. The registry keeps the corresponding console
+flow restriction. Common vendor-feed and desktop-tool conditions are stated once
+under the table.
+
+Ubuntu 24.04's firewall ran separately from the seven-kind profile run: the
+recorded x86_64 UFW run passed all 13 scenarios
+(`ubuntu2404-amd64-local-firewall-g5.json`, SHA-256
+`ae3766950c7a4d3115c294c7387efc0aca888b0fc19d28611bb24d6664484d7c`).
+Its record is listed under [all resource kinds](#all-resource-kinds-in-one-connected-lane).
+The old profile-test-completeness footnote has been removed.
 
 GitHub's Markdown API rendered the final README, wrapped in
 `github-markdown-css` 5.9.0 and opened in Chromium at 880px and 400px in light
@@ -147,7 +158,7 @@ and a 96 × 96 icon. The corrected support table fits the 880px view and scrolls
 within its own container at 400px instead of widening the page.
 
 The raw README, API response, rendered HTML, eight preview PNGs and geometry
-record are in `~/.cache/lindm-readme-v01/correction/`. Preview names are
+record are in `~/.cache/lindm-readme-v01/notes/`. Preview names are
 `readme-{880,400}-{light,dark}.png` and their `-expanded.png` variants.
 `layout-proof.json` records the README hash, selected images, geometry and
 screenshot hashes. Both owned capture fixtures stopped cleanly; private owner
