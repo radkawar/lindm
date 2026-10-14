@@ -208,6 +208,15 @@ func RPMCaptureStageKnown(stage string) bool {
 		"native-keyring-label", "native-keyring-diagnostic-initialization", "native-keyring-database-init",
 		"native-keyring-database-init-permission-denied", "native-keyring-database-init-read-only",
 		"native-keyring-database-init-locked", "native-keyring-database-init-backend", "native-keyring-database-init-timeout",
+		"vendor-key-import-release2", "vendor-key-import-release4",
+		"vendor-key-import-release2-permission-denied", "vendor-key-import-release4-permission-denied",
+		"vendor-key-import-release2-read-only", "vendor-key-import-release4-read-only",
+		"vendor-key-import-release2-locked", "vendor-key-import-release4-locked",
+		"vendor-key-import-release2-backend", "vendor-key-import-release4-backend",
+		"vendor-key-import-release2-timeout", "vendor-key-import-release4-timeout",
+		"vendor-key-import-release2-unsupported-key-version", "vendor-key-import-release4-unsupported-key-version",
+		"vendor-key-import-release2-unsupported-key-algorithm", "vendor-key-import-release4-unsupported-key-algorithm",
+		"vendor-key-import-release2-key-policy-rejected", "vendor-key-import-release4-key-policy-rejected",
 		"native-repository-configuration", "native-metadata-load", "native-dependency-solve",
 		"metadata-retention", "native-package-download", "native-package-signature-check",
 		"native-solver-version-query", "evidence-write", "manifest-output":
@@ -275,28 +284,33 @@ def command(args):
   if out.tell() > 1048576: raise RuntimeError('native output bound')
   out.seek(0)
   return out.read().decode('utf-8')
-def init_database(db):
+def keyring_command(args, stage):
  global phase
  phase = 'native-keyring-diagnostic-initialization'
- # Only initdb's fixed native error markers may leave this 4 KiB anonymous pipe.
+ # Only fixed native keyring error markers may leave this 4 KiB anonymous pipe.
  # Neither raw diagnostics nor filesystem paths are persisted or returned.
  readfd, writefd = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
  try:
   # Go supplies the Linux syscall command: Python 3.9 does not export F_SETPIPE_SZ.
   if fcntl.fcntl(writefd, int(sys.argv[2]), 4096) != 4096: raise RuntimeError('diagnostic pipe bound')
-  phase = 'native-keyring-database-init'
+  phase = stage
   try:
-   subprocess.run(['/usr/bin/rpm','--dbpath',str(db),'--initdb'], stdout=subprocess.DEVNULL, stderr=writefd, check=True, timeout=60)
+   subprocess.run(args, stdout=subprocess.DEVNULL, stderr=writefd, check=True, timeout=60)
   except subprocess.TimeoutExpired:
-   phase = 'native-keyring-database-init-timeout'
+   phase = stage + '-timeout'
    raise
   except subprocess.CalledProcessError:
    try: diagnostic = os.read(readfd, 4096).lower()
    except BlockingIOError: diagnostic = b''
    for marker, suffix in [(b'permission denied','permission-denied'), (b'read-only file system','read-only'), (b'database is locked','locked'), (b'unsupported database backend','backend'), (b'unknown database backend','backend')]:
     if marker in diagnostic:
-     phase = 'native-keyring-database-init-' + suffix
+     phase = stage + '-' + suffix
      break
+   if phase == stage and stage.startswith('vendor-key-import-'):
+    for marker, suffix in [(b'unsupported version of key','unsupported-key-version'), (b'unsupported key version','unsupported-key-version'), (b'unsupported public key algorithm','unsupported-key-algorithm'), (b'unsupported algorithm','unsupported-key-algorithm'), (b'policy rejects','key-policy-rejected')]:
+     if marker in diagnostic:
+      phase = stage + '-' + suffix
+      break
    raise
  finally:
   os.close(readfd)
@@ -322,7 +336,7 @@ with tempfile.TemporaryDirectory(prefix='lindm-rhel-solve-') as work:
   command(['chcon','--reference=/',work])
   command(['chcon','--reference=' + native_db,str(db)])
  phase = 'native-keyring-database-init'
- init_database(db)
+ keyring_command(['/usr/bin/rpm','--dbpath',str(db),'--initdb'], 'native-keyring-database-init')
  for fingerprint, keyid, keysha in keys:
   phase = 'vendor-key-acquisition'
   name = 'keys/' + keyid + '.asc'
@@ -333,8 +347,8 @@ with tempfile.TemporaryDirectory(prefix='lindm-rhel-solve-') as work:
   if len(key) > 65536 or hashlib.sha256(key).hexdigest() != keysha: raise RuntimeError('vendor key pin')
   with open(p, 'xb') as f: f.write(key)
   record(name, 'FILE_KIND_KEY', signer=fingerprint)
-  phase = 'vendor-key-import'
-  command(['rpmkeys','--dbpath',str(db),'--import',str(p)])
+  key_stage = 'vendor-key-import-release2' if keyid == 'fd431d51' else 'vendor-key-import-release4'
+  keyring_command(['/usr/bin/rpmkeys','--dbpath',str(db),'--import',str(p)], key_stage)
  phase = 'native-repository-configuration'
  with dnf.Base() as base:
   base.conf.read()

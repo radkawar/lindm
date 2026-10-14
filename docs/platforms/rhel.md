@@ -146,11 +146,14 @@ new host trust root.
 
 Failed capture reports only a closed acquisition-stage code, never native
 stderr, traceback, entitlement material or repository configuration. Private
-RPM database initialization may additionally classify permission, read-only
-filesystem, locked database, unsupported backend or timeout failures. Its
-native stderr stays in a nonblocking 4 KiB anonymous pipe and is discarded;
-unrecognized causes remain the generic initialization-stage failure. These
-codes are diagnosis, not successful acquisition or replay evidence.
+RPM database initialization and exact-pinned vendor key import may additionally
+classify permission, read-only filesystem, locked database, unsupported backend
+or timeout failures. Key import identifies only the public release-key slot
+(2 or 4), with fixed unsupported-key-version, algorithm or policy-rejection
+codes when matched. Native stderr stays in a nonblocking 4 KiB anonymous pipe
+and is discarded; unrecognized causes remain generic stage failures. These
+codes are diagnosis, not successful acquisition or replay evidence. Both vendor
+keys remain required; a failed import is not skipped or relaxed.
 The pipe-size syscall command comes from Go's Linux constants, not
 `fcntl.F_SETPIPE_SZ` (which Python exposes only
 [since 3.10](https://docs.python.org/3.10/library/fcntl.html)). RHEL's native
