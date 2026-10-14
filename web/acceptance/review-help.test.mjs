@@ -5,11 +5,15 @@ import test from "node:test";
 import { chromium } from "playwright";
 import { captureHelpDocument } from "./review-help.mjs";
 import { contactSheet } from "./review-report.mjs";
+import { captureReviewPNG } from "./review-capture.mjs";
 
 // Exercise real Chromium rasterization: one enormous full-page image timed out
 // and prevented later display variants from reaching the owner report.
 test("help evidence covers a long document in bounded images and exposes every part", async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    ignoreDefaultArgs: ["--hide-scrollbars"],
+  });
   try {
     const page = await browser.newPage();
     const captures = [];
@@ -26,19 +30,20 @@ test("help evidence covers a long document in bounded images and exposes every p
           h1 { margin: 0; }
           footer { position: absolute; bottom: 0; height: 17px; width: 100%; background: red; }
         </style><main><h1>Long reference</h1><footer></footer></main>`);
+        const documentWidth = await page.evaluate(() => document.documentElement.scrollWidth);
         const images = new Map();
         const evidence = await captureHelpDocument({
           page,
           prefix: `reference-${theme}-${viewport.name}`,
           async screenshot(page, name, fullPage) {
-            const image = await page.screenshot({ fullPage, timeout: 30_000 });
+            const image = await captureReviewPNG(page, { fullPage, timeout: 30_000 });
             images.set(name, image);
             return name;
           },
         });
         assert.deepEqual(page.viewportSize(), { width: viewport.width, height: viewport.height });
         assert.equal(await page.evaluate(() => window.scrollY), 0);
-        assert.deepEqual(evidence.dimensions, { width: viewport.width, height: 40017 });
+        assert.deepEqual(evidence.dimensions, { width: documentWidth, height: 40017 });
         let covered = 0;
         for (const part of evidence.fullScreenshots) {
           const image = images.get(part.screenshot);

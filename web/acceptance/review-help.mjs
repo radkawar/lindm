@@ -8,11 +8,13 @@ const captureHeight = 8_192;
 export async function captureHelpDocument({ page, prefix, screenshot }) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => document.fonts.ready);
+  const viewportScreenshot = await screenshot(page, `${prefix}.png`, false);
+  // The first capture can normalize native scrollbars and change document height.
+  // Partition the rendered document, not its stale pre-capture bounds.
   const dimensions = await page.evaluate(() => ({
     width: document.documentElement.scrollWidth,
     height: document.documentElement.scrollHeight,
   }));
-  const viewportScreenshot = await screenshot(page, `${prefix}.png`, false);
   const fullScreenshots = [];
   const viewport = page.viewportSize();
   try {

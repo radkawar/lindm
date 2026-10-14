@@ -1209,6 +1209,11 @@ height, then restores the requested viewport. The report records each part's
 offset and height; the contact sheet links every part in order. This retains the
 complete reference document on desktop and mobile without a single oversized
 Chromium surface, even when a full-page capture has a smaller clip.
+Partition dimensions are measured after the initial viewport capture restores
+native scrollbars, not before it: a changed document height otherwise makes the
+final physical viewport exceed the remaining page and clamps its requested offset.
+The real Chromium long-document regression uses the same PNG capture helper with
+classic scrollbars and verifies complete coverage, the final footer and restoration.
 
 Device-list owner checks wait for the requested sort direction and for
 `aria-busy` to clear before inspecting rows. Route prefetch keeps the previous
