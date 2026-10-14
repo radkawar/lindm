@@ -12480,6 +12480,21 @@
       "scope": "historical-install-audit",
       "reference": "#control-plane-deployment-matrix",
       "mainlineRevision": "49220ad876b98c8d101b36bf8aede6d22ee74aee"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "resources",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-desktopderiv-20261011/pop/resources-connected-packages-01.json",
+      "sha256": "b8f8a9910cb3af1155c830d0bc6b09104b52a73abfa52e94df32d151f17edd43",
+      "recorded": "2026-10-14T01:01:19.347352037Z",
+      "revision": "38283dd9c9b391edf209217cdbf8e273e2e05dd4",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "connected packages: 15 scenarios incl. vendor-updater busy and approved adoption",
+      "mainlineRevision": "38283dd9c9b391edf209217cdbf8e273e2e05dd4"
     }
   ]
 }

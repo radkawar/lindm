@@ -46,8 +46,9 @@ Intel and AMD graphics; the `intel` channel's build 20 is an older, separately
 maintained image and `nvidia` adds the proprietary driver). System76 arm64 images
 are not part of this row. Qualified natively on x86_64: inventory, lifecycle,
 dispatch and power, self-update, encryption, live-root crypto-erase, report-loss,
-lock/release/quarantine, and the resource kinds files, groups, users, sysctl,
-definitions, password, firewall, secret-password and local-admin; see the
+lock/release/quarantine, and every resource kind (packages, files, groups,
+users, sysctl, definitions, password, firewall, secret-password, local-admin);
+see the
 [tier capability matrix](../verification.md#tier-capability-matrix) and
 [Known gaps](#known-gaps). Records are under
 `~/.cache/lindm-desktopderiv-20261011/pop/` unless stated otherwise.
@@ -324,6 +325,20 @@ unseal (`device-actions-tpm-boots-01.json`,
 evidence, not the `tpm-unattended-boots` cell). All ran with Secure Boot off (see
 systemd-boot above); the Secure Boot TPM cells and recovery sanitize are gated.
 
+## Resources
+
+The executor phase passed packages and files (`resources-executor-01.json`,
+`a05870165bf024d21a615d823ce98d1dc0ae08f452dbb80708d997bb11e4a7a5`, main
+`85caf6ed`). The connected phase passed files, groups, users, sysctl (with
+`vm.vfs_cache_pressure`), definitions, password, firewall, secret-password and
+local-admin (`resources-connected-rest-01.json`,
+`c008015771c2bec124d9d8707621a7fc34b3be1004333d0a26d0e7ed554a8582`, main
+`60be6a7a`), and packages with all fifteen scenarios, including
+`vendor-updater-native-busy` and approved adoption of an installed package
+(`resources-connected-packages-01.json`,
+`b8f8a9910cb3af1155c830d0bc6b09104b52a73abfa52e94df32d151f17edd43`, main
+`60be6a7a`).
+
 ## Actions
 
 Lock ends `OUTCOME_UNKNOWN` `session_lock_state_unreported` with the COSMIC
@@ -399,20 +414,10 @@ the recipe above; ISO relabels are not used.
 
 ## Known gaps
 
-Resources: the executor phase passed packages and files
-(`resources-executor-01.json`,
-`a05870165bf024d21a615d823ce98d1dc0ae08f452dbb80708d997bb11e4a7a5`, main
-`85caf6ed`), and the connected phase passed files, groups, users, sysctl (with
-`vm.vfs_cache_pressure`), definitions, password, firewall, secret-password and
-local-admin (`resources-connected-rest-01.json`,
-`c008015771c2bec124d9d8707621a7fc34b3be1004333d0a26d0e7ed554a8582`, main
-`60be6a7a`). The connected packages kind passed its earlier scenarios,
-including `vendor-updater-native-busy`, but stops at
-`modified-installation-unverified`
-(`resources-connected-01-snap13-failed.json`,
-`ac59b7082169fd0d1b1019843932c70561e925f44ca14a674f974a5356a9a3af`): main's
-server does not yet qualify approved package adoption on any APT release, so
-that rerun waits for the package-adoption qualification to land. Recovery
-sanitize and the Secure Boot TPM cells are gated on the unsigned systemd-boot.
+Recovery sanitize and the Secure Boot TPM cells are gated on the unsigned
+systemd-boot.
 Assistance is gated: VIEW ends `UNAVAILABLE` `notification_actions_hidden` and
-CONTROL `portal_remote_desktop_unavailable`, both before consent.
+CONTROL `portal_remote_desktop_unavailable`, both before consent (observed
+natively by DesktopSessions,
+`~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-assistance-10/assistance.json`,
+`bf8b91b6854252ced50a1ba8bfd4e5d46b6500f58ab088fb9a2e2f9483c277dd`).
