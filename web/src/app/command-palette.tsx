@@ -134,7 +134,6 @@ export function CommandPalette({
           returnFocus.current = event.currentTarget;
           changeOpen(true);
         }}
-        aria-label="Search pages, actions and devices (Control or Command K)"
         aria-keyshortcuts="Control+k Meta+k"
         aria-haspopup="dialog"
       >

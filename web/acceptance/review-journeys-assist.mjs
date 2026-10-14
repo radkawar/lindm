@@ -32,8 +32,7 @@ async function remoteHelp(ctx) {
   requireState(device?.Hostname, "assistance_route_device_missing");
   const main = page.getByRole("main");
   const searchTrigger = page.getByRole("button", {
-    name: "Search pages, actions and devices (Control or Command K)",
-    exact: true,
+    name: /^Find\b/,
   });
   const theme = async (value) => {
     const dark = value === "dark";

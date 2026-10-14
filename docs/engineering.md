@@ -160,6 +160,12 @@ Control/Command-K opens Find: pages, actions and devices found by server-side
 hostname prefix search. Actions
 (`web/src/app/palette-actions.ts`) open the page or dialog where the job is done and
 are shown only when the session holds the permission that destination checks.
+The Find trigger derives its accessible name from its visible responsive text and
+shortcut, not a different Search label. Account menu names include the displayed
+initials and, in the mobile drawer, the visible identity and role. This keeps the
+visible label in the accessible name without hiding text or weakening axe checks.
+Explicit spaces separate avatar, identity and role text; flex/grid gaps alone do
+not supply word boundaries to visible-text or accessible-name computation.
 Device actions (Wipe device…, Restart device…, Refresh inventory…, Request remote
 assistance…) first ask for the device, then open its wipe review, action dialog
 (`/devices/$deviceId?action=restart`) or Remote assistance tab; nothing is sent from

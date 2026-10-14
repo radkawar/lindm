@@ -186,10 +186,12 @@ export function ConsoleShell({
     ));
   }
 
+  const accountInitials = userLabel.slice(0, 2).toUpperCase();
+  const accountRoleLabel = roleLabel(role);
   const account = (mobile = false) => (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={`Account menu for ${userLabel}`}
+        aria-label={`Account menu for ${accountInitials} ${userLabel}${mobile ? ` ${accountRoleLabel}` : ""}`}
         render={
           <Button
             variant="ghost"
@@ -198,12 +200,12 @@ export function ConsoleShell({
         }
       >
         <span className="flex size-8 shrink-0 items-center justify-center border bg-background text-sm font-semibold">
-          {userLabel.slice(0, 2).toUpperCase()}
-        </span>
+          {accountInitials}
+        </span>{" "}
         {mobile ? (
           <span className="grid min-w-0 gap-1 text-left">
-            <span className="wrap-anywhere">{userLabel}</span>
-            <span className="text-xs text-muted-foreground">{roleLabel(role)}</span>
+            <span className="wrap-anywhere">{userLabel}</span>{" "}
+            <span className="text-xs text-muted-foreground">{accountRoleLabel}</span>
           </span>
         ) : null}
       </Menu.Trigger>
@@ -220,7 +222,7 @@ export function ConsoleShell({
               {principal.breakGlass ? (
                 <StatusBadge status="warning">Break-glass session</StatusBadge>
               ) : (
-                <Badge variant="secondary">{roleLabel(role)}</Badge>
+                <Badge variant="secondary">{accountRoleLabel}</Badge>
               )}
             </div>
             <Menu.Item
