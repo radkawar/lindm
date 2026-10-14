@@ -1786,10 +1786,14 @@ On Ubuntu, the installer preseeds `create_main_cluster = false` before the vendo
 PostgreSQL transaction and temporarily denies native service starts through
 `policy-rc.d`. It removes only its own unchanged temporary policy. Existing operator
 configuration is never overwritten: an existing cluster switch must already be
-disabled; an existing foreign service policy is refused rather than executed,
+disabled (`off`, `false`, `no` or `0`, case-insensitive); an existing foreign service policy is refused rather than executed,
 replaced or assumed to deny every maintainer-script invocation. Vendor
 configuration preservation remains enabled; no default `16-main` cluster is
 created or started as a side effect.
+If you create that policy before installing PostgreSQL clients, install the approved
+`postgresql-common` package before invoking the installer: it supplies `pg_conftool`
+for validating an existing policy. The installer does not replace the file to
+avoid a missing tool or an enabled policy.
 
 Server/device trust and deployment identity are generated automatically with
 maintained Go X.509 and existing signed execution-authority libraries. Execution

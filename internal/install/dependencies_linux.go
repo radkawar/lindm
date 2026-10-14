@@ -131,7 +131,7 @@ func prepareUbuntuDependencies(ctx context.Context) (cleanup func() error, err e
 			return nil, err
 		}
 		value, err := command(ctx, nil, "pg_conftool", configPath, "show", "-bs", "create_main_cluster")
-		if err != nil || strings.TrimSpace(string(value)) != "off" {
+		if err != nil || !clusterCreationDisabled(string(value)) {
 			return nil, errors.New("existing PostgreSQL cluster policy is not disabled; refusing to overwrite operator configuration")
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -165,4 +165,12 @@ func prepareUbuntuDependencies(ctx context.Context) (cleanup func() error, err e
 		}
 		return os.Remove(policyPath)
 	}, nil
+}
+
+// pg_conftool preserves boolean spelling. Accept the four disabled spellings
+// without changing an existing operator-owned configuration.
+func clusterCreationDisabled(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "0" || strings.EqualFold(value, "off") ||
+		strings.EqualFold(value, "false") || strings.EqualFold(value, "no")
 }
