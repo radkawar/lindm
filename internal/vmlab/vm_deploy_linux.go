@@ -285,10 +285,10 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	defer clear(integrationProof.Ciphertext)
 	result.IntegrationSecretGates = append(result.IntegrationSecretGates, "installed")
 	request.CommandPath = filepath.Join(private, "console-command")
-	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
+	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
 		result.DeviceID = enrolled.DeviceID
 		if err := browser("manage", enrolled.DeviceID); err != nil {
-			return err
+			return errors.Join(err, saveDeployFailureJournal(ctx, server, options.CustodyEscrowRecipientFile, options.EvidenceDirectory, "management-server-journal"))
 		}
 		admin.fence()
 		device.fence()
@@ -655,6 +655,18 @@ func closeDeployTransfer(current error, transfer io.Closer) error {
 		return current
 	}
 	return errors.Join(current, closeErr)
+}
+
+func saveDeployFailureJournal(ctx context.Context, guest *guestVM, recipient, directory, label string) error {
+	if recipient == "" || directory == "" || guest.client == nil || guest.processError() != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+	defer cancel()
+	output, err := guest.runResult(ctx, "sudo -n journalctl --no-pager -u lindmd.service -u lindm-agent.service -u lindm-executor.service -n 1500 -o short-iso-precise", nil, deployInstallerDiagnosticLimit, 10*time.Second)
+	defer clear(output.Stdout)
+	defer clear(output.Stderr)
+	return errors.Join(err, writeDeployInstallerDiagnostics(recipient, directory, label, output.Stdout, output.Stderr))
 }
 
 type deployBackupWriter struct {

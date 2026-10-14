@@ -4215,6 +4215,15 @@ cells. Actual two-OS three-guest install/enroll/backup/upgrade/restore/live-mana
 proof remains a separate `lab deploy` invocation using its signed exports and
 independently recorded pins.
 
+If live management fails after clipboard enrollment, `lab deploy` captures bounded
+server and agent/executor journals before tearing down its owned guests. Only
+`management-server-journal-{stdout,stderr}.age` and
+`management-agent-journal-{stdout,stderr}.age` leave the guests. Decrypt these with
+the dedicated off-server lab escrow identity. Journals never become plaintext
+evidence files or release, server backup or support bundle inputs. A sent action
+or a recent heartbeat is not a completed management action and cannot qualify the
+backup, upgrade and restore stages that were not reached.
+
 The guest child raises only its own process's memlock allowance through authorized
 `sudo prlimit` before entering the unchanged secret-memory gate. Do not raise the
 allowance before `runuser`: its PAM session can reset the inherited limit. The

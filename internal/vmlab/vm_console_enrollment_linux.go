@@ -35,6 +35,9 @@ type VMConsoleEnrollmentOptions struct {
 	// DiagnosticsDir receives, when the copied command fails, the guest's
 	// native package-manager log tail; never the command or its output.
 	DiagnosticsDir string
+	// FailureRecipientFile seals management-failure journals directly to the
+	// lab operator before owned guest teardown; never plaintext on disk.
+	FailureRecipientFile string
 	// RedHatTokenFile registers an entitled (RHEL) guest, as a customer's
 	// subscribed host is, so the copied DNF command reaches its vendor
 	// repositories. Required for entitled releases, refused otherwise.
@@ -283,7 +286,7 @@ if ` + query + ` >/dev/null 2>&1; then exit 1; fi
 	}
 	result.BinarySHA256 = fields[0]
 	if err := options.VerifyEnrollment(ctx, result); err != nil {
-		return nil, fmt.Errorf("server-side enrollment was not confirmed before guest teardown: %w", err)
+		return nil, errors.Join(fmt.Errorf("server-side enrollment was not confirmed before guest teardown: %w", err), saveDeployFailureJournal(ctx, vm, options.FailureRecipientFile, options.DiagnosticsDir, "management-agent-journal"))
 	}
 	if options.PackageSourceFixture != nil {
 		result.PackageSources, err = proveRegistryPackageSources(ctx, vm, release, result.DeviceID, options, registration)
