@@ -58,16 +58,22 @@ variable "public_ingress_enabled" {
   default     = true
 }
 variable "database_instance_class" {
-  type    = string
-  default = "db.t4g.micro"
+  description = "Use db.t4g.small or a larger provisioned RDS class with at least 2 GiB RAM."
+  type        = string
+  default     = "db.t4g.small"
+  validation {
+    condition     = can(regex("^db\\.[a-z0-9]+\\.(small|medium|large|xlarge|[0-9]+xlarge)$", var.database_instance_class))
+    error_message = "Use db.t4g.small or a larger supported provisioned class. Micro classes are below the 2 GiB minimum."
+  }
 }
 variable "database_engine_version" {
-  type    = string
-  default = "18.6"
-}
-variable "database_parameter_family" {
-  type    = string
-  default = "postgres18"
+  description = "Supported PostgreSQL 16 patch release. Other database majors are not supported in v0.1."
+  type        = string
+  default     = "16.13"
+  validation {
+    condition     = can(regex("^16\\.[0-9]+$", var.database_engine_version))
+    error_message = "v0.1 requires a PostgreSQL 16 patch version."
+  }
 }
 variable "allowed_account_id" {
   description = "Account guard. Change deliberately before using another account."

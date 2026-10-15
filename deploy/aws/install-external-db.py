@@ -257,14 +257,16 @@ def database_url(args, role, password, binding):
 
 def backup_clients(admin):
     server_major = int(admin.execute("SHOW server_version_num").fetchone()[0]) // 10000
+    if server_major != 16:
+        raise InstallError("v0.1 supports PostgreSQL 16 only; no database changes made.")
     for binary in ("/usr/bin/pg_dump", "/usr/bin/pg_restore"):
         try:
             version = command([binary, "--version"], capture=True)
         except (OSError, InstallError):
-            raise InstallError("PostgreSQL backup clients are missing; install approved clients matching or newer than RDS.") from None
+            raise InstallError("PostgreSQL 16 backup clients are required before provisioning.") from None
         match = re.search(rb"\(PostgreSQL\) (\d+)", version)
-        if match is None or int(match[1]) < server_major:
-            raise InstallError("PostgreSQL backup clients are older than RDS; install matching or newer approved clients before provisioning.")
+        if match is None or int(match[1]) != 16:
+            raise InstallError("v0.1 requires PostgreSQL 16 pg_dump and pg_restore; no database changes made.")
 
 
 def provision_database(args):

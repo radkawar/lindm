@@ -100,7 +100,7 @@ resource "aws_db_subnet_group" "deployment" {
 }
 resource "aws_db_parameter_group" "deployment" {
   name   = var.name
-  family = var.database_parameter_family
+  family = "postgres16"
   parameter {
     name  = "rds.force_ssl"
     value = "1"

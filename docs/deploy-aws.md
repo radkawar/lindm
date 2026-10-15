@@ -16,6 +16,12 @@ The server accepts HTTPS only; use Systems Manager (SSM), not inbound SSH.
 If you use this helper on a separately provisioned SSH-accessible host, apply the
 same root custody and private-terminal rules. The supplied Terraform disables SSH.
 
+v0.1 supports PostgreSQL **16 only**, both locally and with external RDS.
+Use `db.t4g.small` or a larger supported class with at least 2 GiB RAM.
+The Terraform defaults are PostgreSQL 16.13 and `db.t4g.small`; micro classes are
+refused. This is a minimum starting size, not a capacity guarantee. Measure CPU,
+memory, storage and workload before choosing a production size.
+
 The EC2 instance role has SSM access and `secretsmanager:GetSecretValue` for the
 exact RDS-managed master-secret ARN. The helper rejects other AWS credential
 sources. Terraform does not generate, receive or output database passwords.
@@ -112,9 +118,10 @@ Authenticate your AWS operator session. Select an approved Canonical Ubuntu 24.0
 amd64 AMI in `us-east-1`; authenticate its publisher and image ID independently.
 The provider checks `allowed_account_id` before managing any resource. The default
 is deliberate. Set it to your intended AWS account.
-Review available RDS engine versions, parameter family and instance class in that
-region; they must agree. Set `ami_id`, `allowed_account_id` and any nonsecret size
-or version overrides in a protected operator `.tfvars` file.
+Review available PostgreSQL 16 patch releases and instance classes in that region.
+The parameter family is fixed to `postgres16`. Set `ami_id`, `allowed_account_id`
+and any supported nonsecret size or PostgreSQL 16 patch override in a protected
+operator `.tfvars` file.
 
 Use Terraform 1.11 or newer and AWS provider major version 6. The checked-in lock
 file pins the provider used by this module.
@@ -146,45 +153,25 @@ Disable active swap before installation. Do not enable swap during the operation
 ### Match PostgreSQL backup clients to RDS
 
 The native backup and restore commands execute `/usr/bin/pg_dump` and
-`/usr/bin/pg_restore`. Ubuntu 24.04's vendor PostgreSQL 16 client cannot dump an
-RDS 18 database. Install an approved PostgreSQL 18 client before invoking the
-helper when using the Terraform RDS 18 defaults. Keep the vendor dependency used
-by the native installer; Debian's `pg_wrapper` selects the newest installed client.
-If selecting another RDS major, approve matching or newer clients for that major.
-The helper compares both actual client versions with RDS `server_version_num`
-before creating roles or the application database. Never bypass this gate.
+`/usr/bin/pg_restore`. Use the PostgreSQL 16 clients from Ubuntu 24.04's signed
+repositories. Do not add a newer client and rely on `pg_wrapper` to select it:
+a newer `pg_dump` can produce an archive that the supported PostgreSQL 16
+recovery environment cannot read.
+The helper checks RDS `server_version_num` and both actual client versions
+before creating roles or the application database. All three majors must be 16.
+Never bypass this gate or claim a client adapter extends v0.1 database support.
 
-Use the authenticated [PostgreSQL Ubuntu repository](https://www.postgresql.org/download/linux/ubuntu/)
-if your approved Ubuntu repositories do not carry the required client.
-On the server, download the public repository key over verified HTTPS into a
-root-protected file. Inspect its full primary fingerprint and compare it with your
-independently approved PGDG signing-key fingerprint before adding repository trust.
-The key URL is distribution, not the independent approval:
+Preseed the disabled local-cluster policy before installing the client:
 
 ```sh
-sudo curl --fail --proto '=https' --tlsv1.2 \
-  --output /root/pgdg.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
-sudo gpg --show-keys --with-fingerprint /root/pgdg.asc
-# Stop unless the complete fingerprint matches the approved custody record.
-sudo install -d -o root -g root -m 0755 /etc/apt/keyrings
-sudo install -o root -g root -m 0644 /root/pgdg.asc /etc/apt/keyrings/pgdg.asc
-sudo tee /etc/apt/sources.list.d/pgdg.sources >/dev/null <<'EOF'
-Types: deb
-URIs: https://apt.postgresql.org/pub/repos/apt
-Suites: noble-pgdg
-Components: main
-Architectures: amd64
-Signed-By: /etc/apt/keyrings/pgdg.asc
-EOF
 sudo apt-get update
 sudo install -d -o root -g root -m 0755 /etc/postgresql-common
 sudo sh -c 'set -C; printf "create_main_cluster = false\n" > /etc/postgresql-common/createcluster.conf'
-sudo apt-get -o Dpkg::Options::=--force-confold install postgresql-client-18
+sudo apt-get -o Dpkg::Options::=--force-confold install postgresql-client-16
 ```
 
-Do not use `trusted=yes`, a global keyring, or disabled APT signature checks.
-Only public repository material is transferred; no database credentials enter
-these commands. The helper's live version preflight is still required.
+Do not disable APT signature checks. These commands transfer no database
+credentials. The helper's live version preflight is still required.
 The create-only cluster-policy command stops if a policy already exists. Do not
 overwrite an existing operator file. The installer reads the root-protected
 standalone disabled setting before package changes; no preinstalled `pg_conftool`
@@ -519,9 +506,11 @@ contents.
 
 ## Recorded AWS installation proof
 
-On 2026-10-15, a fresh deployment in `us-east-1` used the supported Terraform
-module and the unchanged, self-built signed `0.2.14` release from source
-`dea56bc2516e240d12cb5411831636830681895d`.
+On 2026-10-15, a historical deployment in `us-east-1` used the previous Terraform
+defaults and the unchanged, self-built signed `0.2.14` release from source
+`dea56bc2516e240d12cb5411831636830681895d`. It used PostgreSQL 18.6 and a
+preinstalled approved PostgreSQL 18 client. It is not qualification of the
+current PostgreSQL 16-only supported contract.
 The cold release build used a fresh Ubuntu VM without swap. Its independently
 approved public release key and update root were checked before installation.
 No release-signing custody was copied to EC2.
@@ -546,10 +535,25 @@ The following steps completed:
   the authenticated deployment CA. It used no certificate-error bypass or TLS
   override. The console and device CAs were distinct.
 
-These results qualify installation and browser TLS, not the complete lifecycle.
-First-owner setup, real-device enrollment, managed inventory, evaluated findings,
-encrypted backup, fresh-host restore and final cleanup require their own recorded
-results. Earlier disposable AWS attempts were destroyed and checked independently.
+First-owner password and user-verifying passkey setup, the exact console-copied
+enrollment command on the second EC2 instance, and a new managed inventory action
+also completed. The automatic real-vendor source download was observed, but
+publication failed when its heartbeat waited on its own batch's lease row.
+The device assessment correctly remained **Unknown**, not clean.
+
+The unchanged signed native RDS backup completed in 10.67 seconds. Its 27-file
+encrypted archive was retained off AWS and the same signed native `restore-drill`
+validated it with PostgreSQL 18.6 in a networkless, swap-zero recovery container
+in 1.44 seconds. This was real archive validation, not fresh-host recovery.
+The lease defect was repaired separately with a real-PostgreSQL blocked-COPY
+regression, lost-lease detection and the unchanged progress watchdog.
+These historical results do not qualify evaluated findings or full recovery.
+The current supported PostgreSQL 16 lifecycle needs its own signed fresh run.
+Terraform destroyed this attempt in 125.36 seconds. After its automated snapshot
+was removed, native AWS CLI inventory found zero owned leftovers across all 20
+checked resource categories, including snapshots and planned-deletion master
+secrets. Retain the failed first-publication evidence; do not count this attempt
+as a complete lifecycle pass.
 
 The maintainer-local evidence directory is
 `/home/r/dev/minor/lindm.worktrees/aws-deploy/artifacts/aws-proof/sdk18-qualified-candidate/`.
