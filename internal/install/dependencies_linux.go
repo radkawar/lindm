@@ -23,6 +23,14 @@ import (
 // installDependencies uses normally authenticated, configured distro repositories
 // in connected mode. Air-gap mode imports only the signed per-platform closure.
 func installDependencies(ctx context.Context, o Options, release *platform.Release) (err error) {
+	if release.Server.PostgreSQLModule != "" {
+		if o.Airgap {
+			return errors.New("RHEL offline installation is not available in this release")
+		}
+		if err := prepareRHELPostgreSQL(ctx, release, command); err != nil {
+			return err
+		}
+	}
 	var cleanup func() error
 	if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
 		cleanup, err = prepareUbuntuDependencies()
@@ -34,7 +42,10 @@ func installDependencies(ctx context.Context, o Options, release *platform.Relea
 		defer func() { err = errors.Join(err, cleanup()) }()
 	}
 	if !o.Airgap {
-		return installConnectedDependencies(ctx, release)
+		if err := installConnectedDependencies(ctx, release); err != nil {
+			return err
+		}
+		return checkPostgreSQLTools(ctx, release, command)
 	}
 	name := release.Server.SnapshotName
 	pin, err := os.ReadFile(filepath.Join(o.Bundle, name+".digest"))
@@ -69,6 +80,9 @@ func installDependencies(ctx context.Context, o Options, release *platform.Relea
 }
 
 func requireAirgapAddon(bundle string, release *platform.Release) error {
+	if release.Server.PostgreSQLModule != "" {
+		return errors.New("RHEL offline installation is not available in this release")
+	}
 	for _, name := range []string{release.Server.SnapshotName, release.Server.SnapshotName + ".digest"} {
 		if _, err := os.Stat(filepath.Join(bundle, name)); errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("air-gap installation requires authenticated %s; use this platform's signed offline add-on", name)

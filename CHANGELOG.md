@@ -19,6 +19,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 
 ### Changed
 
+- Require PostgreSQL 16 for all v0.1.0 local and external databases; refuse older or newer server versions before migrations. PostgreSQL 17/18 with matching backup clients is post-v0.1 work.
+- Select RHEL 9's signed distro PostgreSQL 16 stream explicitly; refuse conflicting modules, older PostgreSQL installs and unrelated clusters without resetting or migrating them. Check PostgreSQL server and backup clients before provisioning and upgrade backup. v0.1.0 RHEL server installation is connected-only; offline installation refuses before mutation. Ubuntu air-gap behavior is unchanged.
 - Make **v0.1.0** the browser-compatible managed-upgrade baseline. Earlier shared-TLS installs are refused before upgrade changes: install fresh and re-enroll devices. Use an independent P-256/SHA-256 console CA and leaf, retain Ed25519 device transport and client/signing authorities, and sign separate per-origin console and device HTTPS roots into new bootstrap bundles. Native deployment proof now imports the actual installed console CA instead of supplying laboratory certificates.
 - Reject Ed25519 console certificates, generate P-256 database leaves, name the console CA in setup and status, and warn that first-owner passkeys require a DNS console URL rather than an IP address.
 - Activate the authenticated installed agent/server release series automatically, so a fresh turnkey device can receive management work without a hidden owner registration step. Preserve immutable release history, exact protocol admission and ninety-day retirement notices.

@@ -106,7 +106,7 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 	if len(policy.Pending) > 0 && policy.Current > policy.Target {
 		return errors.New("database is newer than migration target")
 	}
-	if err := databasePreflight(ctx); err != nil {
+	if err := upgradeDatabasePreflight(ctx, release); err != nil {
 		return err
 	}
 	if o.Rollback && (!policy.Compatible || len(policy.Pending) != 0 || policy.Target < policy.Floor) {

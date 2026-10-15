@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
+
+	"lindm/internal/platform"
 )
 
 // Preserve the full least-privilege resource gate before native service startup.
@@ -63,6 +65,20 @@ func integrationCredentialPreflight(ctx context.Context, binary string) error {
 	return errors.New("target binary cannot explicitly select the native integration credential; package and secret state retained")
 }
 
+func upgradeDatabasePreflight(ctx context.Context, release *platform.Release) error {
+	if err := checkPostgreSQLTools(ctx, release, command); err != nil {
+		return err
+	}
+	return databasePreflight(ctx)
+}
+
+func checkPostgreSQLServerVersion(version int64) error {
+	if version/10000 != 16 {
+		return errors.New("PostgreSQL 16 is required for local and external databases in v0.1.0; older and newer server versions are not supported")
+	}
+	return nil
+}
+
 func databasePreflight(ctx context.Context) error {
 	pool, err := migrationPool(ctx)
 	if err != nil {
@@ -74,8 +90,8 @@ func databasePreflight(ctx context.Context) error {
 	if err := pool.QueryRow(ctx, `SELECT current_setting('server_version_num')::bigint,pg_database_size(current_database())`).Scan(&version, &size); err != nil {
 		return err
 	}
-	if version < 130000 {
-		return errors.New("PostgreSQL 13 or newer required; use the supported distribution repository version")
+	if err := checkPostgreSQLServerVersion(version); err != nil {
+		return err
 	}
 	var disk unix.Statfs_t
 	if err := unix.Statfs("/var/backups", &disk); err != nil {

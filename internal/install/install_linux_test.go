@@ -62,15 +62,23 @@ func TestAirgapRequiresItsOwnPlatformAddonBeforeMutation(t *testing.T) {
 		}
 		t.Run(key, func(t *testing.T) {
 			bundle := t.TempDir()
-			if err := requireAirgapAddon(bundle, release); err == nil || !strings.Contains(err.Error(), "air-gap installation requires authenticated") {
-				t.Fatalf("missing platform add-on did not fail clearly: %v", err)
+			expected := "air-gap installation requires authenticated"
+			if key == "rhel-9" {
+				expected = "RHEL offline installation is not available in this release"
+			}
+			if err := requireAirgapAddon(bundle, release); err == nil || !strings.Contains(err.Error(), expected) {
+				t.Fatalf("missing platform add-on or unavailable mode did not fail clearly: %v", err)
 			}
 			for _, name := range []string{release.Server.SnapshotName, release.Server.SnapshotName + ".digest"} {
 				if err := os.WriteFile(filepath.Join(bundle, name), []byte("presence only; signature authentication is tested by releasebuild"), 0600); err != nil {
 					t.Fatal(err)
 				}
 				err := requireAirgapAddon(bundle, release)
-				if (err == nil) != strings.HasSuffix(name, ".digest") {
+				if key == "rhel-9" {
+					if err == nil || err.Error() != expected {
+						t.Fatalf("RHEL offline mode became available from add-on file presence: %v", err)
+					}
+				} else if (err == nil) != strings.HasSuffix(name, ".digest") {
 					t.Fatalf("incomplete platform pair accepted: %v", err)
 				}
 			}

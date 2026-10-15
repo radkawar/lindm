@@ -3,7 +3,7 @@
 Use a dedicated Ubuntu 24.04 or RHEL 9 x86 server. Give the server a stable DNS name.
 An IP-address URL cannot be a WebAuthn relying-party ID. Use the DNS name for first-owner password and passkey setup.
 The browser and managed devices must reach its HTTPS listeners.
-For RHEL, retain the required Red Hat subscription or an entitled offline repository.
+For RHEL, retain access to the configured entitled Red Hat repositories.
 
 ## Before you start
 
@@ -36,6 +36,10 @@ backups. It runs explicit migrations and checks readiness before printing the
 console URL and a one-time setup code. Keep the code private.
 Connected installation uses the server's configured, signed distribution
 repositories. For RHEL, keep its entitlement available.
+RHEL 9 explicitly selects the distribution's PostgreSQL 16 stream and checks its
+server and backup clients before provisioning. Conflicting PostgreSQL modules,
+older server/client packages and unrelated clusters are refused without reset or
+migration: use a fresh supported turnkey host.
 The root-only file `/var/lib/lindmd-operations/setup/code` also holds the code.
 Database URLs and the integrations encryption key stay root-owned and private.
 Native services receive temporary systemd credentials, not ownership of those files.
@@ -48,8 +52,10 @@ console certificates do not need a custom CA import.
 Server status marks an absent private CA for the console as inactive.
 This does not mean that the console lacks HTTPS.
 
-To use an existing PostgreSQL database, provide protected runtime and migration
-URL files. Each connection must verify the database certificate. See the
+**v0.1.0 supports PostgreSQL 16 only**, for local and existing databases.
+Older and newer server versions are refused before migrations. To use an existing
+PostgreSQL 16 database, provide protected runtime and migration URL files. Each
+connection must verify the database certificate. See the
 [installation runbook](security-and-operations.md#native-single-host-installation)
 for the actual options, required grants and certificate choices.
 
@@ -57,10 +63,14 @@ For an Ubuntu 24.04 server on AWS with private RDS PostgreSQL, use the
 [AWS deployment runbook](deploy-aws.md). It covers SSM access, external-database
 credentials, browser trust and cleanup.
 
-For an air gap, use the bundle's authenticated offline add-on for your server
-platform and run `sudo ./install.sh --airgap`. A missing platform add-on stops
-installation; it never downloads missing dependencies from the Internet.
-Keep DNS, time and certificate trust available inside the site.
+For an Ubuntu 24.04 air gap, use the bundle's authenticated Ubuntu offline add-on
+and run `sudo ./install.sh --airgap`. A missing add-on stops installation; it never
+downloads missing dependencies from the Internet. Keep DNS, time and certificate
+trust available inside the site.
+
+**v0.1.0 RHEL 9 is connected-only.** `--airgap` stops before mutation with
+“RHEL offline installation is not available in this release”. An entitled offline
+repository or the older generic PostgreSQL snapshot does not bypass this limit.
 
 ## Create the first owner
 

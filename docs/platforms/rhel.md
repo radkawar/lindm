@@ -112,6 +112,37 @@ identity, metadata refresh, unregister and activation-key deletion independently
 interrupted cleanup requires exact owned-consumer reconciliation, not broad tenant
 deletion. Air-gap content authorization and mirrors require separate evidence.
 
+### Native turnkey PostgreSQL dependency contract
+
+Connected RHEL 9 turnkey installation explicitly enables the vendor
+`postgresql:16` AppStream before installing `postgresql-server` and `postgresql`
+from the configured, authenticated distribution repositories. No public repository
+is added and no operator module-selection step is required. Vendor repository
+access (normally RHSM entitlement) remains a host prerequisite.
+See [Red Hat's PostgreSQL documentation](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_using_database_servers/using-postgresql_configuring-and-using-database-servers).
+
+The installer never resets modules or switches an existing PostgreSQL stream.
+Conflicting/disabled PostgreSQL module policy, non-16 PostgreSQL server/client
+packages, or a nonempty unrelated standard PostgreSQL data directory cause a
+refusal. The remedy is a fresh supported turnkey host, not adoption, overwrite,
+or major-version migration of an existing database. Other modules are untouched.
+The private cluster remains under `/var/lib/pgsql/lindm`.
+
+Before provisioning, the installer checks the actual `postgres`, `psql`,
+`pg_dump` and `pg_restore` executables for PostgreSQL 16. Upgrade checks these
+clients before its backup and rejects server/client major-version skew in
+database preflight. Database URLs retain `channel_binding=require` and
+`require_auth=scram-sha-256`; older libpq clients are not accommodated by removing
+authentication requirements.
+
+v0.1.0 RHEL 9 turnkey installation is connected-only. RHEL `--airgap` refuses
+before mutation: “RHEL offline installation is not available in this release”.
+The current snapshot contract does not establish PostgreSQL 16 module capability;
+the existing generic PostgreSQL closure is not accepted as a PostgreSQL 13
+fallback. An authenticated PostgreSQL 16 capable add-on is post-v0.1 roadmap
+work. The capture/backend description below is not turnkey air-gap qualification.
+Connected release exports remain snapshot-optional; Ubuntu air-gap is unchanged.
+
 ### Native air-gap server dependencies
 
 The dedicated `internal/serverdeps` RPM backend targets RHEL 9 x86_64, not
@@ -175,7 +206,7 @@ The pipe-size syscall command comes from Go's Linux constants, not
 [since 3.10](https://docs.python.org/3.10/library/fcntl.html)). RHEL's native
 DNF interpreter is retained; no newer Python prerequisite is introduced.
 
-The privileged native installer owns a separate PostgreSQL 13-or-newer cluster
+The privileged native installer owns a separate distro PostgreSQL 16 cluster
 at `/var/lib/pgsql/lindm`, loopback port 5432 and `/run/lindm-postgresql`.
 An existing port-5432 owner is a collision, not a cluster to adopt. Native
 `restorecon` applies the standard data labels; installation does not disable
@@ -184,8 +215,8 @@ migration roles use verify-full TLS under the deployment's database CA.
 The cluster config permits 64 connections and 256 MiB shared buffers; server
 device and console pools are 16 and 4 respectively. Protected setup and
 operations state live under `/var/lib/lindmd-operations`. RPM pre-transaction
-checks refuse unsigned native-upgrade bypasses; the signed air-gap path does
-not consult EPEL or a public registry.
+checks refuse unsigned native-upgrade bypasses. RHEL 9 offline installation is
+not available in v0.1.0 and refuses before mutation, even with a supplied add-on.
 
 Native units use the distribution's systemd `LoadCredential=` support for distinct
 runtime and migrator URLs. Persistent URL files remain root:root mode 0600;

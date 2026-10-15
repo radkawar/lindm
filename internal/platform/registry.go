@@ -707,6 +707,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Server: &ServerInstallation{
 			SnapshotName: "rhel9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			PostgreSQLModule:        "postgresql:16",
 			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432",
 		},
 		Desktop: gnomeGDM, Firewall: firewalld,

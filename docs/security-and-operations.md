@@ -1722,11 +1722,12 @@ Even a successful result is scoped `first-run-install-only` with
 The default three-guest workflow and all four root-credential assertions above
 remain unchanged.
 
-For native air-gap **server installation**, add `-airgap` to `lab deploy setup`.
-The fresh server guest has external QEMU networking denied, and the real installer
-must consume the bundle's authenticated host-platform offline add-on. It receives
-no online RHEL entitlement token. An absent or invalid add-on fails rather than
-falling back to vendor repositories. The record identifies `airgap_server_install`
+For native Ubuntu air-gap **server installation**, add `-airgap` to
+`lab deploy setup`. The fresh server guest has external QEMU networking denied,
+and the real installer must consume the authenticated Ubuntu offline add-on.
+An absent or invalid add-on fails rather than falling back to vendor repositories.
+RHEL 9 offline installation is not available in v0.1.0 and refuses before mutation.
+The record identifies `airgap_server_install`
 and retains the first-run-only scope; this does not qualify an air-gap device
 enrollment or backup/upgrade/restore lifecycle.
 
@@ -1761,12 +1762,14 @@ signature verification enabled. HTTPS repositories retain certificate and host
 verification. RHEL needs its normal Red Hat entitlement or an entitled repository.
 No external identity provider is needed.
 
-For `--airgap`, obtain the authenticated offline add-on for the host's platform.
+For Ubuntu `--airgap`, obtain the authenticated Ubuntu offline add-on.
 The installer imports only that retained vendor-authenticated dependency closure;
-it refuses a missing platform snapshot and digest before generating custody or
-changing services. It never falls back to a network repository. Both modes retain
-the exact signed agent repository inside `lindmd`. Release DSSE does not replace
-vendor or agent package signatures.
+it refuses a missing snapshot and digest before generating custody or changing
+services. It never falls back to a network repository. RHEL 9 is connected-only
+in v0.1.0: `--airgap` refuses before mutation with **RHEL offline installation is
+not available in this release**, even when an add-on is supplied. Supported modes
+retain the exact signed agent repository inside `lindmd`. Release DSSE does not
+replace vendor or agent package signatures.
 
 Connected turnkey configuration sets `advisories.refreshEnabled` and
 `advisories.automaticInventoryFeeds`. Automatic selection uses maintained complete
@@ -1805,7 +1808,11 @@ no mode preserves absent policy and still upgrades normally. Migration 58 fences
 traffic, records the exact applied history and raises the runtime floor to 58;
 below-floor rollback requires a compatible fenced backup restore, never schema Down.
 
-The installer creates a private native PostgreSQL cluster, distinct restricted
+v0.1.0 supports PostgreSQL 16 only for local and external databases. The installer
+refuses older or newer server versions before migrations; using a newer external
+database with the distribution's older backup client is not a supported pairing.
+PostgreSQL 17/18 support with matching clients is post-v0.1 work.
+The installer creates a private native PostgreSQL 16 cluster, distinct restricted
 database-owner migrator and non-owner runtime roles, SCRAM credentials and
 verify-full database TLS. Ubuntu uses `/var/lib/postgresql/lindm` and loopback port
 15432; RHEL uses `/var/lib/pgsql/lindm`, standard SELinux labels and loopback port 5432. It never adopts an existing cluster or disables SELinux. A collision fails
@@ -1995,15 +2002,17 @@ Release custodians enable the complete installer export with `lab release build`
 `-tuf-root-file` and independently supplied `-tuf-root-sha256`. The public TUF root
 is the actual custodian-signed update root, never an installer-generated substitute.
 The default connected export requires no vendor snapshots. To add Ubuntu air-gap
-support, supply `-serverdeps-cache` and `-ubuntu-serverdeps`; for RHEL, supply
-`-rhel-serverdeps` with that explicit cache. Either or both add-ons may be selected.
-Every supplied closure must bind platform, solver/base inventory, native vendor
-authentication and offline replay evidence. RHEL offline redistribution requires
-appropriate private customer entitlement and custody; lab development custody is
-not production legal authorization. A requested but absent or unauthenticated
-add-on fails export. Installer executables are compared across two isolated
-captured-source builds. All required bootstrap assets and each optional snapshot
-pair are signed and bound to the full `release.json`.
+support, supply `-serverdeps-cache` and `-ubuntu-serverdeps`. Every supplied closure
+must bind platform, solver/base inventory, native vendor authentication and
+offline replay evidence. A requested but absent or unauthenticated add-on fails
+export. RHEL 9 offline installation is unavailable in v0.1.0; supplying a RHEL
+snapshot cannot bypass that refusal. A PostgreSQL 16-capable authenticated add-on
+and its qualification are post-v0.1 work in [the roadmap](../ROADMAP.md).
+Any future RHEL offline redistribution requires appropriate private customer
+entitlement and custody; lab development custody is not production legal
+authorization. Installer executables are compared across two isolated
+captured-source builds. All required bootstrap assets and each supplied optional
+snapshot pair are signed and bound to the full `release.json`.
 
 The low-level native package contract below remains useful for independently
 managed deployments; it is not the turnkey installation procedure.

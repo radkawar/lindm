@@ -542,8 +542,10 @@ const (
 // snapshot and owned PostgreSQL cluster. These facts apply only to the release
 // itself, never to a derivative through Native; admission also requires LaneDeploy.
 type ServerInstallation struct {
-	SnapshotName            string
-	RequiredPackages        []string
+	SnapshotName     string
+	RequiredPackages []string
+	// PostgreSQLModule is an explicit distro stream, never a reset/switch request.
+	PostgreSQLModule        string
 	PostgreSQLDataDirectory string
 	PostgreSQLBinDirectory  string
 	PostgreSQLPort          string

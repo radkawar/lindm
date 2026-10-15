@@ -20,4 +20,12 @@ v0.1 uses [self-built releases and operator signing keys](docs/self-built-releas
 Official project-signed releases need an approved key-custody plan before they can ship.
 That work must keep signature verification, independently retained trust pins and trust-domain separation.
 
+- After v0.1.0, implement and qualify an authenticated RHEL 9 offline add-on with
+  explicit PostgreSQL 16 server/client resolution, retained module capability and
+  safe offline installation. Preserve distro package signatures, existing module
+  policy and clusters; never fall back to PostgreSQL 13 or weaken database auth.
+- After v0.1.0, implement and qualify PostgreSQL 17/18 support with a matching
+  backup and restore client. Keep version-skew preflight and verified database
+  authentication; v0.1.0 supports PostgreSQL 16 only for local and external databases.
+
 Read [GOVERNANCE](GOVERNANCE.md) for project decisions and [CONTRIBUTING](CONTRIBUTING.md) to propose work.
