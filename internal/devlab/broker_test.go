@@ -137,13 +137,57 @@ func TestBrokerGroupRemovalRequiresEmptySessionGrantsAndDeniedRPC(t *testing.T) 
 	}
 }
 
-func TestBrokerStartupDiagnosticsAreBoundedAndRedacted(t *testing.T) {
+func TestIsolatedStartupDiagnosticsAreBoundedAndRedacted(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "server.log")
 	if err := os.WriteFile(path, []byte("startup failure secret-value\n"+strings.Repeat("x", 70*1024)), 0600); err != nil {
 		t.Fatal(err)
 	}
-	err := brokerStartupError(path, "secret-value")
+	err := isolatedStartupError(path, "secret-value")
 	if err == nil || strings.Contains(err.Error(), "secret-value") || !strings.Contains(err.Error(), "[redacted]") || len(err.Error()) > 65*1024 {
 		t.Fatal("startup diagnostics were not bounded and redacted")
+	}
+}
+
+func TestAuthorityStartupDiagnosticsPreserveReasonAndHideDatabaseCredentials(t *testing.T) {
+	directory := t.TempDir()
+	const password = "private-database-password"
+	const dsn = "postgresql://fixture:" + password + "@localhost/owned?sslmode=verify-full"
+	const reason = "installed agent release does not match server build identity"
+	for name, body := range map[string]string{
+		"database-url": dsn,
+		"server.log":   reason + "\nconnection " + dsn + "\npassword " + password,
+	} {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exitErr := errors.New("exit status 1")
+	fixture := &AuthorityFixture{directory: directory}
+	got := fixture.startupError(exitErr)
+	if !errors.Is(got, exitErr) || !strings.Contains(got.Error(), reason) ||
+		strings.Contains(got.Error(), password) || strings.Contains(got.Error(), dsn) {
+		t.Fatal("startup diagnostics lost the failure or exposed database credentials")
+	}
+}
+
+func TestAuthorityStartupDiagnosticsFailClosedWithoutRedactionCredentials(t *testing.T) {
+	for _, malformed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("malformed=%t", malformed), func(t *testing.T) {
+			directory := t.TempDir()
+			const secret = "private-startup-secret"
+			if err := os.WriteFile(filepath.Join(directory, "server.log"), []byte(secret), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if malformed {
+				if err := os.WriteFile(filepath.Join(directory, "database-url"), []byte("postgresql://user:"+secret+"%@localhost/owned"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			exitErr := errors.New("exit status 1")
+			got := (&AuthorityFixture{directory: directory}).startupError(exitErr)
+			if !errors.Is(got, exitErr) || strings.Contains(got.Error(), secret) {
+				t.Fatal("unavailable redaction credentials exposed startup diagnostics")
+			}
+		})
 	}
 }

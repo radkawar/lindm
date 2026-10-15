@@ -1317,6 +1317,14 @@ stable ID and hostname; they do not infer a different device from row order.
 Scrolled-dialog checks center controls hidden beneath the sticky header before
 the real pointer click. Palette shortcuts distinguish active dialogs from
 retained closed portals, and the owner regression exercises both states.
+Capabilities checks require the connectivity check's rollback consequence, not
+an incidental article in its wording. Every package-source prerequisite result
+links its real full-page capture, whether the prerequisite check passes or fails.
+Route-error evidence includes at most 16 same-origin HTTP failure records with
+bounded endpoint, method and browser error text, never query strings or bodies.
+It does not retry the route or turn a failed request into a successful review.
+Isolated startup failures retain their exit status and bounded, credential-redacted
+reason before fixture cleanup removes the log.
 
 Server status adds explicitly labelled **synthetic transport** captures for known,
 unknown, stale, failed-read and retained-evidence failed-read states on

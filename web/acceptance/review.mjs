@@ -676,21 +676,47 @@ async function review(page, route, target, theme, viewport, variant, expectedBut
 }
 
 async function visit(page, url) {
-  await page.goto(`${config.origin}${url}`, { waitUntil: "domcontentloaded" });
-  const settled = await settle(page);
-  return { state: await probe(page, "page"), settled };
+  // Keep bounded same-origin HTTP evidence, never query strings or request bodies.
+  const requestFailures = [];
+  let requestFailureCount = 0;
+  const failed = (request) => {
+    const endpoint = new URL(request.url());
+    if (
+      (endpoint.protocol !== "https:" && endpoint.protocol !== "http:") ||
+      endpoint.origin !== config.origin
+    )
+      return;
+    requestFailureCount += 1;
+    if (requestFailures.length < 16)
+      requestFailures.push({
+        endpoint: endpoint.pathname.slice(0, 256),
+        method: request.method().slice(0, 40),
+        error: request.failure()?.errorText?.slice(0, 400) ?? null,
+      });
+  };
+  page.on("requestfailed", failed);
+  try {
+    await page.goto(`${config.origin}${url}`, { waitUntil: "domcontentloaded" });
+    const settled = await settle(page);
+    return { state: await probe(page, "page"), settled, requestFailures, requestFailureCount };
+  } finally {
+    page.off("requestfailed", failed);
+  }
 }
 
 async function reviewRoute(page, route, theme, viewport) {
   const record = report.routes.find((item) => item.path === route.path);
   for (const target of record.targets) {
-    const { state, settled } = await visit(page, target.url);
+    const { state, settled, requestFailures, requestFailureCount } = await visit(page, target.url);
     const expected = new URL(`${config.origin}${target.url}`).pathname;
     if (state.path !== expected || state.routeError) {
       const diagnostic = state.routeError ? state.routeErrorMessage : state.path;
+      const transport = requestFailureCount
+        ? `${requestFailureCount} failed same-origin HTTP request(s): ${JSON.stringify(requestFailures)}`
+        : "No same-origin HTTP request-failed event occurred during this visit.";
       const errorIndex =
         record.errors.push(
-          `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : "a different route"}: ${diagnostic}`,
+          `${theme} ${viewport.name}: ${target.url} rendered ${state.routeError ? "the route error page" : "a different route"}: ${diagnostic}; transport: ${transport}`,
         ) - 1;
       const image = await screenshot(
         page,

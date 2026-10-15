@@ -92,6 +92,7 @@ export async function reviewEnrollmentFixtures({
             published.page,
             helpers.screenshot,
           );
+          entry.screenshots.full = entry.screenshots.prerequisite;
           entry.passed = true;
         } catch {
           entry.checks.contract.findings.push({

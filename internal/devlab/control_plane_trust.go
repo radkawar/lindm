@@ -475,10 +475,10 @@ func (f *AuthorityFixture) start(ctx context.Context) error {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-f.done:
+		case exitErr := <-f.done:
 			f.process, f.done = nil, nil
 			f.processPID.Store(0)
-			return errors.New("isolated lindmd exited before readiness")
+			return f.startupError(exitErr)
 		default:
 		}
 		req, err := http.NewRequestWithContext(ready, http.MethodGet, f.ConsoleOrigin+"/readyz", nil)
@@ -550,6 +550,28 @@ func (f *AuthorityFixture) Restart(ctx context.Context) error {
 		return err
 	}
 	return f.start(ctx)
+}
+
+// startupError retains the failed process and bounded log diagnostics before
+// Close removes them, without exposing the fixture's database credentials.
+func (f *AuthorityFixture) startupError(exitErr error) error {
+	databaseURL, err := os.ReadFile(filepath.Join(f.directory, "database-url"))
+	if err != nil {
+		return errors.Join(errors.New("read isolated startup redaction credentials"), exitErr, err)
+	}
+	defer clear(databaseURL)
+	dsn := strings.TrimSpace(string(databaseURL))
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return errors.Join(errors.New("parse isolated startup redaction credentials"), exitErr)
+	}
+	secrets := []string{dsn}
+	if parsed.User != nil {
+		if password, ok := parsed.User.Password(); ok {
+			secrets = append(secrets, password)
+		}
+	}
+	return errors.Join(exitErr, isolatedStartupError(filepath.Join(f.directory, "server.log"), secrets...))
 }
 
 // serverLogTailLimit bounds a failure diagnostic copy of the fixture's log.

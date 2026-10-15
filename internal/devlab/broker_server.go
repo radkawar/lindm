@@ -239,7 +239,7 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 			for _, secret := range options.secrets {
 				secrets = append(secrets, secret)
 			}
-			return nil, "", fmt.Errorf("bootstrap isolated directory owner: %w", brokerStartupError(filepath.Join(f.directory, "server.log"), secrets...))
+			return nil, "", fmt.Errorf("bootstrap isolated directory owner: %w", isolatedStartupError(filepath.Join(f.directory, "server.log"), secrets...))
 		}
 	}
 	err = errors.Join(admin.Close(), device.Close())
@@ -274,7 +274,7 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 			for _, secret := range options.secrets {
 				secrets = append(secrets, secret)
 			}
-			return nil, "", brokerStartupError(filepath.Join(f.directory, "server.log"), secrets...)
+			return nil, "", isolatedStartupError(filepath.Join(f.directory, "server.log"), secrets...)
 		default:
 		}
 		req, err := http.NewRequestWithContext(ready, http.MethodGet, origin+"/readyz", nil)
@@ -296,15 +296,15 @@ func openDirectoryServer(ctx context.Context, root, binary string, options direc
 	}
 }
 
-func brokerStartupError(path string, secrets ...string) (resultErr error) {
+func isolatedStartupError(path string, secrets ...string) (resultErr error) {
 	log, err := os.Open(path)
 	if err != nil {
-		return errors.Join(errors.New("isolated broker lindmd exited before readiness"), err)
+		return errors.Join(errors.New("isolated lindmd exited before readiness"), err)
 	}
 	defer func() { resultErr = errors.Join(resultErr, log.Close()) }()
 	body, err := io.ReadAll(io.LimitReader(log, 64*1024))
 	if err != nil {
-		return errors.Join(errors.New("read isolated broker startup log"), err)
+		return errors.Join(errors.New("read isolated startup log"), err)
 	}
 	detail := string(body)
 	for _, secret := range secrets {
@@ -312,5 +312,5 @@ func brokerStartupError(path string, secrets ...string) (resultErr error) {
 			detail = strings.ReplaceAll(detail, secret, "[redacted]")
 		}
 	}
-	return fmt.Errorf("isolated broker lindmd exited before readiness: %s", strings.TrimSpace(detail))
+	return fmt.Errorf("isolated lindmd exited before readiness: %s", strings.TrimSpace(detail))
 }

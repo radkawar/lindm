@@ -103,7 +103,10 @@ export async function reviewCapabilities({
         await addresses.nth(savedAddressCount).fill("192.0.2.10");
         await countsDevices(form, fail);
         const text = await form.innerText();
-        for (const expected of ["What happens when you save", "a connectivity check"])
+        for (const expected of [
+          "What happens when you save",
+          "The connectivity check reverses changes if the device loses contact.",
+        ])
           if (!text.includes(expected)) fail(`The all-devices editor omits "${expected}"`);
       },
     );
