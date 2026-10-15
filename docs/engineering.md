@@ -384,6 +384,12 @@ holds trust and recovery instructions. Batch input names first-boot timing and
 requires merging with the complete installer configuration before use. After
 installation, refresh Enrollment and follow the used code's device link or the
 approval inbox. Inventory receipt and findings assessment remain separate evidence.
+The shown-once result dialog is the creation confirmation; no duplicate success
+toast may cover its forget-secret action. Its zero-padding popup uses the local
+zero-margin footer convention. Stock enrollment review checks the full action
+bounds within the popup and viewport and its actual pointer hit target without
+waiting for a toast to disappear. Creation errors and ambiguous secret delivery
+retain their existing feedback and recovery semantics.
 The `first-device` task walkthrough checks both OS commands, exact clipboard
 copy, cloud-init and Ubuntu autoinstall, then reads a clearly identified seeded
 device's inventory and findings. It records the missing native-device prerequisite;

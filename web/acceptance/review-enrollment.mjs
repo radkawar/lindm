@@ -261,6 +261,11 @@ async function reviewEnrollment({
   await creation.getByRole("button", { name: "Create one-time code", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("heading", { name: contract.heading, exact: true }).waitFor();
+  const creationSuccessToastVisible =
+    (await page
+      .locator('[data-sonner-toast][data-type="success"]')
+      .filter({ visible: true })
+      .count()) !== 0;
   await dialog.getByLabel(contract.chooser, { exact: true }).waitFor();
   const secret = await dialog.getByLabel(contract.heading, { exact: true }).inputValue();
   protectSecret(secret);
@@ -272,6 +277,8 @@ async function reviewEnrollment({
         "/enrollment",
         index === 0 ? "ubuntu-install" : "fedora-install",
         async (require, prefix, entry) => {
+          if (index === 0)
+            require(!creationSuccessToastVisible, "Creation duplicates the shown-once result with a success toast");
           step = "choose operating system";
           const chooser = dialog.getByLabel(contract.chooser, { exact: true });
           if (emptyFleet && ready && index === 0) {
@@ -342,6 +349,29 @@ async function reviewEnrollment({
           await dialog.evaluate((node) => {
             node.scrollTop = 0;
           });
+          step = "review forget-secret action";
+          await settle(page);
+          const forget = dialog.getByRole("button", { name: "Done, forget secret", exact: true });
+          const forgetUncovered = await forget.evaluate((node) => {
+            const rect = node.getBoundingClientRect();
+            const popup = node.closest('[role="dialog"]')?.getBoundingClientRect();
+            if (
+              !popup ||
+              rect.width < 24 ||
+              rect.height < 24 ||
+              rect.left < Math.max(0, popup.left) ||
+              rect.top < Math.max(0, popup.top) ||
+              rect.right > Math.min(window.innerWidth, popup.right) ||
+              rect.bottom > Math.min(window.innerHeight, popup.bottom)
+            )
+              return false;
+            const hit = document.elementFromPoint(
+              rect.left + rect.width / 2,
+              rect.top + rect.height / 2,
+            );
+            return hit === node || node.contains(hit);
+          });
+          require(forgetUncovered, "The forget-secret action is clipped or covered");
           entry.screenshots.viewport = await screenshot(page, `${prefix}.png`, false);
           if (ready) {
             step = "review install trust disclosure";

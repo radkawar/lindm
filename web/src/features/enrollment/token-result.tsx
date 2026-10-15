@@ -448,7 +448,7 @@ function SecretDialog({ credential, onDismiss }: SecretDialogProps) {
             </div>
           </details>
         </div>
-        <DialogFooter className="border-t p-4">
+        <DialogFooter className="m-0 border-t p-4">
           <Button variant="outline" onClick={dismiss}>
             {unavailable ? "Close" : "Done, forget secret"}
           </Button>

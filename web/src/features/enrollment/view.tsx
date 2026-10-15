@@ -292,12 +292,10 @@ function IssueGrant({
       setReason("");
       setLifetime("300");
       void client.invalidateQueries({ queryKey: ["enrollment-grants", authLifetime.generation] });
-      if (!authLifetime.signal.aborted) {
-        if (result.deliveryUnknown)
-          toast.error("Couldn't show the code", {
-            description: "Revoke it and create a new one.",
-          });
-        else toast.success("One-time code created");
+      if (!authLifetime.signal.aborted && result.deliveryUnknown) {
+        toast.error("Couldn't show the code", {
+          description: "Revoke it and create a new one.",
+        });
       }
     },
     onError: (error) => {
