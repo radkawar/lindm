@@ -42,6 +42,17 @@ export async function launchTrustedDeploymentBrowser(config) {
   }
 }
 
+export async function requireInitialVendorDownload(page, source) {
+  const notice = page.locator(
+    `[id="advisory-source-${source.id}"] [data-advisory-initial-download="downloading"]`,
+  );
+  await notice.getByText("Downloading first vulnerability data", { exact: true }).waitFor();
+  await notice.getByText("Download progress is not reported.", { exact: false }).waitFor();
+  const displayedStart = await notice.locator("time").getAttribute("datetime");
+  if (displayedStart !== new Date(source.refreshStartedAt).toISOString())
+    throw new Error("initial_vendor_download_start_not_displayed");
+}
+
 const evaluatedStates = new Set([
   "ADVISORY_FINDING_STATE_AFFECTED",
   "ADVISORY_FINDING_STATE_ACCEPTED",

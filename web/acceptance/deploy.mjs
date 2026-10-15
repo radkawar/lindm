@@ -5,7 +5,11 @@
 // CA store, never ignoreHTTPSErrors or a certificate-verification bypass.
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { assessDeploymentFindings, launchTrustedDeploymentBrowser } from "./deploy-browser.mjs";
+import {
+  assessDeploymentFindings,
+  launchTrustedDeploymentBrowser,
+  requireInitialVendorDownload,
+} from "./deploy-browser.mjs";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import { submitReviewedDeviceAction, waitForSettledActionHistory } from "./deploy-actions.mjs";
 import { enroll, signIn, signOut, createGrant, confirmEnrolledDevice } from "./journey.mjs";
@@ -210,16 +214,7 @@ async function inspectInventoryAndFindings(ui) {
           !source.error &&
           !capturedDownloads.has(source.id)
         ) {
-          const notice = driver.page.locator(
-            `[id="advisory-source-${source.id}"] [data-advisory-initial-download="downloading"]`,
-          );
-          await notice
-            .getByRole("heading", { name: "Downloading first vulnerability data", exact: true })
-            .waitFor();
-          await notice.getByText("Download progress is not reported.", { exact: false }).waitFor();
-          const displayedStart = await notice.locator("time").getAttribute("datetime");
-          if (displayedStart !== new Date(source.refreshStartedAt).toISOString())
-            throw new Error("initial_vendor_download_start_not_displayed");
+          await requireInitialVendorDownload(driver.page, source);
           await capture(`initial-vendor-download-${source.id}`);
           capturedDownloads.add(source.id);
           result.initial_download_observed = true;

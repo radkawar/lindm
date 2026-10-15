@@ -9,7 +9,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { assessDeploymentFindings, launchTrustedDeploymentBrowser } from "./deploy-browser.mjs";
+import {
+  assessDeploymentFindings,
+  launchTrustedDeploymentBrowser,
+  requireInitialVendorDownload,
+} from "./deploy-browser.mjs";
 
 const exec = promisify(execFile);
 
@@ -126,6 +130,21 @@ test("native deployment browser trusts its supplied CA but rejects unknown roots
   const page = await context.newPage();
   await page.goto(`https://localhost:${trustedPort}`);
   assert.equal(await page.locator("body").textContent(), "native TLS verified");
+  const source = { id: "ubuntu-native", refreshStartedAt: "2026-10-15T02:34:00.000Z" };
+  await page.setContent(
+    `<article id="advisory-source-${source.id}">
+      <div role="status" data-advisory-initial-download="downloading">
+        <p class="font-medium">Downloading first vulnerability data</p>
+        <p>Download progress is not reported.</p>
+        <time datetime="${source.refreshStartedAt}">Actual start</time>
+      </div>
+    </article>`,
+  );
+  await requireInitialVendorDownload(page, source);
+  await assert.rejects(
+    requireInitialVendorDownload(page, { ...source, refreshStartedAt: "2026-10-15T02:35:00Z" }),
+    /initial_vendor_download_start_not_displayed/,
+  );
   await assert.rejects(page.goto(`https://localhost:${unknownPort}`), /ERR_CERT_AUTHORITY_INVALID/);
   await assert.rejects(
     page.goto(`https://127.0.0.1:${trustedPort}`),
