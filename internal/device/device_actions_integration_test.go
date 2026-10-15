@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"fmt"
 	"testing"
 	"time"
 
@@ -76,18 +77,38 @@ func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Msg.GetAction().GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
-		t.Fatal("unreported possible effect not unknown")
+	if status := state.Msg.GetAction().GetStatus(); status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || status.GetCompletedAt() != nil || status.GetFailure() == agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED {
+		t.Fatalf("fresh start grant not in flight: %v", status)
 	}
-	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(lockActionSpec()))); connect.CodeOf(err) != connect.CodeFailedPrecondition {
-		t.Fatalf("new effect admitted while unknown: %v", err)
+	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(refreshActionSpec()))); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "device_action_pending" {
+		t.Fatalf("new effect admitted while running: %v", err)
 	}
-	result := f.result(t, f.work(t), 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, nil)
+	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(f.result(t, f.work(t), 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, nil))); err != nil {
+		t.Fatal(err)
+	}
+	state, err = f.svc.GetDeviceAction(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: action.GetActionId()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := state.Msg.GetAction().GetStatus(); status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || status.GetCompletedAt() != nil {
+		t.Fatalf("signed progress replaced by ambiguous completion: %v", status)
+	}
+	result := f.result(t, f.work(t), 2, agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, nil)
 	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(result)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(result)); err != nil {
 		t.Fatalf("exact attestation replay: %v", err)
+	}
+	state, err = f.svc.GetDeviceAction(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: action.GetActionId()}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Msg.GetAction().GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
+		t.Fatal("explicit ambiguous result lost before deadline")
+	}
+	if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(refreshActionSpec()))); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "device_action_pending" {
+		t.Fatalf("new effect admitted while unknown: %v", err)
 	}
 	if f.work(t).GetActionId() != action.GetActionId() {
 		t.Fatal("unknown action replaced")
@@ -95,6 +116,41 @@ func TestDeviceActionImmutableDigestGrantReplayAndUnknown(t *testing.T) {
 	acquireTestSession(t, t.Context(), f.svc, f.principal, f.key, 1)
 	if _, err := f.svc.GetDeviceActionWork(f.deviceCtx(), connect.NewRequest(&devicev1.GetDeviceActionWorkRequest{SessionEpoch: 1})); connect.CodeOf(err) != connect.CodeFailedPrecondition {
 		t.Fatalf("stale session work: %v", err)
+	}
+}
+
+func TestDeviceActionStartedDeadlineProjectsUnknownWithoutCompletion(t *testing.T) {
+	parallelDeviceIntegration(t)
+	for _, reported := range []bool{false, true} {
+		t.Run(fmt.Sprintf("reported_%t", reported), func(t *testing.T) {
+			f := newDeviceActionFixture(t)
+			action := f.create(t, f.request(refreshActionSpec()))
+			start, _ := f.startRequest(t, f.work(t))
+			if _, err := f.svc.AuthorizeDeviceActionStart(f.deviceCtx(), connect.NewRequest(start)); err != nil {
+				t.Fatal(err)
+			}
+			if reported {
+				if _, err := f.svc.ReportDeviceActionResult(f.deviceCtx(), connect.NewRequest(f.result(t, f.work(t), 1, agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, nil))); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// Age only the stored dispatch window, as in the unstarted-expiry
+			// test. No native effect or device completion is fabricated.
+			if _, err := f.svc.Pool.Exec(t.Context(), "UPDATE device_actions SET issued_at=clock_timestamp()-interval '2 minutes', expires_at=clock_timestamp()-interval '1 second' WHERE id=$1", action.GetActionId()); err != nil {
+				t.Fatal(err)
+			}
+			got, err := f.svc.GetDeviceAction(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: action.GetActionId()}))
+			if err != nil {
+				t.Fatal(err)
+			}
+			status := got.Msg.GetAction().GetStatus()
+			if status.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN || status.GetCompletedAt() != nil || status.GetFailure() == agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED || got.Msg.GetAction().GetClosedReason() != "" {
+				t.Fatalf("overdue action fabricated a terminal result: %v", got.Msg.GetAction())
+			}
+			if _, err := f.svc.CreateDeviceAction(f.ownerCtx, connect.NewRequest(f.request(refreshActionSpec()))); connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcReason(err) != "device_action_pending" {
+				t.Fatalf("retry admitted after started deadline: %v", err)
+			}
+		})
 	}
 }
 

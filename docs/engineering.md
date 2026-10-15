@@ -427,8 +427,15 @@ two buttons, Actions and Assign profile. A restriction is stated as confirmed
 the restricting action completed verified on the device; a fence without that
 evidence reads as sent but unconfirmed, never hedged. Each restriction has one
 Undo that opens the release action form, shown in the Overview restrictions row
-and Actions tab, with only a compact header badge elsewhere. Action actors use
-the server-projected account label (`actor_display_name`), never a client
+and Actions tab, with only a compact header badge elsewhere.
+Start-authorized actions show Running while inside their action deadline, or
+retain their signed Queued/Running progress. The stored possible-effect fence
+still blocks another action; it is not an interrupted result. Only an overdue
+or closed possible effect without a conclusive report, or an explicitly ambiguous
+device result, shows Outcome unknown. Server projection never invents completion
+time or interrupted failure. The fleet recent-action outcome follows this same
+deadline distinction. Running and unknown actions remain non-retryable.
+Action actors use the server-projected account label (`actor_display_name`), never a client
 account lookup. Keep collection states visible; do not infer a primary network
 interface or agent version from unrelated fields. Protocol sequence counters and
 the device ID belong in collapsed support details. Inventory opens with Access

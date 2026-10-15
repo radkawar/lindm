@@ -71,18 +71,22 @@ func actionMessage(row devicedb.DeviceAction, now time.Time) (*adminv1.DeviceAct
 	if row.ActionRevision.Valid && row.ActionRevision.Int != nil && row.ActionRevision.Int.IsUint64() {
 		result.ActionRevision = row.ActionRevision.Int.Uint64()
 	}
-	// Start authority is evidence of a possible effect, never evidence of success.
+	// OutcomeUnknown is the fail-closed possible-effect fence, set at start
+	// authorization. It does not mean an unexpired operation already failed.
+	// Keep signed progress until its deadline; an explicit ambiguous result
+	// remains unknown even before then. Never invent failure or completion proof.
 	if row.OutcomeUnknown && (result.Status == nil || result.Status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || result.Status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_QUEUED) {
-		digest := sha256.Sum256(row.IntentEnvelope)
-		before := result.Status.GetBefore()
-		if before == nil {
-			before = &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(row.IssuedAt.Time), Reason: "result_not_received"}
+		if result.Status == nil {
+			digest := sha256.Sum256(row.IntentEnvelope)
+			started := row.StartAuthorizedAt.Time
+			if !row.StartAuthorizedAt.Valid {
+				started = row.IssuedAt.Time
+			}
+			result.Status = &agentv1.DeviceActionStatus{ActionId: row.ID.String(), IntentSha256: digest[:], State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, AcceptedAt: timestamppb.New(row.IssuedAt.Time), StartedAt: timestamppb.New(started)}
 		}
-		started := row.StartAuthorizedAt.Time
-		if !row.StartAuthorizedAt.Valid {
-			started = row.IssuedAt.Time
+		if row.ClosedAt.Valid || !now.Before(row.ExpiresAt.Time) {
+			result.Status.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
 		}
-		result.Status = &agentv1.DeviceActionStatus{ActionId: row.ID.String(), IntentSha256: digest[:], State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED, AcceptedAt: timestamppb.New(row.IssuedAt.Time), StartedAt: timestamppb.New(started), CompletedAt: timestamppb.New(started), Before: before}
 	}
 	return result, nil
 }

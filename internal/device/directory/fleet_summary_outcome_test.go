@@ -16,6 +16,7 @@ import (
 
 func TestRecentActionOutcome(t *testing.T) {
 	at := pgtype.Timestamptz{Time: time.Unix(1_700_000_000, 0), Valid: true}
+	future := pgtype.Timestamptz{Time: at.Time.Add(time.Minute), Valid: true}
 	device := func(state agentv1.DeviceActionState) []byte {
 		document, err := proto.Marshal(&agentv1.DeviceActionStatus{State: state})
 		if err != nil {
@@ -44,6 +45,12 @@ func TestRecentActionOutcome(t *testing.T) {
 		{"closed after start without report is never success", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ClosedAt: at, ClosedReason: "result"}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN},
 		{"device cancelled before start", devicedb.FleetSummaryRecentActionsRow{Kind: "device", ClosedAt: at, ClosedReason: "cancelled"}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_CANCELLED},
 		{"device open unknown flag", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, OutcomeUnknown: true}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN},
+		{"device start grant inside deadline", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: future, OutcomeUnknown: true}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING},
+		{"device queued inside deadline", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: future, OutcomeUnknown: true, StatusDocument: device(agentv1.DeviceActionState_DEVICE_ACTION_STATE_QUEUED)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING},
+		{"device running inside deadline", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: future, OutcomeUnknown: true, StatusDocument: device(agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING},
+		{"device deadline without result", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: at, OutcomeUnknown: true}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN},
+		{"device deadline with running progress", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: at, OutcomeUnknown: true, StatusDocument: device(agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN},
+		{"device reported unknown inside deadline", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, ExpiresAt: future, OutcomeUnknown: true, StatusDocument: device(agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN},
 		{"device running", devicedb.FleetSummaryRecentActionsRow{Kind: "device", StartAuthorizedAt: at, StatusDocument: device(agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING},
 		{"device waiting", devicedb.FleetSummaryRecentActionsRow{Kind: "device"}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_WAITING},
 		{"resource succeeded", devicedb.FleetSummaryRecentActionsRow{Kind: "resource", StartAuthorizedAt: at, ClosedAt: at, ClosedReason: "result", StatusDocument: resource(agentv1.ResourceExecutionState_RESOURCE_EXECUTION_STATE_SUCCEEDED)}, adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_SUCCEEDED},
@@ -54,7 +61,7 @@ func TestRecentActionOutcome(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := recentActionOutcome(test.row)
+			got, err := recentActionOutcome(test.row, at.Time)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,7 +70,7 @@ func TestRecentActionOutcome(t *testing.T) {
 			}
 		})
 	}
-	if _, err := recentActionOutcome(devicedb.FleetSummaryRecentActionsRow{Kind: "device", StatusDocument: []byte{0xff}}); err == nil {
+	if _, err := recentActionOutcome(devicedb.FleetSummaryRecentActionsRow{Kind: "device", StatusDocument: []byte{0xff}}, at.Time); err == nil {
 		t.Fatal("corrupt status document was accepted")
 	}
 }

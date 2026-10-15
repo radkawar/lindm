@@ -155,7 +155,7 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 	}
 	response.RecentActions = make([]*adminv1.FleetRecentAction, 0, len(actions))
 	for _, row := range actions {
-		outcome, err := recentActionOutcome(row)
+		outcome, err := recentActionOutcome(row, counts.ObservedAt.Time)
 		if err != nil {
 			return nil, err
 		}
@@ -172,8 +172,9 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 
 // recentActionOutcome reports success or failure only from the device's own
 // status document; server closures without a conclusive report are never
-// presented as success.
-func recentActionOutcome(row devicedb.FleetSummaryRecentActionsRow) (adminv1.FleetActionOutcome, error) {
+// presented as success. The possible-effect fence is not an ambiguous outcome
+// while the action is still inside its dispatch window.
+func recentActionOutcome(row devicedb.FleetSummaryRecentActionsRow, now time.Time) (adminv1.FleetActionOutcome, error) {
 	reported := len(row.StatusDocument) > 0
 	if reported && row.Kind == "resource" {
 		status := new(agentv1.ResourceExecutionStatus)
@@ -217,9 +218,9 @@ func recentActionOutcome(row devicedb.FleetSummaryRecentActionsRow) (adminv1.Fle
 		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
 	case closed:
 		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_CANCELLED, nil
-	case row.Kind == "device" && row.OutcomeUnknown:
+	case row.Kind == "device" && row.OutcomeUnknown && !now.Before(row.ExpiresAt.Time):
 		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_UNKNOWN, nil
-	case row.StartAuthorizedAt.Valid || reported:
+	case row.StartAuthorizedAt.Valid || reported || row.OutcomeUnknown:
 		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_RUNNING, nil
 	default:
 		return adminv1.FleetActionOutcome_FLEET_ACTION_OUTCOME_WAITING, nil

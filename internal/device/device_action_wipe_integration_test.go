@@ -46,8 +46,8 @@ func TestDeviceActionLiveRootAggregateRequiresVolatileExactProof(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, err := f.svc.GetDeviceAction(f.ownerCtx, connect.NewRequest(&adminv1.GetDeviceActionRequest{ActionId: action.GetActionId()}))
-	if err != nil || before.Msg.GetAction().GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
-		t.Fatalf("missing terminal proof not unknown: %v", err)
+	if err != nil || before.Msg.GetAction().GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || before.Msg.GetAction().GetStatus().GetCompletedAt() != nil {
+		t.Fatalf("unexpired aggregate grant not in flight: %v", err)
 	}
 	verification := &agentv1.DeviceActionVerification{Verified: true, After: &agentv1.DeviceActionObservation{ObservedAt: timestamppb.Now(), Supported: true}}
 	for _, target := range challenge.GetNativePlan().GetCryptoEraseTargets() {
