@@ -5,3 +5,5 @@ terraform.tfstate*
 *.tfvars.json
 crash.log
 artifacts/
+__pycache__/
+*.pyc
