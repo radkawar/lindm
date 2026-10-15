@@ -3,7 +3,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ChromiumDriver, UI } from "./drivers.mjs";
-import { submitReviewedDeviceAction, waitForSettledActionHistory } from "./deploy-actions.mjs";
+import {
+  openDeviceActionResult,
+  submitReviewedDeviceAction,
+  waitForSettledActionHistory,
+} from "./deploy-actions.mjs";
 
 async function browser(run) {
   const driver = new ChromiumDriver();
@@ -96,5 +100,29 @@ test("old-row and empty history snapshots wait for settled asynchronous renderin
     `);
     await waitForSettledActionHistory(driver);
     assert.equal(await driver.observe(() => document.body.innerText.trim()), "No actions yet");
+  });
+});
+
+test("terminal action evidence expands only its existing result and never retries", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <details data-device-action-row data-action-id="other-action">
+        <summary>Other action</summary><p>Other result</p>
+      </details>
+      <details data-device-action-row data-action-id="failed-action">
+        <summary>Refresh inventory: Outcome unknown, don't retry</summary>
+        <dl><dt>Failure</dt><dd>Interrupted</dd></dl>
+      </details>
+      <button onclick="document.body.dataset.submitted='yes'">Send action</button>
+    `);
+    await openDeviceActionResult(driver.page, "failed-action");
+    await openDeviceActionResult(driver.page, "failed-action");
+    const failed = driver.page.locator('[data-action-id="failed-action"]');
+    assert.equal(await failed.locator("dd").isVisible(), true);
+    assert.equal(
+      await driver.page.locator('[data-action-id="other-action"]').getAttribute("open"),
+      null,
+    );
+    assert.equal(await driver.observe(() => document.body.dataset.submitted), undefined);
   });
 });

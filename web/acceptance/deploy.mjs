@@ -11,7 +11,11 @@ import {
   requireInitialVendorDownload,
 } from "./deploy-browser.mjs";
 import { ChromiumDriver, UI } from "./drivers.mjs";
-import { submitReviewedDeviceAction, waitForSettledActionHistory } from "./deploy-actions.mjs";
+import {
+  openDeviceActionResult,
+  submitReviewedDeviceAction,
+  waitForSettledActionHistory,
+} from "./deploy-actions.mjs";
 import { enroll, signIn, signOut, createGrant, confirmEnrolledDevice } from "./journey.mjs";
 import {
   privateDirectory,
@@ -157,8 +161,13 @@ async function managedRefresh(ui) {
       await capture("completed-live-refresh");
       return;
     }
-    if (["Failed", "Expired", "Outcome unknown, don't retry"].includes(observed?.state))
+    if (["Failed", "Expired", "Outcome unknown, don't retry"].includes(observed?.state)) {
+      result.device_id = config.deviceId;
+      result.action_id = observed.id;
+      await openDeviceActionResult(driver.page, observed.id);
+      await capture("failed-live-refresh-details");
       throw new Error("live_management_action_failed");
+    }
     await delay(1_000);
   }
   throw new Error("live_management_action_timeout");

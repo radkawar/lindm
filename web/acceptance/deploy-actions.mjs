@@ -24,3 +24,9 @@ export async function waitForSettledActionHistory(driver) {
     { timeout: 30_000 },
   );
 }
+
+// Expanding an existing result is read-only; never submit or retry failed work.
+export async function openDeviceActionResult(page, actionId) {
+  const row = page.locator(`[data-device-action-row][data-action-id="${actionId}"]`);
+  if ((await row.getAttribute("open")) === null) await row.locator("summary").click();
+}
