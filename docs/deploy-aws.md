@@ -280,7 +280,12 @@ credential, passphrase or private key. Do not run with shell tracing.
 The helper fetches the RDS-managed master secret in memory using the instance
 role. It disables core dumps, locks current/future memory and refuses active swap.
 It does not print, persist or pass the master password to a subprocess. Raw
-SDK/libpq/installer diagnostics are withheld because they can contain secrets.
+SDK/libpq diagnostics are withheld because they can contain secrets. The native
+installer's stdout and stderr are retained only in the create-exclusive root:root
+mode 0600 file `installer-diagnostic.private` inside `--credential-directory`.
+Inspect it only in the protected root session; never publish its raw contents,
+copy it into evidence or include it in an uploaded archive. A failed install
+does not authorize rerunning the create-only helper or replacing its credentials.
 
 Before any database mutation it makes a real `channel_binding=require` connection
 with `sslmode=verify-full` and `require_auth=scram-sha-256`. Success keeps `require`.

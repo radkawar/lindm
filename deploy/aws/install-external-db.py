@@ -70,12 +70,26 @@ def create_file(path, data):
         os.fsync(stream.fileno())
 
 
-def command(arguments, capture=False):
+def command(arguments, capture=False, diagnostic_path=None):
     # Child argv/environment contain public paths and configuration only. In
     # particular no database connection string, password, or setup code is sent.
-    result = subprocess.run(arguments, env=CHILD_ENV, stdin=subprocess.DEVNULL,
-                            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, check=False)
+    if diagnostic_path is None:
+        result = subprocess.run(arguments, env=CHILD_ENV, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL, check=False)
+    else:
+        if capture:
+            raise InstallError("Private installer diagnostics cannot also be captured in memory.")
+        protected(str(Path(diagnostic_path).parent), directory=True, private=True)
+        fd = os.open(diagnostic_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                     os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            os.fchown(stream.fileno(), 0, 0)
+            os.fchmod(stream.fileno(), 0o600)
+            result = subprocess.run(arguments, env=CHILD_ENV, stdin=subprocess.DEVNULL,
+                                    stdout=stream, stderr=subprocess.STDOUT, check=False)
+            stream.flush()
+            os.fsync(stream.fileno())
     if result.returncode:
         raise InstallError(f"Public {Path(arguments[0]).name} command failed (exit {result.returncode}); output withheld.")
     return result.stdout
@@ -337,7 +351,7 @@ def install_bundle(args):
     if args.tls_cert_file:
         flags.extend(["--tls-cert-file", args.tls_cert_file, "--tls-key-file", args.tls_key_file,
                       "--tls-ca-file", args.tls_ca_file])
-    command(flags)
+    command(flags, diagnostic_path=directory / "installer-diagnostic.private")
 
 
 def install_edge(args):
