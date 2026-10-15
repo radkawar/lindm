@@ -183,10 +183,13 @@ message AdvisoryConfig {
     gte: 300
     lte: 604800
   }];
+  // Activate maintained registry exports only for enrolled inventory identities.
+  // Explicit feeds remain authoritative. This never enables network refresh by itself.
+  bool automatic_inventory_feeds = 5;
   option (buf.validate.message).cel = {
     id: "advisories.unique"
-    message: "feed IDs and distro/release/stream combinations must be unique"
-    expression: "this.feeds.all(f, this.feeds.filter(x, x.id == f.id).size() == 1 && this.feeds.filter(x, x.distro == f.distro && x.release == f.release && x.platform_stream == f.platform_stream).size() == 1)"
+    message: "feed IDs and distro/release/stream/architecture combinations must be unique"
+    expression: "this.feeds.all(f, this.feeds.filter(x, x.id == f.id).size() == 1 && this.feeds.filter(x, x.distro == f.distro && x.release == f.release && x.platform_stream == f.platform_stream && x.architecture == f.architecture).size() == 1)"
   };
 }
 

@@ -489,7 +489,7 @@ func TestEvaluationWaitsForConcurrentFeedConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := q.ConfigureAdvisoryFeed(t.Context(), advisorydb.ConfigureAdvisoryFeedParams{ID: source.GetId(), Distro: source.GetDistro(), Release: source.GetRelease(), SourceUrl: source.GetUrl(), ConfigBytes: encoded, Revision: uuid.New()}); err != nil {
+	if err := q.ConfigureAdvisoryFeed(t.Context(), advisorydb.ConfigureAdvisoryFeedParams{ID: source.GetId(), Distro: source.GetDistro(), Release: source.GetRelease(), Architecture: source.GetArchitecture(), SourceUrl: source.GetUrl(), ConfigBytes: encoded, Revision: uuid.New()}); err != nil {
 		t.Fatal(err)
 	}
 	type outcome struct {

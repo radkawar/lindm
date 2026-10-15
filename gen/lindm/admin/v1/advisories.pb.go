@@ -483,9 +483,16 @@ type AdvisoryFreshness struct {
 	FeedId             string                 `protobuf:"bytes,8,opt,name=feed_id,json=feedId,proto3" json:"feed_id,omitempty"`
 	SourceSha256       string                 `protobuf:"bytes,9,opt,name=source_sha256,json=sourceSha256,proto3" json:"source_sha256,omitempty"`
 	// Installed packages the applied feed does not cover (PARTIAL only).
-	UncoveredPackages uint64 `protobuf:"varint,10,opt,name=uncovered_packages,json=uncoveredPackages,proto3" json:"uncovered_packages,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	UncoveredPackages     uint64                 `protobuf:"varint,10,opt,name=uncovered_packages,json=uncoveredPackages,proto3" json:"uncovered_packages,omitempty"`
+	Refreshing            bool                   `protobuf:"varint,11,opt,name=refreshing,proto3" json:"refreshing,omitempty"`
+	RefreshStartedAt      *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=refresh_started_at,json=refreshStartedAt,proto3" json:"refresh_started_at,omitempty"`
+	RefreshLeaseExpiresAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=refresh_lease_expires_at,json=refreshLeaseExpiresAt,proto3" json:"refresh_lease_expires_at,omitempty"`
+	// Scheduled network refresh is enabled; queued is not proof of a live download.
+	RefreshEnabled bool `protobuf:"varint,14,opt,name=refresh_enabled,json=refreshEnabled,proto3" json:"refresh_enabled,omitempty"`
+	// Applied source has a recorded failed attempt; no error details are exposed.
+	RefreshFailed bool `protobuf:"varint,15,opt,name=refresh_failed,json=refreshFailed,proto3" json:"refresh_failed,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AdvisoryFreshness) Reset() {
@@ -586,6 +593,41 @@ func (x *AdvisoryFreshness) GetUncoveredPackages() uint64 {
 		return x.UncoveredPackages
 	}
 	return 0
+}
+
+func (x *AdvisoryFreshness) GetRefreshing() bool {
+	if x != nil {
+		return x.Refreshing
+	}
+	return false
+}
+
+func (x *AdvisoryFreshness) GetRefreshStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RefreshStartedAt
+	}
+	return nil
+}
+
+func (x *AdvisoryFreshness) GetRefreshLeaseExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RefreshLeaseExpiresAt
+	}
+	return nil
+}
+
+func (x *AdvisoryFreshness) GetRefreshEnabled() bool {
+	if x != nil {
+		return x.RefreshEnabled
+	}
+	return false
+}
+
+func (x *AdvisoryFreshness) GetRefreshFailed() bool {
+	if x != nil {
+		return x.RefreshFailed
+	}
+	return false
 }
 
 type ListDeviceFindingsRequest struct {
@@ -1394,9 +1436,14 @@ type AdvisoryFeedStatus struct {
 	RejectedRecords []*v1.RejectedRecord   `protobuf:"bytes,15,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
 	// Platform registry display name of distro/release, e.g. "Fedora 44"; empty
 	// when the release is not registered.
-	OsName        string `protobuf:"bytes,16,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	OsName string `protobuf:"bytes,16,opt,name=os_name,json=osName,proto3" json:"os_name,omitempty"`
+	// A live, exact-configuration publication lease; not successful publication.
+	Refreshing            bool                   `protobuf:"varint,17,opt,name=refreshing,proto3" json:"refreshing,omitempty"`
+	RefreshStartedAt      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=refresh_started_at,json=refreshStartedAt,proto3" json:"refresh_started_at,omitempty"`
+	RefreshLeaseExpiresAt *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=refresh_lease_expires_at,json=refreshLeaseExpiresAt,proto3" json:"refresh_lease_expires_at,omitempty"`
+	RefreshEnabled        bool                   `protobuf:"varint,20,opt,name=refresh_enabled,json=refreshEnabled,proto3" json:"refresh_enabled,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *AdvisoryFeedStatus) Reset() {
@@ -1539,6 +1586,34 @@ func (x *AdvisoryFeedStatus) GetOsName() string {
 		return x.OsName
 	}
 	return ""
+}
+
+func (x *AdvisoryFeedStatus) GetRefreshing() bool {
+	if x != nil {
+		return x.Refreshing
+	}
+	return false
+}
+
+func (x *AdvisoryFeedStatus) GetRefreshStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RefreshStartedAt
+	}
+	return nil
+}
+
+func (x *AdvisoryFeedStatus) GetRefreshLeaseExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RefreshLeaseExpiresAt
+	}
+	return nil
+}
+
+func (x *AdvisoryFeedStatus) GetRefreshEnabled() bool {
+	if x != nil {
+		return x.RefreshEnabled
+	}
+	return false
 }
 
 type ListAdvisoryFeedsResponse struct {
@@ -1743,7 +1818,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\afeed_id\x18\f \x01(\tR\x06feedId\x12\x1d\n" +
 	"\n" +
 	"source_url\x18\r \x01(\tR\tsourceUrl\x12\x16\n" +
-	"\x06reason\x18\x0e \x01(\tR\x06reason\"\x8a\x04\n" +
+	"\x06reason\x18\x0e \x01(\tR\x06reason\"\x99\x06\n" +
 	"\x11AdvisoryFreshness\x12:\n" +
 	"\x05state\x18\x01 \x01(\x0e2$.lindm.admin.v1.AdvisoryFindingStateR\x05state\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x1f\n" +
@@ -1756,7 +1831,14 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\afeed_id\x18\b \x01(\tR\x06feedId\x12#\n" +
 	"\rsource_sha256\x18\t \x01(\tR\fsourceSha256\x12-\n" +
 	"\x12uncovered_packages\x18\n" +
-	" \x01(\x04R\x11uncoveredPackages\"\xb7\x02\n" +
+	" \x01(\x04R\x11uncoveredPackages\x12\x1e\n" +
+	"\n" +
+	"refreshing\x18\v \x01(\bR\n" +
+	"refreshing\x12H\n" +
+	"\x12refresh_started_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\x10refreshStartedAt\x12S\n" +
+	"\x18refresh_lease_expires_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x15refreshLeaseExpiresAt\x12'\n" +
+	"\x0frefresh_enabled\x18\x0e \x01(\bR\x0erefreshEnabled\x12%\n" +
+	"\x0erefresh_failed\x18\x0f \x01(\bR\rrefreshFailed\"\xb7\x02\n" +
 	"\x19ListDeviceFindingsRequest\x12%\n" +
 	"\tdevice_id\x18\x01 \x01(\tB\b\xbaH\x05r\x03\xb0\x01\x01R\bdeviceId\x12%\n" +
 	"\tpage_size\x18\x02 \x01(\rB\b\xbaH\x05*\x03\x18\xc8\x01R\bpageSize\x12'\n" +
@@ -1821,7 +1903,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x11evaluated_devices\x18\x04 \x01(\x04R\x10evaluatedDevices\x12'\n" +
 	"\x0fpartial_devices\x18\x05 \x01(\x04R\x0epartialDevices\x12[\n" +
 	"\x10unchecked_groups\x18\x06 \x03(\v2&.lindm.admin.v1.AdvisoryUncheckedGroupB\b\xbaH\x05\x92\x01\x02\x10\x14R\x0funcheckedGroups\"\x1a\n" +
-	"\x18ListAdvisoryFeedsRequest\"\xae\x05\n" +
+	"\x18ListAdvisoryFeedsRequest\"\x96\a\n" +
 	"\x12AdvisoryFeedStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06distro\x18\x02 \x01(\tR\x06distro\x12\x18\n" +
@@ -1843,7 +1925,13 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\vsnapshot_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"snapshotAt\x12L\n" +
 	"\x10rejected_records\x18\x0f \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\x12\x17\n" +
-	"\aos_name\x18\x10 \x01(\tR\x06osName\"U\n" +
+	"\aos_name\x18\x10 \x01(\tR\x06osName\x12\x1e\n" +
+	"\n" +
+	"refreshing\x18\x11 \x01(\bR\n" +
+	"refreshing\x12H\n" +
+	"\x12refresh_started_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\x10refreshStartedAt\x12S\n" +
+	"\x18refresh_lease_expires_at\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\x15refreshLeaseExpiresAt\x12'\n" +
+	"\x0frefresh_enabled\x18\x14 \x01(\bR\x0erefreshEnabled\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
 	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xb0\x02\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +
@@ -1947,29 +2035,33 @@ var file_lindm_admin_v1_advisories_proto_depIdxs = []int32{
 	21, // 7: lindm.admin.v1.AdvisoryFreshness.inventory_expires_at:type_name -> google.protobuf.Timestamp
 	21, // 8: lindm.admin.v1.AdvisoryFreshness.feed_checked_at:type_name -> google.protobuf.Timestamp
 	21, // 9: lindm.admin.v1.AdvisoryFreshness.feed_expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 10: lindm.admin.v1.ListDeviceFindingsRequest.sort:type_name -> lindm.admin.v1.DeviceFindingSort
-	4,  // 11: lindm.admin.v1.ListDeviceFindingsResponse.findings:type_name -> lindm.admin.v1.AdvisoryFinding
-	5,  // 12: lindm.admin.v1.ListDeviceFindingsResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
-	7,  // 13: lindm.admin.v1.ListDeviceFindingsResponse.totals:type_name -> lindm.admin.v1.DeviceFindingTotals
-	10, // 14: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.packages:type_name -> lindm.admin.v1.UncoveredPackage
-	5,  // 15: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
-	2,  // 16: lindm.admin.v1.AdvisoryUncheckedGroup.reason:type_name -> lindm.admin.v1.AdvisoryUncheckedReason
-	13, // 17: lindm.admin.v1.ListAdvisorySummaryResponse.advisories:type_name -> lindm.admin.v1.AdvisorySummary
-	14, // 18: lindm.admin.v1.ListAdvisorySummaryResponse.unchecked_groups:type_name -> lindm.admin.v1.AdvisoryUncheckedGroup
-	21, // 19: lindm.admin.v1.AdvisoryFeedStatus.checked_at:type_name -> google.protobuf.Timestamp
-	21, // 20: lindm.admin.v1.AdvisoryFeedStatus.expires_at:type_name -> google.protobuf.Timestamp
-	21, // 21: lindm.admin.v1.AdvisoryFeedStatus.attempted_at:type_name -> google.protobuf.Timestamp
-	22, // 22: lindm.admin.v1.AdvisoryFeedStatus.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	21, // 23: lindm.admin.v1.AdvisoryFeedStatus.snapshot_at:type_name -> google.protobuf.Timestamp
-	23, // 24: lindm.admin.v1.AdvisoryFeedStatus.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
-	17, // 25: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
-	21, // 26: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
-	3,  // 27: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	21, // 10: lindm.admin.v1.AdvisoryFreshness.refresh_started_at:type_name -> google.protobuf.Timestamp
+	21, // 11: lindm.admin.v1.AdvisoryFreshness.refresh_lease_expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 12: lindm.admin.v1.ListDeviceFindingsRequest.sort:type_name -> lindm.admin.v1.DeviceFindingSort
+	4,  // 13: lindm.admin.v1.ListDeviceFindingsResponse.findings:type_name -> lindm.admin.v1.AdvisoryFinding
+	5,  // 14: lindm.admin.v1.ListDeviceFindingsResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
+	7,  // 15: lindm.admin.v1.ListDeviceFindingsResponse.totals:type_name -> lindm.admin.v1.DeviceFindingTotals
+	10, // 16: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.packages:type_name -> lindm.admin.v1.UncoveredPackage
+	5,  // 17: lindm.admin.v1.ListDeviceUncoveredPackagesResponse.freshness:type_name -> lindm.admin.v1.AdvisoryFreshness
+	2,  // 18: lindm.admin.v1.AdvisoryUncheckedGroup.reason:type_name -> lindm.admin.v1.AdvisoryUncheckedReason
+	13, // 19: lindm.admin.v1.ListAdvisorySummaryResponse.advisories:type_name -> lindm.admin.v1.AdvisorySummary
+	14, // 20: lindm.admin.v1.ListAdvisorySummaryResponse.unchecked_groups:type_name -> lindm.admin.v1.AdvisoryUncheckedGroup
+	21, // 21: lindm.admin.v1.AdvisoryFeedStatus.checked_at:type_name -> google.protobuf.Timestamp
+	21, // 22: lindm.admin.v1.AdvisoryFeedStatus.expires_at:type_name -> google.protobuf.Timestamp
+	21, // 23: lindm.admin.v1.AdvisoryFeedStatus.attempted_at:type_name -> google.protobuf.Timestamp
+	22, // 24: lindm.admin.v1.AdvisoryFeedStatus.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
+	21, // 25: lindm.admin.v1.AdvisoryFeedStatus.snapshot_at:type_name -> google.protobuf.Timestamp
+	23, // 26: lindm.admin.v1.AdvisoryFeedStatus.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	21, // 27: lindm.admin.v1.AdvisoryFeedStatus.refresh_started_at:type_name -> google.protobuf.Timestamp
+	21, // 28: lindm.admin.v1.AdvisoryFeedStatus.refresh_lease_expires_at:type_name -> google.protobuf.Timestamp
+	17, // 29: lindm.admin.v1.ListAdvisoryFeedsResponse.feeds:type_name -> lindm.admin.v1.AdvisoryFeedStatus
+	21, // 30: lindm.admin.v1.AcceptAdvisoryFindingRequest.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 31: lindm.admin.v1.AcceptAdvisoryFindingResponse.exception:type_name -> lindm.admin.v1.AdvisoryException
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_lindm_admin_v1_advisories_proto_init() }

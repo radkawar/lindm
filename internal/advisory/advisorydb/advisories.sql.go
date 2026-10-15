@@ -372,10 +372,10 @@ func (q *Queries) ClaimAdvisoryEvaluations(ctx context.Context, arg ClaimAdvisor
 }
 
 const configureAdvisoryFeed = `-- name: ConfigureAdvisoryFeed :exec
-INSERT INTO advisory_feeds (id,distro,release,source_url,config_bytes,revision,platform_stream)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
+INSERT INTO advisory_feeds (id,distro,release,source_url,config_bytes,revision,platform_stream,architecture)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
- source_url=EXCLUDED.source_url,config_bytes=EXCLUDED.config_bytes,platform_stream=EXCLUDED.platform_stream,enabled=true,
+ source_url=EXCLUDED.source_url,config_bytes=EXCLUDED.config_bytes,platform_stream=EXCLUDED.platform_stream,architecture=EXCLUDED.architecture,enabled=true,
  revision=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.revision ELSE EXCLUDED.revision END,
  source_sha256=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_sha256 ELSE ''::bytea END,
  source_manifest=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_manifest ELSE ''::bytea END,
@@ -384,6 +384,8 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
+ attempted_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.attempted_at END,
+ error=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.error ELSE '' END,
  configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
   THEN advisory_feeds.configured_at ELSE clock_timestamp() END
 `
@@ -396,6 +398,7 @@ type ConfigureAdvisoryFeedParams struct {
 	ConfigBytes    []byte
 	Revision       uuid.UUID
 	PlatformStream string
+	Architecture   string
 }
 
 func (q *Queries) ConfigureAdvisoryFeed(ctx context.Context, arg ConfigureAdvisoryFeedParams) error {
@@ -407,6 +410,7 @@ func (q *Queries) ConfigureAdvisoryFeed(ctx context.Context, arg ConfigureAdviso
 		arg.ConfigBytes,
 		arg.Revision,
 		arg.PlatformStream,
+		arg.Architecture,
 	)
 	return err
 }
@@ -686,7 +690,7 @@ func (q *Queries) GetAdvisoryExceptionRequest(ctx context.Context, arg GetAdviso
 }
 
 const getAdvisoryFeed = `-- name: GetAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE id=$1
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture FROM advisory_feeds WHERE id=$1
 `
 
 func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -711,6 +715,7 @@ func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed,
 		&i.Enabled,
 		&i.CompleteSnapshot,
 		&i.ConfiguredAt,
+		&i.Architecture,
 	)
 	return i, err
 }
@@ -906,7 +911,7 @@ type InsertAdvisorySetFindingsParams struct {
 }
 
 const listAdvisoryFeeds = `-- name: ListAdvisoryFeeds :many
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
 `
 
 func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error) {
@@ -937,7 +942,42 @@ func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error)
 			&i.Enabled,
 			&i.CompleteSnapshot,
 			&i.ConfiguredAt,
+			&i.Architecture,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdvisoryRefreshes = `-- name: ListAdvisoryRefreshes :many
+SELECT DISTINCT ON (g.feed_id) g.feed_id,g.started_at,g.cleanup_after
+FROM advisory_generation_cleanup g JOIN advisory_feeds f ON f.id=g.feed_id
+WHERE f.enabled AND g.config_bytes=f.config_bytes AND g.started_at IS NOT NULL
+ AND g.cleanup_after>clock_timestamp()
+ORDER BY g.feed_id,g.started_at DESC LIMIT 32
+`
+
+type ListAdvisoryRefreshesRow struct {
+	FeedID       string
+	StartedAt    pgtype.Timestamptz
+	CleanupAfter pgtype.Timestamptz
+}
+
+func (q *Queries) ListAdvisoryRefreshes(ctx context.Context) ([]ListAdvisoryRefreshesRow, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryRefreshes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdvisoryRefreshesRow{}
+	for rows.Next() {
+		var i ListAdvisoryRefreshesRow
+		if err := rows.Scan(&i.FeedID, &i.StartedAt, &i.CleanupAfter); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -1178,6 +1218,48 @@ func (q *Queries) ListAdvisoryUncoveredPackages(ctx context.Context, arg ListAdv
 	return items, nil
 }
 
+const listAutomaticAdvisoryInventory = `-- name: ListAutomaticAdvisoryInventory :many
+SELECT DISTINCT d.os_id,d.os_version,d.architecture,h.advisory_platform_stream
+FROM devices d
+JOIN enrollment_generations e ON e.id=d.current_generation_id
+JOIN host_observations h ON h.generation_id=e.id
+WHERE d.state='active' AND e.current_snapshot_id IS NOT NULL AND h.advisory_eligible
+ AND h.advisory_registry_revision=$1
+ORDER BY d.os_id,d.os_version,d.architecture,h.advisory_platform_stream LIMIT 256
+`
+
+type ListAutomaticAdvisoryInventoryRow struct {
+	OsID                   string
+	OsVersion              string
+	Architecture           string
+	AdvisoryPlatformStream string
+}
+
+func (q *Queries) ListAutomaticAdvisoryInventory(ctx context.Context, advisoryRegistryRevision []byte) ([]ListAutomaticAdvisoryInventoryRow, error) {
+	rows, err := q.db.Query(ctx, listAutomaticAdvisoryInventory, advisoryRegistryRevision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAutomaticAdvisoryInventoryRow{}
+	for rows.Next() {
+		var i ListAutomaticAdvisoryInventoryRow
+		if err := rows.Scan(
+			&i.OsID,
+			&i.OsVersion,
+			&i.Architecture,
+			&i.AdvisoryPlatformStream,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeviceAdvisoryFindings = `-- name: ListDeviceAdvisoryFindings :many
 SELECT f.id, f.device_id, f.advisory_id, f.package_name, f.installed_version, f.fixed_version, f.architecture, f.severity, f.published_at, f.cves, f.feed_id, f.source_url, f.evaluated_at, f.inventory_at, f.feed_checked_at, f.feed_expires_at, f.exception_actor_id, f.exception_reason, f.accepted_at, f.exception_expires_at, f.state, EXISTS (
  SELECT 1 FROM unnest($1::text[]) WITH ORDINALITY AS r(advisory_id,ordinal)
@@ -1303,7 +1385,7 @@ func (q *Queries) LockAdvisoryDevice(ctx context.Context, id uuid.UUID) error {
 }
 
 const lockAdvisoryFeed = `-- name: LockAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at FROM advisory_feeds WHERE id=$1 FOR UPDATE
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture FROM advisory_feeds WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -1328,6 +1410,7 @@ func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed
 		&i.Enabled,
 		&i.CompleteSnapshot,
 		&i.ConfiguredAt,
+		&i.Architecture,
 	)
 	return i, err
 }
@@ -1379,6 +1462,67 @@ func (q *Queries) MergeAdvisoryPublicationBatch(ctx context.Context, publication
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const pendingAutomaticAdvisoryIdentity = `-- name: PendingAutomaticAdvisoryIdentity :many
+SELECT h.generation_id,h.sequence,d.os_id,d.os_version,d.architecture,
+ h.os_id_status,h.os_version_status,h.architecture_status,
+ CASE WHEN d.os_id=ANY($1::text[]) THEN h.details ELSE ''::bytea END AS details
+FROM devices d
+JOIN enrollment_generations e ON e.id=d.current_generation_id
+JOIN host_observations h ON h.generation_id=e.id
+WHERE d.state='active' AND e.current_snapshot_id IS NOT NULL
+ AND h.advisory_registry_revision<>$2::bytea
+ORDER BY h.generation_id LIMIT 256 FOR UPDATE OF h SKIP LOCKED
+`
+
+type PendingAutomaticAdvisoryIdentityParams struct {
+	StreamIds        []string
+	RegistryRevision []byte
+}
+
+type PendingAutomaticAdvisoryIdentityRow struct {
+	GenerationID       uuid.UUID
+	Sequence           int64
+	OsID               string
+	OsVersion          string
+	Architecture       string
+	OsIDStatus         int16
+	OsVersionStatus    int16
+	ArchitectureStatus int16
+	Details            []byte
+}
+
+// Resolve bounded current observations durably, so a large cohort cannot
+// permanently hide later products behind a LIMIT on full native details.
+func (q *Queries) PendingAutomaticAdvisoryIdentity(ctx context.Context, arg PendingAutomaticAdvisoryIdentityParams) ([]PendingAutomaticAdvisoryIdentityRow, error) {
+	rows, err := q.db.Query(ctx, pendingAutomaticAdvisoryIdentity, arg.StreamIds, arg.RegistryRevision)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PendingAutomaticAdvisoryIdentityRow{}
+	for rows.Next() {
+		var i PendingAutomaticAdvisoryIdentityRow
+		if err := rows.Scan(
+			&i.GenerationID,
+			&i.Sequence,
+			&i.OsID,
+			&i.OsVersion,
+			&i.Architecture,
+			&i.OsIDStatus,
+			&i.OsVersionStatus,
+			&i.ArchitectureStatus,
+			&i.Details,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const pruneAdvisoryExceptionRequests = `-- name: PruneAdvisoryExceptionRequests :exec
@@ -1497,6 +1641,30 @@ func (q *Queries) RenewAdvisoryGeneration(ctx context.Context, generation uuid.U
 	return result.RowsAffected(), nil
 }
 
+const resolveAutomaticAdvisoryIdentity = `-- name: ResolveAutomaticAdvisoryIdentity :exec
+UPDATE host_observations SET advisory_registry_revision=$3,advisory_eligible=$4,advisory_platform_stream=$5
+WHERE generation_id=$1 AND sequence=$2
+`
+
+type ResolveAutomaticAdvisoryIdentityParams struct {
+	GenerationID             uuid.UUID
+	Sequence                 int64
+	AdvisoryRegistryRevision []byte
+	AdvisoryEligible         bool
+	AdvisoryPlatformStream   string
+}
+
+func (q *Queries) ResolveAutomaticAdvisoryIdentity(ctx context.Context, arg ResolveAutomaticAdvisoryIdentityParams) error {
+	_, err := q.db.Exec(ctx, resolveAutomaticAdvisoryIdentity,
+		arg.GenerationID,
+		arg.Sequence,
+		arg.AdvisoryRegistryRevision,
+		arg.AdvisoryEligible,
+		arg.AdvisoryPlatformStream,
+	)
+	return err
+}
+
 const shareAdvisoryFeedConfiguration = `-- name: ShareAdvisoryFeedConfiguration :exec
 SELECT pg_advisory_xact_lock_shared(6152883104475031217)
 `
@@ -1507,17 +1675,24 @@ func (q *Queries) ShareAdvisoryFeedConfiguration(ctx context.Context) error {
 }
 
 const startAdvisoryGeneration = `-- name: StartAdvisoryGeneration :exec
-INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
-VALUES($1,$2,clock_timestamp()+interval '10 minutes')
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after,started_at,config_bytes)
+VALUES($1,$2,clock_timestamp()+interval '10 minutes',$3,$4)
 `
 
 type StartAdvisoryGenerationParams struct {
-	FeedID     string
-	Generation uuid.UUID
+	FeedID      string
+	Generation  uuid.UUID
+	StartedAt   pgtype.Timestamptz
+	ConfigBytes []byte
 }
 
 func (q *Queries) StartAdvisoryGeneration(ctx context.Context, arg StartAdvisoryGenerationParams) error {
-	_, err := q.db.Exec(ctx, startAdvisoryGeneration, arg.FeedID, arg.Generation)
+	_, err := q.db.Exec(ctx, startAdvisoryGeneration,
+		arg.FeedID,
+		arg.Generation,
+		arg.StartedAt,
+		arg.ConfigBytes,
+	)
 	return err
 }
 

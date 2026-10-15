@@ -13,6 +13,14 @@ Use [verification](../verification.md#1-launch-platform-qualification) and the
 **Evidence access:** `~/.cache` and `$HOME` evidence paths identify maintainer-local retained records with hash references.
 The repository does not include these records or provide public downloads.
 
+Connected turnkey advisory defaults activate only complete maintained exports for
+actual enrolled inventory identities; registry support alone is not a promise of
+automatic complete feed coverage. Unknown products, derivatives, partial rows and
+rows without every maintained export remain unchecked unless explicit policy
+supplies a valid source. All matching, rejection and origin rules remain in force.
+See [installation guidance](../install.md#wait-for-the-first-vulnerability-assessment)
+and each family's advisory section. There is no new qualification claim.
+
 ## Support status matrix
 
 The table below is generated from the platform registry (`internal/platform`, run

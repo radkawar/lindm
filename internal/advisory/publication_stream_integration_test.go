@@ -367,7 +367,18 @@ func (f *streamPublicationFixture) assertUnchanged(t *testing.T, before advisory
 	if after := f.feed(t); !reflect.DeepEqual(before, after) {
 		t.Fatalf("incomplete publication changed the active feed: before=%+v after=%+v", before, after)
 	}
-	if after := f.listFindings(t); !proto.Equal(findings, after) {
+	after := f.listFindings(t)
+	// In-flight ownership is deliberately visible without publishing staged
+	// claims. Compare every immutable assessment field, excluding only the
+	// independently tested live lease timestamps and refreshing flag.
+	expected := proto.CloneOf(findings)
+	actual := proto.CloneOf(after)
+	for _, response := range []*adminv1.ListDeviceFindingsResponse{expected, actual} {
+		response.Freshness.Refreshing = false
+		response.Freshness.RefreshStartedAt = nil
+		response.Freshness.RefreshLeaseExpiresAt = nil
+	}
+	if !proto.Equal(expected, actual) {
 		t.Fatalf("incomplete publication changed active findings: before=%v after=%v", findings, after)
 	}
 }

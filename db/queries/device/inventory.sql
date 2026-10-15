@@ -341,6 +341,9 @@ ON CONFLICT (generation_id) DO UPDATE SET
     hardware_model_value = EXCLUDED.hardware_model_value,
     hardware_serial_status = EXCLUDED.hardware_serial_status,
     hardware_serial_value = EXCLUDED.hardware_serial_value,
+    advisory_registry_revision = ''::bytea,
+    advisory_eligible = false,
+    advisory_platform_stream = '',
     details = EXCLUDED.details;
 
 -- name: GetHostObservation :one

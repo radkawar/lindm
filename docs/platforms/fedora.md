@@ -1007,6 +1007,13 @@ Aarch64 reruns are blocked: lab hosts offline.
 
 ## Advisory feeds
 
+Connected turnkey servers automatically activate the registry's architecture-specific
+repomd export after enrolled Fedora inventory arrives. The selected source stays
+bound to that release and architecture; another architecture gets its own source,
+not inferred coverage. Air-gap refresh remains disabled and explicit custom or
+disabled policy is preserved. Initial download and evaluation have no guaranteed
+latency; see [installation guidance](../install.md#wait-for-the-first-vulnerability-assessment).
+
 Fedora uses repository **updateinfo**, not Red Hat CSAF/VEX. The adapter requires
 `distro=fedora`, a supported explicit architecture and bounded compressed XML
 ([`advisory/feed/rpm.go:51-79`](../../internal/advisory/feed/rpm.go#L51-L79)).

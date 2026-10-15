@@ -96,6 +96,23 @@ compatibility policy; contracts fence traffic and below-floor rollback restores 
 protected backup rather than running Down. Configuration/key ownership remains
 checked at resource loading in addition to systemd sandboxing. PostgreSQL is
 external to the application package and purge retains operator keys/data/accounts.
+
+Connected turnkey installations enable inventory-driven registered advisory
+sources, not an eager download of every supported distribution. The immutable
+`AdvisoryConfig.automatic_inventory_feeds` policy and explicit sources reconcile
+through the existing shared feed-configuration fence; source bytes, publications
+and per-source attempted times in PostgreSQL remain the only mutable authority.
+The exclusive maintenance leader acquires and verifies sources while replicated
+device evaluation continues independently. Live exact-configuration publication
+leases expose real refresh start/ownership, never findings or estimated completion.
+Air-gap configuration disables scheduled egress, and upgrades preserve explicit
+operator policy and older installations whose original connection mode is unknown.
+Every inventory-derived source, including its exact native release and feed ID,
+passes the feed protobuf rules before projection can mark it eligible.
+Malformed observed identities remain unknown; they cannot stop service startup
+or another device's feed acquisition. The projection policy revision fences
+eligibility cached under earlier validation semantics.
+
 The existing Compose assets remain narrower laboratory topology, not equal-guarantee
 turnkey container delivery: no bundled independently signed database image,
 automatic protected PKI/database setup or protected native upgrade/restore gate is

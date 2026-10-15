@@ -60,6 +60,13 @@ message AdvisoryFreshness {
   string source_sha256 = 9;
   // Installed packages the applied feed does not cover (PARTIAL only).
   uint64 uncovered_packages = 10;
+  bool refreshing = 11;
+  google.protobuf.Timestamp refresh_started_at = 12;
+  google.protobuf.Timestamp refresh_lease_expires_at = 13;
+  // Scheduled network refresh is enabled; queued is not proof of a live download.
+  bool refresh_enabled = 14;
+  // Applied source has a recorded failed attempt; no error details are exposed.
+  bool refresh_failed = 15;
 }
 
 // Order of a device's findings. UNSPECIFIED is SEVERITY: critical first, then
@@ -211,6 +218,11 @@ message AdvisoryFeedStatus {
   // Platform registry display name of distro/release, e.g. "Fedora 44"; empty
   // when the release is not registered.
   string os_name = 16;
+  // A live, exact-configuration publication lease; not successful publication.
+  bool refreshing = 17;
+  google.protobuf.Timestamp refresh_started_at = 18;
+  google.protobuf.Timestamp refresh_lease_expires_at = 19;
+  bool refresh_enabled = 20;
 }
 message ListAdvisoryFeedsResponse {
   repeated AdvisoryFeedStatus feeds = 1;

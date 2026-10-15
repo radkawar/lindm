@@ -35,7 +35,9 @@ type installState struct {
 	// checkpoints the native package database independently of runtime readiness.
 	AttemptedVersion, InstalledVersion string
 	LocalDatabase                      bool
-	Pending                            *installationProgress
+	// Nil preserves older journals whose original egress mode was not recorded.
+	Airgap  *bool
+	Pending *installationProgress
 }
 
 func upgradeRelease(ctx context.Context, o Options, version, packagePath string, release *platform.Release) (err error) {
@@ -122,6 +124,9 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 		return err
 	}
 	if err := prepareNativeIntegrationUpgrade(ctx, binary); err != nil {
+		return err
+	}
+	if err := enableNativeAdvisoryUpgrade(state.Airgap); err != nil {
 		return err
 	}
 	if err := lease.Backup(ctx, serverops.BackupOptions{Config: "/etc/lindm/server.json", RecipientFile: "/etc/lindm/backup-recipient", OutputDirectory: "/var/backups/lindm"}); err != nil {

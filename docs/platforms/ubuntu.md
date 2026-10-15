@@ -1319,6 +1319,16 @@ parent confirmation.
 
 ## Advisory feeds
 
+Connected turnkey servers automatically activate the registered Ubuntu export
+only after enrolled Ubuntu inventory arrives. Sources retain numeric release and
+native dpkg architecture identity (including the existing `noble` alias rules);
+derivatives do not automatically acquire Ubuntu coverage. The complete OSV archive
+can make the first download substantial. Real start/lease metadata describes live
+work, not a percentage or a guaranteed duration; publication and current device
+evaluation remain prerequisites for assessed findings. See the
+[installation guidance](../install.md#wait-for-the-first-vulnerability-assessment).
+Air-gap mode and explicit custom/disabled policy remain unchanged.
+
 Two-human advisory exceptions use the shared control-plane approval mechanism;
 there is no Ubuntu-specific exception executor. The disposable
 `lab vm dispatch -advisory-exceptions -local-authority` lane requires a real

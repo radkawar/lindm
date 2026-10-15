@@ -47,6 +47,7 @@ type AdvisoryFeed struct {
 	Enabled          bool
 	CompleteSnapshot bool
 	ConfiguredAt     pgtype.Timestamptz
+	Architecture     string
 }
 
 type AdvisoryFinding struct {

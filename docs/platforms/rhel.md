@@ -826,6 +826,16 @@ consult them before enabling an action on a RHEL device.
 
 ## Advisory feeds
 
+Connected turnkey servers automatically activate the registry's Red Hat CSAF
+archive export for enrolled RHEL inventory only after the existing native CPE,
+repository and release-lock checks prove its maintained servicing stream.
+Automatic sources retain the observed exact minor and architecture; an EUS/E4S,
+unknown or conflicting stream never borrows the standard export. RHEL 9 and 10
+therefore keep their own product claims rather than relying on a compatible
+rebuild. Initial-download timing is observed, not guaranteed. Air-gap and explicit
+operator feed policy remain unchanged; see
+[installation guidance](../install.md#wait-for-the-first-vulnerability-assessment).
+
 RHEL uses vendor CSAF 2.0 security advisories and VEX, not Fedora updateinfo or a
 version-string-only CVE join. Parsing checks publisher, final status, product tree
 and supported relationships, retaining fixed, known affected, known not affected

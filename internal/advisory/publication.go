@@ -58,7 +58,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	}
 	elapsed := time.Now()
 	generation := advisoryGeneration{feedID: source.GetId(), revision: uuid.New()}
-	if err := advisorydb.New(s.pool).StartAdvisoryGeneration(ctx, advisorydb.StartAdvisoryGenerationParams{FeedID: generation.feedID, Generation: generation.revision}); err != nil {
+	if err := advisorydb.New(s.pool).StartAdvisoryGeneration(ctx, advisorydb.StartAdvisoryGenerationParams{FeedID: generation.feedID, Generation: generation.revision, StartedAt: timestamp(started), ConfigBytes: encoded}); err != nil {
 		return err
 	}
 	// Include only generations owned by this call or retired by its switch.

@@ -198,7 +198,7 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 }
 
 func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e advisorydb.AdvisoryEvaluation) (*adminv1.AdvisoryFreshness, error) {
-	f := &adminv1.AdvisoryFreshness{State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED, Reason: e.Reason, InventoryAt: protoTime(e.InventoryAt), InventoryExpiresAt: protoTime(e.ExpiresAt), FeedId: e.FeedID}
+	f := &adminv1.AdvisoryFreshness{State: adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_AFFECTED, Reason: e.Reason, InventoryAt: protoTime(e.InventoryAt), InventoryExpiresAt: protoTime(e.ExpiresAt), FeedId: e.FeedID, RefreshEnabled: s.config.GetRefreshEnabled()}
 	if e.SnapshotID != nil {
 		f.SnapshotId = e.SnapshotID.String()
 	}
@@ -247,6 +247,19 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	f.FeedCheckedAt = protoTime(row.CheckedAt)
 	f.FeedExpiresAt = protoTime(row.ExpiresAt)
 	f.SourceSha256 = hex.EncodeToString(row.SourceSha256)
+	f.RefreshFailed = row.Enabled && row.Error != ""
+	refreshes, err := q.ListAdvisoryRefreshes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, refresh := range refreshes {
+		if refresh.FeedID == e.FeedID && row.Enabled && d.State == "active" && sameID(e.SnapshotID, d.CurrentSnapshotID) && e.HostReceivedAt == d.HostReceivedAt {
+			f.Refreshing = true
+			f.RefreshStartedAt = protoTime(refresh.StartedAt)
+			f.RefreshLeaseExpiresAt = protoTime(refresh.CleanupAfter)
+			break
+		}
+	}
 	if !row.ExpiresAt.Valid || !now.Time.Before(row.ExpiresAt.Time) {
 		unknown("feed_stale")
 	}
@@ -266,6 +279,10 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 	if err != nil {
 		return nil, err
 	}
+	refreshes, err := q.ListAdvisoryRefreshes(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := &adminv1.ListAdvisoryFeedsResponse{}
 	for _, row := range rows {
 		var manifest advisoryv1.FeedManifest
@@ -273,6 +290,16 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 			return nil, err
 		}
 		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, OsName: registeredName(platform.ForFeed(row.Distro, row.Release)), PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, RejectedRecords: manifest.RejectedRecords, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
+		status := out.Feeds[len(out.Feeds)-1]
+		status.RefreshEnabled = s.config.GetRefreshEnabled()
+		for _, refresh := range refreshes {
+			if refresh.FeedID == row.ID {
+				status.Refreshing = true
+				status.RefreshStartedAt = protoTime(refresh.StartedAt)
+				status.RefreshLeaseExpiresAt = protoTime(refresh.CleanupAfter)
+				break
+			}
+		}
 	}
 	return out, nil
 }

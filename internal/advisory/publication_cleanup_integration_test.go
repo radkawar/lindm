@@ -71,7 +71,7 @@ func TestAdvisoryGenerationCleanupResumesAfterCancellation(t *testing.T) {
 func TestAdvisoryGenerationCleanupProtectsActiveAndLiveStaging(t *testing.T) {
 	f := newStreamPublicationFixture(t)
 	staging := seedStreamCleanupGeneration(t, f, 501)
-	if err := advisorydb.New(f.pool).StartAdvisoryGeneration(t.Context(), advisorydb.StartAdvisoryGenerationParams{FeedID: f.source.Id, Generation: staging}); err != nil {
+	if err := advisorydb.New(f.pool).StartAdvisoryGeneration(t.Context(), advisorydb.StartAdvisoryGenerationParams{FeedID: f.source.Id, Generation: staging, ConfigBytes: f.before.ConfigBytes}); err != nil {
 		t.Fatal(err)
 	}
 	// Even an erroneously queued active revision cannot be deleted. Future

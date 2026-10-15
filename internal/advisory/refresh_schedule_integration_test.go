@@ -30,8 +30,8 @@ func TestRefreshScheduleIsSharedAcrossReplicas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if due, err := first.refreshDue(t.Context()); err != nil || !due {
-		t.Fatalf("never-attempted feed not due: %t %v", due, err)
+	if due, err := first.dueSources(t.Context()); err != nil || len(due) != 1 {
+		t.Fatalf("never-attempted feed not due: %v %v", due, err)
 	}
 	attempted := time.Now().UTC().Truncate(time.Microsecond)
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
@@ -43,12 +43,12 @@ func TestRefreshScheduleIsSharedAcrossReplicas(t *testing.T) {
 		t.Fatal(err)
 	}
 	second.clock = func() time.Time { return attempted.Add(time.Minute) }
-	if due, err := second.refreshDue(t.Context()); err != nil || due {
-		t.Fatalf("new leader repeated a recent attempt: %t %v", due, err)
+	if due, err := second.dueSources(t.Context()); err != nil || len(due) != 0 {
+		t.Fatalf("new leader repeated a recent attempt: %v %v", due, err)
 	}
 	second.clock = func() time.Time { return attempted.Add(second.refreshInterval) }
-	if due, err := second.refreshDue(t.Context()); err != nil || !due {
-		t.Fatalf("feed not due after its interval: %t %v", due, err)
+	if due, err := second.dueSources(t.Context()); err != nil || len(due) != 1 {
+		t.Fatalf("feed not due after its interval: %v %v", due, err)
 	}
 }
 
@@ -62,8 +62,8 @@ func TestCancelledRefreshIsNotRecordedAsAttempt(t *testing.T) {
 	if err := s.Refresh(cancelled); err == nil {
 		t.Fatal("cancelled refresh reported success")
 	}
-	if due, err := s.refreshDue(t.Context()); err != nil || !due {
-		t.Fatalf("cancelled refresh deferred the schedule: due=%t err=%v", due, err)
+	if due, err := s.dueSources(t.Context()); err != nil || len(due) != 1 {
+		t.Fatalf("cancelled refresh deferred the schedule: due=%v err=%v", due, err)
 	}
 }
 

@@ -107,6 +107,7 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 		ExecutionBootstrap: &configv1.ExecutionBootstrapConfig{RootFile: "/etc/lindm/execution-root.json", BootstrapFile: "/etc/lindm/bootstrap.dsse.json", InitialDelegationFile: proto.String("/etc/lindm/execution-delegation.json")},
 		Integrations:       &configv1.IntegrationsConfig{EncryptionKeyFile: nativeIntegrationKey},
 		ExecutionSigning:   &configv1.ExecutionSigningConfig{PlanKeyFile: "/etc/lindm/plan.key", StartKeyFile: "/etc/lindm/start.key"}}
+	cfg.Advisories = nativeAdvisoryDefaults(o.Airgap)
 	if err := writeConfig("/etc/lindm/server.json", cfg, uid, gid); err != nil {
 		return err
 	}

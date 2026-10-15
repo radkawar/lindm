@@ -123,6 +123,8 @@ func beginInstallation(o Options, version string) (*installState, error) {
 		return nil, err
 	}
 	state := &installState{Origin: o.Origin, DeviceOrigin: o.DeviceOrigin, TLSCA: "/etc/lindm/console-ca.crt", LocalDatabase: o.DatabaseURL == "", Pending: &installationProgress{Binding: binding, Version: version, Deployment: uuid.NewString(), GeneratedCustodians: len(o.ExecutionRootRecipients) < 3}}
+	airgap := o.Airgap
+	state.Airgap = &airgap
 	if err := writeInstallationState(state); err != nil {
 		return nil, err
 	}

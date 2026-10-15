@@ -6,7 +6,6 @@
 package advisory
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -20,7 +19,6 @@ import (
 
 	"buf.build/go/protovalidate"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/sync/singleflight"
@@ -43,13 +41,15 @@ var (
 // Service holds checked dependencies. The protobuf configuration is copied at
 // construction so callers cannot change feed authority while a refresh is running.
 type Service struct {
-	pool            *pgxpool.Pool
-	config          *configv1.AdvisoryConfig
-	client          *feed.Client
-	rules           protovalidate.Validator
-	clock           func() time.Time
-	inventoryAge    time.Duration
-	refreshInterval time.Duration
+	pool              *pgxpool.Pool
+	config            *configv1.AdvisoryConfig
+	client            *feed.Client
+	rules             protovalidate.Validator
+	clock             func() time.Time
+	inventoryAge      time.Duration
+	refreshInterval   time.Duration
+	automaticRevision []byte
+	streamIDs         []string
 	// setBuilds deduplicates concurrent cold builds of one finding set.
 	setBuilds singleflight.Group
 }
@@ -79,46 +79,15 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 	if cfg.RefreshIntervalSeconds != nil {
 		s.refreshInterval = time.Duration(cfg.GetRefreshIntervalSeconds()) * time.Second
 	}
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	q := advisorydb.New(tx)
-	// Evaluations read the enabled feed set under the shared side of this lock,
-	// so none can miss a feed whose configured_at precedes its own time.
-	if err := q.LockAdvisoryFeedConfiguration(ctx); err != nil {
-		return nil, err
-	}
-	ids := make([]string, 0, len(cfg.GetFeeds()))
-	var retired []advisoryGeneration
-	for _, source := range cfg.GetFeeds() {
-		encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
+	if cfg.GetAutomaticInventoryFeeds() {
+		s.automaticRevision, s.streamIDs, err = automaticProjectionRegistryRevision()
 		if err != nil {
 			return nil, err
 		}
-		ids = append(ids, source.GetId())
-		current, err := q.LockAdvisoryFeed(ctx, source.GetId())
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return nil, err
-		}
-		if err == nil && !bytes.Equal(current.ConfigBytes, encoded) {
-			retired = append(retired, advisoryGeneration{feedID: source.GetId(), revision: current.Revision})
-			if err := q.QueueAdvisoryGenerationCleanup(ctx, advisorydb.QueueAdvisoryGenerationCleanupParams{FeedID: source.GetId(), Generation: current.Revision}); err != nil {
-				return nil, err
-			}
-		}
-		if err := q.ConfigureAdvisoryFeed(ctx, advisorydb.ConfigureAdvisoryFeedParams{ID: source.GetId(), Distro: source.GetDistro(), Release: source.GetRelease(), PlatformStream: source.GetPlatformStream(), SourceUrl: source.GetUrl(), ConfigBytes: encoded, Revision: uuid.New()}); err != nil {
-			return nil, fmt.Errorf("configure advisory feed: %w", err)
-		}
 	}
-	if err := q.DisableAdvisoryFeeds(ctx, ids); err != nil {
+	if err := s.reconcileFeeds(ctx); err != nil {
 		return nil, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-	s.cleanupAdvisoryGenerations(ctx, retired)
 	return s, nil
 }
 
@@ -127,7 +96,14 @@ func New(ctx context.Context, pool *pgxpool.Pool, cfg *configv1.AdvisoryConfig, 
 func (s *Service) Refresh(ctx context.Context) error {
 	// Maintenance also runs when egress is disabled or no sources are configured.
 	s.cleanupAdvisoryGenerations(ctx, nil)
-	sources := s.config.GetFeeds()
+	sources, err := s.configuredSources(ctx)
+	if err != nil {
+		return err
+	}
+	return s.refreshSources(ctx, sources)
+}
+
+func (s *Service) refreshSources(ctx context.Context, sources []*advisoryv1.FeedSource) error {
 	results := make([]error, len(sources)+1)
 	var next atomic.Int64
 	var workers sync.WaitGroup
@@ -225,25 +201,31 @@ const (
 func (s *Service) RunMaintenance(ctx context.Context) error {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
-	// The local floor keeps the previous per-process cadence even if recording
-	// an attempt fails; durable attempts add the cross-instance schedule.
-	var nextLocalRefresh time.Time
+	// Discovery runs even with refresh disabled, without making network requests.
 	for {
 		cleanupCtx, cleanupCancel := context.WithTimeout(ctx, 30*time.Second)
 		if err := s.drainAdvisoryGenerationCleanup(cleanupCtx); err != nil && ctx.Err() == nil {
 			slog.Warn("advisory generation cleanup deferred", "error", err)
 		}
 		cleanupCancel()
-		if s.config.GetRefreshEnabled() && !s.clock().Before(nextLocalRefresh) {
-			due, err := s.refreshDue(ctx)
+		var err error
+		if s.config.GetAutomaticInventoryFeeds() {
+			discover, stopDiscovery := context.WithTimeout(ctx, 15*time.Second)
+			err = s.reconcileFeeds(discover)
+			stopDiscovery()
+		}
+		if err != nil && ctx.Err() == nil {
+			slog.Warn("advisory feed activation deferred", "error", err)
+		}
+		if err == nil && s.config.GetRefreshEnabled() {
+			sources, err := s.dueSources(ctx)
 			if err != nil && ctx.Err() == nil {
 				slog.Warn("advisory refresh schedule unavailable", "error", err)
 			}
-			if due {
-				if err := s.Refresh(ctx); err != nil && ctx.Err() == nil {
+			if err == nil {
+				if err := s.refreshSources(ctx, sources); err != nil && ctx.Err() == nil {
 					slog.Warn("advisory refresh failed", "error", err)
 				}
-				nextLocalRefresh = s.clock().Add(s.refreshInterval)
 			}
 		}
 		bounded, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -264,31 +246,6 @@ func (s *Service) RunMaintenance(ctx context.Context) error {
 		case <-ticker.C:
 		}
 	}
-}
-
-// refreshDue reports whether any configured feed lacks an attempt within the
-// refresh interval. Every attempt, successful or failed, records attempted_at.
-func (s *Service) refreshDue(ctx context.Context) (bool, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	feeds, err := advisorydb.New(s.pool).ListAdvisoryFeeds(ctx)
-	if err != nil {
-		return false, fmt.Errorf("list advisory feeds: %w", err)
-	}
-	attempted := make(map[string]time.Time, len(feeds))
-	for _, row := range feeds {
-		if row.AttemptedAt.Valid {
-			attempted[row.ID] = row.AttemptedAt.Time
-		}
-	}
-	now := s.clock()
-	for _, source := range s.config.GetFeeds() {
-		last, ok := attempted[source.GetId()]
-		if !ok || !now.Before(last.Add(s.refreshInterval)) {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 // RunEvaluations is the replicated evaluation job and returns only on

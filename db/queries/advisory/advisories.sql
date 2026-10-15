@@ -15,10 +15,10 @@ SELECT pg_advisory_xact_lock_shared(6152883104475031217);
 UPDATE advisory_feeds SET enabled = false WHERE NOT (id = ANY(sqlc.arg('enabled_ids')::text[]));
 
 -- name: ConfigureAdvisoryFeed :exec
-INSERT INTO advisory_feeds (id,distro,release,source_url,config_bytes,revision,platform_stream)
-VALUES ($1,$2,$3,$4,$5,$6,$7)
+INSERT INTO advisory_feeds (id,distro,release,source_url,config_bytes,revision,platform_stream,architecture)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
- source_url=EXCLUDED.source_url,config_bytes=EXCLUDED.config_bytes,platform_stream=EXCLUDED.platform_stream,enabled=true,
+ source_url=EXCLUDED.source_url,config_bytes=EXCLUDED.config_bytes,platform_stream=EXCLUDED.platform_stream,architecture=EXCLUDED.architecture,enabled=true,
  revision=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.revision ELSE EXCLUDED.revision END,
  source_sha256=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_sha256 ELSE ''::bytea END,
  source_manifest=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.source_manifest ELSE ''::bytea END,
@@ -27,6 +27,8 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  advisory_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.advisory_count ELSE 0 END,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
+ attempted_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.attempted_at END,
+ error=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.error ELSE '' END,
  configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
   THEN advisory_feeds.configured_at ELSE clock_timestamp() END;
 
@@ -79,8 +81,8 @@ WHERE r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
  AND r.id<=(SELECT id FROM doomed ORDER BY id DESC LIMIT 1);
 
 -- name: StartAdvisoryGeneration :exec
-INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after)
-VALUES($1,$2,clock_timestamp()+interval '10 minutes');
+INSERT INTO advisory_generation_cleanup(feed_id,generation,cleanup_after,started_at,config_bytes)
+VALUES($1,$2,clock_timestamp()+interval '10 minutes',$3,$4);
 
 -- name: RenewAdvisoryGeneration :execrows
 UPDATE advisory_generation_cleanup SET cleanup_after=clock_timestamp()+interval '10 minutes'
@@ -98,6 +100,40 @@ DELETE FROM advisory_generation_cleanup WHERE feed_id=$1 AND generation=$2;
 SELECT feed_id,generation FROM advisory_generation_cleanup
 WHERE cleanup_after<=clock_timestamp()
 ORDER BY cleanup_after,feed_id,generation LIMIT 1 FOR UPDATE SKIP LOCKED;
+
+
+-- name: ListAdvisoryRefreshes :many
+SELECT DISTINCT ON (g.feed_id) g.feed_id,g.started_at,g.cleanup_after
+FROM advisory_generation_cleanup g JOIN advisory_feeds f ON f.id=g.feed_id
+WHERE f.enabled AND g.config_bytes=f.config_bytes AND g.started_at IS NOT NULL
+ AND g.cleanup_after>clock_timestamp()
+ORDER BY g.feed_id,g.started_at DESC LIMIT 32;
+
+-- name: PendingAutomaticAdvisoryIdentity :many
+-- Resolve bounded current observations durably, so a large cohort cannot
+-- permanently hide later products behind a LIMIT on full native details.
+SELECT h.generation_id,h.sequence,d.os_id,d.os_version,d.architecture,
+ h.os_id_status,h.os_version_status,h.architecture_status,
+ CASE WHEN d.os_id=ANY(sqlc.arg('stream_ids')::text[]) THEN h.details ELSE ''::bytea END AS details
+FROM devices d
+JOIN enrollment_generations e ON e.id=d.current_generation_id
+JOIN host_observations h ON h.generation_id=e.id
+WHERE d.state='active' AND e.current_snapshot_id IS NOT NULL
+ AND h.advisory_registry_revision<>sqlc.arg('registry_revision')::bytea
+ORDER BY h.generation_id LIMIT 256 FOR UPDATE OF h SKIP LOCKED;
+
+-- name: ResolveAutomaticAdvisoryIdentity :exec
+UPDATE host_observations SET advisory_registry_revision=$3,advisory_eligible=$4,advisory_platform_stream=$5
+WHERE generation_id=$1 AND sequence=$2;
+
+-- name: ListAutomaticAdvisoryInventory :many
+SELECT DISTINCT d.os_id,d.os_version,d.architecture,h.advisory_platform_stream
+FROM devices d
+JOIN enrollment_generations e ON e.id=d.current_generation_id
+JOIN host_observations h ON h.generation_id=e.id
+WHERE d.state='active' AND e.current_snapshot_id IS NOT NULL AND h.advisory_eligible
+ AND h.advisory_registry_revision=$1
+ORDER BY d.os_id,d.os_version,d.architecture,h.advisory_platform_stream LIMIT 256;
 
 -- name: GetAdvisoryDevice :one
 SELECT d.id,d.state,d.os_id,d.os_version,d.architecture,d.current_generation_id,

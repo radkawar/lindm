@@ -1768,6 +1768,43 @@ changing services. It never falls back to a network repository. Both modes retai
 the exact signed agent repository inside `lindmd`. Release DSSE does not replace
 vendor or agent package signatures.
 
+Connected turnkey configuration sets `advisories.refreshEnabled` and
+`advisories.automaticInventoryFeeds`. Automatic selection uses maintained complete
+platform-registry exports only after active enrolled inventory exists; derivative,
+unknown, missing-export and registry-partial products do not acquire inferred
+coverage. Explicit feeds take precedence. At most 32 feeds are enabled, with
+bounded inventory discovery and two source-refresh workers. New sources are due
+immediately, independently of another source's six-hour durable attempt schedule.
+Archive acquisition has the existing byte and two-hour overall ceilings; automatic
+sources allow one hour without a parsed document or committed publication batch
+so a slow initial archive transfer is not stopped by the parser's five-minute
+default. These bounds are not a promised download duration.
+Discovery resolves at most 256 current host observations per pass, durably bound
+to their exact sequence and registry-fact revision, before deduplicating native
+product/release/architecture/stream identities. New observations invalidate that
+derived projection. Unsupported cohorts therefore make bounded forward progress
+instead of permanently hiding a later supported device. This projection contains
+only eligibility and native servicing stream, never source configuration or
+publication authority.
+
+`ListAdvisoryFeeds` and applied-feed `AdvisoryFreshness` expose `refreshing`,
+`refreshStartedAt` and `refreshLeaseExpiresAt` only for a live publication lease
+whose source bytes match the enabled feed. `refreshEnabled` separately identifies
+scheduled network policy. A lease heartbeat proves worker ownership, not byte
+progress or vendor freshness; successful checked time, digest, rejection records
+and device evaluation retain their existing authority. No percentage is inferred.
+Applied freshness also exposes `refreshFailed` when the enabled source has a
+recorded failed attempt, without disclosing error details. Waiting cannot hide a
+failed first download.
+See [first vulnerability assessment](install.md#wait-for-the-first-vulnerability-assessment).
+
+Managed upgrades preserve any explicit advisory message, including empty or
+disabled policy and custom sources. Absent policy receives defaults only when the
+protected installation journal records the original mode. A legacy journal with
+no mode preserves absent policy and still upgrades normally. Migration 58 fences
+traffic, records the exact applied history and raises the runtime floor to 58;
+below-floor rollback requires a compatible fenced backup restore, never schema Down.
+
 The installer creates a private native PostgreSQL cluster, distinct restricted
 database-owner migrator and non-owner runtime roles, SCRAM credentials and
 verify-full database TLS. Ubuntu uses `/var/lib/postgresql/lindm` and loopback port

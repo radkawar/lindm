@@ -74,6 +74,29 @@ The setup code cannot replace a password or passkey after setup completes. If it
 expiry interrupts setup, use the protected setup-code procedure in the runbook.
 Never disable TLS or package verification to complete enrollment.
 
+## Wait for the first vulnerability assessment
+
+Connected turnkey installations automatically select real vendor advisory exports
+after a supported device sends its managed package inventory. There is no feed
+configuration step. The server selects only the enrolled product, release,
+architecture and corroborated servicing stream; it does not download every
+distribution's archive before enrollment.
+
+The first download may be large. Its elapsed time depends on the actual vendor
+export, link and parsing work; measure the observed start-to-evaluation duration
+instead of assuming a fixed completion time. A live refresh reports its real start
+and publication lease, not an estimated percentage. Downloading or waiting is not
+an assessment: findings stay unknown until verified publication and the device's
+background evaluation complete. Failed, stale and partial coverage stay visible.
+Later attempts use the durable per-source schedule, six hours by default.
+
+Air-gap installs do not enable network refresh. Explicit advisory policy, including
+disabled refresh and custom sources, survives managed upgrades. New installations
+record their original air-gap mode; a missing advisory section on a known connected
+installation receives the same automatic defaults on upgrade. Older journals that
+did not record the mode keep their absent advisory policy without enabling egress
+or adding a new upgrade refusal.
+
 ## Set up integrations and reports
 
 Native installation enables integrations and reports. The installer creates the

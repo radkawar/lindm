@@ -340,6 +340,14 @@ diagnosis are in
 
 ## Advisory feeds
 
+Connected turnkey servers can automatically activate maintained AlmaLinux OSV
+exports after enrolled native inventory arrives. Rocky remains registry-partial
+and is not automatically activated as complete coverage. Neither distribution
+borrows Red Hat sources. Explicit Rocky sources retain their existing partial
+semantics, and air-gap/custom/disabled policy is unchanged. See
+[installation guidance](../install.md#wait-for-the-first-vulnerability-assessment);
+download queued or active never means a completed assessment.
+
 Fedora's updateinfo adapter explicitly refuses other distro identities
 ([`advisory/feed/rpm.go:51-59`](../../internal/advisory/feed/rpm.go#L51-L59)).
 Red Hat CSAF applicability requires actual Red Hat CPE and corresponding native

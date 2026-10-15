@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"slices"
 	"time"
 
 	"connectrpc.com/connect"
@@ -17,7 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
-	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/advisory"
 	"lindm/internal/config"
@@ -27,63 +25,11 @@ import (
 // HeldAdvisories derives online feeds exclusively from the platform registry.
 // Rows without maintained complete export facts are explicitly unsupported.
 func HeldAdvisories(release platform.Release, architecture string) (*configv1.AdvisoryConfig, error) {
-	registered, ok := platform.Lookup(release.Key)
-	if !ok {
-		return nil, errors.New("held advisories require a registered release")
+	sources, err := advisory.RegisteredSources(release.Key, architecture, "held")
+	if err != nil {
+		return nil, err
 	}
-	release = *registered
-	nativeArchitecture := architecture
-	switch architecture {
-	case "amd64", "x86_64":
-		nativeArchitecture, architecture = "x86_64", "amd64"
-	case "arm64", "aarch64":
-		nativeArchitecture, architecture = "aarch64", "arm64"
-	}
-	if !slices.Contains(release.Architectures, nativeArchitecture) {
-		return nil, fmt.Errorf("held advisories: architecture %q unsupported for %s", architecture, release.Key)
-	}
-	if release.Packages.Backend != platform.BackendAPT {
-		architecture = nativeArchitecture
-	}
-	if release.Advisory.Partial != "" {
-		return nil, fmt.Errorf("held advisories: partial coverage for %s: %s", release.Key, release.Advisory.Partial)
-	}
-	if len(release.Advisory.Feeds) == 0 || release.Advisory.Ecosystem == "" {
-		return nil, fmt.Errorf("held advisories: no advisory ecosystem for %s", release.Key)
-	}
-	cfg := &configv1.AdvisoryConfig{RefreshEnabled: true}
-	for _, source := range release.Advisory.Feeds {
-		export, ok := release.Advisory.Exports[source]
-		url := export.URL
-		if len(export.ArchitectureURLs) != 0 {
-			url = export.ArchitectureURLs[nativeArchitecture]
-		}
-		if !ok || url == "" || export.MaxAgeSeconds == 0 {
-			return nil, fmt.Errorf("held advisories: no maintained %s export for %s", source, release.Key)
-		}
-		var format advisoryv1.FeedFormat
-		switch export.Format {
-		case "osv-zip":
-			format = advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP
-		case "rpm-repomd":
-			format = advisoryv1.FeedFormat_FEED_FORMAT_RPM_REPOMD
-		case "redhat-csaf-archives":
-			format = advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES
-		default:
-			return nil, fmt.Errorf("held advisories: unsupported export format %q for %s", export.Format, release.Key)
-		}
-		feed := &advisoryv1.FeedSource{
-			Id:     "held-" + release.Key + "-" + architecture + "-" + string(source),
-			Distro: release.ID, Release: release.FeedRelease(release.Version.Value),
-			Architecture: architecture, Url: url, Format: format, MaxAgeSeconds: export.MaxAgeSeconds,
-			PlatformStream: export.PlatformStream,
-		}
-		if export.MaxArchiveBytes != 0 {
-			feed.MaxArchiveBytes = proto.Uint64(export.MaxArchiveBytes)
-		}
-		cfg.Feeds = append(cfg.Feeds, feed)
-	}
-	return cfg, nil
+	return &configv1.AdvisoryConfig{RefreshEnabled: true, Feeds: sources}, nil
 }
 
 const (

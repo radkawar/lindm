@@ -565,8 +565,11 @@ type AdvisoryConfig struct {
 	RefreshEnabled         bool                   `protobuf:"varint,2,opt,name=refresh_enabled,json=refreshEnabled,proto3" json:"refresh_enabled,omitempty"`
 	RefreshIntervalSeconds *uint32                `protobuf:"varint,3,opt,name=refresh_interval_seconds,json=refreshIntervalSeconds,proto3,oneof" json:"refresh_interval_seconds,omitempty"`
 	InventoryMaxAgeSeconds *uint32                `protobuf:"varint,4,opt,name=inventory_max_age_seconds,json=inventoryMaxAgeSeconds,proto3,oneof" json:"inventory_max_age_seconds,omitempty"`
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Activate maintained registry exports only for enrolled inventory identities.
+	// Explicit feeds remain authoritative. This never enables network refresh by itself.
+	AutomaticInventoryFeeds bool `protobuf:"varint,5,opt,name=automatic_inventory_feeds,json=automaticInventoryFeeds,proto3" json:"automatic_inventory_feeds,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *AdvisoryConfig) Reset() {
@@ -625,6 +628,13 @@ func (x *AdvisoryConfig) GetInventoryMaxAgeSeconds() uint32 {
 		return *x.InventoryMaxAgeSeconds
 	}
 	return 0
+}
+
+func (x *AdvisoryConfig) GetAutomaticInventoryFeeds() bool {
+	if x != nil {
+		return x.AutomaticInventoryFeeds
+	}
+	return false
 }
 
 type IntegrationsConfig struct {
@@ -2276,13 +2286,14 @@ const file_lindm_config_v1_config_proto_rawDesc = "" +
 	"\x1arelease_attestation_key_id\x18\x04 \x01(\tB\x15\xbaH\x12r\x102\x0e^[a-f0-9]{64}$R\x17releaseAttestationKeyId\x12'\n" +
 	"\tdirectory\x18\x05 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\"C\n" +
 	"\x18ReleaseRepositorySigning\x12'\n" +
-	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\"\xed\x04\n" +
+	"\tdirectory\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x90\xb5\x18\x01R\tdirectory\"\xda\x05\n" +
 	"\x0eAdvisoryConfig\x12=\n" +
 	"\x05feeds\x18\x01 \x03(\v2\x1d.lindm.advisory.v1.FeedSourceB\b\xbaH\x05\x92\x01\x02\x10 R\x05feeds\x12'\n" +
 	"\x0frefresh_enabled\x18\x02 \x01(\bR\x0erefreshEnabled\x12K\n" +
 	"\x18refresh_interval_seconds\x18\x03 \x01(\rB\f\xbaH\t*\a\x18\x80\xf5$(\x90\x1cH\x00R\x16refreshIntervalSeconds\x88\x01\x01\x12L\n" +
-	"\x19inventory_max_age_seconds\x18\x04 \x01(\rB\f\xbaH\t*\a\x18\x80\xf5$(\xac\x02H\x01R\x16inventoryMaxAgeSeconds\x88\x01\x01:\x9c\x02\xbaH\x98\x02\x1a\x95\x02\n" +
-	"\x11advisories.unique\x12>feed IDs and distro/release/stream combinations must be unique\x1a\xbf\x01this.feeds.all(f, this.feeds.filter(x, x.id == f.id).size() == 1 && this.feeds.filter(x, x.distro == f.distro && x.release == f.release && x.platform_stream == f.platform_stream).size() == 1)B\x1b\n" +
+	"\x19inventory_max_age_seconds\x18\x04 \x01(\rB\f\xbaH\t*\a\x18\x80\xf5$(\xac\x02H\x01R\x16inventoryMaxAgeSeconds\x88\x01\x01\x12:\n" +
+	"\x19automatic_inventory_feeds\x18\x05 \x01(\bR\x17automaticInventoryFeeds:\xcd\x02\xbaH\xc9\x02\x1a\xc6\x02\n" +
+	"\x11advisories.unique\x12Kfeed IDs and distro/release/stream/architecture combinations must be unique\x1a\xe3\x01this.feeds.all(f, this.feeds.filter(x, x.id == f.id).size() == 1 && this.feeds.filter(x, x.distro == f.distro && x.release == f.release && x.platform_stream == f.platform_stream && x.architecture == f.architecture).size() == 1)B\x1b\n" +
 	"\x19_refresh_interval_secondsB\x1c\n" +
 	"\x1a_inventory_max_age_seconds\"O\n" +
 	"\x12IntegrationsConfig\x129\n" +
