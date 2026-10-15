@@ -231,11 +231,15 @@ Repeat for the authenticated helper and public trust files, or transfer those
 public bytes through your approved SSM file-transfer process. Authenticate each
 file against the independently retained pins before use. Extract your own
 operator-created release archive as root into `/root/lindm-transfer/release` with
-`tar --no-same-owner -xf ARCHIVE -C /root/lindm-transfer/release`. Do not restore
-the workstation's UID/GID from archive metadata. Use no symlinks, hard links or
-special files. The helper and installer reject them.
+`tar --no-same-owner --same-permissions -xf ARCHIVE -C /root/lindm-transfer/release`.
+Do not restore the workstation's UID/GID from archive metadata. Preserve each
+signed release member's original permission bits: the canonical agent repository
+digest binds file modes as well as contents. Do not apply recursive `chmod` to
+the release. A mode change is an integrity failure, not permission to bypass the
+verifier. Use no symlinks, hard links or special files.
 All input files and their ancestors must be root:root and not group/world
-writable. The transfer directory must remain mode 0700; public files may use 0600.
+writable. Keep `/root/lindm-transfer` mode 0700. Separately transferred public
+trust files may use 0600; that rule does not normalize signed bundle members.
 Do not transfer any database URL, master password, private age identity, signing
 key or custody passphrase. Delete uploaded S3 objects and expired capabilities
 according to your retention policy after the transfer.
@@ -511,6 +515,66 @@ contents.
 
 ## Recorded AWS installation proof
 
+### PostgreSQL 16 source, findings and encrypted backup
+
+On 2026-10-15, a fresh deployment used the supported PostgreSQL 16.13
+`db.t4g.small` shape and unchanged signed `0.2.16` release from source
+`68d81cac87024a4855a421907e4315703576920c`. Its independent cold-build key,
+update root and exact public archive were authenticated before installation.
+The archive's original signed file modes were preserved.
+
+The following real steps passed:
+
+- Terraform apply: 466.10 seconds. RDS was private and encrypted, with its
+  managed master password in Secrets Manager.
+- Signed native external-database install: 109.30 seconds. TLS used
+  `verify-full`, required SCRAM channel binding and no `prefer` override.
+  The Ubuntu-signed backup clients were PostgreSQL 16.15. No local PostgreSQL
+  cluster or manual `postgresql-common` workaround was used.
+- Stock Chromium 156.0.8078.4 loaded the console with its real deployment CA
+  imported, without TLS overrides. Browser first-owner setup used a password
+  and a user-verified virtual CTAP2 authenticator, not a physical human key.
+- The unchanged command copied from the console enrolled the second real
+  Ubuntu EC2 instance in 28.53 seconds. A newly authorized inventory action
+  completed and published fresh inventory.
+- Read-only browser observation saw the real initial vendor download and
+  evaluated findings in 439.55 seconds. The automatic Ubuntu OSV source
+  published 2,306,946 claims. Its archive SHA-256 was
+  `9c4f5e08e3a7490c90c78ac85f72004d5715c8b1641e9d5ed9e65a6438dd986d`.
+  The actual assessment was **Affected**, with 18,228 open findings, including
+  one critical finding. The proof matched finding package identities to the
+  actual native inventory; it did not import or manually refresh a feed.
+- The unchanged signed native RDS backup and encrypted off-host transfer
+  completed in 24.41 seconds. The retained ciphertext was 93,308,344 bytes,
+  SHA-256 `76dc65827629aef2d6857db97bead2d7bf70e08d0ea78f81dec871968f4b03f7`.
+  Signed native `restore-drill` validated that archive in a pinned,
+  networkless, swap-zero PostgreSQL 16 recovery container in 1.80 seconds.
+- Four stock-Chromium screenshots captured the real dashboard, device list,
+  enrolled device and server status. They are retained on the maintainer's
+  workstation under `~/.cache/lindm-aws-proof-screens/`, with prefix
+  `sdk19-real-rds16-evaluated-`.
+- Terraform destroy completed in 249.23 seconds. After the exact owned
+  asynchronous automated snapshot disappeared, native AWS CLI inventory
+  confirmed zero leftovers in all 20 owned resource categories.
+
+The conservative full-shape estimate for this 2,963.86-second attempt was
+USD 0.099 at USD 0.119674 per hour. It is not an invoice. It excludes S3,
+transfer, burst CPU credits, taxes and Free Tier adjustments.
+
+**This is not a full fresh-host recovery pass.** A separate native run found
+that this signed version staged two restored archives under the small `/run`
+filesystem and stopped with insufficient space. No AWS restore workaround or
+verification bypass was applied. Full recovery requires the corrected signed
+release and its own fresh end-to-end deployment.
+
+Maintainer-local evidence is in
+`/home/r/dev/minor/lindm.worktrees/aws-deploy/artifacts/aws-proof/sdk19-qualified-final/`.
+The files include the actual browser findings, encrypted archive, screenshot
+record, wall times, cost estimate and final native cleanup inventory. They are
+not public downloads or repository files.
+
+### Historical PostgreSQL 18 investigation
+
 On 2026-10-15, a historical deployment in `us-east-1` used the previous Terraform
 defaults and the unchanged, self-built signed `0.2.14` release from source
 `dea56bc2516e240d12cb5411831636830681895d`. It used PostgreSQL 18.6 and a
@@ -553,7 +617,8 @@ in 1.44 seconds. This was real archive validation, not fresh-host recovery.
 The lease defect was repaired separately with a real-PostgreSQL blocked-COPY
 regression, lost-lease detection and the unchanged progress watchdog.
 These historical results do not qualify evaluated findings or full recovery.
-The current supported PostgreSQL 16 lifecycle needs its own signed fresh run.
+The separate PostgreSQL 16 source qualification above does not turn this
+historical failed attempt into a lifecycle pass.
 Terraform destroyed this attempt in 125.36 seconds. After its automated snapshot
 was removed, native AWS CLI inventory found zero owned leftovers across all 20
 checked resource categories, including snapshots and planned-deletion master
