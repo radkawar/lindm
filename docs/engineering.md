@@ -3132,9 +3132,12 @@ caches, writes evidence to `<main>/artifacts/acceptance-<ts>`, and posts the
 failure or interrupt.
 
 The pre-push hook (`make pre-push`, `go run ./cmd/devenv pre-push`) reads git's
-pushed refs and, for each pushed SHA without a green `signoff/unit` status, runs
-`make check` in a temporary clean worktree of that SHA, so the shared dirty tree
-never decides a push. Clean-worktree `make check` (pre-push and signoff) runs
+pushed refs and peels annotated tags to their commits before looking up signoff
+status or building. For each distinct pushed commit without a green
+`signoff/unit` status, it runs `make check` in a temporary clean worktree of that
+commit, never the caller's HEAD or shared dirty tree. The hook clears inherited
+`GIT_*` settings before opening worktrees or running gates, so nested test
+repositories use their own Git state. Clean-worktree `make check` (pre-push and signoff) runs
 golangci-lint with `--allow-parallel-runners` and a cache reserved for those
 gates (`~/.cache/lindm-clean-golangci`), so concurrent interactive lint runs
 neither block nor fail it.

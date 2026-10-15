@@ -25,7 +25,8 @@ Git pre-push hook body (make pre-push). For each commit being pushed, as read
 from git's "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin,
 it skips a SHA whose GitHub status already has a green signoff/unit, and
 otherwise runs make check in a temporary clean worktree of exactly that SHA,
-never the shared dirty tree. Deletions push nothing and are skipped.
+never the shared dirty tree. Annotated tags are peeled to their commit before
+checking status or building. Deletions push nothing and are skipped.
 `
 
 func runPrePush(args []string) error {
@@ -41,11 +42,16 @@ func runPrePush(args []string) error {
 	if flags.NArg() > 2 || *timeout <= 0 {
 		return errors.New("pre-push takes at most git's remote name and URL, and a positive timeout")
 	}
+	// Git exports repository-local variables to hooks. They must not redirect
+	// worktree commands or the temporary repositories created by gate tests.
+	if err := clearPrePushGitEnvironment(); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
-	shas, err := pushedCommits(os.Stdin)
+	shas, err := pushedCommitTips(ctx, *root, os.Stdin)
 	if err != nil {
 		return err
 	}
@@ -66,6 +72,38 @@ func runPrePush(args []string) error {
 		}
 	}
 	return nil
+}
+
+func clearPrePushGitEnvironment() error {
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "GIT_") {
+			if err := os.Unsetenv(name); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func pushedCommitTips(ctx context.Context, root string, input io.Reader) ([]string, error) {
+	objects, err := pushedCommits(input)
+	if err != nil {
+		return nil, err
+	}
+	var commits []string
+	seen := make(map[string]bool, len(objects))
+	for _, object := range objects {
+		commit, err := output(ctx, root, "git", "rev-parse", "--verify", "--end-of-options", object+"^{commit}")
+		if err != nil {
+			return nil, fmt.Errorf("resolve pushed commit %s: %w", object, err)
+		}
+		if !seen[commit] {
+			seen[commit] = true
+			commits = append(commits, commit)
+		}
+	}
+	return commits, nil
 }
 
 // pushedCommits returns the distinct local SHAs of git's pre-push lines,
