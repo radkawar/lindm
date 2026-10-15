@@ -31,3 +31,36 @@ func TestAssistanceTerminalUsesDesktopHome(t *testing.T) {
 		t.Fatalf("terminal inherited directory %q, want desktop home %q", got, home)
 	}
 }
+
+func TestAssistanceHostsFilePrecedesSyntheticLocalhost(t *testing.T) {
+	for _, test := range []struct {
+		name, input, want string
+	}{
+		{"omarchy", "passwd: files systemd\nhosts: mymachines mdns_minimal [NOTFOUND=return] resolve files myhostname dns\n",
+			"passwd: files systemd\nhosts: files mymachines mdns_minimal [NOTFOUND=return] resolve myhostname dns\n"},
+		{"already first", "hosts: files myhostname resolve [!UNAVAIL=return] dns\n",
+			"hosts: files myhostname resolve [!UNAVAIL=return] dns\n"},
+		{"files actions", "hosts: resolve [!UNAVAIL=return] files [NOTFOUND=continue SUCCESS=return] dns\n",
+			"hosts: files [NOTFOUND=continue SUCCESS=return] resolve [!UNAVAIL=return] dns\n"},
+		{"missing files", "hosts: myhostname dns # files is absent\n",
+			"hosts: files myhostname dns # files is absent\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := test.input
+			for range 2 {
+				command := exec.CommandContext(t.Context(), "/bin/sh", "-eu", "-c", assistanceNSSHostsFilesFirst)
+				command.Stdin = strings.NewReader(input)
+				output, err := command.CombinedOutput()
+				if err != nil || string(output) != test.want {
+					t.Fatalf("NSS hosts ordering = %q, %v; want %q", output, err, test.want)
+				}
+				input = string(output)
+			}
+		})
+	}
+	command := exec.CommandContext(t.Context(), "/bin/sh", "-eu", "-c", assistanceNSSHostsFilesFirst)
+	command.Stdin = strings.NewReader("passwd: files systemd\n")
+	if err := command.Run(); err == nil {
+		t.Fatal("accepted NSS configuration without a hosts entry")
+	}
+}

@@ -693,6 +693,8 @@ device are retained.
 
 Held assistance demos skip advisory feed seeding and the findings-readiness wait only when the platform registry explicitly marks advisories unavailable, as on Omarchy, Mint and Pop!_OS. The console retains that unavailable status; no base-distribution feed or clean findings are substituted. Supported advisory coverage still requires the maintained complete exports and real evaluated findings before the demo is held.
 
+The disposable assistance guest routes `localhost` to QEMU's host alias for the fixture's signed device origin and TURN listener. It preserves `/etc/hosts` and `/etc/nsswitch.conf` under `.lindm-lab-orig` names, moves the existing NSS `files` module and its action clauses ahead of modules that synthesize loopback addresses, and still requires normal `getent` resolution to return `10.0.2.2`. This changes only the admitted disposable guest, never the golden image or host.
+
 An unnamed demo holds one lab slot, with no lane deadline, until Ctrl-C tears
 its disposable fixture down. Add `-name NAME` to keep a demo across stops:
 the same command resumes the same database, owner account, console/TURN ports

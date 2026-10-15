@@ -153,6 +153,7 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   xdg-desktop-portal-hyprland 1.4.1 exposes ScreenCast version 6 and no
   RemoteDesktop. `gst-plugins-good` is not installed. The lab runs only the
   refusal scenarios.
+- **Lab name resolution.** Omarchy places NSS `resolve` before `files`, so rewriting `/etc/hosts` alone leaves synthetic `localhost` at `127.0.0.1`. Assistance fixtures move `files` first in the disposable guest (retaining the original configuration and module actions) before validating the existing `10.0.2.2` QEMU-host route. This is lab routing, not a desktop assistance qualification or a change to the golden.
 - **TPM.** The busybox `encrypt` hook cannot consume systemd TPM2 tokens and the
   lab has no TPM early-boot variant; the device-action lane binds a real token and
   records the observed passphrase prompt as unsupported.

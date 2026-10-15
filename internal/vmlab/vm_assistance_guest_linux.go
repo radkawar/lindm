@@ -22,18 +22,51 @@ import (
 	"lindm/internal/platform"
 )
 
+// NSS modules such as resolve and myhostname synthesize localhost. The
+// disposable guest must consult its lab hosts file first, retaining the other
+// modules and any action clauses attached to the files module.
+const assistanceNSSHostsFilesFirst = `awk '
+$1 == "hosts:" {
+  found = 1
+  start = 0
+  end = 0
+  for (i = 2; i <= NF && $i != "#"; i++) {
+    if ($i != "files") continue
+    start = i
+    end = i + 1
+    while (end <= NF && $end ~ /^\[/) {
+      while (end <= NF && $end !~ /\]$/) end++
+      end++
+    }
+    break
+  }
+  printf "hosts:"
+  if (start) for (i = start; i < end; i++) printf " %s", $i
+  else printf " files"
+  for (i = 2; i <= NF; i++) if (!start || i < start || i >= end) printf " %s", $i
+  printf "\n"
+  next
+}
+{ print }
+END { if (!found) exit 1 }
+'`
+
 // routeAssistanceLocalhost makes the guest resolve "localhost" to QEMU's host
 // alias 10.0.2.2, as the recovery boot artifact lanes do. The signed device
 // origin (https://localhost:PORT) and the relay URL (turn:localhost:PORT) then
 // name the same host listeners for the guest and the host browser, and the
 // TURN UDP path traverses user-mode networking rather than an SSH forward.
 func routeAssistanceLocalhost(ctx context.Context, vm *guestVM) (string, error) {
-	const script = `test -e /etc/hosts.lindm-lab-orig || cp -p /etc/hosts /etc/hosts.lindm-lab-orig
+	const script = `test -e /etc/nsswitch.conf.lindm-lab-orig || cp -p /etc/nsswitch.conf /etc/nsswitch.conf.lindm-lab-orig
+` + assistanceNSSHostsFilesFirst + ` < /etc/nsswitch.conf.lindm-lab-orig > /etc/nsswitch.conf.lindm-lab
+chmod 0644 /etc/nsswitch.conf.lindm-lab
+mv /etc/nsswitch.conf.lindm-lab /etc/nsswitch.conf
+test -e /etc/hosts.lindm-lab-orig || cp -p /etc/hosts /etc/hosts.lindm-lab-orig
 awk '($1 == "127.0.0.1" || $1 == "::1") { line = $1; n = 0; for (i = 2; i <= NF; i++) if ($i != "localhost" && $i != "localhost.localdomain") { line = line " " $i; n++ } if (n) print line; next } { print }' /etc/hosts.lindm-lab-orig > /etc/hosts.lindm-lab
 printf '10.0.2.2 localhost\n' >> /etc/hosts.lindm-lab
 chmod 0644 /etc/hosts.lindm-lab
 mv /etc/hosts.lindm-lab /etc/hosts
-if command -v restorecon >/dev/null; then restorecon /etc/hosts; fi
+if command -v restorecon >/dev/null; then restorecon /etc/hosts /etc/nsswitch.conf; fi
 getent ahostsv4 localhost | awk '{print $1}' | sort -u`
 	out, err := vm.run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), nil, 4096, 30*time.Second)
 	if err != nil {
