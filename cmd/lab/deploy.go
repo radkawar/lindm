@@ -36,6 +36,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeployOptions
 	manifestPath := flags.String("manifest", "", "pinned fresh connected x86_64 image for a registry-supported native server host; installers require explicit firmware; entitled RHEL requires Red Hat input")
+	deviceManifestPath := flags.String("device-manifest", "", "optional pinned native x86_64 managed-device image; default server manifest; Findings proves this device, not the server distribution's device advisory coverage")
 	flags.BoolVar(&options.WithoutFindings, "without-findings", false, "prove only the native server lifecycle; exclude Findings and never qualify the full lifecycle")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
@@ -100,6 +101,12 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	manifest, err := vmlab.LoadManifest(*manifestPath)
 	if err != nil {
 		return err
+	}
+	if *deviceManifestPath != "" {
+		options.DeviceManifest, err = vmlab.LoadManifest(*deviceManifestPath)
+		if err != nil {
+			return err
+		}
 	}
 	options.Browser = deployBrowser(options.Repository)
 	options.VerifyBackup = func(ctx context.Context, archive string) error {

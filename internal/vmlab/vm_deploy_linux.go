@@ -39,6 +39,7 @@ type VMDeployOptions struct {
 	RedHatTokenFile                                              string
 	WithoutFindings                                              bool
 	Hardware                                                     *VMHardwareOptions
+	DeviceManifest                                               *labv1.ImageManifest
 	BackupIdentityPassphrase                                     []byte `json:"-"`
 	Browser                                                      func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error)
 	VerifyBackup                                                 func(context.Context, string) error
@@ -57,6 +58,7 @@ type VMDeployResult struct {
 	Failure                          string                       `json:"failure,omitempty"`
 	ImageID                          string                       `json:"image_id"`
 	ImageSHA256                      string                       `json:"image_sha256"`
+	DeviceImageID                    string                       `json:"device_image_id"`
 	GuestOS                          []string                     `json:"guest_os"`
 	Runtime                          *vmRuntimeEvidence           `json:"runtime,omitempty"`
 	RestoreRuntime                   *vmRuntimeEvidence           `json:"restore_runtime,omitempty"`
@@ -122,6 +124,16 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	if err := release.LabLaneOn(platform.LaneDeploy, manifest.Architecture); err != nil {
 		return result, err
 	}
+	deviceManifest, err := deployDeviceManifest(manifest, options.DeviceManifest)
+	if err != nil {
+		return result, err
+	}
+	deviceRelease := manifestRelease(deviceManifest)
+	result.DeviceImageID = deviceManifest.Id
+	deviceTokenFile, err := deployDeviceTokenFile(release, deviceRelease, options.RedHatTokenFile)
+	if err != nil {
+		return result, err
+	}
 	hardware, err := deployServerHardware(false, options.Hardware)
 	if err != nil {
 		return result, err
@@ -131,12 +143,6 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	}
 	if options.Browser == nil || options.Recovery == nil || options.VerifyBackup == nil || options.EvidenceDirectory == "" || options.LabBinary == "" {
 		return result, errors.New("deploy requires real browser, offline backup drill and independently signed restore reconciliation")
-	}
-	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
-		return result, err
-	}
-	if release.Lab.Entitlement && options.RedHatTokenFile == "" {
-		return result, errors.New("deploy requires protected Red Hat entitlement input")
 	}
 	first, err := releasebuild.Verify(ctx, options.FirstRelease, options.ReleasePublicKey, options.ReleaseKeyID)
 	if err != nil {
@@ -175,8 +181,8 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	defer func() { err = errors.Join(err, device.close()) }()
 	origin := "https://localhost:" + strings.Split(admin.listener.Addr().String(), ":")[1]
 	deviceOrigin := "https://localhost:" + strings.Split(device.listener.Addr().String(), ":")[1]
-	request := deploylab.BrowserRequest{Origin: origin, Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: caPath, PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), Platform: release.Name}
-	request.AdvisorySources, err = deployAdvisoryExpectations(release, manifest.Version, manifest.Architecture)
+	request := deploylab.BrowserRequest{Origin: origin, Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: caPath, PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), Platform: deviceRelease.Name}
+	request.AdvisorySources, err = deployAdvisoryExpectations(deviceRelease, deviceManifest.Version, deviceManifest.Architecture)
 	if err != nil {
 		return result, err
 	}
@@ -329,7 +335,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	deviceHardware := *hardware
 	deviceHardware.AllowNetwork = false
 	deviceHardware.minimumDiskBytes = 0
-	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &deviceHardware, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
+	result.Enrollment, err = EnrollFromConsoleVM(ctx, deviceManifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: deviceTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &deviceHardware, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
 		result.DeviceID = enrolled.DeviceID
 		if err := observeDeployManagedPhase(options, func() error {
 			if err := browser("manage", enrolled.DeviceID); err != nil {
@@ -583,6 +589,47 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	}
 	result.Passed, result.OwnedCleanupComplete = true, true
 	return result, nil
+}
+
+func deployDeviceManifest(server, supplied *labv1.ImageManifest) (*labv1.ImageManifest, error) {
+	device := supplied
+	if device == nil {
+		device = server
+	}
+	// The server manifest has already passed validation in DeployVM.
+	if device != server {
+		if err := validateManifest(device); err != nil {
+			return nil, err
+		}
+	}
+	if !platform.SameArchitecture(device.Architecture, "x86_64") {
+		return nil, errors.New("deploy requires a native x86_64 device image")
+	}
+	release := manifestRelease(device)
+	if err := release.LabLaneOn(platform.LaneEnrollFromConsole, device.Architecture); err != nil {
+		return nil, err
+	}
+	if release.Version.Rule == platform.VersionMajor && device.Version == release.Version.Value {
+		return nil, errors.New("deploy requires an exact minor device image")
+	}
+	return device, nil
+}
+
+func deployDeviceTokenFile(server, device *platform.Release, input string) (string, error) {
+	entitled := server
+	if !entitled.Lab.Entitlement {
+		entitled = device
+	}
+	if err := validateVMRedHatToken(entitled, input); err != nil {
+		return "", err
+	}
+	if entitled.Lab.Entitlement && input == "" {
+		return "", errors.New("deploy requires protected Red Hat entitlement input for entitled guests")
+	}
+	if device.Lab.Entitlement {
+		return input, nil
+	}
+	return "", nil
 }
 
 // Management always proves a completed action and fresh same-device inventory.

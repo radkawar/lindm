@@ -4195,6 +4195,16 @@ browser version and virtual CTAP2 authenticator type, screenshots and failures.
 TLS trusts only the owned deployment CA in an isolated child NSS store; there is
 no blanket browser certificate-error bypass.
 
+The server and enrolled device are independent proof identities. `-manifest`
+selects both native servers; optional `-device-manifest` selects the actual
+managed guest, defaulting to the same image. A Rocky server may therefore manage
+an Ubuntu 24.04 device for full server qualification without asserting Rocky-device
+advisory completeness. The selected device controls real clipboard package-family
+selection and expected vendor source identities, and its verified image/runtime
+remain in the record. All current same-device publication, inventory, evaluation,
+upgrade and restore observations remain mandatory; this option does not set
+`findings_excluded` or weaken qualification.
+
 The explicitly requested `lab deploy -without-findings` observation preserves
 all server-lifecycle checks but excludes the three Findings observations. Its
 scope is `native-server-lifecycle-without-findings`, with

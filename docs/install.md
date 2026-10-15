@@ -13,6 +13,12 @@ first-run, enrollment, managed inventory and evaluated Findings, encrypted backu
 signed upgrade and fresh-host restore followed by management of the original device.
 An installer recipe or setup-only observation does not imply that qualification.
 
+The managed device may use a different supported distribution from the server.
+Each proof identifies both: for example, a native Rocky Linux server managing an
+Ubuntu 24.04 device can prove the complete server lifecycle without claiming
+Rocky-device advisory coverage. The device still requires real current vendor
+publication and evaluated Findings before backup, after upgrade and after restore.
+
 <!-- BEGIN GENERATED server-support -->
 
 | Server platform                           | Architecture | PostgreSQL | Packages            | Install mode          | Lifecycle         |

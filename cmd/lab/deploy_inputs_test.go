@@ -42,6 +42,24 @@ func TestDeployMatrixInputsRequirePrivateIndependentArtifacts(t *testing.T) {
 			t.Errorf("missing required signed lifecycle input %s", flag)
 		}
 	}
+	if slices.Contains(args, "-device-manifest") {
+		t.Fatal("default matrix deployment changed its managed-device image")
+	}
+	input.DeviceManifest = "relative-device.json"
+	put()
+	if _, err := readMatrixDeployInputs(path); err == nil {
+		t.Fatal("accepted relative independent managed-device manifest")
+	}
+	input.DeviceManifest = "/images/managed-device.json"
+	put()
+	read, err = readMatrixDeployInputs(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args = read.args()
+	if args[len(args)-2] != "-device-manifest" || args[len(args)-1] != input.DeviceManifest {
+		t.Fatalf("matrix lost independent device image: %v", args)
+	}
 	input.FirstRelease = "relative-export"
 	put()
 	if _, err := readMatrixDeployInputs(path); err == nil {

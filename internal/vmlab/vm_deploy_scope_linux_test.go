@@ -7,11 +7,13 @@ package vmlab
 import (
 	"encoding/json"
 	"errors"
+	"path/filepath"
 	"testing"
 	"time"
 
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/deploylab"
+	"lindm/internal/platform"
 )
 
 func TestDeployResultScopeCannotQualifyWithoutFindings(t *testing.T) {
@@ -94,5 +96,94 @@ func TestDeployManagedPhasesRequireCompletedFreshInventoryWithoutFindings(t *tes
 				}
 			}
 		})
+	}
+}
+
+func TestDeployDeviceManifestSelectsIndependentNativeInventory(t *testing.T) {
+	server, err := LoadManifest(filepath.Join("..", "..", "lab", "images", "rocky-9.8-x86_64.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	device, err := LoadManifest(filepath.Join("..", "..", "lab", "images", "ubuntu-noble-amd64.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name           string
+		supplied, want *labv1.ImageManifest
+	}{
+		{name: "default", want: server},
+		{name: "explicit", supplied: device, want: device},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			selected, err := deployDeviceManifest(server, test.supplied)
+			if err != nil || selected != test.want {
+				t.Fatalf("selected device image = %v, %v", selected, err)
+			}
+		})
+	}
+	selected, err := deployDeviceManifest(server, device)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sources, err := deployAdvisoryExpectations(manifestRelease(selected), selected.Version, selected.Architecture)
+	if err != nil || len(sources) == 0 {
+		t.Fatalf("selected device has no real expected vendor source: %v", err)
+	}
+	for _, source := range sources {
+		if source.Distro != "ubuntu" || source.Release != "24.04" {
+			t.Fatalf("Findings borrowed the server's device coverage: %+v", source)
+		}
+	}
+	if manifestRelease(server).Advisory.Partial == "" || server.Distribution != "rocky" {
+		t.Fatal("independent managed device changed Rocky's device coverage")
+	}
+	device.Architecture = "arm64"
+	if _, err := deployDeviceManifest(server, device); err == nil {
+		t.Fatal("foreign device architecture admitted to native x86 deployment")
+	}
+	if _, err := deployDeviceManifest(server, &labv1.ImageManifest{}); err == nil {
+		t.Fatal("invalid independent device manifest admitted")
+	}
+}
+
+func TestDeployDeviceEntitlementInputDoesNotReachUnentitledGuest(t *testing.T) {
+	const token = "/protected/redhat-token"
+	for _, test := range []struct {
+		server, device, input, want string
+		refuse                      bool
+	}{
+		{server: "rhel-10", device: "ubuntu-24.04", input: token},
+		{server: "ubuntu-24.04", device: "rhel-9", input: token, want: token},
+		{server: "rhel-10", device: "rhel-9", input: token, want: token},
+		{server: "rocky-9", device: "ubuntu-24.04"},
+		{server: "rocky-9", device: "ubuntu-24.04", input: token, refuse: true},
+		{server: "rhel-10", device: "ubuntu-24.04", refuse: true},
+		{server: "ubuntu-24.04", device: "rhel-9", refuse: true},
+	} {
+		t.Run(test.server+"/"+test.device+"/"+test.input, func(t *testing.T) {
+			server, ok := platform.Lookup(test.server)
+			if !ok {
+				t.Fatal("missing server fixture")
+			}
+			device, ok := platform.Lookup(test.device)
+			if !ok {
+				t.Fatal("missing managed-device fixture")
+			}
+			got, err := deployDeviceTokenFile(server, device, test.input)
+			if (err != nil) != test.refuse || got != test.want {
+				t.Fatalf("device entitlement input = %q, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestDeployIndependentDeviceStillRequiresFullFindings(t *testing.T) {
+	for _, without := range []bool{false, true} {
+		result := &VMDeployResult{Passed: true}
+		setDeployResultScope(result, VMDeployOptions{DeviceManifest: &labv1.ImageManifest{Id: "independent-device"}, WithoutFindings: without})
+		if result.FindingsExcluded != without || result.LifecycleQualified != !without {
+			t.Fatalf("alternate device changed Findings qualification: %+v", result)
+		}
 	}
 }

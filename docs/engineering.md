@@ -4068,6 +4068,18 @@ The first-run-only `deploy setup` path accepts the same inputs. Hardware selecti
 never enables a foreign-architecture or TCG fallback, changes the server disk floor
 or overrides the lane's connected/air-gap network policy.
 
+`-manifest` always selects the native source and fresh restore servers.
+Optional `-device-manifest` selects an independently pinned native x86_64 managed
+device; omitting it retains the server image for that guest. Server qualification
+does not require the device distribution to match: use a real supported device,
+such as Ubuntu 24.04, when the server distribution's device advisory coverage is
+explicitly partial. This does not change that device-platform limitation or skip
+any Findings gate. Enrollment platform, package family and expected vendor sources
+come from the selected device and the server's real registry-backed instructions.
+Evidence records `device_image_id` separately and retains the enrolled device's
+verified image digest and observed runtime. Optional matrix deployment input
+`deviceManifest` supplies the same absolute pinned manifest path.
+
 ```sh
 go run ./cmd/lab deploy \
   -host "$LOCAL_HOST_ID" -manifest "$PINNED_SERVER_IMAGE" \
@@ -4101,8 +4113,9 @@ process, not a replacement server/device or a second native lifecycle lane.
 Matrix deployment inputs may supply a `drillImages` object keyed by supported
 database major; an absent entry retains the native operator-client requirement.
 
-Omit the Red Hat input on unentitled distributions; entitled RHEL requires it and
-its content must never be printed. The lane records initial vendor-tool presence before installation,
+Omit the Red Hat input when neither guest distribution needs entitlement. An
+entitled server or device requires it; only entitled guests receive that input,
+and its content must never be printed. The lane records initial vendor-tool presence before installation,
 installs `install.sh` with a protected setup-code destination, then uses real
 Chromium and production visible controls for password plus user-verifying passkey
 setup/sign-in and the exact browser-clipboard enrollment command. A dedicated child

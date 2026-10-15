@@ -8,6 +8,7 @@
 - Verify installed RPM header signatures and exact product-component identities before applying RHEL vendor absence; list third-party, undeclared and unusable vendor components as unchecked instead of silently clean.
 - Contain rejected vendor documents to their exhaustive component scope where provable, retaining whole-source uncertainty only for unbounded errors and showing the document count and cause.
 - Distinguish published incomplete vulnerability coverage from unpublished or stale source data in the console and native deployment diagnostics.
+- Allow native server lifecycle proof to enroll an independently pinned managed-device image, keeping all real Findings gates and separate server/device identities; preserve partial device advisory limitations and route entitlement input only to entitled guests.
 
 ## [0.1.0] - 2026-10-15
 

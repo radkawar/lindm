@@ -52,3 +52,18 @@ func TestDeployCommandsAcceptRoutedFirmwareFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestDeployIndependentDeviceManifestKeepsNativeFootprint(t *testing.T) {
+	args := []string{"-device-manifest", "/images/managed-device.json"}
+	var diagnostics bytes.Buffer
+	err := runDeployAdmitted(t.Context(), args, io.Discard, &diagnostics)
+	if err == nil || !strings.Contains(err.Error(), "requires") || strings.Contains(diagnostics.String(), "flag provided but not defined") {
+		t.Fatalf("deploy did not parse independent device manifest: %v %s", err, diagnostics.String())
+	}
+	if got := vmGuestCount("deploy", args); got != 3 {
+		t.Fatalf("independent device changed native FIFO footprint to %d", got)
+	}
+	if !vmRequiresKVM(&labv1.LabConfig{}, "deploy", "tcg", "amd64") {
+		t.Fatal("independent device allowed nonnative deployment")
+	}
+}

@@ -25,6 +25,7 @@ type deployMatrixInputs struct {
 	BackupIdentityFile         string `json:"backupIdentityFile"`
 	Lindmd                     string `json:"lindmd"`
 	Lindmctl                   string `json:"lindmctl"`
+	DeviceManifest             string `json:"deviceManifest,omitempty"`
 	// Optional per-major off-server clients; absent entries use native tools.
 	DrillImages map[string]string `json:"drillImages,omitempty"`
 }
@@ -38,6 +39,9 @@ func readMatrixDeployInputs(path string) (*deployMatrixInputs, error) {
 		if !filepath.IsAbs(value) {
 			return nil, errors.New("deploy matrix inputs require absolute authenticated artifact and protected backup input paths")
 		}
+	}
+	if inputs.DeviceManifest != "" && !filepath.IsAbs(inputs.DeviceManifest) {
+		return nil, errors.New("deploy matrix device manifest requires an absolute pinned image path")
 	}
 	if len(inputs.ReleaseKeyID) != 64 {
 		return nil, errors.New("deploy matrix inputs require independently pinned release key ID")
@@ -58,5 +62,9 @@ func readMatrixDeployInputs(path string) (*deployMatrixInputs, error) {
 }
 
 func (inputs *deployMatrixInputs) args() []string {
-	return []string{"-first-release", inputs.FirstRelease, "-upgrade-release", inputs.UpgradeRelease, "-release-public-key", inputs.ReleasePublicKey, "-release-key-id", inputs.ReleaseKeyID, "-tuf-root-file", inputs.TUFRootFile, "-backup-recipient-file", inputs.BackupRecipientFile, "-custody-escrow-recipient-file", inputs.CustodyEscrowRecipientFile, "-backup-identity-file", inputs.BackupIdentityFile, "-lindmd", inputs.Lindmd, "-lindmctl", inputs.Lindmctl}
+	args := []string{"-first-release", inputs.FirstRelease, "-upgrade-release", inputs.UpgradeRelease, "-release-public-key", inputs.ReleasePublicKey, "-release-key-id", inputs.ReleaseKeyID, "-tuf-root-file", inputs.TUFRootFile, "-backup-recipient-file", inputs.BackupRecipientFile, "-custody-escrow-recipient-file", inputs.CustodyEscrowRecipientFile, "-backup-identity-file", inputs.BackupIdentityFile, "-lindmd", inputs.Lindmd, "-lindmctl", inputs.Lindmctl}
+	if inputs.DeviceManifest != "" {
+		args = append(args, "-device-manifest", inputs.DeviceManifest)
+	}
+	return args
 }

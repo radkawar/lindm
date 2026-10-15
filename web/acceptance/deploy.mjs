@@ -408,14 +408,19 @@ async function proveRepositoryReadiness() {
     packageFamily,
     readiness,
   }));
-  await writePrivateJSON(join(config.evidenceDirectory, "setup-agent-repository-readiness.json"), {
-    readiness: body.readiness,
-    platforms,
-  });
+  await writePrivateJSON(
+    join(config.evidenceDirectory, `${config.phase}-agent-repository-readiness.json`),
+    {
+      readiness: body.readiness,
+      platforms,
+    },
+  );
   await capture("agent-repository-readiness");
-  if (platforms.find((platform) => platform.label === config.platform)?.readiness?.ready !== true)
+  const selected = platforms.find((platform) => platform.label === config.platform);
+  if (selected?.readiness?.ready !== true || !selected.packageFamily)
     throw new Error("agent_repository_not_ready");
   result.agent_repository_ready = true;
+  return selected.packageFamily;
 }
 
 try {
@@ -473,7 +478,7 @@ try {
       throw new Error("phase_user_verified_signin_not_observed");
     result.password_and_passkey = true;
     if (config.phase === "copy") {
-      const family = config.platform.startsWith("Ubuntu") ? "apt" : "dnf";
+      const family = await proveRepositoryReadiness();
       const grant = await createGrant(ui, {
         ...config,
         requireRepositories: true,
