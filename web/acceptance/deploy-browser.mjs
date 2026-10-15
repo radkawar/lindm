@@ -58,6 +58,13 @@ export async function requireInitialVendorDownload(page, source) {
     throw new Error("initial_vendor_download_start_not_displayed");
 }
 
+export async function requirePackageInventoryCard(page) {
+  const card = page.locator('[data-slot="card"]').filter({
+    has: page.getByText("From the device's latest package list.", { exact: true }),
+  });
+  await card.getByText("Installed packages", { exact: true }).waitFor();
+}
+
 const evaluatedStates = new Set([
   "ADVISORY_FINDING_STATE_AFFECTED",
   "ADVISORY_FINDING_STATE_ACCEPTED",

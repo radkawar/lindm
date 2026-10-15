@@ -4738,6 +4738,42 @@ vendor evaluation, backup, upgrade or restore. The repaired observer continues
 bounded, read-only polling of the same action when its outcome is unknown;
 it never resubmits work or treats unknown as success.
 
+SDK18 freezes integrated source `dea56bc2516e240d12cb5411831636830681895d`,
+including the reviewed inventory receipt-recovery and owner-serialization fixes,
+the in-flight action projection and the bounded no-retry browser observer.
+Fresh `cold-release-attempt19.json` passed literal `make release-keys`, two
+`make release` commands for 0.2.14 and 0.2.15, authenticated export and owned
+cleanup in 1,706.91 seconds. Its SHA-256 is
+`8c557f1145191bade9ddd10d6c1121119aecc33aabd7fcd1b970c7ba8ae46c26`.
+The actual fresh Git clone used source-bundle SHA-256
+`7ac68e053fec40f1d64b76c406bc8ede30a2047c7c008622982fc4a370fd3386`.
+Independent exported public-pin hashes are
+`68ef91fd497faecaccdbbf215eddcbb5b5229c9d6e7acf0cca65fc70cf11f8bc`
+for `keys/attestation.pub` and
+`2b34b25ed55c08762a25f5b5d455d2da2c6859e0b815aea95ae3a69873b91ce9`
+for `keys/root.json`. The independently derived Ed25519 SPKI key ID is
+`caa7c64e2e681c4a49a9d38dff3d907b275e931330c5bbdba630ff8c956da382`.
+These authenticated exports remain **build-only** evidence with
+`lifecycle_qualified: false`; fresh native evaluation and recovery must supply
+their own results.
+
+The first SDK18 native Ubuntu run, `native-ubuntu-attempt22.json`, SHA-256
+`49a5ab75a6e06e8f5efefff44fece3f2bd5fd3ed2c60f0d9f5e6790df0f45b9c`,
+remains **FAIL** after 412.81 seconds. Generated-certificate stock Chromium setup,
+Ready packages, protected credentials, SCRAM-PLUS, integration-secret decryption,
+clipboard enrollment and the managed inventory action passed. The action
+completed with fresh inventory at `2026-10-15T03:58:19.772Z`.
+The browser then observed the real initial vendor download and, at
+`2026-10-15T04:01:57.457Z`, `vendor_findings_present` /
+`advisory_finding_state_affected`, and captured the real device Findings page.
+Its next unfiltered inventory screenshot guard matched two identical
+“Installed packages” card titles and failed. The corrected guard scopes the
+actual package-list card using its distinct description; exact snapshot and
+installed-package comparisons remain unchanged. Formal completed browser/SQL
+Findings evidence, qualified first-evaluation latency, backup, upgrade and
+restore are not established by this failed run. It records two manual commands,
+51 decisions, one observed failure and `owned_cleanup_complete: false`.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

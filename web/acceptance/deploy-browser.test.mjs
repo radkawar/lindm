@@ -13,6 +13,7 @@ import {
   assessDeploymentFindings,
   launchTrustedDeploymentBrowser,
   requireInitialVendorDownload,
+  requirePackageInventoryCard,
 } from "./deploy-browser.mjs";
 
 const exec = promisify(execFile);
@@ -154,6 +155,24 @@ test("native deployment browser trusts its supplied CA but rejects unknown roots
     requireInitialVendorDownload(page, { ...source, refreshStartedAt: "2026-10-15T02:35:00Z" }),
     /initial_vendor_download_start_not_displayed/,
   );
+  await page.setContent(`
+    <div data-slot="card">
+      <div data-slot="card-title">Installed packages</div>
+      <div data-slot="card-description">The latest complete package list.</div>
+    </div>
+    <div data-slot="card">
+      <div data-slot="card-title">Installed packages</div>
+      <div data-slot="card-description">From the device's latest package list.</div>
+    </div>
+  `);
+  assert.equal(await page.locator('[data-slot="card-title"]').count(), 2);
+  await requirePackageInventoryCard(page);
+  await page
+    .getByText("From the device's latest package list.", { exact: true })
+    .evaluate((node) => node.remove());
+  page.setDefaultTimeout(150);
+  await assert.rejects(requirePackageInventoryCard(page), /Timeout/);
+  page.setDefaultTimeout(30_000);
   await assert.rejects(page.goto(`https://localhost:${unknownPort}`), /ERR_CERT_AUTHORITY_INVALID/);
   await assert.rejects(
     page.goto(`https://127.0.0.1:${trustedPort}`),

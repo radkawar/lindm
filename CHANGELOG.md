@@ -26,6 +26,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Observe the first native vendor download through its actual visible status title, rather than requiring a heading that the console does not render; compare its start with the console's canonical protobuf millisecond rounding, retaining exact source, lease and timestamp checks without a tolerance.
 - Retain the actual action identity and expand its existing result before taking failed native management screenshots; never resubmit expired, failed or unknown work to obtain evidence.
 - Continue bounded, read-only observation of the same managed inventory action after start authority makes its outcome temporarily unknown; only verified completion passes, and unknown never permits a retry.
+- Scope the post-evaluation native inventory screenshot to the actual package-list card, not the identically titled status card; preserve exact snapshot and installed-package matching checks.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.

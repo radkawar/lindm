@@ -9,6 +9,7 @@ import {
   assessDeploymentFindings,
   launchTrustedDeploymentBrowser,
   requireInitialVendorDownload,
+  requirePackageInventoryCard,
 } from "./deploy-browser.mjs";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import {
@@ -273,7 +274,7 @@ async function inspectInventoryAndFindings(ui) {
       });
     }
     await readPage(`${devicePath}?tab=inventory`, "ListDevicePackages");
-    await ui.wait({ text: "Installed packages", exact: true });
+    await requirePackageInventoryCard(driver.page);
     await capture("live-package-inventory");
     await readPage("/advisories", "ListAdvisoryFeeds");
     await ui.wait({ css: `[id="advisory-source-${assessed.feed.id}"]` });
