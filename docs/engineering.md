@@ -4112,6 +4112,12 @@ by the normal UI timeout. It sends only after the real control becomes enabled.
 Other policy refusals are not refreshed, and an accepted action still has one
 identity with no resend or replacement.
 
+Each browser invocation uses a fresh random screenshot scope, including repeated
+management and Findings phases. Later phases must not overwrite earlier images.
+An opaque browser failure records only a finite error category and an owned
+script's line number. It never publishes the exception message, origin, locator
+arguments or full stack; this adds diagnostics, not retry authority.
+
 Public `findings[]` evidence has ordered `installed`, `upgraded` and `restored`
 entries for the original device, each with its distinct completed managed action,
 managed/current snapshot identities, package count, actual durable `evaluated_at`,
@@ -4837,6 +4843,38 @@ refreshes only a disconnected pre-send review, never a policy denial or an
 accepted action. This run records six manual commands, 57 decisions, two observed
 failures and `owned_cleanup_complete: false`; it does not qualify post-upgrade
 management continuity, fresh-host restore or cleanup.
+
+SDK19's fresh cold build, `cold-release-attempt20.json`, SHA-256
+`22fa8632b4920f41047dffde1cbe7d3798a76a4bbe43f5cf99fb22037bf7df7b`,
+passed in 1,665.56 seconds at source
+`68d81cac87024a4855a421907e4315703576920c`. It includes PostgreSQL 16-only
+preflight, RHEL's connected PostgreSQL 16 module selection and the serialized
+publication lease heartbeat. The authenticated 0.2.16 and 0.2.17 exports came
+from a fresh VM clone, pristine caches, pinned SDKs and the literal release
+commands, with owned cleanup complete. This is build evidence, not lifecycle
+qualification.
+
+Fresh `native-ubuntu-attempt25.json`, SHA-256
+`7bc4d7c59357a721e2b90efa7e515bfb3a32bc5941bc59ada719e91fd37ae3d6`,
+uses that unchanged signed SDK19 pair and observer source. Its installed
+evaluation passed browser and independent same-action/snapshot SQL binding in
+379,616 milliseconds from installer invocation; refresh start to durable
+evaluation took 196,512 milliseconds. Encrypted backup passed in 7.61 seconds,
+archive verification in 2.06 seconds and authentic upgrade in 29.41 seconds.
+Post-upgrade action `467c70f0-9dbc-4edd-b2b9-9a0d7e918354` completed with fresh
+inventory; root-only credentials, the original integration key/ciphertext and
+both listener CAs were retained.
+
+The overall verdict remains **FAIL** after 455.58 seconds. The second read-only
+Findings phase reached live Findings and a filtered installed-package table,
+then failed with the observer's generic browser exception. No semantic
+inventory/vendor mismatch or product cause was established. The run has six
+manual commands, 60 decisions, one observed failure and
+`owned_cleanup_complete: false`. It does not qualify post-upgrade evaluated
+Findings, fresh restore or cleanup. Repeated phase screenshot names also
+overwrote earlier images; those old images are not reconstructed. Subsequent
+observers retain invocation-specific images and safe error categories/source
+positions instead.
 
 #### Durable laboratory custody escrow
 

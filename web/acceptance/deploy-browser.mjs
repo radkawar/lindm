@@ -65,6 +65,31 @@ export async function requirePackageInventoryCard(page) {
   await card.getByText("Installed packages", { exact: true }).waitFor();
 }
 
+// Public failure evidence contains only a finite error category and an owned
+// script position. Playwright messages, URLs and call arguments can be secrets.
+export function deploymentBrowserFailure(error) {
+  const message = String(error?.message ?? "");
+  if (/^[a-z][a-z0-9_]+$/.test(message)) return message;
+  const category = [
+    [/net::ERR_ABORTED/, "navigation_aborted"],
+    [/Execution context was destroyed/, "context_destroyed"],
+    [
+      /No (resource with given identifier found|data found for resource with given identifier)/i,
+      "response_body_unavailable",
+    ],
+    [/strict mode violation/, "ambiguous_locator"],
+    [/Target page, context or browser has been closed/, "browser_closed"],
+  ].find(([pattern]) => pattern.test(message))?.[1];
+  const kind = ["TypeError", "SyntaxError", "TimeoutError", "ProtocolError"].includes(error?.name)
+    ? error.name.toLowerCase()
+    : "opaque";
+  const position = String(error?.stack ?? "").match(
+    /^\s+at [^\n]*\/(deploy(?:-browser)?|drivers)\.mjs:(\d{1,4}):\d{1,4}\)?$/m,
+  );
+  const location = position ? `_${position[1].replaceAll("-", "_")}_${Number(position[2])}` : "";
+  return `deployment_browser_failed_${category ?? kind}${location}`;
+}
+
 const evaluatedStates = new Set([
   "ADVISORY_FINDING_STATE_AFFECTED",
   "ADVISORY_FINDING_STATE_ACCEPTED",

@@ -3,10 +3,12 @@
 
 // Real visible setup, clipboard and management controls. TLS uses a private NSS
 // CA store, never ignoreHTTPSErrors or a certificate-verification bypass.
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   assessDeploymentFindings,
+  deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
@@ -30,6 +32,7 @@ process.umask(0o077);
 let config;
 let driver;
 const result = { passed: false, screenshots: [], password_and_passkey: false, operations: [] };
+const captureScope = randomUUID();
 
 class AuditedUI extends UI {
   async record(name, operation) {
@@ -63,7 +66,7 @@ async function capture(name) {
     }
   });
   try {
-    const path = join(config.evidenceDirectory, `${config.phase}-${name}.png`);
+    const path = join(config.evidenceDirectory, `${config.phase}-${captureScope}-${name}.png`);
     await writePrivate(path, await driver.screenshot());
     result.screenshots.push(path);
   } finally {
@@ -504,9 +507,7 @@ try {
   }
   result.passed = true;
 } catch (error) {
-  result.failure = /^[a-z][a-z0-9_]+$/.test(String(error?.message))
-    ? error.message
-    : "deployment_browser_failed";
+  result.failure = deploymentBrowserFailure(error);
   if (driver?.page) {
     try {
       await capture("failure");

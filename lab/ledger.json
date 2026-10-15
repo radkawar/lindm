@@ -13760,6 +13760,23 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
       "mainlineRevision": "e4b64f2caf0010f23c2d3223c06f1082fcd99814"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt25.json",
+      "sha256": "7bc4d7c59357a721e2b90efa7e515bfb3a32bc5941bc59ada719e91fd37ae3d6",
+      "recorded": "2026-10-15T05:55:47.486503226Z",
+      "revision": "68d81cac87024a4855a421907e4315703576920c",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "turnkey-sdk19-68d81cac8-backup-upgrade-postfindings-fail",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "68d81cac87024a4855a421907e4315703576920c"
     }
   ]
 }

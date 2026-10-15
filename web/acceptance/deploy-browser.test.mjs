@@ -11,6 +11,7 @@ import test from "node:test";
 import { promisify } from "node:util";
 import {
   assessDeploymentFindings,
+  deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
@@ -303,4 +304,37 @@ test("native findings never publishes exception text or cursor authority", () =>
     ).ready,
     false,
   );
+});
+
+test("native browser failure evidence retains only safe categories and owned source positions", () => {
+  const secret = "private-token-and-origin";
+  for (const [message, category] of [
+    [`page.goto: net::ERR_ABORTED at https://${secret}/`, "navigation_aborted"],
+    [`Execution context was destroyed: ${secret}`, "context_destroyed"],
+    [`No resource with given identifier found: ${secret}`, "response_body_unavailable"],
+    [`strict mode violation: ${secret}`, "ambiguous_locator"],
+    [`Target page, context or browser has been closed: ${secret}`, "browser_closed"],
+  ]) {
+    const error = new Error(message);
+    error.stack = `${message}\n    at readPage (file:///private/${secret}/deploy.mjs:198:23)`;
+    assert.equal(
+      deploymentBrowserFailure(error),
+      `deployment_browser_failed_${category}_deploy_198`,
+    );
+    assert.equal(deploymentBrowserFailure(error).includes(secret), false);
+  }
+  const error = new TypeError(secret);
+  error.stack = `TypeError: ${secret}\n    at handler (https://${secret}/untrusted.mjs:12:8)`;
+  assert.equal(deploymentBrowserFailure(error), "deployment_browser_failed_typeerror");
+  assert.equal(
+    deploymentBrowserFailure(new Error("vendor_finding_does_not_match_native_inventory")),
+    "vendor_finding_does_not_match_native_inventory",
+  );
+});
+
+test("native screenshots have an independent invocation scope instead of overwriting earlier phases", async () => {
+  const script = await readFile(new URL("./deploy.mjs", import.meta.url), "utf8");
+  assert.match(script, /const captureScope = randomUUID\(\);/);
+  assert.match(script, /\$\{config\.phase\}-\$\{captureScope\}-\$\{name\}\.png/);
+  assert.doesNotMatch(script, /\$\{config\.phase\}-\$\{name\}\.png/);
 });
