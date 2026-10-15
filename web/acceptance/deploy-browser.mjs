@@ -96,7 +96,7 @@ export async function observeDeploymentRPCs(page, origin) {
         return response;
       };
     },
-    { origin },
+    { origin: new URL(origin).origin },
   );
 }
 

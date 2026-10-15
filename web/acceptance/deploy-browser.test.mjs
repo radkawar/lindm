@@ -400,3 +400,40 @@ test("native RPC evidence passively captures real UI fetches across repeated Chr
     "error bodies never enter evidence memory",
   );
 });
+
+test("native RPC capture uses Chromium's canonical default HTTPS port without accepting other origins", async (t) => {
+  const browser = await chromium.launch({ channel: "chromium", headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  const body = { snapshotId: "canonical-origin", packages: [{ name: "actual-package" }] };
+  await page.route(/^https:\/\/console\.example(?::8443)?\//, async (route) => {
+    if (new URL(route.request().url()).pathname.startsWith("/lindm.admin.v1.AdminService/")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(body),
+      });
+    } else {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: `<script>fetch("/lindm.admin.v1.AdminService/ListDevicePackages", {method:"POST"})
+          .then(response => response.json()).then(body => document.body.textContent=JSON.stringify(body));</script>`,
+      });
+    }
+  });
+  await observeDeploymentRPCs(page, "https://console.example:443");
+  const driver = { page, goto: (url) => page.goto(url, { waitUntil: "domcontentloaded" }) };
+  assert.deepEqual(
+    await readDeploymentPage(
+      driver,
+      "https://console.example:443",
+      "/inventory",
+      "ListDevicePackages",
+    ),
+    body,
+  );
+  await page.goto("https://console.example:8443/inventory");
+  await page.getByText(JSON.stringify(body), { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => Object.keys(window.__lindmDeploymentReplies)), []);
+});
