@@ -4057,18 +4057,62 @@ visible authoritative lifecycle badge to say Enrolled. It issues no inventory
 request or other work. This is enrollment evidence only, not managed-action or
 fresh-inventory qualification.
 
-The same maintained `web/acceptance/deploy.mjs` harness also accepts a separate
-`findings` phase with an enrolled `deviceId` and the independently selected
-`advisoryFeedId`. Use the usual protected browser configuration, CA, password and
-persisted user-verifying credential inputs. This phase reads the actual visible
-inventory, advisory-source and device-findings pages and their real browser-issued
-RPC replies. It requires an unexpired published source, a current package snapshot
-and matching source/snapshot digests. Up to five displayed findings are compared
-with the device's real package/version/architecture inventory through the normal
-inventory page. Its private `inventory-findings.json` retains coverage limitations;
-partial coverage is never reported as clean. This additional phase is not run or
-claimed by the default native lifecycle lane. Configure and publish real vendor
-feeds separately using the supported advisory feed operations below.
+The maintained lifecycle invokes `web/acceptance/deploy.mjs`'s `findings` phase
+after each newly completed managed inventory action: before the first backup,
+after upgrade, and on the original device after fresh-host recovery. The real
+password/user-verifying-passkey browser reads the visible inventory, advisory
+sources and Findings pages and their actual browser-issued RPC replies. It never
+configures a source, requests a feed refresh, imports an archive or seeds a finding.
+Expected vendor URL, product/release and servicing stream come from the platform
+registry; the installed production worker must acquire and publish the applicable
+real feed automatically. Missing configuration, queued/downloading data, errors,
+stale publication/inventory and unknown/not-checked evaluations cannot pass.
+Explicit partial vendor coverage can pass **only as partial**, with its reason
+and uncovered-package count, a real published feed and a real matching evaluation.
+There is no requirement for a positive CVE or a fabricated all-clear result.
+
+The initial publication/evaluation wait is bounded at **90 minutes**, separately
+from browser sign-in/capture overhead. Ubuntu's complete OSV export exceeds
+700 MB and 500,000 claims; a 0.6 MB/s connection can take over 20 minutes just to
+download it. This deadline is a lab failure bound, not a promised service latency.
+Upgraded and restored read-only evaluation waits are bounded at 15 minutes each.
+No failed/denied managed action is silently resubmitted while waiting.
+
+Public `findings[]` evidence has ordered `installed`, `upgraded` and `restored`
+entries for the original device, each with its distinct completed managed action,
+managed/current snapshot identities, package count, actual durable `evaluated_at`,
+vendor feed identity/digest, publication time and finding/coverage counts.
+A bounded read-only PostgreSQL observation through pinned guest SSH ties the
+browser snapshot/digest to the current durable evaluation and the completed
+action's actual host/package publication. It neither submits work nor substitutes
+for browser authorization, TLS, runtime SCRAM-PLUS or restore/security gates.
+Up to five displayed findings are compared with native package name, version and
+architecture through the normal inventory page; no positive finding is invented.
+The sanitized `inventory-findings-ACTION_ID.json` retains these facts/matches,
+never RPC cursors, risk-exception text, credentials or raw diagnostic responses.
+Screenshots redact inputs, code and explicitly sensitive content; failure
+service journals remain encrypted to the dedicated lab escrow recipient.
+
+For the `installed` entry, `started_at` is the controller's securely observed first
+signed-installer invocation and `elapsed_milliseconds` ends at the browser's
+first observed qualifying managed-inventory evaluation (`observed_at`).
+`duration_meaning` explicitly includes installation, owner setup, enrollment,
+managed collection and polling; **it is not pure download time or the timestamp
+of the worker's first internal attempt**. Later entries measure from that stage's
+management start to its first qualifying browser observation. `evaluated_at` is
+read from the matching durable evaluation, never inferred from page load.
+Only when a real live exact-configuration refresh lease was observed does
+`findings.refresh_started_at` appear. If that start precedes the evaluation,
+`observed_refresh_start_to_evaluation_milliseconds` additionally measures that
+observed refresh start to the durable evaluation; it includes publication and
+evaluation, not just network transfer. Unobserved progress or start times are
+omitted rather than invented. Actual Ubuntu/RHEL outcomes belong in
+`docs/install.md` only after a real run.
+When naturally observed during polling, the first live download also requires
+the source's visible **Downloading first vulnerability data** notice, a rendered
+start time bound to the actual lease start, and truthful unreported-progress text
+before a redacted screenshot is retained. `initial_download_observed` records that
+observation, not an assumed state. The lane never delays publication to obtain it.
 
 Deployment exercises the generated quick custody path with **zero supplied
 execution recipients**. Three age identities exist only in memory; execution roots

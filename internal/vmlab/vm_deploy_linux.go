@@ -66,6 +66,7 @@ type VMDeployResult struct {
 	DeviceID                         string                       `json:"device_id,omitempty"`
 	Enrollment                       *VMConsoleEnrollmentResult   `json:"enrollment,omitempty"`
 	Browser                          []*deploylab.BrowserEvidence `json:"browser"`
+	Findings                         []*VMDeployFindingsProof     `json:"findings"`
 	EvidenceFiles                    []string                     `json:"evidence_files"`
 	TLS                              []*VMDeployTLSEvidence       `json:"tls"`
 	RuntimeSQLGates                  []VMDeploySQLGate            `json:"runtime_sql_gates"`
@@ -160,6 +161,10 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	origin := "https://localhost:" + strings.Split(admin.listener.Addr().String(), ":")[1]
 	deviceOrigin := "https://localhost:" + strings.Split(device.listener.Addr().String(), ":")[1]
 	request := deploylab.BrowserRequest{Origin: origin, Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: caPath, PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), Platform: release.Name}
+	request.AdvisorySources, err = deployAdvisoryExpectations(release, manifest.Version, manifest.Architecture)
+	if err != nil {
+		return result, err
+	}
 	defer func() { request.Password, request.SetupCode = "", "" }()
 	op := func(name, kind string, run func() error) error {
 		observed := deploylab.Operation{Name: name, Kind: kind, StartedAt: time.Now().UTC()}
@@ -184,8 +189,28 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 					result.IntegrationDestinationID = observed.IntegrationDestinationID
 					result.IntegrationSecretSHA256 = observed.IntegrationSecretSHA256
 				}
+				if phase == "manage" {
+					request.ManagedActionID = observed.ActionID
+				}
 			}
 			return errors.Join(runErr, deploylab.ValidateBrowserEvidence(request, observed))
+		})
+	}
+	findings := func(guest *guestVM, stage string, started time.Time) error {
+		wait := deploylab.SubsequentFindingsWait
+		if stage == "installed" {
+			wait = deploylab.InitialFindingsWait
+		}
+		request.FindingsWaitMilliseconds = wait.Milliseconds()
+		if err := browser("findings", result.DeviceID); err != nil {
+			return errors.Join(err, saveDeployFailureJournal(ctx, guest, options.CustodyEscrowRecipientFile, options.EvidenceDirectory, stage+"-findings-server-journal"))
+		}
+		return op("prove "+stage+" durable same-device findings evaluation", "harness", func() error {
+			proof, proofErr := observeDeployFindings(ctx, guest, request, result.Browser[len(result.Browser)-1], stage, started)
+			if proof != nil {
+				result.Findings = append(result.Findings, proof)
+			}
+			return proofErr
 		})
 	}
 	server, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(false))
@@ -224,6 +249,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	if err := prepareDeployInputs(ctx, server, options); err != nil {
 		return result, err
 	}
+	firstInstallStarted := time.Now().UTC()
 	if err := op("install signed turnkey bundle", "command", func() error {
 		return installDeployRelease(ctx, server, options, options.FirstRelease, "/root/lindm-release-first", origin, deviceOrigin, first.GetVersion(), custodyPassphrase, false)
 	}); err != nil {
@@ -290,6 +316,9 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		if err := browser("manage", enrolled.DeviceID); err != nil {
 			return errors.Join(err, saveDeployFailureJournal(ctx, server, options.CustodyEscrowRecipientFile, options.EvidenceDirectory, "management-server-journal"))
 		}
+		if err := findings(server, "installed", firstInstallStarted); err != nil {
+			return err
+		}
 		admin.fence()
 		device.fence()
 		if err := op("encrypted backup", "command", func() error { return createDeployBackup(ctx, server, private, "backup.age", &result.BackupSHA256) }); err != nil {
@@ -335,7 +364,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		}); err != nil {
 			return err
 		}
+		upgradeManagementStarted := time.Now().UTC()
 		if err := browser("manage", enrolled.DeviceID); err != nil {
+			return err
+		}
+		if err := findings(server, "upgraded", upgradeManagementStarted); err != nil {
 			return err
 		}
 		admin.fence()
@@ -503,7 +536,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		if runErr := browser("custody", ""); runErr != nil {
 			return runErr
 		}
+		restoreManagementStarted := time.Now().UTC()
 		if runErr := browser("manage", enrolled.DeviceID); runErr != nil {
+			return runErr
+		}
+		if runErr := findings(restored, "restored", restoreManagementStarted); runErr != nil {
 			return runErr
 		}
 		result.RestoredCurrentSecuritySnapshot = true
@@ -512,6 +549,9 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		return nil
 	}})
 	if err != nil {
+		return result, err
+	}
+	if err := validateDeployFindingsStages(result.DeviceID, result.Findings); err != nil {
 		return result, err
 	}
 	result.Passed, result.OwnedCleanupComplete = true, true

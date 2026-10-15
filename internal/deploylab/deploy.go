@@ -42,51 +42,57 @@ type CustodyExport struct {
 // BrowserRequest is a private handoff. It must never be included in evidence.
 // SetupCode and authenticator state exist only in owned temporary mode0600 files.
 type BrowserRequest struct {
-	Phase             string          `json:"phase"`
-	Origin            string          `json:"origin"`
-	Username          string          `json:"username"`
-	Password          string          `json:"password"`
-	SetupCode         string          `json:"setupCode,omitempty"`
-	SetupMethod       string          `json:"setupMethod,omitempty"`
-	CAFile            string          `json:"caFile"`
-	PrivateDirectory  string          `json:"privateDirectory"`
-	EvidenceDirectory string          `json:"evidenceDirectory"`
-	CredentialPath    string          `json:"credentialPath"`
-	CommandPath       string          `json:"commandPath,omitempty"`
-	Platform          string          `json:"platform,omitempty"`
-	DeviceID          string          `json:"deviceId,omitempty"`
-	ResultPath        string          `json:"resultPath"`
-	CustodySHA256     string          `json:"custodySha256,omitempty"`
-	CustodyExports    []CustodyExport `json:"custodyExports,omitempty"`
+	Phase                    string           `json:"phase"`
+	Origin                   string           `json:"origin"`
+	Username                 string           `json:"username"`
+	Password                 string           `json:"password"`
+	SetupCode                string           `json:"setupCode,omitempty"`
+	SetupMethod              string           `json:"setupMethod,omitempty"`
+	CAFile                   string           `json:"caFile"`
+	PrivateDirectory         string           `json:"privateDirectory"`
+	EvidenceDirectory        string           `json:"evidenceDirectory"`
+	CredentialPath           string           `json:"credentialPath"`
+	CommandPath              string           `json:"commandPath,omitempty"`
+	Platform                 string           `json:"platform,omitempty"`
+	DeviceID                 string           `json:"deviceId,omitempty"`
+	ResultPath               string           `json:"resultPath"`
+	CustodySHA256            string           `json:"custodySha256,omitempty"`
+	CustodyExports           []CustodyExport  `json:"custodyExports,omitempty"`
+	AdvisorySources          []AdvisorySource `json:"advisorySources,omitempty"`
+	FindingsWaitMilliseconds int64            `json:"findingsWaitMilliseconds,omitempty"`
+	ManagedActionID          string           `json:"managedActionId,omitempty"`
 }
 
 // BrowserEvidence is sanitized by the browser runner before publication. A
 // managed action qualifies only after its own completed row appears for this
 // exact device and a subsequently collected inventory is visible.
 type BrowserEvidence struct {
-	Phase                    string          `json:"phase"`
-	Passed                   bool            `json:"passed"`
-	Failure                  string          `json:"failure,omitempty"`
-	BrowserVersion           string          `json:"browser_version"`
-	Authenticator            string          `json:"authenticator"`
-	PasswordAndPasskey       bool            `json:"password_and_passkey"`
-	AgentRepositoryReady     bool            `json:"agent_repository_ready"`
-	CommandSHA256            string          `json:"command_sha256,omitempty"`
-	CommandSource            string          `json:"command_source,omitempty"`
-	DeviceID                 string          `json:"device_id,omitempty"`
-	IntegrationDestinationID string          `json:"integration_destination_id,omitempty"`
-	IntegrationSecretSHA256  string          `json:"integration_secret_sha256,omitempty"`
-	IntegrationCreated       bool            `json:"integration_created"`
-	ActionID                 string          `json:"action_id,omitempty"`
-	ActionCompleted          bool            `json:"action_completed"`
-	ActionFinishedAt         time.Time       `json:"action_finished_at,omitempty"`
-	FreshInventoryReceived   bool            `json:"fresh_inventory_received"`
-	Screenshots              []string        `json:"screenshots"`
-	Operations               []Operation     `json:"operations"`
-	OwnerStepUp              bool            `json:"owner_step_up"`
-	OwnerCustodyAttested     bool            `json:"owner_custody_attested"`
-	CustodySHA256            string          `json:"custody_sha256,omitempty"`
-	CustodyExports           []CustodyExport `json:"custody_exports,omitempty"`
+	Phase                    string                `json:"phase"`
+	Passed                   bool                  `json:"passed"`
+	Failure                  string                `json:"failure,omitempty"`
+	BrowserVersion           string                `json:"browser_version"`
+	Authenticator            string                `json:"authenticator"`
+	PasswordAndPasskey       bool                  `json:"password_and_passkey"`
+	AgentRepositoryReady     bool                  `json:"agent_repository_ready"`
+	CommandSHA256            string                `json:"command_sha256,omitempty"`
+	CommandSource            string                `json:"command_source,omitempty"`
+	DeviceID                 string                `json:"device_id,omitempty"`
+	IntegrationDestinationID string                `json:"integration_destination_id,omitempty"`
+	IntegrationSecretSHA256  string                `json:"integration_secret_sha256,omitempty"`
+	IntegrationCreated       bool                  `json:"integration_created"`
+	ActionID                 string                `json:"action_id,omitempty"`
+	ActionCompleted          bool                  `json:"action_completed"`
+	ActionFinishedAt         time.Time             `json:"action_finished_at,omitempty"`
+	FreshInventoryReceived   bool                  `json:"fresh_inventory_received"`
+	Screenshots              []string              `json:"screenshots"`
+	Operations               []Operation           `json:"operations"`
+	OwnerStepUp              bool                  `json:"owner_step_up"`
+	OwnerCustodyAttested     bool                  `json:"owner_custody_attested"`
+	CustodySHA256            string                `json:"custody_sha256,omitempty"`
+	CustodyExports           []CustodyExport       `json:"custody_exports,omitempty"`
+	Findings                 *FindingsEvidence     `json:"findings,omitempty"`
+	FindingsWait             *FindingsWaitEvidence `json:"findings_wait,omitempty"`
+	InitialDownloadObserved  bool                  `json:"initial_download_observed"`
 }
 
 // ValidateBrowserEvidence prevents a green browser exit or a database-only
@@ -134,6 +140,10 @@ func ValidateBrowserEvidence(request BrowserRequest, evidence *BrowserEvidence) 
 	case "manage":
 		if request.DeviceID == "" || evidence.DeviceID != request.DeviceID || evidence.ActionID == "" || !evidence.ActionCompleted || evidence.ActionFinishedAt.IsZero() || !evidence.FreshInventoryReceived {
 			return errors.New("deploy: same-device live inventory action did not complete")
+		}
+	case "findings":
+		if err := ValidateFindingsEvidence(request, evidence); err != nil {
+			return err
 		}
 	default:
 		return errors.New("deploy: unknown browser phase")

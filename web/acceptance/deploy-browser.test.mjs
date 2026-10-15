@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
-import { launchTrustedDeploymentBrowser } from "./deploy-browser.mjs";
+import { assessDeploymentFindings, launchTrustedDeploymentBrowser } from "./deploy-browser.mjs";
 
 const exec = promisify(execFile);
 
@@ -130,5 +130,130 @@ test("native deployment browser trusts its supplied CA but rejects unknown roots
   await assert.rejects(
     page.goto(`https://127.0.0.1:${trustedPort}`),
     /ERR_CERT_COMMON_NAME_INVALID/,
+  );
+});
+
+function nativeFindingsReply() {
+  const now = Date.parse("2026-10-15T12:00:00Z");
+  const source = {
+    distro: "ubuntu",
+    release: "24.04",
+    source_url: "https://vendor.invalid/real-export.zip",
+    platform_stream: "",
+  };
+  const feed = {
+    id: "automatically-selected-vendor",
+    distro: source.distro,
+    release: source.release,
+    sourceUrl: source.source_url,
+    sourceSha256: "a".repeat(64),
+    fresh: true,
+    checkedAt: "2026-10-15T11:58:00Z",
+    expiresAt: "2026-10-16T11:58:00Z",
+    advisoryCount: "123",
+  };
+  return {
+    now,
+    config: { advisorySources: [source] },
+    inventory: {
+      snapshotId: "b0b7a78e-07b1-419b-80ae-bd95e67d6694",
+      sequence: "4",
+      packages: [{ name: "native-package", version: "1", architecture: "amd64" }],
+    },
+    sources: { feeds: [feed] },
+    findings: {
+      freshness: {
+        snapshotId: "b0b7a78e-07b1-419b-80ae-bd95e67d6694",
+        feedId: feed.id,
+        sourceSha256: feed.sourceSha256,
+        inventoryAt: "2026-10-15T11:59:00Z",
+        inventoryExpiresAt: "2026-10-16T11:59:00Z",
+        feedExpiresAt: feed.expiresAt,
+        state: "ADVISORY_FINDING_STATE_CLEAR",
+      },
+      totals: {},
+    },
+  };
+}
+
+test("native findings waits for actual publication and matching evaluation", () => {
+  const assess = (reply) =>
+    assessDeploymentFindings(
+      reply.inventory,
+      reply.sources,
+      reply.findings,
+      reply.config,
+      reply.now,
+    );
+  assert.equal(
+    assess(nativeFindingsReply()).ready,
+    true,
+    "a real clear result needs no invented CVE",
+  );
+  for (const mutate of [
+    (r) => (r.sources.feeds = []),
+    (r) => (r.sources.feeds[0].error = "network_failure"),
+    (r) => (r.sources.feeds[0].sourceUrl = "https://different.invalid/export"),
+    (r) => (r.sources.feeds[0].platformStream = "eus"),
+    (r) => (r.sources.feeds[0].sourceSha256 = ""),
+    (r) => (r.sources.feeds[0].advisoryCount = "0"),
+    (r) => (r.sources.feeds[0].expiresAt = "2026-10-14T00:00:00Z"),
+    (r) => (r.inventory.packages = []),
+    (r) => (r.findings.freshness.snapshotId = "old-snapshot"),
+    (r) => (r.findings.freshness.sourceSha256 = "b".repeat(64)),
+    (r) => (r.findings.freshness.state = "ADVISORY_FINDING_STATE_UNKNOWN"),
+    (r) => (r.findings.freshness.inventoryExpiresAt = "2026-10-14T00:00:00Z"),
+  ]) {
+    const reply = nativeFindingsReply();
+    mutate(reply);
+    assert.equal(assess(reply).ready, false);
+  }
+  const downloading = nativeFindingsReply();
+  downloading.sources.feeds[0].fresh = false;
+  downloading.sources.feeds[0].refreshing = true;
+  assert.equal(assess(downloading).reason, "vendor_feed_download_in_progress");
+  const partial = nativeFindingsReply();
+  partial.findings.freshness.state = "ADVISORY_FINDING_STATE_PARTIAL";
+  partial.findings.freshness.reason = "package_origin_uncovered";
+  partial.findings.freshness.uncoveredPackages = "9";
+  const proof = assess(partial);
+  assert.equal(proof.ready, true);
+  assert.equal(proof.evidence.complete_coverage, false);
+  assert.equal(proof.evidence.uncovered_packages, 9);
+  partial.findings.freshness.uncoveredPackages = "0";
+  assert.throws(() => assess(partial), /vendor_coverage_label_inconsistent/);
+});
+
+test("native findings never publishes exception text or cursor authority", () => {
+  const reply = nativeFindingsReply();
+  reply.inventory.pageToken = "private-cursor";
+  reply.findings.findings = [
+    {
+      feedId: reply.sources.feeds[0].id,
+      state: "ADVISORY_FINDING_STATE_ACCEPTED",
+      exception: { reason: "private-operator-text" },
+    },
+  ];
+  reply.findings.totals = { accepted: "1" };
+  const proof = assessDeploymentFindings(
+    reply.inventory,
+    reply.sources,
+    reply.findings,
+    reply.config,
+    reply.now,
+  );
+  assert.equal(proof.ready, true);
+  assert.equal(proof.evidence.totals.accepted, 1);
+  assert.equal(JSON.stringify(proof.evidence).includes("private-"), false);
+  reply.findings.findings[0].state = "ADVISORY_FINDING_STATE_UNKNOWN";
+  assert.equal(
+    assessDeploymentFindings(
+      reply.inventory,
+      reply.sources,
+      reply.findings,
+      reply.config,
+      reply.now,
+    ).ready,
+    false,
   );
 });

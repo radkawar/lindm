@@ -249,7 +249,7 @@ func deployBrowser(repository string) func(context.Context, deploylab.BrowserReq
 		if err != nil {
 			return nil, err
 		}
-		runErr := labexec.Run(ctx, labexec.Command{Path: node, Args: []string{filepath.Join(repository, "web/acceptance/deploy.mjs"), path}, Env: environ, Dir: repository, Timeout: 10 * time.Minute, Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
+		runErr := labexec.Run(ctx, labexec.Command{Path: node, Args: []string{filepath.Join(repository, "web/acceptance/deploy.mjs"), path}, Env: environ, Dir: repository, Timeout: deploylab.BrowserTimeout(request), Interrupt: syscall.SIGTERM, Grace: 45 * time.Second})
 		observed := new(deploylab.BrowserEvidence)
 		readErr := readConsoleBrowserJSON(request.ResultPath, observed)
 		return observed, errors.Join(runErr, readErr)
