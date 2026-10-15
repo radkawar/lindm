@@ -186,10 +186,10 @@ if as omarchy-hyprland-session-locked; then echo locked; else case $? in 1) echo
 		locker:     "Omarchy Quickshell WlSessionLock via omarchy-hyprland-session-locked",
 		lockedHint: false,
 		logindLock: false,
-		// The stock tuple lacks a verified fixed-runtime qualification for
-		// VIEW. CONTROL fails earlier because xdg-desktop-portal-hyprland
-		// exposes ScreenCast but no RemoteDesktop; both refuse before consent.
-		assistance: unavailableScenarios("desktop_runtime_unqualified", "portal_remote_desktop_unavailable"),
+		// Stock Quickshell advertises actions without rendering Allow/Decline.
+		// CONTROL fails earlier because xdg-desktop-portal-hyprland exposes
+		// ScreenCast but no RemoteDesktop; both refuse before consent.
+		assistance: unavailableScenarios("notification_actions_unverified", "portal_remote_desktop_unavailable"),
 	},
 	{
 		// greetd's initial_session autologin into start-cosmic (Pop!_OS 24.04).

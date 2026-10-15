@@ -6,11 +6,42 @@ package desktop
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestFixedHyprlandManifestPinsConsentDeployment(t *testing.T) {
+	seen := make(map[string]string)
+	for _, artifact := range fixedHyprlandRootFiles {
+		if _, duplicate := seen[artifact.path]; duplicate || !strings.HasPrefix(artifact.path, "/") {
+			t.Fatal("ambiguous reviewed artifact path:", artifact.path)
+		}
+		seen[artifact.path] = artifact.consumer
+		digest, err := hex.DecodeString(artifact.sha)
+		if err != nil || len(digest) != 32 {
+			t.Fatal("invalid reviewed artifact digest:", artifact.path)
+		}
+		if strings.HasPrefix(artifact.path, "/usr/share/omarchy/") && artifact.consumer != "shell" {
+			t.Fatal("shell source assigned to another process's deployment fence:", artifact.path)
+		}
+	}
+	for _, path := range []string{
+		fixedQuickshell,
+		fixedOmarchyShell,
+		"/usr/share/omarchy/shell/Ui/Button.qml",
+		"/usr/share/omarchy/shell/Ui/BorderSurface.qml",
+		"/usr/share/omarchy/shell/plugins/notifications/Service.qml",
+		"/usr/share/omarchy/shell/plugins/notifications/NotificationLogic.js",
+		"/usr/share/omarchy/shell/plugins/notifications/components/NotificationCard.qml",
+	} {
+		if seen[path] != "shell" {
+			t.Fatal("consent artifact absent from shell deployment-age fence:", path)
+		}
+	}
+}
 
 func TestFixedHyprlandPortalCommandRequiresObservedLoaderInvocation(t *testing.T) {
 	// Native Omarchy record reviewed-live-processes.json, backend.cmdline_base64.
@@ -159,5 +190,26 @@ func TestFixedHyprlandNoUserPluginsChecksBoundedDirectory(t *testing.T) {
 	}
 	if err := fixedHyprlandNoUserPlugins(entry); err == nil {
 		t.Fatal("regular file substituted for plugin directory admitted")
+	}
+}
+
+func TestFixedHyprlandNotificationOwnerMatchesReviewedShell(t *testing.T) {
+	ctx := t.Context()
+	server, bus := privateSessionBus(t, ctx, notificationsName)
+	q := &FixedDesktopVerifier{bus: bus}
+	pid := uint32(os.Getpid())
+	if err := q.fixedHyprlandNotificationOwner(ctx, pid); err != nil {
+		t.Fatalf("actual notification owner: %v", err)
+	}
+	for _, other := range []uint32{0, pid + 1} {
+		if err := q.fixedHyprlandNotificationOwner(ctx, other); err == nil {
+			t.Fatalf("accepted different reviewed shell PID %d", other)
+		}
+	}
+	if _, err := server.ReleaseName(notificationsName); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.fixedHyprlandNotificationOwner(ctx, pid); err == nil {
+		t.Fatal("accepted missing notification owner")
 	}
 }

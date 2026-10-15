@@ -176,6 +176,11 @@ installation time.
   it renders non-default action buttons and removes implicit first-action
   activation from card clicks. It is not stock `1.10.0`, and does not create
   a minimum-version rule or qualify public Pop!\_OS packages.
+  Replacing the daemon with generic Quickshell does not establish safe consent:
+  its `actions` advertisement also lacks visible buttons in the stock Omarchy
+  surface. It refuses `notification_actions_unverified` unless the separate
+  [reviewed Omarchy QML and live notification owner](omarchy.md#experimental-fixed-wayland-tuple)
+  are qualified; COSMIC does not inherit that tuple from an advertised name.
   The pre-consent portal probe takes precedence, so the older ISO now refuses
   VIEW as well as CONTROL for missing RemoteDesktop. Upgrading just the portal
   and compositor does not enable assistance: the public notification packages

@@ -149,13 +149,13 @@ func TestCOSMICProfileLocksThroughLogindAndRefusesAssistance(t *testing.T) {
 	}
 }
 
-func TestHyprlandStockProfileRefusesUnqualifiedRuntimeBeforeLockCheck(t *testing.T) {
+func TestHyprlandStockProfileRefusesUnverifiedActionsBeforeLockCheck(t *testing.T) {
 	desktop := mustLabDesktop(t, "hyprland")
 	var got []string
 	for _, spec := range desktop.assistance {
 		got = append(got, spec.name+"="+spec.detail)
 	}
-	if strings.Join(got, ",") != "view-unavailable=desktop_runtime_unqualified,control-unavailable=portal_remote_desktop_unavailable" || !desktop.refusalOnly() {
+	if strings.Join(got, ",") != "view-unavailable=notification_actions_unverified,control-unavailable=portal_remote_desktop_unavailable" || !desktop.refusalOnly() {
 		t.Fatalf("stock Hyprland scenarios = %v", got)
 	}
 	// Runtime qualification does not change the stock lock-observation truth.

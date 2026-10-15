@@ -346,3 +346,19 @@ func TestRenderSupportDoesNotTreatNewCosmicPortalAsSafeConsent(t *testing.T) {
 		t.Fatal("missing separate portal and consent restriction")
 	}
 }
+
+func TestRenderSupportDoesNotMislabelUnverifiedQuickshellAsCosmic(t *testing.T) {
+	r, cells := supportFixture()
+	r.Supports = slices.DeleteFunc(r.Supports, func(c platform.Capability) bool { return c == platform.Assistance })
+	r.Gates = map[platform.Capability]string{platform.Assistance: "notification_actions_unverified: Quickshell"}
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[7]; !strings.HasPrefix(got, "✗ [^support-") {
+		t.Fatalf("unverified consent became supported: %q", got)
+	}
+	if strings.Contains(body, "COSMIC") || !strings.Contains(body, "notification surface has not been verified to show safe consent buttons") {
+		t.Fatal("notification restriction misidentified the desktop or consent proof")
+	}
+}

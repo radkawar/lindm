@@ -4,9 +4,14 @@ package platform
 
 // NotificationActionsUnavailable adds server-specific consent qualification
 // to the ordinary "actions" capability check performed by the caller. COSMIC
-// advertises that capability even when it renders no buttons, so its runtime
-// version requires native visible-button evidence rather than capability trust.
+// and Quickshell advertise that capability without necessarily rendering
+// buttons. COSMIC needs a verified version; Quickshell needs reviewed QML and
+// a live owner binding, which the desktop runtime qualifier checks separately.
 func NotificationActionsUnavailable(server, version string) string {
+	if server == "quickshell" {
+		// A binary version cannot qualify a configurable QML surface.
+		return "notification_actions_unverified"
+	}
 	if server != "cosmic-notifications" {
 		return ""
 	}

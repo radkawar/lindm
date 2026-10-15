@@ -992,7 +992,7 @@ var registry = []*Release{
 		Supports: caps(agentCore, []Capability{Packages, Accounts, Sysctl, Definitions, Encryption, Wipe, ReportLoss, Lock}),
 		Gates: gates(string(Advisories), "no vendor advisory feed; the Arch feed does not cover Omarchy packages",
 			string(RecoverySanitize), reasonOmarchyOwnedBoot,
-			string(Assistance), "session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland",
+			string(Assistance), "notification_actions_unverified: stock Quickshell advertises actions without rendering consent buttons; session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland",
 			string(Password), "Omarchy 4.0.4 ships pam 1.7.2-2 (Arch pins measured 1.7.3-1) and rewrites system-auth (pam_faillock deny=10); its own PAM stack has no measured password pins",
 			string(Firewall), "the Arch firewall provider manages firewalld zones; Omarchy 4.0.4 runs ufw active by default and its ISO carries no firewalld",
 			string(OSUpdate), reasonOmarchyOSUpdate),

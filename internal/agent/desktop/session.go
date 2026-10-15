@@ -645,7 +645,10 @@ func (s *session) servable(ctx context.Context, request PortalRequest, admission
 	if err != nil {
 		return unavailable("notification_server_unavailable", err)
 	}
-	if reason := platform.NotificationActionsUnavailable(server, version); reason != "" {
+	// Only the runtime-qualified Hyprland tuple proves Quickshell's actual
+	// action QML and binds the notification owner to that reviewed process.
+	verifiedQuickshell := server == "quickshell" && admission.profile == hyprlandWayland && admission.runtimeErr == nil
+	if reason := platform.NotificationActionsUnavailable(server, version); reason != "" && !verifiedQuickshell {
 		return unavailable(reason, nil)
 	}
 	if admission.runtimeErr != nil {

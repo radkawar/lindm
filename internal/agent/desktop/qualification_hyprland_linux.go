@@ -42,6 +42,11 @@ var fixedHyprlandRootFiles = [...]struct {
 	{fixedOmarchyShell, "4a4b7694e5b9e0bd952ce0efa2d6dc2cea44cdfa98cc2f442e40fe41cbc1beab", "shell"},
 	{"/usr/share/omarchy/shell/services/PluginRegistry.qml", "8466127c53037b80b582544610b0bdf78a86764e4f037a3b9ce360d107359803", "shell"},
 	{"/usr/share/omarchy/config/omarchy/shell.json", "b16dc9646bf68e81643522cef504795d97cb5016d80d8b65784bde44f2c0883f", "shell"},
+	{"/usr/share/omarchy/shell/Ui/Button.qml", "fda48672cc11dba109acea1cc98eb4b29746e5ce09f90a47f487b776ff99e799", "shell"},
+	{"/usr/share/omarchy/shell/Ui/BorderSurface.qml", "e17d8150d0b0e60f431bd6df5e661f5d9fe1f5eec9c2e2420f6eff2179a45baf", "shell"},
+	{"/usr/share/omarchy/shell/plugins/notifications/Service.qml", "6bd0c86bcf814a23b578ae1e7be4b575151ce41a25350e686bd8fa544b239b97", "shell"},
+	{"/usr/share/omarchy/shell/plugins/notifications/NotificationLogic.js", "db0f4b680f6b40d8a54d300371765d9629df1f9f47c2925bceebe31494d91c9d", "shell"},
+	{"/usr/share/omarchy/shell/plugins/notifications/components/NotificationCard.qml", "366a5aa93e3753dacaca5147239cd8abb29044e142dcb77be39aa03c3197041b", "shell"},
 	{"/usr/share/omarchy/shell/plugins/lock/manifest.json", "58af8610a79045dfc09b541a5c2fdfd2e8886624549a49114ba424b4833cc546", "shell"},
 	{"/usr/share/omarchy/shell/plugins/lock/Service.qml", "25be2b64fbf2cd1928a8e9c03fe62bdb35fffa942a5635a4b3252795dd81b852", "shell"},
 	{"/usr/share/omarchy/shell/plugins/lock/login-session.sh", "f338b0df710df14d014d3bb5a81da12caa2862c0f76f1bdc74366cfe3dd8b0ce", "shell"},
@@ -164,6 +169,21 @@ func (q *FixedDesktopVerifier) verifyHyprland(ctx context.Context) error {
 	}
 	if currentPID != backendPID {
 		return errors.New("hyprland backend changed during qualification")
+	}
+	return q.fixedHyprlandNotificationOwner(ctx, shellPID)
+}
+
+// The reviewed consent QML must belong to the actual notification server, not
+// an unrelated Quickshell instance. The bus resolves the well-known name and
+// connection credentials atomically; the shell's image and environment have
+// already been checked above.
+func (q *FixedDesktopVerifier) fixedHyprlandNotificationOwner(ctx context.Context, shellPID uint32) error {
+	var pid uint32
+	if err := q.bus.conn.BusObject().CallWithContext(ctx, "org.freedesktop.DBus.GetConnectionUnixProcessID", 0, notificationsName).Store(&pid); err != nil {
+		return fmt.Errorf("identify reviewed shell notification owner: %w", err)
+	}
+	if pid != shellPID {
+		return errors.New("notification server is not the reviewed shell process")
 	}
 	return nil
 }

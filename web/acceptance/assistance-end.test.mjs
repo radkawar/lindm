@@ -36,7 +36,10 @@ test("qualification remedies distinguish unknown consent and do not promise unsu
     new URL("../src/features/assistance/display.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(display, /notification_actions_unverified:\s*"[^"]*version has not been verified/);
+  assert.match(
+    display,
+    /notification_actions_unverified:\s*"[^"]*implementation has not been verified/,
+  );
   assert.match(display, /desktop_runtime_unqualified:\s*"[^"]*reviewed assistance tuple/);
   assert.doesNotMatch(display, /Request view only instead/);
   assert.match(display, /This desktop may also require it for viewing/);

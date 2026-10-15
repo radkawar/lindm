@@ -154,7 +154,7 @@ Encryption and wipe require an encrypted installation. TPM2 unlock needs a compa
 
 [^support-15]: No vendor advisory feed covers this distribution.
 
-[^support-16]: The desktop does not report screen-lock state for safe sharing.
+[^support-16]: The desktop's notification surface has not been verified to show safe consent buttons.
 
 <!-- END GENERATED readme-support -->
 

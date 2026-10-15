@@ -12,40 +12,40 @@ it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability            | Omarchy 4.0.4                                                                                                                                                                                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| inventory             | implemented                                                                                                                                                                                                                                                 |
-| lifecycle             | implemented                                                                                                                                                                                                                                                 |
-| dispatch              | implemented                                                                                                                                                                                                                                                 |
-| packages              | implemented                                                                                                                                                                                                                                                 |
-| accounts              | implemented                                                                                                                                                                                                                                                 |
-| sysctl                | implemented                                                                                                                                                                                                                                                 |
-| definitions           | implemented                                                                                                                                                                                                                                                 |
-| password              | gated: Omarchy 4.0.4 ships pam 1.7.2-2 (Arch pins measured 1.7.3-1) and rewrites system-auth (pam_faillock deny=10); its own PAM stack has no measured password pins                                                                                        |
-| firewall              | gated: the Arch firewall provider manages firewalld zones; Omarchy 4.0.4 runs ufw active by default and its ISO carries no firewalld                                                                                                                        |
-| encryption            | implemented                                                                                                                                                                                                                                                 |
-| wipe                  | implemented                                                                                                                                                                                                                                                 |
-| report-loss           | implemented                                                                                                                                                                                                                                                 |
-| lock                  | implemented                                                                                                                                                                                                                                                 |
-| recovery-sanitize     | gated: owned-boot recovery fixture packages (systemd-ukify, sbsigntools, busybox) are not on the authenticated Omarchy ISO and partial pacman upgrades are unsupported                                                                                      |
-| self-update           | implemented                                                                                                                                                                                                                                                 |
-| assistance            | gated: session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland |
-| assistance-clipboard  | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                    |
-| assistance-keyboard   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                    |
-| assistance-displays   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                    |
-| assistance-messages   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                    |
-| assistance-files      | gated: local FileChooser consent, input isolation and secure transfer are not qualified on this release                                                                                                                                                     |
-| assistance-reconnect  | gated: fresh consent after real logout/reboot and workflow expiry are not qualified on this release                                                                                                                                                         |
-| assistance-recording  | gated: recording disclosure, encrypted storage and retention are not qualified on this release                                                                                                                                                              |
-| assistance-unattended | gated: a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release                                                                                                                               |
-| assistance-elevation  | gated: pausing all remote injection around a local privileged prompt is not qualified on this release                                                                                                                                                       |
-| assistance-annotation | gated: no qualified non-interactive compositor overlay exists on this release                                                                                                                                                                               |
-| assistance-audio      | gated: selected PipeWire output/microphone capture with local mute is not qualified on this release                                                                                                                                                         |
-| assistance-kde        | gated: kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability                                                                                                                               |
-| assistance-x11        | gated: x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE                                                                                                                                                    |
-| advisories            | gated: no vendor advisory feed; the Arch feed does not cover Omarchy packages                                                                                                                                                                               |
-| os-update             | gated: Omarchy 4.0.4's ALPM guard aborts direct pacman system upgrades (only `omarchy update` may run them), and its moving stable mirrors have no immutable snapshot for a pinned rolling update                                                           |
-| release-upgrade       | gated: release upgrade is not implemented                                                                                                                                                                                                                   |
+| Capability            | Omarchy 4.0.4                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory             | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| lifecycle             | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| dispatch              | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| packages              | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| accounts              | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| sysctl                | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| definitions           | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| password              | gated: Omarchy 4.0.4 ships pam 1.7.2-2 (Arch pins measured 1.7.3-1) and rewrites system-auth (pam_faillock deny=10); its own PAM stack has no measured password pins                                                                                                                                                                                                |
+| firewall              | gated: the Arch firewall provider manages firewalld zones; Omarchy 4.0.4 runs ufw active by default and its ISO carries no firewalld                                                                                                                                                                                                                                |
+| encryption            | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| wipe                  | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| report-loss           | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| lock                  | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| recovery-sanitize     | gated: owned-boot recovery fixture packages (systemd-ukify, sbsigntools, busybox) are not on the authenticated Omarchy ISO and partial pacman upgrades are unsupported                                                                                                                                                                                              |
+| self-update           | implemented                                                                                                                                                                                                                                                                                                                                                         |
+| assistance            | gated: notification_actions_unverified: stock Quickshell advertises actions without rendering consent buttons; session_lock_state_unreported: Omarchy's Quickshell WlSessionLock bypasses logind (no Lock listener, no LockedHint) and Hyprland screencopy keeps streaming a locked screen; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-hyprland |
+| assistance-clipboard  | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                                                                                                                            |
+| assistance-keyboard   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                                                                                                                            |
+| assistance-displays   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                                                                                                                            |
+| assistance-messages   | gated: not implemented for Omarchy 4.0.4                                                                                                                                                                                                                                                                                                                            |
+| assistance-files      | gated: local FileChooser consent, input isolation and secure transfer are not qualified on this release                                                                                                                                                                                                                                                             |
+| assistance-reconnect  | gated: fresh consent after real logout/reboot and workflow expiry are not qualified on this release                                                                                                                                                                                                                                                                 |
+| assistance-recording  | gated: recording disclosure, encrypted storage and retention are not qualified on this release                                                                                                                                                                                                                                                                      |
+| assistance-unattended | gated: a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release                                                                                                                                                                                                                                       |
+| assistance-elevation  | gated: pausing all remote injection around a local privileged prompt is not qualified on this release                                                                                                                                                                                                                                                               |
+| assistance-annotation | gated: no qualified non-interactive compositor overlay exists on this release                                                                                                                                                                                                                                                                                       |
+| assistance-audio      | gated: selected PipeWire output/microphone capture with local mute is not qualified on this release                                                                                                                                                                                                                                                                 |
+| assistance-kde        | gated: kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability                                                                                                                                                                                                                                       |
+| assistance-x11        | gated: x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE                                                                                                                                                                                                                                                            |
+| advisories            | gated: no vendor advisory feed; the Arch feed does not cover Omarchy packages                                                                                                                                                                                                                                                                                       |
+| os-update             | gated: Omarchy 4.0.4's ALPM guard aborts direct pacman system upgrades (only `omarchy update` may run them), and its moving stable mirrors have no immutable snapshot for a pinned rolling update                                                                                                                                                                   |
+| release-upgrade       | gated: release upgrade is not implemented                                                                                                                                                                                                                                                                                                                           |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -144,7 +144,8 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   that also locks accounts or terminates sessions proceeds; its session part
   ends unverified with `session_lock_state_unreported`. Release, account lock and
   quarantine pass.
-- **Assistance.** Gated in the registry (`session_lock_state_unreported`). The
+- **Assistance.** Gated in the registry (`notification_actions_unverified` and
+  `session_lock_state_unreported`). The
   helper starts through `graphical-session.target` (uwsm) and sees
   `XDG_CURRENT_DESKTOP=Hyprland`. The earlier native record
   `omarchy404-assistance-03` observed VIEW `UNAVAILABLE`
@@ -230,6 +231,50 @@ deployment. Ordinary reviewed executables must be the actual process image,
 not merely mapped alongside an unreviewed loader. The reviewed locker is the
 `lock-logind-4.0.4-native` port (`38a30a51`) with Quickshell `0.3.1-1`, not an
 assumption that a newer Omarchy package fixes locking.
+
+Quickshell's advertised `actions` capability is not consent proof. A fresh
+normal signed-SDK run with the reviewed portal and locker reached the
+notification, but the stock card rendered no Allow/Decline buttons, even when
+physically hovered; the invitation timed out without sharing. Generic Quickshell
+therefore refuses `notification_actions_unverified`, including on COSMIC and
+other desktops. The fixed tuple additionally pins the explicit-action backport
+from existing [Omarchy PR 9717](https://github.com/omacom/omarchy/pull/9717).
+Under `/usr/share/omarchy/shell/plugins/notifications/`, the reviewed source is:
+
+| File                              | SHA-256                                                            |
+| --------------------------------- | ------------------------------------------------------------------ |
+| `Service.qml`                     | `6bd0c86bcf814a23b578ae1e7be4b575151ce41a25350e686bd8fa544b239b97` |
+| `NotificationLogic.js`            | `db0f4b680f6b40d8a54d300371765d9629df1f9f47c2925bceebe31494d91c9d` |
+| `components/NotificationCard.qml` | `366a5aa93e3753dacaca5147239cd8abb29044e142dcb77be39aa03c3197041b` |
+
+The actual native `/usr/share/omarchy/shell/Ui/` widgets are pinned too:
+
+| File                | SHA-256                                                            |
+| ------------------- | ------------------------------------------------------------------ |
+| `Button.qml`        | `fda48672cc11dba109acea1cc98eb4b29746e5ce09f90a47f487b776ff99e799` |
+| `BorderSurface.qml` | `e17d8150d0b0e60f431bd6df5e661f5d9fe1f5eec9c2e2420f6eff2179a45baf` |
+
+The source checkout's newer Button is not substituted for the actual golden
+file. Native `GetServerInformation` reports `quickshell` with an empty version;
+neither inventing a version nor trusting its advertised capability qualifies it.
+The root-owned, mode-0644 widget measurements and actual D-Bus reply are retained
+in `~/.cache/lindm-upstream-prs/omarchy-qualified-20261015l/native-notification-widget-roots.json`
+(SHA-256 `ec59a3146fa299a853095a111358f0eb524739a53d55c167718552e27abbc08a`).
+
+These files participate in the shell's deployment-age fence. The notification
+server must also be that reviewed Quickshell process, not another instance or
+daemon borrowing its QML qualification. Only this runtime proof overrides the
+generic unverified-action refusal.
+
+The local native backport rendered actual Allow/Decline buttons, and a physical
+Decline ended VIEW as `DECLINED` / `prompt_declined` without sharing. Evidence
+under `~/.cache/lindm-upstream-prs/omarchy-qualified-20261015j/`:
+`guest-respond-20261015T221641.427Z-screenshot.png` (SHA-256
+`118af7e28c2e46fa3d6e2fb9e1908feeb4baa4cafcbccbc0ccb90b9b237aabf3`)
+and `native-action-row-declined-helper-journal.txt` (SHA-256
+`fc44939f67b62d5fbc294d5d9fc30b959949f625780ff0b5d195262e399ec7d4`).
+This establishes native button rendering and denial, not a complete qualified
+VIEW/CONTROL run with the final signed SDK.
 
 On Btrfs, `stat` can identify a subvolume with a different device number from
 the backing superblock reported in executable mappings. Such a mismatch is not

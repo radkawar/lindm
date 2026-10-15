@@ -15,6 +15,9 @@ func TestNotificationActionsUnavailableUsesVerifiedVersions(t *testing.T) {
 		{"cosmic-notifications", "", "notification_actions_unverified"},
 		{"cosmic-notifications", "1.11.0", "notification_actions_unverified"},
 		{"cosmic-notifications", "1.10.0+unknown", "notification_actions_unverified"},
+		{"quickshell", "0.3.1", "notification_actions_unverified"},
+		{"quickshell", "0.3.2", "notification_actions_unverified"},
+		{"quickshell", "", "notification_actions_unverified"},
 		{"gnome-shell", "", ""},
 		{"Notification Daemon", "", ""},
 	} {

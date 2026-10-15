@@ -94,6 +94,54 @@ func TestFixedDesktopVerificationFailureNeverOffersConsent(t *testing.T) {
 	}
 }
 
+func TestQuickshellAdvertisedActionsRequireReviewedConsentSurface(t *testing.T) {
+	for _, test := range []struct {
+		name, desktop, sessionType string
+		qualifier                  *fakeFixedDesktopQualifier
+		allowPrompt                bool
+	}{
+		{name: "COSMIC", desktop: "COSMIC", sessionType: "wayland"},
+		{name: "GNOME", desktop: "GNOME", sessionType: "wayland"},
+		{name: "stock Hyprland", desktop: "Hyprland", sessionType: "wayland"},
+		{name: "rejected Hyprland tuple", desktop: "Hyprland", sessionType: "wayland", qualifier: &fakeFixedDesktopQualifier{err: errors.New("unreviewed consent QML")}},
+		{name: "reviewed Cinnamon tuple", desktop: "X-Cinnamon", sessionType: "x11", qualifier: &fakeFixedDesktopQualifier{}},
+		{name: "reviewed Hyprland tuple", desktop: "Hyprland", sessionType: "wayland", qualifier: &fakeFixedDesktopQualifier{}, allowPrompt: true},
+	} {
+		for _, mode := range []agentv1.AssistanceMode{modeView, modeControl} {
+			t.Run(test.name+"/"+mode.String(), func(t *testing.T) {
+				h := newDesktopHarness(t, test.desktop)
+				h.local.SessionType = test.sessionType
+				h.local.Desktop = test.desktop
+				// The actual native server reports an empty version. Only
+				// reviewed source and live owner proof can admit its actions.
+				h.notifier.server, h.notifier.version = "quickshell", ""
+				if test.qualifier != nil {
+					h.helper.deps.fixedDesktopQualifier = test.qualifier
+				}
+				inv := desktopInvitation(mode, func(p *agentv1.AssistancePolicy) { p.X11 = modeOn })
+				h.sync(directiveFor(inv))
+				if test.allowPrompt {
+					h.notifier.next(t, "Remote assistance request").result <- actionDecline
+					h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_DECLINED)
+				} else {
+					report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+					if report.GetEndDetail() != "notification_actions_unverified" {
+						t.Fatalf("unreviewed action surface was not refused precisely: %v", report)
+					}
+					select {
+					case notice := <-h.notifier.posted:
+						t.Fatalf("posted %q with unreviewed action rendering", notice.notification.Summary)
+					default:
+					}
+				}
+				if h.portal.openCount() != 0 {
+					t.Fatal("portal opened without local consent")
+				}
+			})
+		}
+	}
+}
+
 func TestVerifiedFixedDesktopNarrowsCapabilitiesAndObservesLocks(t *testing.T) {
 	for _, test := range []struct {
 		desktop, sessionType string
