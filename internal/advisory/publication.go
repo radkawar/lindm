@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,8 +66,6 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	// Never sweep all inactive rows: another producer may still be staging them.
 	cleanup := []advisoryGeneration{generation}
 	defer func() { s.cleanupAdvisoryGenerations(ctx, cleanup) }()
-	ctx, stopHeartbeat := s.startAdvisoryLeaseHeartbeat(ctx, generation.revision, time.Minute)
-	defer stopHeartbeat()
 	limit := source.GetTotalClaimsLimit()
 	if source.TotalClaimsLimit == nil {
 		limit = 5000000
@@ -77,6 +76,8 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 		batch:     make([]advisorydb.InsertAdvisoryPublicationBatchParams, 0, advisoryPublicationBatchSize),
 		payloads:  make([]byte, 0, advisoryPublicationBatchBytes+(64<<10)),
 	}
+	ctx, stopHeartbeat := s.startAdvisoryLeaseHeartbeat(ctx, generation.revision, time.Minute, &stager.lease)
+	defer stopHeartbeat()
 	emit := func(record *advisoryv1.Advisory) error { return stager.emit(ctx, record) }
 	doc, err := producer(ctx, emit, progress.Mark)
 	if err != nil || stager.err != nil {
@@ -164,6 +165,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 // batches. A sink error is sticky: every later emit returns it.
 type publicationStager struct {
 	s          *Service
+	lease      sync.Mutex
 	progress   *feed.RefreshProgress
 	generation uuid.UUID
 	feedID     string
@@ -180,7 +182,11 @@ func (p *publicationStager) flush(ctx context.Context) error {
 	if len(p.batch) == 0 {
 		return nil
 	}
+	// The batch renews and locks its own lease until commit. A heartbeat must
+	// wait outside its SQL timeout rather than cancel that same transaction.
+	p.lease.Lock()
 	inserted, err := p.s.stageAdvisoryBatch(ctx, p.generation, p.batch)
+	p.lease.Unlock()
 	clear(p.batch)
 	p.batch = p.batch[:0]
 	p.payloads = p.payloads[:0]
