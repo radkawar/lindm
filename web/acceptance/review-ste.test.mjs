@@ -30,6 +30,15 @@ test("STE copy probe enforces primary copy and same-origin links", async () => {
       return page.evaluate(() => window.__review.copy().map((finding) => finding.rule));
     };
     assert.ok((await inspect("<p>The request is accepted.</p>")).includes("STE passive voice"));
+    assert.ok(
+      (await inspect("<p>Exposure cannot be confirmed.</p>")).includes("STE passive voice"),
+    );
+    assert.deepEqual(
+      await inspect(
+        "<p>This device's exposure remains unknown: the inventory check has not finished yet.</p>",
+      ),
+      [],
+    );
     assert.ok((await inspect("<button>Delete machine</button>")).includes('STE use "device"'));
     assert.deepEqual(await inspect("<p>Service drop-in</p>"), []);
     assert.ok((await inspect("<button>Drop device</button>")).includes('STE use "remove"'));

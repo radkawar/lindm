@@ -241,6 +241,8 @@ List affected settings as individual items. Do not turn variable-length lists
 into sentences.
 Recording notices must name lindm as the actor. State the policy, prior notice and
 conditional user-approval requirements directly.
+Describe incomplete checks as unknown exposure, not a clean result. Keep the
+reason visible.
 
 `make ui-review` checks rendered copy for sentence length, passive voice,
 forbidden synonyms and noun clusters. These heuristics do not certify ASD-STE100.

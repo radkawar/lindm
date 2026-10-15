@@ -237,10 +237,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
         </div>
         {!current && !firstDownload ? (
           <p className="border bg-muted/30 p-3 text-sm">
-            Status unknown.{" "}
             {freshness?.reason
-              ? `Exposure cannot be confirmed: ${advisoryReasonText(freshness.reason)}.`
-              : "The device inventory or advisory sources are not current."}
+              ? `This device's exposure remains unknown: ${advisoryReasonText(freshness.reason)}.`
+              : "This device's exposure remains unknown. The device inventory or advisory sources are not current."}
           </p>
         ) : null}
         {partial ? (
