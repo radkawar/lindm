@@ -25,8 +25,14 @@ export async function waitForSettledActionHistory(driver) {
   );
 }
 
+export function deviceActionFailureIsTerminal(state) {
+  // A start grant already projects unknown while its same action can complete.
+  // Continue bounded read-only observation; unknown never authorizes a retry.
+  return state === "Failed" || state === "Expired";
+}
+
 // Expanding an existing result is read-only; never submit or retry failed work.
 export async function openDeviceActionResult(page, actionId) {
   const row = page.locator(`[data-device-action-row][data-action-id="${actionId}"]`);
-  if ((await row.getAttribute("open")) === null) await row.locator("summary").click();
+  if ((await row.getAttribute("open")) === null) await row.locator(":scope > summary").click();
 }

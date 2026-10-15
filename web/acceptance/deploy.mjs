@@ -12,6 +12,7 @@ import {
 } from "./deploy-browser.mjs";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import {
+  deviceActionFailureIsTerminal,
   openDeviceActionResult,
   submitReviewedDeviceAction,
   waitForSettledActionHistory,
@@ -148,27 +149,31 @@ async function managedRefresh(ui) {
         inventory: fact("Fresh inventory")?.textContent.trim(),
       };
     }, previous);
+    if (observed) {
+      result.device_id = config.deviceId;
+      result.action_id = observed.id;
+    }
     if (
       observed?.state === "Completed" &&
       observed.inventory === "Received" &&
       Date.parse(observed.finished) >= requestedAt - 5_000
     ) {
-      result.device_id = config.deviceId;
-      result.action_id = observed.id;
       result.action_completed = true;
       result.fresh_inventory_received = true;
       result.action_finished_at = observed.finished;
       await capture("completed-live-refresh");
       return;
     }
-    if (["Failed", "Expired", "Outcome unknown, don't retry"].includes(observed?.state)) {
-      result.device_id = config.deviceId;
-      result.action_id = observed.id;
+    if (deviceActionFailureIsTerminal(observed?.state)) {
       await openDeviceActionResult(driver.page, observed.id);
       await capture("failed-live-refresh-details");
       throw new Error("live_management_action_failed");
     }
     await delay(1_000);
+  }
+  if (result.action_id) {
+    await openDeviceActionResult(driver.page, result.action_id);
+    await capture("timed-out-live-refresh-details");
   }
   throw new Error("live_management_action_timeout");
 }

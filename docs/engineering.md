@@ -4709,6 +4709,35 @@ backup, upgrade, restore and a completed vulnerability evaluation were not
 established. A screenshot of download activity is not publication or lifecycle
 qualification. The record reports `owned_cleanup_complete: false`.
 
+Three further SDK17 Ubuntu attempts use the same signed package pair, not new
+product builds. Their distinct observer revisions remain explicit in the ledger:
+
+- `native-ubuntu-attempt19.json`, SHA-256
+  `cf1c7f28d88e4dd8d8a6e0254d36bc1b7fff635283cb7f318750d23bb46b1521`,
+  uses observer `9a6a1e09a`. Managed inventory completed, but the Findings observer
+  compared truncated RFC 3339 milliseconds with the console's rounded protobuf
+  milliseconds. The repaired observer uses that same canonical conversion.
+- `native-ubuntu-attempt20.json`, SHA-256
+  `b8843765f115e82e589f21752ad243509ebb461cf1807af0557f857ddf579130`,
+  uses observer `7c3cdb73f`. It stopped at “Outcome unknown, don't retry”.
+  Server source and its grant integration test establish that this conservative
+  projection can appear immediately after start authority, before any executor
+  terminal result. This screenshot does not prove an executor failure.
+- `native-ubuntu-attempt21.json`, SHA-256
+  `647a3381c9bcfa5921f57705013aaceb9b880ba44cf0333b22aa94d29555b494`,
+  uses observer `b038d3df8`. It retained the actual action identity but the result
+  expansion failed with a redacted generic browser error; no expanded result or
+  authoritative terminal failure was retained. The result-expansion regression
+  now includes the real nested technical-details summary and scopes the toggle
+  to the action's immediate summary.
+
+Each remains **FAIL**, with two manual commands and one observed failure.
+Attempt 19 records 51 operator decisions; attempts 20 and 21 record 48 each.
+All three report `owned_cleanup_complete: false`. None establishes completed
+vendor evaluation, backup, upgrade or restore. The repaired observer continues
+bounded, read-only polling of the same action when its outcome is unknown;
+it never resubmits work or treats unknown as success.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

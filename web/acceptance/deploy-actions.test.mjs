@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { ChromiumDriver, UI } from "./drivers.mjs";
 import {
+  deviceActionFailureIsTerminal,
   openDeviceActionResult,
   submitReviewedDeviceAction,
   waitForSettledActionHistory,
@@ -103,7 +104,7 @@ test("old-row and empty history snapshots wait for settled asynchronous renderin
   });
 });
 
-test("terminal action evidence expands only its existing result and never retries", async () => {
+test("action evidence expands only its existing result and never retries", async () => {
   await browser(async (driver) => {
     await driver.page.setContent(`
       <details data-device-action-row data-action-id="other-action">
@@ -112,17 +113,39 @@ test("terminal action evidence expands only its existing result and never retrie
       <details data-device-action-row data-action-id="failed-action">
         <summary>Refresh inventory: Outcome unknown, don't retry</summary>
         <dl><dt>Failure</dt><dd>Interrupted</dd></dl>
+        <details data-slot="technical-details">
+          <summary>Details</summary><dl><dt>Action ID</dt><dd>failed-action</dd></dl>
+        </details>
       </details>
       <button onclick="document.body.dataset.submitted='yes'">Send action</button>
     `);
     await openDeviceActionResult(driver.page, "failed-action");
     await openDeviceActionResult(driver.page, "failed-action");
     const failed = driver.page.locator('[data-action-id="failed-action"]');
-    assert.equal(await failed.locator("dd").isVisible(), true);
+    assert.equal(await failed.locator("summary").count(), 2);
+    assert.equal(await failed.locator(":scope > dl > dd").isVisible(), true);
+    assert.equal(
+      await failed.locator('[data-slot="technical-details"]').getAttribute("open"),
+      null,
+    );
     assert.equal(
       await driver.page.locator('[data-action-id="other-action"]').getAttribute("open"),
       null,
     );
     assert.equal(await driver.observe(() => document.body.dataset.submitted), undefined);
   });
+});
+
+test("unknown remains bounded observation, not terminal failure or retry authority", () => {
+  for (const state of [
+    "Queued",
+    "Running",
+    "Completed",
+    "Outcome unknown, don't retry",
+    "",
+    undefined,
+  ])
+    assert.equal(deviceActionFailureIsTerminal(state), false, state);
+  for (const state of ["Failed", "Expired"])
+    assert.equal(deviceActionFailureIsTerminal(state), true, state);
 });
