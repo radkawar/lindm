@@ -45,6 +45,29 @@ type installState struct {
 // The installer itself retains its private umask for credentials and custody.
 const rpmUpgradeExtractCommand = `set -eu; umask 022; cd "$2"; rpm2cpio "$1" | cpio --extract --make-directories --no-absolute-filenames`
 
+func extractUpgradePackage(ctx context.Context, packagePath, directory string, release *platform.Release) error {
+	if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
+		_, err := command(ctx, nil, "dpkg-deb", "--extract", packagePath, directory)
+		return err
+	}
+	_, err := command(ctx, nil, "/bin/sh", "-c", rpmUpgradeExtractCommand, "extract", packagePath, directory)
+	return err
+}
+
+func prepareUpgradeExecutable(ctx context.Context, binary string, release *platform.Release, run dependencyCommand) error {
+	enforcing, err := selinuxEnforcing(ctx, release, run)
+	if err != nil || !enforcing {
+		return err
+	}
+	// The verified public payload inherits var_lib_t in its temporary directory.
+	// Give only this executable the installed native service binary's context;
+	// leave the checker UID, NNP, credential isolation and sandbox unchanged.
+	if _, err := run(ctx, nil, "chcon", "--reference=/usr/bin/lindmd", "--", binary); err != nil {
+		return fmt.Errorf("label verified upgrade executable like the native service binary: %w", err)
+	}
+	return nil
+}
+
 func upgradeRelease(ctx context.Context, o Options, version, packagePath string, release *platform.Release) (err error) {
 	if err := verifyNativePackage(ctx, packagePath, release, o.Bundle); err != nil {
 		return err
@@ -79,16 +102,13 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 	if err := os.Chmod(tmp, 0755); err != nil {
 		return err
 	}
-	if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
-		if _, err := command(ctx, nil, "dpkg-deb", "--extract", packagePath, tmp); err != nil {
-			return err
-		}
-	} else {
-		if _, err := command(ctx, nil, "/bin/sh", "-c", rpmUpgradeExtractCommand, "extract", packagePath, tmp); err != nil {
-			return err
-		}
+	if err := extractUpgradePackage(ctx, packagePath, tmp, release); err != nil {
+		return err
 	}
 	binary := filepath.Join(tmp, "usr/bin/lindmd")
+	if err := prepareUpgradeExecutable(ctx, binary, release, command); err != nil {
+		return err
+	}
 	if err := integrationCredentialPreflight(ctx, binary); err != nil {
 		return err
 	}

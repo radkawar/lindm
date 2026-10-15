@@ -5285,6 +5285,43 @@ binary's 0755 mode. Security review closed with no findings. A new signed native
 run must qualify the correction; neither this scoped failure nor the separate
 full Findings failure is promoted.
 
+SDK25's authentic 0.2.28 → 0.2.29 pair at source
+`d90117efd9c4cd96932e6c096b233f6fb76c9c2f` passes the independent cold release
+build in 1,753.75 seconds. `cold-release-attempt27.json` has SHA-256
+`fec5f775b5ea2efe397a41195cf0b9323b542c6e9cc8c1ebef09b225611425c5`.
+This remains build-only evidence, not lifecycle qualification.
+
+The separate RHEL server-only run
+`native-rhel-sdk25-server-lifecycle-attempt1.json`, SHA-256
+`c90f67f731054ef2ffb63d4b54aea5c775860a20d71f19ad3569c5fe9444156d`,
+is **FAIL**, retaining the exact restricted scope, Findings exclusion and false
+full qualification. Protected owner setup, Ready repository, actual completed
+management with fresh inventory, encrypted backup and offline drill pass. Upgrade
+again exits 203 before recovery, despite the corrected extraction permissions.
+No fresh-host restore or Findings success is claimed.
+
+A separate one-slot RHEL control uses the identical installed signed executable
+and the unchanged service-user preflight. Every directory and executable mode is
+`0755`. The temporary executable's default `var_lib_t` context produces 203/EXEC
+with permission denied. Copying only the installed executable's SELinux context
+with `chcon --reference=/usr/bin/lindmd` yields `bin_t`; the same restricted check
+then exits zero. Its first-run-only record is
+`rhel-sdk25-exec-label-diagnostic.json`, SHA-256
+`af9cfefc961500e670a6cef6d1e8c3419d366aa453331e80f39fd8a2a7d72a80`.
+The separate encrypted probe output has SHA-256
+`04b9cf8aec923b447402d571499d0ca0a3f71503c8fa3d906dd138bfef0ed1b1`.
+This diagnostic neither upgrades nor restores a server and cannot qualify the
+native lifecycle. The disposable observer hook is removed.
+
+The installer now prepares only that authenticated temporary executable with
+the installed native context on enforcing RPM hosts. Detection or relabelling
+failure refuses the upgrade; service UID, NNP, capabilities, credentials and
+all other sandbox directives remain unchanged. There is no custom policy or
+permissive-mode change. Focused unit tests pass and security review has no
+findings. Encrypted, size-capped native failure diagnostics additionally retain
+80 lines from the transient checker journal, so another execution failure is
+not hidden behind its numeric exit code.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

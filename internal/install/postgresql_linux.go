@@ -101,24 +101,6 @@ func checkPostgreSQLTools(ctx context.Context, release *platform.Release, run de
 	return nil
 }
 
-func postgresSELinuxEnforcing(ctx context.Context, release *platform.Release, run dependencyCommand) (bool, error) {
-	if release.Packages.Backend.PackageDB() != platform.PackageDBRPM {
-		return false, nil
-	}
-	output, err := run(ctx, nil, "getenforce")
-	if err != nil {
-		return false, fmt.Errorf("determine PostgreSQL SELinux enforcement: %w", err)
-	}
-	switch strings.TrimSpace(string(output)) {
-	case "Enforcing":
-		return true, nil
-	case "Permissive", "Disabled":
-		return false, nil
-	default:
-		return false, errors.New("unrecognized PostgreSQL SELinux enforcement state")
-	}
-}
-
 func localPostgresUnit(data, bin, socket string, enforcing bool) string {
 	noNewPrivileges := "yes"
 	if enforcing {

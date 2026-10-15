@@ -5,6 +5,7 @@
 package install
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -259,6 +260,62 @@ func TestRPMUpgradePreflightParentsRemainTraversableUnderPrivateUmask(t *testing
 			info, err := os.Stat(filepath.Join(stage, "usr/bin/lindmd"))
 			if err != nil || info.Mode().Perm() != 0755 {
 				t.Fatalf("public preflight executable permissions changed: %v", err)
+			}
+		})
+	}
+}
+
+func TestUpgradeExecutableUsesOnlyTheInstalledNativeSELinuxContext(t *testing.T) {
+	const binary = "/var/lib/lindm-upgrade-fixture/usr/bin/lindmd"
+	for _, test := range []struct {
+		name, distro, version, state, failAt string
+		label, wantError                     bool
+	}{
+		{"ubuntu", "ubuntu", "24.04", "", "", false, false},
+		{"rhel-enforcing", "rhel", "9.8", "Enforcing\n", "", true, false},
+		{"rhel-permissive", "rhel", "9.8", "Permissive\n", "", false, false},
+		{"rhel-disabled", "rhel", "9.8", "Disabled\n", "", false, false},
+		{"rhel-unknown", "rhel", "9.8", "unexpected", "", false, true},
+		{"rhel-detection-fails", "rhel", "9.8", "", "getenforce", false, true},
+		{"rhel-relabel-fails", "rhel", "9.8", "Enforcing", "chcon", true, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var calls []string
+			run := func(_ context.Context, input []byte, name string, args ...string) ([]byte, error) {
+				calls = append(calls, name)
+				if len(input) != 0 {
+					t.Fatal("public executable preparation received secret input")
+				}
+				if name == "getenforce" {
+					if len(args) != 0 {
+						t.Fatal("unexpected SELinux detector arguments")
+					}
+					if test.failAt == name {
+						return nil, errors.New("fixture detection failure")
+					}
+					return []byte(test.state), nil
+				}
+				if name != "chcon" || strings.Join(args, "\x00") != "--reference=/usr/bin/lindmd\x00--\x00"+binary {
+					t.Fatal("preparation changed policy or relabelled anything other than the verified executable")
+				}
+				if test.failAt == name {
+					return nil, errors.New("fixture relabel failure")
+				}
+				return nil, nil
+			}
+			err := prepareUpgradeExecutable(t.Context(), binary, platform.ForManifest(test.distro, test.version), run)
+			if (err != nil) != test.wantError {
+				t.Fatalf("preparation error=%v, want error=%t", err, test.wantError)
+			}
+			wantCalls := ""
+			if test.distro == "rhel" {
+				wantCalls = "getenforce"
+			}
+			if test.label {
+				wantCalls += ",chcon"
+			}
+			if strings.Join(calls, ",") != wantCalls {
+				t.Fatalf("commands=%v, want %s", calls, wantCalls)
 			}
 		})
 	}

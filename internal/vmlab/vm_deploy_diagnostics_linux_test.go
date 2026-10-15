@@ -88,6 +88,9 @@ func TestDeployServiceJournalIncludesOwnedPostgreSQL(t *testing.T) {
 			t.Fatalf("bounded owned-service diagnostic omits %s", required)
 		}
 	}
+	if !strings.Contains(deployServiceJournalCommand, `journalctl --no-pager --output=cat --lines=80 --unit="run-*.service"`) {
+		t.Fatal("private diagnostics omit the bounded transient config-checker journal")
+	}
 	for _, required := range []string{`stat -c "%n uid=%u gid=%g mode=%a context=%C"`, "systemctl cat lindm-postgresql.service", "--property=NoNewPrivileges", `"/proc/$pid/attr/current"`, `"/proc/$pid/status"`, `"/proc/$pid/mountinfo"`, "/var/lib/pgsql/lindm/log/*.log", "/var/lib/postgresql/lindm/log/*.log", `dd if="$logfile" bs=32768 count=1 iflag=nofollow status=none`, `if [ "$logs" -ge 8 ]; then break; fi`, "ausearch -m AVC,USER_AVC -ts boot --raw", `exit "$journal_status"`} {
 		if !strings.Contains(deployServiceJournalCommand, required) {
 			t.Fatalf("private PostgreSQL security diagnostic omits %s", required)

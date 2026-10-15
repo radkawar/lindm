@@ -92,6 +92,7 @@ func executeDeployRestore(ctx context.Context, guest *guestVM, options VMDeployO
 const deployServiceJournalCommand = `sudo -n sh -c '
 env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service --unit=lindm-postgresql.service
 journal_status=$?
+env LC_ALL=C journalctl --no-pager --output=cat --lines=80 --unit="run-*.service"
 env LC_ALL=C journalctl --no-pager --output=json --lines=50 --unit=lindm-postgresql.service
 env LC_ALL=C journalctl --no-pager --output=cat --lines=200 _TRANSPORT=audit
 stat -c "%n uid=%u gid=%g mode=%a context=%C" /var/lib/pgsql /var/lib/pgsql/lindm /var/lib/pgsql/lindm/postgresql.conf /var/lib/pgsql/lindm/lindm.conf /etc/lindm /etc/lindm/postgresql /etc/lindm/postgresql/server.crt /etc/lindm/postgresql/server.key

@@ -178,7 +178,7 @@ func TestPostgreSQLSELinuxEnforcementControlsOnlyVendorNNPException(t *testing.T
 				}
 				return []byte(test.state + "\n"), nil
 			}
-			got, err := postgresSELinuxEnforcing(t.Context(), platform.ForManifest(test.distro, test.release), run)
+			got, err := selinuxEnforcing(t.Context(), platform.ForManifest(test.distro, test.release), run)
 			if got != test.want || (err != nil) != test.wantError {
 				t.Fatalf("enforcement=%t error=%v", got, err)
 			}

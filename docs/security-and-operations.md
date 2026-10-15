@@ -2285,6 +2285,14 @@ not credentials. Its extraction child uses umask 022 so the restricted service
 account can traverse implicit parent directories. The installer retains its
 private umask for secrets; the service-user check keeps every sandbox directive.
 
+On SELinux-enforcing RPM hosts, the installer also gives only the verified
+temporary executable the installed `/usr/bin/lindmd` SELinux context. A temporary
+file otherwise inherits `var_lib_t`, which the restricted checker cannot execute,
+even with correct Unix permissions. Detection or relabelling failure refuses the
+upgrade before native package or credential changes. No custom policy module,
+permissive-mode change or `NoNewPrivileges` exception is introduced. Operators do
+not need to relabel files manually.
+
 `schema-check` distinguishes reviewed expand migrations from contract migrations.
 For `online=true`, the old runtime continues serving through the consistent backup,
 native binary replacement and bounded dedicated-identity expand migration. Its

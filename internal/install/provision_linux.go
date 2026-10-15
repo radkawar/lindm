@@ -175,7 +175,7 @@ func writeConfig(path string, cfg *configv1.ServerConfig, uid, gid int) error {
 }
 
 func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid int) error {
-	enforcing, err := postgresSELinuxEnforcing(ctx, release, command)
+	enforcing, err := selinuxEnforcing(ctx, release, command)
 	if err != nil {
 		return err
 	}

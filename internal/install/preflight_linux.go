@@ -44,6 +44,24 @@ func runtimeConfigArguments(binary string) []string {
 	}
 }
 
+func selinuxEnforcing(ctx context.Context, release *platform.Release, run dependencyCommand) (bool, error) {
+	if release.Packages.Backend.PackageDB() != platform.PackageDBRPM {
+		return false, nil
+	}
+	output, err := run(ctx, nil, "getenforce")
+	if err != nil {
+		return false, fmt.Errorf("determine SELinux enforcement: %w", err)
+	}
+	switch strings.TrimSpace(string(output)) {
+	case "Enforcing":
+		return true, nil
+	case "Permissive", "Disabled":
+		return false, nil
+	default:
+		return false, errors.New("unrecognized SELinux enforcement state")
+	}
+}
+
 // Read only the authenticated target's public flag help before changing any
 // package or secret state. Older binaries must not be installed with a unit
 // whose explicit credential selection they cannot accept.
