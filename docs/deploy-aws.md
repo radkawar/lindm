@@ -412,9 +412,10 @@ that real device action to complete.
 
 Open **Server status** and inspect the first-download state. Downloading or waiting
 does not mean the device has been assessed. Wait for verified source publication
-and the device's background evaluation. The first transfer and parsing work can
-take time; record the observed duration, not an estimated percentage.
-Later refresh attempts use the durable source schedule, six hours by default.
+and the device's background evaluation. The maintained native proof allows a
+bounded 90-minute initial wait and records the real first-download notice.
+Record the observed duration, not an estimated percentage. Later refresh
+attempts use the durable source schedule, six hours by default.
 
 Inspect source status, actual package versions and findings together. Record real
 vendor/package/version matches and any missing, stale or partial coverage.
@@ -457,9 +458,9 @@ The replacement server role can download those same two encrypted objects.
 Do not upload a plaintext dump, a release-signing key, an execution-custodian
 identity, an unlock secret or a plaintext database URL.
 
-The recovery workstation also needs `pg_restore` of the dump's major version or
-newer. An older client cannot validate a newer custom archive. Use an approved,
-isolated recovery environment if you cannot install that client on the workstation.
+The recovery workstation needs PostgreSQL 16 `pg_restore`, matching the supported
+server and backup-client major. Use an approved, isolated PostgreSQL 16 recovery
+environment if you cannot install that client on the workstation.
 
 Run `restore-drill` on the recovery workstation with the encrypted backup identity
 and its anonymous-pipe passphrase input. Then perform the complete
@@ -485,6 +486,12 @@ Retain restored URL ownership and systemd credential paths. Validate integration
 ciphertext decryption, browser reauthentication, device reconciliation and a newly
 authorized real action before removing the external fence. Never report an archive
 parse or RDS snapshot restore as this complete drill.
+
+Compare the fresh database connection identity, password, authentication options
+and TLS resource bytes, not only the raw URL-file hash. Native restore retains
+the root-owned stable URL filenames but rewrites TLS references into the role-owned
+`database-restored` directories. This expected path change is not credential
+rotation. The native HTTPS `/readyz` endpoint returns **204** when ready.
 
 Use SSM port forwarding for the operator's private HTTPS checks. For the proof
 device, admit only its security group to port 443 after the authorized restore
@@ -515,7 +522,102 @@ contents.
 
 ## Recorded AWS installation proof
 
-### PostgreSQL 16 source, findings and encrypted backup
+### Complete PostgreSQL 16 fresh-host recovery
+
+On 2026-10-15, a new deployment completed the full real AWS lifecycle with the
+unchanged signed `0.2.18` release from source
+`16a96e3f6b5cdb678fdec4aa1be8eb6aa3b36c4c`. Its cold build, release-key pin,
+update root and exact public bundle were authenticated independently. No release
+was re-signed, no authenticated file mode was changed and no private release
+or execution-custodian key was uploaded to EC2.
+
+The deployment used Ubuntu 24.04, private encrypted RDS PostgreSQL 16.13
+`db.t4g.small`, Ubuntu PostgreSQL 16 clients and the Terraform module above.
+Both source and fresh destination required `verify-full`,
+`channel_binding=require` and `require_auth=scram-sha-256`. The RDS-managed
+master password stayed in Secrets Manager and the protected guest helper.
+There was no local database cluster, manual `postgresql-common` repair,
+`prefer` override, feed import or forced finding.
+
+These real steps passed:
+
+- Fresh Terraform apply: **455.38 seconds**. The signed source installation
+  completed in **141.05 seconds**.
+- Stock Chromium loaded the real HTTPS setup page with the deployment CA
+  imported and no certificate-error or TLS overrides. First-owner setup used
+  a password and a user-verified virtual CTAP2 authenticator. This is browser
+  automation evidence, not a physical human passkey or independent human quorum.
+- The exact command copied from the console enrolled a second real Ubuntu EC2
+  instance in **28.14 seconds**. Its newly authorized managed inventory action
+  completed in **20.86 seconds**.
+- Initial automatic vendor findings completed in **436.72 seconds**. The real
+  first-download notice was observed. The Ubuntu 24.04 OSV source published
+  2,306,946 claims with archive SHA-256
+  `9c4f5e08e3a7490c90c78ac85f72004d5715c8b1641e9d5ed9e65a6438dd986d`.
+  The actual result was **Affected**, not clean: 18,228 open findings, including
+  one critical finding. Browser evidence and a read-only RDS transaction bound
+  the evaluation to the completed action and fresh committed native inventory.
+- Native application backup completed in **21.81 seconds**. Its immutable
+  encrypted off-host copy was 93,104,520 bytes, SHA-256
+  `fbab51361f870ab903a479105ea16d46a448ceff354c456b10f4635041101866`.
+  The same signed `restore-drill` validated it in a pinned, networkless,
+  swap-zero PostgreSQL 16 container in **2.69 seconds**.
+- A second, newer managed inventory action and evaluated findings completed
+  before fencing. Terraform then removed public HTTPS ingress. A new external
+  connection was refused, and both runtime and edge services were stopped.
+  Native `backup -confirm-fenced` drained grants, retained its durable hold and
+  captured the complete newer security state in **172.99 seconds**. The separate
+  encrypted security archive was 93,131,656 bytes, SHA-256
+  `2ba6ffdd297fd757975585ae4c33eec69349ddaa55c4a4e63eb224cf1c8d369d`.
+- The offline native CLI authenticated the original execution root and signed
+  a higher delegation version and recovery epoch, plus the complete security
+  checkpoint. Encrypted custodian identities stayed off AWS. Anonymous pipes
+  supplied their unlocks inside a networkless, locked-memory, swap-zero process.
+- Terraform replaced **both** the stopped EC2 server and RDS database in
+  **562.01 seconds**. The original enrolled device, network interface and
+  public origins remained. The fresh destination installed the same signed
+  release in **117.87 seconds** with new restricted database credentials.
+  It had no original device. Its genuinely different integration key could
+  not decrypt the original captured destination ciphertext.
+- The signed native full restore used the fresh migrator configuration, both
+  encrypted archives, the independently pinned root, the signed current
+  checkpoint and recovery epoch **1**. It completed in **66.53 seconds**.
+  A guest-only one-time age courier supplied the backup unlock through an
+  anonymous pipe; it was not placed in argv, environment or a plaintext file.
+  The courier and its private identity were removed after success.
+- Independent checks confirmed the fresh database identity and passwords,
+  strict authentication options, exact fresh TLS resource bytes and root-only
+  stable credential filenames. The original integration encryption key
+  decrypted the unchanged original ciphertext and matched its secret digest.
+  The original console CA authenticated the restored HTTPS ready response.
+- Public ingress stayed closed. The browser used authenticated SSM forwarding;
+  only the original device's security group received temporary private port-443
+  access. Original-owner browser reauthentication and a genuinely new action on
+  the **original** device completed after restore. Managed inventory took
+  **20.55 seconds** and evaluated vendor findings **12.95 seconds**.
+  The read-only RDS binding confirmed inventory sequence **4**, **759** packages
+  and evaluation time **2026-10-15T09:19:18.541104Z** for that new action.
+- The temporary private network paths were removed. Terraform destroy completed
+  in **127.10 seconds**. After the exact owned automated snapshot finished its
+  asynchronous deletion, native AWS CLI inventory confirmed **zero leftovers
+  in all 20 owned resource categories**, including planned-deletion master secrets.
+  No owner-review hold or running deployment remains.
+
+The apply-start through destroy-finish wall time was **4,985.18 seconds**.
+The full-shape baseline estimate was **USD 0.166** at USD 0.119674 per hour.
+This is not an invoice and excludes S3, transfer, burst CPU credits, taxes and
+Free Tier adjustments.
+
+Four stock-Chromium images of the actual source dashboard, device list, device
+page and server status are retained under `~/.cache/lindm-aws-proof-screens/`,
+with prefix `sdk20-real-rds16-evaluated-`.
+Maintainer-local evidence is in
+`/home/r/dev/minor/lindm.worktrees/aws-deploy/artifacts/aws-proof/sdk20-full-lifecycle/`.
+It includes signed public approvals, both encrypted archives, actual browser
+and native RDS bindings, wall times, cost estimate and the final native cleanup
+inventory. It is not a public download or part of the repository.
+
+### Earlier PostgreSQL 16 source-only proof
 
 On 2026-10-15, a fresh deployment used the supported PostgreSQL 16.13
 `db.t4g.small` shape and unchanged signed `0.2.16` release from source
@@ -561,11 +663,11 @@ The conservative full-shape estimate for this 2,963.86-second attempt was
 USD 0.099 at USD 0.119674 per hour. It is not an invoice. It excludes S3,
 transfer, burst CPU credits, taxes and Free Tier adjustments.
 
-**This is not a full fresh-host recovery pass.** A separate native run found
-that this signed version staged two restored archives under the small `/run`
-filesystem and stopped with insufficient space. No AWS restore workaround or
-verification bypass was applied. Full recovery requires the corrected signed
-release and its own fresh end-to-end deployment.
+**That attempt was not a full fresh-host recovery pass.** A separate native run
+found that its signed version staged two restored archives under the small `/run`
+filesystem and stopped with insufficient space. No AWS workaround or verification
+bypass was applied. The separate, complete `0.2.18` run above used the corrected
+signed restore staging and its own fresh deployment.
 
 Maintainer-local evidence is in
 `/home/r/dev/minor/lindm.worktrees/aws-deploy/artifacts/aws-proof/sdk19-qualified-final/`.

@@ -16,7 +16,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Add stock-Chromium console TLS qualification and a strict-TLS browser proof for real device inventory, vendor advisory publication and findings matched to native package identities, with explicit partial-coverage evidence.
 - Observe an enrolled device's authoritative console lifecycle independently from managed work in native deployment browser proof, without treating enrollment as inventory or action completion.
 - Add an AWS Terraform deployment for Ubuntu 24.04 with private RDS PostgreSQL, SSM-only access, root-only external database credentials, required verified TLS and a signed Turnkey installation runbook.
-- Record real AWS PostgreSQL 16 signed installation, stock-browser setup, EC2 enrollment, managed inventory, evaluated automatic vendor findings, encrypted native backup, offline archive validation and native zero-leftover cleanup evidence; keep fresh-host recovery explicitly unqualified pending the corrected signed release.
+- Record the complete real AWS PostgreSQL 16 lifecycle: signed install, stock-Chromium setup, actual EC2 enrollment, managed inventory and evaluated vendor findings, encrypted backup, quorum-approved fresh EC2 and RDS restore, original integration-secret decryption and new original-device inventory and findings; destroy the stack and independently confirm zero leftovers in 20 native AWS resource categories.
 - Record the complete Ubuntu 24.04 native signed-install, stock-browser owner setup, clipboard enrollment, real management and Findings, encrypted backup, upgrade and fresh-host recovery proof; retain the failed fresh-RHEL source evidence separately.
 
 ### Changed
