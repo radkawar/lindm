@@ -53,6 +53,10 @@ func sessionCommand(ctx context.Context, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	fixedDesktopQualifier, err := desktop.NewFixedDesktopVerifier(bus)
+	if err != nil {
+		return err
+	}
 	capturer, err := desktop.NewGStreamer(logger)
 	if err != nil {
 		return err
@@ -83,6 +87,7 @@ func sessionCommand(ctx context.Context, args []string) (err error) {
 		Peers:                       desktop.NewPionPeers(),
 		Locks:                       desktop.LogindLockMonitor{},
 		CurrentDesktop:              os.Getenv("XDG_CURRENT_DESKTOP"),
+		FixedDesktopQualifier:       fixedDesktopQualifier,
 		Logger:                      logger,
 		FilesUnavailableReason:      sessionCapabilityUnavailableReason(ctx, platform.AssistanceFiles, "platform_files_unqualified"),
 		RecordingUnavailableReason:  sessionCapabilityUnavailableReason(ctx, platform.AssistanceRecording, "platform_recording_unqualified"),

@@ -3,6 +3,7 @@
 package desktop
 
 import (
+	"context"
 	"slices"
 	"strings"
 
@@ -45,9 +46,8 @@ const (
 type desktopProfile struct {
 	// name is the audited profile, reported as desktop_profile.
 	name string
-	// gate selects the policy's Tier 3 admission gate. Nil marks the Tier 1/2
-	// GNOME and COSMIC Wayland profiles, which this table does not narrow:
-	// their portal and lock checks remain the whole admission.
+	// gate selects a Tier 3 policy gate. Nil defaults to ON, but still
+	// narrows capabilities to the profile and refuses unlisted desktops.
 	gate func(*agentv1.AssistancePolicy) agentv1.AssistancePolicyMode
 	// gateName prefixes the exact refusal details of a gated profile.
 	gateName string
@@ -60,6 +60,12 @@ type desktopProfile struct {
 	// and no monitor picker (xdg-desktop-portal-kde), so the product prompt
 	// must not promise a later view-only choice.
 	sharedControlDialog bool
+	// selectedControlDialog grants the picked screen together with input,
+	// with no view-only choice (COSMIC's device icons are not toggles).
+	selectedControlDialog bool
+	// fixedTuple is selected only after live runtime verification, including
+	// the patched locker. It never changes the static stock lock table.
+	fixedTuple bool
 }
 
 func kdePlasmaGate(policy *agentv1.AssistancePolicy) agentv1.AssistancePolicyMode {
@@ -75,10 +81,14 @@ func x11Gate(policy *agentv1.AssistancePolicy) agentv1.AssistancePolicyMode {
 // parity is never assumed for another desktop or for X11.
 var (
 	gnomeWayland  = &desktopProfile{name: "gnome_wayland", view: true, control: true, qualified: allCapabilities}
-	cosmicWayland = &desktopProfile{name: "cosmic_wayland", view: true, control: true, qualified: allCapabilities}
+	cosmicWayland = &desktopProfile{name: "cosmic_wayland", view: true, control: true, qualified: capKeyboard, selectedControlDialog: true}
 	// KDE Plasma 6.6 on Wayland (Fedora 44, xdg-desktop-portal-kde 6.6):
 	// kscreenlocker sets logind LockedHint and locks on Session.Lock.
 	kdePlasmaWayland = &desktopProfile{name: "kde_plasma_wayland", gate: kdePlasmaGate, gateName: "kde_plasma", view: true, control: true, qualified: capKeyboard, sharedControlDialog: true}
+	// These profiles are never selected by desktopProfileFor. Their reviewed
+	// deployed tuples must pass the session's FixedDesktopQualifier first.
+	hyprlandWayland  = &desktopProfile{name: "hyprland_wayland", view: true, control: true, qualified: capKeyboard, selectedControlDialog: true, fixedTuple: true}
+	cinnamonX11Fixed = &desktopProfile{name: "cinnamon_x11_fixed", gate: x11Gate, gateName: "x11", view: true, control: true, qualified: capKeyboard, selectedControlDialog: true, fixedTuple: true}
 	// x11Profiles are the qualified X11 desktops, keyed on an
 	// XDG_CURRENT_DESKTOP component. Every other X11 session is refused.
 	x11Profiles = map[string]*desktopProfile{
@@ -99,6 +109,16 @@ var (
 // executor, never the helper) and the helper's XDG_CURRENT_DESKTOP.
 func desktopProfileFor(sessionType, currentDesktop string) *desktopProfile {
 	names := strings.Split(currentDesktop, ":")
+	// A mixed desktop name must not let a fixed-tuple desktop inherit a
+	// GNOME/KDE profile before its runtime has been verified.
+	for _, name := range names {
+		if strings.EqualFold(name, "Hyprland") || strings.EqualFold(name, "X-Cinnamon") || strings.EqualFold(name, "Cinnamon") {
+			if sessionType == "x11" {
+				return unlistedX11
+			}
+			return unlisted
+		}
+	}
 	if sessionType == "x11" {
 		for _, name := range names {
 			if profile, ok := x11Profiles[name]; ok {
@@ -111,14 +131,37 @@ func desktopProfileFor(sessionType, currentDesktop string) *desktopProfile {
 		return unlisted
 	}
 	switch {
-	case slices.Contains(names, "GNOME"):
-		return gnomeWayland
 	case slices.Contains(names, "COSMIC"):
 		return cosmicWayland
+	case slices.Contains(names, "GNOME"):
+		return gnomeWayland
 	case slices.Contains(names, "KDE"):
 		return kdePlasmaWayland
 	}
 	return unlisted
+}
+
+func fixedDesktopProfileFor(sessionType, currentDesktop string) *desktopProfile {
+	switch {
+	case sessionType == "wayland" && currentDesktop == "Hyprland":
+		return hyprlandWayland
+	case sessionType == "x11" && currentDesktop == "X-Cinnamon":
+		return cinnamonX11Fixed
+	default:
+		return nil
+	}
+}
+
+func (d *sessionDeps) qualifiedDesktopProfile(ctx context.Context, sessionType string) (*desktopProfile, error) {
+	stock := desktopProfileFor(sessionType, d.currentDesktop)
+	fixed := fixedDesktopProfileFor(sessionType, d.currentDesktop)
+	if fixed == nil || d.fixedDesktopQualifier == nil {
+		return stock, nil
+	}
+	if err := d.fixedDesktopQualifier.Verify(ctx, sessionType, d.currentDesktop); err != nil {
+		return stock, err
+	}
+	return fixed, nil
 }
 
 // desktopAdmission is the profile's decision for one invitation.
@@ -131,6 +174,9 @@ type desktopAdmission struct {
 	reasons map[capability]string
 	// refusal, when set, ends the session UNAVAILABLE before consent.
 	refusal string
+	// runtimeErr preserves a rejected fixed tuple's evidence failure without
+	// hiding earlier native portal or notification gaps.
+	runtimeErr error
 }
 
 // admitDesktop narrows the consented policy to the profile. OFF refuses the
@@ -142,15 +188,14 @@ func admitDesktop(profile *desktopProfile, mode agentv1.AssistanceMode, consente
 	policy := proto.CloneOf(consented)
 	policy.KdePlasma, policy.X11 = agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED, agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_UNSPECIFIED
 	admission := desktopAdmission{profile: profile, policy: policy, reasons: map[capability]string{}}
-	if profile.gate == nil {
-		if profile == unlisted {
-			admission.refusal = unlisted.name
-		}
-		return admission
+	gate := agentv1.AssistancePolicyMode_ASSISTANCE_POLICY_MODE_ON
+	if profile.gate != nil {
+		gate = profile.gate(consented)
 	}
-	gate := profile.gate(consented)
 	control := mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL
 	switch {
+	case profile == unlisted:
+		admission.refusal = unlisted.name
 	case !policyEnabled(gate):
 		admission.refusal = profile.gateName + "_policy_off"
 	case !profile.view:

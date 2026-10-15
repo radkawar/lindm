@@ -61,6 +61,26 @@ func TestNoticeActionBeforeCloseIsNotDismissal(t *testing.T) {
 	}
 }
 
+func TestNotificationServerInformationPreservesRuntimeVersion(t *testing.T) {
+	ctx := t.Context()
+	server, bus := privateSessionBus(t, ctx, notificationsName)
+	if err := server.ExportMethodTable(map[string]any{
+		"GetServerInformation": func() (string, string, string, string, *dbus.Error) {
+			return "cosmic-notifications", "System76", "1.10.0-lindm-actions.1", "1.2", nil
+		},
+	}, notificationsPath, notificationsIface); err != nil {
+		t.Fatal(err)
+	}
+	notifier, err := NewDesktopNotifier(bus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, version, err := notifier.ServerInformation(ctx)
+	if err != nil || name != "cosmic-notifications" || version != "1.10.0-lindm-actions.1" {
+		t.Fatalf("server information = %q %q %v", name, version, err)
+	}
+}
+
 type postedNotification struct {
 	id, replaces uint32
 	summary      string

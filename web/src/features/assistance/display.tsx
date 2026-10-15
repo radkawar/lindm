@@ -76,15 +76,19 @@ export function couldNotStart(session: AssistanceSession): boolean {
   );
 }
 
-// UNAVAILABLE details that no package fix resolves: the desktop itself cannot honour
-// consent, lock or control. Every other detail keeps the packages remedy.
+// Platform and runtime qualification refusals need their precise explanation
+// instead of the generic capture-package repair remedy.
 const unsupportedDesktop: Record<string, string> = {
   notification_actions_hidden:
-    "This desktop shows no Allow or Decline buttons. The user cannot give consent. This desktop does not support remote assistance.",
+    "This notification-server version hides Allow and Decline actions, so safe consent is unavailable. Use a verified action-button implementation; upgrading the portal alone is not enough.",
+  notification_actions_unverified:
+    "This notification-server version has not been verified to show safe consent buttons. A newer version or advertised actions capability alone is not sufficient.",
+  desktop_runtime_unqualified:
+    "The active desktop runtime does not match its reviewed assistance tuple. Stock or unlisted implementations remain refused.",
   session_lock_state_unreported:
     "This desktop does not report screen locks. Sharing cannot stop when the screen locks. This desktop does not support remote assistance.",
   portal_remote_desktop_unavailable:
-    "This desktop cannot provide remote control. Request view only instead.",
+    "The session portal does not expose RemoteDesktop. This desktop may also require it for viewing; check its platform support requirements.",
 };
 
 export function startFailureRemedy(session: AssistanceSession): ReactNode {

@@ -77,6 +77,7 @@ func (n *fakeNotice) isClosed() bool {
 type fakeNotifier struct {
 	capabilities []string
 	server       string
+	version      string
 	err          error
 	posted       chan *fakeNotice
 }
@@ -89,8 +90,8 @@ func (n *fakeNotifier) Capabilities(context.Context) ([]string, error) {
 	return n.capabilities, n.err
 }
 
-func (n *fakeNotifier) ServerName(context.Context) (string, error) {
-	return n.server, n.err
+func (n *fakeNotifier) ServerInformation(context.Context) (string, string, error) {
+	return n.server, n.version, n.err
 }
 
 func (n *fakeNotifier) Notify(_ context.Context, notification Notification) (Notice, error) {
@@ -232,6 +233,9 @@ func (p *fakePortal) Check(_ context.Context, request PortalRequest) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.checked = append(p.checked, request)
+	if request.RequireRemoteDesktop && p.refuse[modeControl] != nil {
+		return p.refuse[modeControl]
+	}
 	return p.refuse[request.Mode]
 }
 

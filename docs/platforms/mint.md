@@ -181,6 +181,41 @@ desktop-session lane).
   through cinnamon-session's XDG autostart instead
   (`session_unit_activation=xdg-autostart`).
 
+### Experimental fixed X11 tuple
+
+The helper has a separate `cinnamon_x11_fixed` profile for exactly the reviewed
+Linux Mint 22.3 X11 session with `XDG_CURRENT_DESKTOP=X-Cinnamon`. This is not
+stock Mint support. Its fork-only native versions are
+`xdg-desktop-portal=1.20.0+ds-2ubuntu1+lindm.lifetime.1`,
+`xdg-desktop-portal-xapp=1.1.4+lindm.rd.3`,
+`muffin`/`libmuffin0`/`muffin-common=6.6.3+lindm.rd.2`,
+`cinnamon-screensaver=6.6.1+lindm.lock.1` and
+`cinnamon-settings-daemon=6.6.2+lindm.lock.1`.
+The base Cinnamon pin is `cinnamon=6.6.4+zena`. The frontend fork closes sessions
+when the unique backend owner disappears; the Muffin fork releases XTest holds
+when its virtual input device is disposed. These lifetime fixes, the physical
+keycode translation and smooth-scroll implementation are part of the tuple,
+not optional input fallbacks.
+The portal exposes the native Xapp RemoteDesktop v1 implementation; the frontend's
+own advertised interface version does not identify that backend.
+
+Admission requires reviewed root artifact digests, the live backend and compositor
+executable/library mappings, the patched locker and settings-daemon processes,
+root portal selection and process start after deployment. An installed package,
+desktop name, helper environment override or stale process is not sufficient.
+The signed X11 policy gate still applies: LIMITED permits VIEW, ON also permits
+CONTROL and keyboard. All other optional capabilities are withheld as
+`desktop_capability_unqualified`. Native control consent grants the picked source and input
+together, so lindm does not promise a later view-only downgrade. The helper still
+uses only the portal's Notify methods, never a direct XTest/X11 fallback. The
+stock registry gates and server-side pure-session lock-action gate are unchanged.
+The live portal frontend must use root-only standard search homes:
+`XDG_CONFIG_HOME=/etc/xdg`, `XDG_DATA_HOME=/usr/share`,
+`XDG_CONFIG_DIRS=/etc/xdg` and `XDG_DATA_DIRS=/usr/share`, installed through a root
+service drop-in. Its first selected configuration must be the pinned
+`/etc/xdg/xdg-desktop-portal/x-cinnamon-portals.conf`; per-user or higher-priority
+unreviewed selection is refused, including a frontend that predates deployment.
+
 ## Advisory feeds
 
 Linux Mint publishes no machine-readable advisory feed, so exposure of Mint's own

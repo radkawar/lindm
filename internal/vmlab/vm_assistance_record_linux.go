@@ -26,24 +26,25 @@ import (
 // Every screenshot and journal excerpt it references lives in the same new
 // evidence directory and is bound by SHA-256; consumers re-verify the files.
 type VMAssistanceResult struct {
-	ImageID           string                     `json:"image_id"`
-	ImageSHA256       string                     `json:"image_sha256"`
-	Distribution      string                     `json:"distribution"`
-	DesktopProfile    string                     `json:"desktop_profile"`
-	Architecture      string                     `json:"architecture"`
-	PackageSHA256     string                     `json:"package_sha256"`
-	SignerFingerprint string                     `json:"package_signer"`
-	LabSHA256         string                     `json:"lab_sha256"`
-	LindmdSHA256      string                     `json:"lindmd_sha256"`
-	Firmware          *EncryptedFirmwareEvidence `json:"firmware"`
-	Runtime           *vmRuntimeEvidence         `json:"runtime"`
-	RecipeVersion     string                     `json:"installer_recipe_version"`
-	Database          string                     `json:"isolated_database"`
-	Topology          string                     `json:"topology"`
-	DeviceID          string                     `json:"device_id"`
-	Relay             assistanceRelayEvidence    `json:"relay"`
-	Guest             *assistanceGuestEvidence   `json:"guest"`
-	Browser           *assistanceBrowserEvidence `json:"browser"`
+	ImageID           string                            `json:"image_id"`
+	ImageSHA256       string                            `json:"image_sha256"`
+	Distribution      string                            `json:"distribution"`
+	DesktopProfile    string                            `json:"desktop_profile"`
+	PackageProfile    *assistancePackageProfileEvidence `json:"package_profile,omitempty"`
+	Architecture      string                            `json:"architecture"`
+	PackageSHA256     string                            `json:"package_sha256"`
+	SignerFingerprint string                            `json:"package_signer"`
+	LabSHA256         string                            `json:"lab_sha256"`
+	LindmdSHA256      string                            `json:"lindmd_sha256"`
+	Firmware          *EncryptedFirmwareEvidence        `json:"firmware"`
+	Runtime           *vmRuntimeEvidence                `json:"runtime"`
+	RecipeVersion     string                            `json:"installer_recipe_version"`
+	Database          string                            `json:"isolated_database"`
+	Topology          string                            `json:"topology"`
+	DeviceID          string                            `json:"device_id"`
+	Relay             assistanceRelayEvidence           `json:"relay"`
+	Guest             *assistanceGuestEvidence          `json:"guest"`
+	Browser           *assistanceBrowserEvidence        `json:"browser"`
 	// Readiness is the server's assistance readiness the lane waited for
 	// after publishing its desktop session inventory.
 	Readiness         *assistanceReadinessEvidence  `json:"readiness,omitempty"`
@@ -119,7 +120,8 @@ type assistanceGuestEvidence struct {
 	Terminal               string   `json:"terminal"`
 	// Capabilities is the native capability probe of the lab session: what
 	// the session helper's environment, portal frontend and notification
-	// server expose, observed before any scenario.
+	// server expose. Observed before scenarios; the pinned experimental
+	// profile refreshes this snapshot after successful native scenarios.
 	Capabilities *assistanceCapabilityEvidence `json:"capabilities"`
 }
 

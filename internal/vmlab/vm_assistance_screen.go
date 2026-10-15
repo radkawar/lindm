@@ -107,6 +107,8 @@ const (
 	// bannerOverFixture is GNOME Shell's banner over the fullscreen native
 	// witness, which has no top bar and draws operator marks.
 	bannerOverFixture
+	// bannerTopRight is the Pop COSMIC panel's notification popup area.
+	bannerTopRight
 )
 
 // locateBannerOverFixture finds a GNOME banner over the fullscreen witness
@@ -184,6 +186,9 @@ const bannerNeutralSaturation = 16
 const plasmaPanelHeight = 64
 
 func (a bannerArea) region(display image.Rectangle) image.Rectangle {
+	if a == bannerTopRight {
+		return image.Rect(display.Max.X-640, display.Min.Y+gnomeTopBarHeight, display.Max.X, display.Max.Y).Intersect(display)
+	}
 	if a == bannerBottomRight {
 		return image.Rect(display.Max.X-640, display.Min.Y, display.Max.X, display.Max.Y-plasmaPanelHeight)
 	}

@@ -903,9 +903,9 @@ var registry = []*Release{
 		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,
 		// The ISO's distinst runs pop-installer's erase layout; the installed
 		// root uses Pop's initramfs-tools and Ubuntu's archive package names.
-		// COSMIC comes from the ISO itself (no packages). The shipped
-		// cosmic.portal declares ScreenCast but no RemoteDesktop; the ISO lacks
-		// gstreamer1.0-pipewire, which the agent package Recommends.
+		// COSMIC comes from the ISO itself (no desktop package group).
+		// Its portal lacks RemoteDesktop; newer archive builds have it, but
+		// stock cosmic-notifications still cannot safely display consent.
 		Lab: Lab{Lanes: derivativeLanes, Installer: Distinst, Guest: ubuntuGuest,
 			Session: LabSession{Desktops: map[string][]string{"cosmic": nil}, Name: "cosmic", Terminal: []string{"cosmic-term", "-e"},
 				Capture: []string{"cosmic-comp", "cosmic-greeter", "cosmic-notifications", "xdg-desktop-portal", "xdg-desktop-portal-cosmic", "pipewire", "gstreamer1.0-pipewire", "gstreamer1.0-plugins-good"}},
@@ -924,7 +924,7 @@ var registry = []*Release{
 		Advisory: Advisory{VendorOrigins: []string{"pop-os-release", "system76"}, Partial: "vendor feed unavailable for Pop!_OS packages"},
 		Supports: caps(agentCore, hostResources, []Capability{Password, Advisories, Encryption, Wipe, ReportLoss, Lock}),
 		Gates: gates(string(RecoverySanitize), "original-device recovery requires Secure Boot; "+popUnsignedBoot,
-			string(Assistance), "notification_actions_hidden: cosmic-notifications (0.1.0 on the ISO, 1.10.0 from the archive) advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1"),
+			string(Assistance), "notification_actions_hidden: stock cosmic-notifications 0.1.0 and 1.10.0 hide consent buttons; unverified versions refuse notification_actions_unverified; COSMIC requires ScreenCast and RemoteDesktop even for VIEW (portal 1.10.0~1791324839~24.04~9d35e63 adds RemoteDesktop, unlike the ISO)"),
 	},
 	{
 		Key: "arch", Name: "Arch Linux", Distribution: "Arch Linux", ID: "arch", Version: Absent(),

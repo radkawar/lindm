@@ -194,6 +194,7 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 	t.Run("hidden actions", func(t *testing.T) {
 		h := newHarness(t)
 		h.notifier.server = "cosmic-notifications"
+		h.notifier.version = "1.10.0"
 		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
 		report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
 		if report.GetEndDetail() != "notification_actions_hidden" {
@@ -202,6 +203,20 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 		select {
 		case notice := <-h.notifier.posted:
 			t.Fatalf("posted %q on a server that hides its actions", notice.notification.Summary)
+		default:
+		}
+	})
+	t.Run("unverified COSMIC actions", func(t *testing.T) {
+		h := newDesktopHarness(t, "COSMIC")
+		h.notifier.server, h.notifier.version = "cosmic-notifications", "1.11.0"
+		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
+		report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+		if report.GetEndDetail() != "notification_actions_unverified" || h.portal.openCount() != 0 {
+			t.Fatalf("unverified actions did not refuse before portal consent: %v", report)
+		}
+		select {
+		case notice := <-h.notifier.posted:
+			t.Fatalf("posted %q with unverified COSMIC action rendering", notice.notification.Summary)
 		default:
 		}
 	})
@@ -259,6 +274,46 @@ func TestPortalCapabilityGateRefusesBeforeConsent(t *testing.T) {
 		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
 		h.notifier.next(t, "Remote assistance request")
 	})
+	t.Run("cosmic_view_requires_remote_desktop", func(t *testing.T) {
+		h := newDesktopHarness(t, "COSMIC")
+		h.portal.refuse = map[agentv1.AssistanceMode]error{modeControl: unavailable("portal_remote_desktop_unavailable", nil)}
+		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
+		report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+		if report.GetEndDetail() != "portal_remote_desktop_unavailable" || h.portal.openCount() != 0 {
+			t.Fatalf("COSMIC VIEW did not require RemoteDesktop: %v", report)
+		}
+		select {
+		case notice := <-h.notifier.posted:
+			t.Fatalf("posted %q without COSMIC RemoteDesktop", notice.notification.Summary)
+		default:
+		}
+	})
+	t.Run("cosmic_with_safe_actions_keeps_view_only", func(t *testing.T) {
+		h := newDesktopHarness(t, "COSMIC")
+		// The harness's GNOME notifier models a server with visible actions;
+		// this is not native COSMIC qualification.
+		h.sync(directiveFor(invitation(modeView, time.Minute, 10*time.Minute)))
+		h.notifier.next(t, "Remote assistance request").result <- actionAllow
+		h.waitPhase(agentv1.AssistancePhase_ASSISTANCE_PHASE_OFFERED)
+		h.portal.mu.Lock()
+		defer h.portal.mu.Unlock()
+		if len(h.portal.checked) != 1 || !h.portal.checked[0].RequireRemoteDesktop ||
+			len(h.portal.opens) != 1 || h.portal.opens[0].Mode != modeView || h.portal.opens[0].deviceTypes() != 0 {
+			t.Fatalf("COSMIC VIEW changed to control: checked=%v opens=%v", h.portal.checked, h.portal.opens)
+		}
+	})
+	for _, mode := range []agentv1.AssistanceMode{modeView, modeControl} {
+		t.Run("cosmic_verified_actions_"+mode.String(), func(t *testing.T) {
+			h := newDesktopHarness(t, "COSMIC")
+			h.notifier.server, h.notifier.version = "cosmic-notifications", "1.10.0-lindm-actions.1"
+			h.offered(directiveFor(invitation(mode, time.Minute, 10*time.Minute)))
+			h.portal.mu.Lock()
+			defer h.portal.mu.Unlock()
+			if len(h.portal.opens) != 1 || h.portal.opens[0].Mode != mode || !h.portal.opens[0].RequireRemoteDesktop {
+				t.Fatalf("verified consent changed requested mode: %v", h.portal.opens)
+			}
+		})
+	}
 }
 
 func TestPortalPreflightUsesConsentedPolicyWithoutOpeningSession(t *testing.T) {

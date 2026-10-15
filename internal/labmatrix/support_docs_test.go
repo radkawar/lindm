@@ -318,3 +318,19 @@ func TestCinnamonNativeConfirmationIsVersionQualifiedNotWholeFeatureSupport(t *t
 		})
 	}
 }
+
+func TestRenderSupportDoesNotTreatNewCosmicPortalAsSafeConsent(t *testing.T) {
+	r, cells := supportFixture()
+	r.Supports = slices.DeleteFunc(r.Supports, func(c platform.Capability) bool { return c == platform.Assistance })
+	r.Gates = map[platform.Capability]string{platform.Assistance: "notification_actions_hidden: stock COSMIC; notification_actions_unverified: other versions"}
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[7]; !strings.HasPrefix(got, "✗ [^support-") {
+		t.Fatalf("unsafe consent became supported: %q", got)
+	}
+	if !strings.Contains(body, "Stock COSMIC hides consent buttons; newer portal support alone does not enable assistance.") {
+		t.Fatal("missing separate portal and consent restriction")
+	}
+}

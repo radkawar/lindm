@@ -146,10 +146,12 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   quarantine pass.
 - **Assistance.** Gated in the registry (`session_lock_state_unreported`). The
   helper starts through `graphical-session.target` (uwsm) and sees
-  `XDG_CURRENT_DESKTOP=Hyprland`. VIEW ends `UNAVAILABLE`
-  `session_lock_state_unreported` and CONTROL ends `UNAVAILABLE`
-  `portal_remote_desktop_unavailable`, both before any prompt
-  (`omarchy404-assistance-03`). xdg-desktop-portal 1.22.1 with
+  `XDG_CURRENT_DESKTOP=Hyprland`. The earlier native record
+  `omarchy404-assistance-03` observed VIEW `UNAVAILABLE`
+  `session_lock_state_unreported` and CONTROL `portal_remote_desktop_unavailable`,
+  both before any prompt. The current helper instead names an unverified fixed
+  runtime `desktop_runtime_unqualified` after the portal/notification probes.
+  xdg-desktop-portal 1.22.1 with
   xdg-desktop-portal-hyprland 1.4.1 exposes ScreenCast version 6 and no
   RemoteDesktop. `gst-plugins-good` is not installed. The lab runs only the
   refusal scenarios.
@@ -214,6 +216,41 @@ selection, messages, files, reconnect, recording and Tier 3 are
 Missing portal/native mechanisms stay explicitly gated; native nonce/hash/guest
 screenshots must qualify each capability. Unattended/KDE work awaits parent
 confirmation.
+
+### Experimental fixed Wayland tuple
+
+The separate `hyprland_wayland` helper profile is admitted only after verifying
+the reviewed deployed portal fork and Omarchy 4.0.4 locker tuple. Merely running
+Hyprland, installing a new backend beside the active one, or retaining the stock
+`omarchy=4.0.4-1` package metadata does not admit it. The verifier checks root-owned
+artifact digests, the live portal implementation's executable mappings and
+reviewed explicit-loader identity and invocation, root frontend selection, the
+actual Quickshell configuration and locker source, and process start after
+deployment. Ordinary reviewed executables must be the actual process image,
+not merely mapped alongside an unreviewed loader. The reviewed locker is the
+`lock-logind-4.0.4-native` port (`38a30a51`) with Quickshell `0.3.1-1`, not an
+assumption that a newer Omarchy package fixes locking.
+
+On Btrfs, `stat` can identify a subvolume with a different device number from
+the backing superblock reported in executable mappings. Such a mismatch is not
+accepted on the strength of a pathname or inode alone: the kernel's
+`/proc/PID/map_files` link must name the exact reviewed artifact, the helper and
+target must share a mount namespace, and the artifact through the target's root
+must retain the hashed file's identity and metadata. This needs only readlink
+access, not privileged access to open the mapped file.
+
+Only VIEW, CONTROL and keyboard are admitted; other optional tools remain
+`desktop_capability_unqualified`. The native flow selects a screen and separately asks
+whether to allow keyboard/pointer control, with no view-only downgrade choice.
+The product consent therefore describes the selected screen and input together,
+not GNOME's view-only choice or KDE's all-monitor behavior. Stock platform
+support, the static desktop lock table and server-side pure-session lock-action
+policy remain unchanged.
+The live frontend must use the standard root-only search homes
+`XDG_CONFIG_HOME=/etc/xdg`, `XDG_DATA_HOME=/usr/share`,
+`XDG_CONFIG_DIRS=/etc/xdg` and `XDG_DATA_DIRS=/usr/share` through a root-installed
+service drop-in. The first matching portal configuration must be the pinned
+`/usr/share/xdg-desktop-portal/hyprland-portals.conf`, not a higher-priority override.
 
 ## Records
 

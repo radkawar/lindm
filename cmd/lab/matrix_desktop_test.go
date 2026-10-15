@@ -47,3 +47,33 @@ func TestMatrixDesktopCellsBootTheReleaseDesktop(t *testing.T) {
 		}
 	}
 }
+
+func TestMatrixCOSMICForkCellRequiresAndForwardsExplicitArtifacts(t *testing.T) {
+	release, ok := platform.Lookup("pop-24.04")
+	if !ok {
+		t.Fatal("Pop registry row missing")
+	}
+	cell := &labmatrix.Cell{
+		Release: release, Architecture: "x86_64", Manifest: &labmatrix.Manifest{Path: "lab/images/pop-os-24.04-encrypted-amd64.json"},
+		Spec: &labv1.MatrixCell{Name: "assistance-cosmic-pinned", Lane: "assistance", Args: []string{
+			"-desktop=cosmic", "-cosmic-package-profile=pop-cosmic-actions-v1", "-scenarios=control,view,decline,portal-cancel",
+		}},
+	}
+	run := &matrixRun{root: t.TempDir(), cache: t.TempDir()}
+	if _, err := run.laneArgs(cell, "base"); err == nil {
+		t.Fatal("fork cell silently substituted public packages")
+	}
+	run.cosmicForkArtifacts = t.TempDir()
+	args, err := run.laneArgs(cell, "base")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"desktop": "cosmic", "cosmic-package-profile": "pop-cosmic-actions-v1",
+		"cosmic-fork-artifacts": run.cosmicForkArtifacts, "scenarios": "control,view,decline,portal-cancel",
+	} {
+		if got := labhost.FlagValue(args, name); got != want {
+			t.Fatalf("-%s = %q, require %q", name, got, want)
+		}
+	}
+}

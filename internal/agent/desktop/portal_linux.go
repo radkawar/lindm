@@ -107,13 +107,13 @@ func (p *DesktopPortal) capabilities(ctx context.Context, request PortalRequest)
 	// Versions are clamped so the audited summary stays within its 64-byte bound.
 	versions := fmt.Sprintf("screencast_%d", min(screenCastVersion, 999))
 	var deviceTypes, remoteDesktopVersion uint32
-	if mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
+	if mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL || request.RequireRemoteDesktop {
 		deviceTypes, err = p.uint32Property(ctx, remoteDesktopIface, "AvailableDeviceTypes")
 		if err != nil {
 			return portalCapabilities{}, unavailable("portal_remote_desktop_unavailable", err)
 		}
 		devicesRequested := request.deviceTypes()
-		if deviceTypes&devicesRequested != devicesRequested {
+		if mode == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL && deviceTypes&devicesRequested != devicesRequested {
 			return portalCapabilities{}, unavailable("portal_input_devices_unavailable", nil)
 		}
 		remoteDesktopVersion, _ = p.uint32Property(ctx, remoteDesktopIface, "version")

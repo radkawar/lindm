@@ -5,6 +5,8 @@
 package desktop
 
 import (
+	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/godbus/dbus/v5"
@@ -73,6 +75,55 @@ func TestPortalRequestedDevicesRespectModeAndKeyboardConsent(t *testing.T) {
 			}}
 			if got := request.deviceTypes(); got != test.want {
 				t.Fatalf("requested devices = %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+func TestPortalPreflightRequiresBothCosmicInterfacesWithoutControl(t *testing.T) {
+	for _, test := range []struct {
+		name                     string
+		screenCast, remote, both bool
+		detail                   string
+	}{
+		{"missing_screencast", false, true, true, "portal_screencast_unavailable"},
+		{"cosmic_missing_remote", true, false, true, "portal_remote_desktop_unavailable"},
+		{"ordinary_view", true, false, false, ""},
+		{"cosmic_both", true, true, true, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+			server, bus := privateSessionBus(t, ctx, portalName)
+			if err := server.ExportMethodTable(map[string]any{
+				"Get": func(iface, property string) (dbus.Variant, *dbus.Error) {
+					if iface == screenCastIface && !test.screenCast || iface == remoteDesktopIface && !test.remote {
+						return dbus.Variant{}, dbus.MakeFailedError(errors.New("interface unavailable"))
+					}
+					var value uint32
+					switch property {
+					case "AvailableSourceTypes", "version":
+						value = 1
+					case "AvailableDeviceTypes":
+						// VIEW must only probe presence, not demand input devices.
+						value = 0
+					}
+					return dbus.MakeVariant(value), nil
+				},
+			}, portalPath, "org.freedesktop.DBus.Properties"); err != nil {
+				t.Fatal(err)
+			}
+			portal, err := NewDesktopPortal(bus, slog.Default())
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = portal.Check(ctx, PortalRequest{Mode: modeView, RequireRemoteDesktop: test.both})
+			var end *EndError
+			if test.detail == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !errors.As(err, &end) || end.Detail != test.detail {
+				t.Fatalf("preflight = %v, want %s", err, test.detail)
 			}
 		})
 	}

@@ -32,7 +32,8 @@ const ocrUpscale = 3
 const ocrBinaryLuma = 150
 
 // ocrRead returns the words tesseract finds in region of img, with boxes in
-// img coordinates, from two passes over the luma crop: plain and binarized.
+// img coordinates. Plain and binary luma passes retain light-on-dark text; an
+// additional edge-cleared binary pass exposes dark text inside accent buttons.
 // Luma, not colour: on Plasma's wallpaper-tinted popups tesseract reads the
 // colour crop as a handful of fragments (kde-fedora44-x86_64-03).
 func ocrRead(ctx context.Context, img *image.RGBA, region image.Rectangle) (_ []ocrWord, err error) {
@@ -46,18 +47,27 @@ func ocrRead(ctx context.Context, img *image.RGBA, region image.Rectangle) (_ []
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
 	var words []ocrWord
-	for pass, binary := range []bool{false, true} {
-		scaled := image.NewGray(image.Rect(0, 0, region.Dx()*ocrUpscale, region.Dy()*ocrUpscale))
-		for y := range scaled.Rect.Dy() {
-			for x := range scaled.Rect.Dx() {
-				luma := pixelLuma(img, region.Min.X+x/ocrUpscale, region.Min.Y+y/ocrUpscale)
-				switch {
-				case binary && luma > ocrBinaryLuma:
-					luma = 255
-				case binary:
-					luma = 0
+	var scaled *image.Gray
+	for pass := range 3 {
+		if pass == 2 {
+			// Reuse the binary mask. Do not invoke OCR again if there was no
+			// edge-connected background to remove.
+			if !ocrClearDarkBorder(scaled) {
+				continue
+			}
+		} else {
+			scaled = image.NewGray(image.Rect(0, 0, region.Dx()*ocrUpscale, region.Dy()*ocrUpscale))
+			for y := range scaled.Rect.Dy() {
+				for x := range scaled.Rect.Dx() {
+					luma := pixelLuma(img, region.Min.X+x/ocrUpscale, region.Min.Y+y/ocrUpscale)
+					switch {
+					case pass == 1 && luma > ocrBinaryLuma:
+						luma = 255
+					case pass == 1:
+						luma = 0
+					}
+					scaled.Pix[scaled.PixOffset(x, y)] = uint8(luma)
 				}
-				scaled.Pix[scaled.PixOffset(x, y)] = uint8(luma)
 			}
 		}
 		path := filepath.Join(dir, fmt.Sprintf("screen-%d.png", pass))
@@ -119,27 +129,31 @@ func (s *assistanceScreen) waitText(ctx context.Context, region func(image.Recta
 	}
 }
 
-// clickText clicks the label's centre inside region after the label is
-// visible there, and re-reads it under the hovering pointer so a popup that
-// moved or restacked is never clicked by stale coordinates.
+// clickText clicks the label's button padding after the label is visible there,
+// and re-reads it under the hovering pointer so a popup that moved or restacked
+// is never clicked by stale coordinates.
 func (s *assistanceScreen) clickText(ctx context.Context, region func(image.Rectangle) image.Rectangle, label, target string, scenario *assistanceScenarioEvidence) error {
-	return s.clickLabel(ctx, region, label, target, scenario, true)
+	return s.clickLabel(ctx, region, label, target, scenario, true, ocrActionPoint)
 }
 
 // focusText clicks inert text (a dialog's description) only to activate its
-// window. Inert text draws no hover feedback and QMP screendumps carry no
-// cursor, so the label's re-read position is the only pre-click proof.
+// window. Inert text draws no hover feedback, so the label's re-read position
+// is the only pre-click proof.
 func (s *assistanceScreen) focusText(ctx context.Context, region func(image.Rectangle) image.Rectangle, label, target string, scenario *assistanceScenarioEvidence) error {
-	return s.clickLabel(ctx, region, label, target, scenario, false)
+	return s.clickLabel(ctx, region, label, target, scenario, false, nil)
 }
 
-func (s *assistanceScreen) clickLabel(ctx context.Context, region func(image.Rectangle) image.Rectangle, label, target string, scenario *assistanceScenarioEvidence, hover bool) error {
+func (s *assistanceScreen) clickLabel(ctx context.Context, region func(image.Rectangle) image.Rectangle, label, target string, scenario *assistanceScenarioEvidence, hover bool, pointForLabel func(image.Rectangle) image.Point) error {
 	img, found, err := s.waitText(ctx, region, 30*time.Second, target, label)
 	if err != nil {
 		return err
 	}
 	box := found[label]
-	point := image.Pt(box.Min.X+box.Dx()/2, box.Min.Y+box.Dy()/2)
+	labelCentre := image.Pt(box.Min.X+box.Dx()/2, box.Min.Y+box.Dy()/2)
+	point := labelCentre
+	if pointForLabel != nil {
+		point = pointForLabel(box)
+	}
 	if hover {
 		err = s.waitPointerHover(ctx, point, target)
 	} else {
@@ -154,7 +168,7 @@ func (s *assistanceScreen) clickLabel(ctx context.Context, region func(image.Rec
 	if err != nil {
 		return err
 	}
-	if moved := again[label]; !point.In(moved.Inset(-2)) {
+	if moved := again[label]; !labelCentre.In(moved.Inset(-2)) {
 		if _, saveErr := s.save(fmt.Sprintf("label-moved-%s-%d", target, time.Now().Unix()), hovered); saveErr != nil {
 			return saveErr
 		}

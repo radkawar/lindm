@@ -12,40 +12,40 @@ Ubuntu, but **no Ubuntu evidence carries over** to it.
 Generated from `internal/platform`; “implemented” is not qualification (see the
 [verification ledger](../verification.md#tier-capability-matrix)).
 
-| Capability            | Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| inventory             | implemented                                                                                                                                                                                                                                                                                     |
-| lifecycle             | implemented                                                                                                                                                                                                                                                                                     |
-| dispatch              | implemented                                                                                                                                                                                                                                                                                     |
-| packages              | implemented                                                                                                                                                                                                                                                                                     |
-| accounts              | implemented                                                                                                                                                                                                                                                                                     |
-| sysctl                | implemented                                                                                                                                                                                                                                                                                     |
-| definitions           | implemented                                                                                                                                                                                                                                                                                     |
-| password              | implemented                                                                                                                                                                                                                                                                                     |
-| firewall              | implemented                                                                                                                                                                                                                                                                                     |
-| encryption            | implemented                                                                                                                                                                                                                                                                                     |
-| wipe                  | implemented                                                                                                                                                                                                                                                                                     |
-| report-loss           | implemented                                                                                                                                                                                                                                                                                     |
-| lock                  | implemented                                                                                                                                                                                                                                                                                     |
-| recovery-sanitize     | gated: original-device recovery requires Secure Boot; Pop!\_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot                                            |
-| self-update           | implemented                                                                                                                                                                                                                                                                                     |
-| assistance            | gated: notification_actions_hidden: cosmic-notifications (0.1.0 on the ISO, 1.10.0 from the archive) advertises actions but renders no Allow/Decline buttons, and activating the card invokes the first action; CONTROL additionally lacks RemoteDesktop in xdg-desktop-portal-cosmic 0.1.0pop1 |
-| assistance-clipboard  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
-| assistance-keyboard   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
-| assistance-displays   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
-| assistance-messages   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                   |
-| assistance-files      | gated: local FileChooser consent, input isolation and secure transfer are not qualified on this release                                                                                                                                                                                         |
-| assistance-reconnect  | gated: fresh consent after real logout/reboot and workflow expiry are not qualified on this release                                                                                                                                                                                             |
-| assistance-recording  | gated: recording disclosure, encrypted storage and retention are not qualified on this release                                                                                                                                                                                                  |
-| assistance-unattended | gated: a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release                                                                                                                                                                   |
-| assistance-elevation  | gated: pausing all remote injection around a local privileged prompt is not qualified on this release                                                                                                                                                                                           |
-| assistance-annotation | gated: no qualified non-interactive compositor overlay exists on this release                                                                                                                                                                                                                   |
-| assistance-audio      | gated: selected PipeWire output/microphone capture with local mute is not qualified on this release                                                                                                                                                                                             |
-| assistance-kde        | gated: kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability                                                                                                                                                                   |
-| assistance-x11        | gated: x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE                                                                                                                                                                                        |
-| advisories            | partial: vendor feed unavailable for Pop!\_OS packages                                                                                                                                                                                                                                          |
-| os-update             | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                                                                         |
-| release-upgrade       | gated: release upgrade is not implemented                                                                                                                                                                                                                                                       |
+| Capability            | Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inventory             | implemented                                                                                                                                                                                                                                                                                              |
+| lifecycle             | implemented                                                                                                                                                                                                                                                                                              |
+| dispatch              | implemented                                                                                                                                                                                                                                                                                              |
+| packages              | implemented                                                                                                                                                                                                                                                                                              |
+| accounts              | implemented                                                                                                                                                                                                                                                                                              |
+| sysctl                | implemented                                                                                                                                                                                                                                                                                              |
+| definitions           | implemented                                                                                                                                                                                                                                                                                              |
+| password              | implemented                                                                                                                                                                                                                                                                                              |
+| firewall              | implemented                                                                                                                                                                                                                                                                                              |
+| encryption            | implemented                                                                                                                                                                                                                                                                                              |
+| wipe                  | implemented                                                                                                                                                                                                                                                                                              |
+| report-loss           | implemented                                                                                                                                                                                                                                                                                              |
+| lock                  | implemented                                                                                                                                                                                                                                                                                              |
+| recovery-sanitize     | gated: original-device recovery requires Secure Boot; Pop!\_OS's installed systemd-boot (EFI/systemd/systemd-bootx64.efi and its EFI/BOOT/BOOTX64.EFI copy) carries no Authenticode signature, so the installed system cannot boot under Secure Boot                                                     |
+| self-update           | implemented                                                                                                                                                                                                                                                                                              |
+| assistance            | gated: notification_actions_hidden: stock cosmic-notifications 0.1.0 and 1.10.0 hide consent buttons; unverified versions refuse notification_actions_unverified; COSMIC requires ScreenCast and RemoteDesktop even for VIEW (portal 1.10.0~1791324839~24.04~9d35e63 adds RemoteDesktop, unlike the ISO) |
+| assistance-clipboard  | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                            |
+| assistance-keyboard   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                            |
+| assistance-displays   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                            |
+| assistance-messages   | gated: not implemented for Pop!\_OS 24.04 LTS                                                                                                                                                                                                                                                            |
+| assistance-files      | gated: local FileChooser consent, input isolation and secure transfer are not qualified on this release                                                                                                                                                                                                  |
+| assistance-reconnect  | gated: fresh consent after real logout/reboot and workflow expiry are not qualified on this release                                                                                                                                                                                                      |
+| assistance-recording  | gated: recording disclosure, encrypted storage and retention are not qualified on this release                                                                                                                                                                                                           |
+| assistance-unattended | gated: a compositor-supported persistent remote-desktop grant, banner/stop and lock refusal are not qualified on this release                                                                                                                                                                            |
+| assistance-elevation  | gated: pausing all remote injection around a local privileged prompt is not qualified on this release                                                                                                                                                                                                    |
+| assistance-annotation | gated: no qualified non-interactive compositor overlay exists on this release                                                                                                                                                                                                                            |
+| assistance-audio      | gated: selected PipeWire output/microphone capture with local mute is not qualified on this release                                                                                                                                                                                                      |
+| assistance-kde        | gated: kde_plasma_desktop_unqualified: no native KDE Plasma Wayland lane on this release; the helper admits no KDE capability                                                                                                                                                                            |
+| assistance-x11        | gated: x11_desktop_unqualified: no native X11 session lane on this release; X11 sessions end UNAVAILABLE                                                                                                                                                                                                 |
+| advisories            | partial: vendor feed unavailable for Pop!\_OS packages                                                                                                                                                                                                                                                   |
+| os-update             | gated: OS update policy (unattended-upgrades/dnf automatic runner) has no native record on this release                                                                                                                                                                                                  |
+| release-upgrade       | gated: release upgrade is not implemented                                                                                                                                                                                                                                                                |
 
 <!-- END GENERATED platform-capabilities -->
 
@@ -144,8 +144,22 @@ installation time.
   `/usr/share/xdg-desktop-portal/portals/cosmic.portal` declares Access,
   FileChooser, Screenshot, Settings and ScreenCast, and **no RemoteDesktop**; the
   image also lacks `gstreamer1.0-pipewire`, which the agent package recommends.
-  Assistance CONTROL therefore ends `UNAVAILABLE`
-  `portal_remote_desktop_unavailable` before consent.
+  Both VIEW and CONTROL now require the session frontend to expose ScreenCast
+  and RemoteDesktop, and end `UNAVAILABLE` `portal_remote_desktop_unavailable`
+  before consent on the ISO. VIEW still requests no input devices and opens
+  only a ScreenCast session. The newer archive pins
+  `xdg-desktop-portal-cosmic=1.10.0~1791324839~24.04~9d35e63` and
+  `cosmic-comp=0.1~1791491785~24.04~4d14528` contain the upstream
+  [RemoteDesktop portal](https://github.com/pop-os/xdg-desktop-portal-cosmic/pull/317)
+  and [compositor input support](https://github.com/pop-os/cosmic-comp/pull/2442).
+  COSMIC's control dialog grants the picked screen and requested input together;
+  its device icons are not toggles. The product prompt discloses that it has no
+  later view-only choice, without claiming KDE's all-monitor behavior.
+  Their presence is necessary, not sufficient: notification consent must also
+  be safe, and successful native qualification is separate from implementation.
+  The admitted COSMIC baseline is VIEW, CONTROL and keyboard; other optional
+  tools are withheld as `desktop_capability_unqualified` until separately
+  qualified. New portal methods do not imply GNOME capability parity.
 - **Notifications.** cosmic-notifications, both the ISO's
   `0.1.0~1785437935~24.04~7837e49` and the archive's
   `1.10.0~1791314632~24.04~1e4c1f1`, advertises the `actions` capability but
@@ -153,9 +167,19 @@ installation time.
   the `default` action, else the first action (`src/app.rs`
   `activate_notification`). Natively observed on 1.10.0 in
   `pop2404-assistance-04`: the lindm consent prompt showed no Allow or Decline.
-  The session helper therefore refuses VIEW before any prompt with `UNAVAILABLE`
-  `notification_actions_hidden` (`pop2404-assistance-10` on 0.1.0), and the
-  registry gates assistance with that reason.
+  The session helper distinguishes runtime versions returned by
+  `GetServerInformation`: known-broken `0.1.0` and `1.10.0` refuse
+  `UNAVAILABLE` `notification_actions_hidden`; other unverified COSMIC versions
+  refuse `notification_actions_unverified`, even when `GetCapabilities`
+  advertises `actions`. A higher version alone does not prove visible consent.
+  The exact fork runtime `1.10.0-lindm-actions.1` is a separate admission:
+  it renders non-default action buttons and removes implicit first-action
+  activation from card clicks. It is not stock `1.10.0`, and does not create
+  a minimum-version rule or qualify public Pop!\_OS packages.
+  The pre-consent portal probe takes precedence, so the older ISO now refuses
+  VIEW as well as CONTROL for missing RemoteDesktop. Upgrading just the portal
+  and compositor does not enable assistance: the public notification packages
+  still offer no safe Allow/Decline surface, and the support registry remains gated.
 - **Lock.** cosmic-greeter, both the ISO's `0.1.0` (`ae627ab`) and the archive's
   `1.10.0` (`98df07d`), locks only on logind `Session.Lock` and `PrepareForSleep`
   (`src/logind.rs`). The lock-screen shortcut and idle action run
@@ -463,15 +487,60 @@ for this row), with the host's `ovmf` `2024.02-2ubuntu0.10`
 `OVMF_CODE_4M.secboot.fd` and unenrolled `OVMF_VARS_4M.fd`. Both goldens come from
 the recipe above; ISO relabels are not used.
 
+The explicit `assistance-cosmic-pinned` matrix cell is a disposable **fork-only
+experiment**, not public Pop!\_OS qualification. It selects
+`pop-cosmic-actions-v1`, pins and holds all eighteen runtime packages, and
+records their observed native versions plus SHA-256 digests of the two local
+fork `.deb` inputs. Its COSMIC tuple is:
+
+| Package                                   | Exact version                     |
+| ----------------------------------------- | --------------------------------- |
+| `xdg-desktop-portal-cosmic`               | `1.10.0+lindm.lifetime.1`         |
+| `cosmic-comp`                             | `0.1~1791491785~24.04~4d14528`    |
+| `cosmic-notifications`                    | `1.10.0+lindm.actions.1`          |
+| `cosmic-greeter`, `cosmic-greeter-daemon` | `1.10.0~1791400742~24.04~98df07d` |
+| `cosmic-term`                             | `1.10.0~1791316259~24.04~3bfca1e` |
+
+The coherent PipeWire family is pinned to
+`1.6.8-1pop1~1787688714~24.04~fdff050` for each of
+`libspa-0.2-modules`, `libpipewire-0.3-0t64`, `libpipewire-0.3-modules`,
+`pipewire-bin`, `pipewire`, `pipewire-jack`, `libspa-0.2-jack`,
+`libspa-0.2-bluetooth`, `pipewire-alsa`, `pipewire-pulse`,
+`gstreamer1.0-pipewire` and `libpipewire-0.3-common`. Installing only the capture
+plugin would otherwise upgrade that family without a reviewed tuple.
+
+The reviewed portal fork is commit
+[`148f07ed9a2ebf9a719f8b517e00c2c165a70153`](https://github.com/radkawar/xdg-desktop-portal-cosmic/commit/148f07ed9a2ebf9a719f8b517e00c2c165a70153),
+with input `.deb` SHA-256
+`fc144f9187590d7544fa3e6a5069f1f24032d8189d6bd58227bd0add27821d6f`.
+The current terminal is pinned too: the older golden terminal lost an immediate
+input prefix in the independent native witness. No input warm-up or retry is
+used to qualify the reviewed tuple.
+
+The [lab invocation](../verification.md#built-in-graphical-remote-assistance-l09-l12) requires
+`-cosmic-fork-artifacts`; missing packages or version drift fail rather than
+fall back to stock packages. Its scenarios use visible local Allow/Decline
+buttons and the native COSMIC source picker for CONTROL, VIEW, decline and
+portal cancellation, with the existing independent media and input witnesses.
+
+Native consent-button evidence for `1.10.0-lindm-actions.1` is
+`~/.cache/lindm-upstream-prs/cosmic-evidence-native-03/native-buttons-observed.png`
+(SHA-256 `bf05335396e64665bb621f43eb2ad0553e4f51607d45a173cca3dda1e28362fe`).
+The native action probes observed `allow` and `decline` from their respective
+buttons and no action from clicking the card. This verifies the notification
+surface only; it is not an assistance-session pass or public package evidence.
+
 ## Known gaps
 
 Recovery sanitize and the Secure Boot TPM cells are gated on the unsigned
 systemd-boot.
-Assistance is gated: VIEW ends `UNAVAILABLE` `notification_actions_hidden` and
-CONTROL `portal_remote_desktop_unavailable`, both before consent (observed
-natively by DesktopSessions,
-`~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-assistance-10/assistance.json`,
-`bf8b91b6854252ced50a1ba8bfd4e5d46b6500f58ab088fb9a2e2f9483c277dd`).
+Assistance remains gated for public COSMIC packages. The current helper refuses
+both modes before consent when RemoteDesktop is missing, and refuses stock
+notification versions for hidden buttons even after the portal upgrade.
+The earlier native record observed VIEW `notification_actions_hidden` and
+CONTROL `portal_remote_desktop_unavailable` before the both-interface gate:
+`~/.cache/lindm-desktopderiv-20261011/sessions/pop/pop2404-assistance-10/assistance.json`
+(`bf8b91b6854252ced50a1ba8bfd4e5d46b6500f58ab088fb9a2e2f9483c277dd`).
 
 ## Capability policy facts (signed provider grants)
 

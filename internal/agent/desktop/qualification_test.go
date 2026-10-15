@@ -23,6 +23,7 @@ func TestDesktopProfileSelectionUsesExecutorSessionType(t *testing.T) {
 	}{
 		{"wayland", "ubuntu:GNOME", gnomeWayland},
 		{"wayland", "COSMIC", cosmicWayland},
+		{"wayland", "COSMIC:GNOME", cosmicWayland},
 		{"wayland", "KDE", kdePlasmaWayland},
 		// The helper's environment never turns an X11 session into Wayland.
 		{"x11", "X-Cinnamon", unlistedX11},
@@ -145,13 +146,22 @@ func TestDesktopGateWithholdsTierThree(t *testing.T) {
 	}
 }
 
-// GNOME and COSMIC Wayland keep their Tier 1/2 admission: no desktop gate
-// narrows or refuses them.
-func TestUngatedProfilesKeepTierOnePolicy(t *testing.T) {
-	for _, profile := range []*desktopProfile{gnomeWayland, cosmicWayland} {
-		admission := admitDesktop(profile, modeControl, fullPolicy())
-		if admission.refusal != "" || len(admission.reasons) != 0 || admission.policy.GetClipboard() != modeOn || admission.policy.GetFiles() != modeOn {
-			t.Fatalf("%s: %+v", profile.name, admission)
+// An absent desktop policy gate is not qualification for optional tools.
+// GNOME retains its native tiers; COSMIC admits only its baseline lane.
+func TestUngatedProfilesStillEnforceQualification(t *testing.T) {
+	admission := admitDesktop(gnomeWayland, modeControl, fullPolicy())
+	if admission.refusal != "" || len(admission.reasons) != 0 || admission.policy.GetClipboard() != modeOn || admission.policy.GetFiles() != modeOn {
+		t.Fatalf("GNOME: %+v", admission)
+	}
+	admission = admitDesktop(cosmicWayland, modeControl, fullPolicy())
+	if admission.refusal != "" || admission.policy.GetKeyboard() != modeOn ||
+		admission.policy.GetClipboard() != modeOff || admission.policy.GetFiles() != modeOff ||
+		admission.reasons[capClipboard] != reasonDesktopUnqualified || admission.reasons[capFiles] != reasonDesktopUnqualified {
+		t.Fatalf("COSMIC: %+v", admission)
+	}
+	for _, reason := range admission.reasons {
+		if reason != reasonDesktopUnqualified {
+			t.Fatalf("COSMIC narrowing reason: %q", reason)
 		}
 	}
 	if admitDesktop(unlisted, modeView, fullPolicy()).refusal != "desktop_unqualified" {
@@ -258,5 +268,17 @@ func TestKDEPlasmaAdmissionNarrowsToQualifiedRow(t *testing.T) {
 	}
 	if kdePlasmaWayland.qualified&capKeyboard == 0 && granted.GetKeyboardReason() != reasonDesktopUnqualified {
 		t.Fatalf("keyboard reason = %q", granted.GetKeyboardReason())
+	}
+}
+
+func TestCOSMICControlConsentDisclosesSelectedScreenAndInputTogether(t *testing.T) {
+	h := newDesktopHarness(t, "COSMIC")
+	h.notifier.server, h.notifier.version = "cosmic-notifications", "1.10.0-lindm-actions.1"
+	h.sync(directiveFor(invitation(modeControl, time.Minute, 10*time.Minute)))
+	prompt := h.notifier.next(t, "Remote assistance request")
+	body := prompt.notification.Body
+	if strings.Contains(body, "allow viewing only") || strings.Contains(body, "every monitor") ||
+		!strings.Contains(body, "selected screen together with control") || !strings.Contains(body, "no view-only choice") {
+		t.Fatalf("COSMIC control prompt misstates native consent: %q", body)
 	}
 }

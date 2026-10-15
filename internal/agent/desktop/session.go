@@ -72,7 +72,8 @@ type sessionDeps struct {
 	lockReporting error
 	// currentDesktop is the session's XDG_CURRENT_DESKTOP; with the
 	// executor-observed session type it selects the desktop profile.
-	currentDesktop string
+	currentDesktop        string
+	fixedDesktopQualifier FixedDesktopQualifier
 
 	firstPacketTimeout time.Duration
 	captureGrace       time.Duration
@@ -396,10 +397,12 @@ func (s *session) drive(ctx context.Context, r *sessionResources) (agentv1.Assis
 	if !slices.Contains(capabilities, "actions") {
 		return agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE, "notification_actions_unavailable"
 	}
-	admission := admitDesktop(desktopProfileFor(s.sessionType, deps.currentDesktop), s.invitation.GetMode(), consentedPolicy(s.invitation))
+	profile, qualificationErr := deps.qualifiedDesktopProfile(consentCtx, s.sessionType)
+	admission := admitDesktop(profile, s.invitation.GetMode(), consentedPolicy(s.invitation))
+	admission.runtimeErr = qualificationErr
 	s.profile = admission.profile
 	policy := admission.policy
-	request := PortalRequest{Mode: s.invitation.GetMode(), Policy: policy, Lifetime: ctx}
+	request := PortalRequest{Mode: s.invitation.GetMode(), Policy: policy, Lifetime: ctx, RequireRemoteDesktop: s.profile == cosmicWayland}
 	if err := s.servable(consentCtx, request, admission); err != nil {
 		return s.failure(consentCtx, err)
 	}
@@ -628,24 +631,27 @@ func (s *session) adoptGrant(r *sessionResources, granted *agentv1.AssistanceCap
 // servable refuses, before any prompt, a session this desktop cannot honour.
 // The request is already narrowed to the desktop profile, so the portal is
 // asked only for that. Native gaps are named first: a missing ScreenCast (or,
-// for CONTROL, RemoteDesktop) portal; a notification server that advertises
-// actions but never shows them, which would present a prompt without visible
-// Allow/Decline where activating it allows; then a desktop whose locks lindm
-// cannot observe, which would keep sharing a locked screen. Then the Tier 3
-// desktop gate and qualification table refuse what policy or evidence does
-// not admit.
+// for CONTROL and all COSMIC requests, RemoteDesktop) portal; a notification
+// server with hidden or unverified action buttons, which would present a
+// prompt without visible Allow/Decline where activating it allows; then a
+// desktop whose locks lindm cannot observe, which would keep sharing a locked
+// screen. Then the Tier 3 desktop gate and qualification table refuse what
+// policy or evidence does not admit.
 func (s *session) servable(ctx context.Context, request PortalRequest, admission desktopAdmission) error {
 	if err := s.deps.portal.Check(ctx, request); err != nil {
 		return unavailable("portal_unavailable", err)
 	}
-	server, err := s.deps.notifier.ServerName(ctx)
+	server, version, err := s.deps.notifier.ServerInformation(ctx)
 	if err != nil {
 		return unavailable("notification_server_unavailable", err)
 	}
-	if platform.NotificationActionsHidden(server) {
-		return unavailable("notification_actions_hidden", nil)
+	if reason := platform.NotificationActionsUnavailable(server, version); reason != "" {
+		return unavailable(reason, nil)
 	}
-	if s.deps.lockReporting != nil {
+	if admission.runtimeErr != nil {
+		return unavailable("desktop_runtime_unqualified", admission.runtimeErr)
+	}
+	if s.deps.lockReporting != nil && !admission.profile.fixedTuple {
 		return s.deps.lockReporting
 	}
 	if admission.refusal != "" {
@@ -1157,6 +1163,8 @@ func (s *session) promptNotification(markup bool, offer recordingOffer, policy *
 	if s.invitation.GetMode() == agentv1.AssistanceMode_ASSISTANCE_MODE_CONTROL {
 		if s.profile != nil && s.profile.sharedControlDialog {
 			body.WriteString("Control is requested. On this desktop the system dialog that follows approves sharing your whole screen, every monitor, together with control; choose Decline here to refuse both.")
+		} else if s.profile != nil && s.profile.selectedControlDialog {
+			body.WriteString("Control is requested. This desktop's system consent grants your selected screen together with control; there is no view-only choice. Choose Decline here to refuse both.")
 		} else {
 			body.WriteString("Control is requested. The system dialog that follows lets you allow viewing only.")
 		}

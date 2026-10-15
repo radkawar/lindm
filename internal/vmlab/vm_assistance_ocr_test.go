@@ -55,3 +55,101 @@ func TestOCRLocatesLowestCaseExactLabel(t *testing.T) {
 		t.Fatalf("phrase joined two passes at %v", box)
 	}
 }
+
+func TestOCRActionPointLeavesVisibleGlyphsUnobscured(t *testing.T) {
+	// Native COSMIC's Allow label sits above the button's lower padding.
+	label := image.Rect(1003, 261, 1040, 274)
+	point := ocrActionPoint(label)
+	if point.In(label) || !point.In(image.Rect(987, 251, 1056, 285)) {
+		t.Fatalf("hover point %v obscures %v or leaves its button", point, label)
+	}
+	if point.X != label.Min.X+label.Dx()/2 || point.Y != label.Max.Y+4 {
+		t.Fatalf("hover point is not derived from the observed label: %v", point)
+	}
+}
+
+func TestOCRSourcePointStaysInsideBottomLabelledThumbnail(t *testing.T) {
+	// The source label overlays the thumbnail's bottom, unlike action buttons.
+	label := image.Rect(606, 598, 670, 619)
+	thumbnail := image.Rect(387, 305, 893, 620)
+	point := ocrSourcePoint(label)
+	if point.In(label) || !point.In(thumbnail) || point.Y >= label.Min.Y {
+		t.Fatalf("source point %v obscures glyphs or leaves native thumbnail", point)
+	}
+	// Native QMP captures contain the entire hand cursor, not only its hotspot.
+	cursor := image.Rect(0, 0, 24, 32).Add(point)
+	if cursor.Overlaps(label) {
+		t.Fatalf("source hover cursor %v obscures native label %v", cursor, label)
+	}
+	if ocrActionPoint(label).In(thumbnail) {
+		t.Fatal("regression fixture does not expose below-thumbnail action padding")
+	}
+}
+
+func TestOCRClearDarkBorderPreservesEnclosedGlyphsAndCropBounds(t *testing.T) {
+	// A strided, nonzero-origin crop of a bright button in dark background.
+	backing := image.NewGray(image.Rect(0, 0, 14, 9))
+	for i := range backing.Pix {
+		backing.Pix[i] = 73
+	}
+	mask, ok := backing.SubImage(image.Rect(2, 1, 12, 8)).(*image.Gray)
+	if !ok {
+		t.Fatal("grayscale crop changed image type")
+	}
+	pattern := []string{
+		"##########",
+		"##......##",
+		"#........#",
+		"#..##....#",
+		"#...#....#",
+		"##......##",
+		"##########",
+	}
+	for y, row := range pattern {
+		for x, pixel := range row {
+			value := uint8(255)
+			if pixel == '#' {
+				value = 0
+			}
+			mask.Pix[y*mask.Stride+x] = value
+		}
+	}
+	pixels := &mask.Pix[0]
+	if !ocrClearDarkBorder(mask) || pixels != &mask.Pix[0] {
+		t.Fatal("background was not cleared in place")
+	}
+	for y := range backing.Rect.Dy() {
+		for x := range backing.Rect.Dx() {
+			want := uint8(73)
+			if image.Pt(x, y).In(mask.Rect) {
+				want = 255
+				if (y == 4 && (x == 5 || x == 6)) || (y == 5 && x == 6) {
+					want = 0
+				}
+			}
+			if got := backing.Pix[backing.PixOffset(x, y)]; got != want {
+				t.Fatalf("pixel (%d,%d)=%d, want %d: lost enclosed glyph or escaped crop", x, y, got, want)
+			}
+		}
+	}
+	if ocrClearDarkBorder(mask) {
+		t.Fatal("unchanged mask would schedule redundant OCR")
+	}
+}
+
+func TestOCRClearDarkBorderHandlesEmptyAndSingleRowOrColumn(t *testing.T) {
+	for _, bounds := range []image.Rectangle{
+		image.Rect(0, 0, 0, 0), image.Rect(0, 0, 1, 1),
+		image.Rect(0, 0, 9, 1), image.Rect(0, 0, 1, 9),
+	} {
+		mask := image.NewGray(bounds)
+		if changed := ocrClearDarkBorder(mask); changed == bounds.Empty() {
+			t.Errorf("bounds %v: changed=%t", bounds, changed)
+		}
+		for _, pixel := range mask.Pix {
+			if pixel != 255 {
+				t.Fatalf("bounds %v retained edge-connected black pixel", bounds)
+			}
+		}
+	}
+}

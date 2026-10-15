@@ -1497,7 +1497,7 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
         <p>Reason: {session.reason}</p>
         <p>
           {control
-            ? "The operator requests control. You can allow viewing only in the system dialog."
+            ? "The operator requests control. Depending on your desktop, accepting system consent may grant the shared screen and control together."
             : "The operator does not request control. Select the shared screen in the system dialog."}
         </p>
         {capabilityLines.map((line) => (
@@ -1509,9 +1509,9 @@ function UserSidePreview({ session }: { session: AssistanceSession }) {
         </div>
       </div>
       <p className="text-muted-foreground">
-        If they choose Allow, their desktop asks which screen to share
-        {control ? " and whether to allow control" : ""}. The device shares nothing until they
-        confirm it.
+        If they choose Allow, their desktop shows its own screen-sharing
+        {control ? " and control" : ""} consent. Its choices vary by desktop. The device shares
+        nothing until they accept that system consent.
       </p>
     </section>
   );

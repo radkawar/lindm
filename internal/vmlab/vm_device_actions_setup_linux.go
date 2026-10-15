@@ -333,6 +333,11 @@ func installActionPrerequisites(ctx context.Context, vm *guestVM, manifest *labv
 	return nil
 }
 
+// labAPTInstallPrelude serializes a disposable lab install with native desktop
+// package frontends. apt-get update cannot wait for the APT lists lock itself.
+const labAPTInstallPrelude = "if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; " +
+	"for i in $(seq 600); do pgrep -x apt-get >/dev/null || pgrep -x apt >/dev/null || pgrep -x unattended-upgr >/dev/null || break; sleep 1; done; "
+
 // labInstallCommand installs maintained lab packages with the release's native
 // backend. Vendor-configured signature verification remains enabled.
 func labInstallCommand(release *platform.Release, packages []string) (string, error) {
@@ -351,8 +356,7 @@ func labInstallCommand(release *platform.Release, packages []string) (string, er
 		// first-boot unattended-upgrades run outlasted the 10 min setup bound
 		// with nothing to install (ubuntu24-tier1-07, amd64 and arm64).
 		return fmt.Sprintf("export DEBIAN_FRONTEND=noninteractive; if [ \"$(dpkg-query -W -f='${db:Status-Status}\\n' %[1]s 2>/dev/null | grep -cx installed)\" = %[2]d ]; then exit 0; fi; ", strings.Join(packages, " "), len(packages)) +
-			"if systemctl cat packagekit.service >/dev/null 2>&1; then systemctl mask --runtime --now packagekit.service; fi; " +
-			"for i in $(seq 600); do pgrep -x apt-get >/dev/null || pgrep -x apt >/dev/null || pgrep -x unattended-upgr >/dev/null || break; sleep 1; done; " +
+			labAPTInstallPrelude +
 			"apt-get -q -o DPkg::Lock::Timeout=600 update; apt-get -q -y -o DPkg::Lock::Timeout=600 install " + strings.Join(packages, " "), nil
 	case backend.DNF():
 		return "dnf -y install " + strings.Join(packages, " "), nil

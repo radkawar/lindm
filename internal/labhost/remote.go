@@ -395,7 +395,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 			args = SetFlag(args, "retained-metadata", remote+"/snapshot-metadata")
 		}
 	}
-	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "demo-device", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections", "first-bundle", "second-bundle", "expired-bundle", "replay-bundle", "bundle-public-key", "release-public-key", "release-root", "release-online-keys", "package-public-key", "advisories"} {
+	for _, name := range []string{"manifest", "recovery-manifest", "control-plane", "demo-device", "cosmic-fork-artifacts", "public-key", "redhat-token-file", "first-build", "second-build", "apt-repository", "arch-first-repository", "arch-second-repository", "rejections", "first-bundle", "second-bundle", "expired-bundle", "replay-bundle", "bundle-public-key", "release-public-key", "release-root", "release-online-keys", "package-public-key", "advisories"} {
 		value := FlagValue(args, name)
 		if value == "" {
 			continue

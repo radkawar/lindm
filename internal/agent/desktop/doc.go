@@ -20,21 +20,30 @@
 //     supplies local identity; the executor derives it from SO_PEERCRED and
 //     logind.
 //   - There is no X11 or other capture path that bypasses the portal dialog;
-//     missing notification actions, a missing ScreenCast (or, for CONTROL,
-//     RemoteDesktop) portal interface, or a desktop whose locks lindm cannot
-//     observe (XDG_CURRENT_DESKTOP outside the lock-observability table in
-//     lock.go) end the session UNAVAILABLE before the consent prompt;
+//     missing or unverified notification actions, a missing ScreenCast (or,
+//     for CONTROL and all COSMIC requests, RemoteDesktop) portal interface,
+//     or a desktop whose locks lindm cannot observe (XDG_CURRENT_DESKTOP
+//     outside the lock-observability table in lock.go) end the session
+//     UNAVAILABLE before the consent prompt;
 //     CONTROL is never downgraded to VIEW. Missing GStreamer elements end it
 //     UNAVAILABLE after consent.
 //   - Every session also passes the desktop qualification table
 //     (qualification.go), keyed on the executor-observed logind session
-//     type and XDG_CURRENT_DESKTOP. GNOME and COSMIC Wayland keep their
-//     Tier 1/2 admission. KDE Plasma Wayland and every X11 session need the
-//     device policy's kde_plasma or x11 gate (LIMITED: VIEW and non-input
+//     type and XDG_CURRENT_DESKTOP. GNOME retains its native Tier 1/2
+//     admission; COSMIC admits only VIEW, CONTROL and keyboard after its
+//     portal and safe-consent checks. KDE Plasma Wayland and every X11 session
+//     need the device policy's kde_plasma or x11 gate (LIMITED: VIEW and non-input
 //     capabilities; ON: also CONTROL and input capabilities) and are
 //     narrowed to the capabilities their own native lanes qualified, with
 //     exact refusal and withholding reasons. X11 uses the same portal
 //     session and persistent local stop; nothing falls back to Xlib/XTest.
+//   - Experimental Hyprland Wayland and Cinnamon X11 profiles require the
+//     exact reviewed deployed fork tuple, verified against root-owned source,
+//     active backend executable mappings, portal selection and locker process
+//     identity/start time. Desktop names or installed packages alone never
+//     admit them. Only VIEW, CONTROL and keyboard are qualified; Cinnamon
+//     additionally keeps the signed X11 gate. Stock platform support and
+//     server-side lock-action policy are unchanged.
 //   - The cursor is embedded into the stream when the portal offers the
 //     embedded cursor mode, otherwise the hidden mode is requested. The
 //     metadata mode is never used because the encoder pipeline does not

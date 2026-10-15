@@ -211,6 +211,8 @@ func publicSupportReason(capability platform.Capability, reason string) string {
 	switch {
 	case strings.Contains(reason, "no ScreenCast or RemoteDesktop"):
 		return "The desktop has no screen-sharing or remote-control portal."
+	case strings.Contains(reason, "notification_actions_unverified"):
+		return "Stock COSMIC hides consent buttons; newer portal support alone does not enable assistance."
 	case strings.Contains(reason, "notification_actions_hidden"):
 		return "The desktop cannot show the required consent buttons."
 	case strings.Contains(reason, "session_lock_state_unreported"):

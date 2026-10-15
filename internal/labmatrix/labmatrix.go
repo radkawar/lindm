@@ -380,10 +380,20 @@ func (in *Inputs) Plan(releases []*platform.Release, specs []*labv1.MatrixCell) 
 
 func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string) *Cell {
 	c := &Cell{Release: r, Spec: spec, Architecture: arch}
+	// This one explicitly named experiment qualifies private fork packages,
+	// never the registry capability of public Pop!_OS. No other cell or
+	// argument combination can use this exception.
+	cosmicFork := spec.GetName() == "assistance-cosmic-pinned" &&
+		spec.GetLane() == "assistance" && slices.Equal(spec.GetCapabilities(), []string{"assistance"}) &&
+		slices.Equal(spec.GetArgs(), []string{"-desktop=cosmic", "-cosmic-package-profile=pop-cosmic-actions-v1", "-scenarios=control,view,decline,portal-cancel"})
+	if spec.GetName() == "assistance-cosmic-pinned" && (!cosmicFork || r.Key != "pop-24.04" || arch != "x86_64") {
+		c.State, c.Reason = Gated, "not applicable: exact pinned COSMIC fork experiment is Pop!_OS 24.04 x86_64 only"
+		return c
+	}
 	var reasons []string
 	for _, name := range spec.GetCapabilities() {
 		capability := platform.Capability(name)
-		if reason := r.GateReasonOn(capability, arch); reason != "" {
+		if reason := r.GateReasonOn(capability, arch); reason != "" && !cosmicFork {
 			reasons = appendUnique(reasons, reason)
 			continue
 		}

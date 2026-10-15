@@ -234,7 +234,9 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 	}
 	var prompt *image.RGBA
 	var banner image.Rectangle
-	if spec.name == "rerequest" {
+	if r.desktop.name == "cosmic" && r.desktop.ocrConsent {
+		prompt, _, err = r.screen.waitText(ctx, r.screen.popupRegion, 60*time.Second, "consent-prompt", "Allow", "Decline")
+	} else if spec.name == "rerequest" {
 		// No waiting out other notices: a resident "ended" banner that hides
 		// the request is the failure (org demo finance-desktop, Fedora 44).
 		prompt, banner, err = r.screen.waitBanner(ctx, 15*time.Second)
@@ -268,7 +270,13 @@ func (r *assistanceRun) scenario(ctx context.Context, spec assistanceScenarioSpe
 		return err
 	}
 	if r.desktop.ocrConsent {
-		if err := r.plasmaPortal(ctx, spec, control, scenario); err != nil {
+		var portalErr error
+		if r.desktop.name == "cosmic" {
+			portalErr = r.cosmicPortal(ctx, spec, control, scenario)
+		} else {
+			portalErr = r.plasmaPortal(ctx, spec, control, scenario)
+		}
+		if err := portalErr; err != nil {
 			return err
 		}
 		if spec.portalCancel {

@@ -154,6 +154,13 @@ func updateSSHFixture(t *testing.T, changedHostKey bool, observe func(int) (stri
 					_ = server.Close()
 					break
 				}
+				// Upload commands must consume the client's stdin before
+				// reporting exit. Otherwise session closure races the SSH
+				// input copier and hides a genuine fake command exit as EOF.
+				if _, err := io.Copy(io.Discard, session); err != nil {
+					_ = session.Close()
+					break
+				}
 				if _, err := io.WriteString(session, output); err != nil {
 					_ = session.Close()
 					break
@@ -181,6 +188,17 @@ func updateSSHFixture(t *testing.T, changedHostKey bool, observe func(int) (stri
 		t.Fatal(err)
 	}
 	return vm, connections
+}
+
+func TestUpdateSSHFixtureConsumesUploadsBeforeReportingExit(t *testing.T) {
+	vm, _ := updateSSHFixture(t, false, func(int) (string, uint32, bool) {
+		return "upload consumed", 100, false
+	})
+	// Exceed the SSH channel window so an unread upload cannot win a timing race.
+	result, err := vm.runResult(t.Context(), "consume upload", strings.NewReader(strings.Repeat("x", 4<<20)), 1024, 5*time.Second)
+	if err != nil || result.ExitCode != 100 || string(result.Stdout) != "upload consumed" {
+		t.Fatalf("upload completion lost remote exit: result=%+v err=%v", result, err)
+	}
 }
 
 func updateStatusJSON(t *testing.T, finished time.Time) string {

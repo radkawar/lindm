@@ -669,3 +669,60 @@ func TestRequalificationFloorMakesRollingCellDue(t *testing.T) {
 		t.Fatalf("pass at the floor was not current: %s", c.State)
 	}
 }
+
+func TestCOSMICForkCellNeverUngatesPublicAssistance(t *testing.T) {
+	matrix, err := LoadMatrix(filepath.Join("..", "..", "lab", "matrix.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fork, public *labv1.MatrixCell
+	for _, spec := range matrix.GetCells() {
+		switch spec.GetName() {
+		case "assistance-cosmic-pinned":
+			fork = spec
+		case "assistance":
+			public = spec
+		}
+	}
+	if fork == nil || public == nil {
+		t.Fatal("missing explicit fork or ordinary assistance cell")
+	}
+	pop := release(t, "pop-24.04")
+	in := &Inputs{Ledger: &labv1.MatrixLedger{}, Manifests: []*Manifest{{
+		Image: &labv1.ImageManifest{Id: "pop", Edition: "cosmic-encrypted-lab"}, Release: pop, Architecture: "x86_64",
+	}}}
+	if c := in.cell(pop, fork, "x86_64"); c.State != NotRun {
+		t.Fatalf("explicit experiment not runnable: %s %s", c.State, c.Reason)
+	}
+	if c := in.cell(pop, public, "x86_64"); c.State != Gated {
+		t.Fatal("private fork silently ungated public package qualification")
+	}
+	for _, key := range []string{"ubuntu-24.04", "linuxmint-22.3", "omarchy-4.0.4"} {
+		if c := in.cell(release(t, key), fork, "x86_64"); c.State != Gated || !strings.Contains(c.Reason, "not applicable") {
+			t.Fatalf("fork profile crossed release: %s %s %s", key, c.State, c.Reason)
+		}
+	}
+	if c := in.cell(pop, fork, "aarch64"); c.State != Gated {
+		t.Fatal("fork profile crossed architecture")
+	}
+	for name, mutate := range map[string]func(*labv1.MatrixCell){
+		"wrong lane":            func(s *labv1.MatrixCell) { s.Lane = "device-actions" },
+		"extra capability":      func(s *labv1.MatrixCell) { s.Capabilities = append(s.Capabilities, "packages") },
+		"missing exact profile": func(s *labv1.MatrixCell) { s.Args = nil },
+		"changed profile":       func(s *labv1.MatrixCell) { s.Args[1] = "-cosmic-package-profile=latest" },
+		"missing real decline":  func(s *labv1.MatrixCell) { s.Args[2] = "-scenarios=control,view" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			spec := proto.CloneOf(fork)
+			mutate(spec)
+			if c := in.cell(pop, spec, "x86_64"); c.State != Gated {
+				t.Fatal("mutated experiment inherited registry admission exception")
+			}
+		})
+	}
+	renamed := proto.CloneOf(fork)
+	renamed.Name = "assistance-anything"
+	if c := in.cell(pop, renamed, "x86_64"); c.State != Gated {
+		t.Fatal("unrelated cell inherited fork registry exception")
+	}
+}

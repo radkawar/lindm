@@ -384,6 +384,7 @@ type matrixRun struct {
 	mainline                                                                string
 	consoleBrowsers, consoleAdmin, consoleDevice                            string
 	bootstrapFirmwareVars                                                   string
+	cosmicForkArtifacts                                                     string
 	signer                                                                  *packaging.SigningKey
 	archArgs, secureBootArgs                                                map[string]*labv1.MatrixArgs
 	airgap                                                                  map[string][]string
@@ -438,6 +439,7 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 	flags.StringVar(&run.consoleAdmin, "console-admin-address", "", "optional host-loopback console listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.consoleDevice, "console-device-address", "", "optional host-loopback device listener forwarded unchanged into each fresh guest")
 	flags.StringVar(&run.bootstrapFirmwareVars, "bootstrap-firmware-vars", "", "owner-key Secure Boot cells only (recovery, TPM unattended boots): package-owned noSB bootstrap NVRAM template on the selected host")
+	flags.StringVar(&run.cosmicForkArtifacts, "cosmic-fork-artifacts", "", "explicit SHA256SUMS-bound exact-version COSMIC fork .debs for assistance-cosmic-pinned only")
 	parallel := flags.Int("parallel", 4, "maximum concurrently scheduled cells (1-32); host slots still bound guests")
 	deployInputsPath := flags.String("deploy-inputs", "", "protected mode0600 JSON references to private signed releases, independent trust, offline backup custody and matching owner CLI binaries")
 	deployPassphraseFD := flags.Int("deploy-backup-identity-passphrase-fd", -1, "protected anonymous pipe carrying one offline backup identity passphrase line; never serialized")
@@ -482,6 +484,9 @@ func runMatrixRun(ctx context.Context, args []string, stdout, stderr io.Writer) 
 		return err
 	}
 	for _, c := range cells {
+		if c.Spec.GetName() == "assistance-cosmic-pinned" && run.cosmicForkArtifacts == "" {
+			return errors.New("assistance-cosmic-pinned requires -cosmic-fork-artifacts DIR; public packages are not a fallback")
+		}
 		if c.Spec.GetLane() == "deploy" && run.deploy == nil {
 			if *deployInputsPath == "" {
 				return errors.New("deploy matrix lane requires explicit -deploy-inputs; it never substitutes unsigned locally built packages")
@@ -892,6 +897,16 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 		if desktop := matrixLabDesktop(c.Release); desktop != "" && labhost.FlagValue(args, "desktop") == "" {
 			args = labhost.SetFlag(args, "desktop", desktop)
 		}
+	}
+	if c.Spec.GetName() == "assistance-cosmic-pinned" {
+		if r.cosmicForkArtifacts == "" {
+			return nil, errors.New("assistance-cosmic-pinned requires explicit fork artifacts")
+		}
+		artifacts, err := filepath.Abs(r.cosmicForkArtifacts)
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, "-cosmic-fork-artifacts", artifacts)
 	}
 	args = append(args, "-manifest", filepath.Join(r.root, c.Manifest.Path), "-cache", r.cache)
 	if vmHasHardwareFlags(lane) {

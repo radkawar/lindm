@@ -66,8 +66,12 @@ type VMAssistanceOptions struct {
 	ExistingOwner bool
 	// X11 logs the lab user into the golden desktop's X11 session instead of
 	// its Wayland session; the helper's X11 gate then applies.
-	X11              bool
-	nativeFilePicker bool
+	X11 bool
+	// CosmicPackageProfile selects one explicitly experimental pinned fork.
+	// It never changes registry support or the baseline COSMIC refusals.
+	CosmicPackageProfile string
+	CosmicForkArtifacts  string
+	nativeFilePicker     bool
 	// RebootPolicy selects separate reboot qualification using this desktop
 	// fixture. It never qualifies remote assistance or a persistent demo.
 	RebootPolicy *VMRebootPolicyResult
@@ -98,8 +102,16 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 			return nil, err
 		}
 	}
-	if err := assistanceAdmission(release, desktop); err != nil {
+	if desktop, err = cosmicAssistanceDesktop(options, release, desktop, architecture); err != nil {
 		return nil, err
+	}
+	if options.CosmicPackageProfile == "" {
+		if err := assistanceAdmission(release, desktop); err != nil {
+			return nil, err
+		}
+	}
+	if options.CosmicPackageProfile != "" && options.Scenarios == nil {
+		options.Scenarios = []string{"control", "view", "decline", "portal-cancel"}
 	}
 	// A non-default desktop of the golden brings its own session entries,
 	// terminal and capture stack (the KDE variant installs no GNOME stack).
@@ -140,6 +152,10 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		"The policy scenario exercises an administrative per-device POLICY downgrade and matching session revocation. Neither agent nor deployment CONFIG ceiling restriction is exercised; both configured ceilings remain ON. FD cancellation and unmappable-Unicode injection remain separate deterministic criteria, not native passes.",
 		"Two-head qualification requires two active native GDK monitors backed by distinct virtio-gpu scanouts activated with private RFB SetDesktopSize. No physical multi-monitor, other compositor, IME or secure-attention claim is made.",
 	}}
+	if options.CosmicPackageProfile != "" {
+		result.Boundaries = append(result.Boundaries, "EXPERIMENTAL FORK ONLY: exact custom COSMIC portal and notification .debs plus pinned compositor and greeter. This result never qualifies public Pop!_OS packages or changes the registry gate.")
+		result.Boundaries = append(result.Boundaries, "The pinned profile refreshes its existing native capability snapshot after successful scenarios, so notification-server identity reflects the exercised runtime rather than a first-login activation race.")
+	}
 	if options.ControlPlane != nil {
 		options.ConsoleTURNTCP = true
 		result.Topology = "split"
@@ -275,6 +291,12 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		return result, errors.New("invalid guest clock observation")
 	}
 	if !resuming {
+		if options.CosmicPackageProfile != "" {
+			result.PackageProfile, err = installCosmicAssistanceProfile(ctx, vm.guest, options)
+			if err != nil {
+				return result, err
+			}
+		}
 		// The agent package Recommends the capture stack; the lab installs it with
 		// --no-install-recommends, so install the release's capture packages from
 		// its signed archive first (Debian's GNOME task lacks gstreamer1.0-tools).
@@ -326,6 +348,11 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	if err := waitNativeActionPresence(ctx, control.session, result.DeviceID); err != nil {
 		return result, err
 	}
+	if result.PackageProfile != nil {
+		if err := observeCosmicAssistancePins(ctx, vm.guest, result.PackageProfile); err != nil {
+			return result, err
+		}
+	}
 	if result.Guest.Desktop, err = prepareAssistanceDesktop(ctx, vm, desktop, release, resuming); err != nil {
 		return result, err
 	}
@@ -359,6 +386,9 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 		}
 		result.Readiness = &assistanceReadinessEvidence{State: readiness.GetState().String(), InventoryObservedAt: readiness.GetInventoryObservedAt().AsTime()}
 		scenarioErr = runAssistanceScenarios(ctx, &assistanceRun{vm: vm, screen: screen, owner: control.session, evidence: evidence, result: result, release: release, desktop: desktop, deviceID: result.DeviceID, turnTCP: options.ConsoleTURNTCP}, fixture, options, scenarios)
+	}
+	if scenarioErr == nil && result.PackageProfile != nil {
+		result.Guest.Capabilities, scenarioErr = observeAssistanceCapabilities(ctx, vm.guest, desktop)
 	}
 	// Device journals are recorded for failures too: they are the product
 	// slices' diagnostic for a wrong end cause.

@@ -186,11 +186,10 @@ if as omarchy-hyprland-session-locked; then echo locked; else case $? in 1) echo
 		locker:     "Omarchy Quickshell WlSessionLock via omarchy-hyprland-session-locked",
 		lockedHint: false,
 		logindLock: false,
-		// xdg-desktop-portal-hyprland implements ScreenCast but no
-		// RemoteDesktop, and a lock there neither reaches logind nor stops
-		// screencopy, so VIEW is refused for its unobservable lock and CONTROL
-		// for its missing portal, both before consent.
-		assistance: unavailableScenarios("session_lock_state_unreported", "portal_remote_desktop_unavailable"),
+		// The stock tuple lacks a verified fixed-runtime qualification for
+		// VIEW. CONTROL fails earlier because xdg-desktop-portal-hyprland
+		// exposes ScreenCast but no RemoteDesktop; both refuse before consent.
+		assistance: unavailableScenarios("desktop_runtime_unqualified", "portal_remote_desktop_unavailable"),
 	},
 	{
 		// greetd's initial_session autologin into start-cosmic (Pop!_OS 24.04).
@@ -245,11 +244,10 @@ case "$last" in *"session unlocked"*|"") echo unlocked;; *"session locked"*) ech
 		locker:     "cosmic-greeter locker journal (session locked/unlocked)",
 		lockedHint: false,
 		logindLock: true,
-		// cosmic-notifications (0.1.0 and 1.10.0) shows the consent prompt without its
-		// Allow/Decline buttons (pop2404-assistance-04), so VIEW is refused
-		// before consent. xdg-desktop-portal-cosmic 0.1.0pop1 has no
-		// RemoteDesktop, which refuses CONTROL first.
-		assistance: unavailableScenarios("notification_actions_hidden", "portal_remote_desktop_unavailable"),
+		// The ISO's old portal has no RemoteDesktop; COSMIC requires that
+		// interface even for VIEW. Public newer notifications still hide
+		// consent actions. Only the explicit pinned fork profile captures.
+		assistance: unavailableScenarios("portal_remote_desktop_unavailable", "portal_remote_desktop_unavailable"),
 	},
 	{
 		// Plasma Login Manager (Fedora 44's SDDM successor; SDDM where a release

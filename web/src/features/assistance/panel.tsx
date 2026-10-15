@@ -382,7 +382,7 @@ function AssistanceRequestForm({
       </div>
       <p id={`${id}-mode-help`} className="text-sm text-muted-foreground">
         {mode === AssistanceMode.CONTROL
-          ? "The user can allow keyboard and mouse control, or choose viewing only."
+          ? "The user must approve control in their desktop's system dialog. Some desktops cannot allow viewing only for a control request."
           : "You can view the shared screen. You cannot type or select items on the device."}
       </p>
       {!controlAllowed ? (

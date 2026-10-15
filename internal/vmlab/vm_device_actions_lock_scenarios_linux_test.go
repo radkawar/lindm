@@ -128,9 +128,8 @@ func TestHeadlessActionGoldenRefusesLockScenarios(t *testing.T) {
 	}
 }
 
-// COSMIC locks through logind without LockedHint and refuses both assistance
-// modes before consent: VIEW for cosmic-notifications' hidden prompt actions,
-// CONTROL for its missing RemoteDesktop portal.
+// COSMIC locks through logind without LockedHint. The ISO's missing
+// RemoteDesktop portal refuses both assistance modes before consent.
 func TestCOSMICProfileLocksThroughLogindAndRefusesAssistance(t *testing.T) {
 	cosmic := mustLabDesktop(t, "cosmic")
 	if want := cosmic.expectedLock(true); want.hint || !want.locker {
@@ -140,13 +139,28 @@ func TestCOSMICProfileLocksThroughLogindAndRefusesAssistance(t *testing.T) {
 	for _, spec := range cosmic.assistance {
 		got = append(got, spec.name+"="+spec.detail)
 	}
-	if strings.Join(got, ",") != "view-unavailable=notification_actions_hidden,control-unavailable=portal_remote_desktop_unavailable" || !cosmic.refusalOnly() {
+	if strings.Join(got, ",") != "view-unavailable=portal_remote_desktop_unavailable,control-unavailable=portal_remote_desktop_unavailable" || !cosmic.refusalOnly() {
 		t.Fatalf("cosmic scenarios = %v", got)
 	}
 	want := cosmic.expectedLock(true)
 	fields := desktopFields(cosmic, "wayland", "COSMIC", want)
 	if _, err := parseActionDesktop(cosmic, []byte(strings.Join(fields, "\n")), want); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestHyprlandStockProfileRefusesUnqualifiedRuntimeBeforeLockCheck(t *testing.T) {
+	desktop := mustLabDesktop(t, "hyprland")
+	var got []string
+	for _, spec := range desktop.assistance {
+		got = append(got, spec.name+"="+spec.detail)
+	}
+	if strings.Join(got, ",") != "view-unavailable=desktop_runtime_unqualified,control-unavailable=portal_remote_desktop_unavailable" || !desktop.refusalOnly() {
+		t.Fatalf("stock Hyprland scenarios = %v", got)
+	}
+	// Runtime qualification does not change the stock lock-observation truth.
+	if want := desktop.expectedLock(true); want.hint || want.locker {
+		t.Fatalf("stock Hyprland lock expectation %+v", want)
 	}
 }
 

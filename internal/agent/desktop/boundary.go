@@ -16,10 +16,16 @@ type Notifier interface {
 	// Capabilities returns the server's capabilities; an error means no
 	// notification server is reachable.
 	Capabilities(ctx context.Context) ([]string, error)
-	// ServerName returns the server's GetServerInformation name.
-	ServerName(ctx context.Context) (string, error)
+	// ServerInformation returns the GetServerInformation name and version.
+	ServerInformation(ctx context.Context) (name, version string, err error)
 	// Notify posts a notification.
 	Notify(ctx context.Context, notification Notification) (Notice, error)
+}
+
+// FixedDesktopQualifier verifies an exact experimental runtime tuple against
+// the session's live native processes. A desktop name alone never admits it.
+type FixedDesktopQualifier interface {
+	Verify(ctx context.Context, sessionType, currentDesktop string) error
 }
 
 // Notification is one desktop notification.
@@ -81,6 +87,9 @@ type Portal interface {
 type PortalRequest struct {
 	Mode   agentv1.AssistanceMode
 	Policy *agentv1.AssistancePolicy
+	// RequireRemoteDesktop probes that interface even for VIEW, without
+	// creating a control session or requesting input devices.
+	RequireRemoteDesktop bool
 	// Lifetime ends ongoing transfers independently of the consent dialog.
 	Lifetime context.Context
 	// Persist asks the local dialog for a persistent grant; only the

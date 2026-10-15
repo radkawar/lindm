@@ -40,7 +40,9 @@ type Config struct {
 	Locks    LockMonitor
 	// CurrentDesktop is the session's XDG_CURRENT_DESKTOP.
 	CurrentDesktop string
-	Logger         *slog.Logger
+	// FixedDesktopQualifier is optional; nil keeps all stock desktop gates.
+	FixedDesktopQualifier FixedDesktopQualifier
+	Logger                *slog.Logger
 	// FilesUnavailableReason is the production composition's exact-release gate.
 	FilesUnavailableReason string
 	// RecordingUnavailableReason and ReconnectUnavailableReason are the
@@ -118,6 +120,7 @@ func newHelper(config Config, uid uint32) (*Helper, error) {
 			clock:                       time.Now,
 			lockReporting:               lockReporting(config.CurrentDesktop),
 			currentDesktop:              config.CurrentDesktop,
+			fixedDesktopQualifier:       config.FixedDesktopQualifier,
 			validator:                   validator,
 			filesUnavailableReason:      config.FilesUnavailableReason,
 			recordings:                  config.Client,

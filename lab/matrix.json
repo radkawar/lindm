@@ -171,6 +171,18 @@
       "lane": "assistance"
     },
     {
+      "name": "assistance-cosmic-pinned",
+      "title": "COSMIC pinned forks (experimental only)",
+      "capabilities": ["assistance"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "assistance",
+      "args": [
+        "-desktop=cosmic",
+        "-cosmic-package-profile=pop-cosmic-actions-v1",
+        "-scenarios=control,view,decline,portal-cancel"
+      ]
+    },
+    {
       "name": "advisories",
       "title": "Advisories",
       "capabilities": ["advisories"],

@@ -36,8 +36,8 @@ const (
 // lockReporting admits only desktops on which every lock is visible to lindm
 // (platform.LockOfDesktop, keyed on XDG_CURRENT_DESKTOP): GNOME and KDE
 // through LockedHint, COSMIC through the logind signals LockMonitor observes.
-// On every other desktop a lock would not end sharing, so no session is
-// offered.
+// Other stock desktops are refused. Only a separately verified fixed runtime
+// tuple can bypass this static refusal in session.servable.
 func lockReporting(currentDesktop string) error {
 	if lock, _ := platform.LockOfDesktop(currentDesktop); lock.EveryLockObservable() {
 		return nil

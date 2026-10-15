@@ -140,7 +140,7 @@ Encryption and wipe require an encrypted installation. TPM2 unlock needs a compa
 
 [^support-8]: The desktop has no screen-sharing or remote-control portal.
 
-[^support-9]: The desktop cannot show the required consent buttons.
+[^support-9]: Stock COSMIC hides consent buttons; newer portal support alone does not enable assistance.
 
 [^support-10]: Firewall profiles require firewalld rather than the installed ufw.
 

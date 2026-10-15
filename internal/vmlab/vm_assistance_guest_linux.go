@@ -347,13 +347,13 @@ func observeAssistancePackages(ctx context.Context, vm *guestVM, release *platfo
 	return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
 }
 
-// observeAssistanceCapabilities records, before any scenario, what the
-// session helper's environment, portal frontend and notification server
-// expose natively. Absent interfaces are recorded, not failed: the
+// observeAssistanceCapabilities records a snapshot of what the session
+// helper's environment, portal frontend and notification server expose
+// natively. Absent interfaces are recorded, not failed: the
 // scenarios assert the product's visible handling of them.
 func observeAssistanceCapabilities(ctx context.Context, vm *guestVM, desktop *labDesktop) (*assistanceCapabilityEvidence, error) {
-	probe := func(script string) (string, error) {
-		result, err := vm.runResult(ctx, desktop.rootScript(script), nil, 64<<10, 30*time.Second)
+	probe := func(script string, timeout time.Duration) (string, error) {
+		result, err := vm.runResult(ctx, desktop.rootScript(script), nil, 64<<10, timeout)
 		if err != nil {
 			return "", err
 		}
@@ -362,21 +362,23 @@ func observeAssistanceCapabilities(ctx context.Context, vm *guestVM, desktop *la
 	const get = `as timeout 20 gdbus call --session --dest org.freedesktop.portal.Desktop --object-path /org/freedesktop/portal/desktop --method org.freedesktop.DBus.Properties.Get`
 	evidence := &assistanceCapabilityEvidence{}
 	var err error
-	if evidence.CurrentDesktop, err = probe(`as systemctl --user show-environment | sed -n 's/^XDG_CURRENT_DESKTOP=//p'`); err != nil {
-		return nil, err
+	if evidence.CurrentDesktop, err = probe(`as systemctl --user show-environment | sed -n 's/^XDG_CURRENT_DESKTOP=//p'`, 30*time.Second); err != nil {
+		return nil, fmt.Errorf("observe native current desktop: %w", err)
 	}
+	// Six serial native calls each have a 20-second timeout; the enclosing
+	// guest operation must outlive their aggregate, including shell overhead.
 	interfaces, err := probe(`for p in ScreenCast:version ScreenCast:AvailableSourceTypes ScreenCast:AvailableCursorModes RemoteDesktop:version RemoteDesktop:AvailableDeviceTypes Clipboard:version; do
-printf '%s=%s\n' "$p" "$(` + get + ` org.freedesktop.portal.${p%%:*} ${p#*:} 2>&1 | tr -d '\n')"
-done`)
+printf '%s=%s\n' "$p" "$(`+get+` org.freedesktop.portal.${p%%:*} ${p#*:} 2>&1 | tr -d '\n')"
+done`, 6*20*time.Second+10*time.Second)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("observe native portal interfaces: %w", err)
 	}
 	evidence.PortalInterfaces = strings.Split(interfaces, "\n")
-	if evidence.NotificationServer, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetServerInformation 2>&1 || true`); err != nil {
-		return nil, err
+	if evidence.NotificationServer, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetServerInformation 2>&1 || true`, 30*time.Second); err != nil {
+		return nil, fmt.Errorf("observe native notification server: %w", err)
 	}
-	if evidence.NotificationCapabilities, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetCapabilities 2>&1 || true`); err != nil {
-		return nil, err
+	if evidence.NotificationCapabilities, err = probe(`as timeout 20 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetCapabilities 2>&1 || true`, 30*time.Second); err != nil {
+		return nil, fmt.Errorf("observe native notification capabilities: %w", err)
 	}
 	return evidence, nil
 }
@@ -392,6 +394,8 @@ var assistanceJournalUnits = []struct{ name, selector string }{
 	{"session-helper", "_SYSTEMD_USER_UNIT=lindm-session.service"},
 	{"native-witness", "_SYSTEMD_USER_UNIT=lindm-assistance-fixture.service"},
 	{"portal", "_SYSTEMD_USER_UNIT=xdg-desktop-portal.service"},
+	{"portal-cosmic", "_SYSTEMD_USER_UNIT=org.freedesktop.impl.portal.desktop.cosmic.service"},
+	{"cosmic-comp", "_COMM=cosmic-comp"},
 	{"portal-gnome", "_SYSTEMD_USER_UNIT=xdg-desktop-portal-gnome.service"},
 	{"gnome-shell", "_COMM=gnome-shell"},
 	{"portal-kde", "_SYSTEMD_USER_UNIT=plasma-xdg-desktop-portal-kde.service"},

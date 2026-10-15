@@ -14270,6 +14270,66 @@
       "recoveryManifestSha256": "a8f990e64985ef9bb7af3f1641b3fd267e3b6b52028e99ab12c66927ed05a95d",
       "mainlineRevision": "e9c333339d3124273fbc9e2ad165b443da1df033",
       "gateReason": "Cinnamon lock confirmation requires 6.7.9 or later; installed 6.6.4+zena and signed vendor candidate 6.6.9+zena are below the minimum"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-06/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "a5de16d77e46880b1084bd166181773300d17cf6f04d25379ec2d807de6a57d4",
+      "recorded": "2026-10-15T19:51:09.673955584Z",
+      "revision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-07/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "ae163512f9bae4d01b61e340e90922b56bfba553f19f957264b5179d137c9277",
+      "recorded": "2026-10-15T20:11:10.663330856Z",
+      "revision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-08/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "8a8380658bce8a50903f668dbb26c91fb2c37daf6184d5356a57c035c721425e",
+      "recorded": "2026-10-15T20:26:21.485928644Z",
+      "revision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-09/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "b019073cc65e59a284cdf142ff136fd47992b4663895196a941481d8318e2377",
+      "recorded": "2026-10-15T20:48:33.386214288Z",
+      "revision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "f7664f47a5d402064d87b17e98d5d8da43c49b8d"
     }
   ]
 }

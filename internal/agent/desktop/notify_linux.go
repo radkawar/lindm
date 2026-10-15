@@ -54,12 +54,12 @@ func (n *DesktopNotifier) Capabilities(ctx context.Context) ([]string, error) {
 	return capabilities, nil
 }
 
-func (n *DesktopNotifier) ServerName(ctx context.Context) (string, error) {
-	var name, vendor, version, spec string
+func (n *DesktopNotifier) ServerInformation(ctx context.Context) (name, version string, err error) {
+	var vendor, spec string
 	if err := n.bus.call(ctx, notificationsName, notificationsPath, notificationsIface+".GetServerInformation").Store(&name, &vendor, &version, &spec); err != nil {
-		return "", fmt.Errorf("notification server information: %w", err)
+		return "", "", fmt.Errorf("notification server information: %w", err)
 	}
-	return name, nil
+	return name, version, nil
 }
 
 // Notify posts notification. Notifications without actions are not tracked:
