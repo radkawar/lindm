@@ -26,6 +26,7 @@ import (
 
 	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/custody"
+	"lindm/internal/devlab"
 	"lindm/internal/gendoc"
 	"lindm/internal/labhost"
 	"lindm/internal/labmatrix"
@@ -197,7 +198,7 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 	recovery := flags.String("recovery-manifest", "", "recovery image manifest id a device-actions record booted; required for rolling releases")
 	evidence := flags.String("evidence", "", "evidence file path as recorded")
 	digest := flags.String("sha256", "", "documented record SHA-256; required when the file is not readable here")
-	verdict := flags.String("verdict", "pass", "pass or fail")
+	verdict := flags.String("verdict", "pass", "pass, fail or gated (validated runtime prerequisite only)")
 	recorded := flags.String("recorded", "", "record time (RFC 3339 or YYYY-MM-DD); defaults to the readable file's modification time")
 	scope := flags.String("scope", "", "named subset the record covers")
 	reference := flags.String("reference", "", "docs/verification.md anchor narrating the record, e.g. #resource-kind-coverage")
@@ -231,13 +232,20 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 		entry.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_PASS
 	case "fail":
 		entry.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_FAIL
+	case "gated":
+		entry.Verdict = labv1.MatrixVerdict_MATRIX_VERDICT_GATED
 	default:
-		return errors.New("-verdict must be pass or fail")
+		return errors.New("-verdict must be pass, fail or gated")
+	}
+	if !specs[0].GetCinnamonLockConfirmation() && (entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_GATED || entry.GetScope() == labmatrix.CinnamonLockConfirmationScope) {
+		return errors.New("native Cinnamon lock-confirmation evidence cannot qualify another matrix cell")
 	}
 	path := expandHome(*evidence)
 	if info, statErr := os.Stat(path); statErr == nil {
 		var sum string
-		if *cell == "production-release-signing" {
+		if specs[0].GetCinnamonLockConfirmation() {
+			sum, entry.GateReason, err = cinnamonLockImportEvidence(path, release, entry, *manifest)
+		} else if *cell == "production-release-signing" {
 			sum, err = productionSigningEvidenceSHA256(path, *scope, *manifest)
 		} else {
 			sum, err = matrixImportEvidenceSHA256(path, *cell, *scope)
@@ -251,6 +259,9 @@ func runMatrixImport(ctx context.Context, args []string, stderr io.Writer) error
 		entry.Sha256, entry.Verified = sum, true
 		entry.Recorded = timestamppb.New(info.ModTime())
 	} else if errors.Is(statErr, os.ErrNotExist) || errors.Is(statErr, os.ErrPermission) {
+		if specs[0].GetCinnamonLockConfirmation() {
+			return errors.New("native Cinnamon lock-confirmation import requires readable native evidence")
+		}
 		if *cell == "production-release-signing" {
 			return errors.New("production signing import requires readable tests-only evidence and reverified test evidence hashes")
 		}
@@ -365,7 +376,7 @@ func (b *boundedBuffer) Write(p []byte) (int, error) {
 }
 
 // Agent package versions every lifecycle cell installs and upgrades between.
-var matrixVersions = [2]string{"0.1.0", "0.1.1"}
+var matrixVersions = [2]string{devlab.NativeFixtureVersion, "0.1.1"}
 
 // matrixRun holds the shared inputs one run prepares for every cell.
 type matrixRun struct {
@@ -674,7 +685,7 @@ func packagingArchitecture(arch string) string {
 func (r *matrixRun) buildStamped(ctx context.Context, stderr io.Writer, name string) (string, error) {
 	out := filepath.Join(r.evidence, "bin", name)
 	_, _ = fmt.Fprintln(stderr, "go build", name)
-	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+matrixVersions[0], "-o", out, "./cmd/"+name)
+	cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", devlab.NativeFixtureLDFlags, "-o", out, "./cmd/"+name)
 	cmd.Dir = r.root
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	cmd.Stdout, cmd.Stderr = stderr, stderr
@@ -754,11 +765,23 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 			evidence = base + ".log"
 		}
 	}
-	sum, err := labmatrix.FileSHA256(evidence)
-	if err != nil {
-		return err
+	var gateReason, recordSum string
+	if c.Spec.GetCinnamonLockConfirmation() {
+		var outcomeErr error
+		verdict, gateReason, recordSum, outcomeErr = cinnamonLockRunOutcome(record, c, laneErr)
+		laneErr = errors.Join(laneErr, outcomeErr)
+	}
+	sum := recordSum
+	if sum == "" {
+		sum, err = labmatrix.FileSHA256(evidence)
+		if err != nil {
+			return err
+		}
 	}
 	entry := &labv1.MatrixLedgerEntry{Platform: c.Release.Key, Cell: c.Spec.GetName(), Architecture: c.Architecture, Manifest: c.Manifest.Image.GetId(), ManifestSha256: c.Manifest.SHA256, RepositorySnapshotDate: c.Manifest.Image.GetRepositorySnapshotDate(), Verdict: verdict, Evidence: homeRelative(evidence), Sha256: sum, Recorded: timestamppb.Now(), Revision: r.revision, MainlineRevision: r.mainline, Source: labv1.MatrixSource_MATRIX_SOURCE_RUN, Verified: true}
+	if c.Spec.GetCinnamonLockConfirmation() {
+		entry.Scope, entry.GateReason = labmatrix.CinnamonLockConfirmationScope, gateReason
+	}
 	entry.RepositoryClosureSha256 = c.Manifest.Image.GetRepositorySnapshotManifestSha256()
 	entry.RepositoryMetadataSha256 = c.Manifest.Image.GetRepositorySnapshotRepomdSha256()
 	if c.Recovery != nil {
@@ -788,6 +811,9 @@ func (r *matrixRun) cell(ctx context.Context, c *labmatrix.Cell, stderr io.Write
 	_, _ = fmt.Fprintf(stderr, "%s %s: %s sha256:%s\n", verdict, name, evidence, sum)
 	if err != nil {
 		return err
+	}
+	if verdict == labv1.MatrixVerdict_MATRIX_VERDICT_GATED {
+		return fmt.Errorf("%s gated: %s (log %s.log)", name, gateReason, base)
 	}
 	if verdict != labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
 		return fmt.Errorf("%s failed: %w (log %s.log)", name, laneErr, base)
@@ -860,6 +886,9 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 	// desktop (Mint's Cinnamon, Pop!_OS's COSMIC, Omarchy's Hyprland) refuse
 	// it, so those releases boot their sole maintained lab desktop.
 	if lane == "device-actions" || lane == "assistance" {
+		if c.Spec.GetCinnamonLockConfirmation() {
+			args = labhost.SetFlag(args, "desktop", "cinnamon")
+		}
 		if desktop := matrixLabDesktop(c.Release); desktop != "" && labhost.FlagValue(args, "desktop") == "" {
 			args = labhost.SetFlag(args, "desktop", desktop)
 		}

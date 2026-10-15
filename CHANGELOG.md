@@ -29,6 +29,8 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 
 ### Changed
 
+- Track Cinnamon's upstream 6.7.9 logind lock-state fix separately from Mint 22.3's unconfirmed 6.6.x locker; add a version-bound native lock-confirmation cell that retries unavailable vendor backports without treating a prerequisite gate or a newer version alone as a pass.
+- Give matrix and remote-VM fixture binaries the same explicit development revision as the authenticated stock agent artifact; retain exact installed-release compatibility checks instead of relying on an unrelated checkout revision.
 - Let held desktop assistance demos start when their platform explicitly lacks advisory coverage, without configuring substitute feeds or claiming vulnerability findings; supported releases still require their real exports and completed findings.
 - Put the disposable assistance guest's NSS hosts-file lookup before synthetic localhost resolution, preserving the original modules and action clauses and retaining the verified QEMU-host route.
 - Retain AWS native installer failure diagnostics in create-exclusive root-only custody instead of discarding the cause; keep child output out of public errors and refuse overwrites or capture into memory.

@@ -22,8 +22,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := run(ctx, os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		_, _ = fmt.Fprintln(os.Stderr, "lab:", err)
-		os.Exit(1)
+		_, printErr := fmt.Fprintln(os.Stderr, "lab:", err)
+		os.Exit(labExitCode(errors.Join(err, printErr)))
 	}
 }
 

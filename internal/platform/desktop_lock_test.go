@@ -2,7 +2,10 @@
 
 package platform
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLockOfDesktopFollowsNativeTable(t *testing.T) {
 	for _, test := range []struct {
@@ -47,5 +50,25 @@ func TestSessionLockUnsupportedKeepsLockCapability(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("no release records the proven Omarchy session-lock fact")
+	}
+}
+
+func TestCinnamonConfirmationRequirementKeepsStockLockSemantics(t *testing.T) {
+	release, ok := Lookup("linuxmint-22.3")
+	if !ok {
+		t.Fatal("Mint release missing")
+	}
+	if got := release.Desktop.LockConfirmationGate; got != CinnamonLockConfirmationGate {
+		t.Fatalf("confirmation requirement = %q", got)
+	}
+	if got := desktop(release.Desktop); !strings.Contains(got, CinnamonLockConfirmationGate) {
+		t.Fatalf("generated desktop documentation omits confirmation prerequisite: %q", got)
+	}
+	if !release.Supported(Lock) || release.Desktop.SessionLockUnsupported != "" {
+		t.Fatal("missing lock confirmation must not disable a working session lock request or account locking")
+	}
+	lock, _ := LockOfDesktop("X-Cinnamon")
+	if lock != DesktopLockUnreported || lock.EveryLockObservable() {
+		t.Fatal("a future Cinnamon version must not qualify the shipped 6.6.x desktop")
 	}
 }

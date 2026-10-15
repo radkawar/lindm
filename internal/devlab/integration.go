@@ -19,10 +19,17 @@ import (
 	"lindm/internal/devlab/project"
 )
 
-// Native-server integration tests must match both identity fields of the
-// authenticated stock agent release, not just its x.y.z version.
-const integrationServerRelease = "0.1.0"
-const integrationServerRevision = "console-enrollment-lab"
+// NativeFixtureVersion identifies the isolated lab's authenticated stock agent
+// artifact, not a production release.
+const NativeFixtureVersion = "0.1.0"
+
+// NativeFixtureRevision must match that artifact's signed manifest. A version
+// stamp alone falls back to the checkout revision and is correctly refused.
+const NativeFixtureRevision = "console-enrollment-lab"
+
+// NativeFixtureLDFlags gives native fixture servers and their probes one
+// coherent build identity; production release builders do not use it.
+const NativeFixtureLDFlags = "-X lindm/internal/agent/buildinfo.Version=" + NativeFixtureVersion + " -X lindm/internal/agent/buildinfo.Revision=" + NativeFixtureRevision
 
 // TestIntegration runs the real Keycloak fresh-authorization smoke followed by
 // PostgreSQL regressions against private per-test schemas. Native-server
@@ -104,7 +111,7 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot, packages, jsonO
 }
 
 func buildIntegrationServer(ctx context.Context, codeRoot, server string) error {
-	return command(ctx, codeRoot, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease+" -X lindm/internal/agent/buildinfo.Revision="+integrationServerRevision, "-o", server, "./cmd/lindmd")
+	return command(ctx, codeRoot, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", NativeFixtureLDFlags, "-o", server, "./cmd/lindmd")
 }
 
 // testEvent is the subset of go test -json (test2json) events used here.

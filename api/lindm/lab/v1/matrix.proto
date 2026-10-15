@@ -80,6 +80,11 @@ message MatrixCell {
     message: "a cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane"
     expression: "this.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)"
   };
+  option (buf.validate.message).cel = {
+    id: "lab.matrix_cinnamon_lock_confirmation"
+    message: "Cinnamon lock confirmation uses the dedicated device-actions wipe phase"
+    expression: "!this.cinnamon_lock_confirmation || (this.lane == 'device-actions' && this.args.exists(a, a == '-scenario=wipe') && this.args.exists(a, a == '-wipe-phase=cinnamon-lock-confirmation'))"
+  };
 
   string name = 1 [(buf.validate.field).string = {
     min_len: 1
@@ -147,6 +152,10 @@ message MatrixCell {
   // (platform TPM2TokenReferences, the TPM2UnsealRetryNextToken quirk); every
   // other release is gated as not applicable: no legacy defect exists there.
   bool tpm2_reference_repair = 12;
+  // Native Cinnamon lock confirmation only, not the complete device-action
+  // lane. Other desktops are statically inapplicable; missing fixed vendor
+  // packages are a retryable runtime prerequisite gate, never a pass.
+  bool cinnamon_lock_confirmation = 13;
 }
 
 // MatrixImage is the kind of pinned manifest a cell boots.
@@ -165,6 +174,12 @@ message MatrixLedger {
 
 // MatrixLedgerEntry binds one cell outcome to immutable evidence.
 message MatrixLedgerEntry {
+  option (buf.validate.message).cel = {
+    id: "lab.matrix_runtime_gate_reason"
+    message: "only a GATED outcome carries a nonempty runtime prerequisite reason"
+    expression: "(this.verdict == 3) == (this.gate_reason != '')"
+  };
+
   // Platform registry key.
   string platform = 1 [(buf.validate.field).string = {
     min_len: 1
@@ -233,6 +248,9 @@ message MatrixLedgerEntry {
   // HEAD main). Landing does not publish worktree commits, so requalification
   // floors are checked against this durable ancestor rather than `revision`.
   string mainline_revision = 23 [(buf.validate.field).string.pattern = "^([0-9a-f]{40})?$"];
+  // Safely established runtime prerequisite absence. Unlike registry gates,
+  // this outcome remains runnable so a future vendor package can qualify.
+  string gate_reason = 24 [(buf.validate.field).string.max_len = 512];
 }
 
 // MatrixVerdict is a lane outcome.
@@ -240,6 +258,8 @@ enum MatrixVerdict {
   MATRIX_VERDICT_UNSPECIFIED = 0;
   MATRIX_VERDICT_PASS = 1;
   MATRIX_VERDICT_FAIL = 2;
+  // Runtime prerequisite absent, with normal teardown; not a successful lane.
+  MATRIX_VERDICT_GATED = 3;
 }
 
 // MatrixSource says how a ledger entry was added.

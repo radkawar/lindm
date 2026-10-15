@@ -20,8 +20,8 @@ func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error
 	if cell == "production-release-signing" {
 		return productionSigningEvidenceSHA256(path, scope)
 	}
-	if cell != "deploy" && cell != "lifecycle" {
-		return labmatrix.FileSHA256(path)
+	if scope == labmatrix.CinnamonLockConfirmationScope {
+		return "", errors.New("native Cinnamon lock confirmation requires its dedicated matrix cell")
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -31,15 +31,22 @@ func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error
 	hash := sha256.New()
 	input := io.TeeReader(file, hash)
 	var record struct {
-		Scope              string `json:"scope"`
-		LifecycleQualified *bool  `json:"lifecycle_qualified"`
-		FindingsExcluded   bool   `json:"findings_excluded"`
+		Scope              string          `json:"scope"`
+		LifecycleQualified *bool           `json:"lifecycle_qualified"`
+		FindingsExcluded   bool            `json:"findings_excluded"`
+		CinnamonLock       json.RawMessage `json:"cinnamon_lock"`
+		WipePhase          string          `json:"wipe_phase"`
 	}
 	decodeErr := json.NewDecoder(io.LimitReader(input, 8<<20)).Decode(&record)
 	if decodeErr != nil && (scope == deploylab.ServerLifecycleScope || (cell == "deploy" && (scope == "" || scope == deploylab.FirstRunInstallScope))) {
 		return "", errors.New("unscoped deploy or first-run import requires bounded readable JSON evidence; historical logs require their explicit historical scope")
 	}
 	if decodeErr == nil {
+		if record.CinnamonLock != nil || record.WipePhase == "cinnamon-lock-confirmation" {
+			return "", errors.New("native Cinnamon lock confirmation cannot qualify the complete device-action lane or another feature")
+		}
+	}
+	if decodeErr == nil && (cell == "deploy" || cell == "lifecycle") {
 		if record.Scope == deploylab.ServerLifecycleScope || record.FindingsExcluded || scope == deploylab.ServerLifecycleScope {
 			if record.Scope != deploylab.ServerLifecycleScope || scope != deploylab.ServerLifecycleScope || !record.FindingsExcluded || record.LifecycleQualified == nil || *record.LifecycleQualified {
 				return "", errors.New("server lifecycle without Findings requires matching -scope native-server-lifecycle-without-findings, findings_excluded:true and lifecycle_qualified:false")

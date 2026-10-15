@@ -100,6 +100,7 @@ type VMDeviceActionsResult struct {
 	DesktopBefore           *actionDesktopEvidence         `json:"desktop_before"`
 	DesktopAfter            *actionDesktopEvidence         `json:"desktop_after"`
 	DesktopAfterRelease     *actionDesktopEvidence         `json:"desktop_after_release"`
+	CinnamonLock            *CinnamonLockEvidence          `json:"cinnamon_lock,omitempty"`
 	Quarantine              []*actionDispatchEvidence      `json:"quarantine"`
 	QuarantineEffective     bool                           `json:"quarantine_effective"`
 	QuarantineDNSPreserved  bool                           `json:"quarantine_dns_preserved"`
@@ -325,7 +326,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if options.Scenario != "all" && options.Scenario != "encryption" && options.Scenario != "wipe" && options.Scenario != "compliance" {
 		return nil, errors.New("device action scenario must be all, encryption, wipe or compliance")
 	}
-	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"live-actions", "lock-quarantine", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
+	if options.WipePhase != "" && (options.Scenario != "wipe" || !slices.Contains([]string{"live-actions", "lock-quarantine", "cinnamon-lock-confirmation", "live-erase", "live-report-loss", "recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
 		return nil, errors.New("wipe phase requires scenario wipe and a supported native phase")
 	}
 	if options.RecoveryBootMode != "" && (options.RecoveryBootMode != recoveryBootMeasured || !slices.Contains([]string{"recovery-nvme", "recovery-sata", "recovery-attestation-refusal"}, options.WipePhase)) {
@@ -366,18 +367,18 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	if err != nil {
 		return nil, err
 	}
-	// Only the lock/quarantine phase never boots through a TPM2 token, so a
-	// desktop whose vendor initramfs cannot unlock with TPM2 still qualifies it.
+	// Lock-only phases never boot through a TPM2 token, so a desktop whose
+	// vendor initramfs cannot unlock with TPM2 still qualifies them.
 	// Releases without any TPM early-boot variant (registry Lab.TPM.Unsupported)
 	// run every phase and record the unattended TPM boot as an observed
 	// unsupported outcome.
-	lockOnly := options.Scenario == "wipe" && options.WipePhase == "lock-quarantine"
+	lockOnly := options.Scenario == "wipe" && (options.WipePhase == "lock-quarantine" || options.WipePhase == "cinnamon-lock-confirmation")
 	noTPMBoot := noTPMBootReason(manifest)
 	if noTPMBoot != "" && options.Encrypted.TPMBoot {
 		return nil, errors.New(noTPMBoot)
 	}
 	if (!options.Encrypted.TPMBoot && !lockOnly && noTPMBoot == "") || options.Encrypted.Hardware == nil || !options.Encrypted.Hardware.AllowNetwork {
-		return nil, errors.New("device actions require an unbound TPM-capable boot stack (except -wipe-phase lock-quarantine or a release without one), explicit topology and signed-package egress")
+		return nil, errors.New("device actions require an unbound TPM-capable boot stack (except lock-only wipe phases or a release without one), explicit topology and signed-package egress")
 	}
 	result = &VMDeviceActionsResult{ImageID: manifest.GetId(), ImageSHA256: manifest.GetSha256(), StartedAt: time.Now().UTC(), Boundaries: []string{
 		"Shared QEMU emulated topology, software TPM2 and pinned firmware only; no physical TPM, firmware or media qualification.",
@@ -389,7 +390,11 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	}}
 	if desktop != nil {
 		result.DesktopProfile = desktop.name
-		result.Boundaries = append(result.Boundaries, "Installer "+desktop.name+" session lock is verified through logind LockedHint and the desktop's own locker oracle ("+desktop.locker+"), not a physical display observation or boot lock.")
+		if options.WipePhase == "cinnamon-lock-confirmation" {
+			result.Boundaries = append(result.Boundaries, "Version-bound Cinnamon native session-lock confirmation only: signed vendor packages, the integrated Cinnamon locker, independent logind LockedHint and normal local PAM unlock are required; stock Cinnamon and account-policy qualification are unchanged.")
+		} else {
+			result.Boundaries = append(result.Boundaries, "Installer "+desktop.name+" session lock is verified through logind LockedHint and the desktop's own locker oracle ("+desktop.locker+"), not a physical display observation or boot lock.")
+		}
 	} else {
 		result.Boundaries = append(result.Boundaries, "Headless server golden without a desktop session or display; no session lock is qualified.")
 	}
@@ -404,8 +409,14 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 			result.HostFailure, hostErr = captureHostResources()
 			if hostErr != nil {
 				result.HostObservationError = hostErr.Error()
+				if IsCinnamonLockGate(err) {
+					err = errors.Join(err, hostErr)
+				}
 			}
 			result.Failure = err.Error()
+			if IsCinnamonLockGate(err) && result.CinnamonLock != nil {
+				result.CinnamonLock.GateReason = err.Error()
+			}
 		}
 	}()
 	result.HostStart, err = captureHostResources()
@@ -456,8 +467,10 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	defer func() { err = errors.Join(err, fixture.Close()) }()
 	// Runs before Close removes the log: a rejected device sync is only a
 	// reason code on the guest ("invalid_argument: constraint").
+	// An expected prerequisite gate is not a fixture failure. Keep that typed
+	// outcome intact; any joined cleanup error still makes it a real failure.
 	defer func() {
-		if err != nil && options.Encrypted.DiagnosticsDir != "" {
+		if err != nil && !IsCinnamonLockGate(err) && options.Encrypted.DiagnosticsDir != "" {
 			err = errors.Join(err, saveFixtureServerLog(fixture, options.Encrypted.DiagnosticsDir))
 		}
 	}()
@@ -491,7 +504,7 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 		result.EncryptionPhase = options.EncryptionPhase
 		return result, nativeTPMReferenceRepair(ctx, manifest, options, packages, fixture, control, delegation, result)
 	}
-	if options.Scenario == "wipe" && options.WipePhase != "" && options.WipePhase != "lock-quarantine" && options.WipePhase != "live-actions" {
+	if options.Scenario == "wipe" && options.WipePhase != "" && options.WipePhase != "lock-quarantine" && options.WipePhase != "live-actions" && options.WipePhase != "cinnamon-lock-confirmation" {
 		result.WipePhase = options.WipePhase
 		return result, nativeWipeEffectPhases(ctx, manifest, options, packages, fixture, control, approver, delegation, result)
 	}
@@ -502,6 +515,9 @@ func DeviceActionsVM(ctx context.Context, manifest *labv1.ImageManifest, options
 	defer func() { err = errors.Join(err, machine.Close()) }()
 	if err := machine.record(ctx, result); err != nil {
 		return result, err
+	}
+	if options.WipePhase == "cinnamon-lock-confirmation" {
+		return result, nativeCinnamonLockConfirmation(ctx, machine, control, result)
 	}
 	if options.Scenario == "compliance" {
 		return result, nativeComplianceScenario(ctx, machine, control, result)
@@ -731,7 +747,7 @@ func deviceActionCapabilities(scenario, wipePhase string) []platform.Capability 
 	switch wipePhase {
 	case "live-actions":
 		return []platform.Capability{platform.Wipe, platform.ReportLoss, platform.Lock}
-	case "lock-quarantine":
+	case "lock-quarantine", "cinnamon-lock-confirmation":
 		return []platform.Capability{platform.Lock}
 	case "live-erase":
 		return []platform.Capability{platform.Wipe}
@@ -748,6 +764,9 @@ func deviceActionCapabilities(scenario, wipePhase string) []platform.Capability 
 // golden has none and is admitted only when no selected scenario locks a
 // desktop session.
 func actionLaneDesktop(options VMDeviceActionsOptions, release *platform.Release) (*labDesktop, error) {
+	if options.WipePhase == "cinnamon-lock-confirmation" && (options.Scenario != "wipe" || options.Encrypted.Desktop != "cinnamon") {
+		return nil, errors.New("cinnamon-lock-confirmation requires scenario wipe and the Cinnamon installer desktop")
+	}
 	if options.Encrypted.Desktop != "" {
 		return labDesktopFor(options.Encrypted.Desktop, release)
 	}

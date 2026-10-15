@@ -83,7 +83,7 @@ func cachedNativeEnrollmentRepository(ctx context.Context, source, cache string,
 	if err != nil {
 		return nil, err
 	}
-	key := sha256.Sum256(fmt.Appendf(nil, "stock-agent-v2\x00%s\x000.1.0\x00console-enrollment-lab\x00%d", inputDigest, packaging.DefaultSourceDateEpoch))
+	key := sha256.Sum256(fmt.Appendf(nil, "stock-agent-v2\x00%s\x00"+NativeFixtureVersion+"\x00"+NativeFixtureRevision+"\x00%d", inputDigest, packaging.DefaultSourceDateEpoch))
 	entry := filepath.Join(cache, hex.EncodeToString(key[:]))
 	lock, err := lockAcceptanceFeedCache(ctx, entry+".lock")
 	if err != nil {
@@ -183,7 +183,7 @@ func buildDevelopmentNativeRepository(ctx context.Context, source, bundle, custo
 		return nil, err
 	}
 	return releasebuild.BuildDevelopmentAgentRepository(ctx, releasebuild.Request{
-		Repository: source, Output: bundle, Version: "0.1.0", Revision: "console-enrollment-lab",
+		Repository: source, Output: bundle, Version: NativeFixtureVersion, Revision: NativeFixtureRevision,
 		SourceDateEpoch: packaging.DefaultSourceDateEpoch, PackageSigner: *signer,
 		AttestationSigner: releasebuild.AttestationKey{Path: filepath.Join(attestation, "attestation.pem"), KeyID: id, Custody: "development"},
 	})
@@ -209,7 +209,7 @@ func loadCachedNativeRepository(ctx context.Context, directory string) (*cachedN
 	if err != nil {
 		return nil, err
 	}
-	if manifest.GetSourceSha256() == "" || manifest.GetVersion() != "0.1.0" || manifest.GetRevision() != "console-enrollment-lab" || manifest.GetSourceDateEpoch() != packaging.DefaultSourceDateEpoch || manifest.GetCustody() != "development" {
+	if manifest.GetSourceSha256() == "" || manifest.GetVersion() != NativeFixtureVersion || manifest.GetRevision() != NativeFixtureRevision || manifest.GetSourceDateEpoch() != packaging.DefaultSourceDateEpoch || manifest.GetCustody() != "development" {
 		return nil, errors.New("stock cache does not match the requested development release and source")
 	}
 	public, err = os.ReadFile(filepath.Join(directory, "package-signing.asc"))

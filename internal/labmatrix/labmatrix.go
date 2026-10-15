@@ -36,6 +36,9 @@ const (
 	LedgerFile = "lab/ledger.json"
 )
 
+// CinnamonLockConfirmationScope never qualifies wipe, quarantine or assistance.
+const CinnamonLockConfirmationScope = "Cinnamon >=" + platform.CinnamonLockMinimumVersion + ": native lock confirmation only"
+
 const maxFileBytes = 16 << 20
 
 // State is a cell's current matrix state.
@@ -95,11 +98,13 @@ type Cell struct {
 	Entry *labv1.MatrixLedgerEntry
 	// Kinds are the implemented capabilities a capability_kinds cell passes.
 	Kinds []platform.Capability
+	// runtimeGate is set only after every static applicability gate cleared.
+	runtimeGate bool
 }
 
-// Runnable reports whether the cell has a lane, an image and no gate.
+// Runnable reports whether the cell can run, including retryable runtime gates.
 func (c *Cell) Runnable() bool {
-	return c.State != Gated && c.State != NoLane && c.State != NoImage
+	return (c.State != Gated || c.runtimeGate) && c.State != NoLane && c.State != NoImage
 }
 
 // RequalificationDue reports whether a rolling cell lacks a current, complete
@@ -402,6 +407,10 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		reasons = appendUnique(reasons, "not applicable: "+r.Name+" needs one systemd-tpm2 token reference (its systemd retries a PCR change itself), so no legacy single-reference bind exists to repair (TPM2TokenReferences)")
 		gated = true
 	}
+	if _, cinnamon := r.Lab.Session.Desktops["cinnamon"]; spec.GetCinnamonLockConfirmation() && !cinnamon {
+		reasons = appendUnique(reasons, "not applicable: the release has no maintained Cinnamon desktop")
+		gated = true
+	}
 	if reason := r.Lab.SecureBootUnavailableFor(arch); spec.GetSecureBoot() && reason != "" {
 		reasons = appendUnique(reasons, "Secure Boot unavailable: "+reason+" (Lab.SecureBootUnavailable)")
 		gated = true
@@ -448,6 +457,8 @@ func (in *Inputs) cell(r *platform.Release, spec *labv1.MatrixCell, arch string)
 		}
 	case c.Entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_PASS:
 		c.State = Pass
+	case spec.GetCinnamonLockConfirmation() && c.Entry.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_GATED && c.Entry.GetGateReason() != "":
+		c.State, c.Reason, c.runtimeGate = Gated, c.Entry.GetGateReason(), true
 	default:
 		c.State = Fail
 	}
@@ -509,6 +520,15 @@ func (in *Inputs) entryMatches(c *Cell, e *labv1.MatrixLedgerEntry) bool {
 		return false
 	}
 	if c.Spec.GetLane() == "production-release-signing" && (e.GetScope() != "production-signing-tests-only" || !e.GetVerified()) {
+		return false
+	}
+	if c.Spec.GetCinnamonLockConfirmation() && (!e.GetVerified() || e.GetScope() != CinnamonLockConfirmationScope) {
+		return false
+	}
+	if !c.Spec.GetCinnamonLockConfirmation() && e.GetScope() == CinnamonLockConfirmationScope {
+		return false
+	}
+	if e.GetVerdict() == labv1.MatrixVerdict_MATRIX_VERDICT_GATED && (!c.Spec.GetCinnamonLockConfirmation() || e.GetGateReason() == "") {
 		return false
 	}
 	if c.Release.Native().RequalificationDays != 0 && (c.Manifest == nil ||

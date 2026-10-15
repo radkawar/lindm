@@ -872,7 +872,8 @@ var registry = []*Release{
 		Key: "linuxmint-22.3", Name: "Linux Mint 22.3", Distribution: "Linux Mint", ID: "linuxmint", Version: Exact("22.3"),
 		IDLike: []string{"ubuntu", "debian"}, Base: "ubuntu-24.04",
 		Tier: Tier1, Page: "mint.md", Family: FamilyDebian, Architectures: x86,
-		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm", Lock: "cinnamon-screensaver (logind Lock; never sets LockedHint)"}, Firewall: ufw,
+		FDE: "LVM on LUKS (Ubiquity)", Desktop: Desktop{Name: "Cinnamon", DisplayManager: "lightdm",
+			Lock: "cinnamon-screensaver (logind Lock)", LockConfirmationGate: CinnamonLockConfirmationGate}, Firewall: ufw,
 		// Only the Ubuntu base archive has pinned package-source key material.
 		// Mint's own repositories are not implicitly approved by the base grant.
 		VendorRepositories: []VendorRepository{nobleArchive}, StandardFileRoots: dropInRoots, Accounts: regularAccounts,

@@ -161,6 +161,9 @@ func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature s
 			continue
 		}
 		scope := strings.ToLower(c.Entry.GetScope())
+		if index == 3 && (c.Spec.GetCinnamonLockConfirmation() || c.Entry.GetScope() == CinnamonLockConfirmationScope) {
+			continue
+		}
 		if index == 3 && (strings.Contains(scope, "report-loss") || strings.Contains(scope, "report loss")) &&
 			!strings.HasPrefix(scope, "lock") && !strings.Contains(scope, " lock") && !strings.Contains(scope, "erase") && !strings.Contains(scope, "wipe") {
 			continue
@@ -184,7 +187,14 @@ func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature s
 			restrictions = appendUnique(restrictions, "TPM2 unattended unlock has not yet been tested.")
 		}
 	case 3:
-		if scopeContains("lock unverifiable") || scopeContains("session_lock_state_unreported") {
+		_, cinnamon := r.Lab.Session.Desktops["cinnamon"]
+		nativeConfirmation := slices.ContainsFunc(cells, func(c *Cell) bool {
+			return cinnamon && c.Spec.GetCinnamonLockConfirmation() && c.State == Pass && supportPassed(c) &&
+				c.Entry.GetVerified() && c.Entry.GetScope() == CinnamonLockConfirmationScope
+		})
+		if nativeConfirmation {
+			restrictions = appendUnique(restrictions, "Native screen-lock confirmation passed for the Cinnamon package version recorded in its dedicated cell (minimum "+platform.CinnamonLockMinimumVersion+"); older packages remain unconfirmed. This does not qualify wipe, quarantine or assistance.")
+		} else if scopeContains("lock unverifiable") || scopeContains("session_lock_state_unreported") {
 			restrictions = appendUnique(restrictions, "Account locks and wipe work; the desktop does not report its screen-lock state.")
 		} else if scopeContains("session lock unsupported") {
 			restrictions = appendUnique(restrictions, "Account locks and wipe work; screen locking is unavailable.")

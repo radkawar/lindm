@@ -164,12 +164,14 @@ Cinnamon 6.6.4+zena (X11, `XDG_CURRENT_DESKTOP=X-Cinnamon`) under LightDM
 `Service=lightdm-autologin`, `Type=x11`, `Desktop=cinnamon` (observed by the
 desktop-session lane).
 
-- **Lock.** logind `LockSessions` engages `cinnamon-screensaver` 6.6.1+zena
-  (`org.cinnamon.ScreenSaver.GetActive` returns true), but Cinnamon never sets
+- **Lock.** On the shipped Cinnamon 6.6.x desktop, logind `LockSessions`
+  engages `cinnamon-screensaver` 6.6.1+zena
+  (`org.cinnamon.ScreenSaver.GetActive` returns true), but the locker never sets
   logind `LockedHint`, which stays `no`. The product therefore reports the lock
   as `OUTCOME_UNKNOWN` with `session_lock_state_unreported` evidence rather than
   claiming a verified lock. Release succeeds and leaves the screensaver locked;
-  account lock/restore and quarantine pass.
+  account lock/restore and quarantine pass. Lock confirmation needs Cinnamon
+  6.7.9 or later, which reports logind lock state; Mint 22.3 ships 6.6.x.
 - **Assistance.** Gated `portal_screencast_unavailable`: xdg-desktop-portal
   1.20.0+ds-2ubuntu1 with `-xapp` 1.1.3+zena and `-gtk` 1.15.1-1build2 exposes no
   ScreenCast or RemoteDesktop portal, and lindm has no X11 capture path. VIEW and
@@ -316,6 +318,45 @@ Records that do not qualify a cell, kept for attribution:
   (`f945d20184d22dd12764d13d584c98294b87989c9b2736e17df6f5829764b7e3`): the host
   header read lacked `SUPERMIN_KERNEL`/`SUPERMIN_MODULES` on this root-only-`/boot`
   host (operator prerequisite).
+
+### Cinnamon lock confirmation on newer releases
+
+The fix is already in Cinnamon's integrated screensaver, not an outstanding
+change to the old `cinnamon-screensaver` daemon. The native locker was added in
+[`3eca4387`](https://github.com/linuxmint/cinnamon/commit/3eca43873c9b1b17bfd9b7f3b0fb5c9d977c03b2).
+Its `LoginManagerSystemd.setLockedHint()` and
+`ScreenShield._setLocked()` / `unlock()` changes in
+[`e6138800`](https://github.com/linuxmint/cinnamon/commit/e613880004474d73e0d3d67ff0cff3ed639c2fc1)
+publish the real lock and unlock state to logind. Both changes are in the 6.7.9
+development source published as
+[`master.mint27`](https://github.com/linuxmint/cinnamon/releases/tag/master.mint27)
+on 2026-10-15. The maintainer
+[closed the old-daemon fix as superseded](https://github.com/linuxmint/cinnamon-screensaver/pull/521#issuecomment-6199151987);
+that PR was not merged. This is not evidence that Mint 22.3 ships the new locker:
+its installed golden has Cinnamon 6.6.4+zena and its observed configured archive
+candidate is 6.6.9+zena.
+
+The dedicated cell checked that prerequisite on the real encrypted Mint 22.3
+golden on 2026-10-15. A fresh signed-source refresh still offered 6.6.9+zena for
+the installed 6.6.4+zena, so the matrix recorded `GATED`, not a pass. No
+6.7.9-or-newer native lock-confirmation result is claimed.
+
+The maintained `cinnamon-lock-confirmation` matrix cell probes Cinnamon releases
+and backports through their normal signed package sources. It does not enable
+confirmation for 6.6.x. An unavailable 6.7.9-or-newer candidate is a retryable
+prerequisite gate, not a pass; package, transport or cleanup failures remain
+failures. A newer version alone is not a qualification result. The cell must
+observe the integrated native locker, `LockedHint=true` after both a real logind
+lock request and a signed lindm lock action, and `LockedHint=false` after normal
+local PAM unlock. A signed release must leave the screen locked.
+
+Select this cell with `lab matrix run -platform linuxmint-22.3
+-cells cinnamon-lock-confirmation` and the usual native-lab build and evidence
+arguments. Future Cinnamon releases use the same cell without a 22.3-only
+allowlist. Only a real pass promotes its version-bound lock-confirmation result;
+it does not qualify wipe, quarantine or X11 assistance, or change the shipped
+6.6.x desktop profile. See the
+[qualification boundary](../verification.md#cinnamon-upstream-lock-confirmation-prerequisite).
 
 ## Remote assistance capability roadmap
 

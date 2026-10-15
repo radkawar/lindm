@@ -138,6 +138,15 @@
       "args": ["-scenario=wipe", "-wipe-phase=live-actions"]
     },
     {
+      "name": "cinnamon-lock-confirmation",
+      "title": "Cinnamon >=6.7.9 lock confirmation only",
+      "capabilities": ["lock"],
+      "image": "MATRIX_IMAGE_ENCRYPTED_INSTALLER",
+      "lane": "device-actions",
+      "args": ["-scenario=wipe", "-wipe-phase=cinnamon-lock-confirmation"],
+      "cinnamonLockConfirmation": true
+    },
+    {
       "name": "recovery-sanitize",
       "title": "Recovery sanitize",
       "capabilities": ["recovery-sanitize"],

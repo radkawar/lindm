@@ -396,6 +396,18 @@ type actionDesktopEvidence struct {
 // user is required: a locked/passwordless installer SSH account is not a useful
 // lock-screen fixture. The display manager performs the real PAM/logind login.
 func prepareActionDesktop(ctx context.Context, vm *EncryptedVM, desktop *labDesktop, release *platform.Release) (string, error) {
+	password := []byte(rand.Text())
+	defer clear(password)
+	return prepareActionDesktopWithPassword(ctx, vm, desktop, release, password)
+}
+
+// prepareActionDesktopWithPassword keeps a caller-owned local PAM credential
+// available for physical-seat unlock proofs. It never puts the password into
+// the shell command, environment or evidence.
+func prepareActionDesktopWithPassword(ctx context.Context, vm *EncryptedVM, desktop *labDesktop, release *platform.Release, password []byte) (string, error) {
+	if len(password) == 0 || bytes.ContainsAny(password, ":\x00\r\n") {
+		return "", errors.New("invalid disposable desktop password")
+	}
 	initial, err := vm.Run(ctx, `sudo -n sh -eu -c 'loginctl list-sessions --no-legend --no-pager | while read -r id rest; do loginctl show-session "$id" -p Id -p Name -p Class -p Type -p Desktop -p Service -p LockedHint; done'`, nil)
 	if err != nil {
 		return "", err
@@ -414,9 +426,13 @@ chown "$u":"$u" /home/"$u"/.config/gnome-initial-setup-done
 		script += `install -o "$u" -g "$u" -m 0600 /dev/null ` + nativeQuote(path) + "\n"
 	}
 	script += desktop.autologin(release.Lab.Session)
-	password := []byte(actionDesktopUser + ":" + rand.Text() + "\n")
-	defer clear(password)
-	_, err = vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), bytes.NewReader(password))
+	input := make([]byte, 0, len(actionDesktopUser)+len(password)+2)
+	input = append(input, actionDesktopUser...)
+	input = append(input, ':')
+	input = append(input, password...)
+	input = append(input, '\n')
+	defer clear(input)
+	_, err = vm.Run(ctx, "sudo -n sh -eu -c "+nativeQuote(script), bytes.NewReader(input))
 	return string(initial), err
 }
 

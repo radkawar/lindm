@@ -24,6 +24,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 
 	labv1 "lindm/gen/lindm/lab/v1"
+	"lindm/internal/devlab"
 	"lindm/internal/vmlab"
 )
 
@@ -275,7 +276,7 @@ func (r RemoteRun) Run(ctx context.Context) (err error) {
 	}
 	for _, item := range executables {
 		output := filepath.Join(local, item.name)
-		cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version=0.1.0", "-o", output, item.command)
+		cmd := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags", devlab.NativeFixtureLDFlags, "-o", output, item.command)
 		cmd.Dir = root
 		cmd.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+item.arch)
 		cmd.Stdout, cmd.Stderr = r.Stderr, r.Stderr

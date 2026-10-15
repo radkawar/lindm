@@ -84,6 +84,8 @@ const (
 	MatrixVerdict_MATRIX_VERDICT_UNSPECIFIED MatrixVerdict = 0
 	MatrixVerdict_MATRIX_VERDICT_PASS        MatrixVerdict = 1
 	MatrixVerdict_MATRIX_VERDICT_FAIL        MatrixVerdict = 2
+	// Runtime prerequisite absent, with normal teardown; not a successful lane.
+	MatrixVerdict_MATRIX_VERDICT_GATED MatrixVerdict = 3
 )
 
 // Enum value maps for MatrixVerdict.
@@ -92,11 +94,13 @@ var (
 		0: "MATRIX_VERDICT_UNSPECIFIED",
 		1: "MATRIX_VERDICT_PASS",
 		2: "MATRIX_VERDICT_FAIL",
+		3: "MATRIX_VERDICT_GATED",
 	}
 	MatrixVerdict_value = map[string]int32{
 		"MATRIX_VERDICT_UNSPECIFIED": 0,
 		"MATRIX_VERDICT_PASS":        1,
 		"MATRIX_VERDICT_FAIL":        2,
+		"MATRIX_VERDICT_GATED":       3,
 	}
 )
 
@@ -337,8 +341,12 @@ type MatrixCell struct {
 	// (platform TPM2TokenReferences, the TPM2UnsealRetryNextToken quirk); every
 	// other release is gated as not applicable: no legacy defect exists there.
 	Tpm2ReferenceRepair bool `protobuf:"varint,12,opt,name=tpm2_reference_repair,json=tpm2ReferenceRepair,proto3" json:"tpm2_reference_repair,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Native Cinnamon lock confirmation only, not the complete device-action
+	// lane. Other desktops are statically inapplicable; missing fixed vendor
+	// packages are a retryable runtime prerequisite gate, never a pass.
+	CinnamonLockConfirmation bool `protobuf:"varint,13,opt,name=cinnamon_lock_confirmation,json=cinnamonLockConfirmation,proto3" json:"cinnamon_lock_confirmation,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *MatrixCell) Reset() {
@@ -455,6 +463,13 @@ func (x *MatrixCell) GetTpm2ReferenceRepair() bool {
 	return false
 }
 
+func (x *MatrixCell) GetCinnamonLockConfirmation() bool {
+	if x != nil {
+		return x.CinnamonLockConfirmation
+	}
+	return false
+}
+
 // MatrixLedger is the append-only record of matrix cell outcomes.
 type MatrixLedger struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -545,8 +560,11 @@ type MatrixLedgerEntry struct {
 	// HEAD main). Landing does not publish worktree commits, so requalification
 	// floors are checked against this durable ancestor rather than `revision`.
 	MainlineRevision string `protobuf:"bytes,23,opt,name=mainline_revision,json=mainlineRevision,proto3" json:"mainline_revision,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Safely established runtime prerequisite absence. Unlike registry gates,
+	// this outcome remains runnable so a future vendor package can qualify.
+	GateReason    string `protobuf:"bytes,24,opt,name=gate_reason,json=gateReason,proto3" json:"gate_reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MatrixLedgerEntry) Reset() {
@@ -740,6 +758,13 @@ func (x *MatrixLedgerEntry) GetMainlineRevision() string {
 	return ""
 }
 
+func (x *MatrixLedgerEntry) GetGateReason() string {
+	if x != nil {
+		return x.GateReason
+	}
+	return ""
+}
+
 var File_lindm_lab_v1_matrix_proto protoreflect.FileDescriptor
 
 const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
@@ -761,7 +786,7 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x1blab.matrix_secure_boot_args\x12@a Secure Boot cell needs secure_boot_args for every architecture\x1aa!this.cells.exists(c, c.secure_boot) || this.architecture_args.all(a, a in this.secure_boot_args)\"7\n" +
 	"\n" +
 	"MatrixArgs\x12)\n" +
-	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xb8\x06\n" +
+	"\x04args\x18\x01 \x03(\tB\x15\xbaH\x12\x92\x01\x0f\x10 \"\vr\t\x10\x01\x18\x80\x022\x02^-R\x04args\"\xa3\t\n" +
 	"\n" +
 	"MatrixCell\x120\n" +
 	"\x04name\x18\x01 \x01(\tB\x1c\xbaH\x19r\x17\x10\x01\x18?2\x11^[a-z][a-z0-9-]*$R\x04name\x12\x1f\n" +
@@ -778,11 +803,13 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"\x10minimum_revision\x18\n" +
 	" \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x0fminimumRevision\x12\x10\n" +
 	"\x03tpm\x18\v \x01(\bR\x03tpm\x122\n" +
-	"\x15tpm2_reference_repair\x18\f \x01(\bR\x13tpm2ReferenceRepair:\x87\x02\xbaH\x83\x02\x1a\x80\x02\n" +
-	"\x14lab.matrix_cell_lane\x12pa cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane\x1avthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)\"U\n" +
+	"\x15tpm2_reference_repair\x18\f \x01(\bR\x13tpm2ReferenceRepair\x12<\n" +
+	"\x1acinnamon_lock_confirmation\x18\r \x01(\bR\x18cinnamonLockConfirmation:\xb4\x04\xbaH\xb0\x04\x1a\x80\x02\n" +
+	"\x14lab.matrix_cell_lane\x12pa cell names either a lane or the reason no maintained lane exists; arguments, Secure Boot and a TPM need a lane\x1avthis.lane != '' ? this.no_lane == '' : (this.no_lane != '' && this.args.size() == 0 && !this.secure_boot && !this.tpm)\x1a\xaa\x02\n" +
+	"%lab.matrix_cinnamon_lock_confirmation\x12GCinnamon lock confirmation uses the dedicated device-actions wipe phase\x1a\xb7\x01!this.cinnamon_lock_confirmation || (this.lane == 'device-actions' && this.args.exists(a, a == '-scenario=wipe') && this.args.exists(a, a == '-wipe-phase=cinnamon-lock-confirmation'))\"U\n" +
 	"\fMatrixLedger\x12E\n" +
 	"\aentries\x18\x01 \x03(\v2\x1f.lindm.lab.v1.MatrixLedgerEntryB\n" +
-	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xd7\v\n" +
+	"\xbaH\a\x92\x01\x04\x10\xa0\x8d\x06R\aentries\"\xa2\r\n" +
 	"\x11MatrixLedgerEntry\x12%\n" +
 	"\bplatform\x18\x01 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\bplatform\x12\x1d\n" +
 	"\x04cell\x18\x02 \x01(\tB\t\xbaH\x06r\x04\x10\x01\x18?R\x04cell\x12:\n" +
@@ -810,15 +837,19 @@ const file_lindm_lab_v1_matrix_proto_rawDesc = "" +
 	"!recovery_repository_snapshot_date\x18\x14 \x01(\tB&\xbaH#r!2\x1f^([0-9]{4}-[0-9]{2}-[0-9]{2})?$R\x1erecoveryRepositorySnapshotDate\x12e\n" +
 	"\"recovery_repository_closure_sha256\x18\x15 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R\x1frecoveryRepositoryClosureSha256\x12g\n" +
 	"#recovery_repository_metadata_sha256\x18\x16 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{64})?$R recoveryRepositoryMetadataSha256\x12E\n" +
-	"\x11mainline_revision\x18\x17 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x10mainlineRevision*i\n" +
+	"\x11mainline_revision\x18\x17 \x01(\tB\x18\xbaH\x15r\x132\x11^([0-9a-f]{40})?$R\x10mainlineRevision\x12)\n" +
+	"\vgate_reason\x18\x18 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\n" +
+	"gateReason:\x9d\x01\xbaH\x99\x01\x1a\x96\x01\n" +
+	"\x1elab.matrix_runtime_gate_reason\x12Conly a GATED outcome carries a nonempty runtime prerequisite reason\x1a/(this.verdict == 3) == (this.gate_reason != '')*i\n" +
 	"\vMatrixImage\x12\x1c\n" +
 	"\x18MATRIX_IMAGE_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12MATRIX_IMAGE_CLOUD\x10\x01\x12$\n" +
-	" MATRIX_IMAGE_ENCRYPTED_INSTALLER\x10\x02*a\n" +
+	" MATRIX_IMAGE_ENCRYPTED_INSTALLER\x10\x02*{\n" +
 	"\rMatrixVerdict\x12\x1e\n" +
 	"\x1aMATRIX_VERDICT_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MATRIX_VERDICT_PASS\x10\x01\x12\x17\n" +
-	"\x13MATRIX_VERDICT_FAIL\x10\x02*^\n" +
+	"\x13MATRIX_VERDICT_FAIL\x10\x02\x12\x18\n" +
+	"\x14MATRIX_VERDICT_GATED\x10\x03*^\n" +
 	"\fMatrixSource\x12\x1d\n" +
 	"\x19MATRIX_SOURCE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11MATRIX_SOURCE_RUN\x10\x01\x12\x18\n" +

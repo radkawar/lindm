@@ -4,6 +4,14 @@ package platform
 
 import "strings"
 
+// CinnamonLockMinimumVersion is the first integrated Cinnamon locker version
+// whose source reports its lock state to logind.
+const CinnamonLockMinimumVersion = "6.7.9"
+
+// CinnamonLockConfirmationGate describes the unqualified stock Mint locker,
+// without disabling account locks or claiming newer packages have passed a lab.
+const CinnamonLockConfirmationGate = "Lock confirmation needs Cinnamon 6.7.9 or later, which reports logind lock state; Mint 22.3 ships 6.6.x."
+
 // DesktopLock is how a desktop's screen locker relates to logind, the only
 // lock interface lindm's root executor and session helper use.
 type DesktopLock int

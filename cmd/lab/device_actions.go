@@ -19,7 +19,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	recoveryPath := flags.String("recovery-manifest", "", "signed same-distribution cloud image or explicit systemd-boot installer recovery baseline")
 	var options vmlab.VMDeviceActionsOptions
 	flags.StringVar(&options.Scenario, "scenario", "all", "all, encryption, wipe or compliance native qualification scenarios")
-	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
+	flags.StringVar(&options.WipePhase, "wipe-phase", "", "with -scenario wipe: live-actions (lock, quarantine, wipe and loss without recovery), cinnamon-lock-confirmation (native Cinnamon >=6.7.9 lock confirmation only), lock-quarantine, live-erase, live-report-loss, recovery-nvme, recovery-sata or recovery-attestation-refusal (TPM-less, measured-grub); empty runs all")
 	flags.StringVar(&options.EncryptionPhase, "encryption-phase", "", "with -scenario encryption: tpm for separately recorded bind/cold-boot/PCR recovery, tpm-repair for a legacy agent's under-referenced bind repaired after a native upgrade to the current agent; empty runs all")
 	flags.IntVar(&options.TPMBoots, "tpm-boots", 1, "consecutive unattended cold boots after the product TPM2 bind that must all unlock without a prompt (more than one requires -encryption-phase tpm or tpm-repair); each records systemd-cryptsetup's unlock journal, with private serial copies under -diagnostics")
 	flags.StringVar(&options.LegacyAgentRevision, "legacy-agent-revision", "", "with -encryption-phase tpm-repair (required there): build-repository git commit whose agent, exported read-only with git archive and packaged as 0.1.0, performs the original bind before the native upgrade to the current 0.1.1 package")
@@ -45,7 +45,7 @@ func runVMDeviceActions(ctx context.Context, args []string, stdout, stderr io.Wr
 	flags.StringVar(&options.Encrypted.Firmware.Version, "firmware-version", "", "exact required firmware package version")
 	flags.BoolVar(&options.Encrypted.Firmware.SecureBoot, "secure-boot", false, "require observed enforced Secure Boot using enrolled template")
 	flags.StringVar(&options.Encrypted.Desktop, "desktop", "gnome", "lab session desktop of the golden: gnome, cinnamon, cosmic or hyprland; empty is a headless server golden, refused for lock scenarios")
-	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack; false is accepted only with -wipe-phase lock-quarantine")
+	flags.BoolVar(&options.Encrypted.TPMBoot, "tpm-boot", true, "golden built with a TPM2-capable unbound boot stack; false is accepted only with -wipe-phase lock-quarantine or cinnamon-lock-confirmation")
 	flags.StringVar(&options.BootstrapFirmwareVars, "bootstrap-firmware-vars", "", "Arch owner-UKI only (original recovery, or -encryption-phase tpm on the systemd-boot installer edition): package-owned non-Secure-Boot template for unsigned archiso; final owner db is enrolled into -firmware-vars after shutdown")
 	record := flags.String("record", "", "required new nonsecret evidence JSON, exclusively created then made read-only")
 	if err := flags.Parse(args); err != nil {

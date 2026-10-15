@@ -283,6 +283,10 @@ type Desktop struct {
 	// (account lock, session lock request) stays supported; the server refuses
 	// a lock action that would only lock sessions.
 	SessionLockUnsupported string
+	// LockConfirmationGate describes a stock desktop whose lock request works
+	// but whose result cannot be confirmed. It does not gate account locking or
+	// replace a native LockedHint observation with a package-version claim.
+	LockConfirmationGate string
 }
 
 // Feed is a vendor advisory source adapter.

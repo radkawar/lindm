@@ -266,3 +266,55 @@ func TestRenderSupportFreshInstallEnrollmentRestriction(t *testing.T) {
 		t.Fatalf("lab-only restriction became product unsupported: %q", got)
 	}
 }
+
+func TestCinnamonNativeConfirmationIsVersionQualifiedNotWholeFeatureSupport(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		verdict   labv1.MatrixVerdict
+		verified  bool
+		scope     string
+		qualified bool
+	}{
+		{"native fixed-version pass", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, true, CinnamonLockConfirmationScope, true},
+		{"old package gate", labv1.MatrixVerdict_MATRIX_VERDICT_GATED, true, CinnamonLockConfirmationScope, false},
+		{"native cleanup failure", labv1.MatrixVerdict_MATRIX_VERDICT_FAIL, true, CinnamonLockConfirmationScope, false},
+		{"unverified claim", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, false, CinnamonLockConfirmationScope, false},
+		{"unscoped claim", labv1.MatrixVerdict_MATRIX_VERDICT_PASS, true, "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, cells := supportFixture()
+			r.Lab.Session.Desktops = release(t, "linuxmint-22.3").Lab.Session.Desktops
+			supportCell(t, cells, "device-actions", "x86_64").Entry.Scope = "crypto-erase, lock unverifiable (no LockedHint), account locks"
+			e := entry(r.Key, "cinnamon-lock-confirmation", "x86_64", tc.verdict, time.Now())
+			e.Verified, e.Scope = tc.verified, tc.scope
+			state := Fail
+			if tc.verdict == labv1.MatrixVerdict_MATRIX_VERDICT_PASS {
+				state = Pass
+			}
+			native := &Cell{Release: r, Architecture: "x86_64", Spec: cinnamonSpec(), State: state, Entry: e}
+			body, err := RenderSupport(append(cells, native))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(body, "Native screen-lock confirmation passed for the Cinnamon package version recorded in its dedicated cell (minimum 6.7.9)") != tc.qualified ||
+				strings.Contains(body, "desktop does not report its screen-lock state") == tc.qualified {
+				t.Fatalf("native version-qualified warning changed incorrectly:\n%s", body)
+			}
+			if tc.qualified && (!strings.Contains(body, "older packages remain unconfirmed") || !strings.Contains(body, "does not qualify wipe, quarantine or assistance")) {
+				t.Fatal("native confirmation was advertised as a stock-release or whole-feature fix")
+			}
+			// Remove the complete action and assistance evidence. The narrow
+			// pass cannot supply either missing feature's qualification.
+			supportCell(t, cells, "device-actions", "x86_64").Entry = nil
+			supportCell(t, cells, "assistance", "x86_64").Entry = nil
+			body, err = RenderSupport(append(cells, native))
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := supportRow(t, body)
+			if row[4] != "not yet tested" || row[7] != "not yet tested" {
+				t.Fatalf("native-lock-only evidence inflated lock/wipe or assistance: %v", row)
+			}
+		})
+	}
+}

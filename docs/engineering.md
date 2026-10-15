@@ -1268,9 +1268,11 @@ input change rebuilds it (about eight minutes here). A reused manifest still
 records the full source digest of the tree it was built from, and a sibling
 `<entry>.inputs` file binds each entry to its input digest; an unbound entry is
 refused, never rebuilt over.
-`acceptance-build` and the native-server builder used by `devenv test-integration`
-stamp the development server with version `0.1.0` and revision
-`console-enrollment-lab`, matching the authenticated stock agent release.
+`acceptance-build`, the native-server builder used by `devenv test-integration`,
+the matrix builder and remote VM staging share the lab fixture build identity:
+version `0.1.0` and revision `console-enrollment-lab`, matching the authenticated
+stock agent release. A version-only linker stamp is insufficient: its checkout
+revision would not match the installed agent artifact.
 The installed-release activation gate still requires exact compiled identity;
 an unstamped or differently stamped server is not compatible with this fixture.
 This development release label is not the frozen source SHA or a production
@@ -3829,8 +3831,9 @@ verified image cache.
 the running development fixture in `-repo`; `-root` (default `.`) is the source
 checkout whose matrix, manifests and ledger are used and whose sources lanes
 build. It prepares shared inputs once in the new `-evidence` directory:
-release-stamped `lindmd` and `lindm-agent` built from `-root` (native fixtures
-refuse unstamped servers) and, through the in-process `lab packages` paths, a
+`lindmd` and `lindm-agent` built from `-root` with the lab's explicit version
+`0.1.0` and revision `console-enrollment-lab` (native fixtures refuse an unstamped
+or differently stamped server) and, through the in-process `lab packages` paths, a
 development signer, agent versions 0.1.0 and 0.1.1 in every needed format and
 architecture, the APT and pacman repositories and the rejection fixtures. The
 `airgap` cell additionally builds both complete attested releases with the
