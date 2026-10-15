@@ -40,6 +40,11 @@ type installState struct {
 	Pending *installationProgress
 }
 
+// Only authenticated public package payloads use this child-process umask.
+// CPIO creates implicit parents; the service-user preflight must traverse them.
+// The installer itself retains its private umask for credentials and custody.
+const rpmUpgradeExtractCommand = `set -eu; umask 022; cd "$2"; rpm2cpio "$1" | cpio --extract --make-directories --no-absolute-filenames`
+
 func upgradeRelease(ctx context.Context, o Options, version, packagePath string, release *platform.Release) (err error) {
 	if err := verifyNativePackage(ctx, packagePath, release, o.Bundle); err != nil {
 		return err
@@ -79,7 +84,7 @@ func upgradeRelease(ctx context.Context, o Options, version, packagePath string,
 			return err
 		}
 	} else {
-		if _, err := command(ctx, nil, "/bin/sh", "-c", `set -eu; cd "$2"; rpm2cpio "$1" | cpio --extract --make-directories --no-absolute-filenames`, "extract", packagePath, tmp); err != nil {
+		if _, err := command(ctx, nil, "/bin/sh", "-c", rpmUpgradeExtractCommand, "extract", packagePath, tmp); err != nil {
 			return err
 		}
 	}

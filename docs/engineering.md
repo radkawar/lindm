@@ -5258,6 +5258,26 @@ substituted for this unknown RHEL exposure. The browser's broad
 or expired timestamps. No completeness, freshness, rejection or proof gate is
 weakened to obtain a release result.
 
+The independent SDK24 server-only RHEL run, observer
+`f1dd6d42dd78314728e0e9f90c2e54745be8d16a`, records
+`native-rhel-sdk24-server-lifecycle-attempt1.json`, SHA-256
+`1b6f325d20057e0cc73d4a90dc7fba3c374099a9af719c9eb3a40555f780054b`.
+It is **FAIL** in 324.54 seconds, explicitly scoped
+`native-server-lifecycle-without-findings`, with Findings excluded and full
+lifecycle qualification false. Native install, protected browser setup, Ready
+repository, actual enrolled RHEL management with fresh inventory, encrypted
+backup and offline backup drill pass. Upgrade fails before fresh-host recovery.
+Encrypted stderr identifies the service-user preflight as `systemd-run` exit
+203/EXEC. Extracting the exact signed RPM under the installer's inherited 0077
+umask independently reproduces implicit `usr` and `usr/bin` directories at
+0700, even though the binary is 0755. The checker cannot traverse those parents.
+Only the authenticated, nonsecret RPM extraction child now uses umask 022;
+installer secrets and all checker sandboxing remain unchanged. An actual-CPIO
+regression proves the old 0700 and corrected 0755 parent modes, retaining the
+binary's 0755 mode. Security review closed with no findings. A new signed native
+run must qualify the correction; neither this scoped failure nor the separate
+full Findings failure is promoted.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

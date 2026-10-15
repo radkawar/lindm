@@ -196,3 +196,70 @@ func upgradeFixtureExecutable(t *testing.T, root, source, destination string) {
 		}
 	}
 }
+
+func TestRPMUpgradePreflightParentsRemainTraversableUnderPrivateUmask(t *testing.T) {
+	cpio, err := exec.LookPath("cpio")
+	if err != nil {
+		t.Skip("native CPIO extraction regression requires cpio")
+	}
+	source := t.TempDir()
+	payload := filepath.Join(source, "usr/bin/lindmd")
+	if err := os.MkdirAll(filepath.Dir(payload), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(payload, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(payload, 0755); err != nil {
+		t.Fatal(err)
+	}
+	create := exec.CommandContext(t.Context(), cpio, "--create", "--format=newc")
+	create.Dir = source
+	create.Stdin = strings.NewReader("usr/bin/lindmd\n")
+	archive, err := create.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	archivePath := filepath.Join(t.TempDir(), "public-payload.cpio")
+	if err := os.WriteFile(archivePath, archive, 0600); err != nil {
+		t.Fatal(err)
+	}
+	tools := t.TempDir()
+	// The real CPIO extractor receives the exact production command and an
+	// archive with no parent entries; only the RPM-to-CPIO converter is a fixture.
+	if err := os.WriteFile(filepath.Join(tools, "rpm2cpio"), []byte("#!/bin/sh\nexec /bin/cat \"$1\"\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, script string
+		mode         os.FileMode
+	}{
+		{"private-inherited-mask-without-policy", strings.Replace(rpmUpgradeExtractCommand, "umask 022; ", "", 1), 0700},
+		{"public-payload-child-policy", rpmUpgradeExtractCommand, 0755},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stage := t.TempDir()
+			if err := os.Chmod(stage, 0755); err != nil {
+				t.Fatal(err)
+			}
+			cmd := exec.CommandContext(t.Context(), "/bin/sh", "-c", "umask 077; "+test.script, "extract", archivePath, stage)
+			cmd.Env = []string{"PATH=" + tools + ":" + filepath.Dir(cpio) + ":/usr/bin:/bin", "HOME=/nonexistent", "LC_ALL=C"}
+			if err := cmd.Run(); err != nil {
+				t.Fatal(err)
+			}
+			for _, parent := range []string{"usr", "usr/bin"} {
+				info, err := os.Stat(filepath.Join(stage, parent))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if info.Mode().Perm() != test.mode {
+					t.Fatalf("implicit package parent %s: mode %04o, want %04o", parent, info.Mode().Perm(), test.mode)
+				}
+			}
+			info, err := os.Stat(filepath.Join(stage, "usr/bin/lindmd"))
+			if err != nil || info.Mode().Perm() != 0755 {
+				t.Fatalf("public preflight executable permissions changed: %v", err)
+			}
+		})
+	}
+}

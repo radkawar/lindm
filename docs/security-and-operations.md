@@ -2280,6 +2280,10 @@ update apply keeps the same lease across imported-release authentication,
 configuration staging and installation. The installer validates and reuses that
 same-process lease without closing its caller's ownership; timer restart occurs
 only after the lease is closed, including failure cleanup.
+The authenticated RPM's temporary preflight payload contains public package files,
+not credentials. Its extraction child uses umask 022 so the restricted service
+account can traverse implicit parent directories. The installer retains its
+private umask for secrets; the service-user check keeps every sandbox directive.
 
 `schema-check` distinguishes reviewed expand migrations from contract migrations.
 For `online=true`, the old runtime continues serving through the consistent backup,

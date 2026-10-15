@@ -14117,6 +14117,23 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "52ef03cbb8681d81f2aa42fc73df1e00bd0af8c8"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-rhel-sdk24-server-lifecycle-attempt1.json",
+      "sha256": "1b6f325d20057e0cc73d4a90dc7fba3c374099a9af719c9eb3a40555f780054b",
+      "recorded": "2026-10-15T14:52:51.889726478Z",
+      "revision": "f1dd6d42dd78314728e0e9f90c2e54745be8d16a",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "native-server-lifecycle-without-findings",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "f1dd6d42dd78314728e0e9f90c2e54745be8d16a"
     }
   ]
 }
