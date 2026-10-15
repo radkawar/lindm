@@ -45,6 +45,8 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Keep private restore staging in a separate `/var/lib/lindmd-restore` tree, preserving service-readable operational-state permissions and excluding recovery plaintext from backup inventory.
 - Observe strict-TLS readiness after native service starts before the independent exact-certificate probe; fail immediately on trust or HTTP refusals, retry no mutations, and retain failed restored-service journals only as operator-encrypted lab evidence.
 - Create a missing protected `/var/backups` parent on fresh RHEL without widening existing permissions; retain root-only backup storage and refuse unsafe parents.
+- Match the vendor PostgreSQL NNP setting only on verified SELinux-Enforcing RHEL, require the running service's `postgresql_t` domain before creating database authority, and retain every other sandbox directive. No custom SELinux policy module is installed.
+- Retain bounded PostgreSQL journals, process identity and filesystem/audit diagnostics only as operator-encrypted native-lab evidence before teardown; preserve source-specific Ubuntu full lifecycle passes and failed RHEL boundaries without qualification shortcuts.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.

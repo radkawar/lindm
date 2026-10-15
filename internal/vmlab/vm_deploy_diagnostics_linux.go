@@ -89,8 +89,21 @@ func executeDeployRestore(ctx context.Context, guest *guestVM, options VMDeployO
 	return errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
 }
 
+const deployServiceJournalCommand = `sudo -n sh -c '
+env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service --unit=lindm-postgresql.service
+journal_status=$?
+env LC_ALL=C journalctl --no-pager --output=json --lines=50 --unit=lindm-postgresql.service
+env LC_ALL=C journalctl --no-pager --output=cat --lines=200 _TRANSPORT=audit
+stat -c "%n uid=%u gid=%g mode=%a context=%C" /var/lib/pgsql /var/lib/pgsql/lindm /var/lib/pgsql/lindm/postgresql.conf /var/lib/pgsql/lindm/lindm.conf /etc/lindm /etc/lindm/postgresql /etc/lindm/postgresql/server.crt /etc/lindm/postgresql/server.key
+stat -L -c "%n uid=%u gid=%g mode=%a context=%C" /usr/bin/postgres /usr/bin/postmaster
+systemctl cat postgresql.service
+if command -v getenforce; then getenforce; fi
+if command -v ausearch; then ausearch -m AVC,USER_AVC -ts boot --raw; fi
+exit "$journal_status"
+'`
+
 func captureDeployServiceJournal(ctx context.Context, guest *guestVM, options VMDeployOptions, label string) error {
-	journal, err := guest.runResult(ctx, "sudo -n env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service", nil, deployInstallerDiagnosticLimit, time.Minute)
+	journal, err := guest.runResult(ctx, deployServiceJournalCommand, nil, deployInstallerDiagnosticLimit, time.Minute)
 	defer clear(journal.Stdout)
 	defer clear(journal.Stderr)
 	captureErr := writeDeployInstallerDiagnostics(options.CustodyEscrowRecipientFile, options.EvidenceDirectory, label, journal.Stdout, journal.Stderr)

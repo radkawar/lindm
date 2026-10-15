@@ -5,6 +5,7 @@
 package install
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -98,4 +99,63 @@ func checkPostgreSQLTools(ctx context.Context, release *platform.Release, run de
 		}
 	}
 	return nil
+}
+
+func postgresSELinuxEnforcing(ctx context.Context, release *platform.Release, run dependencyCommand) (bool, error) {
+	if release.Packages.Backend.PackageDB() != platform.PackageDBRPM {
+		return false, nil
+	}
+	output, err := run(ctx, nil, "getenforce")
+	if err != nil {
+		return false, fmt.Errorf("determine PostgreSQL SELinux enforcement: %w", err)
+	}
+	switch strings.TrimSpace(string(output)) {
+	case "Enforcing":
+		return true, nil
+	case "Permissive", "Disabled":
+		return false, nil
+	default:
+		return false, errors.New("unrecognized PostgreSQL SELinux enforcement state")
+	}
+}
+
+func localPostgresUnit(data, bin string, enforcing bool) string {
+	noNewPrivileges := "yes"
+	if enforcing {
+		// Match the vendor unit: SELinux must transition to postgresql_t.
+		// NNP can silently retain init_t, which cannot read the private cluster.
+		noNewPrivileges = "no"
+	}
+	return "[Unit]\nDescription=Lindm private PostgreSQL cluster\nAfter=network.target\n[Service]\nType=simple\nUser=postgres\nGroup=postgres\nRuntimeDirectory=lindm-postgresql\nRuntimeDirectoryMode=0700\nExecStart=" + bin + "postgres -D " + data + "\nRestart=on-failure\nUMask=0077\nNoNewPrivileges=" + noNewPrivileges + "\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nReadWritePaths=" + data + " /run/lindm-postgresql\nInaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate\nLimitCORE=0\nMemorySwapMax=0\n[Install]\nWantedBy=multi-user.target\n"
+}
+
+func requirePostgresSELinuxDomain(ctx context.Context, run dependencyCommand) error {
+	output, err := run(ctx, nil, "systemctl", "show", "--property=MainPID", "--value", "lindm-postgresql.service")
+	if err != nil {
+		return err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil || pid <= 0 {
+		return errors.New("private PostgreSQL has no valid service process identity")
+	}
+	label, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/attr/current")
+	if err != nil {
+		return errors.New("cannot verify private PostgreSQL SELinux process confinement")
+	}
+	if !postgresSELinuxDomain(label) {
+		return errors.New("private PostgreSQL must run in the enforcing postgresql_t SELinux domain")
+	}
+	return nil
+}
+
+func postgresSELinuxDomain(label []byte) bool {
+	for range 2 {
+		_, tail, ok := bytes.Cut(label, []byte(":"))
+		if !ok {
+			return false
+		}
+		label = tail
+	}
+	domain, _, ok := bytes.Cut(label, []byte(":"))
+	return ok && bytes.Equal(domain, []byte("postgresql_t"))
 }

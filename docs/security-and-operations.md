@@ -1820,6 +1820,17 @@ closed. Defaults are 64 database connections, 256 MiB shared buffers, 16 device
 pool connections plus the separate console pool, bounded statements and cgroup-v2
 swap/core-dump protection. Runtime credentials cannot create schemas or mutate
 Goose, schema-compatibility or server-recovery metadata.
+
+On a verified SELinux **Enforcing** RHEL host, only `lindm-postgresql.service`
+follows the vendor PostgreSQL unit's `NoNewPrivileges=no`, permitting its
+transition to the confined `postgresql_t` domain. The installer verifies the
+actual service MainPID's kernel security context before creating database
+credentials or roles; a missing or wrong domain stops the owned service and
+refuses installation. Every other sandbox directive is unchanged. Ubuntu and
+non-enforcing hosts retain `NoNewPrivileges=yes`. No custom SELinux policy module
+is installed, and disabling SELinux is not a startup remedy. See the
+[kernel's no-new-privileges contract](https://docs.kernel.org/userspace-api/no_new_privs.html).
+
 The local database CA uses ECDSA P-256/SHA-256 signatures so PostgreSQL
 SCRAM-PLUS can bind authentication to the server certificate. Device and console
 authorities remain separate. TLS verification and channel binding are not disabled

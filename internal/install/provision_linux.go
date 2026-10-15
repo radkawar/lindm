@@ -175,6 +175,10 @@ func writeConfig(path string, cfg *configv1.ServerConfig, uid, gid int) error {
 }
 
 func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid int) error {
+	enforcing, err := postgresSELinuxEnforcing(ctx, release, command)
+	if err != nil {
+		return err
+	}
 	data, port := release.Server.PostgreSQLDataDirectory, release.Server.PostgreSQLPort
 	if err := installationFile("/etc/lindm/postgresql/port", []byte(port), 0, 0, 0600); err != nil {
 		return err
@@ -211,7 +215,7 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 			return err
 		}
 	}
-	unit := "[Unit]\nDescription=Lindm private PostgreSQL cluster\nAfter=network.target\n[Service]\nType=simple\nUser=postgres\nGroup=postgres\nRuntimeDirectory=lindm-postgresql\nRuntimeDirectoryMode=0700\nExecStart=" + bin + "postgres -D " + data + "\nRestart=on-failure\nUMask=0077\nNoNewPrivileges=yes\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nReadWritePaths=" + data + " /run/lindm-postgresql\nInaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate\nLimitCORE=0\nMemorySwapMax=0\n[Install]\nWantedBy=multi-user.target\n"
+	unit := localPostgresUnit(data, bin, enforcing)
 	if err := installationFile("/etc/systemd/system/lindm-postgresql.service", []byte(unit), 0, 0, 0644); err != nil {
 		return err
 	}
@@ -231,6 +235,12 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 		case <-startCtx.Done():
 			return errors.New("local PostgreSQL readiness deadline exceeded")
 		case <-time.After(time.Second):
+		}
+	}
+	if enforcing {
+		if err := requirePostgresSELinuxDomain(ctx, command); err != nil {
+			_, stopErr := command(ctx, nil, "systemctl", "stop", "lindm-postgresql.service")
+			return errors.Join(err, stopErr)
 		}
 	}
 	passwords, err := installationDatabasePasswords(port)

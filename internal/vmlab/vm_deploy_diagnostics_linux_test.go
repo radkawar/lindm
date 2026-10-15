@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"filippo.io/age"
@@ -76,5 +78,19 @@ func TestDeployInstallerDiagnosticsRejectUnboundedOrEscapingInputs(t *testing.T)
 	entries, err := os.ReadDir(directory)
 	if err != nil || len(entries) != 0 {
 		t.Fatalf("rejected diagnostics created files: %v", err)
+	}
+}
+
+func TestDeployServiceJournalIncludesOwnedPostgreSQL(t *testing.T) {
+	args := strings.Fields(deployServiceJournalCommand)
+	for _, required := range []string{"--no-pager", "--output=cat", "--lines=200", "--unit=lindmd.service", "--unit=lindmd-migrate.service", "--unit=lindm-postgresql.service"} {
+		if !slices.Contains(args, required) {
+			t.Fatalf("bounded owned-service diagnostic omits %s", required)
+		}
+	}
+	for _, required := range []string{`stat -c "%n uid=%u gid=%g mode=%a context=%C"`, "ausearch -m AVC,USER_AVC -ts boot --raw", `exit "$journal_status"`} {
+		if !strings.Contains(deployServiceJournalCommand, required) {
+			t.Fatalf("private PostgreSQL security diagnostic omits %s", required)
+		}
 	}
 }

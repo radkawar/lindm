@@ -5049,9 +5049,76 @@ no-symlink ancestry before creating the root-only child. It never changes an
 existing parent's permissions. Seven isolated root/chroot cases passed:
 missing parent, existing normal/private parent, and refusal of writable,
 symlink, regular-file and unsafe-ancestor parents. This fix is not present in
-SDK20; its RHEL result remains **FAIL** until a newly signed pair passes the
-complete fresh connected lifecycle.
+SDK20; its RHEL result remains **FAIL**. A corrected signed pair must independently
+pass the complete fresh connected lifecycle.
 The installer security re-review closed with no findings.
+
+SDK21's fresh `cold-release-attempt23.json`, SHA-256
+`31dd9d766e505e75e9c0a9726501022aa3ff659ebd82a6fe6e1e2c1b0fb23528`,
+passed in 1,633.93 seconds at integrated source
+`fb2d88bd659dff6a94752429871f7da7b6216b11`. A fresh Ubuntu VM cloned the
+exact source, used pristine caches and pinned SDKs, had no swap, and ran
+literal `make release-keys` plus two `make release` invocations. Authenticated
+exports and owned cleanup passed. The immutable 0.2.20 → 0.2.21 pair includes
+the protected RHEL backup-parent correction; the cold-build record remains
+build-only, not lifecycle qualification.
+
+Fresh `native-ubuntu-attempt32.json`, SHA-256
+`caceef165911fed9d0db057dd78203baba37ce48db478f07781731b593fdf645`,
+is a complete SDK21 Ubuntu 24.04 x86 native lifecycle **PASS** in 768.96 seconds.
+It uses the same source for matching lab tools and signed product, no TLS bypass
+or laboratory server certificates. All installed, upgraded and fresh-host
+restored browser/SQL Findings gates passed, as did real PostgreSQL PLUS and
+least-privilege denials, root-only credentials, integration-key negative control
+and recovered-secret decryption, per-origin TLS, higher-epoch quorum-approved
+current-security recovery and owned cleanup.
+
+The original device `5d9b9749-0952-4497-875c-74efdacb4293` completed recovered
+action `49412a1d-0d76-4067-97ef-0391ce1d1f2a` with new inventory sequence 4.
+Observed first Findings took 370,185 ms from installer invocation; the first
+refresh start to stored evaluation took 196,571 ms. Native installation took
+47.12 seconds, encrypted backup 7.53 seconds, archive drill 1.41 seconds, upgrade
+34.89 seconds and actual fresh-host restore 30.61 seconds. Full-lifecycle
+interaction counts: 11 commands, 106 browser decisions and zero observed
+failures. Repeated read-only pre-send reconnect checks are included; accepted
+work is never resubmitted. Custodians remain laboratory operator fixtures.
+
+The same SDK21 pair's fresh full RHEL 9 connected attempt,
+`native-rhel-sdk21-attempt1.json`, SHA-256
+`3fa6efb417e8b29e92fa3830642a34063ccd0d9f5ae3192a90b059370bd360d3`,
+failed in 199.11 seconds at local PostgreSQL readiness: one command, no browser
+decisions and one failure. Entitlement registration, metadata refresh,
+unregistration and activation-key deletion passed; full owned cleanup is false.
+
+Four subsequent one-guest observations are strictly `first-run-install-only`,
+with `lifecycle_qualified: false`; none qualifies management or recovery.
+`rhel-sdk21-postgres-diagnostic4.json`, SHA-256
+`3fc5689d91553fe6f42963d0b06d09f6adbd85fe0476484ccb9cd03e757086b3`,
+retained the decisive encrypted journal identity: actual PostgreSQL UID/GID 26
+running in `init_t:s0`, not `postgresql_t`, with SELinux Enforcing. Private
+database directories were postgres-owned 0700, configuration files 0600,
+all correctly `postgresql_db_t`; the executable was `postgresql_exec_t`.
+The process could not open its configuration. No malformed credential, TLS
+failure or bad PostgreSQL major is inferred.
+
+The maintained failure observer now retains bounded owned PostgreSQL journals,
+process identities, filesystem modes/labels, native vendor-unit metadata and
+available audit records through the existing operator-encrypted, create-exclusive
+diagnostic path only. Raw contents never enter public errors or release inputs.
+
+The owner-approved correction preserves the separate private cluster and every
+existing sandbox directive except PostgreSQL's NNP setting on verified Enforcing
+hosts, matching the distro unit so SELinux can transition to `postgresql_t`.
+Ubuntu and other enforcement states retain NNP. Before creating database URLs
+or roles, the installer requires the actual running MainPID's PostgreSQL domain;
+otherwise it stops its owned unit and refuses. There is no custom SELinux policy
+module. Regression tests pin the single-directive exception and reject the
+observed `init_t` context. Native RHEL proof independently requires Enforcing,
+`postgresql_t`, the configured NNP exception and kernel `NoNewPrivs: 0`.
+The already signed SDK21 artifacts remain unchanged and its RHEL result remains
+**FAIL**; a newly signed release must prove the correction end to end.
+Focused installer and native-lab regression packages passed; the installer
+security re-review closed with no findings.
 
 #### Durable laboratory custody escrow
 

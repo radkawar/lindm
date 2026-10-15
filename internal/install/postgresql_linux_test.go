@@ -6,6 +6,7 @@ package install
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -149,5 +150,68 @@ func TestRHELModuleSelectionFollowsReadOnlyAdmission(t *testing.T) {
 				t.Fatalf("unsafe state mutated modules: %v: %v", calls, err)
 			}
 		})
+	}
+}
+
+func TestPostgreSQLSELinuxEnforcementControlsOnlyVendorNNPException(t *testing.T) {
+	for _, test := range []struct {
+		name, distro, release, state  string
+		commandError, want, wantError bool
+	}{
+		{name: "ubuntu", distro: "ubuntu", release: "24.04"},
+		{name: "enforcing", distro: "rhel", release: "9", state: "Enforcing", want: true},
+		{name: "permissive", distro: "rhel", release: "9", state: "Permissive"},
+		{name: "disabled", distro: "rhel", release: "9", state: "Disabled"},
+		{name: "unknown", distro: "rhel", release: "9", state: "unrecognized", wantError: true},
+		{name: "empty", distro: "rhel", release: "9", wantError: true},
+		{name: "command failed", distro: "rhel", release: "9", commandError: true, wantError: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			run := func(_ context.Context, input []byte, name string, args ...string) ([]byte, error) {
+				calls++
+				if name != "getenforce" || len(args) != 0 || len(input) != 0 {
+					t.Fatal("enforcement detection executed an unexpected command")
+				}
+				if test.commandError {
+					return nil, errors.New("unavailable")
+				}
+				return []byte(test.state + "\n"), nil
+			}
+			got, err := postgresSELinuxEnforcing(t.Context(), platform.ForManifest(test.distro, test.release), run)
+			if got != test.want || (err != nil) != test.wantError {
+				t.Fatalf("enforcement=%t error=%v", got, err)
+			}
+			if test.distro == "ubuntu" && calls != 0 || test.distro == "rhel" && calls != 1 {
+				t.Fatal("SELinux detection escaped its native platform boundary")
+			}
+		})
+	}
+}
+
+func TestPostgreSQLVendorNNPExceptionPreservesEveryOtherSandboxDirective(t *testing.T) {
+	normal := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", false)
+	enforcing := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", true)
+	if !strings.Contains(normal, "\nNoNewPrivileges=yes\n") || !strings.Contains(enforcing, "\nNoNewPrivileges=no\n") ||
+		strings.Replace(enforcing, "\nNoNewPrivileges=no\n", "\nNoNewPrivileges=yes\n", 1) != normal {
+		t.Fatal("vendor confinement exception changed more than the PostgreSQL NNP directive")
+	}
+	for _, directive := range []string{"User=postgres", "Group=postgres", "RuntimeDirectoryMode=0700", "UMask=0077", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "InaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate", "LimitCORE=0", "MemorySwapMax=0"} {
+		if !strings.Contains(enforcing, "\n"+directive+"\n") {
+			t.Fatalf("SELinux-confined unit lost %s", directive)
+		}
+	}
+}
+
+func TestPostgreSQLSELinuxDomainRejectsTheObservedInitDomain(t *testing.T) {
+	for _, label := range []string{"system_u:system_r:postgresql_t:s0", "system_u:system_r:postgresql_t:s0:c0,c1\x00\n"} {
+		if !postgresSELinuxDomain([]byte(label)) {
+			t.Fatal("expected PostgreSQL confinement was refused")
+		}
+	}
+	for _, label := range []string{"", "postgresql_t", "system_u:system_r:init_t:s0", "system_u:system_r:unconfined_service_t:s0", "system_u:system_r:postgresql_t_extra:s0", "system_u:system_r:postgresql_t"} {
+		if postgresSELinuxDomain([]byte(label)) {
+			t.Fatal("missing or wrong PostgreSQL confinement was accepted")
+		}
 	}
 }
