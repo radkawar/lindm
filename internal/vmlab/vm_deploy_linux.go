@@ -37,6 +37,7 @@ type VMDeployOptions struct {
 	BackupRecipientFile, BackupIdentityFile, TUFRootFile         string
 	CustodyEscrowRecipientFile                                   string
 	RedHatTokenFile                                              string
+	WithoutFindings                                              bool
 	BackupIdentityPassphrase                                     []byte `json:"-"`
 	Browser                                                      func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error)
 	VerifyBackup                                                 func(context.Context, string) error
@@ -49,6 +50,9 @@ type VMDeployResult struct {
 	StartedAt                        time.Time                    `json:"started_at"`
 	FinishedAt                       time.Time                    `json:"finished_at"`
 	Passed                           bool                         `json:"passed"`
+	Scope                            string                       `json:"scope,omitempty"`
+	FindingsExcluded                 bool                         `json:"findings_excluded"`
+	LifecycleQualified               bool                         `json:"lifecycle_qualified"`
 	Failure                          string                       `json:"failure,omitempty"`
 	ImageID                          string                       `json:"image_id"`
 	ImageSHA256                      string                       `json:"image_sha256"`
@@ -98,6 +102,7 @@ type VMDeployResult struct {
 // It never opens the shared development database or imports a fixture owner.
 func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDeployOptions) (result *VMDeployResult, err error) {
 	result = &VMDeployResult{StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), ServerMinimumDiskBytes: deployServerDiskBytes}
+	setDeployResultScope(result, options)
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
 		result.ManualCommands, result.OperatorDecisions, result.ObservedFailures = deploylab.Counts(result.Operations)
@@ -106,6 +111,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			result.OwnedCleanupComplete = false
 			result.Failure = "native_deployment_failed"
 		}
+		setDeployResultScope(result, options)
 	}()
 	if err := validateManifest(manifest); err != nil {
 		return result, err
@@ -313,10 +319,14 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	request.CommandPath = filepath.Join(private, "console-command")
 	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
 		result.DeviceID = enrolled.DeviceID
-		if err := browser("manage", enrolled.DeviceID); err != nil {
-			return errors.Join(err, saveDeployFailureJournal(ctx, server, options.CustodyEscrowRecipientFile, options.EvidenceDirectory, "management-server-journal"))
-		}
-		if err := findings(server, "installed", firstInstallStarted); err != nil {
+		if err := observeDeployManagedPhase(options, func() error {
+			if err := browser("manage", enrolled.DeviceID); err != nil {
+				return errors.Join(err, saveDeployFailureJournal(ctx, server, options.CustodyEscrowRecipientFile, options.EvidenceDirectory, "management-server-journal"))
+			}
+			return nil
+		}, func() error {
+			return findings(server, "installed", firstInstallStarted)
+		}); err != nil {
 			return err
 		}
 		admin.fence()
@@ -367,10 +377,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return err
 		}
 		upgradeManagementStarted := time.Now().UTC()
-		if err := browser("manage", enrolled.DeviceID); err != nil {
-			return err
-		}
-		if err := findings(server, "upgraded", upgradeManagementStarted); err != nil {
+		if err := observeDeployManagedPhase(options, func() error {
+			return browser("manage", enrolled.DeviceID)
+		}, func() error {
+			return findings(server, "upgraded", upgradeManagementStarted)
+		}); err != nil {
 			return err
 		}
 		admin.fence()
@@ -538,10 +549,11 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return runErr
 		}
 		restoreManagementStarted := time.Now().UTC()
-		if runErr := browser("manage", enrolled.DeviceID); runErr != nil {
-			return runErr
-		}
-		if runErr := findings(restored, "restored", restoreManagementStarted); runErr != nil {
+		if runErr := observeDeployManagedPhase(options, func() error {
+			return browser("manage", enrolled.DeviceID)
+		}, func() error {
+			return findings(restored, "restored", restoreManagementStarted)
+		}); runErr != nil {
 			return runErr
 		}
 		result.RestoredCurrentSecuritySnapshot = true
@@ -552,11 +564,34 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	if err != nil {
 		return result, err
 	}
-	if err := validateDeployFindingsStages(result.DeviceID, result.Findings); err != nil {
-		return result, err
+	if !options.WithoutFindings {
+		if err := validateDeployFindingsStages(result.DeviceID, result.Findings); err != nil {
+			return result, err
+		}
 	}
 	result.Passed, result.OwnedCleanupComplete = true, true
 	return result, nil
+}
+
+// Management always proves a completed action and fresh same-device inventory.
+// Only the subsequent Findings browser and independent SQL observation is optional.
+func observeDeployManagedPhase(options VMDeployOptions, manage, findings func() error) error {
+	if err := manage(); err != nil {
+		return err
+	}
+	if options.WithoutFindings {
+		return nil
+	}
+	return findings()
+}
+
+func setDeployResultScope(result *VMDeployResult, options VMDeployOptions) {
+	result.Scope = ""
+	result.FindingsExcluded = options.WithoutFindings
+	result.LifecycleQualified = result.Passed && !options.WithoutFindings
+	if options.WithoutFindings {
+		result.Scope = deploylab.ServerLifecycleScope
+	}
 }
 
 func prepareDeployEntitlement(ctx context.Context, guest *guestVM, options VMDeployOptions, evidence **VMRedHatEvidence) (*vmRedHatRegistration, error) {

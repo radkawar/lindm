@@ -14,6 +14,9 @@ import (
 // FirstRunInstallScope never qualifies the full backup/upgrade/restore lifecycle.
 const FirstRunInstallScope = "first-run-install-only"
 
+// ServerLifecycleScope excludes Findings and never qualifies the full lifecycle.
+const ServerLifecycleScope = "native-server-lifecycle-without-findings"
+
 // Operation records an observed operator boundary, not an inferred runbook step.
 // Name is fixed harness text; commands, credentials and guest output are excluded.
 type Operation struct {

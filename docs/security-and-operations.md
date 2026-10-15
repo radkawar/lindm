@@ -1709,6 +1709,14 @@ units' distinct `LoadCredential=` sources while the actual server is active.
 These filesystem/credential gates enter the private nonsecret workflow record;
 database passwords never enter browser configuration or published evidence.
 
+`lab deploy -without-findings` is a separate server-lifecycle observation. It
+retains every install, managed-inventory, security, backup, upgrade and fresh-host
+restore check, but excludes Findings and cannot qualify the full lane. Its record
+must say `scope: native-server-lifecycle-without-findings`,
+`findings_excluded: true` and `lifecycle_qualified: false`. Matrix import accepts
+only that exact scope; never relabel it as full lifecycle or discard a failed
+Findings result.
+
 For a release producer's single-bundle install/first-owner timing, use the separate
 `lab deploy setup` subcommand. It reserves one fresh native guest, uses the same
 signed install, owned PostgreSQL, root-only database credential and CA-trusted

@@ -4071,6 +4071,17 @@ The authenticator is Chromium's CTAP2 user-verified virtual authenticator, not
 physical-authenticator qualification. No password, setup code, enrollment command,
 age identity or offline private signer enters the public record/screenshots.
 
+Use `-without-findings` only for a separately requested **server-lifecycle**
+observation. It excludes the three Findings browser/SQL gates, not management or
+fresh inventory. Native install, browser setup and clipboard enrollment, all
+credential/TLS/SQL and integration-key checks, encrypted backup/drill, signed
+upgrade, quorum-approved fresh-host recovery and new original-device management
+remain mandatory. Its record always has scope
+`native-server-lifecycle-without-findings`, `findings_excluded: true` and
+`lifecycle_qualified: false`, even on failure. Matrix import requires that exact
+scope and refuses dropped, full-lifecycle or contradictory labels. Such a pass
+does not qualify vulnerability Findings or replace a failed full-lane result.
+
 Before declaring a native console browser-compatible, run the maintained
 `web/acceptance/deploy.mjs` `tls` phase with its protected configuration, exact
 HTTPS origin, independently authenticated CA and private evidence directory.
@@ -5200,6 +5211,52 @@ integration tests admit that unchanged window and still reject one second short
 of ninety 24-hour days; native `psql` also starts in UTC. Both security reviews
 closed with no findings. A new signed lifecycle must qualify RHEL; this failure
 is not promoted.
+
+SDK24's authentic 0.2.26 → 0.2.27 pair at source
+`52ef03cbb8681d81f2aa42fc73df1e00bd0af8c8` passed the fresh, empty-cache
+production build `cold-release-attempt26.json` in 1,642.80 seconds, SHA-256
+`eb6d7d231c9c49d70eb75410b755b09bd1189af7ca15691deaacfd2bc10eb2c4`.
+The build remains separate from deployment qualification. Fresh Ubuntu
+`native-ubuntu-attempt35.json`, SHA-256
+`458e9eeca915d4dc102530c99945d885ede58f1bb05339d3ceb32560ccb83d93`,
+is full native lifecycle **PASS** in 770.44 seconds: 11 commands, 89 browser
+decisions, no failures and complete owned cleanup. All strict stock-browser
+setup, Ready repository, exact clipboard enrollment, PLUS/SQL authority,
+root-only credential, encrypted integration/backup, real native upgrade and
+quorum-approved current-security fresh-host recovery gates pass. The original
+device completes new restored action `61d3daa9-d09d-4a5b-8a6b-584805b6bb9d`,
+inventory sequence 4 and independently verified Findings. First observed
+Findings took 373,537 ms from installer invocation; refresh start to durable
+evaluation took 196,506 ms. The authenticated pair and public pins were handed
+to AWSDeploy; its separately recorded SDK20 AWS lifecycle remains source-specific.
+
+The same pair's fresh RHEL full lane `native-rhel-sdk24-attempt1.json`, SHA-256
+`19e687fd3e3f3322dc04bd7628f2074edf293dff06b7a64c2ab6808923b389a4`,
+is **FAIL** in 5,724.78 seconds: two commands, 51 browser decisions and one
+failure. Native installation itself completes in 34.91 seconds. Actual hardened
+PostgreSQL, PLUS and runtime SQL denials, protected stock-browser owner setup,
+Ready repository, integration encryption, exact clipboard RHEL enrollment and a
+completed management action with fresh inventory pass. The following Findings
+phase exhausts its ninety-minute deadline with `feed_partial_coverage` and
+unknown exposure. The final screenshot contains real vendor advisory rows,
+not just a download spinner; this does not establish complete feed authority.
+Backup, upgrade and restore are not reached. Registration cleanup succeeds;
+full owned lifecycle cleanup is not claimed. The owner's separately authorized
+server-lifecycle scope excludes Findings explicitly; it cannot promote this
+full-lane failure.
+
+Source inspection confirms connected defaults enable refresh and inventory-derived
+RHEL sources; the actual `auto-rhel-9-x86_64-redhat-csaf-9.8` selection is correct.
+The authenticated paired-archive adapter deliberately never asserts
+`CompleteSnapshot`. Publication preserves that limitation, and the native
+matcher returns `UNKNOWN/feed_partial_coverage`. Existing live-source tests and
+the RHEL/architecture runbooks explicitly retain this conservative policy.
+Bounded derivative-package `PARTIAL` is a different contract and cannot be
+substituted for this unknown RHEL exposure. The browser's broad
+`vendor_feed_unpublished_or_stale` label also covers incompleteness because its
+`Fresh` field includes complete coverage; it does not prove a stalled download
+or expired timestamps. No completeness, freshness, rejection or proof gate is
+weakened to obtain a release result.
 
 #### Durable laboratory custody escrow
 

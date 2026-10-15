@@ -36,6 +36,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeployOptions
 	manifestPath := flags.String("manifest", "", "pinned fresh Ubuntu24.04 or entitled RHEL9 x86 cloud image")
+	flags.BoolVar(&options.WithoutFindings, "without-findings", false, "prove only the native server lifecycle; exclude Findings and never qualify the full lifecycle")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "configured native lab work directory")

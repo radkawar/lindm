@@ -33,12 +33,18 @@ func matrixImportEvidenceSHA256(path, cell, scope string) (sum string, err error
 	var record struct {
 		Scope              string `json:"scope"`
 		LifecycleQualified *bool  `json:"lifecycle_qualified"`
+		FindingsExcluded   bool   `json:"findings_excluded"`
 	}
 	decodeErr := json.NewDecoder(io.LimitReader(input, 8<<20)).Decode(&record)
-	if cell == "deploy" && decodeErr != nil && (scope == "" || scope == deploylab.FirstRunInstallScope) {
+	if decodeErr != nil && (scope == deploylab.ServerLifecycleScope || (cell == "deploy" && (scope == "" || scope == deploylab.FirstRunInstallScope))) {
 		return "", errors.New("unscoped deploy or first-run import requires bounded readable JSON evidence; historical logs require their explicit historical scope")
 	}
 	if decodeErr == nil {
+		if record.Scope == deploylab.ServerLifecycleScope || record.FindingsExcluded || scope == deploylab.ServerLifecycleScope {
+			if record.Scope != deploylab.ServerLifecycleScope || scope != deploylab.ServerLifecycleScope || !record.FindingsExcluded || record.LifecycleQualified == nil || *record.LifecycleQualified {
+				return "", errors.New("server lifecycle without Findings requires matching -scope native-server-lifecycle-without-findings, findings_excluded:true and lifecycle_qualified:false")
+			}
+		}
 		if record.Scope == productionSigningScope {
 			return "", errors.New("production signing tests-only evidence cannot qualify deploy or lifecycle")
 		}
