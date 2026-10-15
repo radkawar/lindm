@@ -4342,6 +4342,13 @@ lab deploy build \
   -evidence "$NEW_PRIVATE_COLD_EVIDENCE_DIRECTORY" -record "$NEW_BUILD_RECORD"
 ```
 
+Protect only your own qualification worktree root before this lane:
+`chmod 0700 "$ACTUAL_INTEGRATED_GIT_CHECKOUT"`. Mode 0755 is also protected, but
+0700 is preferred for a private worktree. A group-writable root (including a
+new worktree's possible 0775 default) is deliberately refused by production
+signing-directory checks. Never change the shared checkout, unrelated ancestors,
+`~/.config` permissions or authenticated signed bundle members.
+
 The configured local native FIFO admits one 8192-MiB/two-vCPU x86 KVM guest.
 The maintained production-signing SDK recipes supply vendor-authenticated Ubuntu
 prerequisites and HTTPS-checked Go 1.26.9 / Node 24.21.0; this command does not
@@ -5341,6 +5348,66 @@ permissive-mode change. Focused unit tests pass and security review has no
 findings. Encrypted, size-capped native failure diagnostics additionally retain
 80 lines from the transient checker journal, so another execution failure is
 not hidden behind its numeric exit code.
+
+SDK26 freezes the reviewed RPM execution fixes at
+`1c31b79f1e03103ee6d74f16d364571e3ad24bde`. Its authentic 0.2.30 → 0.2.31
+pair passes `cold-release-attempt28.json` in 1,878.48 seconds, SHA-256
+`b65b907f51e97f6dc218550cd9c2e5cb34add6898cfee8352abc9906f0188ac7`.
+The fresh clone, pristine caches, pinned SDKs, no-swap signing, literal release
+commands, authenticated exports and complete cleanup remain build-only evidence.
+
+The independent fresh RHEL 9.8 connected server lifecycle now **passes**:
+`native-rhel-sdk26-server-lifecycle-attempt1.json`, SHA-256
+`21acfd954eb946b98ff2949722f32d3dffd2864a47e52048995c6e91fe72a5f4`.
+Its actual guest workflow takes 737.38 seconds; the 3,734.17-second command wall
+time includes normal FIFO admission. The proof records 11 commands, 69 browser
+decisions, zero failures and complete cleanup, including all three RHSM consumers
+and activation keys. Stock Chromium 156 verifies installer-generated P-256 TLS,
+password plus UV passkey owner setup, Ready repository and exact clipboard
+enrollment. Native management completes with fresh inventory.
+
+Encrypted backup and offline drill pass. Native RPM upgrade takes 25.34 seconds.
+The current-security snapshot is independently fenced, with an offline
+higher-epoch recovery quorum; restore into a fresh RHEL host takes 16.57 seconds.
+The original device `47d1630e-76c9-44da-810d-087415056a4b` completes **new**
+post-restore action `97f9e5cc-339b-4c75-b27e-b7eb8d8c9128` with fresh inventory.
+Installed, upgraded, fresh-destination and restored credentials retain root:root
+0600 custody and ephemeral delivery. PLUS, six runtime SQL denials and actual
+enforcing PostgreSQL confinement pass. The fresh integration key cannot decrypt
+the original destination; the restored original key can. Both console and device
+trust survive upgrade and recovery with strict HTTPS verification.
+
+This result retains exactly `native-server-lifecycle-without-findings`,
+`findings_excluded: true` and `lifecycle_qualified: false`. It proves the server
+care cycle, **not** vulnerability Findings, full lifecycle qualification, RHEL
+air-gap installation, other server platforms or later source revisions. The
+separate full RHEL Findings failure remains recorded; its deliberate partial
+Red Hat authority is not converted into a successful exposure assessment.
+
+The same SDK26 pair also passes the **full** fresh Ubuntu 24.04 lifecycle:
+`native-ubuntu-attempt36.json`, SHA-256
+`27cbd21782d90875404e13670fcf6689d402b448f9dac458b89049d6a71fe049`.
+Its guest workflow takes 801.29 seconds; command wall time is 7,383.47 seconds
+including unchanged FIFO admission. There are 11 commands, 78 browser decisions,
+zero failures and complete cleanup. `findings_excluded` is false and
+`lifecycle_qualified` is true. Stock Chromium verifies generated certificates,
+password and UV passkey setup, Ready repository and clipboard enrollment.
+The initial real Ubuntu feed download and same-device evaluation complete;
+Findings are independently checked against stored SQL state, before and after
+upgrade and recovery, rather than inferred from a successful browser render.
+
+The first qualifying observation takes 387,188 ms from installer invocation,
+including installation, setup, enrollment and inventory. First refresh start to
+durable evaluation takes 201,203 ms. These are observed timings, not guarantees.
+Native upgrade takes 36.07 seconds and fresh-host recovery takes 31.65 seconds.
+The original device `fe22d81f-ac36-4b65-a3ec-00f50c7c5e25` completes **new**
+post-restore action `02340e74-791a-4070-b8a2-f577896c0590`, sends inventory
+sequence 4 with 759 packages, and receives a durable matching Findings evaluation.
+Encrypted backup/drill, independently fenced current-security recovery, offline
+higher-epoch quorum, root-only credential delivery, exact console/device trust
+preservation and restored integration-key decryption all pass, including the
+negative fresh-key check. This qualifies only the recorded source/platform,
+not the later server-platform expansion or its still-separate qualification.
 
 #### Durable laboratory custody escrow
 

@@ -14151,6 +14151,40 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "d90117efd9c4cd96932e6c096b233f6fb76c9c2f"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt36.json",
+      "sha256": "27cbd21782d90875404e13670fcf6689d402b448f9dac458b89049d6a71fe049",
+      "recorded": "2026-10-15T19:46:50.414918440Z",
+      "revision": "1c31b79f1e03103ee6d74f16d364571e3ad24bde",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full-native-lifecycle-sdk26-1c31b79f1",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "1c31b79f1e03103ee6d74f16d364571e3ad24bde"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-rhel-sdk26-server-lifecycle-attempt1.json",
+      "sha256": "21acfd954eb946b98ff2949722f32d3dffd2864a47e52048995c6e91fe72a5f4",
+      "recorded": "2026-10-15T17:43:31.884717195Z",
+      "revision": "1c31b79f1e03103ee6d74f16d364571e3ad24bde-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "native-server-lifecycle-without-findings",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "1c31b79f1e03103ee6d74f16d364571e3ad24bde"
     }
   ]
 }
