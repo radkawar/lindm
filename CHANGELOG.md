@@ -17,6 +17,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Observe an enrolled device's authoritative console lifecycle independently from managed work in native deployment browser proof, without treating enrollment as inventory or action completion.
 - Add an AWS Terraform deployment for Ubuntu 24.04 with private RDS PostgreSQL, SSM-only access, root-only external database credentials, required verified TLS and a signed Turnkey installation runbook.
 - Record real AWS PostgreSQL 16 signed installation, stock-browser setup, EC2 enrollment, managed inventory, evaluated automatic vendor findings, encrypted native backup, offline archive validation and native zero-leftover cleanup evidence; keep fresh-host recovery explicitly unqualified pending the corrected signed release.
+- Record the complete Ubuntu 24.04 native signed-install, stock-browser owner setup, clipboard enrollment, real management and Findings, encrypted backup, upgrade and fresh-host recovery proof; retain the failed fresh-RHEL source evidence separately.
 
 ### Changed
 
@@ -43,6 +44,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Stage live restore archives in a root-only data-filesystem directory instead of exhausting the shared `/run` tmpfs; preflight disk capacity, create files exclusively without following symlinks, and remove temporary plaintext on returned success or failure.
 - Keep private restore staging in a separate `/var/lib/lindmd-restore` tree, preserving service-readable operational-state permissions and excluding recovery plaintext from backup inventory.
 - Observe strict-TLS readiness after native service starts before the independent exact-certificate probe; fail immediately on trust or HTTP refusals, retry no mutations, and retain failed restored-service journals only as operator-encrypted lab evidence.
+- Create a missing protected `/var/backups` parent on fresh RHEL without widening existing permissions; retain root-only backup storage and refuse unsafe parents.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.

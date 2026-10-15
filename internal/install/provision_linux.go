@@ -16,10 +16,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/sys/unix"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	configv1 "lindm/gen/lindm/config/v1"
+	"lindm/internal/custody"
 	"lindm/internal/platform"
 	"lindm/internal/serverops"
 )
@@ -48,7 +50,7 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 	if err := directory("/var/lib/lindmd-operations/setup", 0, 0, 0700); err != nil {
 		return err
 	}
-	if err := directory("/var/backups/lindm", 0, 0, 0700); err != nil {
+	if err := prepareBackupDirectory(); err != nil {
 		return err
 	}
 	var pguid, pggid int
@@ -138,6 +140,30 @@ func provision(ctx context.Context, o Options, release *platform.Release, custod
 	}
 	state.Pending.Provisioned = true
 	return writeInstallationState(state)
+}
+
+// RHEL need not provide /var/backups. Create only the missing protected parent;
+// existing operator permissions must not be widened to install lindm.
+func prepareBackupDirectory() error {
+	parent, _, err := custody.OpenRoot("/var", unix.O_PATH|unix.O_DIRECTORY)
+	if err != nil {
+		return err
+	}
+	mkdirErr := unix.Mkdirat(int(parent.Fd()), "backups", 0755)
+	if errors.Is(mkdirErr, unix.EEXIST) {
+		mkdirErr = nil
+	}
+	if err = errors.Join(mkdirErr, parent.Close()); err != nil {
+		return err
+	}
+	parent, _, err = custody.OpenRoot("/var/backups", unix.O_PATH|unix.O_DIRECTORY)
+	if err != nil {
+		return err
+	}
+	if err = parent.Close(); err != nil {
+		return err
+	}
+	return directory("/var/backups/lindm", 0, 0, 0700)
 }
 
 func writeConfig(path string, cfg *configv1.ServerConfig, uid, gid int) error {

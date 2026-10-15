@@ -2314,6 +2314,11 @@ execution keys in one export do not constitute three independent humans.
 Supplied-custodian mode requires the operator to retain its encrypted CA/root
 key inputs separately as well.
 
+Native installation creates `/var/backups/lindm` as a root-owned 0700 directory.
+It creates `/var/backups` if the distro does not supply it, preserving any
+existing parent's stricter permissions. A linked, non-directory, non-root-owned
+or group/other-writable parent is refused rather than adopted or repaired.
+
 For an immediate native backup:
 
 ```sh

@@ -4998,6 +4998,60 @@ bounded service journals directly as operator-encrypted ciphertext before
 teardown. This is an observation correction, not an established diagnosis of
 the earlier reset; SDK20's signed contents are unchanged.
 
+Fresh `native-ubuntu-attempt31.json`, SHA-256
+`c143fe549c1e93d4255ad205238b9a3e9239c912116250c1a692660434f6ba7e`,
+is the first complete SDK20 Ubuntu 24.04 x86 native lifecycle **PASS**:
+727.58 seconds, zero observed failures and owned cleanup complete.
+Signed product source remains
+`16a96e3f6b5cdb678fdec4aa1be8eb6aa3b36c4c`; the strict-readiness observer is
+`242bd3b25702eeb96f5b5ec45e5d72334545bb14`.
+
+The same 0.2.18 → 0.2.19 authentic pair passed protected first owner setup,
+stock Chromium with generated P-256 console certificates and a user-verifying
+passkey, Ready agent repository, exact clipboard enrollment, real PostgreSQL
+SCRAM-SHA-256-PLUS and six SQLSTATE 42501 runtime privilege denials. Installed,
+upgraded and restored browser Findings each matched independent SQL evaluation
+of the same completed managed action and fresh inventory snapshot. The first
+qualifying observation took 364,873 ms from installer invocation; first refresh
+start to durable evaluation took 186,469 ms.
+
+Encrypted backup took 7.64 seconds, archive validation 0.95 seconds, authentic
+upgrade 31.60 seconds and actual fresh-host restore 29.97 seconds. Offline
+quorum approval bound the earlier archive and complete current fenced security
+snapshot to a higher recovery epoch. Root-only credentials passed at all four
+stages; the fresh integration key could not decrypt the original destination,
+and the restored original key did. All three strict console TLS probes passed
+with unchanged console and device CA digests. After recovery, the original
+device `9cda8b50-d423-417b-9594-d021143fe07c` completed new action
+`7f2be172-7c6e-452e-8784-cd06fb5b1084`; inventory sequence 4 and its evaluated
+Findings passed. The current-security-snapshot and cleanup flags are both true.
+
+Full-lifecycle operation counts were 11 commands and 144 recorded browser
+decisions, including repeated read-only pre-send **Check again** controls while
+the original device reconnected. Those are observed drill interactions, not
+144 first-install decisions or retries of accepted work. Laboratory custodians
+remain operator fixtures, not independent humans.
+
+The same pair's first fresh RHEL 9 connected run,
+`native-rhel-sdk20-attempt1.json`, SHA-256
+`50371e2a3fdff0f3c7a14592064702f85cb54f8d138afdde038b500985ecef80`,
+failed after 127.43 seconds at native installation: one command, no browser
+decisions and one observed failure. Registration, refreshed repository metadata,
+unregistration and activation-key deletion passed; overall owned cleanup is
+false. The encrypted installer diagnostic was classified inside a no-swap,
+no-core-dump transient unit: `mkdir /var/backups/lindm: no such file or directory`.
+Fresh RHEL does not provide Ubuntu's `/var/backups` parent.
+
+Provisioning now creates only that missing parent through its held,
+root-protected `/var` descriptor, then verifies `/var/backups` with protected
+no-symlink ancestry before creating the root-only child. It never changes an
+existing parent's permissions. Seven isolated root/chroot cases passed:
+missing parent, existing normal/private parent, and refusal of writable,
+symlink, regular-file and unsafe-ancestor parents. This fix is not present in
+SDK20; its RHEL result remains **FAIL** until a newly signed pair passes the
+complete fresh connected lifecycle.
+The installer security re-review closed with no findings.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
