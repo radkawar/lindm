@@ -139,6 +139,12 @@ interfaces; do not force external standards into proprietary RPC envelopes.
 - Support current and previous two released minor agent series for at least 90 days.
   Deprecated compatibility has an announced end date. Unsupported agents may obtain
   a verified update but cannot receive plans they cannot safely execute.
+  Stock startup admits only the verified installed bundle's exact compiled
+  release/source identity and protocol. The release-control lock serializes
+  activation with owner registration; one transaction records the new series,
+  extends the former three series' retirement notice and writes its audit.
+  Restarts and patch upgrades do not rewrite existing history. Custom native
+  publications cannot authorize release compatibility.
 
 ### Server schema compatibility
 

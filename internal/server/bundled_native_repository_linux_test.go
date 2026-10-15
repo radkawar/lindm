@@ -130,6 +130,9 @@ func TestInstalledBundleProvidesReadyEnrollmentWithoutRepositoryConfig(t *testin
 	if native.apt.err != nil {
 		t.Fatal(native.apt.err)
 	}
+	if native.bundledRelease == nil || native.bundledRelease.GetVersion() != "1.0.0" {
+		t.Fatal("verified installed release lost its compatibility authority")
+	}
 	instructions := enrollmentInstructions(resources, native)
 	if !instructions.GetReadiness().GetReady() || instructions.GetAptRepository().GetSigningKeyFingerprint() != f.fingerprint {
 		t.Fatalf("readiness or signer: %v", instructions.GetReadiness())
@@ -173,6 +176,9 @@ func TestInstalledBundleRefusesTamperedReleaseAndUnsafeFiles(t *testing.T) {
 			native := loadNativeBundle(t.Context(), f.directory)
 			if native.apt.err == nil || native.rpm.err == nil || native.arch.err == nil {
 				t.Fatal("unsafe bundle supplied installation instructions")
+			}
+			if native.bundledRelease != nil {
+				t.Fatal("unsafe bundle supplied release compatibility authority")
 			}
 		})
 	}

@@ -4554,6 +4554,36 @@ HTTPS. They separately record the unchanged Ed25519 device identity and require
 both authentic CAs to survive upgrade and restore. No historical fixture-TLS
 observation or production-cold-build record is promoted to that qualification.
 
+The `eb5720e886fbd4d8aadf2de95bde487d08c840b7` cold SDK15 build then
+completed the literal fresh-guest `make release-keys` and two `make release` commands
+for 0.2.8 and 0.2.9. `cold-release-attempt16.json` SHA-256 is
+`52856b9d5a0161ecca63caa4650dff9c79360504363f367cda9cf96a86969536`.
+It remains build-only evidence, not native lifecycle qualification.
+`native-ubuntu-attempt16.json` SHA-256 is
+`88eec40ebcf3519088700b281dfb04f71893778033e664f20a233d457047d832`;
+the diagnostic observer at `a797d928d5bc2bb42ac205a7cc7ce37d3a72fea4`
+used the same untouched signed SDK15 pair for `native-ubuntu-attempt17.json`,
+SHA-256 `2f211075f47afc30e3d9c21e6a4d455ac539af30afea9d7ebabf7669e31df43d`.
+Both default-certificate runs established stock Chromium HTTPS, password/passkey
+setup, Ready agent packages, owner step-up custody, actual SCRAM-PLUS, root-only
+database credentials, a decryptable encrypted integration destination and
+clipboard enrollment. Both observed two manual commands, 48 operator decisions
+and one failed operation before backup. Their source-scoped ledger verdicts are
+**FAIL**: no completed management action, fresh action inventory, backup, upgrade
+or restore was established.
+
+Native17 retained only age-encrypted management journals before owned guest
+teardown. Its agent stdout ciphertext SHA-256 is
+`a3baffddaa7fdd3d203072554cf63b21ffe5f97af4c6b3f1dc357fe1261dfebc`.
+The redacted journal established `agent_release_unsupported` on both device-action
+and service-work polling, after execution trust synchronized. The fresh database
+had no registered release series: verified embedded package publication had not
+activated compatibility. Startup now registers only the authenticated installed
+bundle's exact compiled release/source identity and protocol, with immutable
+history and the same ninety-day retirement rules. That repair needs new signed
+bundles and the complete Ubuntu and RHEL native lifecycle runs; prior failed
+records are not rewritten or promoted.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

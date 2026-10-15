@@ -35,6 +35,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
+	releasev1 "lindm/gen/lindm/release/v1"
 	"lindm/internal/config"
 	"lindm/internal/packaging"
 )
@@ -66,6 +67,9 @@ type nativeFile struct {
 
 type nativeRepositories struct {
 	apt, rpm, arch *nativeRepository
+	// Set only after validating the protected installed release attestations.
+	// Explicit custom native repositories do not grant release compatibility.
+	bundledRelease *releasev1.ReleaseManifest
 }
 
 func loadNativeRepositories(ctx context.Context, resources *config.Resources) *nativeRepositories {

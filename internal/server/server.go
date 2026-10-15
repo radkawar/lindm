@@ -268,6 +268,7 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		return nil, err
 	}
 	assistanceRuntime := assistance.NewRuntime()
+	buildIdentity := buildinfo.Current()
 	deviceConfig := devicecore.Config{
 		DeploymentID:                 resources.Proto.GetDeploymentId(),
 		CACertificate:                resources.DeviceCACertificate,
@@ -281,7 +282,7 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 		EscrowRevealApprovalRequired: resources.EscrowRevealApprovalRequired,
 		ReleasePublisher:             releasePublisher,
 		RecoveryArtifacts:            recoveryArtifacts,
-		ServerRelease:                buildinfo.Current().Version,
+		ServerRelease:                buildIdentity.Version,
 		ServerProtocol:               buildinfo.ProtocolVersion,
 		RequireReleaseCompatibility:  true,
 		EnrollmentInstructions:       enrollmentInstructions(resources, native),
@@ -295,6 +296,9 @@ func newControlPlane(ctx context.Context, pool, adminPool *pgxpool.Pool, resourc
 	devices, err := device.New(pool, deviceConfig, assistanceRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("initialize device service: %w", err)
+	}
+	if err := activateBundledRelease(ctx, devices.Service, native, buildIdentity); err != nil {
+		return nil, fmt.Errorf("activate authenticated installed release compatibility: %w", err)
 	}
 	// SQL cores retain separate pool admission; only the process-local assistance
 	// command broker is shared between administrative admission and device sync.

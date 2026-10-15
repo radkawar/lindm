@@ -87,9 +87,10 @@ func loadNativeBundle(ctx context.Context, directory string) *nativeRepositories
 		hashes[artifact.GetPath()] = artifact.GetSha256()
 	}
 	result := &nativeRepositories{
-		apt:  loadNativeRepository(ctx, directory, "apt", fingerprint),
-		rpm:  loadNativeRepository(ctx, directory, "rpm", fingerprint),
-		arch: loadNativeRepository(ctx, directory, string(packaging.FormatArch), fingerprint),
+		apt:            loadNativeRepository(ctx, directory, "apt", fingerprint),
+		rpm:            loadNativeRepository(ctx, directory, "rpm", fingerprint),
+		arch:           loadNativeRepository(ctx, directory, string(packaging.FormatArch), fingerprint),
+		bundledRelease: manifest,
 	}
 	for _, repository := range []*nativeRepository{result.apt, result.rpm, result.arch} {
 		if repository.err != nil {

@@ -3797,8 +3797,16 @@ unauthenticated mutation endpoint.
   their recorded end date. Registering a newer minor gives the former three
   series at least 90 additional days before retirement.
 
-Register the actual server and agent released series before enabling executable
-work. Production always enforces this gate; unknown/development stamps and missing
+Stock `lindmd` packages activate their own release series automatically at startup,
+using only the protected installed agent bundle's verified release attestation.
+Its version and source revision must exactly match the server's compiled identity;
+protocol bounds come from the compiled implementation, not an agent claim or an
+HTTP publication. Activation and its audit commit atomically. A new minor gives
+the prior three series at least 90 days of retirement notice. Restarts and patch
+upgrades preserve recorded release dates, protocol bounds and support deadlines.
+Conflicting history, future release dates and unregistered older series fail
+closed. Custom repositories require explicit `RegisterReleaseSeries` admission.
+Production always enforces compatibility; unknown/development stamps and missing
 agent reports do not become supported by inference. The executor signs its own
 release/protocol into session acquisition, and a same-boot package replacement
 acquires a new session when that protected build identity changes. A claimed
