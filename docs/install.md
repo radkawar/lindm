@@ -53,6 +53,10 @@ URL files. Each connection must verify the database certificate. See the
 [installation runbook](security-and-operations.md#native-single-host-installation)
 for the actual options, required grants and certificate choices.
 
+For an Ubuntu 24.04 server on AWS with private RDS PostgreSQL, use the
+[AWS deployment runbook](deploy-aws.md). It covers SSM access, external-database
+credentials, browser trust and cleanup.
+
 For an air gap, use the bundle's authenticated offline add-on for your server
 platform and run `sudo ./install.sh --airgap`. A missing platform add-on stops
 installation; it never downloads missing dependencies from the Internet.
