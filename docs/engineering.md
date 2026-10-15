@@ -4932,6 +4932,34 @@ Subsequent restore commands retain bounded failure stdout/stderr only as
 operator before clearing parent memory and tearing down the guest. No plaintext
 log or public exception text is added, and no failed restore is retried.
 
+Fresh `native-ubuntu-attempt29.json`, SHA-256
+`af8ae6bb5f490582aa0a581578b7e04b8c9ffdca5ab3eafdeb3ec9d9c1f31ec8`,
+uses unchanged SDK19 product and observer
+`91034b5ff781af1ce36ab78f6ff40ff621fec109`. Installed and upgraded Findings
+again passed browser and independent SQL binding, along with encrypted backup,
+authentic upgrade, fresh target provisioning and offline quorum approval.
+The actual restore failed in 1.08 seconds; the overall verdict remains **FAIL**
+after 720.78 seconds, with 11 commands, 60 decisions, one failure and incomplete
+cleanup. Its 215-byte stderr was retained only as operator-encrypted ciphertext.
+
+An owned no-swap, no-core diagnostic process decrypted that ciphertext in
+memory and emitted only finite classifiers: `ENOSPC` while writing the current
+archive's extracted files under `/run/lindmd-restore-*`. The default shared
+`/run` capacity cannot hold both complete archives. Live restore now preflights
+and uses a root-only private staging tree on the data filesystem, with
+create-exclusive/no-follow files and cleanup on every returned exit. This is a
+product change requiring new authentic signed bundles; SDK19 is immutable and
+does not qualify recovery. No restore or restored-device pass is inferred.
+
+Focused archive/staging regressions passed, including UID 0 execution of
+`TestRestoreStagePrivateDataFilesystemAndCleanup` and
+`TestRestoreStageSweepRejectsUnsafeEntries`. They exercised root:root 0700
+staging, nested crash-residue removal, unrelated-file retention, rejected
+symlinks/readable directories and returned-path cleanup. Space boundary,
+overflow and invalid-capacity tests passed. The security re-review closed the
+crash-leftover finding with no remaining findings. These tests are not the
+fresh-host database/device recovery qualification.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

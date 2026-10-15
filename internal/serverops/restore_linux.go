@@ -107,11 +107,11 @@ func restore(ctx context.Context, options RestoreOptions) (result DrillResult, e
 	if err = requireStopped(ctx); err != nil {
 		return result, err
 	}
-	stage, err := os.MkdirTemp("/run", "lindmd-restore-*")
+	stage, stageCleanup, err := prepareRestoreStage(options.Archive, options.SecurityArchive)
 	if err != nil {
 		return result, err
 	}
-	defer func() { err = errors.Join(err, os.RemoveAll(stage)) }()
+	defer func() { err = errors.Join(err, stageCleanup()) }()
 	var checkpoint restoreCheckpoint
 	if err = prepareRestoreCheckpoint(ctx, options, stage, &checkpoint); err != nil {
 		return result, err
@@ -195,7 +195,7 @@ func restore(ctx context.Context, options RestoreOptions) (result DrillResult, e
 		return result, err
 	}
 	defer func() { err = errors.Join(err, restoredCleanup()) }()
-	if err = errors.Join(cleanup(), runtimeCleanup(), restoredCleanup(), os.RemoveAll(stage)); err != nil {
+	if err = errors.Join(cleanup(), runtimeCleanup(), restoredCleanup(), stageCleanup()); err != nil {
 		return result, err
 	}
 	if _, err = pool.Exec(ctx, "UPDATE server_recovery_state SET hold=false WHERE singleton"); err != nil {

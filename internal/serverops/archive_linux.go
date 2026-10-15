@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"filippo.io/age"
+	"golang.org/x/sys/unix"
 )
 
 func decryptArchive(ctx context.Context, archive, identity string, passphrase []byte, destination string) (manifest archiveManifest, err error) {
@@ -121,7 +122,7 @@ func extractArchive(reader io.Reader, destination string) (manifest archiveManif
 		if err = root.MkdirAll(filepath.Dir(header.Name), 0700); err != nil {
 			return manifest, err
 		}
-		output, err := root.OpenFile(header.Name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		output, err := root.OpenFile(header.Name, os.O_CREATE|os.O_EXCL|os.O_WRONLY|unix.O_NOFOLLOW, 0600)
 		if err != nil {
 			return manifest, err
 		}

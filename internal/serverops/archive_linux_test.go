@@ -169,6 +169,41 @@ func TestArchiveRejectsTraversalSymlinksDuplicateMissingAndBadSchema(t *testing.
 	}
 }
 
+func TestArchiveExtractionNeverOverwritesOrFollowsExistingOutput(t *testing.T) {
+	manifest, resources, dump := archiveFixture(t)
+	var encoded bytes.Buffer
+	if err := writeArchive(&encoded, manifest, resources, dump); err != nil {
+		t.Fatal(err)
+	}
+	for _, symlink := range []bool{false, true} {
+		destination := t.TempDir()
+		outside := filepath.Join(t.TempDir(), "untouched")
+		before := []byte("existing file must remain unchanged")
+		if err := os.WriteFile(outside, before, 0600); err != nil {
+			t.Fatal(err)
+		}
+		output := filepath.Join(destination, "database.dump")
+		if symlink {
+			if err := os.Symlink(outside, output); err != nil {
+				t.Fatal(err)
+			}
+		} else if err := os.WriteFile(output, before, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := extractArchive(bytes.NewReader(encoded.Bytes()), destination); err == nil {
+			t.Fatal("pre-existing output admitted")
+		}
+		got, err := os.ReadFile(outside)
+		if err != nil || !bytes.Equal(got, before) {
+			t.Fatalf("symlink target changed: %v", err)
+		}
+		got, err = os.ReadFile(output)
+		if err != nil || !bytes.Equal(got, before) {
+			t.Fatalf("existing output changed: %v", err)
+		}
+	}
+}
+
 func TestBoundedWriterNeverPublishesBeyondLimit(t *testing.T) {
 	var buffer bytes.Buffer
 	writer := boundedWriter{&buffer, 3}

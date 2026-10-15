@@ -39,6 +39,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Capture native-lab evidence from the original browser UI fetch's response clone rather than Chromium's ephemeral CDP response resource; observe only the three read-only evidence RPCs at the console origin, with no extra requests, error-body capture, retries or weaker snapshot matching.
 - Compare native-lab RPC origins in the same canonical URL form as Chromium, so an explicit default HTTPS port does not discard valid evidence; other origins remain excluded.
 - Retain failed native-lab restore command diagnostics only as bounded ciphertext encrypted to the off-server lab operator before clearing memory; preserve the restore refusal without plaintext logs or retries.
+- Stage live restore archives in a root-only data-filesystem directory instead of exhausting the shared `/run` tmpfs; preflight disk capacity, create files exclusively without following symlinks, and remove temporary plaintext on returned success or failure.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.
