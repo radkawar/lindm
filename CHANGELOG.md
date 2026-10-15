@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## [0.1.0] - 2026-10-15
 
-There is no tagged public release yet. The repository is a v0.1 preview.
+### Known limitations
+
+The server install is supported on Ubuntu 24.04, including the AWS deployment. RHEL 9 server install is a preview in this release: install, setup, enrollment and device management work; vulnerability findings for RHEL devices on a fresh install and backup/restore on a RHEL server are still being verified.
+
+- PostgreSQL 16 is required for local and external databases.
+- RHEL 9 server installation is connected-only; offline installation is refused before changes are made.
+- Operators must build and sign their own releases. There are no official project signing keys or project-signed release bundles.
 
 ### Added
 

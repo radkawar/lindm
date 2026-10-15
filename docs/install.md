@@ -1,6 +1,6 @@
 # Install lindm
 
-Use a dedicated Ubuntu 24.04 or RHEL 9 x86 server. Give the server a stable DNS name.
+Use a dedicated Ubuntu 24.04 x86 server, or RHEL 9 for the preview described below. Give the server a stable DNS name.
 An IP-address URL cannot be a WebAuthn relying-party ID. Use the DNS name for first-owner password and passkey setup.
 The browser and managed devices must reach its HTTPS listeners.
 For RHEL, retain access to the configured entitled Red Hat repositories.
@@ -67,6 +67,11 @@ For an Ubuntu 24.04 air gap, use the bundle's authenticated Ubuntu offline add-o
 and run `sudo ./install.sh --airgap`. A missing add-on stops installation; it never
 downloads missing dependencies from the Internet. Keep DNS, time and certificate
 trust available inside the site.
+
+The server install is supported on Ubuntu 24.04, including the AWS deployment.
+RHEL 9 server install is a preview in this release: install, setup, enrollment and
+device management work; vulnerability findings for RHEL devices on a fresh install
+and backup/restore on a RHEL server are still being verified.
 
 **v0.1.0 RHEL 9 is connected-only.** `--airgap` stops before mutation with
 “RHEL offline installation is not available in this release”. An entitled offline
