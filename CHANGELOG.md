@@ -14,6 +14,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Weekly Dependabot version updates for Go modules, npm and GitHub Actions.
 - Create the native integrations encryption key automatically, retain root-only custody through systemd credentials, and preserve the original key with encrypted backups and restores.
 - Add stock-Chromium console TLS qualification and a strict-TLS browser proof for real device inventory, vendor advisory publication and findings matched to native package identities, with explicit partial-coverage evidence.
+- Observe an enrolled device's authoritative console lifecycle independently from managed work in native deployment browser proof, without treating enrollment as inventory or action completion.
 
 ### Changed
 

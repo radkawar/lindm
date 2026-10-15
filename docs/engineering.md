@@ -4026,6 +4026,12 @@ authenticator and ignores no HTTPS errors. No TLS algorithm override is passed.
 The pass record requires the actual setup control to be visible. A successful
 curl or OpenSSL request does not establish browser TLS compatibility.
 
+The independent `device` phase uses the protected authenticated configuration and
+the actual enrolled `deviceId` to load its console detail page. It requires the
+visible authoritative lifecycle badge to say Enrolled. It issues no inventory
+request or other work. This is enrollment evidence only, not managed-action or
+fresh-inventory qualification.
+
 The same maintained `web/acceptance/deploy.mjs` harness also accepts a separate
 `findings` phase with an enrolled `deviceId` and the independently selected
 `advisoryFeedId`. Use the usual protected browser configuration, CA, password and

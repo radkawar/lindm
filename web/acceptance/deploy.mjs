@@ -386,7 +386,7 @@ async function proveRepositoryReadiness() {
 try {
   config = await readPrivateJSON(process.argv[2]);
   if (
-    !["tls", "setup", "custody", "copy", "manage", "findings", "integration"].includes(
+    !["tls", "setup", "custody", "copy", "device", "manage", "findings", "integration"].includes(
       config.phase,
     ) ||
     new URL(config.origin).protocol !== "https:"
@@ -441,6 +441,11 @@ try {
       grant.secret = "";
       for (const key of Object.keys(grant.commands)) grant.commands[key] = "";
       await capture("console-command-copied");
+    } else if (config.phase === "device") {
+      await confirmEnrolledDevice(ui, config);
+      result.device_id = config.deviceId;
+      result.enrollment_observed = true;
+      await capture("real-device-enrolled");
     } else if (config.phase === "custody") await confirmOffServerCustody(ui);
     else if (config.phase === "integration") await createIntegrationProof(ui);
     else if (config.phase === "findings") await inspectInventoryAndFindings(ui);
