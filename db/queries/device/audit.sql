@@ -7,7 +7,11 @@ VALUES (sqlc.arg('id'), sqlc.narg('actor_id'), sqlc.arg('action'), sqlc.arg('res
 -- name: ListAuditEvents :many
 -- device_action_capability names the device action a device_action.* event
 -- records; device action capabilities never change after creation.
-SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.details,
+-- The public details map is textual display context; stored JSON and signed
+-- report payloads retain their original types and bytes.
+SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason,
+       COALESCE((SELECT jsonb_object_agg(detail.key, detail.value)
+                 FROM jsonb_each_text(a.details) AS detail), '{}'::jsonb)::jsonb AS details,
        f.target_device_id, COALESCE(d.hostname, '')::text AS device_hostname,
        COALESCE(p.display_name, '')::text AS actor_display_name,
        COALESCE(da.capability, '')::text AS device_action_capability

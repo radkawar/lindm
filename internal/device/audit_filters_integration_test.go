@@ -5,6 +5,8 @@
 package device
 
 import (
+	"bytes"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -308,5 +310,51 @@ func TestAuditTargetListAndPickerIncludeActualEnrollment(t *testing.T) {
 	}
 	if originalTarget != nil {
 		t.Fatal("projection rewrote original enrollment evidence")
+	}
+}
+
+func TestAuditListsTypedMetadataWithoutChangingSignedEvidence(t *testing.T) {
+	parallelDeviceIntegration(t)
+	f := newEnrolled(t, 0)
+	id := uuid.New()
+	const details = `{"state":1,"count":9007199254740993,"enabled":true,"note":"unchanged text","nested":{"enabled":true},"list":[1,"two"],"empty":null}`
+	if _, err := f.conn.Exec(f.ctx, `INSERT INTO audit_events(id,action,resource_id,details) VALUES($1,$2,'server/test/backups',$3::jsonb)`,
+		id, auditkind.ServerStatusUnknown.String(), details); err != nil {
+		t.Fatal(err)
+	}
+	readEvidence := func() (stored, payload, hash []byte) {
+		t.Helper()
+		if err := f.conn.QueryRow(f.ctx, `SELECT a.details::text, r.payload, r.row_hash FROM audit_events a JOIN report_audit_rows r ON r.event_id=a.id WHERE a.id=$1`, id).
+			Scan(&stored, &payload, &hash); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	storedBefore, payloadBefore, hashBefore := readEvidence()
+	page, err := f.svc.ListAuditEvents(f.ownerCtx, connect.NewRequest(&adminv1.ListAuditEventsRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var event *adminv1.AuditEvent
+	for _, candidate := range page.Msg.Events {
+		if candidate.Id == id.String() {
+			event = candidate
+			break
+		}
+	}
+	if event == nil {
+		t.Fatal("All actions omitted the typed server-status event")
+	}
+	want := map[string]string{
+		"state": "1", "count": "9007199254740993", "enabled": "true",
+		"note": "unchanged text", "nested": `{"enabled": true}`,
+		"list": `[1, "two"]`, "empty": "",
+	}
+	if !maps.Equal(event.Details, want) {
+		t.Fatalf("public audit detail projection = %v, want %v", event.Details, want)
+	}
+	storedAfter, payloadAfter, hashAfter := readEvidence()
+	if !bytes.Equal(storedBefore, storedAfter) || !bytes.Equal(payloadBefore, payloadAfter) || !bytes.Equal(hashBefore, hashAfter) {
+		t.Fatal("listing changed the original typed JSON or signed audit evidence")
 	}
 }

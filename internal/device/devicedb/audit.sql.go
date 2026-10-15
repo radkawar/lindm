@@ -148,7 +148,9 @@ func (q *Queries) ListAuditDevices(ctx context.Context, arg ListAuditDevicesPara
 }
 
 const listAuditEvents = `-- name: ListAuditEvents :many
-SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason, a.details,
+SELECT a.id, a.occurred_at, a.actor_id, a.action, a.resource_id, a.reason,
+       COALESCE((SELECT jsonb_object_agg(detail.key, detail.value)
+                 FROM jsonb_each_text(a.details) AS detail), '{}'::jsonb)::jsonb AS details,
        f.target_device_id, COALESCE(d.hostname, '')::text AS device_hostname,
        COALESCE(p.display_name, '')::text AS actor_display_name,
        COALESCE(da.capability, '')::text AS device_action_capability
@@ -200,6 +202,8 @@ type ListAuditEventsRow struct {
 
 // device_action_capability names the device action a device_action.* event
 // records; device action capabilities never change after creation.
+// The public details map is textual display context; stored JSON and signed
+// report payloads retain their original types and bytes.
 // Human actions: a person acted, and the kind is not session or read bookkeeping.
 func (q *Queries) ListAuditEvents(ctx context.Context, arg ListAuditEventsParams) ([]ListAuditEventsRow, error) {
 	rows, err := q.db.Query(ctx, listAuditEvents,

@@ -64,6 +64,8 @@ async function detailsInView(page, main, width) {
 export async function check({ page, demo, visit, settle, require, capture, step }) {
   const main = page.getByRole("main");
   const original = page.viewportSize();
+  let checkFailed = false;
+  let checkError;
   try {
     step("open audit log at 1440x900");
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -204,13 +206,35 @@ export async function check({ page, demo, visit, settle, require, capture, step 
     const phone = await detailsInView(page, main, 390);
     require(phone.length === 0, `Details not fully visible at 390: ${phone.join("; ")}`);
     await capture("audit-pass2-all-mobile");
+  } catch (error) {
+    checkFailed = true;
+    checkError = error;
+    try {
+      await capture("audit-pass2-failed-before-restore");
+    } catch (captureError) {
+      checkError = new AggregateError(
+        [error, captureError],
+        "Audit check and failure capture both failed",
+      );
+    }
+    throw checkError;
   } finally {
-    step("restore default view and viewport");
-    if (original) await page.setViewportSize(original);
-    const human = main.getByRole("button", { name: "Human actions", exact: true });
-    if (await human.count()) {
-      await human.click();
-      await settle();
+    if (!checkFailed) step("restore default view and viewport");
+    try {
+      if (original) await page.setViewportSize(original);
+      const human = main.getByRole("button", { name: "Human actions", exact: true });
+      if (await human.count()) {
+        await human.click();
+        await settle();
+      }
+    } catch (error) {
+      if (checkFailed) {
+        throw new AggregateError(
+          [checkError, error],
+          "Audit check and restoring its view both failed",
+        );
+      }
+      throw error;
     }
   }
 }

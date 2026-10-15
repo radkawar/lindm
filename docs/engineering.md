@@ -335,6 +335,11 @@ to the device page, falling back to "Unnamed device"; mode and duration read
 Audit exports hash the exact PostgreSQL JSON bytes of the complete immutable row,
 including `target_device_id` and `details`; current hostname is display context,
 not historical evidence. Preserve original payload bytes when verifying the chain.
+The public audit list projects JSON detail values into its existing textual
+metadata map: strings stay unchanged; numbers retain every digit, and booleans,
+arrays and objects use their PostgreSQL JSON text. This is display context only,
+not a rewrite of the typed source JSON or signed export payload. System-status
+events legitimately record numeric state and must remain readable in All actions.
 Every recorded action code is an `auditkind.Kind` (`internal/auditkind`): audit
 write helpers take a `Kind`, which only that package constructs, and sqlc audit
 parameters receive its `String()`, so `auditkind.All()` is the complete list of
@@ -1899,6 +1904,9 @@ desktop after the route matrix and before the walkthroughs. Each saves its
 screenshots as `owner-edit-*.png`; the contact sheet lists the results under
 **Owner edit acceptance** and any failed criterion fails the review. A passing
 check establishes only that criterion, not owner approval of the screen.
+The audit owner check captures a failure before restoring its view and viewport,
+retains the failed user step, and reports secondary capture or cleanup failures
+alongside the primary error. Restoring the screen never clears or retries a failure.
 
 Organize `web/src` around working product features:
 
