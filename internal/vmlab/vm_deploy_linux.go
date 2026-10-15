@@ -482,8 +482,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		}
 		if runErr := op("restore encrypted backup into fresh VM", "command", func() error {
 			input := io.MultiReader(bytes.NewReader(options.BackupIdentityPassphrase), strings.NewReader("\n"))
-			_, restoreErr := serverGuestCommand(ctx, restored, "restore encrypted backup into fresh VM", "cat | lindmd restore -archive /root/lindm-deploy-input/backup.age -security-archive /root/lindm-deploy-input/security-backup.age -identity-file /root/lindm-deploy-input/backup-identity -identity-passphrase-fd 0 -root-file /root/lindm-deploy-input/execution-root.json -config /etc/lindm/migrate/server.json -security-checkpoint /root/lindm-deploy-input/security-checkpoint -execution-update /root/lindm-deploy-input/execution-update -confirm-fenced -reason 'Maintained lab fenced fresh-host recovery drill' && rm -- /root/lindm-deploy-input/backup-identity && systemctl start lindmd.service", input)
-			return restoreErr
+			return executeDeployRestore(ctx, restored, options, "cat | lindmd restore -archive /root/lindm-deploy-input/backup.age -security-archive /root/lindm-deploy-input/security-backup.age -identity-file /root/lindm-deploy-input/backup-identity -identity-passphrase-fd 0 -root-file /root/lindm-deploy-input/execution-root.json -config /etc/lindm/migrate/server.json -security-checkpoint /root/lindm-deploy-input/security-checkpoint -execution-update /root/lindm-deploy-input/execution-update -confirm-fenced -reason 'Maintained lab fenced fresh-host recovery drill' && rm -- /root/lindm-deploy-input/backup-identity && systemctl start lindmd.service", input)
 		}); runErr != nil {
 			return runErr
 		}

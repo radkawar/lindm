@@ -68,6 +68,27 @@ func executeDeployBackup(ctx context.Context, guest *guestVM, options VMDeployOp
 	return nil, errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
 }
 
+// Restore output follows the same off-server ciphertext-only custody as backup
+// output. Never discard a real refusal or print credential-bearing diagnostics.
+func executeDeployRestore(ctx context.Context, guest *guestVM, options VMDeployOptions, command string, input io.Reader) (resultErr error) {
+	const step = "restore encrypted backup into fresh VM"
+	if observer := guest.serverCommandObserver; observer != nil {
+		started := time.Now().UTC()
+		defer func() { observer(step, started, time.Now().UTC(), resultErr == nil) }()
+	}
+	output, err := guest.runResult(ctx, "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), input, deployInstallerDiagnosticLimit, 10*time.Minute)
+	defer clear(output.Stdout)
+	defer clear(output.Stderr)
+	if err == nil && output.ExitCode == 0 {
+		return nil
+	}
+	captureErr := writeDeployInstallerDiagnostics(options.CustodyEscrowRecipientFile, options.EvidenceDirectory, "restore-command", output.Stdout, output.Stderr)
+	if err != nil {
+		return errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
+	}
+	return errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
+}
+
 func captureDeployServiceJournal(ctx context.Context, guest *guestVM, options VMDeployOptions, label string) error {
 	journal, err := guest.runResult(ctx, "sudo -n env LC_ALL=C journalctl --no-pager --output=cat --lines=200 --unit=lindmd.service --unit=lindmd-migrate.service", nil, deployInstallerDiagnosticLimit, time.Minute)
 	defer clear(journal.Stdout)

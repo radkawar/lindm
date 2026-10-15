@@ -4908,6 +4908,30 @@ unchanged. Real Chromium regression coverage exercises repeated page navigation
 and proves one UI request per visit, unchanged UI consumption and no error-body
 evidence.
 
+Fresh `native-ubuntu-attempt28.json`, SHA-256
+`2d836ad235751d0afabe6b12f1e9f9a4512d86a0356cd1804bad91cb91a8e1dd`,
+uses unchanged SDK19 product and observer
+`ea4fbd9c64ac3bd20226bd0db50143a392f21a59`. Installed **and upgraded** Findings
+passed browser and independent same-action/snapshot SQL proof. Installed
+observation took 364,758 milliseconds from installer invocation; upgraded
+observation took 6,716 milliseconds from its managed refresh. Both distinct
+phase screenshots remain available. Encrypted backup, archive verification,
+authentic upgrade, completed post-upgrade management, fenced current-security
+backup and higher-epoch delegation/checkpoint quorum signing passed.
+
+The fresh destination installed and passed its hardened PostgreSQL and root-only
+credential checks. Its independent integration key correctly could not decrypt
+the original secret. The actual restore then exited 1 in 1.21 seconds, with
+216 stderr bytes discarded by the old generic command wrapper. This is not a
+successful restore or established product diagnosis. The overall verdict is
+**FAIL** after 666.21 seconds, with 11 commands, 60 decisions, one observed
+failure and incomplete cleanup.
+
+Subsequent restore commands retain bounded failure stdout/stderr only as
+`restore-command-{stdout,stderr}.age`, encrypted directly to the off-server lab
+operator before clearing parent memory and tearing down the guest. No plaintext
+log or public exception text is added, and no failed restore is retried.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
