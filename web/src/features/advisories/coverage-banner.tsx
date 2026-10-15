@@ -11,7 +11,8 @@ import {
 } from "../../../gen/lindm/admin/v1/advisories_pb";
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { feedOSLabel, osLabel, sourceAnchor } from "./display";
+import { feedOSLabel, osLabel, sourceAnchor, useFreshnessClock } from "./display";
+import { firstDownloadState } from "./initial-download";
 
 // The remedy a cause offers: wait for the background check, act on the devices
 // (request inventory, inspect their evidence), or fix the advisory source setup.
@@ -21,6 +22,7 @@ function describe(
   reason: AdvisoryUncheckedReason,
   os: string,
   feed: AdvisoryFeedStatus | undefined,
+  now: number,
 ): { title: string; detail: string; fix: Fix } {
   switch (reason) {
     case AdvisoryUncheckedReason.EVALUATION_PENDING:
@@ -68,6 +70,16 @@ function describe(
         fix: "devices",
       };
     case AdvisoryUncheckedReason.FEED_STALE:
+      if (firstDownloadState(feed, now)) {
+        return {
+          title: `First vulnerability data not ready for ${os}`,
+          detail:
+            firstDownloadState(feed, now) === "downloading"
+              ? "lindm is downloading and checking the first vulnerability data. Findings follow after the device inventory check."
+              : "Automatic download is enabled. Findings follow after the first vulnerability data download and device inventory check.",
+          fix: "source",
+        };
+      }
       return {
         title: `Source out of date for ${os}`,
         detail: `The ${os} source expired without a successful refresh; its card shows why.`,
@@ -214,6 +226,7 @@ export function CoverageBanner({
   reloading: boolean;
   onReload: () => void;
 }) {
+  const now = useFreshnessClock();
   const total = summary.unknownDevices;
   if (total === 0n) return null;
   const listed = summary.uncheckedGroups.reduce((sum, group) => sum + group.devices, 0n);
@@ -240,7 +253,7 @@ export function CoverageBanner({
         {summary.uncheckedGroups.map((group) => {
           const os = osLabel(group.osName, group.osId, group.osVersion);
           const feed = feeds.find((item) => item.id === group.feedId);
-          const cause = describe(group.reason, os, feed);
+          const cause = describe(group.reason, os, feed, now);
           const filter = toJsonString(
             DeviceFilterSchema,
             create(DeviceFilterSchema, { osId: group.osId, osVersion: group.osVersion }),

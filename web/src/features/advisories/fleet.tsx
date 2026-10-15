@@ -37,6 +37,8 @@ import {
   useFreshnessClock,
 } from "./display";
 import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./queries";
+import { firstDownloadState } from "./initial-download";
+import { InitialDownloadNotice } from "./initial-download-notice";
 
 export function AdvisoryFleet() {
   const lifetime = useAuthLifetime();
@@ -46,6 +48,10 @@ export function AdvisoryFleet() {
   const canReviewSources = canPermission(usePrincipal(), "fleet.read", true);
   const summary = useQuery(advisorySummaryQueryOptions(lifetime, pageToken));
   const feeds = useQuery({ ...advisoryFeedsQueryOptions(lifetime), enabled: canReviewSources });
+  const firstDataPending =
+    canReviewSources &&
+    !feeds.error &&
+    feeds.data?.feeds.some((feed) => firstDownloadState(feed, now) !== undefined);
   const feedUnknown =
     !feeds.data?.feeds.length ||
     !!feeds.error ||
@@ -197,8 +203,16 @@ export function AdvisoryFleet() {
               </Table>
               {!summary.data.advisories.length ? (
                 <EmptyState
-                  title="No advisories on this page"
-                  description="Outdated advisory sources leave device exposure unknown."
+                  title={
+                    firstDataPending
+                      ? "First vulnerability data not ready"
+                      : "No advisories on this page"
+                  }
+                  description={
+                    firstDataPending
+                      ? "Findings will appear after the first vulnerability data download and device inventory check. Exposure remains unknown."
+                      : "Outdated advisory sources leave device exposure unknown."
+                  }
                 />
               ) : null}
             </>
@@ -250,6 +264,7 @@ export function AdvisoryFleet() {
             ) : null}
             {feeds.data?.feeds.map((feed) => {
               const status = sourceStatus(feed, now, !!feeds.error);
+              const firstDownload = feeds.error ? undefined : firstDownloadState(feed, now);
               return (
                 <article
                   key={feed.id}
@@ -266,6 +281,12 @@ export function AdvisoryFleet() {
                       {status.label}
                     </StatusBadge>
                   </div>
+                  {firstDownload ? (
+                    <InitialDownloadNotice
+                      state={firstDownload}
+                      startedAt={feed.refreshStartedAt}
+                    />
+                  ) : null}
                   {feed.id.startsWith("demo-authored-critical-") ? (
                     <p className="rounded border border-warning/40 bg-warning/5 p-3">
                       <strong className="block">Authored demo supplement</strong>
@@ -273,11 +294,13 @@ export function AdvisoryFleet() {
                       This source does not prove a real vulnerability or a vendor fix.
                     </p>
                   ) : null}
-                  <p>
-                    {feed.advisoryCount === 1n
-                      ? "1 advisory"
-                      : `${feed.advisoryCount.toString()} advisories`}
-                  </p>
+                  {!firstDownload ? (
+                    <p>
+                      {feed.advisoryCount === 1n
+                        ? "1 advisory"
+                        : `${feed.advisoryCount.toString()} advisories`}
+                    </p>
+                  ) : null}
                   <p>
                     Last refreshed: <Timestamp value={feed.checkedAt} missing="Never" />
                   </p>
@@ -374,6 +397,14 @@ function sourceStatus(
       tone: "destructive",
       label: "Refresh failed",
       sentence: "The last refresh failed. Check the server logs.",
+    };
+  }
+  const firstDownload = firstDownloadState(feed, now);
+  if (firstDownload) {
+    return {
+      tone: "neutral",
+      label: firstDownload === "downloading" ? "First download" : "Waiting for first data",
+      sentence: "No vulnerability data has been published for this source yet.",
     };
   }
   const skipped = feed.rejectedRecords.length;

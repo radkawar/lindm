@@ -6,6 +6,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useAuthLifetime } from "@/hooks/use-auth-lifetime";
 import { advisoryReasonText, unexpired, useFreshnessClock } from "./display";
 import { deviceFindingsQueryOptions } from "./queries";
+import { firstDownloadState } from "./initial-download";
+import { InitialDownloadNotice } from "./initial-download-notice";
 
 function plural(count: number, one: string, many: string) {
   return `${count.toLocaleString()} ${count === 1 ? one : many}`;
@@ -19,6 +21,17 @@ export function DeviceFindingsSummary({ deviceId }: { deviceId: string }) {
   if (findings.isPending) return <span role="status">Checking findings…</span>;
   if (findings.error) return <span>Findings unavailable. Open Findings for the error.</span>;
   const { freshness } = findings.data;
+  const firstDownload = freshness?.feedId ? firstDownloadState(freshness, now) : undefined;
+  if (firstDownload) {
+    return (
+      <div className="grid gap-2">
+        <StatusBadge status="neutral" className="w-fit">
+          Unknown
+        </StatusBadge>
+        <InitialDownloadNotice state={firstDownload} startedAt={freshness?.refreshStartedAt} />
+      </div>
+    );
+  }
   const current =
     freshness !== undefined &&
     unexpired(freshness.inventoryExpiresAt, now) &&
@@ -27,7 +40,7 @@ export function DeviceFindingsSummary({ deviceId }: { deviceId: string }) {
     return (
       <span className="flex flex-wrap items-center gap-2">
         <StatusBadge status="neutral">Unknown</StatusBadge>
-        {current && freshness.reason
+        {freshness?.reason
           ? `Not checked: ${advisoryReasonText(freshness.reason)}.`
           : "The device inventory or advisory sources are out of date."}
       </span>

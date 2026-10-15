@@ -106,6 +106,7 @@ const vendorFeedText: Record<string, string> = {
 // Server evaluation reasons (internal/advisory/match.go), in operator words.
 const evaluationReasonText: Record<string, string> = {
   device_not_active: "the device has not enrolled",
+  evaluation_pending: "the inventory check has not finished yet",
   inventory_unavailable: "the device has not sent package inventory",
   inventory_stale: "the package inventory is out of date",
   host_inventory_stale_or_failed: "the latest device inventory is out of date or failed",

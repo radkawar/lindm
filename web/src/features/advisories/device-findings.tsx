@@ -51,6 +51,8 @@ import {
 } from "./display";
 import { deviceFindingsQueryOptions } from "./queries";
 import { UncoveredPackages } from "./uncovered-packages";
+import { firstDownloadState } from "./initial-download";
+import { InitialDownloadNotice } from "./initial-download-notice";
 
 // Debian/RPM epoch 0 is the implicit default; showing "0:" only adds noise.
 function packageVersion(version: string) {
@@ -79,6 +81,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
   const totals = findings.error ? undefined : findings.data?.totals;
   const filtered = packagePrefix !== "" || advisoryPrefix !== "";
   const freshness = findings.data?.freshness;
+  const firstDownload =
+    findings.error || !freshness?.feedId ? undefined : firstDownloadState(freshness, now);
+  const awaitingEvaluation = !findings.error && freshness?.reason === "evaluation_pending";
   const cveDetails = useMemo(() => {
     const items: { label: string; value: string }[] = [];
     for (const finding of findings.data?.findings ?? []) {
@@ -147,6 +152,11 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             </Link>
           ) : null}
         </div>
+        {firstDownload ? (
+          <div className="border bg-muted/30 p-3">
+            <InitialDownloadNotice state={firstDownload} startedAt={freshness?.refreshStartedAt} />
+          </div>
+        ) : null}
         {canPermission(principal, "profiles.manage") ? (
           <p className="text-sm text-muted-foreground">
             <Link
@@ -159,7 +169,8 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             affected devices.
           </p>
         ) : null}
-        {totals ? (
+        {totals &&
+        !((firstDownload || awaitingEvaluation) && findings.data?.findings.length === 0) ? (
           <p className="text-sm" data-finding-totals>
             <strong className="font-semibold tabular-nums">
               {totals.open.toLocaleString()} open {totals.open === 1n ? "finding" : "findings"}
@@ -224,9 +235,12 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
             />
           </div>
         </div>
-        {!current ? (
+        {!current && !firstDownload ? (
           <p className="border bg-muted/30 p-3 text-sm">
-            Status unknown. The device inventory or advisory sources are out of date.
+            Status unknown.{" "}
+            {freshness?.reason
+              ? `Exposure cannot be confirmed: ${advisoryReasonText(freshness.reason)}.`
+              : "The device inventory or advisory sources are not current."}
           </p>
         ) : null}
         {partial ? (
@@ -276,10 +290,14 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           </>
         ) : null}
         {!freshness && cveDetails.length ? <TechnicalDetails items={cveDetails} /> : null}
-        {findings.data?.findings.length === 0 ? (
+        {findings.data?.findings.length === 0 && !firstDownload ? (
           <EmptyState
-            title="No findings on this page"
-            description="Outdated inventory or advisory sources leave this device's exposure unknown."
+            title={awaitingEvaluation ? "Findings not ready" : "No findings on this page"}
+            description={
+              awaitingEvaluation
+                ? "Findings will appear after lindm checks the device inventory against vulnerability data. Exposure remains unknown until that check finishes."
+                : "Outdated inventory or advisory sources leave this device's exposure unknown."
+            }
           />
         ) : null}
         {findings.data?.findings.length ? (

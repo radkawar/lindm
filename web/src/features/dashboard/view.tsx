@@ -35,6 +35,10 @@ import { canPermission, canUseApprovals } from "@/lib/permissions";
 import { formatTimestamp, freshnessLabel } from "@/lib/time";
 import { fleetSummaryQueryOptions, staleContactUntil } from "./queries";
 import { StaleDevices } from "./stale-devices";
+import { advisoryFeedsQueryOptions } from "@/features/advisories/queries";
+import { feedOSLabel, useFreshnessClock } from "@/features/advisories/display";
+import { firstDownloadState } from "@/features/advisories/initial-download";
+import { InitialDownloadNotice } from "@/features/advisories/initial-download-notice";
 
 const actionLabels: Record<string, string> = {
   "device.escrow-rotate.v1": "Rotate escrow recovery key",
@@ -121,6 +125,17 @@ export function DashboardView() {
   // and its causes, but reviewing and fixing sources is someone else's task.
   const canFixCoverage = canPermission(principal, "fleet.read", true);
   const summary = useQuery({ ...fleetSummaryQueryOptions(lifetime), enabled: canReadFleet });
+  const feeds = useQuery({
+    ...advisoryFeedsQueryOptions(lifetime),
+    enabled: canFixCoverage,
+  });
+  const now = useFreshnessClock();
+  const firstSource =
+    canFixCoverage && !feeds.error
+      ? (feeds.data?.feeds.find((feed) => firstDownloadState(feed, now) === "downloading") ??
+        feeds.data?.feeds.find((feed) => firstDownloadState(feed, now) === "waiting"))
+      : undefined;
+  const firstDownload = firstDownloadState(firstSource, now);
   const failure = summary.error ? toRpcFailure(summary.error) : null;
   // A failed refresh must not present a previous response as current evidence.
   const data = canReadFleet && !failure ? summary.data : undefined;
@@ -217,7 +232,10 @@ export function DashboardView() {
               disabled={!canReadFleet || summary.isFetching}
               data-review-next-action={failure && !summary.isFetching ? "" : undefined}
               onClick={() => {
-                if (!lifetime.signal.aborted) void summary.refetch();
+                if (!lifetime.signal.aborted) {
+                  void summary.refetch();
+                  if (canFixCoverage) void feeds.refetch();
+                }
               }}
             >
               <RefreshCwIcon aria-hidden="true" />
@@ -330,7 +348,18 @@ export function DashboardView() {
                   </Link>
                 }
               >
-                {findings ? (
+                {firstSource && firstDownload ? (
+                  <div className="grid gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Source: {feedOSLabel(firstSource)}
+                    </p>
+                    <InitialDownloadNotice
+                      state={firstDownload}
+                      startedAt={firstSource.refreshStartedAt}
+                    />
+                  </div>
+                ) : null}
+                {findings && !(firstDownload && findings.evaluatedDevices === 0n) ? (
                   <>
                     <p>
                       <strong className="font-semibold tabular-nums">
@@ -344,7 +373,7 @@ export function DashboardView() {
                       count excludes accepted findings. Zero findings does not mean no exposure.
                     </p>
                   </>
-                ) : (
+                ) : firstDownload ? null : (
                   <Unavailable section="Advisory summary" />
                 )}
               </WorkItem>

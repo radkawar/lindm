@@ -1749,6 +1749,17 @@ and pagination contract. Current findings without active exceptions match the
 advisory summary's affected population; unknown exposure is not a clear result.
 Patch requests and accepted exceptions remain distinct from native remediation.
 
+Before a connected source's first publication, the console says that the first
+vulnerability data is not ready and that findings follow the download and device
+inventory check. It calls a download active only while the applied source has a
+live publisher lease and a recorded start. That start is not the last completed
+attempt timestamp. Byte and percentage progress are not reported. A cached lease
+stops showing active work when it expires. Published, failed, refresh-disabled
+and offline sources retain their normal evidence state. Device findings use only
+their applied source metadata; a device-scoped reader does not query fleet sources.
+`advisory-initial-download.test.mjs` covers the lease and publication boundaries in
+the existing test and UI-review targets.
+
 A walk reports
 **blocked**, not completed, when the actual UI cannot finish its job or a native
 installation, user consent, second approver or real device execution is required.
