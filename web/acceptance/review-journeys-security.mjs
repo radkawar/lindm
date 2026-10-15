@@ -66,6 +66,9 @@ async function recoveryAudit(ctx) {
     "No recovery or time filter has been applied yet; the default Human actions view is not the answer.",
   );
   await main.getByRole("button", { name: "Recovery key reveals", exact: true }).click();
+  await visible(
+    main.getByRole("button", { name: "Recovery key reveals", exact: true, pressed: true }),
+  );
   await shot(
     ctx,
     "recovery-audit-reveal-view",
@@ -79,7 +82,6 @@ async function recoveryAudit(ctx) {
   await page
     .getByRole("option", { name: "Last week, Monday to Sunday (UTC)", exact: true })
     .click();
-  await settled(page);
   // The chosen week is saved as fixed UTC dates in the URL.
   await page.waitForURL(
     /[?&]from=\d{4}-\d{2}-\d{2}.*[?&]through=\d{4}-\d{2}-\d{2}|[?&]through=\d{4}-\d{2}-\d{2}.*[?&]from=\d{4}-\d{2}-\d{2}/,
@@ -87,6 +89,14 @@ async function recoveryAudit(ctx) {
       timeout: 15_000,
     },
   );
+  // URL navigation can finish before React commits the new filter. Do not
+  // inspect rows from the previous scope while its replacement is still loading.
+  await visible(
+    main
+      .getByRole("combobox", { name: "Time range", exact: true })
+      .filter({ hasText: "Last week, Monday to Sunday (UTC)" }),
+  );
+  await settled(page);
   const saved = () => new URL(page.url()).searchParams;
   const from = saved().get("from") ?? "";
   const through = saved().get("through") ?? "";

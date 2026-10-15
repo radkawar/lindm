@@ -1724,6 +1724,14 @@ shortcuts. Any runner failure or unexpected administrator RPC HTTP error fails
 the review, even if a later read succeeds. Diagnostic records contain only bounded
 operation names, status codes and machine reasons, never request bodies or secrets.
 
+The recovery-audit walk waits for the committed recovery-reveal view and fixed-date
+URL, then the visible selected time range and its query to settle before counting
+events. URL navigation alone
+can precede React's filter commit; a table from the previous scope must not stand
+in for the dated answer. The same walk still checks the exact UTC calendar week,
+bookmark restoration, named filters and actual signed-evidence downloads. It does
+not retry the selection or relax empty-result, category or export assertions.
+
 The walks start in light desktop mode; the lost-device recovery handoff also checks
 light/dark desktop/mobile layouts. They do not establish native qualification.
 The lost-device walk delays a real encryption read to check that pending status
