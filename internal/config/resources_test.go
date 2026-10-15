@@ -86,6 +86,9 @@ func TestDatabaseFailoverTLS(t *testing.T) {
 			if conn.RuntimeParams["application_name"] != "failover test+client" {
 				t.Fatalf("application name changed: %q", conn.RuntimeParams["application_name"])
 			}
+			if conn.RuntimeParams["timezone"] != "UTC" {
+				t.Fatal("database sessions must not inherit a DST-sensitive cluster time zone")
+			}
 			if conn.ConnectTimeout != 10*time.Second || len(conn.Fallbacks) != len(test.hosts)-1 {
 				t.Fatalf("unexpected timeout or fallback count: %v, %d", conn.ConnectTimeout, len(conn.Fallbacks))
 			}

@@ -410,7 +410,7 @@ func TestBackupMigrationStagingPreservesLibpqTLSAndRole(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, setting := range []string{"user=migration\n", "sslmode=verify-full\n", "sslrootcert=system\n", "channel_binding=require\n", "require_auth=scram-sha-256\n"} {
+	for _, setting := range []string{"user=migration\n", "sslmode=verify-full\n", "sslrootcert=system\n", "channel_binding=require\n", "require_auth=scram-sha-256\n", "options=-c timezone=UTC\n"} {
 		if !bytes.Contains(service, []byte(setting)) {
 			t.Fatalf("backup libpq service lost %q", setting)
 		}

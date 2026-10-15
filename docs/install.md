@@ -105,9 +105,9 @@ background evaluation complete. Failed, stale and partial coverage stay visible.
 Later attempts use the durable per-source schedule, six hours by default.
 
 One Ubuntu 24.04 x86 laboratory run on 15 October 2026 took about 6 minutes
-13 seconds from starting the installer to observing qualifying findings for the
+19 seconds from starting the installer to observing qualifying findings for the
 newly enrolled device. The observed first refresh start to its stored evaluation
-took 3 minutes 16 seconds. The first measurement includes installation, owner
+took 3 minutes 17 seconds. The first measurement includes installation, owner
 setup, enrollment and inventory collection. These are measurements, not completion
 guarantees. The full install, upgrade and recovery result is recorded in the
 [deployment evidence](verification.md#control-plane-deployment-matrix).

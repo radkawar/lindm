@@ -392,3 +392,22 @@ func runIntegrationDrillDump(t *testing.T, ctx context.Context, pool *pgxpool.Po
 	}
 	return nil
 }
+
+func TestNativeDatabaseToolsStartInUTC(t *testing.T) {
+	connection, err := os.ReadFile(os.Getenv("LINDM_TEST_DATABASE_URL_FILE"))
+	if err != nil {
+		t.Fatal("cannot read protected fixture database reference")
+	}
+	defer clear(connection)
+	env, err := libpqService(t.TempDir(), strings.TrimSpace(string(connection)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := runTool(t.Context(), "psql", []string{"--dbname=service=lindm-backup", "--no-password", "--no-psqlrc", "--tuples-only", "--no-align", "--set=ON_ERROR_STOP=1", "--command=SHOW timezone"}, env, nil, &output); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(output.String()) != "UTC" {
+		t.Fatal("native database tools inherited the cluster time zone")
+	}
+}

@@ -98,6 +98,9 @@ func (d *Document) database(path string) (*pgxpool.Config, error) {
 		// Driver parse errors may contain the complete URL and password.
 		return nil, errors.New("database credential contains an invalid PostgreSQL connection configuration")
 	}
+	// Lifecycle durations are UTC instants. Inheriting a database's local zone
+	// makes calendar-day constraints differ from Go durations across DST.
+	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
 	if err := configureDatabaseTLS(cfg.ConnConfig.TLSConfig, roots, certificates); err != nil {
 		return nil, err
 	}

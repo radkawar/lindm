@@ -89,6 +89,9 @@ func libpqService(stage, connection string) ([]string, error) {
 		}
 		values[key] = entries[0]
 	}
+	// Native dumps and restores must use the same calendar arithmetic as the
+	// application's UTC sessions, independently of the cluster's local zone.
+	values["options"] = "-c timezone=UTC"
 	var keys []string
 	for key := range values {
 		keys = append(keys, key)

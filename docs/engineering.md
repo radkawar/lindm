@@ -5166,6 +5166,41 @@ additional sandbox exception is introduced. A new signed pair and full lifecycle
 are still required; SDK22's RHEL failure is not promoted.
 The socket-path and bounded-observer security re-review closed with no findings.
 
+SDK23's authentic 0.2.24 → 0.2.25 pair at source
+`bd6b494569b9c99c2adf9903902d071aed949cc5` passed
+`cold-release-attempt25.json` in 1,690.26 seconds, SHA-256
+`8d4afee671a06f0e8e634bf02e074c58e2e9b8ece9bcad149a1017104b43a4d5`.
+Fresh clone, empty caches, pinned tools, no swap, literal release commands,
+authenticated export and owned cleanup passed; this alone is build evidence.
+Fresh `native-ubuntu-attempt34.json`, SHA-256
+`fca47382a865584f70f82a570a993e2172818fede2df003e59b3710c9b771785`,
+is a full native lifecycle **PASS** in 747.49 seconds, with 11 commands,
+96 browser decisions, no failure and complete cleanup. It repeats strict
+stock-browser TLS and owner setup, Ready repository, clipboard enrollment,
+managed inventory and browser plus SQL Findings, PLUS and runtime denials,
+encrypted backup, native upgrade and quorum-approved fresh-host recovery.
+The original restored integration key decrypts its secret; the wrong-key control
+fails. The original device completes new action
+`b528baae-0e14-4a2d-854e-b65cf31d4775` and inventory sequence 4.
+First observed Findings took 379,311 ms; refresh start to durable evaluation
+took 196,503 ms.
+
+The same pair's `native-rhel-sdk23-attempt1.json`, SHA-256
+`aca9d3bb7a5574280a27810790a1148c35414acc2e3665a6daad1eb9d190586c`,
+is **FAIL** in 226.03 seconds before browser setup. PostgreSQL starts with actual
+`postgresql_t` confinement and kernel `NoNewPrivs: 0`; the reviewed socket and
+service correction works. The encrypted collector instead records lindmd's
+release activation failing `released_agent_series_check`, SQLSTATE `23514`.
+Registration cleanup succeeds; full lifecycle cleanup is not claimed.
+The real PostgreSQL regression reproduces the DST boundary: New York's
+ninety-calendar-day interval rejects a 90×24-hour-plus-30-minute release window
+crossing the fall transition. Application and native backup/restore sessions now
+start in UTC without changing the SQL constraint or cluster default. Real
+integration tests admit that unchanged window and still reject one second short
+of ninety 24-hour days; native `psql` also starts in UTC. Both security reviews
+closed with no findings. A new signed lifecycle must qualify RHEL; this failure
+is not promoted.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

@@ -1855,6 +1855,13 @@ unbound SCRAM. Startup logs one redacted downgrade warning, and **Server status*
 keeps the database check at **Needs attention** while the connection is healthy.
 A connection failure still reports **Failed**. Prefer a PLUS-capable connection;
 do not use the pooler exception to work around a broken certificate.
+
+Application, migration, backup and restore sessions use UTC, independently of the
+local or external PostgreSQL cluster's default time zone. This keeps the
+ninety-day release-support minimum consistent across daylight-saving changes.
+The installer does not change the cluster's global time zone. URL options cannot
+override the application session's time zone.
+
 On Ubuntu, the installer preseeds `create_main_cluster = false` before the vendor
 PostgreSQL transaction and temporarily denies native service starts through
 `policy-rc.d`. It removes only its own unchanged temporary policy. Existing operator
