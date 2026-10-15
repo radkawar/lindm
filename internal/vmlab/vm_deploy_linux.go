@@ -321,7 +321,9 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		}
 		admin.fence()
 		device.fence()
-		if err := op("encrypted backup", "command", func() error { return createDeployBackup(ctx, server, private, "backup.age", &result.BackupSHA256) }); err != nil {
+		if err := op("encrypted backup", "command", func() error {
+			return createDeployBackup(ctx, server, options, private, "backup.age", &result.BackupSHA256)
+		}); err != nil {
 			return err
 		}
 		if err := copyDeployEvidence(ctx, filepath.Join(private, "backup.age"), filepath.Join(options.EvidenceDirectory, "original-backup.tar.age"), 2<<30, result.BackupSHA256); err != nil {
@@ -377,7 +379,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return runErr
 		}
 		if runErr := op("fenced security snapshot backup", "command", func() error {
-			return createDeployBackup(ctx, server, private, "security-backup.age", &result.SecurityBackupSHA256)
+			return createDeployBackup(ctx, server, options, private, "security-backup.age", &result.SecurityBackupSHA256)
 		}); runErr != nil {
 			return runErr
 		}
@@ -639,13 +641,10 @@ func copyDeployRecoveryCustody(ctx context.Context, guest *guestVM, source, dest
 	return nil
 }
 
-func createDeployBackup(ctx context.Context, guest *guestVM, private, name string, digest *string) error {
+func createDeployBackup(ctx context.Context, guest *guestVM, options VMDeployOptions, private, name string, digest *string) error {
 	directory := "/root/lindm-deploy-input/" + strings.TrimSuffix(name, ".age")
-	fenced := ""
-	if name == "security-backup.age" {
-		fenced = " -confirm-fenced"
-	}
-	path, err := serverGuestCommand(ctx, guest, "create encrypted backup", "lindmd backup -config /etc/lindm/server.json -output-dir "+nativeQuote(directory)+" -recipient-file /root/lindm-deploy-input/backup-recipient"+fenced, nil)
+	path, err := executeDeployBackup(ctx, guest, options, name, deployBackupCommand(directory, name == "security-backup.age"))
+	defer clear(path)
 	if err != nil {
 		return err
 	}
@@ -654,6 +653,15 @@ func createDeployBackup(ctx context.Context, guest *guestVM, private, name strin
 		return errors.New("deploy backup did not return one archive path in its owned directory")
 	}
 	return copyDeployBackup(ctx, guest, source, filepath.Join(private, name), digest)
+}
+
+func deployBackupCommand(directory string, fenced bool) string {
+	argument := ""
+	if fenced {
+		argument = " -confirm-fenced"
+	}
+	quotedDirectory := nativeQuote(directory)
+	return "mkdir -m 0700 -- " + quotedDirectory + " && lindmd backup -config /etc/lindm/server.json -output-dir " + quotedDirectory + " -recipient-file /root/lindm-deploy-input/backup-recipient" + argument
 }
 
 func copyDeployBackup(ctx context.Context, guest *guestVM, source, destination string, digest *string) (err error) {

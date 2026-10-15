@@ -27,6 +27,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Retain the actual action identity and expand its existing result before taking failed native management screenshots; never resubmit expired, failed or unknown work to obtain evidence.
 - Continue bounded, read-only observation of the same managed inventory action after start authority makes its outcome temporarily unknown; only verified completion passes, and unknown never permits a retry.
 - Scope the post-evaluation native inventory screenshot to the actual package-list card, not the identically titled status card; preserve exact snapshot and installed-package matching checks.
+- Create a new private native-lab backup output directory before invoking the unchanged root-owned-directory gate; refuse reused or symlink targets, and encrypt bounded failed backup diagnostics to the off-server lab operator.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.

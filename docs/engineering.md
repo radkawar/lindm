@@ -4782,6 +4782,32 @@ Findings evidence, qualified first-evaluation latency, backup, upgrade and
 restore are not established by this failed run. It records two manual commands,
 51 decisions, one observed failure and `owned_cleanup_complete: false`.
 
+The next fresh SDK18 run, `native-ubuntu-attempt23.json`, SHA-256
+`39e0447c838d2a864b83dc79058b1d06efa2d7d4fc7e0ff28788c32ae18ec975`,
+uses the same signed product and observer `16ba9e0d1`. It passed the complete
+installed-stage real-browser Findings proof and the separate read-only SQL
+binding to the same completed action, inventory snapshot/sequence and published
+vendor source. Installer invocation to first qualifying browser observation took
+435,845 milliseconds, including install, first-owner setup, enrollment and
+managed inventory. The observed refresh start to durable evaluation took
+227,033 milliseconds; evaluation time was `2026-10-15T04:20:44.000709Z`.
+The exact source SHA-256 is
+`9c4f5e08e3a7490c90c78ac85f72004d5715c8b1641e9d5ed9e65a6438dd986d`.
+This establishes the first installed evaluation measurement, not pure download
+latency, upgrade or recovery qualification.
+
+The overall verdict remains **FAIL** after 463.87 seconds: the following backup
+command exited 1 after 85 milliseconds. Its 117-byte stderr was not retained, so
+the original stderr reason is not established. Source inspection found a lab
+prerequisite defect: `createDeployBackup` selected a new output directory without
+creating it, while the product backup command requires an existing private
+root-owned directory. The helper now creates a new 0700 directory before invoking
+the unchanged backup gate and refuses existing or symlink targets. Backup failure
+streams are bounded and encrypted to the off-server lab operator before teardown,
+never published as plaintext. This run records three manual commands, 51 decisions,
+one observed failure and `owned_cleanup_complete: false`; it does not establish
+backup, upgrade, restored-device continuity or cleanup qualification.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

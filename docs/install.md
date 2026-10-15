@@ -90,6 +90,14 @@ an assessment: findings stay unknown until verified publication and the device's
 background evaluation complete. Failed, stale and partial coverage stay visible.
 Later attempts use the durable per-source schedule, six hours by default.
 
+One Ubuntu 24.04 x86 laboratory run on 15 October 2026 took about 7 minutes
+16 seconds from starting the installer to observing qualifying findings for the
+newly enrolled device. The observed first refresh start to its stored evaluation
+took 3 minutes 47 seconds. The first measurement includes installation, owner
+setup, enrollment and inventory collection. These are measurements, not completion
+guarantees or recovery qualification. See the
+[deployment evidence](verification.md#control-plane-deployment-matrix).
+
 Air-gap installs do not enable network refresh. Explicit advisory policy, including
 disabled refresh and custom sources, survives managed upgrades. New installations
 record their original air-gap mode; a missing advisory section on a known connected

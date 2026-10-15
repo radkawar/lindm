@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -44,6 +45,27 @@ func executeDeployInstaller(ctx context.Context, guest *guestVM, options VMDeplo
 		return errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
 	}
 	return errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
+}
+
+// executeDeployBackup retains failed backup output only as off-server custody
+// ciphertext, with the same bounded streams and root command as the installer.
+func executeDeployBackup(ctx context.Context, guest *guestVM, options VMDeployOptions, name, command string) (path []byte, resultErr error) {
+	const step = "create encrypted backup"
+	if observer := guest.serverCommandObserver; observer != nil {
+		started := time.Now().UTC()
+		defer func() { observer(step, started, time.Now().UTC(), resultErr == nil) }()
+	}
+	output, err := guest.runResult(ctx, "sudo -n env LC_ALL=C DEBIAN_FRONTEND=noninteractive sh -eu -c "+nativeQuote(command), nil, deployInstallerDiagnosticLimit, 10*time.Minute)
+	defer clear(output.Stderr)
+	if err == nil && output.ExitCode == 0 {
+		return output.Stdout, nil
+	}
+	defer clear(output.Stdout)
+	captureErr := writeDeployInstallerDiagnostics(options.CustodyEscrowRecipientFile, options.EvidenceDirectory, strings.TrimSuffix(name, ".age")+"-command", output.Stdout, output.Stderr)
+	if err != nil {
+		return nil, errors.Join(fmt.Errorf("%s: %w", step, err), captureErr)
+	}
+	return nil, errors.Join(fmt.Errorf("%s: guest exit %d (stdout %d bytes, stderr %d bytes)", step, output.ExitCode, len(output.Stdout), len(output.Stderr)), captureErr)
 }
 
 func captureDeployServiceJournal(ctx context.Context, guest *guestVM, options VMDeployOptions, label string) error {
