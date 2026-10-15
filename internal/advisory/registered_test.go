@@ -18,7 +18,15 @@ func TestRegisteredSourcesPreserveExactProductAndExport(t *testing.T) {
 		format                                                   advisoryv1.FeedFormat
 	}{
 		{"ubuntu-24.04", "ubuntu", "24.04", "x86_64", "amd64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"ubuntu-22.04", "ubuntu", "22.04", "x86_64", "amd64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"ubuntu-26.04", "ubuntu", "26.04", "x86_64", "amd64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"debian-12", "debian", "12", "x86_64", "amd64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"debian-13", "debian", "13", "x86_64", "amd64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"debian-13", "debian", "13", "aarch64", "arm64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"almalinux-9", "almalinux", "9.8", "x86_64", "x86_64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
+		{"almalinux-10", "almalinux", "10.2", "x86_64", "x86_64", "", advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP},
 		{"rhel-9", "rhel", "9.8", "x86_64", "x86_64", "standard", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES},
+		{"rhel-10", "rhel", "10.2", "x86_64", "x86_64", "standard", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES},
 	} {
 		t.Run(test.key, func(t *testing.T) {
 			sources, err := RegisteredSources(test.key, test.architecture, "auto")
@@ -42,7 +50,7 @@ func TestRegisteredSourcesPreserveExactProductAndExport(t *testing.T) {
 }
 
 func TestRegisteredSourcesRefuseUnknownDerivativePartialAndArchitecture(t *testing.T) {
-	for _, key := range []string{"", "unregistered", "linuxmint-22.3", "popos-24.04", "rocky-9", "debian-13", "arch"} {
+	for _, key := range []string{"", "unregistered", "linuxmint-22.3", "popos-24.04", "rocky-9", "rocky-10", "debian-11", "arch"} {
 		if sources, err := RegisteredSources(key, "amd64", "auto"); err == nil || len(sources) != 0 {
 			t.Fatalf("%s gained automatic complete coverage: %v", key, sources)
 		}

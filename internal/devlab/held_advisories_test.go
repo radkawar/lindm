@@ -22,27 +22,35 @@ import (
 )
 
 func TestHeldAdvisoriesGuestArchitecture(t *testing.T) {
-	release, ok := platform.Lookup("ubuntu-24.04")
-	if !ok {
-		t.Fatal("missing guest registry row")
-	}
-	for input, want := range map[string]string{"amd64": "amd64", "arm64": "arm64", "x86_64": "amd64", "aarch64": "arm64"} {
-		t.Run(input, func(t *testing.T) {
-			cfg, err := HeldAdvisories(*release, input)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := protovalidate.Validate(cfg); err != nil {
-				t.Fatal(err)
-			}
-			if !cfg.GetRefreshEnabled() || len(cfg.GetFeeds()) != 1 {
-				t.Fatalf("held configuration = %v", cfg)
-			}
-			feed := cfg.GetFeeds()[0]
-			if feed.GetArchitecture() != want || feed.GetDistro() != release.ID || feed.GetRelease() != release.Version.Value || feed.GetUrl() != "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip" || feed.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP || feed.GetMaxAgeSeconds() != 86400 || feed.GetMaxArchiveBytes() < 2<<30 {
-				t.Fatalf("guest feed = %v", feed)
-			}
-		})
+	for _, target := range []struct {
+		key, url string
+	}{
+		{key: "ubuntu-24.04", url: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip"},
+		{key: "debian-12", url: "https://osv-vulnerabilities.storage.googleapis.com/Debian/all.zip"},
+		{key: "debian-13", url: "https://osv-vulnerabilities.storage.googleapis.com/Debian/all.zip"},
+	} {
+		release, ok := platform.Lookup(target.key)
+		if !ok {
+			t.Fatalf("missing guest registry row %s", target.key)
+		}
+		for input, want := range map[string]string{"amd64": "amd64", "arm64": "arm64", "x86_64": "amd64", "aarch64": "arm64"} {
+			t.Run(target.key+"/"+input, func(t *testing.T) {
+				cfg, err := HeldAdvisories(*release, input)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := protovalidate.Validate(cfg); err != nil {
+					t.Fatal(err)
+				}
+				if !cfg.GetRefreshEnabled() || len(cfg.GetFeeds()) != 1 {
+					t.Fatalf("held configuration = %v", cfg)
+				}
+				feed := cfg.GetFeeds()[0]
+				if feed.GetArchitecture() != want || feed.GetDistro() != release.ID || feed.GetRelease() != release.Version.Value || feed.GetUrl() != target.url || feed.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP || feed.GetMaxAgeSeconds() != 86400 || feed.GetMaxArchiveBytes() < 2<<30 {
+					t.Fatalf("guest feed = %v", feed)
+				}
+			})
+		}
 	}
 }
 
@@ -88,7 +96,7 @@ func TestHeldAdvisoriesRPMGuestArchitecture(t *testing.T) {
 }
 
 func TestHeldAdvisoriesRejectUnsupportedCoverage(t *testing.T) {
-	for _, key := range []string{"rocky-9", "linuxmint-22.3", "debian-13"} {
+	for _, key := range []string{"rocky-9", "rocky-10", "linuxmint-22.3", "debian-11"} {
 		t.Run(key, func(t *testing.T) {
 			release, ok := platform.Lookup(key)
 			if !ok {

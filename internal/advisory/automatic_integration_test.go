@@ -88,6 +88,33 @@ func TestAutomaticInventoryActivationAndIndependentInitialSchedule(t *testing.T)
 	}
 }
 
+func TestAutomaticDebianMaintainedPrimaryExportActivatesAfterInventory(t *testing.T) {
+	for _, version := range []string{"12", "13"} {
+		t.Run(version, func(t *testing.T) {
+			pool, _ := testdb.Open(t)
+			s, err := New(t.Context(), pool, &configv1.AdvisoryConfig{RefreshEnabled: true, AutomaticInventoryFeeds: true}, http.DefaultClient)
+			if err != nil {
+				t.Fatal(err)
+			}
+			device := seedInventory(t, pool, "debian", version, &inventoryv1.Package{Name: "fixture", Version: "1", Architecture: "amd64", Manager: "dpkg"})
+			if err := s.reconcileFeeds(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			sources, err := s.dueSources(t.Context())
+			if err != nil || len(sources) != 1 || sources[0].GetDistro() != "debian" || sources[0].GetRelease() != version || sources[0].GetArchitecture() != "amd64" || sources[0].GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_OSV_ZIP {
+				t.Fatalf("maintained Debian primary export was not immediately eligible: %v %v", sources, err)
+			}
+			if _, err := s.Evaluate(t.Context(), device); err != nil {
+				t.Fatal(err)
+			}
+			findings, err := s.ListDevice(t.Context(), &adminv1.ListDeviceFindingsRequest{DeviceId: device.String()}, true, []byte("[]"))
+			if err != nil || findings.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {
+				t.Fatalf("source activation fabricated unpublished vendor findings: %v %v", findings, err)
+			}
+		})
+	}
+}
+
 type refusingFeedTransport struct{ calls atomic.Int32 }
 
 func (r *refusingFeedTransport) RoundTrip(*http.Request) (*http.Response, error) {

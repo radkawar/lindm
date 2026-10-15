@@ -38,11 +38,14 @@ func RegisteredSources(key, architecture, prefix string) ([]*advisoryv1.FeedSour
 	sources := make([]*advisoryv1.FeedSource, 0, len(release.Advisory.Feeds))
 	for _, kind := range release.Advisory.Feeds {
 		export, ok := release.Advisory.Exports[kind]
+		if !ok {
+			continue
+		}
 		url := export.URL
 		if len(export.ArchitectureURLs) != 0 {
 			url = export.ArchitectureURLs[native]
 		}
-		if !ok || url == "" || export.MaxAgeSeconds == 0 {
+		if url == "" || export.MaxAgeSeconds == 0 {
 			return nil, fmt.Errorf("advisory: no maintained %s export for %s", kind, key)
 		}
 		var format advisoryv1.FeedFormat
@@ -67,6 +70,9 @@ func RegisteredSources(key, architecture, prefix string) ([]*advisoryv1.FeedSour
 		}
 		sources = append(sources, source)
 	}
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("advisory: no maintained exports for %s", key)
+	}
 	return sources, nil
 }
 
@@ -88,7 +94,7 @@ func automaticProjectionRegistryRevision() ([]byte, []string, error) {
 			}
 		}
 	}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.MarshalAppend([]byte("automatic-native-identity-v2\x00"), config)
+	encoded, err := proto.MarshalOptions{Deterministic: true}.MarshalAppend([]byte("automatic-native-identity-v3\x00"), config)
 	if err != nil {
 		return nil, nil, err
 	}
