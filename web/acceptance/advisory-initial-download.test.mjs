@@ -2,7 +2,11 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { firstDownloadState } from "../src/features/advisories/initial-download.ts";
+import {
+  firstDownloadState,
+  initialSourceForOS,
+  unavailableSourceDescription,
+} from "../src/features/advisories/initial-download.ts";
 
 const now = 1_000_000;
 const stamp = (milliseconds) => ({
@@ -58,4 +62,65 @@ test("failed refresh remains an error, not a waiting or downloading message", ()
   assert.equal(firstDownloadState({ ...downloading, error: "source failed" }, now), undefined);
   assert.equal(firstDownloadState({ ...downloading, refreshFailed: true }, now), undefined);
   assert.equal(firstDownloadState({ ...pending, refreshFailed: true }, now), undefined);
+});
+
+test("a newly downloading OS source supersedes old global absence copy, not the device assessment", () => {
+  const source = { ...downloading, distro: "ubuntu", release: "24.04" };
+  assert.equal(initialSourceForOS([source], "ubuntu", "24.04", now), source);
+  const copy = unavailableSourceDescription("Ubuntu 24.04 LTS", source, now);
+  assert.match(copy.title, /^Downloading first vulnerability data/);
+  assert.match(copy.detail, /No source was applied.*last check/);
+  assert.match(copy.detail, /Exposure remains unknown until a matching source is ready/);
+  assert.doesNotMatch(copy.detail, /server has no|devices are covered|exposure is clear/i);
+  assert.equal(copy.fix, "source");
+});
+
+test("OS source preparation requires exact known OS identity and real first-publication metadata", () => {
+  const source = { ...downloading, distro: "ubuntu", release: "24.04" };
+  for (const [osId, osVersion] of [
+    ["debian", "24.04"],
+    ["ubuntu", "22.04"],
+    ["", "24.04"],
+    ["ubuntu", ""],
+  ]) {
+    assert.equal(initialSourceForOS([source], osId, osVersion, now), undefined);
+  }
+  for (const retained of [
+    { checkedAt: stamp(now - 10_000) },
+    { sourceSha256: "published-proof" },
+    { error: "refresh failed" },
+    { refreshEnabled: false },
+  ]) {
+    assert.equal(
+      initialSourceForOS([{ ...source, ...retained }], "ubuntu", "24.04", now),
+      undefined,
+    );
+  }
+  assert.equal(initialSourceForOS([], "ubuntu", "24.04", now), undefined);
+});
+
+test("live OS preparation takes priority over waiting without asserting architecture or stream coverage", () => {
+  const waiting = { ...pending, distro: "rhel", release: "9", platformStream: "eus" };
+  const live = { ...downloading, distro: "rhel", release: "9", platformStream: "standard" };
+  assert.equal(initialSourceForOS([waiting, live], "rhel", "9", now), live);
+  assert.equal(initialSourceForOS([waiting], "rhel", "9", now), waiting);
+  const copy = unavailableSourceDescription("RHEL 9", waiting, now);
+  assert.match(copy.title, /^Waiting/);
+  assert.doesNotMatch(copy.detail, /is downloading/);
+  assert.match(copy.detail, /matching source/);
+});
+
+test("unconfigured, failed, retained or disabled source keeps absence at the last check, not a global claim", () => {
+  for (const source of [
+    undefined,
+    { ...downloading, error: "failed" },
+    { ...downloading, refreshEnabled: false },
+    { ...downloading, checkedAt: stamp(now - 10_000) },
+  ]) {
+    const copy = unavailableSourceDescription("Ubuntu 24.04 LTS", source, now);
+    assert.equal(copy.title, "No source applied for Ubuntu 24.04 LTS");
+    assert.match(copy.detail, /last device check/);
+    assert.doesNotMatch(copy.detail, /is downloading|server has no/);
+    assert.equal(copy.fix, "sources");
+  }
 });

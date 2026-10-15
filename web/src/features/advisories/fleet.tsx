@@ -85,7 +85,7 @@ export function AdvisoryFleet() {
       {summary.data ? (
         <CoverageBanner
           summary={summary.data}
-          feeds={feeds.data?.feeds ?? []}
+          feeds={!canReviewSources || feeds.error ? [] : (feeds.data?.feeds ?? [])}
           reloading={summary.isFetching}
           onReload={() => void summary.refetch()}
           canReviewSources={canReviewSources}

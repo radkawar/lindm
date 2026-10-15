@@ -1759,6 +1759,11 @@ and offline sources retain their normal evidence state. Device findings use only
 their applied source metadata; a device-scoped reader does not query fleet sources.
 `advisory-initial-download.test.mjs` covers the lease and publication boundaries in
 the existing test and UI-review targets.
+The unchecked-source cause describes the last device evaluation, not a global
+statement that no source exists now. A fleet-wide reader can also see preparation
+from an exact OS/release source's current metadata. That progress does not prove
+architecture or stream coverage: exposure stays unknown until a matching source is
+ready and the device is checked. Restricted readers do not inspect fleet sources.
 
 A walk reports
 **blocked**, not completed, when the actual UI cannot finish its job or a native

@@ -12,7 +12,11 @@ import {
 import { DeviceFilterSchema } from "../../../gen/lindm/admin/v1/inventory_management_pb";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { feedOSLabel, osLabel, sourceAnchor, useFreshnessClock } from "./display";
-import { firstDownloadState } from "./initial-download";
+import {
+  firstDownloadState,
+  initialSourceForOS,
+  unavailableSourceDescription,
+} from "./initial-download";
 
 // The remedy a cause offers: wait for the background check, act on the devices
 // (request inventory, inspect their evidence), or fix the advisory source setup.
@@ -57,11 +61,7 @@ function describe(
         fix: "devices",
       };
     case AdvisoryUncheckedReason.FEED_UNAVAILABLE:
-      return {
-        title: `No advisory source for ${os}`,
-        detail: `The lindm server has no ${os} advisory source to check these devices against.`,
-        fix: "sources",
-      };
+      return unavailableSourceDescription(os, feed, now);
     case AdvisoryUncheckedReason.RHEL_PLATFORM_STREAM_UNAVAILABLE:
       return {
         title: "Update stream not reported",
@@ -252,7 +252,11 @@ export function CoverageBanner({
       <ul className="grid min-w-0 divide-y divide-warning/25 border-t border-warning/25">
         {summary.uncheckedGroups.map((group) => {
           const os = osLabel(group.osName, group.osId, group.osVersion);
-          const feed = feeds.find((item) => item.id === group.feedId);
+          const feed = group.feedId
+            ? feeds.find((item) => item.id === group.feedId)
+            : canReviewSources && group.reason === AdvisoryUncheckedReason.FEED_UNAVAILABLE
+              ? initialSourceForOS(feeds, group.osId, group.osVersion, now)
+              : undefined;
           const cause = describe(group.reason, os, feed, now);
           const filter = toJsonString(
             DeviceFilterSchema,
