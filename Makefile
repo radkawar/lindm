@@ -146,7 +146,7 @@ UI_REVIEW_REPO ?= .
 UI_REVIEW_FLAGS ?=
 
 acceptance-build: web-assets
-	go build -trimpath -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0' -o artifacts/bin/lindmd ./cmd/lindmd
+	go build -trimpath -ldflags '-X lindm/internal/agent/buildinfo.Version=0.1.0 -X lindm/internal/agent/buildinfo.Revision=console-enrollment-lab' -o artifacts/bin/lindmd ./cmd/lindmd
 	CGO_ENABLED=0 go build -trimpath -o artifacts/bin/lab ./cmd/lab
 
 # Browser drivers are explicit prerequisites, never silently substituted engines.

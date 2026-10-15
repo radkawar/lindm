@@ -1246,6 +1246,12 @@ input change rebuilds it (about eight minutes here). A reused manifest still
 records the full source digest of the tree it was built from, and a sibling
 `<entry>.inputs` file binds each entry to its input digest; an unbound entry is
 refused, never rebuilt over.
+`acceptance-build` stamps the development server with version `0.1.0` and
+revision `console-enrollment-lab`, matching the authenticated stock agent release.
+The installed-release activation gate still requires exact compiled identity;
+an unstamped or differently stamped server is not compatible with this fixture.
+This development release label is not the frozen source SHA or a production
+release claim; review evidence records its source revision and binary digest.
 For a private worktree, use `make ui-review UI_REVIEW_REPO=/path/to/shared-checkout`
 to read the shared fixture's protected trust without copying credentials. The
 embedded UI and browser runner still come from the current worktree; the default
