@@ -35,7 +35,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags := flag.NewFlagSet("deploy", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeployOptions
-	manifestPath := flags.String("manifest", "", "pinned fresh Ubuntu24.04 or entitled RHEL9 x86 cloud image")
+	manifestPath := flags.String("manifest", "", "pinned fresh connected x86_64 cloud image for a registry-supported native server host; entitled RHEL requires Red Hat input")
 	flags.BoolVar(&options.WithoutFindings, "without-findings", false, "prove only the native server lifecycle; exclude Findings and never qualify the full lifecycle")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
@@ -56,6 +56,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected available Red Hat offline-token input; never print contents")
 	lindmd := flags.String("lindmd", "", "matching consolidated prebuilt lindmd for offline backup drill/checkpoint signing")
 	lindmctl := flags.String("lindmctl", "", "matching prebuilt owner CLI for offline higher-epoch delegation")
+	drillImage := flags.String("drill-image", "", "pre-pulled digest-pinned docker.io/library/postgres image with the matching pg_restore major for networkless off-server drill; default native operator client")
 	record := flags.String("record", "", "new private nonsecret full workflow/audit record")
 	if err := flags.Parse(args); err != nil {
 		return err
@@ -65,6 +66,9 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	}
 	if *identityPassphraseFD < 0 && (*identityPassphraseEscrow == "" || *labEscrowIdentity == "") {
 		return errors.New("deploy requires protected backup passphrase FD or durable encrypted lab unlock escrow with dedicated operator identity")
+	}
+	if err := validateDeployDrillImage(*drillImage); err != nil {
+		return err
 	}
 	if err := prepareDeployCustodianMemory(ctx, options.Repository); err != nil {
 		return err
@@ -97,6 +101,9 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	}
 	options.Browser = deployBrowser(options.Repository)
 	options.VerifyBackup = func(ctx context.Context, archive string) error {
+		if *drillImage != "" {
+			return offlineContainerDrill(ctx, options.Repository, *drillImage, *lindmd, archive, options.BackupIdentityFile, options.BackupIdentityPassphrase)
+		}
 		return offlineDeployCommand(ctx, options.Repository, *lindmd, [][]byte{options.BackupIdentityPassphrase}, "restore-drill", "-archive", archive, "-identity-file", options.BackupIdentityFile, "-identity-passphrase-fd", "0")
 	}
 	var recoveryOperations []deploylab.Operation
@@ -105,6 +112,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	}
 	result, runErr := vmlab.DeployVM(ctx, manifest, options)
 	if result != nil {
+		result.OfflineDrillImage = *drillImage
 		result.Operations = append(result.Operations, recoveryOperations...)
 		result.ManualCommands, result.OperatorDecisions, result.ObservedFailures = deploylab.Counts(result.Operations)
 	}

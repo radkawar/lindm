@@ -1816,13 +1816,14 @@ no mode preserves absent policy and still upgrades normally. Migration 58 fences
 traffic, records the exact applied history and raises the runtime floor to 58;
 below-floor rollback requires a compatible fenced backup restore, never schema Down.
 
-v0.1.0 supports PostgreSQL 16 only for local and external databases. The installer
-refuses older or newer server versions before migrations; using a newer external
-database with the distribution's older backup client is not a supported pairing.
-PostgreSQL 17/18 support with matching clients is post-v0.1 work.
-The installer creates a private native PostgreSQL 16 cluster, distinct restricted
+Supported database majors are PostgreSQL 16, 17 and 18 for local and external
+databases, always with exact native `pg_dump`/`pg_restore`/server major matching.
+The installer refuses unsupported majors and mismatched clients before migrations.
+There is no automatic database-major migration. See the registry-generated
+[server table and package-source decision](install.md#server-platforms).
+The installer creates a private native PostgreSQL cluster, distinct restricted
 database-owner migrator and non-owner runtime roles, SCRAM credentials and
-verify-full database TLS. Ubuntu uses `/var/lib/postgresql/lindm` and loopback port
+verify-full database TLS. Debian-family hosts use `/var/lib/postgresql/lindm` and loopback port
 15432; RHEL uses `/var/lib/pgsql/lindm`, standard SELinux labels and loopback port 5432. It never adopts an existing cluster or disables SELinux. A collision fails
 closed. Defaults are 64 database connections, 256 MiB shared buffers, 16 device
 pool connections plus the separate console pool, bounded statements and cgroup-v2
@@ -2409,6 +2410,14 @@ age final-stream authentication, the closed manifest/schema/version inventory,
 every file digest, safe archive paths/modes, configuration and trust loading,
 and the actual PostgreSQL custom-archive parser. It does not claim live device
 management recovery, fresh security state or absence of later revocations.
+
+The recovery workstation's `pg_restore` major must exactly match both the archived
+server and `pg_dump` majors, even for this offline drill. Install the matching
+client on that separate workstation, or use an independently verified, digest-pinned
+official PostgreSQL recovery container with networking disabled, no swap and
+locked secret memory. Never upload the private backup identity to an online
+server just to obtain matching tools; retain its unlock phrase in a protected
+anonymous pipe rather than an argument, environment variable or file.
 
 Safe stale recovery requires a **separately authenticated complete current
 checkpoint**. While the source is available, externally fence every admin/device

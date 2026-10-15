@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -84,20 +85,27 @@ func integrationCredentialPreflight(ctx context.Context, binary string) error {
 }
 
 func upgradeDatabasePreflight(ctx context.Context, release *platform.Release) error {
-	if err := checkPostgreSQLTools(ctx, release, command); err != nil {
-		return err
-	}
-	return databasePreflight(ctx)
+	return databasePreflight(ctx, release)
 }
 
 func checkPostgreSQLServerVersion(version int64) error {
-	if version/10000 != 16 {
-		return errors.New("PostgreSQL 16 is required for local and external databases in v0.1.0; older and newer server versions are not supported")
+	if !platform.PostgreSQLMajorSupported(int(version / 10000)) {
+		return errors.New("PostgreSQL 16, 17 or 18 is required for local and external databases; libpq must preserve channel_binding=require and require_auth=scram-sha-256")
 	}
 	return nil
 }
 
-func databasePreflight(ctx context.Context) error {
+func checkSelectedPostgreSQLServerVersion(version int64, major int) error {
+	if err := checkPostgreSQLServerVersion(version); err != nil {
+		return err
+	}
+	if !platform.PostgreSQLMajorSupported(major) || int(version/10000) != major {
+		return fmt.Errorf("database server must match selected PostgreSQL %d tools; no database major migration is supported", major)
+	}
+	return nil
+}
+
+func databasePreflight(ctx context.Context, release *platform.Release) error {
 	pool, err := migrationPool(ctx)
 	if err != nil {
 		return err
@@ -108,7 +116,14 @@ func databasePreflight(ctx context.Context) error {
 	if err := pool.QueryRow(ctx, `SELECT current_setting('server_version_num')::bigint,pg_database_size(current_database())`).Scan(&version, &size); err != nil {
 		return err
 	}
-	if err := checkPostgreSQLServerVersion(version); err != nil {
+	if err := checkSelectedPostgreSQLServerVersion(version, release.Server.PostgreSQLMajor); err != nil {
+		return err
+	}
+	_, localErr := os.Lstat("/etc/systemd/system/lindm-postgresql.service")
+	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
+		return localErr
+	}
+	if err := checkPostgreSQLClientTools(ctx, release, localErr == nil, command); err != nil {
 		return err
 	}
 	var disk unix.Statfs_t

@@ -68,6 +68,9 @@ func runServerDependenciesCapture(ctx context.Context, args []string, stdout, st
 	if err := release.LabLaneOn(platform.LaneDeploy, image.Architecture); err != nil {
 		return err
 	}
+	if !release.Server.DependencySnapshots {
+		return errors.New("server dependency snapshots are not qualified for this connected-only recipe")
+	}
 	switch release.Packages.Backend.PackageDB() {
 	case platform.PackageDBDpkg:
 		result, err = vmlab.CaptureServerDependencies(ctx, image, vmlab.ServerDependenciesOptions{CacheDir: *cache, SnapshotCache: *snapshots, WorkDir: *work, Custody: *custody, RequestedPackages: requested, MaxBytes: *maxBytes, MaxPackages: uint32(*maxPackages), Hardware: hardware.options()})

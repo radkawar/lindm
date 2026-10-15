@@ -35,7 +35,7 @@ func prepareRHELPostgreSQLAt(ctx context.Context, release *platform.Release, run
 	if err != nil {
 		return err
 	}
-	if err := admitRHELPostgreSQL(string(configuration), string(installed)); err != nil {
+	if err := admitRHELPostgreSQL(string(configuration), string(installed), release.Server.PostgreSQLMajor); err != nil {
 		return err
 	}
 	for _, path := range []string{"/var/lib/pgsql/data", "/var/lib/pgsql/13/data"} {
@@ -47,19 +47,25 @@ func prepareRHELPostgreSQLAt(ctx context.Context, release *platform.Release, run
 			return errors.New("existing unrelated PostgreSQL cluster; use a fresh supported turnkey host; no database adoption or migration is supported")
 		}
 	}
+	if release.Server.PostgreSQLModule == "" {
+		return nil
+	}
 	_, err = run(ctx, nil, "dnf", "--assumeyes", "--setopt=*.gpgcheck=True", "--setopt=*.sslverify=True", "module", "enable", release.Server.PostgreSQLModule)
 	return err
 }
 
-func admitRHELPostgreSQL(configuration, installed string) error {
-	refuse := errors.New("existing PostgreSQL module or packages are not a fresh PostgreSQL 16 baseline; use a fresh supported turnkey host; no module reset, stream switch or database migration is supported")
+func admitRHELPostgreSQL(configuration, installed string, major int) error {
+	refuse := fmt.Errorf("existing PostgreSQL module or packages are not a fresh PostgreSQL %d baseline; use a fresh supported turnkey host; no module reset, stream switch or database migration is supported", major)
+	if !platform.PostgreSQLMajorSupported(major) {
+		return refuse
+	}
 	for line := range strings.SplitSeq(configuration, "\n") {
 		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
 		if !ok {
 			continue
 		}
 		key, value = strings.TrimSpace(key), strings.TrimSpace(value)
-		if (key == "stream" && value != "16") || (key == "state" && value != "enabled") {
+		if (key == "stream" && value != strconv.Itoa(major)) || (key == "state" && value != "enabled") {
 			return refuse
 		}
 	}
@@ -68,7 +74,7 @@ func admitRHELPostgreSQL(configuration, installed string) error {
 		if len(fields) == 0 || (fields[0] != "postgresql" && fields[0] != "postgresql-server") {
 			continue
 		}
-		if len(fields) != 2 || postgresMajor(fields[1]) != 16 {
+		if len(fields) != 2 || postgresMajor(fields[1]) != major {
 			return refuse
 		}
 	}
@@ -85,17 +91,25 @@ func postgresMajor(version string) int {
 }
 
 func checkPostgreSQLTools(ctx context.Context, release *platform.Release, run dependencyCommand) error {
-	if release.Server.PostgreSQLModule == "" {
-		return nil
+	return checkPostgreSQLClientTools(ctx, release, true, run)
+}
+
+func checkPostgreSQLClientTools(ctx context.Context, release *platform.Release, local bool, run dependencyCommand) error {
+	major := release.Server.PostgreSQLMajor
+	if !platform.PostgreSQLMajorSupported(major) {
+		return fmt.Errorf("unsupported selected PostgreSQL major %d; require PostgreSQL 16, 17 or 18", major)
 	}
 	for _, tool := range []string{"postgres", "psql", "pg_dump", "pg_restore"} {
+		if tool == "postgres" && !local {
+			continue
+		}
 		output, err := run(ctx, nil, release.Server.PostgreSQLBinDirectory+tool, "--version")
 		if err != nil {
 			return err
 		}
 		fields := strings.Fields(string(output))
-		if len(fields) < 3 || fields[1] != "(PostgreSQL)" || postgresMajor(fields[2]) != 16 {
-			return fmt.Errorf("%s must be distro PostgreSQL 16 before provisioning or backup; libpq must preserve channel_binding=require and require_auth=scram-sha-256", tool)
+		if len(fields) < 3 || fields[0] != tool || fields[1] != "(PostgreSQL)" || postgresMajor(fields[2]) != major {
+			return fmt.Errorf("%s must match selected PostgreSQL %d before provisioning or backup; libpq must preserve channel_binding=require and require_auth=scram-sha-256", tool, major)
 		}
 	}
 	return nil

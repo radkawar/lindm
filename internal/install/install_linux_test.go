@@ -28,14 +28,15 @@ import (
 )
 
 func TestDependencyClosureRequiresEveryNativePrerequisite(t *testing.T) {
-	for _, key := range []string{"ubuntu-24.04", "rhel-9"} {
+	for _, key := range []string{"ubuntu-22.04", "ubuntu-24.04", "ubuntu-26.04", "debian-12", "debian-13", "rhel-9", "rhel-10", "rocky-9", "rocky-10", "almalinux-9", "almalinux-10"} {
 		release, ok := platform.Lookup(key)
 		if !ok {
 			t.Fatalf("missing server release %s", key)
 		}
 		names := []string{"openssl", "systemd", "ca-certificates"}
 		if release.Packages.Backend.PackageDB() == platform.PackageDBDpkg {
-			names = append(names, "postgresql-16", "postgresql-client-16", "gpgv", "util-linux")
+			major := strconv.Itoa(release.Server.PostgreSQLMajor)
+			names = append(names, "postgresql-"+major, "postgresql-client-"+major, "gpgv", "util-linux")
 		} else {
 			names = append(names, "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils")
 		}
@@ -64,7 +65,7 @@ func TestAirgapRequiresItsOwnPlatformAddonBeforeMutation(t *testing.T) {
 			bundle := t.TempDir()
 			expected := "air-gap installation requires authenticated"
 			if key == "rhel-9" {
-				expected = "RHEL offline installation is not available in this release"
+				expected = "this server platform supports connected installation only; air-gap qualification is out of scope"
 			}
 			if err := requireAirgapAddon(bundle, release); err == nil || !strings.Contains(err.Error(), expected) {
 				t.Fatalf("missing platform add-on or unavailable mode did not fail clearly: %v", err)
@@ -80,6 +81,30 @@ func TestAirgapRequiresItsOwnPlatformAddonBeforeMutation(t *testing.T) {
 					}
 				} else if (err == nil) != strings.HasSuffix(name, ".digest") {
 					t.Fatalf("incomplete platform pair accepted: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestConnectedServerRecipesRefuseOfflineBeforeDependencyMutation(t *testing.T) {
+	for _, release := range platform.Releases() {
+		if release.Server == nil || !release.Server.ConnectedOnly {
+			continue
+		}
+		t.Run(release.Key, func(t *testing.T) {
+			bundle := t.TempDir()
+			for _, name := range []string{release.Server.SnapshotName, release.Server.SnapshotName + ".digest"} {
+				if err := os.WriteFile(filepath.Join(bundle, name), []byte("not an authenticated offline qualification"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, err := range []error{
+				requireAirgapAddon(bundle, release),
+				installDependencies(t.Context(), Options{Airgap: true, Bundle: bundle}, release),
+			} {
+				if err == nil || !strings.Contains(err.Error(), "connected installation only") {
+					t.Fatalf("unqualified offline path admitted or mutated state: %v", err)
 				}
 			}
 		})

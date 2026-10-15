@@ -4042,8 +4042,11 @@ N and strictly newer N+1, independently pinned attestation/TUF trust and off-ser
 age custody. It reserves **three** local native x86 guests together through normal
 FIFO admission (configured local ceiling remains four), not nested sublane leases:
 fresh server, second fresh managed device and third fresh restore server.
-Supported server hosts are Ubuntu 24.04 and entitled RHEL 9 only; the derived
-matrix gate explicitly distinguishes other device targets from supported servers.
+Server host recipes and architecture admission come from each release's
+`ServerInstallation` registry row, independently of endpoint support. The generated
+[server table](install.md#server-platforms) distinguishes recipes from qualification.
+Each added connected x86_64 host must pass this entire lane separately; shared
+APT/RPM implementation or setup-only evidence never substitutes for its proof.
 The source and fresh restore servers request a 32 GiB overlay floor, also used by
 the one-server `lab deploy setup` observation. The full multiarchitecture release
 and its private immutable snapshot must fit while preserving the installer's
@@ -4068,8 +4071,25 @@ go run ./cmd/lab deploy \
   -evidence "$NEW_PRIVATE_EVIDENCE_DIRECTORY" -record "$NEW_PRIVATE_RECORD"
 ```
 
-For Ubuntu, omit the Red Hat input. It is required for RHEL and its content must
-never be printed. The lane records initial vendor-tool presence before installation,
+The offline operator must have the same `pg_restore` major as the archived server
+and `pg_dump`; a newer client is not a substitute. When the host's native client
+differs, pre-pull and independently verify an official `docker.io/library/postgres`
+linux/amd64 image by manifest digest, then pass
+`-drill-image docker.io/library/postgres@sha256:FULL_DIGEST`.
+The lane never pulls an image while processing custody. It runs only the matching
+`lindmd restore-drill` in an off-server, networkless, read-only container with
+zero swap allowance, locked secret memory, disabled core/log output and private
+tmpfs staging. Only the public binary, encrypted archive and encrypted identity
+are mounted read-only; the unlock phrase uses an anonymous pipe. The owned
+container and anonymous volumes are removed even on cancellation, and a cleanup
+failure fails the lane. `offline_drill_image` records the exact configured digest.
+The regular three-guest native FIFO footprint is unchanged: this is an operator
+process, not a replacement server/device or a second native lifecycle lane.
+Matrix deployment inputs may supply a `drillImages` object keyed by supported
+database major; an absent entry retains the native operator-client requirement.
+
+Omit the Red Hat input on unentitled distributions; entitled RHEL requires it and
+its content must never be printed. The lane records initial vendor-tool presence before installation,
 installs `install.sh` with a protected setup-code destination, then uses real
 Chromium and production visible controls for password plus user-verifying passkey
 setup/sign-in and the exact browser-clipboard enrollment command. A dedicated child

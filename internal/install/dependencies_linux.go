@@ -23,10 +23,10 @@ import (
 // installDependencies uses normally authenticated, configured distro repositories
 // in connected mode. Air-gap mode imports only the signed per-platform closure.
 func installDependencies(ctx context.Context, o Options, release *platform.Release) (err error) {
-	if release.Server.PostgreSQLModule != "" {
-		if o.Airgap {
-			return errors.New("RHEL offline installation is not available in this release")
-		}
+	if o.Airgap && release.Server.ConnectedOnly {
+		return errors.New("this server platform supports connected installation only; air-gap qualification is out of scope")
+	}
+	if release.Packages.Backend.PackageDB() == platform.PackageDBRPM {
 		if err := prepareRHELPostgreSQL(ctx, release, command); err != nil {
 			return err
 		}
@@ -42,6 +42,11 @@ func installDependencies(ctx context.Context, o Options, release *platform.Relea
 		defer func() { err = errors.Join(err, cleanup()) }()
 	}
 	if !o.Airgap {
+		if repository := release.Server.PostgreSQLRepository; repository != nil {
+			if err := preparePGDG(ctx, repository); err != nil {
+				return err
+			}
+		}
 		if err := installConnectedDependencies(ctx, release); err != nil {
 			return err
 		}
@@ -80,8 +85,8 @@ func installDependencies(ctx context.Context, o Options, release *platform.Relea
 }
 
 func requireAirgapAddon(bundle string, release *platform.Release) error {
-	if release.Server.PostgreSQLModule != "" {
-		return errors.New("RHEL offline installation is not available in this release")
+	if release.Server.ConnectedOnly {
+		return errors.New("this server platform supports connected installation only; air-gap qualification is out of scope")
 	}
 	for _, name := range []string{release.Server.SnapshotName, release.Server.SnapshotName + ".digest"} {
 		if _, err := os.Stat(filepath.Join(bundle, name)); errors.Is(err, os.ErrNotExist) {
@@ -96,15 +101,7 @@ func requireAirgapAddon(bundle string, release *platform.Release) error {
 func installConnectedDependencies(ctx context.Context, release *platform.Release) error {
 	switch release.Packages.Backend.PackageDB() {
 	case platform.PackageDBDpkg:
-		args := make([]string, 0, 16+len(release.Server.RequiredPackages))
-		args = append(args, "-o", "APT::Get::AllowUnauthenticated=false", "-o", "Acquire::AllowInsecureRepositories=false", "-o", "Acquire::AllowDowngradeToInsecureRepositories=false", "-o", "Acquire::https::Verify-Peer=true", "-o", "Acquire::https::Verify-Host=true", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
-		if _, err := command(ctx, nil, "apt-get", append(args, "update")...); err != nil {
-			return err
-		}
-		args = append(args, "-y", "install")
-		args = append(args, release.Server.RequiredPackages...)
-		_, err := command(ctx, nil, "apt-get", args...)
-		return err
+		return installAPTDependencies(ctx, release.Server.RequiredPackages)
 	case platform.PackageDBRPM:
 		args := make([]string, 0, 5+len(release.Server.RequiredPackages))
 		args = append(args, "--assumeyes", "--setopt=*.gpgcheck=True", "--setopt=*.sslverify=True", "--setopt=install_weak_deps=False", "install")
@@ -114,6 +111,18 @@ func installConnectedDependencies(ctx context.Context, release *platform.Release
 	default:
 		return errors.New("connected dependency backend is unsupported")
 	}
+}
+
+func installAPTDependencies(ctx context.Context, packages []string) error {
+	args := make([]string, 0, 19+len(packages))
+	args = append(args, "-o", "APT::Get::AllowUnauthenticated=false", "-o", "Acquire::AllowInsecureRepositories=false", "-o", "Acquire::AllowDowngradeToInsecureRepositories=false", "-o", "Acquire::https::Verify-Peer=true", "-o", "Acquire::https::Verify-Host=true", "-o", "APT::Update::Error-Mode=any", "-o", "Dpkg::Options::=--force-confdef", "-o", "Dpkg::Options::=--force-confold")
+	if _, err := command(ctx, nil, "apt-get", append(args, "update")...); err != nil {
+		return err
+	}
+	args = append(args, "-y", "--no-install-recommends", "install")
+	args = append(args, packages...)
+	_, err := command(ctx, nil, "apt-get", args...)
+	return err
 }
 
 func requiredDependencies(requested []string, release *platform.Release) error {

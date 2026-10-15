@@ -159,6 +159,9 @@ func validateDeploySetupOptions(manifest *labv1.ImageManifest, options VMDeployS
 	if release.Version.Rule == platform.VersionMajor && manifest.Version == release.Version.Value {
 		return errors.New("deploy setup requires an exact minor base image")
 	}
+	if options.Airgap && release.Server.ConnectedOnly {
+		return errors.New("deploy setup requires connected installation for this registry-supported server host")
+	}
 	if options.Browser == nil || options.LabBinary == "" || options.EvidenceDirectory == "" || options.FirstRelease == "" || options.ReleasePublicKey == "" || options.ReleaseKeyID == "" || options.TUFRootFile == "" || options.BackupRecipientFile == "" || options.CustodyEscrowRecipientFile == "" {
 		return errors.New("deploy setup requires real browser, independent release/TUF trust, backup public recipient and lab custody escrow public recipient")
 	}
@@ -167,6 +170,9 @@ func validateDeploySetupOptions(manifest *labv1.ImageManifest, options VMDeployS
 	}
 	if options.Airgap && options.RedHatTokenFile != "" {
 		return errors.New("air-gap server setup requires the authenticated host-platform add-on, not an online Red Hat entitlement token")
+	}
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
+		return err
 	}
 	return nil
 }

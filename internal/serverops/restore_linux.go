@@ -69,7 +69,7 @@ func RestoreDrill(ctx context.Context, archive, identity string, passphrase []by
 		return result, err
 	}
 	defer resources.HTTPClient.CloseIdleConnections()
-	if err = runTool(ctx, "pg_restore", []string{"--list", filepath.Join(stage, "database.dump")}, cleanEnvironment(), nil, io.Discard); err != nil {
+	if _, _, err = checkDatabaseArchive(ctx, filepath.Join(stage, "database.dump")); err != nil {
 		return result, err
 	}
 	return DrillResult{CapturedAt: manifest.CapturedAt, Version: manifest.Version, DeploymentID: manifest.DeploymentID, Files: len(manifest.Files), DatabaseArchiveValid: true}, nil
@@ -175,10 +175,17 @@ func restore(ctx context.Context, options RestoreOptions) (result DrillResult, e
 	if err != nil {
 		return result, err
 	}
+	restoreMajor, err := databaseMajor(ctx, pool)
+	if err != nil {
+		return result, err
+	}
+	if restoreMajor != checkpoint.databaseMajor {
+		return result, errors.New("operations: restore_database_archive_major_mismatch")
+	}
 	if err = enterRestoreHold(targetIdentity); err != nil {
 		return result, err
 	}
-	if err = runTool(ctx, "pg_restore", []string{"--dbname=service=lindm-backup", "--exit-on-error", "--single-transaction", "--clean", "--if-exists", "--no-owner", "--no-acl", "--no-password", filepath.Join(checkpoint.directory, "database.dump")}, env, nil, io.Discard); err != nil {
+	if err = runTool(ctx, checkpoint.restoreTool, []string{"--dbname=service=lindm-backup", "--exit-on-error", "--single-transaction", "--clean", "--if-exists", "--no-owner", "--no-acl", "--no-password", filepath.Join(checkpoint.directory, "database.dump")}, env, nil, io.Discard); err != nil {
 		return result, err
 	}
 	if err = db.Check(ctx, pool); err != nil {
@@ -221,6 +228,8 @@ type restoreCheckpoint struct {
 	signed            *agentv1.ServerRecoveryCheckpoint
 	inventory         *resourceSet
 	resources         *config.Resources
+	restoreTool       string
+	databaseMajor     int
 }
 
 func prepareRestoreCheckpoint(ctx context.Context, options RestoreOptions, stage string, snapshot *restoreCheckpoint) (err error) {
@@ -290,7 +299,8 @@ func prepareRestoreCheckpoint(ctx context.Context, options RestoreOptions, stage
 	if snapshot.resources.ExecutionBootstrap == nil {
 		return errors.New("operations: checkpoint_execution_bootstrap_required")
 	}
-	return runTool(ctx, "pg_restore", []string{"--list", filepath.Join(currentDir, "database.dump")}, cleanEnvironment(), nil, io.Discard)
+	snapshot.restoreTool, snapshot.databaseMajor, err = checkDatabaseArchive(ctx, filepath.Join(currentDir, "database.dump"))
+	return err
 }
 
 func checkFreshRestoreTarget(ctx context.Context, pool *pgxpool.Pool, current *archiveManifest) error {

@@ -66,6 +66,7 @@ type VMDeployResult struct {
 	BackupSHA256                     string                       `json:"encrypted_backup_sha256,omitempty"`
 	SecurityBackupSHA256             string                       `json:"fenced_security_backup_sha256,omitempty"`
 	RecoveryCustodySHA256            string                       `json:"off_server_recovery_custody_sha256,omitempty"`
+	OfflineDrillImage                string                       `json:"offline_drill_image,omitempty"`
 	RestoredCurrentSecuritySnapshot  bool                         `json:"restored_current_security_snapshot"`
 	DeviceID                         string                       `json:"device_id,omitempty"`
 	Enrollment                       *VMConsoleEnrollmentResult   `json:"enrollment,omitempty"`
@@ -125,6 +126,9 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	}
 	if options.Browser == nil || options.Recovery == nil || options.VerifyBackup == nil || options.EvidenceDirectory == "" || options.LabBinary == "" {
 		return result, errors.New("deploy requires real browser, offline backup drill and independently signed restore reconciliation")
+	}
+	if err := validateVMRedHatToken(release, options.RedHatTokenFile); err != nil {
+		return result, err
 	}
 	if release.Lab.Entitlement && options.RedHatTokenFile == "" {
 		return result, errors.New("deploy requires protected Red Hat entitlement input")

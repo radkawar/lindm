@@ -195,7 +195,7 @@ func continueInstallation(ctx context.Context, o *Options, release *platform.Rel
 	if err := provision(ctx, *o, release, rootCustody, state); err != nil {
 		return err
 	}
-	if err := databasePreflight(ctx); err != nil {
+	if err := databasePreflight(ctx, release); err != nil {
 		return err
 	}
 	if _, err := command(ctx, nil, "systemctl", "start", "lindmd-migrate.service"); err != nil {

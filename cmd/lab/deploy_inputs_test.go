@@ -54,7 +54,23 @@ func TestDeployMatrixInputsRequirePrivateIndependentArtifacts(t *testing.T) {
 		t.Fatal("accepted missing offline backup custody")
 	}
 	input.BackupIdentityFile = "/custody/backup-identity"
+	for _, images := range []map[string]string{
+		{"15": "docker.io/library/postgres@sha256:" + strings.Repeat("a", 64)},
+		{"017": "docker.io/library/postgres@sha256:" + strings.Repeat("a", 64)},
+		{"17": "postgres:17"},
+		{"18": ""},
+	} {
+		input.DrillImages = images
+		put()
+		if _, err := readMatrixDeployInputs(path); err == nil {
+			t.Fatal("accepted unpinned or unsupported recovery client image")
+		}
+	}
+	input.DrillImages = map[string]string{"17": "docker.io/library/postgres@sha256:" + strings.Repeat("a", 64)}
 	put()
+	if _, err := readMatrixDeployInputs(path); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(path, 0644); err != nil {
 		t.Fatal(err)
 	}

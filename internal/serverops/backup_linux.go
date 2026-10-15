@@ -217,7 +217,11 @@ func dumpBackupDatabase(ctx context.Context, stage, configPath string, runtime *
 	if err != nil {
 		return "", err
 	}
-	return dumpDatabase(ctx, stage, string(connection))
+	major, err := databaseMajor(ctx, migrator)
+	if err != nil {
+		return "", err
+	}
+	return dumpDatabase(ctx, stage, string(connection), major)
 }
 
 func checkBackupDatabaseTarget(ctx context.Context, runtime, migrator *pgxpool.Pool) error {

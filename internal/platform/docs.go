@@ -33,10 +33,20 @@ func DocBlocks() ([]gendoc.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+	server, err := serverSupportTable("docs/platforms/")
+	if err != nil {
+		return nil, err
+	}
+	serverInstall, err := serverSupportTable("platforms/")
+	if err != nil {
+		return nil, err
+	}
 	blocks := []gendoc.Block{
 		{File: "docs/product-specification.md", Name: "platform-tiers", Body: tiers},
 		{File: "docs/verification.md", Name: "platform-tiers", Body: tiers},
 		{File: "docs/platforms/README.md", Name: "platform-support", Body: support},
+		{File: "README.md", Name: "server-support", Body: server},
+		{File: "docs/install.md", Name: "server-support", Body: serverInstall},
 	}
 	for _, page := range pages() {
 		body, err := capabilityTable(page)
@@ -46,6 +56,33 @@ func DocBlocks() ([]gendoc.Block, error) {
 		blocks = append(blocks, gendoc.Block{File: "docs/platforms/" + page, Name: "platform-capabilities", Body: body})
 	}
 	return blocks, nil
+}
+
+func serverSupportTable(pagePrefix string) (string, error) {
+	var rows [][]string
+	for _, release := range registry {
+		server := release.Server
+		if server == nil {
+			continue
+		}
+		source := "Distribution"
+		if server.PostgreSQLRepository != nil {
+			source = "PGDG"
+		}
+		if server.PostgreSQLModule != "" {
+			source += " stream"
+		}
+		mode := "Connected and air gap"
+		if server.ConnectedOnly {
+			mode = "Connected only"
+		}
+		rows = append(rows, []string{
+			fmt.Sprintf("[%s](%s%s)", gendoc.Escape(release.Name), pagePrefix, release.Page),
+			strings.Join(server.Architectures, ", "), strconv.Itoa(server.PostgreSQLMajor),
+			source, mode, gendoc.Escape(server.Status),
+		})
+	}
+	return gendoc.Table([]string{"Server platform", "Architecture", "PostgreSQL", "Packages", "Install mode", "Lifecycle"}, rows)
 }
 
 func label(r *Release) string {

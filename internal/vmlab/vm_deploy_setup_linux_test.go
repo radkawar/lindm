@@ -5,6 +5,7 @@
 package vmlab
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -12,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	labv1 "lindm/gen/lindm/lab/v1"
 	"lindm/internal/deploylab"
+	"lindm/internal/platform"
 )
 
 func TestDeploySetupCannotQualifyFullLifecycle(t *testing.T) {
@@ -103,5 +106,62 @@ func TestDeploySetupAirgapEvidenceRemainsFirstRunOnly(t *testing.T) {
 	}
 	if observed["airgap_server_install"] != true || observed["scope"] != deploylab.FirstRunInstallScope || observed["lifecycle_qualified"] != false {
 		t.Fatalf("air-gap server install promoted to full lifecycle evidence: %s", body)
+	}
+}
+
+func TestDeploySetupAdmissionFollowsNativeServerRegistry(t *testing.T) {
+	for _, key := range []string{"ubuntu-22.04", "ubuntu-24.04", "ubuntu-26.04", "debian-12", "debian-13", "rhel-9", "rhel-10", "rocky-9", "rocky-10", "almalinux-9", "almalinux-10"} {
+		t.Run(key, func(t *testing.T) {
+			release, ok := platform.Lookup(key)
+			if !ok || release.Server == nil {
+				t.Fatal("native server registry entry missing")
+			}
+			manifest := testManifest([]byte("pinned image"), strings.Repeat("A", 40), labv1.ChecksumMode_CHECKSUM_MODE_DETACHED)
+			manifest.Distribution, manifest.Version = release.ID, release.Version.Value
+			if release.Version.Rule == platform.VersionMajor {
+				manifest.Version += ".1"
+			}
+			options := VMDeploySetupOptions{
+				Browser: func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error) {
+					t.Fatal("admission must not invoke browser")
+					return nil, nil
+				},
+				LabBinary: "lab", EvidenceDirectory: "evidence", FirstRelease: "release",
+				ReleasePublicKey: "release-key", ReleaseKeyID: "independent-pin", TUFRootFile: "tuf-root",
+				BackupRecipientFile: "backup-recipient", CustodyEscrowRecipientFile: "escrow-recipient",
+			}
+			if release.Lab.Entitlement {
+				if err := validateDeploySetupOptions(manifest, options); err == nil || !strings.Contains(err.Error(), "Red Hat entitlement") {
+					t.Fatalf("entitled host admitted without Red Hat input: %v", err)
+				}
+				options.RedHatTokenFile = "protected-token"
+			} else {
+				options.RedHatTokenFile = "unrelated-token"
+				if err := validateDeploySetupOptions(manifest, options); err == nil || !strings.Contains(err.Error(), "only valid for subscription-entitled") {
+					t.Fatalf("unentitled host accepted Red Hat input: %v", err)
+				}
+				options.RedHatTokenFile = ""
+			}
+			for _, architecture := range []string{"amd64", "x86_64"} {
+				manifest.Architecture = architecture
+				if err := validateDeploySetupOptions(manifest, options); err != nil {
+					t.Fatalf("registry-supported connected %s host rejected: %v", architecture, err)
+				}
+			}
+			manifest.Architecture = "arm64"
+			if err := validateDeploySetupOptions(manifest, options); err == nil {
+				t.Fatal("connected x86_64 server admission escaped to arm64")
+			}
+			manifest.Architecture = "amd64"
+			options.Airgap, options.RedHatTokenFile = true, ""
+			err := validateDeploySetupOptions(manifest, options)
+			if release.Server.ConnectedOnly {
+				if err == nil || !strings.Contains(err.Error(), "requires connected installation") {
+					t.Fatalf("connected-only host admitted airgap installation: %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("existing offline-capable host rejected: %v", err)
+			}
+		})
 	}
 }

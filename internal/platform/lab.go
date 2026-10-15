@@ -205,6 +205,9 @@ func (r *Release) ProvisionGate(l LabLane) string {
 
 // LabLane returns nil when the release has a maintained recipe for the lane.
 func (r *Release) LabLane(l LabLane) error {
+	if l == LaneDeploy && r.Server != nil {
+		return nil
+	}
 	if slices.Contains(r.Lab.Lanes, l) {
 		return nil
 	}
@@ -261,8 +264,8 @@ func (r *Release) LaneGateOn(l LabLane, architecture string) string {
 	if l == LaneProductionReleaseSigning && (r.Key != "ubuntu-24.04" || kernelArchitecture(architecture) != "x86_64") {
 		return "Production release signing tests are a disposable no-swap Ubuntu 24.04 x86_64 custodian qualification only; this is not a device-platform or native installer lifecycle qualification."
 	}
-	if l == LaneDeploy && (kernelArchitecture(architecture) != "x86_64" || (r.Key != "ubuntu-24.04" && r.Key != "rhel-9")) {
-		return "The turnkey native server installer supports Ubuntu 24.04 and RHEL 9 on x86_64 only; device platform support is not server installation support."
+	if l == LaneDeploy && (r.Server == nil || !slices.Contains(r.Server.Architectures, kernelArchitecture(architecture))) {
+		return "No turnkey server installation recipe for this release and architecture; device support does not imply server installation support."
 	}
 	gate, ok := r.Lab.LaneGates[l]
 	if !ok || (len(gate.Architectures) != 0 && !slices.Contains(gate.Architectures, kernelArchitecture(architecture))) {

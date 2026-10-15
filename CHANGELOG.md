@@ -6,7 +6,7 @@
 
 The server install is supported on Ubuntu 24.04, including the AWS deployment. RHEL 9 server install is a preview in this release: install, setup, enrollment and device management work; vulnerability findings for RHEL devices on a fresh install and backup/restore on a RHEL server are still being verified.
 
-- PostgreSQL 16 is required for local and external databases.
+- PostgreSQL 16, 17 or 18 is required, with exact native backup/restore client and server major matching.
 - RHEL 9 server installation is connected-only; offline installation is refused before changes are made.
 - Operators must build and sign their own releases. There are no official project signing keys or project-signed release bundles.
 
@@ -16,6 +16,8 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Contribution, private security disclosure and community conduct guides, with issue and pull request templates.
 - GitHub Actions checks for lint, generated output, unit tests, container integration and the Chromium console journey.
 - Public platform status and operator documentation for self-built, operator-signed releases.
+- Generate a separate server-install support table from per-release registry recipes, distinguishing lifecycle qualification from device support; admit connected x86_64 Debian 12/13, Ubuntu 22.04/26.04, RHEL 10 and Rocky Linux/AlmaLinux 9/10 qualification lanes without claiming unrun native proofs.
+- Let native deployment qualification use an explicitly digest-pinned official PostgreSQL recovery client in an off-server networkless, swap-zero container for exact-major offline drills, without installing extra clients or adding third-party sources on the operator host.
 - Require DCO trailers for each new commit's author and recorded coauthors in public CI.
 - Weekly Dependabot version updates for Go modules, npm and GitHub Actions.
 - Create the native integrations encryption key automatically, retain root-only custody through systemd credentials, and preserve the original key with encrypted backups and restores.
@@ -30,7 +32,7 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Let held desktop assistance demos start when their platform explicitly lacks advisory coverage, without configuring substitute feeds or claiming vulnerability findings; supported releases still require their real exports and completed findings.
 - Put the disposable assistance guest's NSS hosts-file lookup before synthetic localhost resolution, preserving the original modules and action clauses and retaining the verified QEMU-host route.
 - Retain AWS native installer failure diagnostics in create-exclusive root-only custody instead of discarding the cause; keep child output out of public errors and refuse overwrites or capture into memory.
-- Require PostgreSQL 16 for all v0.1.0 local and external databases; refuse older or newer server versions before migrations. PostgreSQL 17/18 with matching backup clients is post-v0.1 work.
+- Admit PostgreSQL 16, 17 and 18 with exact backup/restore client/server major matching; prefer distribution-native supported majors, using a dedicated fingerprint-pinned PGDG APT source only for Ubuntu 22.04 and Debian 12 whose native clients lack the required authentication control.
 - Select RHEL 9's signed distro PostgreSQL 16 stream explicitly; refuse conflicting modules, older PostgreSQL installs and unrelated clusters without resetting or migrating them. Check PostgreSQL server and backup clients before provisioning and upgrade backup. v0.1.0 RHEL server installation is connected-only; offline installation refuses before mutation. Ubuntu air-gap behavior is unchanged.
 - Make **v0.1.0** the browser-compatible managed-upgrade baseline. Earlier shared-TLS installs are refused before upgrade changes: install fresh and re-enroll devices. Use an independent P-256/SHA-256 console CA and leaf, retain Ed25519 device transport and client/signing authorities, and sign separate per-origin console and device HTTPS roots into new bootstrap bundles. Native deployment proof now imports the actual installed console CA instead of supplying laboratory certificates.
 - Reject Ed25519 console certificates, generate P-256 database leaves, name the console CA in setup and status, and warn that first-owner passkeys require a DNS console URL rather than an IP address.

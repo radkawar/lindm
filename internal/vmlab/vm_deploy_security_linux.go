@@ -155,7 +155,7 @@ func proveDeployRuntimePrivileges(ctx context.Context, guest *guestVM) (gates []
 		_, removeErr := serverGuestCommand(context.WithoutCancel(ctx), guest, "remove ephemeral runtime PGPass", "rm -- "+privatePass, nil)
 		err = errors.Join(err, removeErr)
 	}()
-	command := "sudo -n runuser -u lindmd -- env LC_ALL=C PGCHANNELBINDING=require PGPASSFILE=" + nativeQuote(privatePass) + " PGSSLMODE=verify-full PGSSLROOTCERT=" + nativeQuote(dsn.Query().Get("sslrootcert")) + " psql -X -v ON_ERROR_STOP=1 -h " + nativeQuote(dsn.Hostname()) + " -p " + nativeQuote(port) + " -U " + nativeQuote(dsn.User.Username()) + " -d " + nativeQuote(database)
+	command := "sudo -n runuser -u lindmd -- env LC_ALL=C PGCHANNELBINDING=require PGPASSFILE=" + nativeQuote(privatePass) + " PGSSLMODE=verify-full PGSSLROOTCERT=" + nativeQuote(dsn.Query().Get("sslrootcert")) + " " + nativeQuote(guest.release.Server.PostgreSQLBinDirectory+"psql") + " -X -v ON_ERROR_STOP=1 -h " + nativeQuote(dsn.Hostname()) + " -p " + nativeQuote(port) + " -U " + nativeQuote(dsn.User.Username()) + " -d " + nativeQuote(database)
 	handshake, handshakeErr := guest.runResult(ctx, command+" -Atq", strings.NewReader("SELECT 1;\n"), 16<<10, time.Minute)
 	if handshakeErr != nil || handshake.ExitCode != 0 || strings.TrimSpace(string(handshake.Stdout)) != "1" || len(handshake.Stderr) != 0 {
 		return nil, errors.New("deploy runtime SCRAM-PLUS handshake and query did not complete")

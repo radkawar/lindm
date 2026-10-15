@@ -69,8 +69,8 @@ func CaptureServerDependencies(ctx context.Context, image *labv1.ImageManifest, 
 		return nil, errors.New("server dependencies: Ubuntu capture requires explicit custody")
 	}
 	release := manifestRelease(image)
-	if release.LabLaneOn(platform.LaneDeploy, image.Architecture) != nil || release.Packages.Backend.PackageDB() != platform.PackageDBDpkg || image.Architecture != "amd64" {
-		return nil, errors.New("APT server closure requires Ubuntu24.04 amd64 image")
+	if release.LabLaneOn(platform.LaneDeploy, image.Architecture) != nil || !release.Server.DependencySnapshots || release.Packages.Backend.PackageDB() != platform.PackageDBDpkg || image.Architecture != "amd64" {
+		return nil, errors.New("APT server closure requires a registry-qualified dependency snapshot recipe on amd64")
 	}
 	if o.CacheDir == "" {
 		o.CacheDir = ".cache/lab/images"
@@ -226,8 +226,8 @@ func CaptureServerDependencies(ctx context.Context, image *labv1.ImageManifest, 
 // native product helper. It never recaptures metadata or replaces old evidence.
 func ReplayServerDependencies(ctx context.Context, image *labv1.ImageManifest, digest string, o ServerDependenciesOptions) (_ *serverdepsv1.Manifest, _ []byte, err error) {
 	release := platform.ForManifest(image.GetDistribution(), image.GetVersion())
-	if release.Server == nil || release.Packages.Backend.PackageDB() != platform.PackageDBDpkg || release.LaneGateOn(platform.LaneDeploy, image.GetArchitecture()) != "" || o.LabBinary == "" || len(o.LabSHA256) != 64 || strings.Trim(o.LabSHA256, "0123456789abcdef") != "" {
-		return nil, nil, errors.New("existing server closure replay requires Ubuntu24.04 amd64 and a SHA256-pinned native helper")
+	if release.Server == nil || !release.Server.DependencySnapshots || release.Packages.Backend.PackageDB() != platform.PackageDBDpkg || release.LaneGateOn(platform.LaneDeploy, image.GetArchitecture()) != "" || o.LabBinary == "" || len(o.LabSHA256) != 64 || strings.Trim(o.LabSHA256, "0123456789abcdef") != "" {
+		return nil, nil, errors.New("existing server closure replay requires a registry-qualified amd64 recipe and a SHA256-pinned native helper")
 	}
 	if o.CacheDir == "" {
 		o.CacheDir = ".cache/lab/images"

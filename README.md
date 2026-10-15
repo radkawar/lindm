@@ -156,6 +156,31 @@ Encryption and wipe require an encrypted installation. TPM2 unlock needs a compa
 
 <!-- END GENERATED readme-support -->
 
+## Server install
+
+Server installation is separate from device support above.
+The table distinguishes maintained installer recipes from full lifecycle qualification.
+New platforms are connected-only; arm64 server qualification is not available.
+See the [installation guide](docs/install.md) for prerequisites and proof records.
+
+<!-- BEGIN GENERATED server-support -->
+
+| Server platform                                | Architecture | PostgreSQL | Packages            | Install mode          | Lifecycle         |
+| ---------------------------------------------- | ------------ | ---------- | ------------------- | --------------------- | ----------------- |
+| [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md)   | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
+| [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md)   | x86_64       | 16         | Distribution        | Connected and air gap | Qualified         |
+| [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Not yet qualified |
+| [Debian 12](docs/platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
+| [Debian 13](docs/platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Not yet qualified |
+| [RHEL 9](docs/platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
+| [RHEL 10](docs/platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [Rocky Linux 9](docs/platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
+| [Rocky Linux 10](docs/platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [AlmaLinux 9](docs/platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
+| [AlmaLinux 10](docs/platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+
+<!-- END GENERATED server-support -->
+
 ## Install
 
 Build a release with your own signing keys, then install the bundle on your server.

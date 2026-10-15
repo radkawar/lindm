@@ -134,6 +134,9 @@ func snapshotTarget(m *serverdepsv1.Manifest) (*platform.Release, error) {
 	if err := release.LabLaneOn(platform.LaneDeploy, m.GetArchitecture()); err != nil {
 		return nil, err
 	}
+	if !release.Server.DependencySnapshots {
+		return nil, errors.New("this connected server recipe has no qualified dependency snapshot capture/replay lane")
+	}
 	backend := serverdepsv1.Backend_BACKEND_DEB
 	if release.Packages.Backend.PackageDB() == platform.PackageDBRPM {
 		backend = serverdepsv1.Backend_BACKEND_RPM

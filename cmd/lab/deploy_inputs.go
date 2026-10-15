@@ -7,10 +7,13 @@ package main
 import (
 	"errors"
 	"path/filepath"
+	"strconv"
+
+	"lindm/internal/platform"
 )
 
 // These are references, never private key contents or a command replacement.
-// Both server OS lanes consume the same independently authenticated exports.
+// All server OS lanes consume the same independently authenticated exports.
 type deployMatrixInputs struct {
 	FirstRelease               string `json:"firstRelease"`
 	UpgradeRelease             string `json:"upgradeRelease"`
@@ -22,6 +25,8 @@ type deployMatrixInputs struct {
 	BackupIdentityFile         string `json:"backupIdentityFile"`
 	Lindmd                     string `json:"lindmd"`
 	Lindmctl                   string `json:"lindmctl"`
+	// Optional per-major off-server clients; absent entries use native tools.
+	DrillImages map[string]string `json:"drillImages,omitempty"`
 }
 
 func readMatrixDeployInputs(path string) (*deployMatrixInputs, error) {
@@ -36,6 +41,18 @@ func readMatrixDeployInputs(path string) (*deployMatrixInputs, error) {
 	}
 	if len(inputs.ReleaseKeyID) != 64 {
 		return nil, errors.New("deploy matrix inputs require independently pinned release key ID")
+	}
+	for version, image := range inputs.DrillImages {
+		major, err := strconv.Atoi(version)
+		if err != nil || strconv.Itoa(major) != version || !platform.PostgreSQLMajorSupported(major) {
+			return nil, errors.New("drill image map keys must be supported PostgreSQL majors")
+		}
+		if image == "" {
+			return nil, errors.New("configured drill image must not be empty")
+		}
+		if err := validateDeployDrillImage(image); err != nil {
+			return nil, err
+		}
 	}
 	return inputs, nil
 }

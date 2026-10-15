@@ -12,6 +12,24 @@ import (
 // Supports is gated; Gates states why when the default reason ("not
 // implemented for <release>") is not the whole story.
 
+// supportedPostgreSQLMajors includes only majors with the libpq authentication
+// controls used by native backup/restore. Native tools must also match the server.
+var supportedPostgreSQLMajors = []int{16, 17, 18}
+
+// PGDG publishes the full primary fingerprint independently at
+// https://www.postgresql.org/about/news/pgdg-apt-repository-for-debianubuntu-1432/
+// and current HTTPS/Signed-By instructions at /download/linux/{ubuntu,debian}/.
+var (
+	pgdgJammy = &PostgreSQLRepository{
+		URL: "https://apt.postgresql.org/pub/repos/apt", Suite: "jammy-pgdg", Component: "main",
+		KeyURL: "https://www.postgresql.org/media/keys/ACCC4CF8.asc", KeyFingerprint: "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8",
+	}
+	pgdgBookworm = &PostgreSQLRepository{
+		URL: "https://apt.postgresql.org/pub/repos/apt", Suite: "bookworm-pgdg", Component: "main",
+		KeyURL: "https://www.postgresql.org/media/keys/ACCC4CF8.asc", KeyFingerprint: "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8",
+	}
+)
+
 var (
 	agentCore = []Capability{Inventory, Lifecycle, Dispatch, SelfUpdate}
 	// hostResources are the EL 9/10, Debian 12/13, Ubuntu and Fedora host providers.
@@ -492,6 +510,11 @@ var registry = []*Release{
 	{
 		Key: "ubuntu-22.04", Name: "Ubuntu 22.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("22.04"), Codename: "jammy", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 249, Provisioning: cloudInitAutoinstall,
+		Server: &ServerInstallation{
+			SnapshotName: "ubuntu22.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgJammy,
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
+		},
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:22.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "jammy",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
@@ -522,6 +545,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
 		Server: &ServerInstallation{
 			SnapshotName: "ubuntu24.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
+			Architectures: x86, Status: "Qualified", DependencySnapshots: true, PostgreSQLMajor: 16,
 			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
 		},
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
@@ -558,6 +582,11 @@ var registry = []*Release{
 	{
 		Key: "ubuntu-26.04", Name: "Ubuntu 26.04 LTS", Distribution: "Ubuntu", ID: "ubuntu", Version: Exact("26.04"), Codename: "resolute", IDLike: debianLike,
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 259, Provisioning: cloudInitAutoinstall,
+		Server: &ServerInstallation{
+			SnapshotName: "ubuntu26.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-18", "postgresql-client-18", "gpgv", "util-linux"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 18,
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/18/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
+		},
 		Desktop: gnomeGDM3, Firewall: ufw,
 		Advisory: Advisory{Feeds: osvFeed, Ecosystem: "Ubuntu:26.04:LTS", PURLNamespace: "ubuntu", PURLDistro: "resolute",
 			Exports: map[Feed]AdvisoryExport{FeedOSV: {URL: "https://osv-vulnerabilities.storage.googleapis.com/Ubuntu/all.zip", Format: "osv-zip", MaxAgeSeconds: 86400, MaxArchiveBytes: 4 << 30}}},
@@ -588,6 +617,11 @@ var registry = []*Release{
 	{
 		Key: "debian-12", Name: "Debian 12", Distribution: "Debian", ID: "debian", Version: Exact("12"), Codename: "bookworm",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252, Provisioning: cloudInitOnly,
+		Server: &ServerInstallation{
+			SnapshotName: "debian12.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgBookworm,
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
+		},
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		// Debian's OSV export qualifies purls with the codename (distro=bookworm).
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:12", PURLNamespace: "debian", PURLDistro: "bookworm", Exports: debianExports},
@@ -607,6 +641,11 @@ var registry = []*Release{
 	{
 		Key: "debian-13", Name: "Debian 13", Distribution: "Debian", ID: "debian", Version: Exact("13"), Codename: "trixie",
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 257, Provisioning: cloudInitOnly,
+		Server: &ServerInstallation{
+			SnapshotName: "debian13.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-17", "postgresql-client-17", "gpgv", "util-linux"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 17,
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/17/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
+		},
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,
 		Advisory: Advisory{Feeds: debianFeeds, Ecosystem: "Debian:13", PURLNamespace: "debian", PURLDistro: "trixie", Exports: debianExports},
 		Quirks: Quirks{SystemdFloor: 255, PAMManager: PAMManagerPamAuthUpdate,
@@ -707,6 +746,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
 		Server: &ServerInstallation{
 			SnapshotName: "rhel9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Preview", ConnectedOnly: true, DependencySnapshots: true, PostgreSQLMajor: 16,
 			PostgreSQLModule:        "postgresql:16",
 			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
 		},
@@ -728,6 +768,11 @@ var registry = []*Release{
 	{
 		Key: "rhel-10", Name: "RHEL 10", Distribution: "RHEL", ID: "rhel", Version: Major("10"),
 		Tier: Tier1, Page: "rhel.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "rhel10.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16,
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:10", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},
 		Quirks:             withPins(elQuirks10, el10Pins),
@@ -744,6 +789,11 @@ var registry = []*Release{
 	{
 		Key: "rocky-9", Name: "Rocky Linux 9", Distribution: "Rocky Linux", ID: "rocky", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "rocky9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLModule: "postgresql:16",
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:9", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-9", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:             withPins(elQuirks9, el9Pins),
@@ -759,6 +809,11 @@ var registry = []*Release{
 	{
 		Key: "rocky-10", Name: "Rocky Linux 10", Distribution: "Rocky Linux", ID: "rocky", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "rocky10.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16,
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "Rocky Linux:10", PURLNamespace: "rocky-linux", PURLDistro: "rocky-linux-10", Partial: reasonRockyOSV, Exports: rockyExports},
 		Quirks:             withPins(elQuirks10, el10Pins),
@@ -772,6 +827,11 @@ var registry = []*Release{
 	{
 		Key: "almalinux-9", Name: "AlmaLinux 9", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("9"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 252, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "almalinux9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLModule: "postgresql:16",
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:9", PURLNamespace: "almalinux", PURLDistro: "almalinux-9", Exports: almaExports},
 		Quirks:             withPins(elQuirks9, el9Pins),
@@ -784,6 +844,11 @@ var registry = []*Release{
 	{
 		Key: "almalinux-10", Name: "AlmaLinux 10", Distribution: "AlmaLinux", ID: "almalinux", Version: Major("10"),
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
+		Server: &ServerInstallation{
+			SnapshotName: "almalinux10.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
+			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16,
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
+		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: osvFeed, Ecosystem: "AlmaLinux:10", PURLNamespace: "almalinux", PURLDistro: "almalinux-10", Exports: almaExports},
 		Quirks:             withPins(elQuirks10, el10Pins),

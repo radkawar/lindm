@@ -920,6 +920,11 @@ func (r *matrixRun) laneArgs(c *labmatrix.Cell, base string) ([]string, error) {
 				return nil, errors.New("missing explicit signed deployment inputs")
 			}
 			args = append(args, r.deploy.args()...)
+			if c.Release.Server != nil {
+				if image := r.deploy.DrillImages[fmt.Sprint(c.Release.Server.PostgreSQLMajor)]; image != "" {
+					args = append(args, "-drill-image", image)
+				}
+			}
 			args = append(args, "-work-dir", r.evidence)
 		case "airgap":
 			args = append(args, r.airgap[c.Release.Key+"/"+c.Architecture]...)

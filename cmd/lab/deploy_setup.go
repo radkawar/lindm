@@ -21,7 +21,7 @@ func runDeploySetupAdmitted(ctx context.Context, args []string, stdout, stderr i
 	flags := flag.NewFlagSet("deploy setup", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeploySetupOptions
-	manifestPath := flags.String("manifest", "", "pinned exact fresh Ubuntu24.04 or entitled RHEL9 x86 cloud image")
+	manifestPath := flags.String("manifest", "", "pinned exact fresh x86_64 cloud image for a registry-supported native server host; connected-only hosts cannot use -airgap")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "configured native lab work directory")

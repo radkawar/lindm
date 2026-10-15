@@ -24,8 +24,8 @@ That work must keep signature verification, independently retained trust pins an
   explicit PostgreSQL 16 server/client resolution, retained module capability and
   safe offline installation. Preserve distro package signatures, existing module
   policy and clusters; never fall back to PostgreSQL 13 or weaken database auth.
-- After v0.1.0, implement and qualify PostgreSQL 17/18 support with a matching
-  backup and restore client. Keep version-skew preflight and verified database
-  authentication; v0.1.0 supports PostgreSQL 16 only for local and external databases.
+- Qualify each new connected x86_64 server recipe through the complete native
+  lifecycle. PostgreSQL 16/17/18 admission and exact native client/server major
+  matching are implemented; only per-platform full-lane evidence establishes support.
 
 Read [GOVERNANCE](GOVERNANCE.md) for project decisions and [CONTRIBUTING](CONTRIBUTING.md) to propose work.

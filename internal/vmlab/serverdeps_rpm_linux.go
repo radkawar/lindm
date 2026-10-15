@@ -46,8 +46,8 @@ const rpmServerDepsGuestRoot = "/var/tmp/lindm-serverdeps-rpm/repository"
 // state. A failed replay or owned RHSM cleanup cannot publish a closure.
 func CaptureRHELServerDependencies(ctx context.Context, image *labv1.ImageManifest, o RHELServerDependenciesOptions) (_ *serverdepsv1.Manifest, err error) {
 	release := manifestRelease(image)
-	if release.LabLaneOn(platform.LaneDeploy, image.GetArchitecture()) != nil || release.Packages.Backend.PackageDB() != platform.PackageDBRPM || image.GetArchitecture() != "x86_64" || image.GetVersion() == release.Version.Value {
-		return nil, errors.New("RHEL server dependencies require an authenticated RHEL 9 x86_64 image")
+	if release.LabLaneOn(platform.LaneDeploy, image.GetArchitecture()) != nil || !release.Server.DependencySnapshots || release.Packages.Backend.PackageDB() != platform.PackageDBRPM || image.GetArchitecture() != "x86_64" || image.GetVersion() == release.Version.Value {
+		return nil, errors.New("RPM server dependencies require a registry-qualified authenticated x86_64 image")
 	}
 	if o.RedHatTokenFile == "" || o.LabBinary == "" || o.DependencyCache == "" || (o.Custody != "development-lab" && o.Custody != "entitled-customer-private") {
 		return nil, errors.New("RHEL server dependency capture requires protected token file, guest lab binary, private store and explicit entitlement custody")

@@ -544,12 +544,37 @@ const (
 type ServerInstallation struct {
 	SnapshotName     string
 	RequiredPackages []string
+	Architectures    []string
+	Status           string
+	ConnectedOnly    bool
+	// DependencySnapshots admits the maintained capture/replay recipe, not
+	// installation in an air gap. RHEL's legacy capture is not an offline add-on.
+	DependencySnapshots bool
+	PostgreSQLMajor     int
+	// PostgreSQLRepository is nil for native distribution packages.
+	PostgreSQLRepository *PostgreSQLRepository
 	// PostgreSQLModule is an explicit distro stream, never a reset/switch request.
 	PostgreSQLModule          string
 	PostgreSQLDataDirectory   string
 	PostgreSQLBinDirectory    string
 	PostgreSQLPort            string
 	PostgreSQLSocketDirectory string
+}
+
+// PostgreSQLRepository pins a third-party APT source to its scoped signing key.
+// These facts are declared only in registry.go.
+type PostgreSQLRepository struct {
+	URL            string
+	Suite          string
+	Component      string
+	KeyURL         string
+	KeyFingerprint string
+}
+
+// PostgreSQLMajorSupported reports the registry's database compatibility policy.
+// It does not waive exact native client/server major matching.
+func PostgreSQLMajorSupported(major int) bool {
+	return slices.Contains(supportedPostgreSQLMajors, major)
 }
 
 // Release is one registry row.

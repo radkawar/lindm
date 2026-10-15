@@ -1,9 +1,73 @@
 # Install lindm
 
-Use a dedicated Ubuntu 24.04 x86 server, or RHEL 9 for the preview described below. Give the server a stable DNS name.
+Use a dedicated x86_64 server with a registry-listed installer recipe below. Give the server a stable DNS name.
 An IP-address URL cannot be a WebAuthn relying-party ID. Use the DNS name for first-owner password and passkey setup.
 The browser and managed devices must reach its HTTPS listeners.
 For RHEL, retain access to the configured entitled Red Hat repositories.
+
+## Server platforms
+
+Server installation is distinct from managed-device support.
+Only a full native lifecycle proof qualifies a platform: installation, stock-Chromium
+first-run, enrollment, managed inventory and evaluated Findings, encrypted backup,
+signed upgrade and fresh-host restore followed by management of the original device.
+An installer recipe or setup-only observation does not imply that qualification.
+
+<!-- BEGIN GENERATED server-support -->
+
+| Server platform                           | Architecture | PostgreSQL | Packages            | Install mode          | Lifecycle         |
+| ----------------------------------------- | ------------ | ---------- | ------------------- | --------------------- | ----------------- |
+| [Ubuntu 22.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
+| [Ubuntu 24.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | Distribution        | Connected and air gap | Qualified         |
+| [Ubuntu 26.04 LTS](platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Not yet qualified |
+| [Debian 12](platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
+| [Debian 13](platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Not yet qualified |
+| [RHEL 9](platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
+| [RHEL 10](platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [Rocky Linux 9](platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
+| [Rocky Linux 10](platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [AlmaLinux 9](platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
+| [AlmaLinux 10](platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+
+<!-- END GENERATED server-support -->
+
+New platforms are **connected-only, x86_64 only**. Their air-gap support is out of scope.
+The [verification ledger](verification.md) records individual native proofs.
+
+### PostgreSQL selection and rollout order
+
+1. Debian 13 uses native PostgreSQL 17 and matching native clients.
+2. Ubuntu 26.04 uses native PostgreSQL 18 and matching native clients.
+3. Ubuntu 22.04 and Debian 12 use PGDG packages pinned to major 16. Their native
+   majors 14 and 15 lack the libpq `require_auth` control used by protected database
+   tooling. PGDG adds a third-party repository and scoped signing-key custody;
+   it is not added to hosts whose native major is supported.
+4. RHEL 10, Rocky Linux 10 and AlmaLinux 10 use native PostgreSQL 16.
+   Rocky Linux 9 and AlmaLinux 9 select the native `postgresql:16` AppStream stream,
+   reusing the RHEL 9 SELinux-enforcing private-cluster lifecycle.
+
+PostgreSQL 16, 17 and 18 are admitted, but native `pg_dump` and `pg_restore` must
+match the database major exactly. There is no automatic database-major upgrade,
+cluster adoption or stream reset. Existing external databases must match the
+selected platform's client major as well; a supported database major alone is insufficient.
+Distribution-native packages are preferred to avoid unnecessary repository/key custody.
+
+The PGDG setup follows the official
+[Ubuntu](https://www.postgresql.org/download/linux/ubuntu/) and
+[Debian](https://www.postgresql.org/download/linux/debian/) instructions without
+executing downloaded scripts. The installer fetches a bounded HTTPS public key,
+validates its independently published full fingerprint, and uses a dedicated
+`/etc/apt/keyrings/lindm-pgdg.asc` with an explicit `Signed-By` fingerprint selector.
+It never adds a global trusted key or overwrites a conflicting operator source.
+Native cluster creation and package-triggered service starts remain fenced.
+Key rotation requires a reviewed registry update, not trust-on-first-use.
+EL10 uses [native RPM packages rather than modules](https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html/configuring_and_using_database_servers/using-postgresql).
+
+Fedora remains a managed-device platform, not a Turnkey server target. Its roughly
+13-month support window and frequent PostgreSQL-major changes create recurring
+host and database migrations for a stateful server. Fedora Server is technically
+viable, but LTS Debian/Ubuntu and EL are the maintained server choices here.
+See [Fedora's lifecycle](https://docs.fedoraproject.org/en-US/releases/lifecycle/).
 
 ## Before you start
 
@@ -52,10 +116,11 @@ console certificates do not need a custom CA import.
 Server status marks an absent private CA for the console as inactive.
 This does not mean that the console lacks HTTPS.
 
-**v0.1.0 supports PostgreSQL 16 only**, for local and existing databases.
-Older and newer server versions are refused before migrations. To use an existing
-PostgreSQL 16 database, provide protected runtime and migration URL files. Each
-connection must verify the database certificate. See the
+**Supported database majors are PostgreSQL 16, 17 and 18**, with exact matching
+native backup and restore clients. Unsupported majors and client/server mismatches
+are refused before migrations. To use an existing matching database, provide
+protected runtime and migration URL files. Each connection must verify the database
+certificate. See the
 [installation runbook](security-and-operations.md#native-single-host-installation)
 for the actual options, required grants and certificate choices.
 
@@ -68,14 +133,13 @@ and run `sudo ./install.sh --airgap`. A missing add-on stops installation; it ne
 downloads missing dependencies from the Internet. Keep DNS, time and certificate
 trust available inside the site.
 
-The server install is supported on Ubuntu 24.04, including the AWS deployment.
-RHEL 9 server install is a preview in this release: install, setup, enrollment and
-device management work; vulnerability findings for RHEL devices on a fresh install
-and backup/restore on a RHEL server are still being verified.
+Ubuntu 24.04 includes the proven AWS deployment. Other rows retain their explicit
+qualification status until their own full lifecycle record passes; sharing an
+installer backend does not qualify another distribution.
 
-**v0.1.0 RHEL 9 is connected-only.** `--airgap` stops before mutation with
-“RHEL offline installation is not available in this release”. An entitled offline
-repository or the older generic PostgreSQL snapshot does not bypass this limit.
+**RHEL 9 is connected-only.** `--airgap` stops before mutation.
+An entitled offline repository or the older generic PostgreSQL snapshot does not
+bypass the registry's connected-only limit.
 
 ## Create the first owner
 
