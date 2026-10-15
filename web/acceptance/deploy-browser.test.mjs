@@ -130,17 +130,26 @@ test("native deployment browser trusts its supplied CA but rejects unknown roots
   const page = await context.newPage();
   await page.goto(`https://localhost:${trustedPort}`);
   assert.equal(await page.locator("body").textContent(), "native TLS verified");
-  const source = { id: "ubuntu-native", refreshStartedAt: "2026-10-15T02:34:00.000Z" };
+  const source = { id: "ubuntu-native", refreshStartedAt: "2026-10-15T02:34:00.000600Z" };
   await page.setContent(
     `<article id="advisory-source-${source.id}">
       <div role="status" data-advisory-initial-download="downloading">
         <p class="font-medium">Downloading first vulnerability data</p>
         <p>Download progress is not reported.</p>
-        <time datetime="${source.refreshStartedAt}">Actual start</time>
+        <time datetime="2026-10-15T02:34:00.001Z">Actual start</time>
       </div>
     </article>`,
   );
   await requireInitialVendorDownload(page, source);
+  for (const [wire, displayed] of [
+    ["2026-10-15T02:34:00.000499Z", "2026-10-15T02:34:00.000Z"],
+    ["2026-10-15T02:34:00.999600Z", "2026-10-15T02:34:01.000Z"],
+  ]) {
+    await page
+      .locator("time")
+      .evaluate((node, value) => node.setAttribute("datetime", value), displayed);
+    await requireInitialVendorDownload(page, { ...source, refreshStartedAt: wire });
+  }
   await assert.rejects(
     requireInitialVendorDownload(page, { ...source, refreshStartedAt: "2026-10-15T02:35:00Z" }),
     /initial_vendor_download_start_not_displayed/,

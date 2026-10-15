@@ -3,6 +3,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { join } from "node:path";
+import { fromJson } from "@bufbuild/protobuf";
+import { TimestampSchema, timestampDate } from "@bufbuild/protobuf/wkt";
 import { chromium } from "playwright";
 import { privateDirectory } from "./private-files.mjs";
 
@@ -49,7 +51,10 @@ export async function requireInitialVendorDownload(page, source) {
   await notice.getByText("Downloading first vulnerability data", { exact: true }).waitFor();
   await notice.getByText("Download progress is not reported.", { exact: false }).waitFor();
   const displayedStart = await notice.locator("time").getAttribute("datetime");
-  if (displayedStart !== new Date(source.refreshStartedAt).toISOString())
+  const expectedStart = timestampDate(
+    fromJson(TimestampSchema, source.refreshStartedAt),
+  ).toISOString();
+  if (displayedStart !== expectedStart)
     throw new Error("initial_vendor_download_start_not_displayed");
 }
 
