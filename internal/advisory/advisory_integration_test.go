@@ -29,6 +29,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/advisory/advisorydb"
 	"lindm/internal/advisory/feed"
+	"lindm/internal/rpmauthority"
 	"lindm/internal/testdb"
 )
 
@@ -832,7 +833,18 @@ func seedInventory(t *testing.T, pool *pgxpool.Pool, distro, release string, pac
 	mustExec(t, ctx, pool, `INSERT INTO package_snapshots(id,device_id,generation_id,sequence,state,manifest_digest,manifest_bytes,created_at,started_at,finished_at,accepted_at,open_until,receipt_expires_at,committed_at,backend,package_count,batch_count,encoded_bytes,metadata_bytes,reserved_bytes,bulk_retained)
 VALUES($1,$2,$3,1,'committed',$4,$5,now(),now(),now(),now(),now()+interval '24 hours',now()+interval '2160 hours',now(),$6,$7,1,$8,0,0,true)`, snapshot, deviceID, generation, digest[:], payload, packages[0].Manager, len(packages), len(payload))
 	for i, p := range packages {
-		mustExec(t, ctx, pool, "INSERT INTO snapshot_packages(snapshot_id,position,name,version,architecture,manager,source_name,source_version,module_status,module_name,module_stream,module_version,module_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)", snapshot, i, p.Name, p.Version, p.Architecture, p.Manager, p.SourceName, p.SourceVersion, int32(p.GetModule().GetStatus()), p.GetModule().GetName(), p.GetModule().GetStream(), p.GetModule().GetVersion(), p.GetModule().GetContext())
+		mustExec(t, ctx, pool, "INSERT INTO snapshot_packages(snapshot_id,position,name,version,architecture,manager,source_name,source_version,module_status,module_name,module_stream,module_version,module_context,source_architecture) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)", snapshot, i, p.Name, p.Version, p.Architecture, p.Manager, p.SourceName, p.SourceVersion, int32(p.GetModule().GetStatus()), p.GetModule().GetName(), p.GetModule().GetStream(), p.GetModule().GetVersion(), p.GetModule().GetContext(), p.GetSourceArchitecture())
+		if p.GetRpmAuthority() != nil || p.GetManager() == "rpm" {
+			evidence := []byte{}
+			if p.GetRpmAuthority() != nil {
+				evidence, err = proto.MarshalOptions{Deterministic: true}.Marshal(p.GetRpmAuthority())
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			signer, reason := rpmauthority.Verify(p)
+			mustExec(t, ctx, pool, "UPDATE snapshot_packages SET rpm_authority=$3,rpm_signer=$4,rpm_authority_reason=$5 WHERE snapshot_id=$1 AND position=$2", snapshot, i, evidence, signer, reason)
+		}
 	}
 	mustExec(t, ctx, pool, "UPDATE enrollment_generations SET current_snapshot_id=$2 WHERE id=$1", generation, snapshot)
 	mustExec(t, ctx, pool, `INSERT INTO host_observations(generation_id,sequence,started_at,finished_at,received_at,digest,boot_id_status,boot_id_value,hostname_status,hostname_value,os_id_status,os_id_value,os_version_status,os_version_value,architecture_status,architecture_value,kernel_release_status,kernel_release_value,hardware_vendor_status,hardware_vendor_value,hardware_model_status,hardware_model_value,hardware_serial_status,hardware_serial_value)

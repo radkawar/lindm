@@ -375,7 +375,7 @@ func TestRedHatArchiveAcquisitionAndCleanup(t *testing.T) {
 			config.Url = server.URL + "/provider/"
 			consumed := 0
 			var heldReader io.Reader
-			manifest, gotOldest, err := client.fetchRedHatArchives(ctx, config, func(reader io.Reader, location string) error {
+			manifest, gotOldest, err := client.fetchRedHatArchives(ctx, config, func(reader io.Reader, location string, _ time.Time) error {
 				consumed++
 				heldReader = reader
 				entries, err := os.ReadDir(tempDir)

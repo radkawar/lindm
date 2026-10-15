@@ -50,6 +50,9 @@ var inventoryUnavailableRules = []struct {
 	{[]platform.PackageDB{platform.PackageDBRPM, platform.PackageDBPacman}, "packages.packages.origin", "RPM and pacman packages have no APT index origin evidence.", func(c inventoryHealthContext) bool {
 		return c.pkg.GetManager() == "rpm" || c.pkg.GetManager() == "pacman"
 	}},
+	{[]platform.PackageDB{platform.PackageDBRPM}, "packages.packages.rpm_authority", "Missing RPM signature evidence leaves this package uncovered without invalidating its native census.", func(c inventoryHealthContext) bool {
+		return c.pkg.GetManager() == "rpm"
+	}},
 	{nil, "host.details.storage.devices.parent", "Whole disks and virtual devices without a parent have no parent name.", func(c inventoryHealthContext) bool { return c.block.GetType().GetValue() != "part" }},
 	{nil, "host.details.storage.devices.filesystem", "Unformatted media and partition-table containers have no filesystem type.", nil},
 	{nil, "host.details.storage.devices.mountpoint", "Unmounted media and backing devices are not mounted filesystems.", nil},

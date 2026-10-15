@@ -79,7 +79,7 @@ message FeedSource {
   // Required for repository metadata. OSV architecture comes from package URLs.
   string architecture = 7 [(buf.validate.field).string.max_len = 64];
   // Optional pin of raw primary bytes; REDHAT_CSAF_ARCHIVES instead pins the
-  // deterministic FeedManifest digest covering both verified archives.
+  // deterministic manifest of verified archives, indexes and document inventory.
   bytes expected_sha256 = 8 [
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE,
     (buf.validate.field).bytes.len = 32
@@ -172,6 +172,9 @@ message Advisory {
       }
     }
   }];
+  // Exact vendor-declared component EVR for product-membership evidence only.
+  // It is not an affected-version boundary, especially for known_affected VEX.
+  string component_version = 23 [(buf.validate.field).string.max_len = 2048];
   option (buf.validate.message).cel = {
     id: "advisory.prerequisite"
     message: "native prerequisite requires both package and minimum version"
@@ -195,6 +198,8 @@ message FeedDocument {
   // Authenticated vendor signing time or conservative generation-time bound.
   google.protobuf.Timestamp snapshot_at = 5;
   repeated RejectedRecord rejected_records = 6;
+  // Closed Red Hat document inventory at the captured vendor index checkpoint.
+  RedHatSnapshot redhat_snapshot = 7;
 }
 
 message FeedArtifact {
@@ -209,6 +214,7 @@ message FeedArtifact {
 message FeedManifest {
   repeated FeedArtifact artifacts = 1 [(buf.validate.field).repeated.max_items = 16];
   repeated RejectedRecord rejected_records = 2;
+  RedHatSnapshot redhat_snapshot = 3;
 }
 
 message RejectedRecord {
@@ -217,4 +223,25 @@ message RejectedRecord {
   repeated string package_names = 3;
   // No trustworthy package names: absence cannot establish clean coverage.
   bool unscoped = 4;
+}
+
+// The document digest commits sorted relative paths and exact original SHA-256
+// bytes. Index/change artifacts retain the TLS-verified checkpoint separately;
+// individually signed replacements need not make the bounded manifest unbounded.
+message RedHatSnapshot {
+  repeated RedHatDistributionSnapshot distributions = 1 [(buf.validate.field).repeated.max_items = 2];
+}
+
+message RedHatDistributionSnapshot {
+  string distribution = 1 [(buf.validate.field).string = {
+    in: [
+      "advisories",
+      "vex"
+    ]
+  }];
+  uint32 document_count = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 250000
+  }];
+  bytes document_manifest_sha256 = 3 [(buf.validate.field).bytes.len = 32];
 }

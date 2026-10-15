@@ -262,6 +262,8 @@ test("native findings waits for actual publication and matching evaluation", () 
   }
   const downloading = nativeFindingsReply();
   downloading.sources.feeds[0].fresh = false;
+  downloading.sources.feeds[0].sourceSha256 = "";
+  downloading.sources.feeds[0].checkedAt = undefined;
   downloading.sources.feeds[0].refreshing = true;
   assert.equal(assess(downloading).reason, "vendor_feed_download_in_progress");
   const partial = nativeFindingsReply();
@@ -274,6 +276,52 @@ test("native findings waits for actual publication and matching evaluation", () 
   assert.equal(proof.evidence.uncovered_packages, 9);
   partial.findings.freshness.uncoveredPackages = "0";
   assert.throws(() => assess(partial), /vendor_coverage_label_inconsistent/);
+});
+
+test("current incomplete publication is neither unpublished nor stale and never qualifies unknown", () => {
+  const reply = nativeFindingsReply();
+  const assess = () =>
+    assessDeploymentFindings(
+      reply.inventory,
+      reply.sources,
+      reply.findings,
+      reply.config,
+      reply.now,
+    );
+  const feed = reply.sources.feeds[0];
+  feed.fresh = false;
+  feed.rejectedRecords = [
+    {
+      id: "CVE-2026-1234 / vendor-document.json",
+      reason: "product_reference_unresolved",
+      unscoped: true,
+      packageNames: [],
+    },
+  ];
+  reply.findings.freshness.state = "ADVISORY_FINDING_STATE_UNKNOWN";
+  reply.findings.freshness.reason = "feed_partial_coverage";
+  assert.equal(assess().reason, "vendor_feed_incomplete");
+  assert.equal(assess().ready, false);
+  // Incomplete publication cannot qualify, even with an evaluated partial device result.
+  reply.findings.freshness.state = "ADVISORY_FINDING_STATE_CLEAR";
+  assert.equal(assess().ready, false);
+  feed.rejectedRecords[0].unscoped = false;
+  feed.rejectedRecords[0].packageNames = ["native-package"];
+  reply.findings.freshness.state = "ADVISORY_FINDING_STATE_PARTIAL";
+  reply.findings.freshness.reason = "source_record_rejected";
+  reply.findings.freshness.uncoveredPackages = "1";
+  assert.equal(assess().ready, false);
+  assert.equal(assess().reason, "vendor_feed_incomplete");
+  // A complete current publication may still leave explicitly scoped components unknown.
+  feed.fresh = true;
+  assert.equal(assess().ready, true);
+  assert.equal(assess().evidence.complete_coverage, false);
+  reply.findings.freshness.sourceSha256 = "b".repeat(64);
+  assert.equal(assess().ready, false);
+  feed.expiresAt = "2026-10-14T00:00:00Z";
+  assert.equal(assess().reason, "vendor_feed_stale_or_invalid");
+  feed.sourceSha256 = "";
+  assert.equal(assess().reason, "vendor_feed_unpublished");
 });
 
 test("native findings never publishes exception text or cursor authority", () => {

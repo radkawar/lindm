@@ -2453,7 +2453,7 @@ entitlement. Declared module name/stream relationships bind native RPM module
 observations. Host RHEL stream selection requires corroborating native CPE,
 release-lock status and enabled BaseOS repository IDs; missing/conflicting evidence
 stays UNKNOWN, and repository presence does not prove subscription entitlement.
-Individual notices and sources without a trustworthy complete binary universe
+Individual notices and sources without trustworthy product/package authority
 (including legacy VEX, SUSE, Arch, Debian tracker and Rocky source-like mappings)
 remain partial: known findings are useful, but absence cannot establish clean.
 
@@ -2462,9 +2462,41 @@ the vendor's exact-filename SHA-256 companion and detached OpenPGP signature,
 verified with the maintained ProtonMail library and pinned vendor keys. Signing
 key validity/revocation and future timestamps are checked. The SUSE trust bootstrap
 is the retained vendor-HTTPS key pin, not an independently published fingerprint.
-Red Hat weekly acquisition authenticates both advisory and VEX archives before
-bounded streaming parsing, reconciles their exact-product fixes, and publishes only
-after both succeed. No partial archive result becomes a feed revision.
+Red Hat acquisition authenticates both advisory and VEX archives before bounded
+streaming parsing. A stable, TLS-verified `index.txt`/`changes.csv` checkpoint
+defines each distribution's closed document inventory. Changes since the named
+archive day's start and indexed documents missing from the archive are individually
+signature-verified; their signing times must reach the captured change watermark.
+The day floor includes the archive-assembly window before signing. Documents
+absent from the captured index are not resurrected. A disk-backed
+path/digest inventory proves every indexed document was consumed and commits its
+exact bytes into the bounded publication manifest. Later publisher changes belong
+to the next refresh, not a freshness extension. Only closure of both distributions
+permits `CompleteSnapshot`; the oldest archive signature still bounds expiry.
+No partial archive result becomes a feed revision.
+
+Completeness of that CVE inventory is not product authority for arbitrary RPMs.
+RHEL package coverage additionally verifies the retained immutable installed RPM
+header with pinned Red Hat release signing roots, binds its NEVRA/source/module
+identity to the package row, and requires an exact binary NEVRA declaration for
+the selected product stream. A Red Hat signer, vendor label or `.el9`/`.el10` suffix
+alone does not establish product membership. Third-party, historical, unverifiable
+and undeclared product versions remain explicit uncovered packages. Covered
+packages can use vendor absence as not affected; bounded mixed coverage is
+PARTIAL, and no covered packages establishes no assessment.
+Signed source filenames do not prove source epoch. Same-document/same-CVE binary
+claims take precedence over redundant source ranges; otherwise epoch-dependent
+source comparisons remain explicitly uncovered unless the fixed-only range's fix
+is at or below the minimum possible epoch-zero source version. No source epoch
+or product membership is inferred from a filename.
+
+Rejected vendor documents roll back all their claims. Exhaustive conservative
+component scope includes their valid prefixes and suffixes; only those components
+are quarantined as vendor-document-unusable. A malformed module marker can bound
+quarantine only with independent native source/module relationships, never by
+repairing an RPM identity. Genuinely unbounded scope keeps the whole source
+incomplete. Source status reports rejected documents and their exact identities;
+published incomplete evidence is not described as unpublished or stale.
 
 Each feed stores original artifact URLs/digests/signer fingerprints, a deterministic
 manifest digest for composite acquisition, verified snapshot signing time,

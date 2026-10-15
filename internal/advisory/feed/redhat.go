@@ -282,6 +282,12 @@ func parseRedHatArchiveStream(ctx context.Context, config *advisoryv1.FeedSource
 }
 
 func parseRedHatArchiveEach(ctx context.Context, config *advisoryv1.FeedSource, input io.Reader, consume func(io.Reader) error) error {
+	return parseRedHatArchiveNamed(ctx, config, input, func(entry io.Reader, _ string) error {
+		return consume(entry)
+	})
+}
+
+func parseRedHatArchiveNamed(ctx context.Context, config *advisoryv1.FeedSource, input io.Reader, consume func(io.Reader, string) error) error {
 	if err := redHatConfig(config); err != nil {
 		return err
 	}
@@ -312,7 +318,7 @@ func parseRedHatArchiveEach(ctx context.Context, config *advisoryv1.FeedSource, 
 		if header.Typeflag != tar.TypeReg || !strings.HasSuffix(header.Name, ".json") || header.Size < 0 || header.Size > redHatRecordBytes || strings.HasPrefix(header.Name, "/") || strings.Contains(header.Name, "\\") || strings.Contains(header.Name, "../") {
 			return errors.New("feed: unsupported Red Hat archive entry")
 		}
-		err = consume(archive)
+		err = consume(archive, header.Name)
 		if errors.Is(err, errRedHatNotApplicable) {
 			continue
 		}

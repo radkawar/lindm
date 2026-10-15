@@ -788,13 +788,14 @@ func redHatPotentiallyApplicable(config *advisoryv1.FeedSource, products map[str
 	return false
 }
 
-// emitRedHatVulnerabilities streams the vulnerabilities array, which starts at
-// the current file offset, emitting claims until one is rejected; the rest of a
-// rejected document only adds its packages to the rejection.
+// emitRedHatVulnerabilities collects quarantine scope across the entire document,
+// including claims staged before a later failure. No rejected-document prefix is
+// published; only bounded unknown rejection claims may leave the stager.
 func emitRedHatVulnerabilities(ctx context.Context, config *advisoryv1.FeedSource, file *os.File, notice *suseCSAF, products map[string]redHatProduct, relations map[string]redHatRelationship, validator protovalidate.Validator, emit func(*advisoryv1.Advisory) error) error {
 	j := &redHatJSON{reader: contextFeedReader{ctx, file}}
 	count := 0
 	var rejected *redHatRejectedRecordError
+	scope := &redHatRejectedRecordError{record: new(advisoryv1.RejectedRecord)}
 	if err := j.container('[', func(string) error {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -803,8 +804,11 @@ func emitRedHatVulnerabilities(ctx context.Context, config *advisoryv1.FeedSourc
 		if err := j.vulnerability(&vulnerability); err != nil {
 			return err
 		}
+		if err := scope.includeRejectedPackages(ctx, config, vulnerability, products, relations); err != nil {
+			return err
+		}
 		if rejected != nil {
-			return rejected.includeRejectedPackages(ctx, config, vulnerability, products, relations)
+			return nil
 		}
 		err := redHatVulnerabilityClaims(config, notice, vulnerability, products, relations, validator, func(record *advisoryv1.Advisory) error {
 			if err := emit(record); err != nil {
@@ -821,11 +825,13 @@ func emitRedHatVulnerabilities(ctx context.Context, config *advisoryv1.FeedSourc
 			return err
 		}
 		rejected = redHatMetadataRejection(notice, err)
-		return rejected.includeRejectedPackages(ctx, config, vulnerability, products, relations)
+		return nil
 	}); err != nil {
 		return err
 	}
 	if rejected != nil {
+		rejected.record.PackageNames = scope.record.PackageNames
+		rejected.record.Unscoped = scope.record.Unscoped
 		return rejected
 	}
 	if count == 0 {

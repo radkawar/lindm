@@ -203,6 +203,9 @@ func supportFeatureText(r *platform.Release, cells []*Cell, index int, feature s
 		if r.BaseCoverage() != nil {
 			restrictions = appendUnique(restrictions, "Findings cover upstream base packages only.")
 		}
+		if r.Advisory.RPMHeaderAuthority {
+			restrictions = appendUnique(restrictions, "Findings cover verified Red Hat packages declared for the selected product stream. Other packages and unusable vendor components are listed as unchecked.")
+		}
 	}
 	return "✓", restrictions
 }

@@ -338,7 +338,7 @@ func (c *Client) fetchVendorProofs(ctx context.Context, location string) ([]byte
 // At most one 512 MiB compressed file is staged; its original bytes are verified
 // before the parser sees them. Freshness must be bounded by the returned oldest
 // signature time, never by the mutable pointer or local download time.
-func (c *Client) fetchRedHatArchives(ctx context.Context, config *advisoryv1.FeedSource, consume func(io.Reader, string) error) (*advisoryv1.FeedManifest, time.Time, error) {
+func (c *Client) fetchRedHatArchives(ctx context.Context, config *advisoryv1.FeedSource, consume func(io.Reader, string, time.Time) error) (*advisoryv1.FeedManifest, time.Time, error) {
 	fingerprint, err := signedPublisher(config)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -397,7 +397,7 @@ func redHatArchiveName(raw []byte, distribution string) (string, error) {
 	return name, nil
 }
 
-func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint string, consume func(io.Reader, string) error) (artifact *advisoryv1.FeedArtifact, signedAt time.Time, err error) {
+func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint string, consume func(io.Reader, string, time.Time) error) (artifact *advisoryv1.FeedArtifact, signedAt time.Time, err error) {
 	checksum, signature, err := c.fetchVendorProofs(ctx, location)
 	if err != nil {
 		return nil, time.Time{}, err
@@ -430,7 +430,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return nil, time.Time{}, fmt.Errorf("feed: rewind verified archive: %w", err)
 	}
-	if err := consume(contextFeedReader{ctx, file}, location); err != nil {
+	if err := consume(contextFeedReader{ctx, file}, location, signedAt); err != nil {
 		return nil, time.Time{}, fmt.Errorf("feed: parse verified archive: %w", err)
 	}
 	if err := ctx.Err(); err != nil {

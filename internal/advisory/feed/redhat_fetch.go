@@ -56,20 +56,8 @@ func (c *Client) fetchRedHatStream(ctx context.Context, source *advisoryv1.FeedS
 		}
 		signedAt = at
 	case advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES:
-		manifest, at, err := c.fetchRedHatArchives(ctx, source, func(input io.Reader, _ string) error {
-			return parseRedHatArchiveEach(ctx, source, input, func(entry io.Reader) error {
-				if err := acceptRedHatDocument(source, c.validator, stager, doc, func() error {
-					return parseRedHatClaims(ctx, source, entry, c.validator, stager.add)
-				}); err != nil {
-					return err
-				}
-				return markProgress(progress)
-			})
-		})
+		at, err := c.fetchIndexedRedHatSnapshot(ctx, source, stager, doc, progress)
 		if err != nil {
-			return nil, err
-		}
-		if err := bindArtifacts(doc, manifest.GetArtifacts()); err != nil {
 			return nil, err
 		}
 		if pin := source.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, doc.GetSourceSha256()) {

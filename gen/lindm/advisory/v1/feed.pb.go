@@ -111,7 +111,7 @@ type FeedSource struct {
 	// Required for repository metadata. OSV architecture comes from package URLs.
 	Architecture string `protobuf:"bytes,7,opt,name=architecture,proto3" json:"architecture,omitempty"`
 	// Optional pin of raw primary bytes; REDHAT_CSAF_ARCHIVES instead pins the
-	// deterministic FeedManifest digest covering both verified archives.
+	// deterministic manifest of verified archives, indexes and document inventory.
 	ExpectedSha256 []byte `protobuf:"bytes,8,opt,name=expected_sha256,json=expectedSha256,proto3" json:"expected_sha256,omitempty"`
 	// Exact product servicing stream, never inferred from RPM compatibility.
 	PlatformStream string `protobuf:"bytes,9,opt,name=platform_stream,json=platformStream,proto3" json:"platform_stream,omitempty"`
@@ -290,8 +290,11 @@ type Advisory struct {
 	AllInstalledInstances bool `protobuf:"varint,21,opt,name=all_installed_instances,json=allInstalledInstances,proto3" json:"all_installed_instances,omitempty"`
 	// The complete architecture disjunction of a native all-instances test.
 	InstanceArchitectures []string `protobuf:"bytes,22,rep,name=instance_architectures,json=instanceArchitectures,proto3" json:"instance_architectures,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Exact vendor-declared component EVR for product-membership evidence only.
+	// It is not an affected-version boundary, especially for known_affected VEX.
+	ComponentVersion string `protobuf:"bytes,23,opt,name=component_version,json=componentVersion,proto3" json:"component_version,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *Advisory) Reset() {
@@ -478,6 +481,13 @@ func (x *Advisory) GetInstanceArchitectures() []string {
 	return nil
 }
 
+func (x *Advisory) GetComponentVersion() string {
+	if x != nil {
+		return x.ComponentVersion
+	}
+	return ""
+}
+
 type FeedDocument struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	Advisories []*Advisory            `protobuf:"bytes,1,rep,name=advisories,proto3" json:"advisories,omitempty"`
@@ -490,8 +500,10 @@ type FeedDocument struct {
 	// Authenticated vendor signing time or conservative generation-time bound.
 	SnapshotAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=snapshot_at,json=snapshotAt,proto3" json:"snapshot_at,omitempty"`
 	RejectedRecords []*RejectedRecord      `protobuf:"bytes,6,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Closed Red Hat document inventory at the captured vendor index checkpoint.
+	RedhatSnapshot *RedHatSnapshot `protobuf:"bytes,7,opt,name=redhat_snapshot,json=redhatSnapshot,proto3" json:"redhat_snapshot,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *FeedDocument) Reset() {
@@ -566,6 +578,13 @@ func (x *FeedDocument) GetRejectedRecords() []*RejectedRecord {
 	return nil
 }
 
+func (x *FeedDocument) GetRedhatSnapshot() *RedHatSnapshot {
+	if x != nil {
+		return x.RedhatSnapshot
+	}
+	return nil
+}
+
 type FeedArtifact struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	Url               string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
@@ -630,6 +649,7 @@ type FeedManifest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Artifacts       []*FeedArtifact        `protobuf:"bytes,1,rep,name=artifacts,proto3" json:"artifacts,omitempty"`
 	RejectedRecords []*RejectedRecord      `protobuf:"bytes,2,rep,name=rejected_records,json=rejectedRecords,proto3" json:"rejected_records,omitempty"`
+	RedhatSnapshot  *RedHatSnapshot        `protobuf:"bytes,3,opt,name=redhat_snapshot,json=redhatSnapshot,proto3" json:"redhat_snapshot,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -674,6 +694,13 @@ func (x *FeedManifest) GetArtifacts() []*FeedArtifact {
 func (x *FeedManifest) GetRejectedRecords() []*RejectedRecord {
 	if x != nil {
 		return x.RejectedRecords
+	}
+	return nil
+}
+
+func (x *FeedManifest) GetRedhatSnapshot() *RedHatSnapshot {
+	if x != nil {
+		return x.RedhatSnapshot
 	}
 	return nil
 }
@@ -747,6 +774,113 @@ func (x *RejectedRecord) GetUnscoped() bool {
 	return false
 }
 
+// The document digest commits sorted relative paths and exact original SHA-256
+// bytes. Index/change artifacts retain the TLS-verified checkpoint separately;
+// individually signed replacements need not make the bounded manifest unbounded.
+type RedHatSnapshot struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	Distributions []*RedHatDistributionSnapshot `protobuf:"bytes,1,rep,name=distributions,proto3" json:"distributions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RedHatSnapshot) Reset() {
+	*x = RedHatSnapshot{}
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RedHatSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RedHatSnapshot) ProtoMessage() {}
+
+func (x *RedHatSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RedHatSnapshot.ProtoReflect.Descriptor instead.
+func (*RedHatSnapshot) Descriptor() ([]byte, []int) {
+	return file_lindm_advisory_v1_feed_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RedHatSnapshot) GetDistributions() []*RedHatDistributionSnapshot {
+	if x != nil {
+		return x.Distributions
+	}
+	return nil
+}
+
+type RedHatDistributionSnapshot struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	Distribution           string                 `protobuf:"bytes,1,opt,name=distribution,proto3" json:"distribution,omitempty"`
+	DocumentCount          uint32                 `protobuf:"varint,2,opt,name=document_count,json=documentCount,proto3" json:"document_count,omitempty"`
+	DocumentManifestSha256 []byte                 `protobuf:"bytes,3,opt,name=document_manifest_sha256,json=documentManifestSha256,proto3" json:"document_manifest_sha256,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *RedHatDistributionSnapshot) Reset() {
+	*x = RedHatDistributionSnapshot{}
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RedHatDistributionSnapshot) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RedHatDistributionSnapshot) ProtoMessage() {}
+
+func (x *RedHatDistributionSnapshot) ProtoReflect() protoreflect.Message {
+	mi := &file_lindm_advisory_v1_feed_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RedHatDistributionSnapshot.ProtoReflect.Descriptor instead.
+func (*RedHatDistributionSnapshot) Descriptor() ([]byte, []int) {
+	return file_lindm_advisory_v1_feed_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *RedHatDistributionSnapshot) GetDistribution() string {
+	if x != nil {
+		return x.Distribution
+	}
+	return ""
+}
+
+func (x *RedHatDistributionSnapshot) GetDocumentCount() uint32 {
+	if x != nil {
+		return x.DocumentCount
+	}
+	return 0
+}
+
+func (x *RedHatDistributionSnapshot) GetDocumentManifestSha256() []byte {
+	if x != nil {
+		return x.DocumentManifestSha256
+	}
+	return nil
+}
+
 var File_lindm_advisory_v1_feed_proto protoreflect.FileDescriptor
 
 const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
@@ -781,7 +915,7 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x15_max_rejected_recordsB\x15\n" +
 	"\x13_total_claims_limitB\x1b\n" +
 	"\x19_progress_timeout_secondsB\x1a\n" +
-	"\x18_refresh_timeout_seconds\"\xca\v\n" +
+	"\x18_refresh_timeout_seconds\"\x81\f\n" +
 	"\bAdvisory\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
 	"\xbaH\ar\x05\x10\x01\x18\x80\x02R\x02id\x12?\n" +
@@ -808,9 +942,10 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\x14prerequisite_package\x18\x13 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x04R\x13prerequisitePackage\x12B\n" +
 	"\x18prerequisite_min_version\x18\x14 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\x16prerequisiteMinVersion\x126\n" +
 	"\x17all_installed_instances\x18\x15 \x01(\bR\x15allInstalledInstances\x12I\n" +
-	"\x16instance_architectures\x18\x16 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18@R\x15instanceArchitectures:\xb2\x02\xbaH\xae\x02\x1a\xa2\x01\n" +
+	"\x16instance_architectures\x18\x16 \x03(\tB\x12\xbaH\x0f\x92\x01\f\x10@\x18\x01\"\x06r\x04\x10\x01\x18@R\x15instanceArchitectures\x125\n" +
+	"\x11component_version\x18\x17 \x01(\tB\b\xbaH\x05r\x03\x18\x80\x10R\x10componentVersion:\xb2\x02\xbaH\xae\x02\x1a\xa2\x01\n" +
 	"\x15advisory.prerequisite\x12=native prerequisite requires both package and minimum version\x1aJ(this.prerequisite_package == '') == (this.prerequisite_min_version == '')\x1a\x86\x01\n" +
-	"\x13advisory.assessment\x12>an advisory cannot be both unknown and explicitly not affected\x1a/!(this.assessment_unknown && this.not_affected)\"\xe7\x02\n" +
+	"\x13advisory.assessment\x12>an advisory cannot be both unknown and explicitly not affected\x1a/!(this.assessment_unknown && this.not_affected)\"\xb3\x03\n" +
 	"\fFeedDocument\x12;\n" +
 	"\n" +
 	"advisories\x18\x01 \x03(\v2\x1b.lindm.advisory.v1.AdvisoryR\n" +
@@ -820,19 +955,28 @@ const file_lindm_advisory_v1_feed_proto_rawDesc = "" +
 	"\tartifacts\x18\x04 \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactR\tartifacts\x12;\n" +
 	"\vsnapshot_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"snapshotAt\x12L\n" +
-	"\x10rejected_records\x18\x06 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"\x86\x01\n" +
+	"\x10rejected_records\x18\x06 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\x12J\n" +
+	"\x0fredhat_snapshot\x18\a \x01(\v2!.lindm.advisory.v1.RedHatSnapshotR\x0eredhatSnapshot\"\x86\x01\n" +
 	"\fFeedArtifact\x12\x1d\n" +
 	"\x03url\x18\x01 \x01(\tB\v\xbaH\br\x06\x18\x80\x10\x88\x01\x01R\x03url\x12\x1f\n" +
 	"\x06sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x06sha256\x126\n" +
-	"\x12signer_fingerprint\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\x11signerFingerprint\"\xa5\x01\n" +
+	"\x12signer_fingerprint\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x18@R\x11signerFingerprint\"\xf1\x01\n" +
 	"\fFeedManifest\x12G\n" +
 	"\tartifacts\x18\x01 \x03(\v2\x1f.lindm.advisory.v1.FeedArtifactB\b\xbaH\x05\x92\x01\x02\x10\x10R\tartifacts\x12L\n" +
-	"\x10rejected_records\x18\x02 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\"y\n" +
+	"\x10rejected_records\x18\x02 \x03(\v2!.lindm.advisory.v1.RejectedRecordR\x0frejectedRecords\x12J\n" +
+	"\x0fredhat_snapshot\x18\x03 \x01(\v2!.lindm.advisory.v1.RedHatSnapshotR\x0eredhatSnapshot\"y\n" +
 	"\x0eRejectedRecord\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\x12#\n" +
 	"\rpackage_names\x18\x03 \x03(\tR\fpackageNames\x12\x1a\n" +
-	"\bunscoped\x18\x04 \x01(\bR\bunscoped*\xd1\x02\n" +
+	"\bunscoped\x18\x04 \x01(\bR\bunscoped\"o\n" +
+	"\x0eRedHatSnapshot\x12]\n" +
+	"\rdistributions\x18\x01 \x03(\v2-.lindm.advisory.v1.RedHatDistributionSnapshotB\b\xbaH\x05\x92\x01\x02\x10\x02R\rdistributions\"\xcf\x01\n" +
+	"\x1aRedHatDistributionSnapshot\x12:\n" +
+	"\fdistribution\x18\x01 \x01(\tB\x16\xbaH\x13r\x11R\n" +
+	"advisoriesR\x03vexR\fdistribution\x122\n" +
+	"\x0edocument_count\x18\x02 \x01(\rB\v\xbaH\b*\x06\x18\x90\xa1\x0f(\x01R\rdocumentCount\x12A\n" +
+	"\x18document_manifest_sha256\x18\x03 \x01(\fB\a\xbaH\x04z\x02h R\x16documentManifestSha256*\xd1\x02\n" +
 	"\n" +
 	"FeedFormat\x12\x1b\n" +
 	"\x17FEED_FORMAT_UNSPECIFIED\x10\x00\x12\x18\n" +
@@ -861,31 +1005,36 @@ func file_lindm_advisory_v1_feed_proto_rawDescGZIP() []byte {
 }
 
 var file_lindm_advisory_v1_feed_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_lindm_advisory_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_lindm_advisory_v1_feed_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_lindm_advisory_v1_feed_proto_goTypes = []any{
-	(FeedFormat)(0),               // 0: lindm.advisory.v1.FeedFormat
-	(*FeedSource)(nil),            // 1: lindm.advisory.v1.FeedSource
-	(*Advisory)(nil),              // 2: lindm.advisory.v1.Advisory
-	(*FeedDocument)(nil),          // 3: lindm.advisory.v1.FeedDocument
-	(*FeedArtifact)(nil),          // 4: lindm.advisory.v1.FeedArtifact
-	(*FeedManifest)(nil),          // 5: lindm.advisory.v1.FeedManifest
-	(*RejectedRecord)(nil),        // 6: lindm.advisory.v1.RejectedRecord
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(FeedFormat)(0),                    // 0: lindm.advisory.v1.FeedFormat
+	(*FeedSource)(nil),                 // 1: lindm.advisory.v1.FeedSource
+	(*Advisory)(nil),                   // 2: lindm.advisory.v1.Advisory
+	(*FeedDocument)(nil),               // 3: lindm.advisory.v1.FeedDocument
+	(*FeedArtifact)(nil),               // 4: lindm.advisory.v1.FeedArtifact
+	(*FeedManifest)(nil),               // 5: lindm.advisory.v1.FeedManifest
+	(*RejectedRecord)(nil),             // 6: lindm.advisory.v1.RejectedRecord
+	(*RedHatSnapshot)(nil),             // 7: lindm.advisory.v1.RedHatSnapshot
+	(*RedHatDistributionSnapshot)(nil), // 8: lindm.advisory.v1.RedHatDistributionSnapshot
+	(*timestamppb.Timestamp)(nil),      // 9: google.protobuf.Timestamp
 }
 var file_lindm_advisory_v1_feed_proto_depIdxs = []int32{
-	0, // 0: lindm.advisory.v1.FeedSource.format:type_name -> lindm.advisory.v1.FeedFormat
-	7, // 1: lindm.advisory.v1.Advisory.published_at:type_name -> google.protobuf.Timestamp
-	2, // 2: lindm.advisory.v1.FeedDocument.advisories:type_name -> lindm.advisory.v1.Advisory
-	4, // 3: lindm.advisory.v1.FeedDocument.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	7, // 4: lindm.advisory.v1.FeedDocument.snapshot_at:type_name -> google.protobuf.Timestamp
-	6, // 5: lindm.advisory.v1.FeedDocument.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
-	4, // 6: lindm.advisory.v1.FeedManifest.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
-	6, // 7: lindm.advisory.v1.FeedManifest.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	0,  // 0: lindm.advisory.v1.FeedSource.format:type_name -> lindm.advisory.v1.FeedFormat
+	9,  // 1: lindm.advisory.v1.Advisory.published_at:type_name -> google.protobuf.Timestamp
+	2,  // 2: lindm.advisory.v1.FeedDocument.advisories:type_name -> lindm.advisory.v1.Advisory
+	4,  // 3: lindm.advisory.v1.FeedDocument.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
+	9,  // 4: lindm.advisory.v1.FeedDocument.snapshot_at:type_name -> google.protobuf.Timestamp
+	6,  // 5: lindm.advisory.v1.FeedDocument.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	7,  // 6: lindm.advisory.v1.FeedDocument.redhat_snapshot:type_name -> lindm.advisory.v1.RedHatSnapshot
+	4,  // 7: lindm.advisory.v1.FeedManifest.artifacts:type_name -> lindm.advisory.v1.FeedArtifact
+	6,  // 8: lindm.advisory.v1.FeedManifest.rejected_records:type_name -> lindm.advisory.v1.RejectedRecord
+	7,  // 9: lindm.advisory.v1.FeedManifest.redhat_snapshot:type_name -> lindm.advisory.v1.RedHatSnapshot
+	8,  // 10: lindm.advisory.v1.RedHatSnapshot.distributions:type_name -> lindm.advisory.v1.RedHatDistributionSnapshot
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_lindm_advisory_v1_feed_proto_init() }
@@ -900,7 +1049,7 @@ func file_lindm_advisory_v1_feed_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lindm_advisory_v1_feed_proto_rawDesc), len(file_lindm_advisory_v1_feed_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

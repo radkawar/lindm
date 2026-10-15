@@ -91,20 +91,21 @@ func TestRedHatDirectStatusRequiresProvenOffScopeIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			calls := 0
-			doc, err := stageRedHatStream(t.Context(), redHatSource("9.4", "standard"), validator, bytes.NewReader(raw), func(*advisoryv1.Advisory) error {
-				calls++
+			var claims []*advisoryv1.Advisory
+			doc, err := stageRedHatStream(t.Context(), redHatSource("9.4", "standard"), validator, bytes.NewReader(raw), func(record *advisoryv1.Advisory) error {
+				claims = append(claims, record)
 				return nil
 			})
 			if test.valid {
-				if err != nil || doc == nil || calls != 4 {
-					t.Fatalf("proven off-scope product poisoned native claims: calls=%d err=%v", calls, err)
+				if err != nil || doc == nil || len(claims) != 4 {
+					t.Fatalf("proven off-scope product poisoned native claims: claims=%v err=%v", claims, err)
 				}
 				return
 			}
-			if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
-				t.Fatalf("unscoped or relevant status gained clean authority: doc=%v calls=%d err=%v", doc, calls, err)
+			if err != nil || doc == nil || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
+				t.Fatalf("unscoped or relevant status gained clean authority: doc=%v claims=%v err=%v", doc, claims, err)
 			}
+			redHatRequireOnlyQuarantine(t, doc.RejectedRecords[0], claims)
 		})
 	}
 }

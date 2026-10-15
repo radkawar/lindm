@@ -54,7 +54,9 @@ FROM resources;
 -- exceptions. Never infer open findings from retained evidence rows.
 WITH dev AS (
  SELECT s.device_id, s.finding_set_id FROM advisory_device_status s
+ JOIN devices d ON d.id=s.device_id
  WHERE NOT s.unknown AND s.finding_set_id IS NOT NULL
+  AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean)
   AND device_scope_matches(s.device_id, sqlc.arg('scope_unrestricted')::boolean, sqlc.arg('scopes')::jsonb)
 ), bound AS (
  SELECT finding_set_id, count(*)::bigint AS devices FROM dev GROUP BY finding_set_id
@@ -87,11 +89,13 @@ FROM totals t CROSS JOIN accepted a;
 SELECT count(*) FILTER (WHERE e.state = 'evaluated' AND e.expires_at > CURRENT_TIMESTAMP
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
- AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS evaluated,
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean))::bigint AS evaluated,
  count(*) FILTER (WHERE e.state = 'partial' AND e.expires_at > CURRENT_TIMESTAMP
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
- AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS partial,
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean))::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id

@@ -26,6 +26,7 @@ import (
 	"lindm/internal/advisory/advisorydb"
 	"lindm/internal/auditkind"
 	"lindm/internal/platform"
+	"lindm/internal/rpmauthority"
 )
 
 // evaluationPending marks a stored evaluation that no longer binds the
@@ -139,7 +140,8 @@ func (s *Service) ListDevice(ctx context.Context, req *adminv1.ListDeviceFinding
 	if err != nil {
 		return nil, err
 	}
-	totals, err := q.CountDeviceAdvisoryFindings(ctx, advisorydb.CountDeviceAdvisoryFindingsParams{DeviceID: deviceID, PackagePrefix: req.GetPackagePrefix(), AdvisoryPrefix: req.GetAdvisoryPrefix()})
+	_, authorityValid := rpmauthority.PolicyIdentity()
+	totals, err := q.CountDeviceAdvisoryFindings(ctx, advisorydb.CountDeviceAdvisoryFindingsParams{DeviceID: deviceID, PackagePrefix: req.GetPackagePrefix(), AdvisoryPrefix: req.GetAdvisoryPrefix(), RpmAuthorityValid: authorityValid})
 	if err != nil {
 		return nil, err
 	}
@@ -210,10 +212,17 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	if err != nil {
 		return nil, err
 	}
+	coverage := derivativeCoverage(platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion}))
+	rpmCoverage := coverage != nil && coverage.rpm && e.FindingSetID != nil
+	if rpmCoverage {
+		f.UncoveredPackages = uint64(e.UncoveredPackages)
+	}
 	unknown := func(reason string) {
 		f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN
 		f.Reason = reason
-		f.UncoveredPackages = 0
+		if !rpmCoverage {
+			f.UncoveredPackages = 0
+		}
 	}
 	if e.State == "partial" {
 		f.State = adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL
@@ -221,6 +230,11 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	}
 	if e.State == "unknown" {
 		unknown(e.Reason)
+	}
+	if rpmCoverage {
+		if _, valid := rpmauthority.PolicyIdentity(); !valid {
+			unknown("rpm_authority_unavailable")
+		}
 	}
 	if !e.ExpiresAt.Valid || !now.Time.Before(e.ExpiresAt.Time) {
 		unknown("inventory_stale")
@@ -230,6 +244,7 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	}
 	if !sameID(e.SnapshotID, d.CurrentSnapshotID) || e.HostReceivedAt != d.HostReceivedAt {
 		unknown(evaluationPending)
+		f.UncoveredPackages = 0
 	}
 	if d.State != "active" {
 		unknown("device_not_active")
@@ -265,6 +280,7 @@ func (s *Service) freshness(ctx context.Context, q *advisorydb.Queries, e adviso
 	}
 	if !row.Enabled || e.FeedRevision == nil || row.Revision != *e.FeedRevision {
 		unknown(evaluationPending)
+		f.UncoveredPackages = 0
 	}
 	return f, nil
 }
@@ -305,6 +321,13 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 }
 
 func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryRequest, unrestricted bool, scopes []byte) (*adminv1.ListAdvisorySummaryResponse, error) {
+	_, authorityValid := rpmauthority.PolicyIdentity()
+	return s.summary(ctx, req, unrestricted, scopes, authorityValid)
+}
+
+// All aggregate queries share one current trust decision, including exceptions
+// and the unchecked complement. A persisted evaluation alone is not authority.
+func (s *Service) summary(ctx context.Context, req *adminv1.ListAdvisorySummaryRequest, unrestricted bool, scopes []byte, authorityValid bool) (*adminv1.ListAdvisorySummaryResponse, error) {
 	var afterAdvisory, afterSeverity string
 	if req.GetPageToken() != "" {
 		data, err := base64.RawURLEncoding.Strict().DecodeString(req.GetPageToken())
@@ -324,16 +347,16 @@ func (s *Service) Summary(ctx context.Context, req *adminv1.ListAdvisorySummaryR
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := advisorydb.New(tx)
 	limit := pageSize(req.GetPageSize())
-	rows, err := q.ListAdvisorySummary(ctx, advisorydb.ListAdvisorySummaryParams{ScopeUnrestricted: unrestricted, Scopes: scopes, AfterAdvisory: afterAdvisory, AfterSeverity: afterSeverity, RowLimit: limit + 1})
+	rows, err := q.ListAdvisorySummary(ctx, advisorydb.ListAdvisorySummaryParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RpmAuthorityValid: authorityValid, AfterAdvisory: afterAdvisory, AfterSeverity: afterSeverity, RowLimit: limit + 1})
 	if err != nil {
 		return nil, err
 	}
-	counts, err := q.CountAdvisoryDevices(ctx, advisorydb.CountAdvisoryDevicesParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
+	counts, err := q.CountAdvisoryDevices(ctx, advisorydb.CountAdvisoryDevicesParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RpmAuthorityValid: authorityValid})
 	if err != nil {
 		return nil, err
 	}
 	out := &adminv1.ListAdvisorySummaryResponse{UnknownDevices: uint64(counts.Total - counts.Evaluated - counts.Partial), EvaluatedDevices: uint64(counts.Evaluated), PartialDevices: uint64(counts.Partial)}
-	groups, err := q.ListAdvisoryUncheckedGroups(ctx, advisorydb.ListAdvisoryUncheckedGroupsParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
+	groups, err := q.ListAdvisoryUncheckedGroups(ctx, advisorydb.ListAdvisoryUncheckedGroupsParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RpmAuthorityValid: authorityValid})
 	if err != nil {
 		return nil, err
 	}
@@ -373,10 +396,9 @@ func registeredName(release *platform.Release) string {
 	return release.Name
 }
 
-// ListUncovered pages the installed packages of a PARTIAL evaluation that the
-// applied base feed does not cover, each with its stable UNKNOWN reason. Any
-// other evaluation state lists nothing: UNKNOWN already covers every package
-// and a complete evaluation has none uncovered.
+// ListUncovered pages explicit package coverage gaps. RHEL also retains its
+// package projection when every package is uncovered (an UNKNOWN evaluation);
+// returning those rows never upgrades the evaluation's freshness or state.
 func (s *Service) ListUncovered(ctx context.Context, req *adminv1.ListDeviceUncoveredPackagesRequest, unrestricted bool, scopes []byte) (*adminv1.ListDeviceUncoveredPackagesResponse, error) {
 	deviceID, err := uuid.Parse(req.GetDeviceId())
 	if err != nil {
@@ -427,19 +449,31 @@ func (s *Service) ListUncovered(ctx context.Context, req *adminv1.ListDeviceUnco
 		return nil, err
 	}
 	response := &adminv1.ListDeviceUncoveredPackagesResponse{Freshness: fresh}
-	if fresh.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL && e.SnapshotID != nil {
-		d, err := q.GetAdvisoryDevice(ctx, deviceID)
-		if err != nil {
-			return nil, err
-		}
-		// The current host identity is the evaluated one: a changed host
-		// observation already makes the evaluation pending above.
-		coverage := derivativeCoverage(platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion}))
-		if coverage == nil || coverage.reason != e.Reason {
+	d, err := q.GetAdvisoryDevice(ctx, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	coverage := derivativeCoverage(platform.Identify(platform.OSRelease{ID: d.OsID, VersionID: d.OsVersion}))
+	current := sameID(e.SnapshotID, d.CurrentSnapshotID) && e.HostReceivedAt == d.HostReceivedAt
+	rpmProjection := coverage != nil && coverage.rpm && e.FindingSetID != nil && current && fresh.GetReason() != evaluationPending
+	if (fresh.GetState() == adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_PARTIAL || rpmProjection) && e.SnapshotID != nil {
+		if coverage == nil || (!coverage.rpm && coverage.reason != e.Reason) {
 			return nil, errors.New("advisory: partial evaluation without its origin policy")
 		}
 		limit := pageSize(req.GetPageSize())
-		rows, err := q.ListAdvisoryUncoveredPackages(ctx, coverage.uncoveredParams(*e.SnapshotID, after, limit+1))
+		var rows []advisorydb.ListAdvisorySetUncoveredRow
+		if coverage.rpm {
+			if e.FindingSetID == nil {
+				return nil, errors.New("advisory: RHEL evaluation without coverage set")
+			}
+			rows, err = q.ListAdvisorySetUncovered(ctx, advisorydb.ListAdvisorySetUncoveredParams{SetID: *e.FindingSetID, AfterPosition: after, RowLimit: limit + 1})
+		} else {
+			var origins []advisorydb.ListAdvisoryUncoveredPackagesRow
+			origins, err = q.ListAdvisoryUncoveredPackages(ctx, coverage.uncoveredParams(*e.SnapshotID, after, limit+1))
+			for _, row := range origins {
+				rows = append(rows, advisorydb.ListAdvisorySetUncoveredRow(row))
+			}
+		}
 		if err != nil {
 			return nil, err
 		}

@@ -18,11 +18,13 @@ const fleetSummaryAdvisoryDevices = `-- name: FleetSummaryAdvisoryDevices :one
 SELECT count(*) FILTER (WHERE e.state = 'evaluated' AND e.expires_at > CURRENT_TIMESTAMP
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
- AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS evaluated,
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean))::bigint AS evaluated,
  count(*) FILTER (WHERE e.state = 'partial' AND e.expires_at > CURRENT_TIMESTAMP
  AND e.snapshot_id = g.current_snapshot_id AND e.feed_revision = af.revision
  AND e.host_received_at = d.host_received_at AND pa.status = 1
- AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP)::bigint AS partial,
+ AND af.enabled AND af.expires_at > CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean))::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id = d.current_generation_id
@@ -30,10 +32,11 @@ LEFT JOIN package_attempts pa ON pa.generation_id = g.id
 LEFT JOIN advisory_evaluations e ON e.device_id = d.id
 LEFT JOIN advisory_feeds af ON af.id = e.feed_id
 WHERE d.state = 'active'
- AND device_scope_matches(d.id, $1::boolean, $2::jsonb)
+ AND device_scope_matches(d.id, $2::boolean, $3::jsonb)
 `
 
 type FleetSummaryAdvisoryDevicesParams struct {
+	RpmAuthorityValid bool
 	ScopeUnrestricted bool
 	Scopes            []byte
 }
@@ -46,7 +49,7 @@ type FleetSummaryAdvisoryDevicesRow struct {
 
 // Same evaluated/partial/unknown population as advisory.CountAdvisoryDevices.
 func (q *Queries) FleetSummaryAdvisoryDevices(ctx context.Context, arg FleetSummaryAdvisoryDevicesParams) (FleetSummaryAdvisoryDevicesRow, error) {
-	row := q.db.QueryRow(ctx, fleetSummaryAdvisoryDevices, arg.ScopeUnrestricted, arg.Scopes)
+	row := q.db.QueryRow(ctx, fleetSummaryAdvisoryDevices, arg.RpmAuthorityValid, arg.ScopeUnrestricted, arg.Scopes)
 	var i FleetSummaryAdvisoryDevicesRow
 	err := row.Scan(&i.Evaluated, &i.Partial, &i.Total)
 	return i, err
@@ -161,8 +164,10 @@ func (q *Queries) FleetSummaryCounts(ctx context.Context, arg FleetSummaryCounts
 const fleetSummaryFindings = `-- name: FleetSummaryFindings :one
 WITH dev AS (
  SELECT s.device_id, s.finding_set_id FROM advisory_device_status s
+ JOIN devices d ON d.id=s.device_id
  WHERE NOT s.unknown AND s.finding_set_id IS NOT NULL
-  AND device_scope_matches(s.device_id, $1::boolean, $2::jsonb)
+  AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean)
+  AND device_scope_matches(s.device_id, $2::boolean, $3::jsonb)
 ), bound AS (
  SELECT finding_set_id, count(*)::bigint AS devices FROM dev GROUP BY finding_set_id
 ), totals AS (
@@ -191,6 +196,7 @@ FROM totals t CROSS JOIN accepted a
 `
 
 type FleetSummaryFindingsParams struct {
+	RpmAuthorityValid bool
 	ScopeUnrestricted bool
 	Scopes            []byte
 }
@@ -207,7 +213,7 @@ type FleetSummaryFindingsRow struct {
 // finding sets weighted by fresh bound devices, minus each device's active
 // exceptions. Never infer open findings from retained evidence rows.
 func (q *Queries) FleetSummaryFindings(ctx context.Context, arg FleetSummaryFindingsParams) (FleetSummaryFindingsRow, error) {
-	row := q.db.QueryRow(ctx, fleetSummaryFindings, arg.ScopeUnrestricted, arg.Scopes)
+	row := q.db.QueryRow(ctx, fleetSummaryFindings, arg.RpmAuthorityValid, arg.ScopeUnrestricted, arg.Scopes)
 	var i FleetSummaryFindingsRow
 	err := row.Scan(
 		&i.CriticalFindings,

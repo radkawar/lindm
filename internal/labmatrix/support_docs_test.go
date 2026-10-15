@@ -92,6 +92,18 @@ func TestRenderSupportScopedPassesCountForFeatures(t *testing.T) {
 	}
 }
 
+func TestRenderSupportNamesRHELPackageCoverageLimit(t *testing.T) {
+	r, cells := supportFixture()
+	r.Advisory.RPMHeaderAuthority = true
+	body, err := RenderSupport(cells)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := supportRow(t, body)[6]; !strings.HasPrefix(got, "✓ [^support-") || !strings.Contains(body, "verified Red Hat packages declared for the selected product stream") || !strings.Contains(body, "unusable vendor components are listed as unchecked") {
+		t.Fatalf("RHEL product and uncovered-package limits were omitted: %s", body)
+	}
+}
+
 func TestRenderSupportProviderRestrictionIsFeatureFootnote(t *testing.T) {
 	r, cells := supportFixture()
 	r.Gates = map[platform.Capability]string{platform.Definitions: "definition provider floor", platform.Password: "PAM stack unavailable"}

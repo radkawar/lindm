@@ -7,6 +7,7 @@ package inventory
 import (
 	"bufio"
 	"context"
+	"encoding/hex"
 	"errors"
 	"io"
 	"io/fs"
@@ -22,6 +23,7 @@ import (
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/nativeexec"
 	"lindm/internal/platform"
+	"lindm/internal/rpmauthority"
 )
 
 const (
@@ -210,7 +212,7 @@ func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 		}
 		module = &inventoryv1.ModuleObservation{Status: unavailable}
 	case "rpm":
-		if len(fields) != 6 || !epoch.MatchString(fields[1]) || !validVersion(fields[2]) || !validVersion(fields[3]) {
+		if (len(fields) != 6 && len(fields) != 8) || !epoch.MatchString(fields[1]) || !validVersion(fields[2]) || !validVersion(fields[3]) {
 			return nil, errInvalid
 		}
 		name, version, arch = fields[0], fields[1]+":"+fields[2]+"-"+fields[3], fields[4]
@@ -228,7 +230,33 @@ func parsePackageLine(line, manager string) (*inventoryv1.Package, error) {
 	if absentArchitecture {
 		arch = ""
 	}
-	return &inventoryv1.Package{Name: name, Version: version, Architecture: arch, Manager: manager, SourceName: sourceName, SourceVersion: sourceVersion, Module: module}, nil
+	pkg := &inventoryv1.Package{Name: name, Version: version, Architecture: arch, Manager: manager, SourceName: sourceName, SourceVersion: sourceVersion, Module: module}
+	if manager == "rpm" {
+		pkg.RpmAuthority = &inventoryv1.RpmAuthority{Status: unavailable}
+		if len(fields) == 8 && fields[6] != "(none)" {
+			if len(fields[6]) > 2*rpmauthority.MaxHeaderBytes || len(fields[7]) > 2*16384 {
+				return nil, errCapacity
+			}
+			header, err := hex.DecodeString(fields[6])
+			if err != nil {
+				return nil, errInvalid
+			}
+			var signature []byte
+			if fields[7] != "(none)" {
+				signature, err = hex.DecodeString(fields[7])
+				if err != nil {
+					return nil, errInvalid
+				}
+			}
+			pkg.RpmAuthority = &inventoryv1.RpmAuthority{Status: success, ImmutableHeader: header, Signature: signature}
+			// Source identity comes from the immutable region, never a guessed
+			// binary name/epoch. Verification independently binds it on admission.
+			if identity, err := rpmauthority.Parse(header); err == nil {
+				pkg.SourceName, pkg.SourceVersion, pkg.SourceArchitecture = identity.SourceName, identity.SourceVersion, identity.SourceArchitecture
+			}
+		}
+	}
+	return pkg, nil
 }
 
 func parseModuleLabel(label string) *inventoryv1.ModuleObservation {
@@ -284,7 +312,7 @@ func parsePackages(ctx context.Context, input io.Reader, manager string, limits 
 		}
 		pkg, err := parsePackageLine(string(line[:len(line)-1]), manager)
 		if err != nil {
-			return nil, invalid
+			return nil, statusFor(err)
 		}
 		if pkg != nil {
 			// Include field tag and a conservative length-prefix allowance.
@@ -354,6 +382,11 @@ func collectPackages(parent context.Context, release map[string]string, stat fun
 		for _, pkg := range packages {
 			pkg.Origin = &inventoryv1.PackageOrigin{Status: unavailable}
 		}
+	}
+	if selected.name == "rpm" && platform.Identify(platform.OSRelease{ID: release["ID"], VersionID: release["VERSION_ID"]}).Advisory.RPMHeaderAuthority {
+		authorityCtx, cancelAuthority := context.WithTimeout(parent, commandTimeout)
+		defer cancelAuthority()
+		attachRpmAuthority(authorityCtx, packages, run, maxOutputBytes)
 	}
 	result.Packages = packages
 	return result

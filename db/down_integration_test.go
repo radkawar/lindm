@@ -132,3 +132,37 @@ func TestReversiblePolicyDownNeverLowersContractFloor(t *testing.T) {
 		})
 	}
 }
+
+func TestRPMAuthoritySecurityDownRefusesBeforeMutation(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	provider := downProvider(t, pool, 59)
+	if _, err := pool.Exec(t.Context(), "UPDATE lindm_schema_compatibility SET minimum_runtime_version=59"); err != nil {
+		t.Fatal(err)
+	}
+	var before string
+	if err := pool.QueryRow(t.Context(), "SELECT row_to_json(c)::text FROM lindm_schema_compatibility c").Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := provider.DownTo(t.Context(), 58); err == nil || !strings.Contains(err.Error(), "fenced") {
+		t.Fatalf("RPM authority Down did not require fenced restore: %v", err)
+	}
+	var after string
+	if err := pool.QueryRow(t.Context(), "SELECT row_to_json(c)::text FROM lindm_schema_compatibility c").Scan(&after); err != nil {
+		t.Fatal(err)
+	}
+	if before != after {
+		t.Fatal("refused RPM authority Down changed compatibility evidence")
+	}
+	fields := []string{"rpm_authority", "rpm_signer", "rpm_authority_reason", "source_architecture"}
+	var retained int
+	if err := pool.QueryRow(t.Context(), "SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='snapshot_packages' AND column_name=ANY($1::text[])", fields).Scan(&retained); err != nil || retained != len(fields) {
+		t.Fatalf("refused Down lost authority columns: retained=%d err=%v", retained, err)
+	}
+	var projection bool
+	if err := pool.QueryRow(t.Context(), "SELECT to_regclass('advisory_set_uncovered') IS NOT NULL").Scan(&projection); err != nil || !projection {
+		t.Fatalf("refused Down lost durable uncovered projection: %v", err)
+	}
+	if _, err := db.Preflight(t.Context(), pool); err != nil {
+		t.Fatalf("refused RPM authority Down changed exact history: %v", err)
+	}
+}

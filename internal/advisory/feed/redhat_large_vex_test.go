@@ -54,11 +54,11 @@ func TestRedHatStreamLargestOriginalVEX(t *testing.T) {
 	}
 	want := map[identity]expectedClaim{
 		{"rhc", false}:           {"x86_64", "1:0.2.7-4.el9_7", false},
-		{"rhc", true}:            {"", "1:0.2.7-4.el9_7", false},
+		{"rhc", true}:            {"src", "1:0.2.7-4.el9_7", false},
 		{"image-builder", false}: {"x86_64", "0:52.1-1.el9_8", false},
-		{"podman", true}:         {"", "", true},
+		{"podman", true}:         {"src", "", true},
 		{"ignition", false}:      {"", "", false},
-		{"ignition", true}:       {"", "", false},
+		{"ignition", true}:       {"src", "", false},
 	}
 	seen := make(map[identity]int, len(want))
 	pin, err := hex.DecodeString(redHatLargeVEXSHA256)
@@ -77,8 +77,8 @@ func TestRedHatStreamLargestOriginalVEX(t *testing.T) {
 			t.Errorf("largest VEX lost native source/CVE identity: %v", record)
 		}
 		if record.SourcePackage {
-			if record.Architecture != "" {
-				t.Errorf("source package became an installed binary: %v", record)
+			if record.Architecture != "src" && record.Architecture != "nosrc" {
+				t.Errorf("source package lost its declared source architecture: %v", record)
 			}
 		} else if record.Architecture != "" && record.Architecture != "noarch" && record.Architecture != "x86_64" {
 			t.Errorf("largest VEX crossed configured architecture: %v", record)

@@ -27,8 +27,9 @@ message Package {
     min_len: 1
     max_len: 64
   }];
-  // Native source-package identity, including epoch; absent as a pair when
-  // the backend does not report source metadata.
+  // Native source-package identity, including epoch where natively reported.
+  // RPM SOURCERPM contains no epoch; do not invent one from the binary.
+  // Absent as a pair when the backend does not report source metadata.
   string source_name = 5 [(buf.validate.field).string.max_len = 512];
   string source_version = 6 [(buf.validate.field).string.max_len = 2048];
   // Absent only on historical package evidence.
@@ -36,10 +37,44 @@ message Package {
   // APT index evidence for the exact installed name, version and architecture.
   // UNAVAILABLE for non-APT backends; absent only on historical evidence.
   PackageOrigin origin = 8;
+  // Immutable librpm HEADERIMMUTABLE region and detached header signatures.
+  // The server independently verifies these bytes; status is collection only.
+  // Absent on historical RPM evidence and non-RPM backends.
+  // No vendor/name/key-ID assertion is authority.
+  RpmAuthority rpm_authority = 9;
+  // RPM source architecture is the signed SOURCERPM filename's src/nosrc
+  // suffix, never the installed binary architecture. Empty for other backends
+  // and historical/unavailable native source evidence.
+  string source_architecture = 10 [(buf.validate.field).string = {
+    in: [
+      "",
+      "src",
+      "nosrc"
+    ]
+  }];
   option (buf.validate.message).cel = {
     id: "package.source_pair"
     message: "source name and version must be present together"
     expression: "(this.source_name == '') == (this.source_version == '')"
+  };
+}
+
+message RpmAuthority {
+  CollectionStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [
+      0,
+      8
+    ]
+  }];
+  // Exact headerGet(RPMTAG_HEADERIMMUTABLE) bytes, without rpm_header_magic.
+  bytes immutable_header = 2 [(buf.validate.field).bytes.max_len = 1048576];
+  // Exact RPMTAG_RSAHEADER detached OpenPGP packet, not rpm --checksig text.
+  bytes signature = 3 [(buf.validate.field).bytes.max_len = 16384];
+  option (buf.validate.message).cel = {
+    id: "rpm_authority.failure"
+    message: "failed collections carry no partial authority bytes"
+    expression: "this.status == 1 || (this.immutable_header.size() == 0 && this.signature.size() == 0)"
   };
 }
 

@@ -300,16 +300,19 @@ func (q *Queries) FailReportArtifact(ctx context.Context, arg FailReportArtifact
 const findingsReportRows = `-- name: FindingsReportRows :many
 SELECT (f.device_id::text || '/' || f.id::text)::text AS cursor, jsonb_build_object('finding_id',f.id,'device_id',f.device_id,
 'advisory_id',f.advisory_id,'package_name',f.package_name,'installed_version',f.installed_version,
-'fixed_version',f.fixed_version,'architecture',f.architecture,'severity',f.severity,'state',f.state,
+'fixed_version',f.fixed_version,'architecture',f.architecture,'severity',f.severity,
+'state',CASE WHEN advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean) THEN f.state ELSE 'unknown' END,
 'evaluated_at',f.evaluated_at,'inventory_at',f.inventory_at)::text AS record
 FROM advisory_finding_status f
-WHERE (f.device_id, f.id) > ($1::uuid, $2::uuid)
+JOIN devices d ON d.id=f.device_id
+WHERE (f.device_id, f.id) > ($2::uuid, $3::uuid)
 ORDER BY f.device_id, f.id LIMIT 128
 `
 
 type FindingsReportRowsParams struct {
-	AfterDevice uuid.UUID
-	AfterID     uuid.UUID
+	RpmAuthorityValid bool
+	AfterDevice       uuid.UUID
+	AfterID           uuid.UUID
 }
 
 type FindingsReportRowsRow struct {
@@ -319,7 +322,7 @@ type FindingsReportRowsRow struct {
 
 // Finding keys are unique per device, not globally: page by (device, finding).
 func (q *Queries) FindingsReportRows(ctx context.Context, arg FindingsReportRowsParams) ([]FindingsReportRowsRow, error) {
-	rows, err := q.db.Query(ctx, findingsReportRows, arg.AfterDevice, arg.AfterID)
+	rows, err := q.db.Query(ctx, findingsReportRows, arg.RpmAuthorityValid, arg.AfterDevice, arg.AfterID)
 	if err != nil {
 		return nil, err
 	}

@@ -23,6 +23,7 @@ import (
 	integrationsv1 "lindm/gen/lindm/integrations/v1"
 	"lindm/internal/identity"
 	"lindm/internal/reports/reportdb"
+	"lindm/internal/rpmauthority"
 )
 
 var errReportLimit = errors.New("reports: artifact size or row limit exceeded")
@@ -432,7 +433,8 @@ func reportPage(ctx context.Context, q *reportdb.Queries, kind integrationsv1.Re
 				return "", 0, errors.New("reports: invalid findings cursor")
 			}
 		}
-		rows, err := q.FindingsReportRows(ctx, reportdb.FindingsReportRowsParams{AfterDevice: afterDevice, AfterID: afterFinding})
+		_, rpmAuthorityValid := rpmauthority.PolicyIdentity()
+		rows, err := q.FindingsReportRows(ctx, reportdb.FindingsReportRowsParams{AfterDevice: afterDevice, AfterID: afterFinding, RpmAuthorityValid: rpmAuthorityValid})
 		if err != nil {
 			return "", 0, err
 		}

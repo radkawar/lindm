@@ -54,7 +54,7 @@ func TestPublishExpandedDependenciesAfterForwardMigration(t *testing.T) {
 	f := newDispatchFixture(t)
 	// Recreate the already-applied lab predecessor, not a destructive Down.
 	// Remove later history too: migration 57 must be pending above Current,
-	// and the later contract migration still requires fenced application.
+	// and the later contract migrations still require fenced application.
 	if _, err := f.pool.Exec(t.Context(), `
 		ALTER TABLE profile_dependencies DROP CONSTRAINT profile_dependencies_dependency_kind_check;
 		ALTER TABLE profile_dependencies ADD CONSTRAINT profile_dependencies_dependency_kind_check CHECK (dependency_kind BETWEEN 1 AND 20);
@@ -66,7 +66,7 @@ func TestPublishExpandedDependenciesAfterForwardMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err := db.Preflight(t.Context(), f.pool)
-	if err != nil || status.Current != 56 || status.Target != 58 || status.Online || status.Compatible || !reflect.DeepEqual(status.Pending, []int64{57, 58}) {
+	if err != nil || status.Current != 56 || status.Target != 59 || status.Online || status.Compatible || !reflect.DeepEqual(status.Pending, []int64{57, 58, 59}) {
 		t.Fatalf("dependency expansion preflight=%+v err=%v", status, err)
 	}
 	provider := profileDependencyMigrationProvider(t, f)
@@ -74,7 +74,7 @@ func TestPublishExpandedDependenciesAfterForwardMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 	status, err = db.Preflight(t.Context(), f.pool)
-	if err != nil || status.Current != 57 || !reflect.DeepEqual(status.Pending, []int64{58}) {
+	if err != nil || status.Current != 57 || !reflect.DeepEqual(status.Pending, []int64{58, 59}) {
 		t.Fatalf("dependency expansion history=%+v err=%v", status, err)
 	}
 	publishExpandedDependencies(t, f)

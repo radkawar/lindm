@@ -141,9 +141,10 @@ func TestRedHatConflictingRelationshipRequiresAllAlternativesOffScope(t *testing
 				t.Fatalf("vendor semantic classification failed: %v, %v", doc, err)
 			}
 			if test.reject {
-				if len(claims) != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
+				if len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped {
 					t.Fatalf("ambiguous native dependency retained claims: claims=%v metadata=%v", claims, doc)
 				}
+				redHatRequireOnlyQuarantine(t, doc.RejectedRecords[0], claims)
 			} else if len(doc.RejectedRecords) != 0 || !slices.Equal(redHatSemanticClaims(t, claims), redHatSemanticClaims(t, baseline.Advisories)) {
 				t.Fatalf("proven foreign ambiguity poisoned native claims: claims=%v metadata=%v", claims, doc)
 			}

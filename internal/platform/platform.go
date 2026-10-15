@@ -340,6 +340,9 @@ type Advisory struct {
 	// standard/EUS/E4S). A standard major feed covers every minor; hosts need
 	// corroborated stream evidence and native module identity.
 	PlatformStreams bool
+	// RPMHeaderAuthority requires vendor-signed immutable installed RPM
+	// identity before vendor absence can establish package coverage.
+	RPMHeaderAuthority bool
 	// Partial says why even a complete vendor export cannot establish a clean
 	// result; empty when a complete export is authoritative.
 	Partial string

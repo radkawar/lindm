@@ -108,16 +108,16 @@ x86_64: ✓ supported · ✗ not supported · not yet tested. Footnotes name fea
 | [Debian 13](docs/platforms/debian.md)                       | ✓         | ✓                            | ✓                | ✓               | ✗ [^support-2]  | ✓               | ✓               |
 | [Fedora 43](docs/platforms/fedora.md)                       | ✓         | ✓ [^support-3] [^support-4]  | ✓                | ✓               | ✓               | ✓               | ✓               |
 | [Fedora 44](docs/platforms/fedora.md)                       | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
-| [RHEL 9](docs/platforms/rhel.md)                            | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
-| [RHEL 10](docs/platforms/rhel.md)                           | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
+| [RHEL 9](docs/platforms/rhel.md)                            | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-5]  | ✓               |
+| [RHEL 10](docs/platforms/rhel.md)                           | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓ [^support-5]  | ✓               |
 | [Rocky Linux 9](docs/platforms/alma-rocky.md)               | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
 | [Rocky Linux 10](docs/platforms/alma-rocky.md)              | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
 | [AlmaLinux 9](docs/platforms/alma-rocky.md)                 | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
 | [AlmaLinux 10](docs/platforms/alma-rocky.md)                | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
-| [Linux Mint 22.3](docs/platforms/mint.md)                   | ✓         | ✓                            | ✓                | ✓ [^support-5]  | ✗ [^support-6]  | ✓ [^support-7]  | ✗ [^support-8]  |
-| [Pop!\_OS 24.04 LTS](docs/platforms/popos.md)               | ✓         | ✓                            | ✓                | ✓ [^support-5]  | ✗ [^support-6]  | ✓ [^support-7]  | ✗ [^support-9]  |
+| [Linux Mint 22.3](docs/platforms/mint.md)                   | ✓         | ✓                            | ✓                | ✓ [^support-6]  | ✗ [^support-7]  | ✓ [^support-8]  | ✗ [^support-9]  |
+| [Pop!\_OS 24.04 LTS](docs/platforms/popos.md)               | ✓         | ✓                            | ✓                | ✓ [^support-6]  | ✗ [^support-7]  | ✓ [^support-8]  | ✗ [^support-10] |
 | [Arch Linux](docs/platforms/arch.md) (rolling)              | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
-| [Omarchy 4.0.4](docs/platforms/omarchy.md)                  | ✓         | ✓ [^support-4] [^support-10] | ✓ [^support-11]  | ✓ [^support-12] | ✗ [^support-13] | ✗ [^support-14] | ✗ [^support-15] |
+| [Omarchy 4.0.4](docs/platforms/omarchy.md)                  | ✓         | ✓ [^support-4] [^support-11] | ✓ [^support-12]  | ✓ [^support-13] | ✗ [^support-14] | ✗ [^support-15] | ✗ [^support-16] |
 | [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling) | ✓         | ✓                            | ✓                | ✓               | ✓               | ✓               | ✓               |
 
 arm64 builds are available for [Ubuntu 22.04 LTS](docs/platforms/ubuntu.md), [Ubuntu 24.04 LTS](docs/platforms/ubuntu.md), [Ubuntu 26.04 LTS](docs/platforms/ubuntu.md), [Debian 12](docs/platforms/debian.md), [Debian 13](docs/platforms/debian.md), [Fedora 43](docs/platforms/fedora.md), [Fedora 44](docs/platforms/fedora.md), [RHEL 9](docs/platforms/rhel.md), [RHEL 10](docs/platforms/rhel.md), [Rocky Linux 9](docs/platforms/alma-rocky.md), [Rocky Linux 10](docs/platforms/alma-rocky.md), [AlmaLinux 9](docs/platforms/alma-rocky.md), [AlmaLinux 10](docs/platforms/alma-rocky.md), [openSUSE Tumbleweed](docs/platforms/opensuse.md) (rolling); their distribution pages list the tested features.
@@ -132,27 +132,29 @@ Encryption and wipe require an encrypted installation. TPM2 unlock needs a compa
 
 [^support-4]: Password-policy profiles are unavailable with this PAM stack.
 
-[^support-5]: Account locks and wipe work; the desktop does not report its screen-lock state.
+[^support-5]: Findings cover verified Red Hat packages declared for the selected product stream. Other packages and unusable vendor components are listed as unchecked.
 
-[^support-6]: Automatic OS updates are not supported on this release.
+[^support-6]: Account locks and wipe work; the desktop does not report its screen-lock state.
 
-[^support-7]: Findings cover upstream base packages only.
+[^support-7]: Automatic OS updates are not supported on this release.
 
-[^support-8]: The desktop has no screen-sharing or remote-control portal.
+[^support-8]: Findings cover upstream base packages only.
 
-[^support-9]: Stock COSMIC hides consent buttons; newer portal support alone does not enable assistance.
+[^support-9]: The desktop has no screen-sharing or remote-control portal.
 
-[^support-10]: Firewall profiles require firewalld rather than the installed ufw.
+[^support-10]: Stock COSMIC hides consent buttons; newer portal support alone does not enable assistance.
 
-[^support-11]: TPM2 unattended unlock is unavailable with this boot setup.
+[^support-11]: Firewall profiles require firewalld rather than the installed ufw.
 
-[^support-12]: Account locks and wipe work; screen locking is unavailable.
+[^support-12]: TPM2 unattended unlock is unavailable with this boot setup.
 
-[^support-13]: System upgrades must use the distribution's own updater.
+[^support-13]: Account locks and wipe work; screen locking is unavailable.
 
-[^support-14]: No vendor advisory feed covers this distribution.
+[^support-14]: System upgrades must use the distribution's own updater.
 
-[^support-15]: The desktop does not report screen-lock state for safe sharing.
+[^support-15]: No vendor advisory feed covers this distribution.
+
+[^support-16]: The desktop does not report screen-lock state for safe sharing.
 
 <!-- END GENERATED readme-support -->
 

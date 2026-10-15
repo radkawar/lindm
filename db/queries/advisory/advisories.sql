@@ -158,7 +158,7 @@ WHERE d.id=$1;
 -- records arrive in page order without sorting the remainder of the snapshot.
 -- RPM imported signing keys (gpg-pubkey without an architecture) are keyring
 -- entries, not installable packages, and never match.
-(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,p.source_architecture,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
 JOIN advisory_record_generations r ON r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
@@ -170,12 +170,13 @@ WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>=sqlc.arg('after_posi
 ORDER BY p.position,r.id
 LIMIT sqlc.arg('row_limit'))
 UNION ALL
-(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,p.source_architecture,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
 JOIN advisory_record_generations r ON r.feed_id=sqlc.arg('feed_id') AND r.generation=sqlc.arg('generation')
  AND r.source_package AND r.package_name=p.source_name
- AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
+ AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch')
+      OR p.manager='rpm' AND r.architecture=p.source_architecture)
 WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>=sqlc.arg('after_position')
  AND (p.position>sqlc.arg('after_position') OR r.id>sqlc.arg('after_record')) AND p.source_name<>''
  AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture='')
@@ -199,6 +200,30 @@ CROSS JOIN LATERAL (SELECT advisory_origin_reason(p.snapshot_id,p.position,p.ori
  sqlc.arg('signers')::text[],sqlc.arg('vendor_origins')::text[]) AS reason) r
 WHERE p.snapshot_id=sqlc.arg('snapshot_id') AND p.position>sqlc.arg('after_position') AND r.reason<>''
 ORDER BY p.position LIMIT sqlc.arg('row_limit');
+
+-- name: ListAdvisoryRpmPackages :many
+-- Server-verified immutable RPM identity and authority, never agent assertions.
+SELECT position,name,version,architecture,manager,source_name,source_version,source_architecture,
+ module_status,module_name,module_stream,module_version,module_context,
+ rpm_signer,rpm_authority_reason
+FROM snapshot_packages
+WHERE snapshot_id=sqlc.arg('snapshot_id') AND position>sqlc.arg('after_position')
+ AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='')
+ORDER BY position LIMIT sqlc.arg('row_limit');
+
+-- name: AdvisoryInstallablePackageCount :one
+-- Imported RPM signing keys are keyring records, not installable packages.
+SELECT count(*)::integer FROM snapshot_packages
+WHERE snapshot_id=$1 AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='');
+
+-- name: InsertAdvisorySetUncovered :copyfrom
+INSERT INTO advisory_set_uncovered(set_id,position,name,version,architecture,reason)
+VALUES ($1,$2,$3,$4,$5,$6);
+
+-- name: ListAdvisorySetUncovered :many
+SELECT position,name,version,architecture,reason FROM advisory_set_uncovered
+WHERE set_id=sqlc.arg('set_id') AND position>sqlc.arg('after_position')
+ORDER BY position LIMIT sqlc.arg('row_limit');
 
 -- name: AdvisoryOriginDigest :one
 -- Normalized origin evidence of one snapshot (status and every listing, in
@@ -243,8 +268,10 @@ UPDATE advisory_evaluations SET evaluated_at=$2 WHERE device_id=$1 AND id=$3;
 SELECT sha256(convert_to(coalesce(string_agg(
  concat_ws(',', position, length(name), name, length(version), version, length(architecture), architecture,
   length(manager), manager, length(source_name), source_name, length(source_version), source_version,
+  length(source_architecture), source_architecture,
   module_status, length(module_name), module_name, length(module_stream), module_stream,
-  length(module_version), module_version, length(module_context), module_context),
+  length(module_version), module_version, length(module_context), module_context,
+  rpm_signer, rpm_authority_reason, encode(sha256(rpm_authority),'hex')),
  ';' ORDER BY position), ''), 'UTF8'))::bytea AS digest
 FROM snapshot_packages WHERE snapshot_id=$1;
 
@@ -308,14 +335,19 @@ OFFSET sqlc.arg('row_offset') LIMIT sqlc.arg('row_limit');
 -- name: CountDeviceAdvisoryFindings :one
 -- Same filters as ListDeviceAdvisoryFindings; active exceptions count as accepted only.
 SELECT
- count(*) FILTER (WHERE f.state<>'accepted')::bigint AS open,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
- count(*) FILTER (WHERE f.state='accepted')::bigint AS accepted
+ count(*) FILTER (WHERE checked.state<>'accepted')::bigint AS open,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
+ count(*) FILTER (WHERE checked.state='accepted')::bigint AS accepted
 FROM advisory_finding_status f
+JOIN devices d ON d.id=f.device_id
+CROSS JOIN LATERAL (
+ SELECT CASE WHEN advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean)
+  THEN f.state ELSE 'unknown' END AS state
+) checked
 WHERE f.device_id=sqlc.arg('device_id')
  AND starts_with(lower(f.package_name), lower(sqlc.arg('package_prefix')::text))
  AND (sqlc.arg('advisory_prefix')::text='' OR starts_with(lower(f.advisory_id), lower(sqlc.arg('advisory_prefix')::text))
@@ -331,7 +363,9 @@ SELECT * FROM advisory_findings WHERE device_id=$1 AND id=$2;
 -- active devices count, the same population as CountAdvisoryDevices.
 -- Severity-first ordering uses the same rank for both the seek key and page order.
 WITH dev AS (
- SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ SELECT s.device_id, s.finding_set_id,
+  (s.unknown OR NOT advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean))::boolean AS unknown
+ FROM advisory_device_status s
  JOIN devices d ON d.id=s.device_id AND d.state='active'
  WHERE s.finding_set_id IS NOT NULL
   AND device_scope_matches(s.device_id,sqlc.arg('scope_unrestricted')::boolean,sqlc.arg('scopes')::jsonb)
@@ -369,11 +403,13 @@ LIMIT sqlc.arg('row_limit');
 SELECT count(*) FILTER(WHERE e.state='evaluated' AND e.expires_at>CURRENT_TIMESTAMP
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
- AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS evaluated,
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean))::bigint AS evaluated,
  count(*) FILTER(WHERE e.state='partial' AND e.expires_at>CURRENT_TIMESTAMP
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
- AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS partial,
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean))::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
@@ -396,6 +432,7 @@ WITH unchecked AS (
    WHEN e.snapshot_id IS DISTINCT FROM g.current_snapshot_id OR e.host_received_at IS DISTINCT FROM d.host_received_at THEN 'evaluation_pending'
    WHEN pa.status IS DISTINCT FROM 1 THEN 'package_collection_failed'
    WHEN e.expires_at<=CURRENT_TIMESTAMP THEN 'inventory_stale'
+   WHEN e.finding_set_id IS NOT NULL AND NOT advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean) THEN 'rpm_authority_unavailable'
    WHEN e.state='unknown' AND e.reason<>'' THEN e.reason
    WHEN e.feed_id='' THEN 'feed_unavailable'
    ELSE 'evaluation_pending'
@@ -409,7 +446,8 @@ WITH unchecked AS (
   AND NOT coalesce(e.state IN ('evaluated','partial') AND e.expires_at>CURRENT_TIMESTAMP
    AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
    AND e.host_received_at=d.host_received_at AND pa.status=1
-   AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP,false)
+   AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+   AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean),false)
 )
 SELECT reason::text AS reason,feed_id::text AS feed_id,os_id,os_version,count(*)::bigint AS devices
 FROM unchecked

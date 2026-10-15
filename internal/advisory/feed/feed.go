@@ -410,7 +410,7 @@ func bindArtifacts(doc *advisoryv1.FeedDocument, artifacts []*advisoryv1.FeedArt
 		doc.SourceSha256 = artifacts[0].GetSha256()
 		return nil
 	}
-	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(&advisoryv1.FeedManifest{Artifacts: artifacts})
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(&advisoryv1.FeedManifest{Artifacts: artifacts, RedhatSnapshot: doc.GetRedhatSnapshot()})
 	if err != nil {
 		return err
 	}

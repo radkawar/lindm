@@ -85,7 +85,7 @@ func (q *Queries) AdvisoryArchitectures(ctx context.Context, snapshotID uuid.UUI
 }
 
 const advisoryCandidates = `-- name: AdvisoryCandidates :many
-(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,p.source_architecture,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
 JOIN advisory_record_generations r ON r.feed_id=$2 AND r.generation=$3
@@ -97,12 +97,13 @@ WHERE p.snapshot_id=$4 AND p.position>=$5
 ORDER BY p.position,r.id
 LIMIT $1)
 UNION ALL
-(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,
+(SELECT p.position,p.name,p.version,p.architecture,p.manager,p.source_name,p.source_version,p.source_architecture,
  p.module_status,p.module_name,p.module_stream,p.module_version,p.module_context,r.id AS record_id,r.record_bytes
 FROM snapshot_packages p
 JOIN advisory_record_generations r ON r.feed_id=$2 AND r.generation=$3
  AND r.source_package AND r.package_name=p.source_name
- AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch'))
+ AND (r.architecture='' OR r.architecture=p.architecture OR r.architecture IN ('all','noarch')
+      OR p.manager='rpm' AND r.architecture=p.source_architecture)
 WHERE p.snapshot_id=$4 AND p.position>=$5
  AND (p.position>$5 OR r.id>$6) AND p.source_name<>''
  AND NOT (p.manager='rpm' AND p.name='gpg-pubkey' AND p.architecture='')
@@ -122,20 +123,21 @@ type AdvisoryCandidatesParams struct {
 }
 
 type AdvisoryCandidatesRow struct {
-	Position      int32
-	Name          string
-	Version       string
-	Architecture  string
-	Manager       string
-	SourceName    string
-	SourceVersion string
-	ModuleStatus  int32
-	ModuleName    string
-	ModuleStream  string
-	ModuleVersion string
-	ModuleContext string
-	RecordID      uuid.UUID
-	RecordBytes   []byte
+	Position           int32
+	Name               string
+	Version            string
+	Architecture       string
+	Manager            string
+	SourceName         string
+	SourceVersion      string
+	SourceArchitecture string
+	ModuleStatus       int32
+	ModuleName         string
+	ModuleStream       string
+	ModuleVersion      string
+	ModuleContext      string
+	RecordID           uuid.UUID
+	RecordBytes        []byte
 }
 
 // Binary and source identities are disjoint UNION ALL branches so each probes
@@ -172,6 +174,7 @@ func (q *Queries) AdvisoryCandidates(ctx context.Context, arg AdvisoryCandidates
 			&i.Manager,
 			&i.SourceName,
 			&i.SourceVersion,
+			&i.SourceArchitecture,
 			&i.ModuleStatus,
 			&i.ModuleName,
 			&i.ModuleStream,
@@ -215,6 +218,19 @@ type AdvisoryDeviceVisibleParams struct {
 func (q *Queries) AdvisoryDeviceVisible(ctx context.Context, arg AdvisoryDeviceVisibleParams) (bool, error) {
 	row := q.db.QueryRow(ctx, advisoryDeviceVisible, arg.DeviceID, arg.ScopeUnrestricted, arg.Scopes)
 	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const advisoryInstallablePackageCount = `-- name: AdvisoryInstallablePackageCount :one
+SELECT count(*)::integer FROM snapshot_packages
+WHERE snapshot_id=$1 AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='')
+`
+
+// Imported RPM signing keys are keyring records, not installable packages.
+func (q *Queries) AdvisoryInstallablePackageCount(ctx context.Context, snapshotID uuid.UUID) (int32, error) {
+	row := q.db.QueryRow(ctx, advisoryInstallablePackageCount, snapshotID)
+	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
 }
@@ -280,8 +296,10 @@ const advisoryPackageDigest = `-- name: AdvisoryPackageDigest :one
 SELECT sha256(convert_to(coalesce(string_agg(
  concat_ws(',', position, length(name), name, length(version), version, length(architecture), architecture,
   length(manager), manager, length(source_name), source_name, length(source_version), source_version,
+  length(source_architecture), source_architecture,
   module_status, length(module_name), module_name, length(module_stream), module_stream,
-  length(module_version), module_version, length(module_context), module_context),
+  length(module_version), module_version, length(module_context), module_context,
+  rpm_signer, rpm_authority_reason, encode(sha256(rpm_authority),'hex')),
  ';' ORDER BY position), ''), 'UTF8'))::bytea AS digest
 FROM snapshot_packages WHERE snapshot_id=$1
 `
@@ -419,21 +437,24 @@ const countAdvisoryDevices = `-- name: CountAdvisoryDevices :one
 SELECT count(*) FILTER(WHERE e.state='evaluated' AND e.expires_at>CURRENT_TIMESTAMP
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
- AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS evaluated,
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean))::bigint AS evaluated,
  count(*) FILTER(WHERE e.state='partial' AND e.expires_at>CURRENT_TIMESTAMP
  AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
  AND e.host_received_at=d.host_received_at AND pa.status=1
- AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP)::bigint AS partial,
+ AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+ AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean))::bigint AS partial,
  count(*)::bigint AS total
 FROM devices d
 LEFT JOIN enrollment_generations g ON g.id=d.current_generation_id
 LEFT JOIN package_attempts pa ON pa.generation_id=g.id
 LEFT JOIN advisory_evaluations e ON e.device_id=d.id
 LEFT JOIN advisory_feeds af ON af.id=e.feed_id
-WHERE d.state='active' AND device_scope_matches(d.id,$1::boolean,$2::jsonb)
+WHERE d.state='active' AND device_scope_matches(d.id,$2::boolean,$3::jsonb)
 `
 
 type CountAdvisoryDevicesParams struct {
+	RpmAuthorityValid bool
 	ScopeUnrestricted bool
 	Scopes            []byte
 }
@@ -447,7 +468,7 @@ type CountAdvisoryDevicesRow struct {
 // A current evaluation is complete ('evaluated') or covers only verified
 // base-archive packages ('partial'); every other active device is unknown.
 func (q *Queries) CountAdvisoryDevices(ctx context.Context, arg CountAdvisoryDevicesParams) (CountAdvisoryDevicesRow, error) {
-	row := q.db.QueryRow(ctx, countAdvisoryDevices, arg.ScopeUnrestricted, arg.Scopes)
+	row := q.db.QueryRow(ctx, countAdvisoryDevices, arg.RpmAuthorityValid, arg.ScopeUnrestricted, arg.Scopes)
 	var i CountAdvisoryDevicesRow
 	err := row.Scan(&i.Evaluated, &i.Partial, &i.Total)
 	return i, err
@@ -455,24 +476,30 @@ func (q *Queries) CountAdvisoryDevices(ctx context.Context, arg CountAdvisoryDev
 
 const countDeviceAdvisoryFindings = `-- name: CountDeviceAdvisoryFindings :one
 SELECT
- count(*) FILTER (WHERE f.state<>'accepted')::bigint AS open,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
- count(*) FILTER (WHERE f.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
- count(*) FILTER (WHERE f.state='accepted')::bigint AS accepted
+ count(*) FILTER (WHERE checked.state<>'accepted')::bigint AS open,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='critical')::bigint AS critical,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='high')::bigint AS high,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='medium')::bigint AS medium,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity)='low')::bigint AS low,
+ count(*) FILTER (WHERE checked.state<>'accepted' AND lower(f.severity) NOT IN ('critical','high','medium','low'))::bigint AS unrated,
+ count(*) FILTER (WHERE checked.state='accepted')::bigint AS accepted
 FROM advisory_finding_status f
-WHERE f.device_id=$1
- AND starts_with(lower(f.package_name), lower($2::text))
- AND ($3::text='' OR starts_with(lower(f.advisory_id), lower($3::text))
-  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower($3::text))))
+JOIN devices d ON d.id=f.device_id
+CROSS JOIN LATERAL (
+ SELECT CASE WHEN advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean)
+  THEN f.state ELSE 'unknown' END AS state
+) checked
+WHERE f.device_id=$2
+ AND starts_with(lower(f.package_name), lower($3::text))
+ AND ($4::text='' OR starts_with(lower(f.advisory_id), lower($4::text))
+  OR EXISTS (SELECT 1 FROM unnest(f.cves) c WHERE starts_with(lower(c), lower($4::text))))
 `
 
 type CountDeviceAdvisoryFindingsParams struct {
-	DeviceID       uuid.UUID
-	PackagePrefix  string
-	AdvisoryPrefix string
+	RpmAuthorityValid bool
+	DeviceID          uuid.UUID
+	PackagePrefix     string
+	AdvisoryPrefix    string
 }
 
 type CountDeviceAdvisoryFindingsRow struct {
@@ -487,7 +514,12 @@ type CountDeviceAdvisoryFindingsRow struct {
 
 // Same filters as ListDeviceAdvisoryFindings; active exceptions count as accepted only.
 func (q *Queries) CountDeviceAdvisoryFindings(ctx context.Context, arg CountDeviceAdvisoryFindingsParams) (CountDeviceAdvisoryFindingsRow, error) {
-	row := q.db.QueryRow(ctx, countDeviceAdvisoryFindings, arg.DeviceID, arg.PackagePrefix, arg.AdvisoryPrefix)
+	row := q.db.QueryRow(ctx, countDeviceAdvisoryFindings,
+		arg.RpmAuthorityValid,
+		arg.DeviceID,
+		arg.PackagePrefix,
+		arg.AdvisoryPrefix,
+	)
 	var i CountDeviceAdvisoryFindingsRow
 	err := row.Scan(
 		&i.Open,
@@ -910,6 +942,15 @@ type InsertAdvisorySetFindingsParams struct {
 	SourceUrl        string
 }
 
+type InsertAdvisorySetUncoveredParams struct {
+	SetID        uuid.UUID
+	Position     int32
+	Name         string
+	Version      string
+	Architecture string
+	Reason       string
+}
+
 const listAdvisoryFeeds = `-- name: ListAdvisoryFeeds :many
 SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
 `
@@ -988,12 +1029,131 @@ func (q *Queries) ListAdvisoryRefreshes(ctx context.Context) ([]ListAdvisoryRefr
 	return items, nil
 }
 
+const listAdvisoryRpmPackages = `-- name: ListAdvisoryRpmPackages :many
+SELECT position,name,version,architecture,manager,source_name,source_version,source_architecture,
+ module_status,module_name,module_stream,module_version,module_context,
+ rpm_signer,rpm_authority_reason
+FROM snapshot_packages
+WHERE snapshot_id=$1 AND position>$2
+ AND NOT (manager='rpm' AND name='gpg-pubkey' AND architecture='')
+ORDER BY position LIMIT $3
+`
+
+type ListAdvisoryRpmPackagesParams struct {
+	SnapshotID    uuid.UUID
+	AfterPosition int32
+	RowLimit      int32
+}
+
+type ListAdvisoryRpmPackagesRow struct {
+	Position           int32
+	Name               string
+	Version            string
+	Architecture       string
+	Manager            string
+	SourceName         string
+	SourceVersion      string
+	SourceArchitecture string
+	ModuleStatus       int32
+	ModuleName         string
+	ModuleStream       string
+	ModuleVersion      string
+	ModuleContext      string
+	RpmSigner          string
+	RpmAuthorityReason string
+}
+
+// Server-verified immutable RPM identity and authority, never agent assertions.
+func (q *Queries) ListAdvisoryRpmPackages(ctx context.Context, arg ListAdvisoryRpmPackagesParams) ([]ListAdvisoryRpmPackagesRow, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryRpmPackages, arg.SnapshotID, arg.AfterPosition, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdvisoryRpmPackagesRow{}
+	for rows.Next() {
+		var i ListAdvisoryRpmPackagesRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.Name,
+			&i.Version,
+			&i.Architecture,
+			&i.Manager,
+			&i.SourceName,
+			&i.SourceVersion,
+			&i.SourceArchitecture,
+			&i.ModuleStatus,
+			&i.ModuleName,
+			&i.ModuleStream,
+			&i.ModuleVersion,
+			&i.ModuleContext,
+			&i.RpmSigner,
+			&i.RpmAuthorityReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdvisorySetUncovered = `-- name: ListAdvisorySetUncovered :many
+SELECT position,name,version,architecture,reason FROM advisory_set_uncovered
+WHERE set_id=$1 AND position>$2
+ORDER BY position LIMIT $3
+`
+
+type ListAdvisorySetUncoveredParams struct {
+	SetID         uuid.UUID
+	AfterPosition int32
+	RowLimit      int32
+}
+
+type ListAdvisorySetUncoveredRow struct {
+	Position     int32
+	Name         string
+	Version      string
+	Architecture string
+	Reason       string
+}
+
+func (q *Queries) ListAdvisorySetUncovered(ctx context.Context, arg ListAdvisorySetUncoveredParams) ([]ListAdvisorySetUncoveredRow, error) {
+	rows, err := q.db.Query(ctx, listAdvisorySetUncovered, arg.SetID, arg.AfterPosition, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAdvisorySetUncoveredRow{}
+	for rows.Next() {
+		var i ListAdvisorySetUncoveredRow
+		if err := rows.Scan(
+			&i.Position,
+			&i.Name,
+			&i.Version,
+			&i.Architecture,
+			&i.Reason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAdvisorySummary = `-- name: ListAdvisorySummary :many
 WITH dev AS (
- SELECT s.device_id, s.finding_set_id, s.unknown FROM advisory_device_status s
+ SELECT s.device_id, s.finding_set_id,
+  (s.unknown OR NOT advisory_rpm_authority_current(d.os_id,d.os_version,$2::boolean))::boolean AS unknown
+ FROM advisory_device_status s
  JOIN devices d ON d.id=s.device_id AND d.state='active'
  WHERE s.finding_set_id IS NOT NULL
-  AND device_scope_matches(s.device_id,$2::boolean,$3::jsonb)
+  AND device_scope_matches(s.device_id,$3::boolean,$4::jsonb)
 ), bound AS (
  SELECT finding_set_id, count(*) FILTER (WHERE NOT unknown)::bigint AS fresh,
   count(*) FILTER (WHERE unknown)::bigint AS stale
@@ -1001,9 +1161,9 @@ WITH dev AS (
 ), totals AS (
  SELECT a.advisory_id, a.severity, sum(b.fresh)::bigint AS fresh, sum(b.stale)::bigint AS stale
  FROM bound b JOIN advisory_set_advisories a ON a.set_id=b.finding_set_id
- WHERE $4::text='' OR
+ WHERE $5::text='' OR
   (CASE lower(a.severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, a.advisory_id, a.severity)>
-  (CASE lower($5::text) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, $4::text, $5::text)
+  (CASE lower($6::text) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, $5::text, $6::text)
  GROUP BY a.advisory_id, a.severity
 ), accepted AS (
  SELECT f.advisory_id, f.severity, dev.device_id, count(*)::integer AS accepted, max(sa.findings) AS findings
@@ -1025,6 +1185,7 @@ LIMIT $1
 
 type ListAdvisorySummaryParams struct {
 	RowLimit          int32
+	RpmAuthorityValid bool
 	ScopeUnrestricted bool
 	Scopes            []byte
 	AfterAdvisory     string
@@ -1047,6 +1208,7 @@ type ListAdvisorySummaryRow struct {
 func (q *Queries) ListAdvisorySummary(ctx context.Context, arg ListAdvisorySummaryParams) ([]ListAdvisorySummaryRow, error) {
 	rows, err := q.db.Query(ctx, listAdvisorySummary,
 		arg.RowLimit,
+		arg.RpmAuthorityValid,
 		arg.ScopeUnrestricted,
 		arg.Scopes,
 		arg.AfterAdvisory,
@@ -1086,6 +1248,7 @@ WITH unchecked AS (
    WHEN e.snapshot_id IS DISTINCT FROM g.current_snapshot_id OR e.host_received_at IS DISTINCT FROM d.host_received_at THEN 'evaluation_pending'
    WHEN pa.status IS DISTINCT FROM 1 THEN 'package_collection_failed'
    WHEN e.expires_at<=CURRENT_TIMESTAMP THEN 'inventory_stale'
+   WHEN e.finding_set_id IS NOT NULL AND NOT advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean) THEN 'rpm_authority_unavailable'
    WHEN e.state='unknown' AND e.reason<>'' THEN e.reason
    WHEN e.feed_id='' THEN 'feed_unavailable'
    ELSE 'evaluation_pending'
@@ -1095,11 +1258,12 @@ WITH unchecked AS (
  LEFT JOIN package_attempts pa ON pa.generation_id=g.id
  LEFT JOIN advisory_evaluations e ON e.device_id=d.id
  LEFT JOIN advisory_feeds af ON af.id=e.feed_id
- WHERE d.state='active' AND device_scope_matches(d.id,$1::boolean,$2::jsonb)
+ WHERE d.state='active' AND device_scope_matches(d.id,$2::boolean,$3::jsonb)
   AND NOT coalesce(e.state IN ('evaluated','partial') AND e.expires_at>CURRENT_TIMESTAMP
    AND e.snapshot_id=g.current_snapshot_id AND e.feed_revision=af.revision
    AND e.host_received_at=d.host_received_at AND pa.status=1
-   AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP,false)
+   AND af.enabled AND af.expires_at>CURRENT_TIMESTAMP
+   AND advisory_rpm_authority_current(d.os_id,d.os_version,$1::boolean),false)
 )
 SELECT reason::text AS reason,feed_id::text AS feed_id,os_id,os_version,count(*)::bigint AS devices
 FROM unchecked
@@ -1109,6 +1273,7 @@ LIMIT 20
 `
 
 type ListAdvisoryUncheckedGroupsParams struct {
+	RpmAuthorityValid bool
 	ScopeUnrestricted bool
 	Scopes            []byte
 }
@@ -1126,7 +1291,7 @@ type ListAdvisoryUncheckedGroupsRow struct {
 // checks override earlier ones, so they come first here). Bounded output,
 // exact group counts; the caller derives the unlisted remainder.
 func (q *Queries) ListAdvisoryUncheckedGroups(ctx context.Context, arg ListAdvisoryUncheckedGroupsParams) ([]ListAdvisoryUncheckedGroupsRow, error) {
-	rows, err := q.db.Query(ctx, listAdvisoryUncheckedGroups, arg.ScopeUnrestricted, arg.Scopes)
+	rows, err := q.db.Query(ctx, listAdvisoryUncheckedGroups, arg.RpmAuthorityValid, arg.ScopeUnrestricted, arg.Scopes)
 	if err != nil {
 		return nil, err
 	}

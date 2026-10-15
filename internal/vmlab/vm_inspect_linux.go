@@ -455,6 +455,7 @@ func copyVMBytes(ctx context.Context, dst io.Writer, src io.Reader, limit int64)
 // No helper or parser from internal/agent/inventory is used for expected data.
 const dpkgTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /usr/bin/dpkg-query --show '--showformat=${db:Status-Status}\t${Package}\t${Version}\t${Architecture}\t${source:Package}\t${source:Version}\n'`
 const rpmTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /usr/bin/rpm --query --all --queryformat '%{NAME}\t%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}\t%|ARCH?{%{ARCH}}:{}|\t%{MODULARITYLABEL}\n'`
+const rpmSourceTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /usr/bin/rpm --query --all --queryformat '%{NAME}\t%|EPOCH?{%{EPOCH}}:{0}|:%{VERSION}-%{RELEASE}\t%|ARCH?{%{ARCH}}:{}|\t%{MODULARITYLABEL}\t%{SOURCERPM}\n'`
 const hostTruthCommand = `env -i PATH=/usr/bin:/bin HOME=/ LANG=C LC_ALL=C /bin/sh -c 'set -eu; if [ -e /etc/os-release ]; then . /etc/os-release; else . /usr/lib/os-release; fi; printf "%s\n" "$ID" "${VERSION_ID-}"; uname -m; uname -r; uname -n; cat /proc/sys/kernel/random/boot_id'`
 
 type nativePackage struct {
@@ -510,6 +511,9 @@ func collectVMTruth(ctx context.Context, vm *guestVM, release *platform.Release)
 	switch backend.PackageDB() {
 	case platform.PackageDBRPM:
 		command, manager = rpmTruthCommand, "rpm"
+		if release.Advisory.RPMHeaderAuthority {
+			command = rpmSourceTruthCommand
+		}
 	case platform.PackageDBPacman:
 		command, manager = pacmanTruthCommand, "pacman"
 	}
@@ -584,7 +588,7 @@ func parseVMTruth(data []byte, manager string) (map[nativePackage]int, error) {
 			fields = fields[1:]
 		}
 		expectedFields := 4
-		if manager == "dpkg" {
+		if manager == "dpkg" || manager == "rpm" && len(fields) == 5 {
 			expectedFields = 5
 		}
 		if len(fields) != expectedFields || fields[0] == "" || fields[1] == "" || (manager == "dpkg" && (fields[2] == "" || fields[3] == "" || fields[4] == "")) || strings.ContainsAny(row, "\x00\r") {
@@ -596,6 +600,13 @@ func parseVMTruth(data []byte, manager string) (map[nativePackage]int, error) {
 			pkg.module = nativeModule{status: truthUnavailable}
 		} else {
 			pkg.module = parseTruthModule(fields[3])
+			if len(fields) == 5 {
+				var err error
+				pkg.sourceName, pkg.sourceVersion, err = rpmSourceTruth(fields[4])
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 		result[pkg]++
 	}
@@ -603,6 +614,26 @@ func parseVMTruth(data []byte, manager string) (map[nativePackage]int, error) {
 		return nil, errors.New("native package truth contains no installed packages")
 	}
 	return result, nil
+}
+
+// SOURCERPM proves source VR, never its epoch or the installed binary's epoch.
+// This native oracle is independent of the agent's immutable-header parser.
+func rpmSourceTruth(value string) (string, string, error) {
+	if value == "(none)" {
+		return "", "", nil
+	}
+	stem, found := strings.CutSuffix(value, ".src.rpm")
+	if !found {
+		stem, found = strings.CutSuffix(value, ".nosrc.rpm")
+	}
+	release := strings.LastIndexByte(stem, '-')
+	if found && release > 0 && release < len(stem)-1 {
+		version := strings.LastIndexByte(stem[:release], '-')
+		if version > 0 && version < release-1 {
+			return stem[:version], stem[version+1:], nil
+		}
+	}
+	return "", "", errors.New("invalid native RPM source truth")
 }
 
 func sameVMPackages(a, b map[nativePackage]int) bool {

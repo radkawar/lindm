@@ -246,9 +246,9 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
           <div className="grid gap-4 border bg-muted/30 p-3 text-sm">
             <p className="font-medium">Partly checked: {advisoryReasonText(freshness.reason)}.</p>
             <p>
-              lindm checks distribution advisories only for packages from its verified signed
-              archive. It does not check {freshness.uncoveredPackages.toString()} other installed
-              packages. This device&apos;s exposure remains unknown.
+              Covered distribution packages were checked. Exposure remains unknown for{" "}
+              {freshness.uncoveredPackages.toString()} installed packages. Review their causes
+              below; this is not a complete assessment of this device.
             </p>
             <UncoveredPackages deviceId={deviceId} />
           </div>
@@ -321,7 +321,7 @@ export function DeviceFindings({ deviceId }: { deviceId: string }) {
                   unexpired(finding.exception?.expiresAt, now);
                 const label =
                   finding.reason === "source_record_rejected"
-                    ? "Unknown (advisory unreadable)"
+                    ? "Vendor document unusable"
                     : !current || freshness?.state === AdvisoryFindingState.UNKNOWN
                       ? "Unknown"
                       : finding.state === AdvisoryFindingState.ACCEPTED && !accepted

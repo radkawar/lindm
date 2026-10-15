@@ -30,6 +30,7 @@ import (
 	"lindm/internal/device/inventory"
 	"lindm/internal/identity"
 	"lindm/internal/platform"
+	"lindm/internal/rpmauthority"
 )
 
 func (s *Service) ListDevices(ctx context.Context, req *connect.Request[adminv1.ListDevicesRequest]) (*connect.Response[adminv1.ListDevicesResponse], error) {
@@ -176,6 +177,7 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		return nil, err
 	}
 	page := new(deviceSearchPage)
+	_, authorityValid := rpmauthority.PolicyIdentity()
 	err = s.Within(ctx, func(ctx context.Context, q *devicedb.Queries) error {
 		if err := core.ValidateAttributeValues(ctx, q, filter.GetAttributes()); err != nil {
 			return err
@@ -184,7 +186,8 @@ func (s *Service) searchDevicePage(ctx context.Context, actor identity.Principal
 		cursor := devicedb.DeviceSearchCursor{ActorID: actor.ID, FilterDigest: digest, UpperEnrolledAt: core.Timestamptz(now), ExpiresAt: core.Timestamptz(now.Add(15 * time.Minute))}
 		params := devicedb.SearchDevicesParams{
 			ScopeUnrestricted: unrestricted, Scopes: scopes, MetadataFilter: metadataFilter, PatchStaleAfterSeconds: inventory.PatchStaleAfterSeconds,
-			OsID: filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
+			RpmAuthorityValid: authorityValid,
+			OsID:              filter.GetOsId(), OsVersion: filter.GetOsVersion(), RowLimit: limit + 1, NamePrefix: filter.GetNamePrefix(),
 			AgentRelease: filter.GetAgentRelease(), HostnameSearch: query.hostnameSearch,
 			AdvisoryID: query.advisoryID, AdvisorySeverity: query.advisorySeverity,
 			ComplianceRanks: complianceRanks(filter.GetCompliance()), PatchBuckets: patchBuckets(filter.GetPatchStates()),

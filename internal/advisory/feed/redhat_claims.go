@@ -84,7 +84,7 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 			if pkg.arch != "" && pkg.arch != "noarch" && !pkg.source && pkg.arch != canonicalArch(config.GetArchitecture()) {
 				continue
 			}
-			record := &advisoryv1.Advisory{Id: d.Tracking.ID, Cves: []string{vulnerability.CVE}, PackageName: pkg.name, SourcePackage: pkg.source, Architecture: pkg.arch, Severity: d.Severity.Text, PublishedAt: published, SourceUrl: config.GetUrl(), PlatformRelease: config.GetRelease(), PlatformStream: config.GetPlatformStream(), ModuleName: pkg.module, ModuleStream: pkg.stream}
+			record := &advisoryv1.Advisory{Id: d.Tracking.ID, Cves: []string{vulnerability.CVE}, PackageName: pkg.name, SourcePackage: pkg.source, Architecture: pkg.arch, ComponentVersion: pkg.version, Severity: d.Severity.Text, PublishedAt: published, SourceUrl: config.GetUrl(), PlatformRelease: config.GetRelease(), PlatformStream: config.GetPlatformStream(), ModuleName: pkg.module, ModuleStream: pkg.stream}
 			if err := applyRedHatStatus(record, pkg, status, uncertain); err != nil {
 				return err
 			}
@@ -107,9 +107,8 @@ func redHatVulnerabilityClaims(config *advisoryv1.FeedSource, notice *suseCSAF, 
 // exact EVR, not-affected bounds the stated version, and uncertain or
 // under-investigation statuses mark the assessment unknown.
 func applyRedHatStatus(record *advisoryv1.Advisory, pkg redHatRPM, status string, uncertain bool) error {
-	if pkg.source {
-		record.Architecture = ""
-	}
+	// Preserve src/nosrc on source claims: their independent fix histories
+	// must not merge before matching the signed installed SOURCERPM role.
 	switch status {
 	case "fixed":
 		if pkg.version == "" {

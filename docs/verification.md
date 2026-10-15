@@ -5425,7 +5425,17 @@ invalid `nginx:1.24` RPM name), 7 min 28 s refresh and 236,744 KiB peak RSS
 without swaps under the progress watchdog (no fixed short deadline). Logs and
 SHA-256 values are in [RHEL advisory feeds](platforms/rhel.md#advisory-feeds).
 This is source publication only, not device findings, console exposure or
-subscription entitlement evidence; coverage remains reported as partial.
+subscription entitlement evidence; that revision reported partial coverage.
+
+The v0.1.1 RHEL coverage regressions were exercised on 2026-10-15: race-enabled
+RPM-authority, inventory, advisory/feed, directory, report and support-renderer
+unit tests passed; all 19 focused source-gap/native-browser/download tests passed.
+Isolated PostgreSQL advisory, device, report and migration suites passed through
+the maintained fixture runner, including genuine signed OpenSSL headers paired
+with unchanged RHSA-2024:6783, epoch-ambiguous source gaps, version-specific binary
+negatives, rejected-component coverage, native inventory Begin/Put/Commit and
+invalid-root device/fleet/report reads. These deterministic regressions do not
+substitute for the separately recorded full native lifecycle.
 
 ## 3. Acceptance scenario families
 
@@ -9833,6 +9843,15 @@ journey without advisory refresh or exposure qualification. Its record is labell
 `diagnostic-skip-feeds-NOT-A-RELEASE-PASS`, `passed` is false and the command exits
 unsuccessfully even if every exercised native assertion passes. It cannot replace
 the mandatory full default run or silently reuse an older feed publication.
+
+Deployment findings diagnostics distinguish missing publication, expired or invalid
+publication, and current but incomplete vendor coverage. An incomplete publication
+never qualifies, even with an evaluated partial device result. A complete current
+publication may qualify a current inventory-bound partial evaluation with explicit
+uncovered packages; unknown evaluation or an unscoped unusable vendor document
+never qualifies. Source status reports unusable-document counts and retains the exact
+document/CVE and reported cause in Details. These are diagnostic contracts, not
+claims of observed native qualification.
 
 The pinned Playwright Chromium lane uses its native CDP virtual authenticator.
 Firefox uses pinned Firefox/geckodriver and W3C WebDriver virtual authenticators.

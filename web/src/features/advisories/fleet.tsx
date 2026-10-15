@@ -32,10 +32,10 @@ import {
   feedOSLabel,
   Severity,
   sourceAnchor,
-  sourceGap,
   unexpired,
   useFreshnessClock,
 } from "./display";
+import { rejectedDocumentDetails, sourceGap } from "./source-gap";
 import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./queries";
 import { firstDownloadState } from "./initial-download";
 import { InitialDownloadNotice } from "./initial-download-notice";
@@ -315,18 +315,20 @@ export function AdvisoryFleet() {
                   </p>
                   {status.remedy ? <p>{status.remedy}</p> : null}
                   {feed.rejectedRecords.length > 0 ? (
-                    <section aria-label="Skipped entries" className="grid gap-3">
-                      <p className="font-medium">Skipped entries ({feed.rejectedRecords.length})</p>
+                    <section aria-label="Unusable vendor documents" className="grid gap-3">
+                      <p className="font-medium">
+                        Unusable vendor documents ({feed.rejectedRecords.length})
+                      </p>
                       <ul className="grid gap-3">
                         {feed.rejectedRecords.map((record, index) => (
                           <li
                             key={`${record.id}:${index}`}
                             className="grid gap-1 break-words border-l-2 border-warning pl-3"
                           >
-                            <p className="font-medium">{record.id || "Entry without an ID"}</p>
-                            <p>{record.reason}</p>
+                            <p className="font-medium">Vendor document unusable</p>
+                            <TechnicalDetails items={rejectedDocumentDetails(record)} />
                             <p className="text-muted-foreground">
-                              {record.unscoped
+                              {record.unscoped || record.packageNames.length === 0
                                 ? "Affected packages unknown."
                                 : `Packages: ${record.packageNames.join(", ")}`}
                             </p>
@@ -408,14 +410,18 @@ function sourceStatus(
     };
   }
   const skipped = feed.rejectedRecords.length;
-  if (feed.fresh && unexpired(feed.expiresAt, now) && skipped > 0) {
+  const unscoped = feed.rejectedRecords.some(
+    (record) => record.unscoped || record.packageNames.length === 0,
+  );
+  if (feed.fresh && !unscoped && unexpired(feed.expiresAt, now) && skipped > 0) {
     return {
       tone: "warning",
-      label: `Up to date, ${skipped} entries skipped`,
-      sentence: "lindm could not read some entries. Counts exclude these entries.",
+      label: `Up to date, ${skipped} unusable vendor documents`,
+      sentence:
+        "The source is current. Named components in unusable documents remain unknown; other covered components can be checked.",
     };
   }
-  if (feed.fresh && unexpired(feed.expiresAt, now)) {
+  if (feed.fresh && !unscoped && unexpired(feed.expiresAt, now)) {
     return {
       tone: "success",
       label: "Up to date",
@@ -436,8 +442,13 @@ function sourceStatus(
       sentence: "This source is out of date. Refresh it.",
     };
   }
-  const gap = sourceGap(feed);
-  return { tone: "warning", label: "Incomplete", sentence: gap.missing, remedy: gap.remedy };
+  const gap = sourceGap(feedOSLabel(feed), feed.rejectedRecords);
+  return {
+    tone: "warning",
+    label: skipped ? `Incomplete, ${skipped} unusable vendor documents` : "Incomplete",
+    sentence: gap.missing,
+    remedy: gap.remedy,
+  };
 }
 
 // Devices with the advisory: confirmed by a current, complete check, and found

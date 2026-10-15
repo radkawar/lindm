@@ -180,16 +180,24 @@ export function assessDeploymentFindings(inventory, sources, findings, config, n
   const feed = candidates.find((source) => source.id === freshness?.feedId) ?? candidates[0];
   if (feed.error) return pending("vendor_feed_refresh_failed", feed);
   if (
-    !feed.fresh ||
     !/^[a-f0-9]{64}$/.test(feed.sourceSha256 ?? "") ||
     count(feed.advisoryCount) === 0 ||
     !(Date.parse(feed.checkedAt) <= now) ||
     !(Date.parse(feed.expiresAt) > now)
   )
     return pending(
-      feed.refreshing ? "vendor_feed_download_in_progress" : "vendor_feed_unpublished_or_stale",
+      feed.refreshing && !feed.sourceSha256
+        ? "vendor_feed_download_in_progress"
+        : !feed.sourceSha256 || !feed.checkedAt
+          ? "vendor_feed_unpublished"
+          : "vendor_feed_stale_or_invalid",
       feed,
     );
+  if (
+    (feed.rejectedRecords ?? []).some((record) => record.unscoped || !record.packageNames?.length)
+  )
+    return pending("vendor_feed_incomplete", feed);
+  if (!feed.fresh) return pending("vendor_feed_incomplete", feed);
   if (
     !freshness ||
     freshness.snapshotId !== inventory.snapshotId ||

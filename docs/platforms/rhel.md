@@ -1018,8 +1018,10 @@ become a partially published source
 An applicable document with invalid vendor semantics is instead rejected as a
 whole and exposed in bounded rejected-record metadata, never repaired. The
 configured rejection threshold is enforced (zero requires no rejected records);
-diagnostics are capped at 48 KiB. Unscoped rejection preserves uncertainty for
-all packages whose claims were rolled back, preventing a clean-coverage claim.
+diagnostics are capped at 48 KiB. A complete conservative scope across every
+relevant status quarantines all affected native/source component names, including
+valid prefixes and suffixes, as **Vendor document unusable**. Unknown scope
+retains whole-source incompleteness, with the exact CVE/document in source details.
 
 Servicing stream matching requires corroborating native Red Hat CPE, enabled
 BaseOS/repository IDs, architecture and release-lock observations. Mixed streams,
@@ -1028,6 +1030,57 @@ missing BaseOS or ambiguous EUS/E4S locks do not establish applicability
 Do not infer entitlement from `VERSION_ID`, rewrite a MAIN.EUS internal identifier
 as an EUS CPE, or treat a derivative as Red Hat. Current complete paired archive
 coverage and freshness are governed by [verification](../verification.md).
+
+### Closed source snapshots and bounded installed-package coverage
+
+The automatic source closes both vendor distributions against captured,
+TLS-verified [`index.txt`](https://security.access.redhat.com/data/csaf/v2/vex/index.txt)
+and [`changes.csv`](https://security.access.redhat.com/data/csaf/v2/vex/changes.csv)
+checkpoints. Each unique indexed path must be present in its signature-verified
+archive or fetched as a separately signature-verified original. Changes on or
+after the named archive day's start replace old claims, including changes during
+archive assembly; replacement signatures must reach the captured change timestamp.
+Documents deleted from the captured index are omitted. A private bounded SQLite
+inventory commits sorted document paths and original SHA-256 bytes into the manifest.
+Index and changes must be stable while captured; changes later in a long refresh belong
+to the next checkpoint. `CompleteSnapshot` describes that closed CVE inventory,
+not an assertion that every installed package belongs to RHEL. The oldest archive
+signature time remains the freshness ceiling.
+
+Installed RPMs supply their immutable header and original header signature.
+The server verifies them against pinned Red Hat package-signing roots and binds
+the signed binary NEVRA, source and module identity to the observed package. Product
+membership additionally requires an exact applicable binary NEVRA declaration
+for the selected stream. A Red Hat signature alone does not distinguish BaseOS
+and AppStream from add-on products, and neither `.el9`/`.el10`, vendor labels nor
+repository configuration may substitute for that evidence. Packages with no exact
+product declaration remain visibly unchecked even when legitimately Red Hat.
+EPEL, third-party, unsigned, unsupported-signature and historical packages are
+likewise uncovered, never silently clean.
+
+The signed source RPM filename proves its name, version-release and `src`/`nosrc`
+architecture, but does not prove its epoch, including zero. It cannot establish
+exact product membership on its own. A valid applicable binary claim takes
+precedence over the redundant source range for the same document and CVE.
+Source-only epoch-dependent comparisons remain visibly unchecked; a fixed-only
+source range can prove not affected when even the minimum possible epoch-zero
+version is at or above the fix. Unversioned vendor statuses need no source epoch
+comparison. No source epoch is invented from a binary epoch or filename.
+Current package-signing root validity also fences device, fleet and exception
+summary reads, newly generated findings reports and cached fleet counts. A revoked
+or expired root cannot leave an old RHEL evaluation appearing clean while inventory
+and feed revisions are unchanged.
+
+Within the proven package/product scope, a closed source can establish affected
+or not affected per vendor. Mixed covered/uncovered inventory is PARTIAL with
+every excluded package listed; no covered packages, stale evidence or unbounded
+vendor errors remains UNKNOWN. Source status reports the rejected-document count
+and exact document/CVE cause. Current incomplete data is labelled incomplete,
+not unpublished/stale. Native lifecycle qualification remains a separate actual
+proof recorded in [verification](../verification.md); adapter support is not a
+claim that an unrun RHEL 10 lifecycle passed.
+
+### Historical paired-archive publication observations
 
 Streaming refresh has no size-derived deadline. A progress watchdog aborts only
 when no source document completes and no publication batch commits for
@@ -1044,8 +1097,8 @@ emitted and 1,892,833 unique claims, one rejected document, 7 min 28 s refresh
 module-build redeclarations were recognized, rejected 38 additional module
 documents (PostgreSQL, Node.js, MariaDB, PHP, Ruby and others) as conflicting
 identities (1,892,498 unique claims, 7 min 3 s, 241,884 KiB); each now parses
-without rejection. Coverage remains partial, so freshness is not advertised as
-clean completeness. Run logs are under `~/.cache/lindm-rhel-publication-20261010/`
+without rejection. At that revision coverage remained partial, so freshness was
+not advertised as clean completeness. Run logs are under `~/.cache/lindm-rhel-publication-20261010/`
 (final `lindm-rhel-live-20261010-2.log` SHA-256
 `74a1313711e73f229847b6d226a20582ba7d5e8a99c1d269da4e24dba05cd8bd`).
 
@@ -1090,8 +1143,11 @@ native binary claims, a bare display label with a versioned unfixed PURL, and a
 genuinely invalid `nginx:1.24` RPM name without module metadata. The
 [completed source interpretation census](../../artifacts/rhel-vex-purl-interpretation-20261010.json)
 distinguishes 115 out-of-scope namespace entries and 290 valid display-label
-differences from that one remaining invalid document; the latter is rejected
-unscoped, not normalized to `nginx`.
+differences from that one remaining invalid document. It is never normalized to
+an invented `nginx` RPM. Current quarantine uses independent applicable native
+nginx source declarations with valid `rpmmod` evidence to bound the module family,
+retains all other applicable names from the rejected document, and withholds those
+components rather than withholding unrelated stream packages.
 
 ## Remote assistance capability roadmap
 

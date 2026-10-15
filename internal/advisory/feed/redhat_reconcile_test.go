@@ -3,9 +3,12 @@
 package feed
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -65,6 +68,47 @@ func TestRedHatDiskReconciliationMatchesNativeRules(t *testing.T) {
 	}
 	if _, err := os.Stat(directory); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("staging directory retained: %v", err)
+	}
+}
+
+func TestRedHatParsedSourceArchitecturesReconcileIndependently(t *testing.T) {
+	for _, reverse := range []bool{false, true} {
+		name := "nosrc-first"
+		if reverse {
+			name = "src-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			notice := redHatRejectionSpecimen(t)
+			src := redHatRejectionTestPackage(&notice, "source", "pkg:rpm/redhat/pkg@3-1?arch=src", "rhel9")
+			nosrc := redHatRejectionTestPackage(&notice, "no-source", "pkg:rpm/redhat/pkg@1-1?arch=nosrc", "rhel9")
+			fixed := []string{nosrc, src}
+			if reverse {
+				slices.Reverse(fixed)
+			}
+			notice.Vulnerabilities[0].Status = map[string][]string{"fixed": fixed}
+			raw, err := json.Marshal(notice)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var claims []*advisoryv1.Advisory
+			doc, err := stageRedHatStream(t.Context(), redHatSource("9.8", "standard"), redHatValidator(t), bytes.NewReader(raw), func(record *advisoryv1.Advisory) error {
+				claims = append(claims, record)
+				return nil
+			})
+			if err != nil || len(doc.GetRejectedRecords()) != 0 || len(claims) != 2 {
+				t.Fatalf("source roles merged before matching: claims=%v metadata=%v err=%v", claims, doc, err)
+			}
+			want := map[string]string{"src": "0:3-1", "nosrc": "0:1-1"}
+			for _, record := range claims {
+				if !record.SourcePackage || record.FixedVersion != want[record.Architecture] || record.ComponentVersion != record.FixedVersion {
+					t.Fatalf("source role or independent fix erased: %v", record)
+				}
+				delete(want, record.Architecture)
+			}
+			if len(want) != 0 {
+				t.Fatalf("source roles lost: %v", want)
+			}
+		})
 	}
 }
 

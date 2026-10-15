@@ -27,6 +27,7 @@ import (
 	"lindm/internal/device/devicedb"
 	"lindm/internal/protodata"
 	"lindm/internal/rpcreason"
+	"lindm/internal/rpmauthority"
 )
 
 const (
@@ -344,13 +345,18 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 				if position < batch.FirstPosition || position >= maxSnapshotRecords {
 					return core.ErrSnapshotCapacity
 				}
+				rpmEvidence, signer, authorityReason, err := snapshotRPMAuthority(pkg)
+				if err != nil {
+					return err
+				}
 				rows[i] = devicedb.InsertSnapshotPackagesParams{
 					SnapshotID: snapshotID, Position: position, Name: pkg.GetName(), Version: pkg.GetVersion(),
 					Architecture: pkg.GetArchitecture(), Manager: pkg.GetManager(),
-					SourceName: pkg.GetSourceName(), SourceVersion: pkg.GetSourceVersion(),
+					SourceName: pkg.GetSourceName(), SourceVersion: pkg.GetSourceVersion(), SourceArchitecture: pkg.GetSourceArchitecture(),
 					ModuleStatus: int32(pkg.GetModule().GetStatus()), ModuleName: pkg.GetModule().GetName(),
 					ModuleStream: pkg.GetModule().GetStream(), ModuleVersion: pkg.GetModule().GetVersion(),
 					ModuleContext: pkg.GetModule().GetContext(), OriginStatus: int16(pkg.GetOrigin().GetStatus()),
+					RpmAuthority: rpmEvidence, RpmSigner: signer, RpmAuthorityReason: authorityReason,
 				}
 				// Validation bounds listings to 16 per package.
 				for ordinal, listing := range pkg.GetOrigin().GetListings() {
@@ -389,6 +395,22 @@ func (s *Service) PutPackageBatch(ctx context.Context, req *connect.Request[devi
 		return nil, core.MapErr(err)
 	}
 	return connect.NewResponse(response), nil
+}
+
+func snapshotRPMAuthority(pkg *inventoryv1.Package) ([]byte, string, string, error) {
+	evidence := []byte{}
+	if pkg.GetRpmAuthority() != nil {
+		var err error
+		evidence, err = proto.MarshalOptions{Deterministic: true}.Marshal(pkg.GetRpmAuthority())
+		if err != nil {
+			return nil, "", "", err
+		}
+	}
+	var signer, reason string
+	if pkg.GetManager() == "rpm" {
+		signer, reason = rpmauthority.Verify(pkg)
+	}
+	return evidence, signer, reason, nil
 }
 
 func (s *Service) CommitPackageSnapshot(ctx context.Context, req *connect.Request[devicev1.CommitPackageSnapshotRequest]) (*connect.Response[devicev1.CommitPackageSnapshotResponse], error) {
@@ -700,7 +722,7 @@ func decodeBatch(rules protovalidate.Validator, payload []byte, count int) ([]*i
 	}
 	for _, pkg := range batch.GetPackages() {
 		if pkg == nil || core.HasNUL(
-			pkg.GetName(), pkg.GetVersion(), pkg.GetArchitecture(), pkg.GetManager(), pkg.GetSourceName(), pkg.GetSourceVersion(),
+			pkg.GetName(), pkg.GetVersion(), pkg.GetArchitecture(), pkg.GetManager(), pkg.GetSourceName(), pkg.GetSourceVersion(), pkg.GetSourceArchitecture(),
 			pkg.GetModule().GetName(), pkg.GetModule().GetStream(), pkg.GetModule().GetVersion(), pkg.GetModule().GetContext(),
 		) {
 			return nil, core.Invalid("invalid_text")

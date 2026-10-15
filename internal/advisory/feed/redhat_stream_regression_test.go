@@ -38,12 +38,12 @@ func TestRedHatStreamMatchesPinnedFixtureSemantics(t *testing.T) {
 	for _, test := range []struct {
 		fixture, release, stream, name, cve, fixed, module, outputSHA256 string
 	}{
-		{"rhsa-2024_6783", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "8c132db15be81524da6dc3ec554f527a1ee1451acee73f005599c572c23e0b9b"},
-		{"rhsa-2024_6783", "9.8", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "cf90f03fc183cd09c2e4e446f0bcfd844c48d81575ebeb99a2b4019289f73a19"},
-		{"rhsa-2024_7846", "8.6", "e4s", "openssl-libs", "CVE-2024-5535", "1:1.1.1k-14.el8_6", "", "43b5f1bd2106c8a50dd59bfccc9e630ae524f042b655718d80589f05645c66f2"},
-		{"rhsa-2024_1880", "8.8", "eus", "nodejs", "CVE-2023-46809", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "c9b545f7d15714ec281cc15ea4acd71901c46803f349a5033ef61cab9701f67e"},
-		{"cve-2024-6119", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "dd237ed52cd9a0acd958d48a8fbb6f1e06819f2087774ef4ef7b6079ba432065"},
-		{"cve-2024-21892", "8.8", "eus", "nodejs", "CVE-2024-21892", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "97506dd7f7eaa49b2871f02094d50f1d453aeb8dab1b821319616694860d9d6d"},
+		{"rhsa-2024_6783", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "a37acc481e6bf26037ee4086497f5e7a5b17a0a22d7597827057fb9d454fbdda"},
+		{"rhsa-2024_6783", "9.8", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "c5a987409c3db8767d068db068bbbb4a27c26f56bf2b7fee6b5d880af0d188ed"},
+		{"rhsa-2024_7846", "8.6", "e4s", "openssl-libs", "CVE-2024-5535", "1:1.1.1k-14.el8_6", "", "2e3b12826e3844f63a381359bae80b17b3dcbd999aeedbc681a00886bff418a5"},
+		{"rhsa-2024_1880", "8.8", "eus", "nodejs", "CVE-2023-46809", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "499d18721da0077aaf3e9adb1eef0fd4939a64648cfd6b8629a1d785ac963bb8"},
+		{"cve-2024-6119", "9.4", "standard", "openssl-libs", "CVE-2024-6119", "1:3.0.7-28.el9_4", "", "cce17942a579fb2bd4607738c47b3523e6aeca3ca35da6f018a0d8f3c261f3f0"},
+		{"cve-2024-21892", "8.8", "eus", "nodejs", "CVE-2024-21892", "1:18.19.1-1.module+el8.8.0+21592+14a8b93e", "18", "ed82b4423209c0869a84e1ee9d008e14174cb474cf3184eef07b15aa9abc3eeb"},
 	} {
 		t.Run(test.fixture+"/"+test.release, func(t *testing.T) {
 			config := redHatSource(test.release, test.stream)
@@ -56,9 +56,9 @@ func TestRedHatStreamMatchesPinnedFixtureSemantics(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Captured from the Decoder.Token implementation before the
-			// scanner cutover. Pin the complete ordered output, not merely
-			// agreement between two APIs delegating to the same parser.
+			// Pin the complete ordered output, including exact vendor component
+			// EVR and src/nosrc role. Independent status/backport assertions below
+			// remain unchanged rather than trusting API agreement alone.
 			if got := fmt.Sprintf("%x", sha256.Sum256(encoded)); got != test.outputSHA256 {
 				t.Fatalf("fixture output bytes changed: got sha256=%s want=%s", got, test.outputSHA256)
 			}
@@ -82,7 +82,7 @@ func TestRedHatStreamMatchesPinnedFixtureSemantics(t *testing.T) {
 			// compatibility API delegates to the same streaming implementation.
 			claims := &advisoryv1.FeedDocument{Advisories: records}
 			record := redHatRecord(t, claims, test.name, test.cve, test.module, false)
-			if record.FixedVersion != test.fixed || record.Architecture != "x86_64" || record.PlatformRelease != test.release || record.PlatformStream != test.stream || record.AssessmentUnknown || record.NotAffected || (test.module != "" && record.ModuleName != "nodejs") {
+			if record.FixedVersion != test.fixed || record.ComponentVersion != test.fixed || record.Architecture != "x86_64" || record.PlatformRelease != test.release || record.PlatformStream != test.stream || record.AssessmentUnknown || record.NotAffected || (test.module != "" && record.ModuleName != "nodejs") {
 				t.Fatalf("stream changed pinned backport/module authority: %v", record)
 			}
 			if test.fixture == "cve-2024-6119" {
@@ -181,14 +181,15 @@ func TestRedHatStreamRejectsTruncatedAndInvalidJSON(t *testing.T) {
 
 func TestRedHatStreamRejectsMalformedCVEWithoutRepairOrPartialClaims(t *testing.T) {
 	raw := bytes.ReplaceAll(redHatFixture(t, "rhsa-2024_6783"), []byte("CVE-2024-6119"), []byte("CVE-2024-6119oops"))
-	calls := 0
-	doc, err := stageRedHatStream(t.Context(), redHatSource("9.4", "standard"), redHatValidator(t), bytes.NewReader(raw), func(*advisoryv1.Advisory) error {
-		calls++
+	var claims []*advisoryv1.Advisory
+	doc, err := stageRedHatStream(t.Context(), redHatSource("9.4", "standard"), redHatValidator(t), bytes.NewReader(raw), func(record *advisoryv1.Advisory) error {
+		claims = append(claims, record)
 		return nil
 	})
-	if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 || !doc.RejectedRecords[0].Unscoped || doc.RejectedRecords[0].Id != "RHSA-2024:6783" {
-		t.Fatalf("malformed CVE was repaired or retained valid prefix claims: doc=%v calls=%d err=%v", doc, calls, err)
+	if err != nil || doc == nil || len(doc.RejectedRecords) != 1 || doc.RejectedRecords[0].Unscoped || doc.RejectedRecords[0].Id != "RHSA-2024:6783" || len(doc.RejectedRecords[0].PackageNames) == 0 {
+		t.Fatalf("malformed CVE lost bounded component scope: doc=%v claims=%v err=%v", doc, claims, err)
 	}
+	redHatRequireOnlyQuarantine(t, doc.RejectedRecords[0], claims)
 }
 
 type redHatFailingReader struct {

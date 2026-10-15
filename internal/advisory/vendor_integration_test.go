@@ -96,7 +96,13 @@ func TestAdvisoryLaunchFamilyBackportsAndNativeStreams(t *testing.T) {
 						t.Fatalf("Debian unknown date or not-affected status fabricated: %v", finding)
 					}
 				}
-				if found == fixed {
+				if test.distro == "rhel" && test.release == "9" {
+					// Historical synthetic rows lack cryptographic installed-RPM
+					// authority. Familiar names/versions cannot acquire findings.
+					if found || len(out.GetFindings()) != 0 {
+						t.Fatalf("unverified RHEL RPM inherited coverage: %v", out)
+					}
+				} else if found == fixed {
 					t.Fatalf("backport classification fixed=%v: %v", fixed, out)
 				}
 				if out.GetFreshness().GetState() != adminv1.AdvisoryFindingState_ADVISORY_FINDING_STATE_UNKNOWN {

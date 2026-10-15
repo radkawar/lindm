@@ -145,8 +145,8 @@ function describe(
       };
     case AdvisoryUncheckedReason.SOURCE_RECORD_REJECTED:
       return {
-        title: "Skipped advisory entry",
-        detail: `The ${os} source skipped an entry naming a package installed on these devices.`,
+        title: "Vendor document unusable",
+        detail: `The ${os} source contains an unusable document naming a package installed on these devices.`,
         fix: "source",
       };
     case AdvisoryUncheckedReason.VENDOR_ASSESSMENT_UNKNOWN:

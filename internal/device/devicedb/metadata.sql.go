@@ -249,45 +249,46 @@ func (q *Queries) LockInventoryMetadata(ctx context.Context) error {
 const searchDevices = `-- name: SearchDevices :many
 WITH keyed AS (
     SELECT d.id, d.state, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture, d.enrolled_at, d.last_seen_at, d.open_snapshot_id, d.reserved_inventory_bytes, d.published_sequence, d.host_received_at, d.package_attempt_received_at, d.snapshot_received_at, d.revoked_at, d.revoked_by, d.revoke_reason, d.metadata, d.owner_principal_id,
-        (CASE $3::int
+        (CASE $4::int
             WHEN 1 THEN d.hostname = ''
             WHEN 2 THEN d.last_seen_at IS NULL
             WHEN 3 THEN d.os_id = ''
             ELSE false
         END)::boolean AS sort_last,
-        (CASE $3::int
+        (CASE $4::int
             WHEN 1 THEN left(lower(d.hostname), 80)
             WHEN 2 THEN coalesce(lpad((extract(epoch FROM d.last_seen_at) * 1000000)::bigint::text, 20, '0'), '')
             WHEN 3 THEN left(lower(d.os_id), 40) || chr(1) || left(lower(d.os_version), 39)
             ELSE lpad((extract(epoch FROM d.enrolled_at) * 1000000)::bigint::text, 20, '0')
         END)::text COLLATE "C" AS sort_key
     FROM devices d
-    WHERE device_scope_matches(d.id, $4::boolean, $5::jsonb)
-      AND d.enrolled_at <= $6::timestamptz
-      AND ($7::text = '' OR d.os_id = $7)
-      AND ($8::text = '' OR d.os_version = $8)
-      AND starts_with(d.hostname, $9::text)
-      AND ($10::text = '' OR strpos(lower(d.hostname), lower($10::text)) > 0)
-      AND ($11::text = '' OR EXISTS (
+    WHERE device_scope_matches(d.id, $5::boolean, $6::jsonb)
+      AND d.enrolled_at <= $7::timestamptz
+      AND ($8::text = '' OR d.os_id = $8)
+      AND ($9::text = '' OR d.os_version = $9)
+      AND starts_with(d.hostname, $10::text)
+      AND ($11::text = '' OR strpos(lower(d.hostname), lower($11::text)) > 0)
+      AND ($12::text = '' OR EXISTS (
           SELECT 1 FROM device_release_reports r
-          WHERE r.generation_id = d.current_generation_id AND r.agent_release = $11::text
+          WHERE r.generation_id = d.current_generation_id AND r.agent_release = $12::text
       ))
-      AND ($12::timestamptz IS NULL OR d.last_seen_at >= $12::timestamptz)
-      AND ($13::timestamptz IS NULL OR d.last_seen_at <= $13::timestamptz)
-      AND d.metadata @> $14::jsonb
+      AND ($13::timestamptz IS NULL OR d.last_seen_at >= $13::timestamptz)
+      AND ($14::timestamptz IS NULL OR d.last_seen_at <= $14::timestamptz)
+      AND d.metadata @> $15::jsonb
       -- Worst profile-item rank (device_compliance_rank) in the requested set.
-      AND (cardinality($15::int[]) = 0
-          OR device_compliance_rank(d.id) = ANY($15::int[]))
+      AND (cardinality($16::int[]) = 0
+          OR device_compliance_rank(d.id) = ANY($16::int[]))
       -- Patch bucket as the fleet summary counts it: active devices only.
-      AND (cardinality($16::text[]) = 0
-          OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, $1::integer) = ANY($16::text[])))
+      AND (cardinality($17::text[]) = 0
+          OR (d.state = 'active' AND device_patch_bucket(d.current_generation_id, $1::integer) = ANY($17::text[])))
       -- Same current evaluation and active-exception population as ListAdvisorySummary.
-      AND ($17::text = '' OR (d.state = 'active' AND EXISTS (
+      AND ($18::text = '' OR (d.state = 'active' AND EXISTS (
           SELECT 1 FROM advisory_device_status s
           JOIN advisory_set_findings f ON f.set_id = s.finding_set_id
           WHERE s.device_id = d.id AND NOT s.unknown
-            AND f.advisory_id = $17::text
-            AND f.severity = $18::text
+            AND advisory_rpm_authority_current(d.os_id,d.os_version,$2::boolean)
+            AND f.advisory_id = $18::text
+            AND f.severity = $19::text
             AND NOT EXISTS (
                 SELECT 1 FROM advisory_exceptions x
                 WHERE x.device_id = d.id AND x.finding_id = f.finding_key
@@ -297,17 +298,17 @@ WITH keyed AS (
 ), page AS MATERIALIZED (
     SELECT k.id, k.state, k.current_generation_id, k.hostname, k.os_id, k.os_version, k.architecture, k.enrolled_at, k.last_seen_at, k.open_snapshot_id, k.reserved_inventory_bytes, k.published_sequence, k.host_received_at, k.package_attempt_received_at, k.snapshot_received_at, k.revoked_at, k.revoked_by, k.revoke_reason, k.metadata, k.owner_principal_id, k.sort_last, k.sort_key
     FROM keyed k
-    WHERE NOT $19::boolean
-       OR k.sort_last > $20::boolean
-       OR (k.sort_last = $20::boolean AND (
-           (NOT $2::boolean AND (k.sort_key, k.id) > ($21::text COLLATE "C", $22::uuid))
-           OR ($2::boolean AND (k.sort_key, k.id) < ($21::text COLLATE "C", $22::uuid))))
+    WHERE NOT $20::boolean
+       OR k.sort_last > $21::boolean
+       OR (k.sort_last = $21::boolean AND (
+           (NOT $3::boolean AND (k.sort_key, k.id) > ($22::text COLLATE "C", $23::uuid))
+           OR ($3::boolean AND (k.sort_key, k.id) < ($22::text COLLATE "C", $23::uuid))))
     ORDER BY k.sort_last,
-        CASE WHEN NOT $2::boolean THEN k.sort_key END COLLATE "C",
-        CASE WHEN $2::boolean THEN k.sort_key END COLLATE "C" DESC,
-        CASE WHEN NOT $2::boolean THEN k.id END,
-        CASE WHEN $2::boolean THEN k.id END DESC
-    LIMIT $23::int
+        CASE WHEN NOT $3::boolean THEN k.sort_key END COLLATE "C",
+        CASE WHEN $3::boolean THEN k.sort_key END COLLATE "C" DESC,
+        CASE WHEN NOT $3::boolean THEN k.id END,
+        CASE WHEN $3::boolean THEN k.id END DESC
+    LIMIT $24::int
 )
 SELECT d.id, d.current_generation_id, d.hostname, d.os_id, d.os_version, d.architecture,
     d.state, d.enrolled_at, d.last_seen_at, d.published_sequence, d.sort_last, d.sort_key::text AS sort_key,
@@ -353,6 +354,7 @@ LEFT JOIN LATERAL (
     LEFT JOIN advisory_exceptions x ON x.device_id = s.device_id AND x.expires_at > CURRENT_TIMESTAMP
     LEFT JOIN advisory_set_findings f ON f.set_id = fs.id AND f.finding_key = x.finding_id
     WHERE s.device_id = d.id AND NOT s.unknown
+      AND advisory_rpm_authority_current(d.os_id,d.os_version,$2::boolean)
     GROUP BY e.state, fs.id
 ) findings ON true
 CROSS JOIN LATERAL (
@@ -364,14 +366,15 @@ CROSS JOIN LATERAL (
     WHERE p.device_id = d.id
 ) compliance
 ORDER BY d.sort_last,
-    CASE WHEN NOT $2::boolean THEN d.sort_key END COLLATE "C",
-    CASE WHEN $2::boolean THEN d.sort_key END COLLATE "C" DESC,
-    CASE WHEN NOT $2::boolean THEN d.id END,
-    CASE WHEN $2::boolean THEN d.id END DESC
+    CASE WHEN NOT $3::boolean THEN d.sort_key END COLLATE "C",
+    CASE WHEN $3::boolean THEN d.sort_key END COLLATE "C" DESC,
+    CASE WHEN NOT $3::boolean THEN d.id END,
+    CASE WHEN $3::boolean THEN d.id END DESC
 `
 
 type SearchDevicesParams struct {
 	PatchStaleAfterSeconds int32
+	RpmAuthorityValid      bool
 	Descending             bool
 	SortField              int32
 	ScopeUnrestricted      bool
@@ -444,6 +447,7 @@ type SearchDevicesRow struct {
 func (q *Queries) SearchDevices(ctx context.Context, arg SearchDevicesParams) ([]SearchDevicesRow, error) {
 	rows, err := q.db.Query(ctx, searchDevices,
 		arg.PatchStaleAfterSeconds,
+		arg.RpmAuthorityValid,
 		arg.Descending,
 		arg.SortField,
 		arg.ScopeUnrestricted,

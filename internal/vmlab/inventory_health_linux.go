@@ -122,6 +122,11 @@ func checkInventoryMessage(message protoreflect.Message, path string, context in
 			}
 			continue
 		}
+		// RPM authority is optional package-coverage evidence, not the native
+		// census. Missing evidence stays visibly uncovered in Findings.
+		if field.FullName() == "lindm.inventory.v1.Package.rpm_authority" && !message.Has(field) {
+			continue
+		}
 		if !message.Has(field) {
 			if requireFields {
 				return fmt.Errorf("inventory health missing %s", name)

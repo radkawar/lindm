@@ -17,17 +17,18 @@ import (
 // nonDistroLiterals are uses of a registry ID string that do not name a
 // distribution; each needs a reason.
 var nonDistroLiterals = map[string]map[string]string{
-	"internal/advisory/feed/osv.go":               {"arch": "OSV package-URL qualifier key"},
-	"internal/advisory/feed/suse_oval.go":         {"arch": "OVAL rpminfo architecture element name"},
-	"internal/agent/dnf/versionlock.go":           {"arch": "DNF versionlock condition key (RPM architecture)"},
-	"internal/agent/packageprovider/pin_linux.go": {"arch": "DNF versionlock condition key (RPM architecture)"},
-	"internal/packaging/result.go":                {"arch": "pacman package format name and .PKGINFO architecture field key"},
-	"internal/offlinebundle/bundle.go":            {"arch": "pacman repository format name (portable; packaging is Linux-only)"},
-	"cmd/lab/hosts.go":                            {"arch": "architecture flag name"},
-	"cmd/lab/images_redhat.go":                    {"arch": "architecture flag name"},
-	"cmd/lab/lifecycle.go":                        {"arch": "pacman package-format flag name"},
-	"cmd/lab/packages.go":                         {"arch": "architecture flag name"},
-	"internal/vmlab/omarchy_installer_linux.go":   {"omarchy": "vendor configurator hostname and runtime package name in the Omarchy archinstall seed"},
+	"internal/advisory/feed/osv.go":                 {"arch": "OSV package-URL qualifier key"},
+	"internal/advisory/feed/redhat_record_error.go": {"arch": "RPM package-URL source architecture qualifier key"},
+	"internal/advisory/feed/suse_oval.go":           {"arch": "OVAL rpminfo architecture element name"},
+	"internal/agent/dnf/versionlock.go":             {"arch": "DNF versionlock condition key (RPM architecture)"},
+	"internal/agent/packageprovider/pin_linux.go":   {"arch": "DNF versionlock condition key (RPM architecture)"},
+	"internal/packaging/result.go":                  {"arch": "pacman package format name and .PKGINFO architecture field key"},
+	"internal/offlinebundle/bundle.go":              {"arch": "pacman repository format name (portable; packaging is Linux-only)"},
+	"cmd/lab/hosts.go":                              {"arch": "architecture flag name"},
+	"cmd/lab/images_redhat.go":                      {"arch": "architecture flag name"},
+	"cmd/lab/lifecycle.go":                          {"arch": "pacman package-format flag name"},
+	"cmd/lab/packages.go":                           {"arch": "architecture flag name"},
+	"internal/vmlab/omarchy_installer_linux.go":     {"omarchy": "vendor configurator hostname and runtime package name in the Omarchy archinstall seed"},
 }
 
 // TestNoDistroIDLiteralsOutsideRegistry keeps distribution knowledge in the

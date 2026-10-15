@@ -136,8 +136,12 @@ INSERT INTO snapshot_packages (
     module_stream,
     module_version,
     module_context,
-    origin_status
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+    origin_status,
+    rpm_authority,
+    rpm_signer,
+    rpm_authority_reason,
+    source_architecture
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18);
 
 -- name: InsertSnapshotPackageListings :copyfrom
 INSERT INTO snapshot_package_listings (

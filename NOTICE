@@ -64,6 +64,67 @@ Attribution/source manifests: redhat-provenance.txt and redhat-*-provenance.txt.
 Original vendor copyright/disclaimer text remains in the documents. Red Hat public
 keys are vendor verification material, not official lindm signing keys.
 
+Installed RPM authority root (RHEL 9 and RHEL 10), retrieved 2026-10-15:
+https://access.redhat.com/security/team/key identifies Red Hat, Inc. (release
+key 2), RSA4096, fingerprint 567E347AD0044ADE55BA8A5F199E2F91FD431D51,
+for both RHEL 9 and 10 at /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release.
+Original public key: https://security.access.redhat.com/data/fd431d51.txt
+Retained armored block: internal/rpmauthority/redhat-release2.asc.
+This pin verifies RPMTAG_RSAHEADER over rpm_header_magic followed by the exact
+headerGet(RPMTAG_HEADERIMMUTABLE) region. Upstream representation and hashing:
+https://github.com/rpm-software-management/rpm/blob/rpm-4.18.x/lib/header.c
+https://github.com/rpm-software-management/rpm/blob/rpm-4.18.x/lib/package.c
+Red Hat also publishes release key 4 (ML-DSA-87+Ed448),
+FCD355B305707A62DA143AB6E422397E50FE8467A2A95343D246D6276AFEDF8F,
+for RHEL 9.7/10.1, and auxiliary key 3 (RSA4096),
+7E4624258C406535D56D6F135054E4A45A6340B3, for RHEL 9/10 disaster recovery.
+Neither unsupported/PQ-only signatures nor unpinned auxiliary signatures confer
+authority here: those packages remain explicit uncovered. A verified release2
+signature is necessary but not sufficient for RHEL product coverage; the closed
+feed must explicitly declare the exact signed binary NEVRA, arch and module.
+
+The following four genuine native header/signature fixtures under
+internal/rpmauthority/testdata were extracted without changing their bytes
+from official TLS-authenticated Red Hat UBI RPMs (2026-10-15). Their original
+RPM SHA256 values were checked against repository primary metadata before
+extraction. Only immutable header/RSAHEADER metadata is retained, no payload;
+product coverage is NOT inferred from UBI repository location:
+dbus.json:
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/d/dbus-1.12.20-8.el9.x86_64.rpm
+96b1daa4de0a635ab760a8431fb005022bb7cb48d2d1d3ec9a8adb1798c0e10e
+fuse-common.json:
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/f/fuse-common-3.10.2-9.el9.x86_64.rpm
+548265cbee787fa659bc79c07e15a12007f39eb70e905bf660ec488f0bb8820f
+dbus10.json:
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi10/10/x86_64/baseos/os/Packages/d/dbus-1.14.10-5.el10.x86_64.rpm
+cac7abf4d1efb20a9deeb00e70418704f6ea027a8a6786c040715775262d0693
+bash.json (23,729-byte immutable header, exceeding census line limits):
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/b/bash-5.1.8-9.el9.x86_64.rpm
+d3adf8b09aa0bf935c67aa12444e0ee02f70a82c2682bfb2b02bda0a989bb806
+
+openssl.json retains original immutable header/RSAHEADER bytes from the
+official TLS-authenticated RPM matching genuine RHSA-2024:6783's exact native
+component. Its signed binary epoch is 1; SOURCERPM still reports no source epoch.
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/o/openssl-3.0.7-28.el9_4.x86_64.rpm
+RPM SHA256: 255fb57a1b308c1f2df2027c63953955717498a76056f4d4e1279f02001e9aa8
+The matching test combines this authentic header with the unchanged retained
+CSAF specimen; controlled generation completeness is a matching fixture, not
+an assertion that this one document is a complete production feed.
+
+Native RPM query framing specimen:
+internal/agent/inventory/testdata/rpm-authority-dracut9.txt is exact stdout from
+rpm 4.18.2 --query --package --queryformat with tab-separated NAME, EPOCHNUM,
+VERSION, RELEASE, ARCH, MODULARITYLABEL, HEADERIMMUTABLE, RSAHEADER and a final
+newline. Both binary tags use the unformatted BIN hexadecimal representation.
+Source artifact, independently matched over official Red Hat TLS:
+https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/d/dracut-057-110.git20260130.el9.x86_64.rpm
+RPM SHA256: adc760055f668cc9c9da21bb6091397aa263c2340b495ac39c84ac08452f3db5
+Only query metadata, the immutable header and RSAHEADER are retained, no payload.
+Portable formatter implementation for RHEL 9 and 10 (stringFormat for BIN,
+pgpHexStr/rpmhex, rather than multiline base64Format; neither has jsonFormat):
+https://github.com/rpm-software-management/rpm/blob/rpm-4.16.1.3/lib/formats.c
+https://github.com/rpm-software-management/rpm/blob/rpm-4.19.1.1-release/lib/formats.c
+
 Canonical Ltd and contributors: Ubuntu OSV security-notice fixtures,
 including ubuntu-USN-6859-1.json and the retained Ubuntu notice fixtures.
 Creative Commons Attribution-ShareAlike 4.0 International (CC-BY-SA-4.0).

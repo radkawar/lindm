@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	adminv1 "lindm/gen/lindm/admin/v1"
 	agentv1 "lindm/gen/lindm/agent/v1"
@@ -72,5 +73,19 @@ func TestRecentActionOutcome(t *testing.T) {
 	}
 	if _, err := recentActionOutcome(devicedb.FleetSummaryRecentActionsRow{Kind: "device", StatusDocument: []byte{0xff}}, at.Time); err == nil {
 		t.Fatal("corrupt status document was accepted")
+	}
+}
+
+func TestFleetPopulationCacheRejectsInvalidRPMRoot(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	population := &adminv1.GetFleetSummaryResponse{ObservedAt: timestamppb.New(now)}
+	if !fleetPopulationCurrent(population, now, true) {
+		t.Fatal("valid current cache unexpectedly rejected")
+	}
+	if fleetPopulationCurrent(population, now, false) {
+		t.Fatal("cached trusted fleet survived RPM root invalidation")
+	}
+	if fleetPopulationCurrent(population, now.Add(FleetSummaryMaxAge+time.Second), true) {
+		t.Fatal("expired cache unexpectedly trusted")
 	}
 }

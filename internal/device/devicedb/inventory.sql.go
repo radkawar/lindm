@@ -659,20 +659,24 @@ type InsertSnapshotPackageListingsParams struct {
 }
 
 type InsertSnapshotPackagesParams struct {
-	SnapshotID    uuid.UUID
-	Position      int32
-	Name          string
-	Version       string
-	Architecture  string
-	Manager       string
-	SourceName    string
-	SourceVersion string
-	ModuleStatus  int32
-	ModuleName    string
-	ModuleStream  string
-	ModuleVersion string
-	ModuleContext string
-	OriginStatus  int16
+	SnapshotID         uuid.UUID
+	Position           int32
+	Name               string
+	Version            string
+	Architecture       string
+	Manager            string
+	SourceName         string
+	SourceVersion      string
+	ModuleStatus       int32
+	ModuleName         string
+	ModuleStream       string
+	ModuleVersion      string
+	ModuleContext      string
+	OriginStatus       int16
+	RpmAuthority       []byte
+	RpmSigner          string
+	RpmAuthorityReason string
+	SourceArchitecture string
 }
 
 const listExpiredOpenSnapshots = `-- name: ListExpiredOpenSnapshots :many

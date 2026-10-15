@@ -196,7 +196,7 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	if previousErr != nil && !errors.Is(previousErr, pgx.ErrNoRows) {
 		return advisorydb.AdvisoryEvaluation{}, previousErr
 	}
-	if previousErr == nil && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt {
+	if previousErr == nil && (coverage == nil || !coverage.rpm) && sameID(previous.SnapshotID, e.SnapshotID) && sameID(previous.FeedRevision, e.FeedRevision) && previous.HostReceivedAt == e.HostReceivedAt && previous.State == e.State && previous.Reason == e.Reason && previous.ExpiresAt == e.ExpiresAt {
 		if previous.FeedID != "" {
 			return previous, nil
 		}
@@ -213,20 +213,22 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 	}
 	e.FindingDigest = emptyFindingDigest()
 	if selected != nil && d.CurrentSnapshotID != nil {
-		missing, err := q.AdvisorySourceMappingMissing(ctx, *d.CurrentSnapshotID)
-		if err != nil {
-			return advisorydb.AdvisoryEvaluation{}, err
-		}
-		if missing {
-			unknown("source_package_identity_missing")
-		}
-		architectures, err := q.AdvisoryArchitectures(ctx, *d.CurrentSnapshotID)
-		if err != nil {
-			return advisorydb.AdvisoryEvaluation{}, err
-		}
-		for _, arch := range architectures {
-			if arch == "" || (arch != "all" && arch != "noarch" && (host.Native().Packages.Backend.PackageDB() != platform.PackageDBPacman || arch != "any") && !feed.Applies(selectedSource, feedOS, feedVersion, arch)) {
-				unknown("package_architecture_uncovered")
+		if coverage == nil || !coverage.rpm {
+			missing, err := q.AdvisorySourceMappingMissing(ctx, *d.CurrentSnapshotID)
+			if err != nil {
+				return advisorydb.AdvisoryEvaluation{}, err
+			}
+			if missing {
+				unknown("source_package_identity_missing")
+			}
+			architectures, err := q.AdvisoryArchitectures(ctx, *d.CurrentSnapshotID)
+			if err != nil {
+				return advisorydb.AdvisoryEvaluation{}, err
+			}
+			for _, arch := range architectures {
+				if arch == "" || (arch != "all" && arch != "noarch" && (host.Native().Packages.Backend.PackageDB() != platform.PackageDBPacman || arch != "any") && !feed.Applies(selectedSource, feedOS, feedVersion, arch)) {
+					unknown("package_architecture_uncovered")
+				}
 			}
 		}
 		// Matching depends only on the feed generation and the exact package
@@ -236,9 +238,12 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 			return advisorydb.AdvisoryEvaluation{}, err
 		}
 		if coverage != nil {
-			origins, err := q.AdvisoryOriginDigest(ctx, *d.CurrentSnapshotID)
-			if err != nil {
-				return advisorydb.AdvisoryEvaluation{}, err
+			var origins []byte
+			if !coverage.rpm {
+				origins, err = q.AdvisoryOriginDigest(ctx, *d.CurrentSnapshotID)
+				if err != nil {
+					return advisorydb.AdvisoryEvaluation{}, err
+				}
 			}
 			digest = coverage.setDigest(digest, origins)
 		}
@@ -255,12 +260,27 @@ func (s *Service) evaluateOnce(ctx context.Context, deviceID uuid.UUID) (advisor
 			unknown(set.Reason)
 		}
 		if coverage != nil {
-			// No verified base-archive package at all (historical snapshots,
-			// failed or empty APT lists) establishes no exposure.
-			if d.PackageCount.Valid && set.UncoveredPackages >= d.PackageCount.Int32 {
-				unknown("package_origin_unavailable")
+			if coverage.rpm {
+				e.UncoveredPackages = set.UncoveredPackages
 			}
-			if e.State == "evaluated" {
+			// Imported RPM signing-key records are not covered/uncovered
+			// installable packages, even though the census retains their rows.
+			allUncovered := d.PackageCount.Valid && set.UncoveredPackages >= d.PackageCount.Int32
+			if coverage.rpm {
+				installable, err := q.AdvisoryInstallablePackageCount(ctx, *d.CurrentSnapshotID)
+				if err != nil {
+					return advisorydb.AdvisoryEvaluation{}, err
+				}
+				allUncovered = set.UncoveredPackages >= installable
+			}
+			if allUncovered {
+				if coverage.rpm {
+					unknown("rhel_no_covered_packages")
+				} else {
+					unknown("package_origin_unavailable")
+				}
+			}
+			if e.State == "evaluated" && (!coverage.rpm || set.UncoveredPackages > 0) {
 				e.State, e.Reason, e.UncoveredPackages = "partial", coverage.reason, set.UncoveredPackages
 			}
 		}
@@ -300,8 +320,8 @@ type missingFindingSet struct {
 	feedID     string
 	snapshotID uuid.UUID
 	digest     []byte
-	// coverage restricts a derivative's base feed to verified-origin
-	// packages; its policy is already bound into digest.
+	// coverage restricts matching to verified origins and, for native RHEL,
+	// exact product membership; its policy is already bound into digest.
 	coverage *originCoverage
 }
 
@@ -385,9 +405,16 @@ func matchFindingSet(ctx context.Context, q *advisorydb.Queries, selected *advis
 	// Uncovered packages are excluded from matching, so a vendor rebuild can
 	// never appear affected or clear by base advisories.
 	var uncovered []bool
+	var uncoveredRows []advisorydb.InsertAdvisorySetUncoveredParams
 	if coverage != nil {
 		var err error
-		if uncovered, set.UncoveredPackages, err = coverage.uncovered(ctx, q, snapshotID); err != nil {
+		if coverage.rpm {
+			uncovered, uncoveredRows, err = rhelCoverage(ctx, q, selected, selectedSource, snapshotID, set.ID)
+			set.UncoveredPackages = int32(len(uncoveredRows))
+		} else {
+			uncovered, set.UncoveredPackages, err = coverage.uncovered(ctx, q, snapshotID)
+		}
+		if err != nil {
 			return set, err
 		}
 	}
@@ -410,6 +437,9 @@ matching:
 			if err := proto.Unmarshal(row.RecordBytes, &record); err != nil {
 				unknown("advisory_record_invalid")
 				break matching
+			}
+			if coverage != nil && coverage.rpm && !rhelCandidateScopeMatches(selectedSource, &record, row.Architecture, row.SourceArchitecture, row.ModuleName, row.ModuleStream) {
+				continue
 			}
 			// OVAL architecture predicates constrain native instances exactly;
 			// unlike repository noarch claims, they are not wildcard joins.
@@ -442,10 +472,23 @@ matching:
 				}
 			}
 			version := row.Version
+			affected, err := false, error(nil)
 			if record.GetSourcePackage() {
-				version = row.SourceVersion
+				if coverage != nil && coverage.rpm {
+					// Coverage has either resolved the fixed-only source range
+					// by a lower bound or found a same-advisory/CVE binary
+					// assessment. Never compare an invented exact source epoch.
+					if rhelSourceEpochRequired(&record) {
+						continue
+					}
+					affected = !record.GetNotAffected()
+				} else {
+					version = row.SourceVersion
+					affected, err = MatchesVersion(row.Manager, version, &record)
+				}
+			} else {
+				affected, err = MatchesVersion(row.Manager, version, &record)
 			}
-			affected, err := MatchesVersion(row.Manager, version, &record)
 			if err != nil {
 				unknown("package_version_unrecognized")
 				continue
@@ -541,6 +584,11 @@ matching:
 	set.FindingCount = int32(len(ordered))
 	if err := q.InsertAdvisoryFindingSet(ctx, advisorydb.InsertAdvisoryFindingSetParams{ID: set.ID, FeedID: set.FeedID, FeedRevision: set.FeedRevision, PackageDigest: set.PackageDigest, State: set.State, Reason: set.Reason, FindingDigest: set.FindingDigest, FindingCount: set.FindingCount, CriticalCount: set.CriticalCount, HighCount: set.HighCount, MediumCount: set.MediumCount, LowCount: set.LowCount, OtherCount: set.OtherCount, UncoveredPackages: set.UncoveredPackages}); err != nil {
 		return set, err
+	}
+	if len(uncoveredRows) > 0 {
+		if _, err := q.InsertAdvisorySetUncovered(ctx, uncoveredRows); err != nil {
+			return set, err
+		}
 	}
 	if _, err := q.InsertAdvisorySetFindings(ctx, ordered); err != nil {
 		return set, err

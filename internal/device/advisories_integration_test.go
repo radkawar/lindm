@@ -213,6 +213,15 @@ func TestAdvisoriesMatchRecordedNativeInventory(t *testing.T) {
 			if err := protojson.Unmarshal(recorded, packages); err != nil {
 				t.Fatal(err)
 			}
+			if test.distro == "rhel" {
+				// This recorded fixture predates signed-header evidence. Even
+				// corroborated stream metadata could not confer RPM authority.
+				for _, p := range packages.Packages {
+					if p.GetRpmAuthority() != nil {
+						t.Fatal("historical RHEL fixture unexpectedly acquired signed-header evidence")
+					}
+				}
+			}
 			host := hostObservation(f.generation, 1, test.name)
 			host.Observation.StartedAt = timestamppb.New(f.now)
 			host.Observation.FinishedAt = timestamppb.New(f.now)

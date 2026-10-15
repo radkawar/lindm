@@ -12,6 +12,7 @@ import (
 
 	"lindm/internal/advisory/advisorydb"
 	"lindm/internal/platform"
+	"lindm/internal/rpmauthority"
 )
 
 var errSnapshotPosition = errors.New("advisory: snapshot position out of range")
@@ -23,21 +24,25 @@ const (
 	uncoveredPage = 5000
 )
 
-// originCoverage applies a base release's feed to a derivative device only
-// for packages whose every APT listing is a verified index of the base
-// archive in a suite that feed assesses (platform.Advisory archive facts).
-// Every other package is UNKNOWN with the advisory_origin_reason code, and
-// the evaluation is always 'partial': the derivative vendor publishes no feed.
-// Nothing is inferred from names, version strings or ID_LIKE.
+// originCoverage restricts matching to independently proved package authority.
+// Derivatives require every APT listing to be a verified covered base-archive
+// index, and always remain PARTIAL because their own vendor has no feed.
+// Native RHEL requires a verified immutable RPM identity plus an exact product
+// declaration; it is PARTIAL only when some installed packages are uncovered.
+// Neither policy infers authority from names, display vendors or ID_LIKE.
 type originCoverage struct {
 	base   *platform.Release
 	reason string
 	vendor []string
+	rpm    bool
 }
 
-// derivativeCoverage returns the coverage rule of an exact derivative
-// registry row, or nil for every other release (whose matching is unchanged).
+// derivativeCoverage retains the existing derivative policy selector and also
+// selects the bounded native-RHEL policy for exact supported registry rows.
 func derivativeCoverage(host *platform.Release) *originCoverage {
+	if host != nil && host.Advisory.RPMHeaderAuthority {
+		return &originCoverage{base: host, reason: "rhel_package_coverage_incomplete", rpm: true}
+	}
 	base := host.BaseCoverage()
 	if base == nil {
 		return nil
@@ -48,7 +53,7 @@ func derivativeCoverage(host *platform.Release) *originCoverage {
 // feedIdentity is the os-release identity feeds are selected and their
 // architectures checked against: the base release for a derivative.
 func feedIdentity(coverage *originCoverage, osID, version string) (string, string) {
-	if coverage == nil {
+	if coverage == nil || coverage.rpm {
 		return osID, version
 	}
 	return coverage.base.ID, coverage.base.Version.Value
@@ -66,6 +71,19 @@ func (c *originCoverage) uncoveredParams(snapshot uuid.UUID, after, limit int32)
 // package rows and their origin evidence. It never equals a complete match's
 // package digest, so base and derivative devices never share a set.
 func (c *originCoverage) setDigest(packageDigest, originDigest []byte) []byte {
+	if c.rpm {
+		h := sha256.New()
+		_, _ = h.Write([]byte("lindm-rhel-immutable-rpm-exact-product-v1\x00" + c.base.Key + "\x00"))
+		root, valid := rpmauthority.PolicyIdentity()
+		_, _ = h.Write(root[:])
+		if valid {
+			_, _ = h.Write([]byte{1})
+		} else {
+			_, _ = h.Write([]byte{0})
+		}
+		_, _ = h.Write(packageDigest)
+		return h.Sum(nil)
+	}
 	a := c.base.Advisory
 	h := sha256.New()
 	for _, part := range []string{"lindm-origin-coverage", a.ArchiveOrigin, c.base.Codename, strings.Join(a.ArchiveSuites, ","), strings.Join(a.ArchiveSigners, ","), strings.Join(c.vendor, ",")} {

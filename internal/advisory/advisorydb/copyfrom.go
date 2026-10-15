@@ -127,3 +127,40 @@ func (r iteratorForInsertAdvisorySetFindings) Err() error {
 func (q *Queries) InsertAdvisorySetFindings(ctx context.Context, arg []InsertAdvisorySetFindingsParams) (int64, error) {
 	return q.db.CopyFrom(ctx, []string{"advisory_set_findings"}, []string{"set_id", "finding_key", "advisory_id", "package_name", "installed_version", "fixed_version", "architecture", "severity", "published_at", "cves", "source_url"}, &iteratorForInsertAdvisorySetFindings{rows: arg})
 }
+
+// iteratorForInsertAdvisorySetUncovered implements pgx.CopyFromSource.
+type iteratorForInsertAdvisorySetUncovered struct {
+	rows                 []InsertAdvisorySetUncoveredParams
+	skippedFirstNextCall bool
+}
+
+func (r *iteratorForInsertAdvisorySetUncovered) Next() bool {
+	if len(r.rows) == 0 {
+		return false
+	}
+	if !r.skippedFirstNextCall {
+		r.skippedFirstNextCall = true
+		return true
+	}
+	r.rows = r.rows[1:]
+	return len(r.rows) > 0
+}
+
+func (r iteratorForInsertAdvisorySetUncovered) Values() ([]interface{}, error) {
+	return []interface{}{
+		r.rows[0].SetID,
+		r.rows[0].Position,
+		r.rows[0].Name,
+		r.rows[0].Version,
+		r.rows[0].Architecture,
+		r.rows[0].Reason,
+	}, nil
+}
+
+func (r iteratorForInsertAdvisorySetUncovered) Err() error {
+	return nil
+}
+
+func (q *Queries) InsertAdvisorySetUncovered(ctx context.Context, arg []InsertAdvisorySetUncoveredParams) (int64, error) {
+	return q.db.CopyFrom(ctx, []string{"advisory_set_uncovered"}, []string{"set_id", "position", "name", "version", "architecture", "reason"}, &iteratorForInsertAdvisorySetUncovered{rows: arg})
+}

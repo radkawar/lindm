@@ -484,3 +484,30 @@ func TestInspectReadinessRecordsFailedUnits(t *testing.T) {
 		})
 	}
 }
+
+func TestVMTruthRPMSourceIdentityNeverInheritsBinaryEpoch(t *testing.T) {
+	for _, suffix := range []string{"src", "nosrc"} {
+		native, err := parseVMTruth([]byte("kernel\t7:6.19-1\tx86_64\t(none)\tsource-with-dashes-2.0-3."+suffix+".rpm\n"), "rpm")
+		if err != nil {
+			t.Fatal(err)
+		}
+		truth, actual := vmTestObservation()
+		truth.packages = native
+		truth.host[0], truth.host[1] = "rhel", "9.8"
+		actual.Host.OsId.Value, actual.Host.OsVersion.Value = truth.host[0], truth.host[1]
+		pkg := actual.Packages.Packages[0]
+		pkg.Version, pkg.SourceName, pkg.SourceVersion = "7:6.19-1", "source-with-dashes", "2.0-3"
+		if err := compareVMObservation(truth, actual); err != nil {
+			t.Fatalf("%s source identity rejected: %v", suffix, err)
+		}
+		pkg.SourceVersion = "7:2.0-3"
+		if err := compareVMObservation(truth, actual); err == nil {
+			t.Fatalf("%s inherited binary epoch accepted", suffix)
+		}
+	}
+	for _, malformed := range []string{"source.rpm", "source-1.src.rpm", "source-1-.src.rpm", ""} {
+		if _, _, err := rpmSourceTruth(malformed); err == nil {
+			t.Fatalf("accepted malformed source identity %q", malformed)
+		}
+	}
+}

@@ -74,28 +74,6 @@ export function sourceAnchor(feedId: string) {
 // How the server's advisory sources are set up (operator documentation).
 export const advisorySourcesDocsUrl = "/help/engineering.md#advisory-feed-operations";
 
-// Why a refreshed, unexpired source is still incomplete, as one sentence, and
-// its remedy in admin terms. The banner states the device consequence; this is
-// the only place the gap itself is explained. An unscoped skipped entry voids
-// completeness; otherwise the source never claimed to list every advisory.
-export function sourceGap(feed: AdvisoryFeedStatus) {
-  const os = feedOSLabel(feed);
-  const unscoped = feed.rejectedRecords.filter(
-    (record) => record.unscoped || record.packageNames.length === 0,
-  ).length;
-  if (unscoped === 0) {
-    return {
-      missing: `Missing the complete ${os} advisory list; this source has only selected advisories.`,
-      remedy: `Add a source that lists every ${os} advisory to the lindm server.`,
-    };
-  }
-  const entries = unscoped === 1 ? `1 skipped ${os} entry` : `${unscoped} skipped ${os} entries`;
-  return {
-    missing: `Missing the affected packages of ${entries}.`,
-    remedy: `Review the skipped entries below; ${os} devices stay unchecked until the vendor names their packages.`,
-  };
-}
-
 // Derivative vendors whose packages no published feed covers. The evaluation
 // reason names the vendor; uncovered vendor packages share that text.
 const vendorFeedText: Record<string, string> = {
@@ -116,6 +94,12 @@ const evaluationReasonText: Record<string, string> = {
   feed_stale: "the advisory source is out of date",
   feed_partial_coverage: "vulnerability data for this release is incomplete",
   matching_capacity_exceeded: "too many packages to match in one check",
+  source_record_rejected: "Vendor document unusable",
+  vendor_assessment_unknown: "the vendor has not determined this component's exposure",
+  package_origin_uncovered: "some installed packages lack covered vendor origin evidence",
+  rhel_package_coverage_incomplete:
+    "some installed packages lack verified Red Hat product coverage",
+  rhel_no_covered_packages: "no installed packages have verified Red Hat product coverage",
 };
 
 const uncoveredReasonText: Record<string, string> = {
@@ -125,6 +109,18 @@ const uncoveredReasonText: Record<string, string> = {
   origin_unverified: "only unsigned or unverified APT sources list this version",
   origin_not_covered: "no advisory feed covers the sources that list this version",
   base_pocket_uncovered: "Ubuntu pocket without security support (backports or proposed)",
+  source_record_rejected: "Vendor document unusable",
+  rhel_product_membership_unproved:
+    "The vendor has not declared this version for the selected product",
+  rpm_authority_unavailable: "Package signature evidence unavailable",
+  rpm_unsigned: "Package has no supported vendor signature",
+  rpm_header_invalid: "Package identity evidence is invalid",
+  rpm_identity_mismatch: "Signed package identity does not match the inventory",
+  rpm_signature_unverified: "Red Hat package signature could not be verified",
+  rpm_source_identity_unavailable: "Signed source package identity unavailable",
+  rpm_source_epoch_unavailable: "Source package epoch cannot be verified",
+  native_module_identity_unavailable: "Native module identity unavailable",
+  package_architecture_uncovered: "The source does not cover this package architecture",
 };
 
 export function advisoryReasonText(reason: string) {

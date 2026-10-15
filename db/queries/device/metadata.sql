@@ -111,6 +111,7 @@ WITH keyed AS (
           SELECT 1 FROM advisory_device_status s
           JOIN advisory_set_findings f ON f.set_id = s.finding_set_id
           WHERE s.device_id = d.id AND NOT s.unknown
+            AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean)
             AND f.advisory_id = sqlc.arg('advisory_id')::text
             AND f.severity = sqlc.arg('advisory_severity')::text
             AND NOT EXISTS (
@@ -178,6 +179,7 @@ LEFT JOIN LATERAL (
     LEFT JOIN advisory_exceptions x ON x.device_id = s.device_id AND x.expires_at > CURRENT_TIMESTAMP
     LEFT JOIN advisory_set_findings f ON f.set_id = fs.id AND f.finding_key = x.finding_id
     WHERE s.device_id = d.id AND NOT s.unknown
+      AND advisory_rpm_authority_current(d.os_id,d.os_version,sqlc.arg('rpm_authority_valid')::boolean)
     GROUP BY e.state, fs.id
 ) findings ON true
 CROSS JOIN LATERAL (

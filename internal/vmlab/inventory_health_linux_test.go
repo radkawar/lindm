@@ -320,3 +320,28 @@ func TestInventoryHealthDoesNotMutateEvidence(t *testing.T) {
 		t.Fatal("health gate changed evidence")
 	}
 }
+
+func TestInventoryHealthSeparatesOptionalRPMAuthorityFromCensus(t *testing.T) {
+	release := platform.Identify(platform.OSRelease{ID: "rhel", VersionID: "9.8"})
+	for _, test := range []struct {
+		name      string
+		authority *inventoryv1.RpmAuthority
+		accepted  bool
+	}{
+		{"historical or missing", nil, true},
+		{"unsigned or unsupported package", &inventoryv1.RpmAuthority{Status: truthUnavailable}, true},
+		{"invalid output", &inventoryv1.RpmAuthority{Status: inventoryv1.CollectionStatus_COLLECTION_STATUS_INVALID_OUTPUT}, false},
+		{"permission denied", &inventoryv1.RpmAuthority{Status: truthDenied}, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			packages := &inventoryv1.PackageObservation{Status: truthSuccess, Backend: "rpm", Packages: []*inventoryv1.Package{{
+				Name: "example", Version: "0:1-1", Architecture: "x86_64", Manager: "rpm",
+				Module: &inventoryv1.ModuleObservation{Status: truthSuccess}, Origin: &inventoryv1.PackageOrigin{Status: truthUnavailable},
+				RpmAuthority: test.authority,
+			}}}
+			if err := CheckInventoryPackageHealth(release, packages); (err == nil) != test.accepted {
+				t.Fatalf("accepted=%v: %v", test.accepted, err)
+			}
+		})
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"io"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -76,6 +77,9 @@ func TestRedHatGenuineBareLabelVersionedPURLRemainsUnfixed(t *testing.T) {
 	if err != nil || doc == nil || len(doc.RejectedRecords) != 0 || source == nil || binary == nil {
 		t.Fatalf("opaque display label displaced PURL identity: metadata=%v source=%v binary=%v err=%v", doc, source, binary, err)
 	}
+	if source.GetComponentVersion() != "0:10.44-1.el10.3" {
+		t.Fatalf("exact vendor product declaration was lost independently of affected bounds: %v", source)
+	}
 	for _, record := range []*advisoryv1.Advisory{source, binary} {
 		if len(record.Cves) != 1 || record.Cves[0] != "CVE-2026-103111" || record.AssessmentUnknown || record.NotAffected || record.FixedVersion != "" || record.IntroducedVersion != "" || record.LastAffectedVersion != "" {
 			t.Fatalf("known_affected invented a fixed/exact version from component PURL: %v", record)
@@ -83,19 +87,42 @@ func TestRedHatGenuineBareLabelVersionedPURLRemainsUnfixed(t *testing.T) {
 	}
 }
 
-func TestRedHatGenuineColonNameRejectsWholeDocumentWithoutModuleRepair(t *testing.T) {
+func TestRedHatGenuineColonNameQuarantinesWholeDocumentWithoutModuleRepair(t *testing.T) {
 	input := redHatPinnedGZIPFixture(t, "cve-2023-44487", "6c3e890cb7965a23e2eca0d95612d8f8ba4e695de94b291d384aec11b32389cc")
-	calls := 0
-	doc, err := stageRedHatStream(t.Context(), redHatSource("9.8", "standard"), redHatValidator(t), input, func(*advisoryv1.Advisory) error {
-		calls++
+	var claims []*advisoryv1.Advisory
+	doc, err := stageRedHatStream(t.Context(), redHatSource("9.8", "standard"), redHatValidator(t), input, func(record *advisoryv1.Advisory) error {
+		claims = append(claims, record)
 		return nil
 	})
-	if err != nil || doc == nil || calls != 0 || len(doc.RejectedRecords) != 1 {
-		t.Fatalf("invalid source component retained valid-prefix claims: metadata=%v calls=%d err=%v", doc, calls, err)
+	if err != nil || doc == nil || len(doc.RejectedRecords) != 1 {
+		t.Fatalf("invalid source component escaped rejection: metadata=%v err=%v", doc, err)
 	}
 	rejected := doc.RejectedRecords[0]
-	if rejected.Id != "CVE-2023-44487" || !rejected.Unscoped || len(rejected.PackageNames) != 0 || !strings.Contains(rejected.Reason, "pkg:rpm/redhat/nginx:1.24?arch=src") {
-		t.Fatalf("ambiguous module was repaired or omitted from diagnostic: %v", rejected)
+	if rejected.Id != "CVE-2023-44487" || rejected.Unscoped || len(rejected.PackageNames) <= 64 || !strings.Contains(rejected.Reason, "pkg:rpm/redhat/nginx:1.24?arch=src") {
+		t.Fatalf("bounded module family lost scope or original diagnostic: %v", rejected)
+	}
+	// The original tree independently declares native nginx source RPMs with
+	// rpmmod=nginx:1.22 and their binaries on RHEL 9. These bound the malformed
+	// source module marker to the nginx component family, not to an invented
+	// nginx:1.24 RPM identity. Earlier valid HTTP/2 and unrelated-to-nginx
+	// component claims in this same rejected document must also be quarantined.
+	for _, name := range []string{"nginx", "nginx-core", "nginx-filesystem", "httpd", "mod_http2", "buildah", "dotnet-runtime-6.0"} {
+		if !slices.Contains(rejected.PackageNames, name) {
+			t.Errorf("discarded document omitted component %q: %v", name, rejected.PackageNames)
+		}
+	}
+	for _, name := range []string{"nginx:1.24", "bash", "rh-nginx118-nginx"} {
+		if slices.Contains(rejected.PackageNames, name) {
+			t.Errorf("invented or off-stream component %q quarantined", name)
+		}
+	}
+	if len(claims) != 2*len(rejected.PackageNames) {
+		t.Fatalf("native/source quarantine incomplete: claims=%d names=%d", len(claims), len(rejected.PackageNames))
+	}
+	for _, claim := range claims {
+		if !claim.SourceRecordRejected || !claim.AssessmentUnknown || claim.NotAffected || len(claim.Cves) != 0 || claim.ModuleName != "" || claim.ModuleStream != "" || claim.FixedVersion != "" || claim.IntroducedVersion != "" || claim.LastAffectedVersion != "" {
+			t.Fatalf("rejected document retained/repaired an advisory claim: %v", claim)
+		}
 	}
 }
 

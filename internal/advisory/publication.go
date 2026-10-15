@@ -261,7 +261,7 @@ func (s *Service) describeFeedRevision(source *advisoryv1.FeedSource, doc *advis
 	if len(artifacts) == 0 {
 		artifacts = []*advisoryv1.FeedArtifact{{Url: source.GetUrl(), Sha256: doc.GetSourceSha256()}}
 	}
-	publication := &advisoryv1.FeedManifest{Artifacts: artifacts, RejectedRecords: doc.GetRejectedRecords()}
+	publication := &advisoryv1.FeedManifest{Artifacts: artifacts, RejectedRecords: doc.GetRejectedRecords(), RedhatSnapshot: doc.GetRedhatSnapshot()}
 	if proto.Size(publication) > 64<<10 {
 		return feedRevision{}, ErrCapacity
 	}

@@ -122,6 +122,63 @@ VALUES($1,$2,now(),now()+interval '1 hour','unknown','inventory unavailable',$3,
 	if records[0]["package_name"] != "openssl" || records[0]["installed_version"] != "1.0" || records[0]["state"] != "unknown" {
 		t.Fatalf("findings lost actual package/freshness: %v", records[0])
 	}
+	// Make the retained finding current, then exercise the same root-validity
+	// decision used by new JSON/CSV reports independently of persisted state.
+	snapshot, revision := uuid.New(), uuid.New()
+	if _, err := pool.Exec(ctx, `INSERT INTO package_snapshots(id,device_id,generation_id,sequence,state,manifest_digest,manifest_bytes,created_at,started_at,finished_at,accepted_at,open_until,receipt_expires_at,committed_at,backend,package_count,batch_count,encoded_bytes,metadata_bytes,reserved_bytes,bulk_retained)
+VALUES($1,$2,$3,1,'committed',$4,$5,now(),now(),now(),now(),now()+interval '24 hours',now()+interval '2160 hours',now(),'rpm',0,0,0,0,0,true)`, snapshot, device, generation, make([]byte, 32), []byte{8, 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO package_attempts(generation_id,sequence,started_at,finished_at,received_at,status,backend,snapshot_id,digest)
+VALUES($1,1,now(),now(),now(),1,'rpm',$2,$3)`, generation, snapshot, make([]byte, 32)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE enrollment_generations SET current_snapshot_id=$1 WHERE id=$2", snapshot, generation); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO advisory_feeds(id,distro,release,source_url,config_bytes,revision,checked_at,expires_at,complete_snapshot)
+VALUES('report-current','rhel','9','https://vendor.example.test/advisory',$1,$2,now(),now()+interval '1 hour',true)`, []byte{8, 1}, revision); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE advisory_finding_sets SET feed_id='report-current',feed_revision=$1 WHERE id=$2", revision, set); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE advisory_evaluations SET snapshot_id=$1,feed_id='report-current',feed_revision=$2,state='evaluated',reason='' WHERE device_id=$3", snapshot, revision, device); err != nil {
+		t.Fatal(err)
+	}
+	for _, accepted := range []bool{false, true} {
+		if accepted {
+			if _, err := pool.Exec(ctx, `INSERT INTO advisory_exceptions(device_id,finding_id,actor_id,reason,accepted_at,expires_at)
+VALUES($1,$2,$3,'controlled report authority test',now(),now()+interval '1 hour')`, device, finding, actor); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, platform := range []struct{ id, version string }{{"rhel", "9.8"}, {"rhel", "10.2"}, {"ubuntu", "24.04"}} {
+			if _, err := pool.Exec(ctx, "UPDATE devices SET os_id=$1,os_version=$2 WHERE id=$3", platform.id, platform.version, device); err != nil {
+				t.Fatal(err)
+			}
+			for _, valid := range []bool{true, false} {
+				rows, err := reportdb.New(pool).FindingsReportRows(ctx, reportdb.FindingsReportRowsParams{AfterDevice: uuid.Nil, AfterID: uuid.Nil, RpmAuthorityValid: valid})
+				if err != nil || len(rows) != 1 {
+					t.Fatalf("current finding root=%t platform=%v rows=%v err=%v", valid, platform, rows, err)
+				}
+				var record map[string]any
+				if err := json.Unmarshal([]byte(rows[0].Record), &record); err != nil {
+					t.Fatal(err)
+				}
+				want := "affected"
+				if accepted {
+					want = "accepted"
+				}
+				if !valid && platform.id == "rhel" {
+					want = "unknown"
+				}
+				if record["state"] != want {
+					t.Fatalf("report bypassed current root: valid=%t platform=%v accepted=%t record=%v want=%s", valid, platform, accepted, record, want)
+				}
+			}
+		}
+	}
 	output.Reset()
 	if _, err := writeDomainReport(ctx, reportdb.New(pool), &output, integrationsv1.ReportKind_REPORT_KIND_INVENTORY, integrationsv1.ReportFormat_REPORT_FORMAT_CSV); err != nil {
 		t.Fatal(err)

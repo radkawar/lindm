@@ -21,6 +21,7 @@ import (
 	agentv1 "lindm/gen/lindm/agent/v1"
 	"lindm/internal/device/devicedb"
 	"lindm/internal/identity"
+	"lindm/internal/rpmauthority"
 )
 
 // GetFleetSummary aggregates the complete fleet.read scope in a single read
@@ -49,7 +50,8 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 		limit = 10
 	}
 	var response *adminv1.GetFleetSummaryResponse
-	if cached := s.FleetPopulation.Load(); unrestricted && cached != nil && s.Clock().Sub(cached.ObservedAt.AsTime()) <= FleetSummaryMaxAge {
+	_, authorityValid := rpmauthority.PolicyIdentity()
+	if cached := s.FleetPopulation.Load(); unrestricted && fleetPopulationCurrent(cached, s.Clock(), authorityValid) {
 		response = proto.CloneOf(cached)
 	} else {
 		tx, err := s.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
@@ -57,7 +59,7 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 			return nil, core.MapErr(err)
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
-		response, err = s.readFleetPopulation(ctx, devicedb.New(tx), unrestricted, scopes)
+		response, err = s.readFleetPopulation(ctx, devicedb.New(tx), unrestricted, scopes, authorityValid)
 		if err != nil {
 			return nil, err
 		}
@@ -82,13 +84,19 @@ func (s *Service) GetFleetSummary(ctx context.Context, req *connect.Request[admi
 // population may be when served; ObservedAt always reports its snapshot time.
 const FleetSummaryMaxAge = 30 * time.Second
 
+func fleetPopulationCurrent(population *adminv1.GetFleetSummaryResponse, now time.Time, authorityValid bool) bool {
+	// A still-fresh cached CLEAR/accepted population cannot survive loss of
+	// the signing root. Read the root-fenced SQL population instead.
+	return authorityValid && population != nil && now.Sub(population.ObservedAt.AsTime()) <= FleetSummaryMaxAge
+}
+
 // fleetSummaryRefresh is the background refresh period of that population.
 const fleetSummaryRefresh = 10 * time.Second
 
 // readFleetPopulation reads the device-population aggregates (lifecycle,
 // contact, operating systems, resource compliance and advisory findings) in the
 // caller's single read snapshot.
-func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, unrestricted bool, scopes []byte) (*adminv1.GetFleetSummaryResponse, error) {
+func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, unrestricted bool, scopes []byte, authorityValid bool) (*adminv1.GetFleetSummaryResponse, error) {
 	counts, err := q.FleetSummaryCounts(ctx, devicedb.FleetSummaryCountsParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
 	if err != nil {
 		return nil, core.MapErr(err)
@@ -134,11 +142,11 @@ func (s *Service) readFleetPopulation(ctx context.Context, q *devicedb.Queries, 
 		response.OperatingSystems.OtherDevices -= uint64(row.Devices)
 	}
 	if s.Advisories != nil {
-		findings, err := q.FleetSummaryFindings(ctx, devicedb.FleetSummaryFindingsParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
+		findings, err := q.FleetSummaryFindings(ctx, devicedb.FleetSummaryFindingsParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RpmAuthorityValid: authorityValid})
 		if err != nil {
 			return nil, core.MapErr(err)
 		}
-		devices, err := q.FleetSummaryAdvisoryDevices(ctx, devicedb.FleetSummaryAdvisoryDevicesParams{ScopeUnrestricted: unrestricted, Scopes: scopes})
+		devices, err := q.FleetSummaryAdvisoryDevices(ctx, devicedb.FleetSummaryAdvisoryDevicesParams{ScopeUnrestricted: unrestricted, Scopes: scopes, RpmAuthorityValid: authorityValid})
 		if err != nil {
 			return nil, core.MapErr(err)
 		}
@@ -257,7 +265,8 @@ func (s *Service) RefreshFleetPopulation(ctx context.Context) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	population, err := s.readFleetPopulation(ctx, devicedb.New(tx), true, []byte("[]"))
+	_, authorityValid := rpmauthority.PolicyIdentity()
+	population, err := s.readFleetPopulation(ctx, devicedb.New(tx), true, []byte("[]"), authorityValid)
 	if err != nil {
 		return err
 	}
