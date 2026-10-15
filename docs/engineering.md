@@ -4960,6 +4960,14 @@ overflow and invalid-capacity tests passed. The security re-review closed the
 crash-leftover finding with no remaining findings. These tests are not the
 fresh-host database/device recovery qualification.
 
+Before new bundle qualification, installation-layout inspection found that
+`/var/lib/lindmd-operations` intentionally has mode 0755 for service-readable
+health state. Private restore staging therefore uses its own root:root 0700
+`/var/lib/lindmd-restore` tree, outside the operational-state backup inventory.
+The root regression models the installed 0755 sibling and verifies it is not
+changed; no chmod of existing operational state or relaxation of private-stage
+admission is allowed.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

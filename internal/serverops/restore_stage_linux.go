@@ -14,7 +14,9 @@ import (
 	"lindm/internal/custody"
 )
 
-const restoreStageParent = "/var/lib/lindmd-operations"
+// Operational health state must remain traversable by lindmd; plaintext restore
+// scratch needs a separate private tree outside the operational backup inventory.
+const restoreStageParent = "/var/lib/lindmd-restore"
 
 // Restore plaintext is destined for the data filesystem. Stage it privately
 // there, rather than exhausting the distribution's small shared /run tmpfs.

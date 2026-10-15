@@ -2413,7 +2413,7 @@ root-protected temporary directory, then remove those transient inputs after
 the drill. Never copy custodian private keys to the fresh server.
 
 Live recovery stages both decrypted archives under
-`/var/lib/lindmd-operations/restore-*`, not the small shared `/run` tmpfs.
+`/var/lib/lindmd-restore/restore-*`, not the small shared `/run` tmpfs.
 The parent and each temporary directory are root-only mode 0700; extracted
 files are create-exclusive, no-follow mode 0600. This is plaintext recovery
 data on the server's data disk, protected in the same way as the restored
@@ -2428,6 +2428,8 @@ operations lease while sweeping abandoned root-owned private `restore-*`
 directories before its capacity check and extraction. Symlinked, non-root-owned
 or non-private matching entries refuse recovery rather than being followed or
 removed; unrelated entries are not swept.
+The private recovery tree is separate from service-readable operational health
+state and is not part of the server backup inventory.
 
 Restore first validates both archives, their bindings and the fresh target,
 then durably fences that target before database mutation. Partial failures stay
@@ -2496,6 +2498,9 @@ binaries/units only. Operator `/etc/lindm` configuration/keys, PostgreSQL data,
 encrypted authority exports, independently protected operational state, backups
 and dedicated accounts are retained deliberately. Their irreversible deletion is
 a separate documented operator retention decision, never a package lifecycle hook.
+An interrupted restore can leave root-only plaintext under
+`/var/lib/lindmd-restore`; include this tree in that explicit data-retention
+decision. The next approved restore sweeps it under the operations lease.
 
 ### OCI and Docker Compose
 

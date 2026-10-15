@@ -69,7 +69,11 @@ func TestRestoreStagePrivateDataFilesystemAndCleanup(t *testing.T) {
 	if err = os.WriteFile(archive, []byte("ciphertext-size fixture; not decrypted"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	parent := filepath.Join(input, "operations")
+	parent := filepath.Join(input, strings.TrimPrefix(restoreStageParent, "/"))
+	operations := filepath.Join(input, "var/lib/lindmd-operations")
+	if err = os.MkdirAll(operations, 0755); err != nil {
+		t.Fatal(err)
+	}
 	abandoned := filepath.Join(parent, "restore-crashed")
 	if err = os.MkdirAll(filepath.Join(abandoned, "nested"), 0700); err != nil {
 		t.Fatal(err)
@@ -96,6 +100,10 @@ func TestRestoreStagePrivateDataFilesystemAndCleanup(t *testing.T) {
 	}
 	if filepath.Dir(stage) != parent || stat.Uid != 0 || stat.Gid != 0 || stat.Mode&0777 != 0700 {
 		t.Fatalf("stage not private on the data filesystem: %+v", stat)
+	}
+	info, err := os.Stat(operations)
+	if err != nil || info.Mode().Perm() != 0755 {
+		t.Fatalf("published operations directory changed: %v", err)
 	}
 	if _, err = os.Lstat(abandoned); !os.IsNotExist(err) {
 		t.Fatalf("crashed stage survives sweep: %v", err)
@@ -151,5 +159,16 @@ func TestRestoreStageSweepRejectsUnsafeEntries(t *testing.T) {
 		if got, readErr := os.ReadFile(marker); readErr != nil || string(got) != "retain" {
 			t.Fatalf("outside data changed: %v", readErr)
 		}
+	}
+}
+
+func TestRestoreStageOutsideOperationalBackupInventory(t *testing.T) {
+	for _, path := range []string{"/var/lib/lindmd", "/var/lib/lindmd-operations"} {
+		if restoreStageParent == path || strings.HasPrefix(restoreStageParent, path+"/") {
+			t.Fatal("private restore staging overlaps published state or backup inventory")
+		}
+	}
+	if filepath.Dir(restoreStageParent) != "/var/lib" {
+		t.Fatal("restore staging is not on the server data filesystem")
 	}
 }
