@@ -179,7 +179,7 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 	if err != nil {
 		return err
 	}
-	data, port := release.Server.PostgreSQLDataDirectory, release.Server.PostgreSQLPort
+	data, port, socket := release.Server.PostgreSQLDataDirectory, release.Server.PostgreSQLPort, release.Server.PostgreSQLSocketDirectory
 	if err := installationFile("/etc/lindm/postgresql/port", []byte(port), 0, 0, 0600); err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 	if err := initializeInstallationDatabase(ctx, data, bin, pguid, pggid); err != nil {
 		return err
 	}
-	postgresConfig := "listen_addresses = '127.0.0.1,::1'\nport = " + port + "\nunix_socket_directories = '/run/lindm-postgresql'\nssl = on\nssl_min_protocol_version = 'TLSv1.3'\nssl_cert_file = '/etc/lindm/postgresql/server.crt'\nssl_key_file = '/etc/lindm/postgresql/server.key'\npassword_encryption = 'scram-sha-256'\nmax_connections = 64\nshared_buffers = '256MB'\nstatement_timeout = '60s'\nidle_in_transaction_session_timeout = '60s'\n"
+	postgresConfig := "listen_addresses = '127.0.0.1,::1'\nport = " + port + "\nunix_socket_directories = '" + socket + "'\nssl = on\nssl_min_protocol_version = 'TLSv1.3'\nssl_cert_file = '/etc/lindm/postgresql/server.crt'\nssl_key_file = '/etc/lindm/postgresql/server.key'\npassword_encryption = 'scram-sha-256'\nmax_connections = 64\nshared_buffers = '256MB'\nstatement_timeout = '60s'\nidle_in_transaction_session_timeout = '60s'\n"
 	postgresConfig += "log_statement = 'none'\nlog_min_error_statement = 'panic'\nlog_parameter_max_length = 0\nlog_parameter_max_length_on_error = 0\n"
 	if err := installationFile(data+"/lindm.conf", []byte(postgresConfig), pguid, pggid, 0600); err != nil {
 		return err
@@ -215,7 +215,7 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 			return err
 		}
 	}
-	unit := localPostgresUnit(data, bin, enforcing)
+	unit := localPostgresUnit(data, bin, socket, enforcing)
 	if err := installationFile("/etc/systemd/system/lindm-postgresql.service", []byte(unit), 0, 0, 0644); err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 	startCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	for {
-		if _, err := command(startCtx, nil, "runuser", "-u", "postgres", "--", bin+"pg_isready", "-h", "/run/lindm-postgresql", "-p", port); err == nil {
+		if _, err := command(startCtx, nil, "runuser", "-u", "postgres", "--", bin+"pg_isready", "-h", socket, "-p", port); err == nil {
 			break
 		}
 		select {
@@ -250,11 +250,11 @@ func localDatabase(ctx context.Context, release *platform.Release, pguid, pggid 
 	// These roles belong to this journal's private cluster. Replaying a partial
 	// bootstrap never changes a password or drops an existing database.
 	sql := fmt.Sprintf("DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='lindm_migrator') THEN CREATE ROLE lindm_migrator LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD '%s'; END IF; IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='lindm_runtime') THEN CREATE ROLE lindm_runtime LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD '%s'; END IF; END $$;\nSELECT 'CREATE DATABASE lindm OWNER lindm_migrator' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname='lindm')\n\\gexec\nREVOKE ALL ON DATABASE lindm FROM PUBLIC;\nGRANT CONNECT ON DATABASE lindm TO lindm_runtime;\n", passwords[1], passwords[0])
-	if err := sqlLocal(ctx, sql, "postgres"); err != nil {
+	if err := sqlLocal(ctx, sql, "postgres", socket); err != nil {
 		return err
 	}
 	sql = "REVOKE ALL ON SCHEMA public FROM PUBLIC;\nALTER SCHEMA public OWNER TO lindm_migrator;\nGRANT USAGE ON SCHEMA public TO lindm_runtime;\nALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO lindm_runtime;\nALTER DEFAULT PRIVILEGES FOR ROLE lindm_migrator IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO lindm_runtime;\n"
-	if err := sqlLocal(ctx, sql, "lindm"); err != nil {
+	if err := sqlLocal(ctx, sql, "lindm", socket); err != nil {
 		return err
 	}
 	return nil
@@ -270,12 +270,12 @@ func localDatabaseURL(role, password, port, ca string) string {
 	return u.String() + "\n"
 }
 
-func sqlLocal(ctx context.Context, sql, database string) error {
+func sqlLocal(ctx context.Context, sql, database, socket string) error {
 	port, err := protected("/etc/lindm/postgresql/port", true)
 	if err != nil {
 		return err
 	}
-	_, err = command(ctx, []byte(sql), "runuser", "-u", "postgres", "--", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-h", "/run/lindm-postgresql", "-p", string(port), "-d", database)
+	_, err = command(ctx, []byte(sql), "runuser", "-u", "postgres", "--", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-h", socket, "-p", string(port), "-d", database)
 	return err
 }
 

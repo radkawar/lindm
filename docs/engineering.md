@@ -5094,12 +5094,12 @@ Four subsequent one-guest observations are strictly `first-run-install-only`,
 with `lifecycle_qualified: false`; none qualifies management or recovery.
 `rhel-sdk21-postgres-diagnostic4.json`, SHA-256
 `3fc5689d91553fe6f42963d0b06d09f6adbd85fe0476484ccb9cd03e757086b3`,
-retained the decisive encrypted journal identity: actual PostgreSQL UID/GID 26
-running in `init_t:s0`, not `postgresql_t`, with SELinux Enforcing. Private
-database directories were postgres-owned 0700, configuration files 0600,
+retained PostgreSQL UID/GID 26 and the journal stream's `init_t:s0` context
+with SELinux Enforcing. That inherited stream metadata does not establish the
+post-exec process domain; the actual MainPID kernel context must be checked.
+Private database directories were postgres-owned 0700, configuration files 0600,
 all correctly `postgresql_db_t`; the executable was `postgresql_exec_t`.
-The process could not open its configuration. No malformed credential, TLS
-failure or bad PostgreSQL major is inferred.
+The original process could not open its configuration.
 
 The maintained failure observer now retains bounded owned PostgreSQL journals,
 process identities, filesystem modes/labels, native vendor-unit metadata and
@@ -5112,13 +5112,59 @@ hosts, matching the distro unit so SELinux can transition to `postgresql_t`.
 Ubuntu and other enforcement states retain NNP. Before creating database URLs
 or roles, the installer requires the actual running MainPID's PostgreSQL domain;
 otherwise it stops its owned unit and refuses. There is no custom SELinux policy
-module. Regression tests pin the single-directive exception and reject the
-observed `init_t` context. Native RHEL proof independently requires Enforcing,
+module. Regression tests pin the single-directive exception and reject non-PostgreSQL
+kernel contexts. Native RHEL proof independently requires Enforcing,
 `postgresql_t`, the configured NNP exception and kernel `NoNewPrivs: 0`.
 The already signed SDK21 artifacts remain unchanged and its RHEL result remains
 **FAIL**; a newly signed release must prove the correction end to end.
 Focused installer and native-lab regression packages passed; the installer
 security re-review closed with no findings.
+
+SDK22's fresh `cold-release-attempt24.json`, SHA-256
+`9df6e7773796a04889344b4a799e8533b8626022da1923ec5bea8a261045ea2c`,
+passed in 1,655.90 seconds at integrated source
+`7ac7cddbd4edaa280a3b509ddde8e444f94d2484`. The fresh-VM clone, empty
+caches, pinned tools, no swap, literal `make release-keys` and two `make release`
+invocations, authenticated export and owned cleanup all passed. Its immutable
+0.2.22 → 0.2.23 pair remains build-only until independently exercised.
+
+Fresh `native-ubuntu-attempt33.json`, SHA-256
+`b66c36a1c8688bfa5d4542184ff3031b9a92b05957b1ce67165bc5d36929b606`,
+is a complete SDK22 Ubuntu 24.04 x86 native lifecycle **PASS** in 770.83 seconds:
+11 commands, 122 browser decisions, no observed failure and complete owned
+cleanup. Strict generated browser TLS, protected password and user-verified
+passkey setup, Ready repository, clipboard enrollment, completed management and
+browser plus independent SQL Findings passed before backup, after actual native
+upgrade and after fresh-host recovery. PostgreSQL PLUS and runtime denials,
+root-only credentials, original restored integration-secret decryption with the
+wrong-key negative control, per-origin TLS and quorum-approved current-security
+recovery passed. The original device completed new restored action
+`a2212bb4-e750-4299-a7f1-fc2da28472fa` with inventory sequence 4.
+First observed qualifying Findings took 372,670 ms from installer invocation;
+first refresh start to durable evaluation took 196,441 ms.
+
+The same pair's fresh RHEL connected `native-rhel-sdk22-attempt1.json`, SHA-256
+`45c3eaa232bb8a2c4634bde013fa57b1783df0353ce5499c4e10a7241e394e3e`,
+is **FAIL** in 191.64 seconds at PostgreSQL readiness: one command, no browser
+decisions and one failure. Registration cleanup passed; full owned cleanup is
+false. First-run-only `rhel-sdk22-collector-diagnostic1.json`, SHA-256
+`17fad0cbe7ae9f53908dc393316ec738bd3760f0d98a104e1d83c2704f4c8987`,
+uses the unchanged signed pair with observer `57d36c34a`. It retains the exact
+unit's `NoNewPrivileges=no` and the native PostgreSQL collector's actual fatal
+boundary: permission denied binding `/run/lindm-postgresql/.s.PGSQL.5432`.
+It does not qualify management or recovery.
+
+The maintained encrypted observer now also retains at most eight 32 KiB
+nofollow regular collector-log prefixes, the owned unit and available actual
+process metadata before teardown. RHEL's corrected private socket is
+`/run/postgresql/lindm`, in the distro's PostgreSQL runtime label namespace.
+Platform metadata drives the unit, writable paths, database configuration,
+readiness, peer SQL and independent SQL observer; Ubuntu's socket is unchanged.
+The native proof additionally requires the actual private socket, postgres
+ownership, mode 0700 and RHEL `postgresql_var_run_t` label. No custom policy or
+additional sandbox exception is introduced. A new signed pair and full lifecycle
+are still required; SDK22's RHEL failure is not promoted.
+The socket-path and bounded-observer security re-review closed with no findings.
 
 #### Durable laboratory custody escrow
 

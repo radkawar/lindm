@@ -13998,6 +13998,57 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "fb2d88bd659dff6a94752429871f7da7b6216b11"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt33.json",
+      "sha256": "b66c36a1c8688bfa5d4542184ff3031b9a92b05957b1ce67165bc5d36929b606",
+      "recorded": "2026-10-15T10:55:45.115858629Z",
+      "revision": "7ac7cddbd4edaa280a3b509ddde8e444f94d2484",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full-native-lifecycle-sdk22-7ac7cddbd",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "7ac7cddbd4edaa280a3b509ddde8e444f94d2484"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-rhel-sdk22-attempt1.json",
+      "sha256": "45c3eaa232bb8a2c4634bde013fa57b1783df0353ce5499c4e10a7241e394e3e",
+      "recorded": "2026-10-15T10:59:09.565636933Z",
+      "revision": "7ac7cddbd4edaa280a3b509ddde8e444f94d2484-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "turnkey-sdk22-rhel-postgresql-collector-startup-not-ready",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "7ac7cddbd4edaa280a3b509ddde8e444f94d2484"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/rhel-sdk22-collector-diagnostic1.json",
+      "sha256": "17fad0cbe7ae9f53908dc393316ec738bd3760f0d98a104e1d83c2704f4c8987",
+      "recorded": "2026-10-15T11:07:16.270170517Z",
+      "revision": "57d36c34a5cf1e70ba3ed5a55cc3c28d71334b3c-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "first-run-install-only",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "7ac7cddbd4edaa280a3b509ddde8e444f94d2484"
     }
   ]
 }

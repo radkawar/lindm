@@ -522,7 +522,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 255, UpgradeTo: "ubuntu-26.04", Provisioning: cloudInitAutoinstall,
 		Server: &ServerInstallation{
 			SnapshotName: "ubuntu24.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
-			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432",
+			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
 		},
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME", Version: "GNOME 46", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: ufw,
 		// Archive facts observed on every 24.04 pocket (archive, security,
@@ -708,7 +708,7 @@ var registry = []*Release{
 		Server: &ServerInstallation{
 			SnapshotName: "rhel9.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
 			PostgreSQLModule:        "postgresql:16",
-			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432",
+			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
 		},
 		Desktop: gnomeGDM, Firewall: firewalld,
 		Advisory:           Advisory{Feeds: redHatFeed, Ecosystem: "cpe:/o:redhat:enterprise_linux:9", PURLNamespace: "redhat", PlatformStreams: true, Exports: rhelCSAFExport},

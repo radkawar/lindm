@@ -97,6 +97,24 @@ env LC_ALL=C journalctl --no-pager --output=cat --lines=200 _TRANSPORT=audit
 stat -c "%n uid=%u gid=%g mode=%a context=%C" /var/lib/pgsql /var/lib/pgsql/lindm /var/lib/pgsql/lindm/postgresql.conf /var/lib/pgsql/lindm/lindm.conf /etc/lindm /etc/lindm/postgresql /etc/lindm/postgresql/server.crt /etc/lindm/postgresql/server.key
 stat -L -c "%n uid=%u gid=%g mode=%a context=%C" /usr/bin/postgres /usr/bin/postmaster
 systemctl cat postgresql.service
+systemctl cat lindm-postgresql.service
+systemctl show lindm-postgresql.service --property=MainPID --property=NoNewPrivileges --property=SELinuxContext --property=ExecStart --property=ProtectSystem --property=ProtectHome --property=PrivateTmp
+pid=$(systemctl show lindm-postgresql.service --property=MainPID --value)
+case "$pid" in
+  ""|*[!0-9]*|0) ;;
+  *)
+    cat "/proc/$pid/attr/current" "/proc/$pid/status" "/proc/$pid/mountinfo"
+    ;;
+esac
+logs=0
+for logfile in /var/lib/pgsql/lindm/log/*.log /var/lib/postgresql/lindm/log/*.log; do
+  if [ -f "$logfile" ] && [ ! -L "$logfile" ]; then
+    printf "%s\n" "$logfile"
+    dd if="$logfile" bs=32768 count=1 iflag=nofollow status=none
+    logs=$((logs + 1))
+    if [ "$logs" -ge 8 ]; then break; fi
+  fi
+done
 if command -v getenforce; then getenforce; fi
 if command -v ausearch; then ausearch -m AVC,USER_AVC -ts boot --raw; fi
 exit "$journal_status"

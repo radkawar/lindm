@@ -207,11 +207,13 @@ The pipe-size syscall command comes from Go's Linux constants, not
 DNF interpreter is retained; no newer Python prerequisite is introduced.
 
 The privileged native installer owns a separate distro PostgreSQL 16 cluster
-at `/var/lib/pgsql/lindm`, loopback port 5432 and `/run/lindm-postgresql`.
+at `/var/lib/pgsql/lindm`, loopback port 5432 and `/run/postgresql/lindm`.
 An existing port-5432 owner is a collision, not a cluster to adopt. Native
 `restorecon` applies the standard data labels; installation does not disable
 SELinux or create a custom high-port exception. Separate SCRAM runtime and
 migration roles use verify-full TLS under the deployment's database CA.
+Its private 0700 socket directory uses the distro's PostgreSQL runtime namespace
+and SELinux label, not a custom policy or a shared socket directory.
 The cluster config permits 64 connections and 256 MiB shared buffers; server
 device and console pools are 16 and 4 respectively. Protected setup and
 operations state live under `/var/lib/lindmd-operations`. RPM pre-transaction

@@ -545,10 +545,11 @@ type ServerInstallation struct {
 	SnapshotName     string
 	RequiredPackages []string
 	// PostgreSQLModule is an explicit distro stream, never a reset/switch request.
-	PostgreSQLModule        string
-	PostgreSQLDataDirectory string
-	PostgreSQLBinDirectory  string
-	PostgreSQLPort          string
+	PostgreSQLModule          string
+	PostgreSQLDataDirectory   string
+	PostgreSQLBinDirectory    string
+	PostgreSQLPort            string
+	PostgreSQLSocketDirectory string
 }
 
 // Release is one registry row.

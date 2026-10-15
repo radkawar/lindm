@@ -29,17 +29,17 @@ func TestDeployServerHostBoundary(t *testing.T) {
 
 func TestServerInstallationNativeLayouts(t *testing.T) {
 	for _, test := range []struct {
-		key, snapshot, data, bin, port, format string
+		key, snapshot, data, bin, port, socket, format string
 	}{
-		{"ubuntu-24.04", "ubuntu24.04.snapshot", "/var/lib/postgresql/lindm", "/usr/lib/postgresql/16/bin/", "15432", "deb"},
-		{"rhel-9", "rhel9.snapshot", "/var/lib/pgsql/lindm", "/usr/bin/", "5432", "rpm"},
+		{"ubuntu-24.04", "ubuntu24.04.snapshot", "/var/lib/postgresql/lindm", "/usr/lib/postgresql/16/bin/", "15432", "/run/lindm-postgresql", "deb"},
+		{"rhel-9", "rhel9.snapshot", "/var/lib/pgsql/lindm", "/usr/bin/", "5432", "/run/postgresql/lindm", "rpm"},
 	} {
 		release, ok := Lookup(test.key)
 		if !ok || release.Server == nil {
 			t.Fatalf("missing server recipe for %s", test.key)
 		}
 		server := release.Server
-		if server.SnapshotName != test.snapshot || server.PostgreSQLDataDirectory != test.data || server.PostgreSQLBinDirectory != test.bin || server.PostgreSQLPort != test.port || release.Packages.Backend.PackageFormat() != test.format {
+		if server.SnapshotName != test.snapshot || server.PostgreSQLDataDirectory != test.data || server.PostgreSQLBinDirectory != test.bin || server.PostgreSQLPort != test.port || server.PostgreSQLSocketDirectory != test.socket || release.Packages.Backend.PackageFormat() != test.format {
 			t.Errorf("wrong native server layout for %s: %+v", test.key, server)
 		}
 	}

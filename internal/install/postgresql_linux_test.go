@@ -190,8 +190,8 @@ func TestPostgreSQLSELinuxEnforcementControlsOnlyVendorNNPException(t *testing.T
 }
 
 func TestPostgreSQLVendorNNPExceptionPreservesEveryOtherSandboxDirective(t *testing.T) {
-	normal := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", false)
-	enforcing := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", true)
+	normal := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", "/run/postgresql/lindm", false)
+	enforcing := localPostgresUnit("/var/lib/pgsql/lindm", "/usr/bin/", "/run/postgresql/lindm", true)
 	if !strings.Contains(normal, "\nNoNewPrivileges=yes\n") || !strings.Contains(enforcing, "\nNoNewPrivileges=no\n") ||
 		strings.Replace(enforcing, "\nNoNewPrivileges=no\n", "\nNoNewPrivileges=yes\n", 1) != normal {
 		t.Fatal("vendor confinement exception changed more than the PostgreSQL NNP directive")
@@ -199,6 +199,22 @@ func TestPostgreSQLVendorNNPExceptionPreservesEveryOtherSandboxDirective(t *test
 	for _, directive := range []string{"User=postgres", "Group=postgres", "RuntimeDirectoryMode=0700", "UMask=0077", "ProtectSystem=strict", "ProtectHome=yes", "PrivateTmp=yes", "InaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate", "LimitCORE=0", "MemorySwapMax=0"} {
 		if !strings.Contains(enforcing, "\n"+directive+"\n") {
 			t.Fatalf("SELinux-confined unit lost %s", directive)
+		}
+	}
+}
+
+func TestPostgreSQLUnitUsesNativePrivateSocketNamespace(t *testing.T) {
+	for _, test := range []struct {
+		distro, release, runtime, socket string
+	}{
+		{"ubuntu", "24.04", "lindm-postgresql", "/run/lindm-postgresql"},
+		{"rhel", "9", "postgresql/lindm", "/run/postgresql/lindm"},
+	} {
+		release := platform.ForManifest(test.distro, test.release)
+		unit := localPostgresUnit(release.Server.PostgreSQLDataDirectory, release.Server.PostgreSQLBinDirectory, release.Server.PostgreSQLSocketDirectory, false)
+		if !strings.Contains(unit, "\nRuntimeDirectory="+test.runtime+"\n") ||
+			!strings.Contains(unit, "\nReadWritePaths="+release.Server.PostgreSQLDataDirectory+" "+test.socket+"\n") {
+			t.Fatalf("%s unit escapes the distro's private PostgreSQL socket namespace", test.distro)
 		}
 	}
 }

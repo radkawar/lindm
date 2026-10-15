@@ -1831,6 +1831,14 @@ non-enforcing hosts retain `NoNewPrivileges=yes`. No custom SELinux policy modul
 is installed, and disabling SELinux is not a startup remedy. See the
 [kernel's no-new-privileges contract](https://docs.kernel.org/userspace-api/no_new_privs.html).
 
+The private RHEL socket directory is `/run/postgresql/lindm`, beneath the distro's
+existing `postgresql_var_run_t` runtime namespace, with postgres ownership and mode
+`0700`. Ubuntu retains `/run/lindm-postgresql`. PostgreSQL configuration, native
+unit writable paths, readiness and privileged peer SQL use the same platform
+socket path. No custom SELinux file-context rule is needed. A journald stream's
+`_SELINUX_CONTEXT` is not a replacement for reading the actual service process's
+`/proc/<MainPID>/attr/current`.
+
 The local database CA uses ECDSA P-256/SHA-256 signatures so PostgreSQL
 SCRAM-PLUS can bind authentication to the server certificate. Device and console
 authorities remain separate. TLS verification and channel binding are not disabled

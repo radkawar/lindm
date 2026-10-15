@@ -13,7 +13,7 @@ import (
 
 func TestNativeRHELPostgresProofRequiresActualEnforcingDomain(t *testing.T) {
 	command := deployPostgresProofCommand(platform.ForManifest("rhel", "9"))
-	for _, required := range []string{"systemctl is-active --quiet lindm-postgresql.service", "$(getenforce)\" = Enforcing", "--property=NoNewPrivileges --value lindm-postgresql.service)\" = no", "--property=MainPID", "/proc/$pid/attr/current", "= postgresql_t", "/proc/$pid/status", "NoNewPrivs:", "test \"$nnp\" = 0"} {
+	for _, required := range []string{"systemctl is-active --quiet lindm-postgresql.service", "$(getenforce)\" = Enforcing", "--property=NoNewPrivileges --value lindm-postgresql.service)\" = no", "--property=MainPID", "/proc/$pid/attr/current", "= postgresql_t", "/proc/$pid/status", "NoNewPrivs:", "test \"$nnp\" = 0", "/run/postgresql/lindm/.s.PGSQL.5432", "= postgresql_var_run_t"} {
 		if !strings.Contains(command, required) {
 			t.Fatalf("native RHEL confinement proof omits %s", required)
 		}
@@ -22,7 +22,7 @@ func TestNativeRHELPostgresProofRequiresActualEnforcingDomain(t *testing.T) {
 
 func TestNativeUbuntuPostgresProofRetainsNoVendorClusterGate(t *testing.T) {
 	command := deployPostgresProofCommand(platform.ForManifest("ubuntu", "24.04"))
-	for _, required := range []string{"test ! -e /etc/postgresql/16/main", "test ! -e /var/lib/postgresql/16/main", "postgresql@16-main.service"} {
+	for _, required := range []string{"test ! -e /etc/postgresql/16/main", "test ! -e /var/lib/postgresql/16/main", "postgresql@16-main.service", "/run/lindm-postgresql/.s.PGSQL.15432"} {
 		if !strings.Contains(command, required) {
 			t.Fatalf("native Ubuntu proof omits %s", required)
 		}

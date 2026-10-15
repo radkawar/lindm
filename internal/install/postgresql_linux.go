@@ -119,14 +119,14 @@ func postgresSELinuxEnforcing(ctx context.Context, release *platform.Release, ru
 	}
 }
 
-func localPostgresUnit(data, bin string, enforcing bool) string {
+func localPostgresUnit(data, bin, socket string, enforcing bool) string {
 	noNewPrivileges := "yes"
 	if enforcing {
 		// Match the vendor unit: SELinux must transition to postgresql_t.
 		// NNP can silently retain init_t, which cannot read the private cluster.
 		noNewPrivileges = "no"
 	}
-	return "[Unit]\nDescription=Lindm private PostgreSQL cluster\nAfter=network.target\n[Service]\nType=simple\nUser=postgres\nGroup=postgres\nRuntimeDirectory=lindm-postgresql\nRuntimeDirectoryMode=0700\nExecStart=" + bin + "postgres -D " + data + "\nRestart=on-failure\nUMask=0077\nNoNewPrivileges=" + noNewPrivileges + "\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nReadWritePaths=" + data + " /run/lindm-postgresql\nInaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate\nLimitCORE=0\nMemorySwapMax=0\n[Install]\nWantedBy=multi-user.target\n"
+	return "[Unit]\nDescription=Lindm private PostgreSQL cluster\nAfter=network.target\n[Service]\nType=simple\nUser=postgres\nGroup=postgres\nRuntimeDirectory=" + strings.TrimPrefix(socket, "/run/") + "\nRuntimeDirectoryMode=0700\nExecStart=" + bin + "postgres -D " + data + "\nRestart=on-failure\nUMask=0077\nNoNewPrivileges=" + noNewPrivileges + "\nProtectSystem=strict\nProtectHome=yes\nPrivateTmp=yes\nReadWritePaths=" + data + " " + socket + "\nInaccessiblePaths=/etc/lindm/offline /etc/lindm/migrate\nLimitCORE=0\nMemorySwapMax=0\n[Install]\nWantedBy=multi-user.target\n"
 }
 
 func requirePostgresSELinuxDomain(ctx context.Context, run dependencyCommand) error {

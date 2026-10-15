@@ -101,7 +101,7 @@ WHERE d.id='%s'::uuid AND s.id='%s'::uuid AND d.state='active' AND g.state='acti
  AND e.state IN ('evaluated','partial');
 COMMIT;
 `, request.ManagedActionID, request.DeviceID, browser.Findings.SnapshotID)
-	command := "runuser -u postgres -- psql -X -Atq -v ON_ERROR_STOP=1 -h /run/lindm-postgresql -p " + nativeQuote(guest.release.Server.PostgreSQLPort) + " -d lindm"
+	command := "runuser -u postgres -- psql -X -Atq -v ON_ERROR_STOP=1 -h " + nativeQuote(guest.release.Server.PostgreSQLSocketDirectory) + " -p " + nativeQuote(guest.release.Server.PostgreSQLPort) + " -d lindm"
 	body, err := serverGuestCommand(ctx, guest, "observe published managed inventory advisory evaluation", command, strings.NewReader(sql))
 	if err != nil {
 		return nil, err
