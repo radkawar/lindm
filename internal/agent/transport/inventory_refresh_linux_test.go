@@ -7,14 +7,21 @@ package transport
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -24,8 +31,11 @@ import (
 	"lindm/gen/lindm/device/v1/devicev1connect"
 	inventoryv1 "lindm/gen/lindm/inventory/v1"
 	"lindm/internal/agent/config"
+	"lindm/internal/agent/executor"
 	"lindm/internal/agent/spool"
+	"lindm/internal/agent/testfixture"
 	"lindm/internal/rpcreason"
+	"lindm/internal/trust"
 )
 
 // These boundaries exercise actual collection scheduling, SQLite spool promotion,
@@ -35,6 +45,7 @@ type refreshTransportFixture struct {
 	t                                   *testing.T
 	r                                   *runner
 	status                              *agentv1.DeviceActionStatus
+	issuedAt                            time.Time
 	connection                          *agentv1.GetConnectionResponse
 	manifest                            *devicev1.PackageSnapshotManifest
 	host, packages                      uint64
@@ -86,6 +97,7 @@ func newRefreshTransportFixture(t *testing.T) *refreshTransportFixture {
 	now := timestamppb.Now()
 	digest := sha256.Sum256([]byte("signed refresh intent"))
 	f.status = &agentv1.DeviceActionStatus{ActionId: uuid.NewString(), IntentSha256: digest[:], State: agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, Failure: agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_NONE, AcceptedAt: now, StartedAt: now, Before: &agentv1.DeviceActionObservation{ObservedAt: now, Supported: true}, RefreshInventory: true}
+	f.issuedAt = now.AsTime()
 	f.connection = originConnectionPins(t)
 	f.connection.DeviceId, f.connection.EnrollmentGeneration = uuid.NewString(), uuid.NewString()
 	dir := t.TempDir()
@@ -185,7 +197,7 @@ func (s *refreshTransportServer) GetSyncState(context.Context, *connect.Request[
 func (s *refreshTransportServer) ReportHostObservation(_ context.Context, req *connect.Request[devicev1.ReportHostObservationRequest]) (*connect.Response[devicev1.ReportHostObservationResponse], error) {
 	f := s.f
 	f.hostCalls++
-	if req.Msg.GetObservation().GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) {
+	if req.Msg.GetObservation().GetStartedAt().AsTime().Before(f.issuedAt) {
 		f.staleUploads++
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("routine host cooldown"))
 	}
@@ -207,7 +219,7 @@ func (s *refreshTransportServer) BeginPackageSnapshot(_ context.Context, req *co
 	f := s.f
 	f.beginCalls++
 	manifest := req.Msg.GetManifest()
-	if manifest.GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) {
+	if manifest.GetStartedAt().AsTime().Before(f.issuedAt) {
 		f.staleUploads++
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("routine package cooldown"))
 	}
@@ -215,7 +227,7 @@ func (s *refreshTransportServer) BeginPackageSnapshot(_ context.Context, req *co
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("refresh package admission already spent"))
 	}
 	if !f.routinePublication && f.manifest != nil && !proto.Equal(f.manifest, manifest) {
-		if !f.manifest.GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) {
+		if !f.manifest.GetStartedAt().AsTime().Before(f.issuedAt) {
 			f.t.Fatal("same-action immutable manifest changed")
 		}
 		f.superseded = append(f.superseded, f.manifest.GetSnapshotId())
@@ -328,19 +340,71 @@ func TestInventoryRefreshStagingNeverSucceedsAndPendingSurvivesRestart(t *testin
 	}
 }
 
-func TestInventoryRefreshDoesNotCollectUnknownOrFailedPackages(t *testing.T) {
-	t.Run("unknown", func(t *testing.T) {
-		f := newRefreshTransportFixture(t)
-		f.status.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
-		f.status.Failure = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED
-		f.status.CompletedAt = timestamppb.Now()
-		if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); err == nil {
-			t.Fatal("unknown consumed action authorized another collection")
-		}
-		if f.collections != 0 || f.confirmations != 0 {
-			t.Fatal("unknown action triggered collection or completion")
-		}
-	})
+func TestInventoryRefreshUnknownNotPublishedPreservesSpool(t *testing.T) {
+	for _, pending := range []bool{false, true} {
+		t.Run(map[bool]string{false: "unopened-spool", true: "pending-and-queued"}[pending], func(t *testing.T) {
+			f := newRefreshTransportFixture(t)
+			var host spool.HostUpload
+			var packages spool.PackageUpload
+			var recovery spool.Recovery
+			if pending {
+				f.queue(refreshObservation(time.Now()))
+				var err error
+				host, err = f.r.store.PromoteHost(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				packages, err = f.r.store.PromotePackage(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.queue(refreshObservation(time.Now().Add(time.Second)))
+				recovery, err = f.r.store.Recovery(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			f.status.State = agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN
+			f.status.Failure = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED
+			f.status.CompletedAt = timestamppb.Now()
+			before := proto.CloneOf(f.status)
+			// Synchronizing these newer global watermarks would mutate the
+			// unrelated spool even without collecting or uploading anything.
+			f.host += 20
+			f.packages += 20
+			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); err != nil {
+				t.Fatal(err)
+			}
+			if f.publicationRequests != 1 || f.collections != 0 || f.hostCalls != 0 || f.beginCalls != 0 || f.batches != 0 || f.staleUploads != 0 || f.confirmations != 0 || !proto.Equal(f.status, before) {
+				t.Fatal("unpublished unknown action collected, uploaded, completed or skipped receipt lookup")
+			}
+			if !pending {
+				if f.r.store != nil {
+					t.Fatal("receipt-only recovery opened the spool")
+				}
+				return
+			}
+			after, err := f.r.store.Recovery(t.Context())
+			if err != nil || after != recovery {
+				t.Fatalf("receipt-only recovery synchronized or rebound the spool: %v", err)
+			}
+			keptHost, ok, err := f.r.store.PendingHost(t.Context())
+			if err != nil || !ok || keptHost.Sequence != host.Sequence || !proto.Equal(keptHost.Observation, host.Observation) {
+				t.Fatalf("receipt-only recovery changed pending host: %v", err)
+			}
+			keptPackages, ok, err := f.r.store.PendingPackage(t.Context())
+			if err != nil || !ok || !proto.Equal(keptPackages.Manifest, packages.Manifest) || !bytes.Equal(keptPackages.CanonicalManifest, packages.CanonicalManifest) {
+				t.Fatalf("receipt-only recovery changed pending packages: %v", err)
+			}
+			queuedHost, queuedPackages, err := f.r.store.Queued(t.Context())
+			if err != nil || !queuedHost || !queuedPackages {
+				t.Fatalf("receipt-only recovery consumed the queued observation: %v", err)
+			}
+		})
+	}
+}
+
+func TestInventoryRefreshDoesNotPublishFailedPackages(t *testing.T) {
 	t.Run("partial", func(t *testing.T) {
 		f := newRefreshTransportFixture(t)
 		collect := f.r.collectInventory
@@ -632,15 +696,27 @@ func TestInventoryRefreshHostFailureResumesExactPendingTuple(t *testing.T) {
 }
 
 func TestInventoryRefreshNonpublicationErrorsNeverAuthorizeRecollection(t *testing.T) {
-	for _, code := range []connect.Code{connect.CodeFailedPrecondition, connect.CodeUnavailable, connect.CodePermissionDenied, connect.CodeCanceled} {
-		t.Run(code.String(), func(t *testing.T) {
-			f := newRefreshTransportFixture(t)
-			f.publicationErr = connect.NewError(code, errors.New("not the typed not-published response"))
-			if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); connect.CodeOf(err) != code {
-				t.Fatalf("publication failure was hidden: %v", err)
-			}
-			if f.collections != 0 || f.hostCalls != 0 || f.beginCalls != 0 || f.confirmations != 0 {
-				t.Fatal("confirmation failure authorized another collection or completion")
+	for _, state := range []agentv1.DeviceActionState{agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING, agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN} {
+		t.Run(state.String(), func(t *testing.T) {
+			for _, code := range []connect.Code{connect.CodeFailedPrecondition, connect.CodeUnavailable, connect.CodePermissionDenied, connect.CodeCanceled} {
+				t.Run(code.String(), func(t *testing.T) {
+					f := newRefreshTransportFixture(t)
+					if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
+						f.status.State = state
+						f.status.Failure = agentv1.DeviceActionFailure_DEVICE_ACTION_FAILURE_INTERRUPTED
+						f.status.CompletedAt = timestamppb.Now()
+					}
+					f.publicationErr = connect.NewError(code, errors.New("not the typed not-published response"))
+					if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); connect.CodeOf(err) != code {
+						t.Fatalf("publication failure was hidden: %v", err)
+					}
+					if f.publicationRequests != 1 || f.collections != 0 || f.hostCalls != 0 || f.beginCalls != 0 || f.confirmations != 0 {
+						t.Fatal("confirmation failure authorized collection or completion")
+					}
+					if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN && f.r.store != nil {
+						t.Fatal("UNKNOWN confirmation failure opened the spool")
+					}
+				})
 			}
 		})
 	}
@@ -847,5 +923,289 @@ func TestInventoryRefreshDoesNotMistakeFailedRoutineQueueForAcknowledgedPackages
 	}
 	if f.collections != 1 || f.batches != 1 || f.staleUploads != 0 || f.confirmations != 1 {
 		t.Fatal("failed routine queue was mistaken for an already acknowledged full refresh")
+	}
+}
+
+// This boundary supplies only the non-mutating refresh plan. Authority,
+// consumption, restart recovery, receipt verification and attestation use the
+// actual executor and its SQLite journal.
+type refreshRecoveryProvider struct {
+	executor.DeviceActionProvider
+	clock        func() time.Time
+	observations atomic.Int32
+}
+
+func (p *refreshRecoveryProvider) Observe(context.Context, *agentv1.DeviceActionSpec) (*agentv1.DeviceActionObservation, error) {
+	p.observations.Add(1)
+	return &agentv1.DeviceActionObservation{ObservedAt: timestamppb.New(p.clock()), Supported: true}, nil
+}
+
+func (*refreshRecoveryProvider) Plan(_ context.Context, spec *agentv1.DeviceActionSpec, before *agentv1.DeviceActionObservation) (*agentv1.DeviceActionPlan, error) {
+	return &agentv1.DeviceActionPlan{Spec: proto.CloneOf(spec), Before: proto.CloneOf(before)}, nil
+}
+
+type refreshRecoveryServer struct {
+	*refreshTransportServer
+	authority *trust.Authority
+	bootstrap *testfixture.Bootstrap
+	clock     func() time.Time
+	work      *devicev1.DeviceActionWork
+	nonce     [32]byte
+	attested  *agentv1.DeviceActionStatus
+}
+
+func (s *refreshRecoveryServer) GetDeviceActionWork(context.Context, *connect.Request[devicev1.GetDeviceActionWorkRequest]) (*connect.Response[devicev1.GetDeviceActionWorkResponse], error) {
+	if s.attested != nil {
+		return connect.NewResponse(&devicev1.GetDeviceActionWorkResponse{}), nil
+	}
+	s.nonce[0]++
+	work := proto.CloneOf(s.work)
+	work.ResultNonce = bytes.Clone(s.nonce[:])
+	work.ResultNonceExpiresAt = timestamppb.New(s.clock().Add(time.Minute))
+	return connect.NewResponse(&devicev1.GetDeviceActionWorkResponse{Work: work}), nil
+}
+
+func (s *refreshRecoveryServer) ReportDeviceActionResult(ctx context.Context, req *connect.Request[devicev1.ReportDeviceActionResultRequest]) (*connect.Response[devicev1.ReportDeviceActionResultResponse], error) {
+	f := s.f
+	binding := &trust.DeviceActionAttestationBinding{
+		DeploymentID: uuid.MustParse(f.connection.GetDeploymentId()), DeviceID: uuid.MustParse(f.connection.GetDeviceId()),
+		EnrollmentGeneration: uuid.MustParse(f.connection.GetEnrollmentGeneration()), SessionEpoch: f.connection.GetSessionEpoch(),
+		ActionID: uuid.MustParse(s.work.GetActionId()), IntentSHA256: sha256.Sum256(s.work.GetIntentEnvelope()), Nonce: s.nonce,
+	}
+	if req.Msg.GetActionId() != s.work.GetActionId() || req.Msg.GetSessionEpoch() != binding.SessionEpoch {
+		f.t.Fatal("recovered result changed its action or session")
+	}
+	attestation, err := s.authority.VerifyDeviceActionAttestation(ctx, req.Msg.GetAttestationEnvelope(), req.Msg.GetCertificatePem(), s.bootstrap.DeviceCA, binding, s.clock(), 0)
+	if err != nil {
+		return nil, err
+	}
+	s.attested = proto.CloneOf(attestation.GetStatus())
+	return connect.NewResponse(&devicev1.ReportDeviceActionResultResponse{Closed: deviceActionTerminal(s.attested.GetState())}), nil
+}
+
+func TestInventoryRefreshRelayRecoversRealExecutorUnknownWithoutEnvelope(t *testing.T) {
+	f := newRefreshTransportFixture(t)
+	now := time.Now().UTC().Add(-time.Minute)
+	var instant atomic.Int64
+	instant.Store(now.UnixNano())
+	clock := func() time.Time { return time.Unix(0, instant.Load()).UTC() }
+	authority, err := trust.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := func() ed25519.PrivateKey {
+		_, private, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return private
+	}
+	public := func(private ed25519.PrivateKey) *agentv1.ExecutionKey {
+		p := ed25519.PublicKey(private[ed25519.SeedSize:])
+		id, err := trust.KeyID(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &agentv1.ExecutionKey{KeyId: id, PublicKey: p}
+	}
+	sign := func(message proto.Message, keys ...ed25519.PrivateKey) []byte {
+		envelope, err := authority.Sign(t.Context(), message, keys...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return envelope
+	}
+	rootKey, planKey, startKey := key(), key(), key()
+	bootstrap := testfixture.NewBootstrap(t, now, "https://console.example.test", "https://device.example.test")
+	executionRoot := proto.CloneOf(bootstrap.Verified.Root)
+	executionRoot.Keys, executionRoot.Threshold = []*agentv1.ExecutionKey{public(rootKey)}, 1
+	bootstrap.RootJSON, err = protojson.Marshal(executionRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle := proto.CloneOf(bootstrap.Verified.Bundle)
+	rootDigest := sha256.Sum256(bootstrap.RootJSON)
+	bundle.ExecutionRootSha256 = rootDigest[:]
+	bootstrap.Envelope = sign(bundle, rootKey)
+	bootstrap.Verified, err = authority.VerifyBootstrap(t.Context(), bootstrap.RootJSON, bootstrap.Envelope, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	provider := &refreshRecoveryProvider{clock: clock}
+	options := []executor.Option{executor.WithClock(clock), executor.WithBootID(func() (string, error) { return f.boot, nil }), executor.WithActionProvider(provider)}
+	root, err := executor.New(t.Context(), directory, options...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := root.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	preparedBootstrap, err := root.PrepareBootstrap(t.Context(), connect.NewRequest(&agentv1.PrepareBootstrapRequest{ExecutionRootJson: bootstrap.RootJSON, BootstrapEnvelope: bootstrap.Envelope, PendingGrant: "lg1_refresh-recovery-grant-with-32-characters"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	device, generation := uuid.New(), uuid.New()
+	certificate := bootstrap.DeviceCertificate(t, preparedBootstrap.Msg.GetCsrPem(), device, generation)
+	if _, err := root.InstallEnrollment(t.Context(), connect.NewRequest(&agentv1.InstallEnrollmentRequest{DeviceId: device.String(), EnrollmentGeneration: generation.String(), CertificatePem: certificate})); err != nil {
+		t.Fatal(err)
+	}
+	session, err := root.PrepareSession(t.Context(), connect.NewRequest(&agentv1.PrepareSessionRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := root.CommitSession(t.Context(), connect.NewRequest(&agentv1.CommitSessionRequest{RequestId: session.Msg.GetPending().GetRequestId(), ServerEpoch: 1})); err != nil {
+		t.Fatal(err)
+	}
+	delegation := &agentv1.ExecutionDelegation{
+		DeploymentId: executionRoot.GetDeploymentId(), RootVersion: 1, Version: 1,
+		NotBefore: timestamppb.New(now.Add(-time.Minute)), ExpiresAt: timestamppb.New(now.Add(time.Hour)),
+		Delegates: []*agentv1.ExecutionDelegate{
+			{Key: public(planKey), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_PLAN, Capabilities: []string{"device.refresh-inventory.v1"}},
+			{Key: public(startKey), Role: agentv1.ExecutionSignerRole_EXECUTION_SIGNER_ROLE_START, Capabilities: []string{"device.refresh-inventory.v1"}},
+		},
+	}
+	if _, err := root.UpdateExecutionTrust(t.Context(), connect.NewRequest(&agentv1.UpdateExecutionTrustRequest{DelegationEnvelope: sign(delegation, rootKey)})); err != nil {
+		t.Fatal(err)
+	}
+	spec := &agentv1.DeviceActionSpec{Action: &agentv1.DeviceActionSpec_RefreshInventory{RefreshInventory: &agentv1.RefreshInventoryAction{}}}
+	specDigest, err := trust.DeviceActionDigest(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent := &agentv1.DeviceActionIntent{
+		DeploymentId: executionRoot.GetDeploymentId(), DeviceId: device.String(), EnrollmentGeneration: generation.String(),
+		ActionId: uuid.NewString(), ActorId: uuid.NewString(), ActionSequence: 1, RootVersion: 1, DelegationVersion: 1, AuthorizationVersion: 1,
+		NotBefore: timestamppb.New(now.Add(-time.Second)), ExpiresAt: timestamppb.New(now.Add(5 * time.Minute)), Spec: spec, SpecSha256: specDigest[:],
+	}
+	intentEnvelope := sign(intent, planKey)
+	prepared, err := root.PrepareDeviceAction(t.Context(), connect.NewRequest(&agentv1.PrepareDeviceActionRequest{IntentEnvelope: intentEnvelope}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	block, _ := pem.Decode(certificate)
+	if block == nil {
+		t.Fatal("missing enrolled device certificate")
+	}
+	leaf, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	devicePublic, ok := leaf.PublicKey.(ed25519.PublicKey)
+	if !ok {
+		t.Fatal("enrolled device key is not Ed25519")
+	}
+	challenge := new(agentv1.DeviceActionChallenge)
+	if err := authority.Verify(t.Context(), prepared.Msg.GetChallengeProof(), challenge, 1, devicePublic); err != nil {
+		t.Fatal(err)
+	}
+	grant := sign(&agentv1.DeviceActionStartGrant{
+		Challenge: challenge, ActorId: intent.GetActorId(), AuthorizationVersion: 1, RootVersion: 1, DelegationVersion: 1,
+		NotBefore: challenge.GetIssuedAt(), ExpiresAt: challenge.GetExpiresAt(),
+	}, startKey)
+	instant.Store(now.Add(time.Second).UnixNano())
+	started, err := root.StartDeviceAction(t.Context(), connect.NewRequest(&agentv1.StartDeviceActionRequest{ActionId: intent.GetActionId(), StartGrantEnvelope: grant}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.status, f.issuedAt = started.Msg.GetStatus(), challenge.GetIssuedAt().AsTime()
+	connection, err := root.GetConnection(t.Context(), connect.NewRequest(&agentv1.GetConnectionRequest{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.connection = connection.Msg
+	server := &refreshRecoveryServer{
+		refreshTransportServer: &refreshTransportServer{f: f}, authority: authority, bootstrap: bootstrap, clock: clock,
+		work: &devicev1.DeviceActionWork{ActionId: intent.GetActionId(), IntentEnvelope: intentEnvelope, StartGrantEnvelope: grant},
+	}
+	_, handler := agentv1connect.NewExecutorServiceHandler(root)
+	local := httptest.NewServer(handler)
+	t.Cleanup(func() { local.Close() })
+	f.r.executor = agentv1connect.NewExecutorServiceClient(local.Client(), local.URL)
+	f.r.cache = connectionCache{connection: proto.CloneOf(f.connection), servers: &connections{device: server}}
+	f.r.collectInventory = func(context.Context) (*inventoryv1.NativeObservation, error) {
+		f.collections++
+		return refreshObservation(clock()), nil
+	}
+	instant.Store(now.Add(2 * time.Second).UnixNano())
+	f.failPublication = true
+	if err := f.r.refreshInventory(t.Context(), proto.CloneOf(f.status)); connect.CodeOf(err) != connect.CodeUnavailable {
+		t.Fatalf("test did not lose the publication envelope after commit: %v", err)
+	}
+	if !f.committed || f.boundHost == 0 || f.boundPackages == 0 || len(server.work.GetInventoryReceiptEnvelope()) != 0 {
+		t.Fatal("test did not retain a committed server tuple without a work envelope")
+	}
+	if _, ok, err := f.r.store.PendingHost(t.Context()); err != nil || ok {
+		t.Fatalf("test did not reach acknowledged host boundary: %v", err)
+	}
+	if _, ok, err := f.r.store.PendingPackage(t.Context()); err != nil || ok {
+		t.Fatalf("test did not reach acknowledged package boundary: %v", err)
+	}
+	intentDigest, grantDigest := sha256.Sum256(intentEnvelope), sha256.Sum256(grant)
+	f.receipt = sign(&agentv1.DeviceActionInventoryReceipt{
+		DeploymentId: intent.GetDeploymentId(), DeviceId: device.String(), EnrollmentGeneration: generation.String(),
+		ActionId: intent.GetActionId(), IntentSha256: intentDigest[:], StartGrantSha256: grantDigest[:],
+		HostSequence: f.boundHost, PackageSequence: f.boundPackages, SnapshotId: f.manifest.GetSnapshotId(),
+		PublishedAt: timestamppb.New(clock()), RootVersion: 1, DelegationVersion: 1,
+	}, startKey)
+	local.Close()
+	if err := root.Close(); err != nil {
+		t.Fatal(err)
+	}
+	root, err = executor.New(t.Context(), directory, options...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, handler = agentv1connect.NewExecutorServiceHandler(root)
+	local = httptest.NewServer(handler)
+	f.r.executor = agentv1connect.NewExecutorServiceClient(local.Client(), local.URL)
+	recovered, err := root.GetDeviceAction(t.Context(), connect.NewRequest(&agentv1.GetDeviceActionRequest{ActionId: intent.GetActionId()}))
+	if err != nil || recovered.Msg.GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
+		t.Fatalf("executor restart did not recover UNKNOWN: %v", err)
+	}
+	f.status = recovered.Msg.GetStatus()
+	f.reopen()
+	f.failPublication = false
+	// Unrelated high-water marks cannot substitute for the admitted action tuple.
+	f.host += 10
+	f.packages += 10
+	beforeRequests := f.publicationRequests
+	loop := &managementLoop{executor: f.r.executor, cache: f.r.cache, gate: f.r.authorityGate, refreshInventory: f.r.refreshInventory}
+	if err := loop.dispatchDeviceActions(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if f.publicationRequests != beforeRequests+1 || f.collections != 1 || f.hostCalls != 1 || f.beginCalls != 1 || f.batches != 1 || provider.observations.Load() != 1 {
+		t.Fatal("UNKNOWN recovery recollected, uploaded or repeated preparation instead of querying publication")
+	}
+	if server.attested.GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED || server.attested.GetVerification().GetInventorySequence() != f.boundPackages || !proto.Equal(server.attested.GetStartedAt(), started.Msg.GetStatus().GetStartedAt()) {
+		t.Fatal("receipt-only UNKNOWN recovery did not report the protected exact-tuple success")
+	}
+}
+
+func TestInventoryRefreshAdmissionUsesChallengeIssuedAtBeforeConsumedStart(t *testing.T) {
+	for _, committed := range []bool{false, true} {
+		t.Run(map[bool]string{false: "staging", true: "committed"}[committed], func(t *testing.T) {
+			f := newRefreshTransportFixture(t)
+			f.status.StartedAt = timestamppb.New(f.issuedAt.Add(2 * time.Second))
+			observation := refreshObservation(f.issuedAt.Add(time.Second))
+			f.queue(observation)
+			f.failCommit = !committed
+			authority := &authorized{connection: f.connection, servers: f.r.cache.servers, epoch: f.connection.GetSessionEpoch()}
+			err := flush(t.Context(), f.r.store, authority, f.r.status)
+			if committed && err != nil || !committed && connect.CodeOf(err) != connect.CodeUnavailable {
+				t.Fatalf("ordinary admission between challenge and start failed: %v", err)
+			}
+			if f.boundHost != 10 || f.boundPackages != 4 || f.batches != 1 || f.committed != committed || f.staleUploads != 0 || f.collections != 0 {
+				t.Fatal("fixture rejected challenge-fresh inventory merely because consumption happened later")
+			}
+			if !f.publishedHost.GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) || !f.manifest.GetStartedAt().AsTime().Before(f.status.GetStartedAt().AsTime()) {
+				t.Fatal("test did not bind the pre-consumption admission slots")
+			}
+		})
 	}
 }

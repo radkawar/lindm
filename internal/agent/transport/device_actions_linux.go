@@ -76,7 +76,15 @@ func (m *managementLoop) relayDeviceAction(ctx context.Context, work *devicev1.D
 			return false, phaseErr
 		}
 	} else {
-		status, phaseErr = m.prepareAndStartDeviceAction(ctx, work, digest)
+		prepare := func() error {
+			status, phaseErr = m.prepareAndStartDeviceAction(ctx, work, digest)
+			return phaseErr
+		}
+		if m.withInventoryOwner != nil {
+			phaseErr = m.withInventoryOwner(ctx, prepare)
+		} else {
+			phaseErr = prepare()
+		}
 	}
 	if phaseErr != nil {
 		// Lost replies never authorize a replacement action or challenge. Query
@@ -98,7 +106,7 @@ func (m *managementLoop) relayDeviceAction(ctx context.Context, work *devicev1.D
 			return false, err
 		}
 	}
-	if !reportOnly && status.GetRefreshInventory() && status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING {
+	if !reportOnly && status.GetRefreshInventory() && (status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING || status.GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN) {
 		if m.refreshInventory == nil {
 			return false, errors.New("inventory refresh transport is unavailable")
 		}

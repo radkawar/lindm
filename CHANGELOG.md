@@ -80,3 +80,4 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Give local-authentication fixtures the test's lifetime instead of sharing one login-operation deadline across independent password-hashing flows.
 - Freeze device and static-group rollout cohorts from bounded identity and membership pages. Keep full inventory evaluation for dynamic cohorts, all excluded fleet rows and the existing save deadline.
 - Build temporary development signing custody outside long user-cache paths. Keep private-key cleanup and atomic native repository cache publication.
+- Serialize signed device-action preparation and start with the inventory owner so ordinary publication cannot claim a Refresh inventory slot before executor consumption. Recover an interrupted Refresh from its existing signed publication receipt without collecting again, uploading again or authorizing another start.

@@ -1143,6 +1143,16 @@ None mandates two-person approval by default; deployment approval policy still
 applies to the exact immutable request. Fresh online challenge/start authority,
 audit, replay protection and the one-open-action fence remain common. Refresh can
 repair absent or stale inventory rather than requiring an existing fresh snapshot.
+The sole inventory owner serializes challenge preparation, server authorization
+and executor consumption against ordinary collection and publication. Ordinary
+inventory is also fenced for the maximum thirty-second challenge lifetime after
+a network-process restart or an uncertain preparation/start reply; exact retained
+grant recovery remains available through the owner and lifts the fence on success.
+This keeps the server's first-bound host/package slots from admitting collection
+between challenge issuance and consumption, without relaxing consumption-time
+freshness. A recovered `OUTCOME_UNKNOWN` refresh may only retrieve and validate
+the receipt for an already committed, action-bound publication. Missing publication
+preserves uncertainty and never authorizes collection, upload or another start.
 The closed action-permission registry also drives approval binding, decisions,
 inbox visibility and pending counts; new action kinds cannot require a separate
 inbox allow-list. Approval labels are scoped server projections of requester and

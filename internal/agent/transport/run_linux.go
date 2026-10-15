@@ -46,6 +46,10 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	defer func() { resultErr = errors.Join(resultErr, cleanup()) }()
 	r := &runner{document: document, executor: executor, status: &agentv1.TransportStatus{}, authorityGate: make(authorityGate, 1)}
 	r.refreshes = make(chan inventoryRefreshJob)
+	// The network process can restart without the executor. Age out any
+	// retained, unconsumed challenge before ordinary inventory may publish;
+	// owner-mediated exact-grant recovery can lift this fence sooner.
+	r.inventoryNotBefore = time.Now().Add(deviceActionCredentialWait)
 	r.collectInventory = inventory.CollectForUpload
 	defer r.cache.Close()
 	defer func() {
@@ -62,7 +66,7 @@ func Run(ctx context.Context, document *config.Document) (resultErr error) {
 	if err := r.report(ctx); err != nil {
 		return err
 	}
-	management := &managementLoop{executor: executor, gate: r.authorityGate, refreshInventory: r.requestInventoryRefresh, refreshCapabilities: r.requestCapabilityRefresh}
+	management := &managementLoop{executor: executor, gate: r.authorityGate, refreshInventory: r.requestInventoryRefresh, refreshCapabilities: r.requestCapabilityRefresh, withInventoryOwner: r.withInventoryOwner}
 	stopManagement := management.start(ctx)
 	defer stopManagement()
 	stopUpdates := startAgentUpdates(ctx, executor)
@@ -106,21 +110,25 @@ func heartbeatDelay() time.Duration {
 }
 
 type runner struct {
-	document         *config.Document
-	executor         agentv1connect.ExecutorServiceClient
-	cache            connectionCache
-	authorityGate    authorityGate
-	store            *spool.Store
-	identity         spool.Identity
-	status           *agentv1.TransportStatus
-	nextCollection   time.Time
-	waiting          *inventoryv1.NativeObservation
-	refreshes        chan inventoryRefreshJob
-	collectInventory func(context.Context) (*inventoryv1.NativeObservation, error)
-	queuedCapability *agentv1.CapabilityPolicyObservation
+	document           *config.Document
+	executor           agentv1connect.ExecutorServiceClient
+	cache              connectionCache
+	authorityGate      authorityGate
+	store              *spool.Store
+	identity           spool.Identity
+	status             *agentv1.TransportStatus
+	nextCollection     time.Time
+	inventoryNotBefore time.Time
+	waiting            *inventoryv1.NativeObservation
+	refreshes          chan inventoryRefreshJob
+	collectInventory   func(context.Context) (*inventoryv1.NativeObservation, error)
+	queuedCapability   *agentv1.CapabilityPolicyObservation
 }
 
 func (r *runner) cycle(ctx context.Context) error {
+	if time.Now().Before(r.inventoryNotBefore) {
+		return nil
+	}
 	connection, connectionErr := rpc(ctx, r.executor.GetConnection, &agentv1.GetConnectionRequest{})
 	if connectionErr == nil {
 		if err := r.bind(ctx, connection); err != nil {

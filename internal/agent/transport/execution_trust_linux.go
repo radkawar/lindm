@@ -30,6 +30,9 @@ type managementLoop struct {
 	cache            connectionCache
 	gate             authorityGate
 	refreshInventory func(context.Context, *agentv1.DeviceActionStatus) error
+	// Preparing the challenge through consuming its grant runs under the
+	// inventory owner, so ordinary publication cannot claim a preconsume slot.
+	withInventoryOwner func(context.Context, func() error) error
 	// encryptionKeyCertificate is the certificate digest whose recipient key
 	// the root reported acknowledged; owned by the loop goroutine.
 	encryptionKeyCertificate []byte

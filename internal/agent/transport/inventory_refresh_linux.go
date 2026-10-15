@@ -28,11 +28,16 @@ type inventoryRefreshJob struct {
 	ctx        context.Context
 	status     *agentv1.DeviceActionStatus
 	capability *agentv1.CapabilityPolicyObservation
+	operation  func() error
 	done       chan error
 }
 
 func (r *runner) requestInventoryRefresh(ctx context.Context, status *agentv1.DeviceActionStatus) error {
 	return r.requestRefresh(inventoryRefreshJob{ctx: ctx, status: status, done: make(chan error, 1)})
+}
+
+func (r *runner) withInventoryOwner(ctx context.Context, operation func() error) error {
+	return r.requestRefresh(inventoryRefreshJob{ctx: ctx, operation: operation, done: make(chan error, 1)})
 }
 
 func (r *runner) requestCapabilityRefresh(ctx context.Context, observation *agentv1.CapabilityPolicyObservation) error {
@@ -54,7 +59,20 @@ func (r *runner) requestRefresh(job inventoryRefreshJob) error {
 }
 
 func (r *runner) handleInventoryRefresh(job inventoryRefreshJob) {
-	if job.capability != nil {
+	if err := job.ctx.Err(); err != nil {
+		job.done <- err
+	} else if job.operation != nil {
+		err := job.operation()
+		// A lost reply may leave an unconsumed challenge in the executor.
+		// Permit exact-grant management recovery, but not ordinary admission,
+		// until that challenge can no longer be consumed.
+		if err != nil {
+			r.inventoryNotBefore = time.Now().Add(deviceActionCredentialWait)
+		} else {
+			r.inventoryNotBefore = time.Time{}
+		}
+		job.done <- err
+	} else if job.capability != nil {
 		job.done <- r.refreshCapabilityObservation(job.ctx, job.capability)
 	} else {
 		job.done <- r.refreshInventory(job.ctx, job.status)
@@ -90,21 +108,25 @@ func (r *runner) refreshInventory(ctx context.Context, status *agentv1.DeviceAct
 	if err := checkDeviceActionStatus(current.GetStatus(), status.GetActionId(), digest); err != nil {
 		return err
 	}
-	if current.GetStatus().GetState() == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
+	state := current.GetStatus().GetState()
+	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_SUCCEEDED {
 		return nil
 	}
-	if !current.GetStatus().GetRefreshInventory() || current.GetStatus().GetState() != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING {
-		return errors.New("inventory refresh no longer running")
+	if !current.GetStatus().GetRefreshInventory() ||
+		(state != agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING && state != agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN) {
+		return errors.New("inventory refresh is not recoverable")
 	}
 	authority, err := synchronize(ctx, r.executor, &r.cache, r.authorityGate)
 	if err != nil {
 		return err
 	}
-	if err := r.bind(ctx, authority.connection); err != nil {
-		return err
-	}
-	if err := r.store.Synchronize(ctx, authority.state.GetHostSequence(), authority.state.GetPackageSequence()); err != nil {
-		return err
+	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_RUNNING {
+		if err := r.bind(ctx, authority.connection); err != nil {
+			return err
+		}
+		if err := r.store.Synchronize(ctx, authority.state.GetHostSequence(), authority.state.GetPackageSequence()); err != nil {
+			return err
+		}
 	}
 	// Publication may have committed before a lost confirmation or a process
 	// restart. The server retains this action's exact admitted tuple even after
@@ -113,6 +135,11 @@ func (r *runner) refreshInventory(ctx context.Context, status *agentv1.DeviceAct
 		return nil
 	} else if connect.CodeOf(err) != connect.CodeFailedPrecondition || rpcreason.Get(err) != "inventory_refresh_not_published" {
 		return err
+	}
+	// Recovery can relay an existing signed receipt, never resume consumed
+	// collection authority or mutate the spool after an interrupted action.
+	if state == agentv1.DeviceActionState_DEVICE_ACTION_STATE_OUTCOME_UNKNOWN {
+		return nil
 	}
 	startedAt := current.GetStatus().GetStartedAt().AsTime()
 	host, pendingHost, err := r.store.PendingHost(ctx)
