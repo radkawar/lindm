@@ -108,10 +108,6 @@ func backup(ctx context.Context, options BackupOptions) (artifact string, err er
 		return "", err
 	}
 	health = beginBackupHealth(prior, identity, health.LastAttempt)
-	connection, err := r.database(r.config.GetDatabase().GetUrlFile())
-	if err != nil {
-		return "", err
-	}
 	doc, err := r.validate(options.Config)
 	if err != nil {
 		return "", err
@@ -164,7 +160,7 @@ func backup(ctx context.Context, options BackupOptions) (artifact string, err er
 	if err = r.inventoryBackup(options.Config); err != nil {
 		return "", err
 	}
-	dump, err := dumpDatabase(ctx, stage, connection)
+	dump, err := dumpBackupDatabase(ctx, stage, options.Config, pool)
 	if err != nil {
 		return "", err
 	}
@@ -191,6 +187,52 @@ func backup(ctx context.Context, options BackupOptions) (artifact string, err er
 		return "", err
 	}
 	return artifact, nil
+}
+
+// The runtime must not read the migration ledger's sequence. Only the root-only
+// migrator credential may produce the complete dump, after both roles resolve
+// the same database and application schema.
+func dumpBackupDatabase(ctx context.Context, stage, configPath string, runtime *pgxpool.Pool) (path string, err error) {
+	document, cleanup, err := StageDatabaseConfig(filepath.Join(filepath.Dir(configPath), "migrate", "server.json"))
+	if err != nil {
+		return "", err
+	}
+	defer func() { err = errors.Join(err, cleanup()) }()
+	cfg, err := document.MigrationDatabase()
+	if err != nil {
+		return "", err
+	}
+	migrator, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return "", errors.New("operations: backup_migrator_unavailable")
+	}
+	defer migrator.Close()
+	if err = checkBackupDatabaseTarget(ctx, runtime, migrator); err != nil {
+		return "", err
+	}
+	// pgx deliberately clears file-based TLS options after loading them. Keep
+	// the checked staged URI for libpq, including its CA and channel binding.
+	connection, err := custody.ReadRoot(document.Proto.GetDatabase().GetMigrationUrlFile(), maxResource, false)
+	defer clear(connection)
+	if err != nil {
+		return "", err
+	}
+	return dumpDatabase(ctx, stage, string(connection))
+}
+
+func checkBackupDatabaseTarget(ctx context.Context, runtime, migrator *pgxpool.Pool) error {
+	target, err := restoreTargetIdentity(ctx, runtime)
+	if err != nil {
+		return err
+	}
+	actual, err := restoreTargetIdentity(ctx, migrator)
+	if err != nil {
+		return err
+	}
+	if actual != target {
+		return errors.New("operations: backup_migrator_target_mismatch")
+	}
+	return nil
 }
 
 func recordBackupCompletion(path, artifact string, health *BackupHealth) error {

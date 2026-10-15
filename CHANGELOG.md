@@ -49,6 +49,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Keep README screenshots proportional and the thumbnail row within GitHub's desktop and mobile columns.
 - Make configuration-permission, Git remote and native GPG test fixtures independent of the caller's umask, Git defaults and temporary-path length.
 - Preserve safe backup cancellation and timeout causes without relaying PostgreSQL diagnostics; let the real archive drill retain opt-in private native-tool diagnostics.
+- Use the separately staged root-only migration credential for complete native PostgreSQL backups, require the same runtime database and schema, and retain protected migration-ledger sequence privileges.
 - Retain cold release launcher failures as lab-only encrypted diagnostics, including failures before the guest creates its custody export.
 - Raise the cold guest's own memlock allowance before custody, rather than losing an inherited allowance through a new PAM session.
 - Distinguish an already-closed SSH channel from a failed native artifact transfer, so encrypted cold-build diagnostics survive guest cleanup.

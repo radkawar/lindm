@@ -345,3 +345,74 @@ func TestBackupDatabaseURLsRequireRootPrivateCustody(t *testing.T) {
 		})
 	}
 }
+
+func TestBackupRequiresSeparateProtectedMigrationCredential(t *testing.T) {
+	directory := rootRestoreDirectory(t)
+	for _, test := range []struct {
+		name          string
+		migrationFile bool
+	}{
+		{name: "missing migration configuration"},
+		{name: "missing explicit migration credential", migrationFile: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			base := filepath.Join(directory, strings.ReplaceAll(test.name, " ", "-"))
+			configPath := filepath.Join(base, "server.json")
+			writeRestoreFixture(t, configPath, marshalRestoreFixture(t, restoreConfigFixture("runtime-url", false)), 0, 0)
+			writeRestoreFixture(t, filepath.Join(base, "runtime-url"), []byte("postgresql://runtime:private@runtime.invalid/lindm?sslmode=verify-full&sslrootcert=system"), 0, 0)
+			if test.migrationFile {
+				writeRestoreFixture(t, filepath.Join(base, "migrate", "server.json"), marshalRestoreFixture(t, restoreConfigFixture("../runtime-url", false)), 0, 0)
+			}
+			_, err := dumpBackupDatabase(t.Context(), base, configPath, nil)
+			if !test.migrationFile {
+				if !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("backup did not require the migration configuration: %v", err)
+				}
+			} else if err == nil || !strings.Contains(err.Error(), "explicit_database_credential_required") {
+				t.Fatalf("backup fell back to a runtime credential: %v", err)
+			}
+		})
+	}
+}
+
+func TestBackupMigrationStagingPreservesLibpqTLSAndRole(t *testing.T) {
+	directory := rootRestoreDirectory(t)
+	configPath := filepath.Join(directory, "migrate", "server.json")
+	cfg := restoreConfigFixture("unavailable-runtime-url", false)
+	cfg.Database.MigrationUrlFile = proto.String("migration-url")
+	writeRestoreFixture(t, configPath, marshalRestoreFixture(t, cfg), 0, 0)
+	writeRestoreFixture(t, filepath.Join(directory, "migrate", "migration-url"), []byte("postgresql://migration:private@database.invalid/lindm?sslmode=verify-full&sslrootcert=system&channel_binding=require&require_auth=scram-sha-256"), 0, 0)
+	document, cleanup, err := StageDatabaseConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := cleanup(); err != nil {
+			t.Error(err)
+		}
+	}()
+	migrator, err := document.MigrationDatabase()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if migrator.ConnConfig.User != "migration" {
+		t.Fatal("backup staging did not retain the separate migration role")
+	}
+	connection, err := os.ReadFile(document.Proto.GetDatabase().GetMigrationUrlFile())
+	defer clear(connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := libpqService(directory, string(connection)); err != nil {
+		t.Fatal(err)
+	}
+	service, err := os.ReadFile(filepath.Join(directory, "pg-service.conf"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, setting := range []string{"user=migration\n", "sslmode=verify-full\n", "sslrootcert=system\n", "channel_binding=require\n", "require_auth=scram-sha-256\n"} {
+		if !bytes.Contains(service, []byte(setting)) {
+			t.Fatalf("backup libpq service lost %q", setting)
+		}
+	}
+}

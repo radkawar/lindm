@@ -93,6 +93,13 @@ Import the customer's signed release feed to learn about updates offline.
 Apply the authenticated next bundle through its installer, not by replacing the
 server executable. The upgrade requires preflight checks and an encrypted backup.
 
+Native backups use the root-only migration configuration at
+`/etc/lindm/migrate/server.json` to read the complete database. Backup checks that
+the migration and runtime credentials name the same database and application
+schema before it runs `pg_dump`. Keep the migration configuration and credential
+root-only. Do not grant runtime access to the migration ledger's sequence to
+repair a failed backup.
+
 If a first installation is interrupted, correct the reported problem and rerun
 the same authenticated bundle with the same origins, trust keys, recipients and
 database/TLS inputs. The protected `/etc/lindm/install-state.json` journal is

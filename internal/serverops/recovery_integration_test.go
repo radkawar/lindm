@@ -80,3 +80,27 @@ func TestRecoveryHoldDatabaseGate(t *testing.T) {
 		t.Fatalf("database hold was not enforced: %v", err)
 	}
 }
+
+func TestBackupMigratorTargetAndProtectedLedgerSequence(t *testing.T) {
+	migrator, _ := testdb.Open(t)
+	other, _ := testdb.Open(t)
+	ctx := t.Context()
+	if err := checkBackupDatabaseTarget(ctx, migrator, migrator); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkBackupDatabaseTarget(ctx, migrator, other); err == nil || err.Error() != "operations: backup_migrator_target_mismatch" {
+		t.Fatalf("backup admitted a different application schema: %v", err)
+	}
+	var schema string
+	if err := migrator.QueryRow(ctx, "SELECT current_schema()").Scan(&schema); err != nil {
+		t.Fatal(err)
+	}
+	var runtimeAllowed, migratorAllowed bool
+	sequence := pgx.Identifier{schema, "goose_db_version_id_seq"}.Sanitize()
+	if err := migrator.QueryRow(ctx, "SELECT has_sequence_privilege('pg_monitor',$1,'SELECT'),has_sequence_privilege(current_user,$1,'SELECT')", sequence).Scan(&runtimeAllowed, &migratorAllowed); err != nil {
+		t.Fatal(err)
+	}
+	if runtimeAllowed || !migratorAllowed {
+		t.Fatal("backup must use the migrator without exposing the ledger sequence to runtime")
+	}
+}
