@@ -5,10 +5,56 @@ package devlab
 import (
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// Exercise the real build command and linker without building the full server.
+// These fields must match the signed stock repository used by native fixtures.
+func TestBuildIntegrationServerStampsStockReleaseIdentity(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module lindm\n\ngo 1.26\n",
+		"internal/agent/buildinfo/buildinfo.go": `package buildinfo
+
+var Version = "dev"
+var Revision = "unknown"
+`,
+		"cmd/lindmd/main.go": `package main
+
+import (
+	"fmt"
+	"lindm/internal/agent/buildinfo"
+)
+
+func main() {
+	fmt.Printf("%s\n%s\n", buildinfo.Version, buildinfo.Revision)
+}
+`,
+	}
+	for name, content := range files {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	binary := filepath.Join(root, "lindmd")
+	if err := buildIntegrationServer(t.Context(), root, binary); err != nil {
+		t.Fatal(err)
+	}
+	output, err := exec.CommandContext(t.Context(), binary).CombinedOutput()
+	if err != nil {
+		t.Fatalf("read compiled release identity: %v: %s", err, output)
+	}
+	if string(output) != "0.1.0\nconsole-enrollment-lab\n" {
+		t.Fatalf("integration server does not match the stock agent release: %q", output)
+	}
+}
 
 func TestTestWithProgressReportsEachPackage(t *testing.T) {
 	root := t.TempDir()

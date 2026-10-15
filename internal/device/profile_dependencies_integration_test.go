@@ -6,8 +6,10 @@ package device
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -22,21 +24,27 @@ func TestPublishProfileRevisionWithExpandedResourceDependencies(t *testing.T) {
 	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	publishExpandedDependencies(t, f)
-	sqlDB := stdlib.OpenDBFromPool(f.pool)
-	defer func() {
-		if err := sqlDB.Close(); err != nil {
-			t.Error(err)
-		}
-	}()
-	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, os.DirFS("../../db/migrations"))
+	// Isolate migration 57 without executing later irreversible Down migrations.
+	// Keep the business tables intact, as in db's migration Down tests.
+	if _, err := f.pool.Exec(t.Context(), `
+		DELETE FROM goose_db_version WHERE version_id > 57;
+		UPDATE lindm_schema_compatibility
+		SET minimum_runtime_version=51,
+		    migration_versions=(SELECT array_agg(version_id ORDER BY version_id) FROM goose_db_version WHERE version_id > 0 AND is_applied);
+	`); err != nil {
+		t.Fatal(err)
+	}
+	before, err := db.Preflight(t.Context(), f.pool)
 	if err != nil {
 		t.Fatal(err)
 	}
+	provider := profileDependencyMigrationProvider(t, f)
 	if _, err := provider.DownTo(t.Context(), 56); err == nil || !strings.Contains(err.Error(), "retained expanded profile dependencies") {
 		t.Fatalf("Down discarded typed dependencies: %v", err)
 	}
-	if err := db.Check(t.Context(), f.pool); err != nil {
-		t.Fatalf("refused Down changed schema admission: %v", err)
+	after, err := db.Preflight(t.Context(), f.pool)
+	if err != nil || !reflect.DeepEqual(before, after) {
+		t.Fatalf("refused Down changed schema admission: before=%+v after=%+v err=%v", before, after, err)
 	}
 	assertExpandedDependencies(t, f)
 }
@@ -45,22 +53,52 @@ func TestPublishExpandedDependenciesAfterForwardMigration(t *testing.T) {
 	parallelDeviceIntegration(t)
 	f := newDispatchFixture(t)
 	// Recreate the already-applied lab predecessor, not a destructive Down.
+	// Remove later history too: migration 57 must be pending above Current,
+	// and the later contract migration still requires fenced application.
 	if _, err := f.pool.Exec(t.Context(), `
 		ALTER TABLE profile_dependencies DROP CONSTRAINT profile_dependencies_dependency_kind_check;
 		ALTER TABLE profile_dependencies ADD CONSTRAINT profile_dependencies_dependency_kind_check CHECK (dependency_kind BETWEEN 1 AND 20);
-		DELETE FROM goose_db_version WHERE version_id=57;
-		UPDATE lindm_schema_compatibility SET migration_versions=array_remove(migration_versions,57::bigint);
+		DELETE FROM goose_db_version WHERE version_id >= 57;
+		UPDATE lindm_schema_compatibility
+		SET minimum_runtime_version=51,
+		    migration_versions=(SELECT array_agg(version_id ORDER BY version_id) FROM goose_db_version WHERE version_id > 0 AND is_applied);
 	`); err != nil {
 		t.Fatal(err)
 	}
 	status, err := db.Preflight(t.Context(), f.pool)
-	if err != nil || !status.Online || status.Compatible || len(status.Pending) != 1 || status.Pending[0] != 57 {
+	if err != nil || status.Current != 56 || status.Target != 58 || status.Online || status.Compatible || !reflect.DeepEqual(status.Pending, []int64{57, 58}) {
 		t.Fatalf("dependency expansion preflight=%+v err=%v", status, err)
 	}
-	if err := db.Migrate(t.Context(), f.pool); err != nil {
+	provider := profileDependencyMigrationProvider(t, f)
+	if _, err := provider.UpTo(t.Context(), 57); err != nil {
 		t.Fatal(err)
 	}
+	status, err = db.Preflight(t.Context(), f.pool)
+	if err != nil || status.Current != 57 || !reflect.DeepEqual(status.Pending, []int64{58}) {
+		t.Fatalf("dependency expansion history=%+v err=%v", status, err)
+	}
 	publishExpandedDependencies(t, f)
+}
+
+func profileDependencyMigrationProvider(t *testing.T, f *dispatchFixture) *goose.Provider {
+	t.Helper()
+	migration, err := os.ReadFile("../../db/migrations/00057_profile_dependency_kinds.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB := stdlib.OpenDBFromPool(f.pool)
+	t.Cleanup(func() {
+		if err := sqlDB.Close(); err != nil {
+			t.Error(err)
+		}
+	})
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, fstest.MapFS{
+		"00057_profile_dependency_kinds.sql": &fstest.MapFile{Data: migration},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return provider
 }
 
 func publishExpandedDependencies(t *testing.T, f *dispatchFixture) {

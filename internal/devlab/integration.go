@@ -19,9 +19,10 @@ import (
 	"lindm/internal/devlab/project"
 )
 
-// integrationServerRelease stamps the lindmd binary that native-server
-// integration tests drive; release fixtures require a real x.y.z stamp.
+// Native-server integration tests must match both identity fields of the
+// authenticated stock agent release, not just its x.y.z version.
 const integrationServerRelease = "0.1.0"
+const integrationServerRevision = "console-enrollment-lab"
 
 // TestIntegration runs the real Keycloak fresh-authorization smoke followed by
 // PostgreSQL regressions against private per-test schemas. Native-server
@@ -78,7 +79,7 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot, packages, jsonO
 	}
 	defer func() { resultErr = errors.Join(resultErr, os.RemoveAll(work)) }()
 	server := filepath.Join(work, "lindmd")
-	if err := command(ctx, codeRoot, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease, "-o", server, "./cmd/lindmd"); err != nil {
+	if err := buildIntegrationServer(ctx, codeRoot, server); err != nil {
 		return fmt.Errorf("build native integration server: %w", err)
 	}
 	env := make([]string, 0, len(os.Environ())+3)
@@ -100,6 +101,10 @@ func TestIntegration(ctx context.Context, fixtureRoot, codeRoot, packages, jsonO
 	// Preserve the per-binary deadline: slower suites need optimization or
 	// sharding, not a longer hold of the shared integration fixture.
 	return testWithProgress(ctx, codeRoot, env, progress, events, "-race", "-tags=integration", "-count=1", "-timeout=30m", packages)
+}
+
+func buildIntegrationServer(ctx context.Context, codeRoot, server string) error {
+	return command(ctx, codeRoot, append(os.Environ(), "CGO_ENABLED=0"), "go", "build", "-trimpath", "-ldflags", "-X lindm/internal/agent/buildinfo.Version="+integrationServerRelease+" -X lindm/internal/agent/buildinfo.Revision="+integrationServerRevision, "-o", server, "./cmd/lindmd")
 }
 
 // testEvent is the subset of go test -json (test2json) events used here.
