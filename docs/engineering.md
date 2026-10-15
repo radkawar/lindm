@@ -4968,6 +4968,36 @@ The root regression models the installed 0755 sibling and verifies it is not
 changed; no chmod of existing operational state or relaxation of private-stage
 admission is allowed.
 
+SDK20's authentic fresh-guest `cold-release-attempt22.json`, SHA-256
+`0203c9bf56e89a36c1fc8254ae051daa5ecf2cccfc1fb4057283927d31a5937c`,
+passed in 1,607.85 seconds at
+`16a96e3f6b5cdb678fdec4aa1be8eb6aa3b36c4c`, with owned cleanup complete.
+Literal production key generation and both release builds produced signed
+0.2.18 and 0.2.19 bundles. This is release-build evidence only, not lifecycle
+qualification.
+
+Fresh `native-ubuntu-attempt30.json`, SHA-256
+`31e9071c51d8af0d4a8babb31e855eebf1592bbb68e9d178ba21e58dbe94820d`,
+used that unchanged pair and source. Installed and upgraded browser/SQL Findings,
+backup, upgrade, current-security snapshot and quorum approvals passed.
+Actual fresh-host restore passed in 27.27 seconds. Root-only restored database
+credentials and decryption of the original integration destination with the
+restored original key passed; the fresh-key negative control had refused it.
+All four restored certificate digests matched the source certificates, but the
+immediate HTTPS probe reset before a handshake. No runtime-readiness or restored
+device-management pass is inferred: overall **FAIL** after 718.75 seconds,
+11 commands, 60 decisions, one failure and incomplete cleanup.
+
+`systemctl start` alone does not establish readiness for a Type=simple unit.
+The native observer now waits within the existing strict-TLS probe deadline for
+the real read-only `/readyz` response before the independent exact-leaf handshake.
+Only transient startup transport failures and HTTP 503 are observed again;
+untrusted certificates, redirects and other HTTP refusals fail immediately.
+No restore or management action is retried. A restored probe failure also saves
+bounded service journals directly as operator-encrypted ciphertext before
+teardown. This is an observation correction, not an established diagnosis of
+the earlier reset; SDK20's signed contents are unchanged.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and

@@ -532,7 +532,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 		if runErr := op("prove restore recovered console and device transport CAs", "harness", func() error {
 			return observeDeployTLS(ctx, restored, &request, "restored", result.TLS[0], &result.TLS)
 		}); runErr != nil {
-			return runErr
+			return errors.Join(runErr, captureDeployServiceJournal(ctx, restored, options, "restored-service-journal"))
 		}
 		if runErr := browser("custody", ""); runErr != nil {
 			return runErr

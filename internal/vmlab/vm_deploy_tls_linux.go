@@ -130,7 +130,11 @@ func observeDeployTLS(ctx context.Context, guest *guestVM, request *deploylab.Br
 	roots.AddCert(certificates[0])
 	probe, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	dialer := &tls.Dialer{Config: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, ServerName: u.Hostname()}}
+	trust := &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots, ServerName: u.Hostname()}
+	if err := waitDeployReadiness(probe, request.Origin, trust); err != nil {
+		return err
+	}
+	dialer := &tls.Dialer{Config: trust}
 	connection, err := dialer.DialContext(probe, "tcp", u.Host)
 	if err != nil {
 		return fmt.Errorf("verify native console TLS: %w", err)
