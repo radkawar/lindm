@@ -4055,6 +4055,16 @@ and its private immutable snapshot must fit while preserving the installer's
 32 GiB-per-guest disk admission, four slots and FIFO remain unchanged. Evidence
 records `server_minimum_disk_bytes`; this budget is not an installer gate bypass.
 
+Installer-media manifests require explicit package-owned UEFI inputs:
+`-firmware-code`, `-firmware-vars`, `-firmware-package` and the exact installed
+`-firmware-version`. These use the same maintained VM hardware flags and host
+configuration as other native lanes; matrix `deploy` cells retain their architecture
+firmware arguments. The source server, original enrolled device and fresh restore
+server each receive the selection with an independently copied private NVRAM file.
+The first-run-only `deploy setup` path accepts the same inputs. Hardware selection
+never enables a foreign-architecture or TCG fallback, changes the server disk floor
+or overrides the lane's connected/air-gap network policy.
+
 ```sh
 go run ./cmd/lab deploy \
   -host "$LOCAL_HOST_ID" -manifest "$PINNED_SERVER_IMAGE" \

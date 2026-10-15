@@ -38,6 +38,7 @@ type VMDeployOptions struct {
 	CustodyEscrowRecipientFile                                   string
 	RedHatTokenFile                                              string
 	WithoutFindings                                              bool
+	Hardware                                                     *VMHardwareOptions
 	BackupIdentityPassphrase                                     []byte `json:"-"`
 	Browser                                                      func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error)
 	VerifyBackup                                                 func(context.Context, string) error
@@ -119,6 +120,10 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	}
 	release := manifestRelease(manifest)
 	if err := release.LabLaneOn(platform.LaneDeploy, manifest.Architecture); err != nil {
+		return result, err
+	}
+	hardware, err := deployServerHardware(false, options.Hardware)
+	if err != nil {
 		return result, err
 	}
 	if release.Version.Rule == platform.VersionMajor && manifest.Version == release.Version.Value {
@@ -223,7 +228,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return proofErr
 		})
 	}
-	server, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(false))
+	server, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, hardware)
 	if err != nil {
 		return result, err
 	}
@@ -321,7 +326,10 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 	defer clear(integrationProof.Ciphertext)
 	result.IntegrationSecretGates = append(result.IntegrationSecretGates, "installed")
 	request.CommandPath = filepath.Join(private, "console-command")
-	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
+	deviceHardware := *hardware
+	deviceHardware.AllowNetwork = false
+	deviceHardware.minimumDiskBytes = 0
+	result.Enrollment, err = EnrollFromConsoleVM(ctx, manifest, VMConsoleEnrollmentOptions{CacheDir: options.CacheDir, WorkDir: options.WorkDir, LabBinary: options.LabBinary, CommandFile: request.CommandPath, AdminAddress: admin.listener.Addr().String(), DeviceAddress: device.listener.Addr().String(), DiagnosticsDir: options.EvidenceDirectory, FailureRecipientFile: options.CustodyEscrowRecipientFile, RedHatTokenFile: options.RedHatTokenFile, CompletionTimeout: 3 * time.Hour, Hardware: &deviceHardware, Ready: func() error { return browser("copy", "") }, VerifyEnrollment: func(ctx context.Context, enrolled *VMConsoleEnrollmentResult) (callbackErr error) {
 		result.DeviceID = enrolled.DeviceID
 		if err := observeDeployManagedPhase(options, func() error {
 			if err := browser("manage", enrolled.DeviceID); err != nil {
@@ -416,7 +424,7 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			}
 			result.EvidenceFiles = append(result.EvidenceFiles, name)
 		}
-		restored, _, runErr := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(false))
+		restored, _, runErr := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, hardware)
 		if runErr != nil {
 			return runErr
 		}

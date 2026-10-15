@@ -24,6 +24,7 @@ type VMDeploySetupOptions struct {
 	FirstRelease, ReleasePublicKey, ReleaseKeyID, TUFRootFile        string
 	BackupRecipientFile, CustodyEscrowRecipientFile, RedHatTokenFile string
 	Airgap                                                           bool
+	Hardware                                                         *VMHardwareOptions
 	Browser                                                          func(context.Context, deploylab.BrowserRequest) (*deploylab.BrowserEvidence, error)
 }
 
@@ -181,12 +182,26 @@ func prepareDeploySetupBrowser(options VMDeploySetupOptions, private string) dep
 	return deploylab.BrowserRequest{Phase: "setup", Username: "deploy-" + strings.ToLower(rand.Text()), Password: rand.Text() + rand.Text(), CAFile: filepath.Join(private, "console-ca.crt"), PrivateDirectory: private, EvidenceDirectory: options.EvidenceDirectory, CredentialPath: filepath.Join(private, "passkey.json"), ResultPath: filepath.Join(options.EvidenceDirectory, "browser-setup.json")}
 }
 
-func deployServerHardware(airgap bool) *VMHardwareOptions {
-	return &VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm", AllowNetwork: !airgap, minimumDiskBytes: deployServerDiskBytes}
+func deployServerHardware(airgap bool, supplied *VMHardwareOptions) (*VMHardwareOptions, error) {
+	hardware := VMHardwareOptions{}
+	if supplied != nil {
+		hardware = *supplied
+	}
+	if (hardware.Architecture != "" && hardware.Architecture != "x86_64" && hardware.Architecture != "amd64") ||
+		(hardware.Accelerator != "" && hardware.Accelerator != "kvm") {
+		return nil, errors.New("deploy requires native x86_64 KVM hardware")
+	}
+	hardware.Architecture, hardware.Accelerator = "x86_64", "kvm"
+	hardware.AllowNetwork, hardware.minimumDiskBytes = !airgap, deployServerDiskBytes
+	return &hardware, nil
 }
 
 func newDeploySetupGuest(ctx context.Context, manifest *labv1.ImageManifest, options VMDeploySetupOptions, result *VMDeploySetupResult) (*guestVM, error) {
-	guest, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, deployServerHardware(options.Airgap))
+	hardware, err := deployServerHardware(options.Airgap, options.Hardware)
+	if err != nil {
+		return nil, err
+	}
+	guest, image, err := newVerifiedGuestWithHardware(ctx, manifest, options.CacheDir, options.WorkDir, false, hardware)
 	if err != nil {
 		return nil, err
 	}

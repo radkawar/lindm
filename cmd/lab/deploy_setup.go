@@ -21,7 +21,7 @@ func runDeploySetupAdmitted(ctx context.Context, args []string, stdout, stderr i
 	flags := flag.NewFlagSet("deploy setup", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeploySetupOptions
-	manifestPath := flags.String("manifest", "", "pinned exact fresh x86_64 cloud image for a registry-supported native server host; connected-only hosts cannot use -airgap")
+	manifestPath := flags.String("manifest", "", "pinned exact fresh x86_64 image for a registry-supported native server host; installers require explicit firmware; connected-only hosts cannot use -airgap")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
 	flags.StringVar(&options.WorkDir, "work-dir", "", "configured native lab work directory")
@@ -36,9 +36,11 @@ func runDeploySetupAdmitted(ctx context.Context, args []string, stdout, stderr i
 	flags.StringVar(&options.CustodyEscrowRecipientFile, "custody-escrow-recipient-file", "", "explicit lab operator public age recipient for memory-only quickstart passphrase escrow")
 	flags.StringVar(&options.RedHatTokenFile, "redhat-token-file", "", "protected available Red Hat offline-token input; never print contents")
 	record := flags.String("record", "", "new private nonsecret first-run-install-only record; never a full lifecycle qualification")
+	hardware := newVMHardwareFlags(flags)
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
+	options.Hardware = hardware.options()
 	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || options.EvidenceDirectory == "" || options.FirstRelease == "" || options.ReleasePublicKey == "" || options.ReleaseKeyID == "" || options.TUFRootFile == "" || options.BackupRecipientFile == "" || options.CustodyEscrowRecipientFile == "" {
 		return errors.New("deploy setup requires -manifest, -first-release, independent release/TUF pins, backup public recipient, lab custody escrow public recipient, -evidence and -record; no positional or private backup inputs")
 	}

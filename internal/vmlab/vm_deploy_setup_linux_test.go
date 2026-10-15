@@ -51,7 +51,10 @@ func TestDeploySetupOptionsDoNotAcceptPrivateBackupOrNewerRelease(t *testing.T) 
 
 func TestDeploySetupAirgapHardwareAndInstaller(t *testing.T) {
 	for _, airgap := range []bool{false, true} {
-		hardware := deployServerHardware(airgap)
+		hardware, err := deployServerHardware(airgap, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if hardware.Architecture != "x86_64" || hardware.Accelerator != "kvm" || hardware.AllowNetwork == airgap || hardware.minimumDiskBytes != deployServerDiskBytes {
 			t.Fatalf("wrong native server network policy for airgap=%t: %+v", airgap, hardware)
 		}
@@ -78,10 +81,14 @@ func TestDeploySetupAirgapHardwareAndInstaller(t *testing.T) {
 }
 
 func TestDeployServerDiskFloorLeavesOtherNativeLanesUnchanged(t *testing.T) {
+	server, err := deployServerHardware(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		hardware *VMHardwareOptions
 		want     int64
-	}{{deployServerHardware(false), 32 << 30}, {&VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, 10 << 30}} {
+	}{{server, 32 << 30}, {&VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, 10 << 30}} {
 		hardware, err := resolveVMHardware(test.hardware, "amd64")
 		if err != nil {
 			t.Fatal(err)
@@ -89,6 +96,29 @@ func TestDeployServerDiskFloorLeavesOtherNativeLanesUnchanged(t *testing.T) {
 		size, err := guestOverlayBytes(1<<30, hardware.minimumDiskBytes)
 		if err != nil || size != test.want {
 			t.Fatalf("native overlay floor=%d want=%d: %v", size, test.want, err)
+		}
+	}
+}
+
+func TestDeployHardwarePreservesExplicitFirmwareAndNativePolicy(t *testing.T) {
+	firmware := &EncryptedFirmwareOptions{Code: "/firmware/code.fd", Vars: "/firmware/vars.fd", Package: "ovmf", Version: "pinned"}
+	for _, airgap := range []bool{false, true} {
+		supplied := VMHardwareOptions{Architecture: "amd64", Firmware: firmware, StorageBus: "virtio-scsi", TPM: true, ExtraDisks: 1, AllowNetwork: airgap, minimumDiskBytes: 1}
+		before := supplied
+		hardware, err := deployServerHardware(airgap, &supplied)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := before
+		want.Architecture, want.Accelerator = "x86_64", "kvm"
+		want.AllowNetwork, want.minimumDiskBytes = !airgap, deployServerDiskBytes
+		if !reflect.DeepEqual(*hardware, want) || !reflect.DeepEqual(supplied, before) {
+			t.Fatalf("explicit firmware or fixed native/network/disk policy changed: got=%+v supplied=%+v", hardware, supplied)
+		}
+	}
+	for _, supplied := range []*VMHardwareOptions{{Architecture: "aarch64"}, {Accelerator: "tcg"}} {
+		if _, err := deployServerHardware(false, supplied); err == nil {
+			t.Fatal("non-native deployment hardware admitted")
 		}
 	}
 }

@@ -6,7 +6,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
+	"strings"
 	"testing"
 
 	labv1 "lindm/gen/lindm/lab/v1"
@@ -29,7 +31,24 @@ func TestDeploySetupRetainsSingleNativeGuestFootprint(t *testing.T) {
 		t.Fatalf("full lifecycle footprint changed to %d, want three", got)
 	}
 	cfg := &labv1.LabConfig{}
-	if !vmRequiresKVM(cfg, "deploy-setup", "tcg", "amd64") {
-		t.Fatal("setup-only slice allowed foreign TCG fallback")
+	for _, command := range []string{"deploy", "deploy-setup"} {
+		if !vmHasHardwareFlags(command) {
+			t.Fatalf("%s does not receive host firmware arguments", command)
+		}
+		for _, accelerator := range []string{"", "kvm", "tcg"} {
+			if !vmRequiresKVM(cfg, command, accelerator, "amd64") {
+				t.Fatal("native deployment allowed foreign TCG fallback")
+			}
+		}
+	}
+}
+
+func TestDeployCommandsAcceptRoutedFirmwareFlags(t *testing.T) {
+	for _, run := range []func(context.Context, []string, io.Writer, io.Writer) error{runDeployAdmitted, runDeploySetupAdmitted} {
+		var diagnostics bytes.Buffer
+		err := run(t.Context(), []string{"-firmware-code", "/firmware/code.fd", "-firmware-vars", "/firmware/vars.fd", "-firmware-package", "ovmf", "-firmware-version", "pinned", "-accelerator", "kvm"}, io.Discard, &diagnostics)
+		if err == nil || !strings.Contains(err.Error(), "requires") || strings.Contains(diagnostics.String(), "flag provided but not defined") {
+			t.Fatalf("deployment did not parse routed firmware before missing-input admission: %v %s", err, diagnostics.String())
+		}
 	}
 }

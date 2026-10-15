@@ -35,7 +35,7 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	flags := flag.NewFlagSet("deploy", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	var options vmlab.VMDeployOptions
-	manifestPath := flags.String("manifest", "", "pinned fresh connected x86_64 cloud image for a registry-supported native server host; entitled RHEL requires Red Hat input")
+	manifestPath := flags.String("manifest", "", "pinned fresh connected x86_64 image for a registry-supported native server host; installers require explicit firmware; entitled RHEL requires Red Hat input")
 	flags.BoolVar(&options.WithoutFindings, "without-findings", false, "prove only the native server lifecycle; exclude Findings and never qualify the full lifecycle")
 	flags.StringVar(&options.Repository, "repo", ".", "checkout containing the maintained real browser driver")
 	flags.StringVar(&options.CacheDir, "cache", ".cache/lab/images", "verified vendor image cache")
@@ -57,10 +57,12 @@ func runDeployAdmitted(ctx context.Context, args []string, stdout, stderr io.Wri
 	lindmd := flags.String("lindmd", "", "matching consolidated prebuilt lindmd for offline backup drill/checkpoint signing")
 	lindmctl := flags.String("lindmctl", "", "matching prebuilt owner CLI for offline higher-epoch delegation")
 	drillImage := flags.String("drill-image", "", "pre-pulled digest-pinned docker.io/library/postgres image with the matching pg_restore major for networkless off-server drill; default native operator client")
+	hardware := newVMHardwareFlags(flags)
 	record := flags.String("record", "", "new private nonsecret full workflow/audit record")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
+	options.Hardware = hardware.options()
 	if flags.NArg() != 0 || *manifestPath == "" || *record == "" || options.EvidenceDirectory == "" || *lindmd == "" || *lindmctl == "" || options.CustodyEscrowRecipientFile == "" {
 		return errors.New("deploy requires -manifest, -first-release, -upgrade-release, explicit trust and backup inputs, -lindmd, -lindmctl, -evidence and -record; no positional arguments")
 	}

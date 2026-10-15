@@ -14200,6 +14200,21 @@
       "scope": "server-platforms-e9c333339-debian13-maintained-export-admission-fail",
       "reference": "#control-plane-deployment-matrix",
       "mainlineRevision": "e9c333339d3124273fbc9e2ad165b443da1df033"
+    },
+    {
+      "platform": "debian-13",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/server-platforms-20261015/native-debian13-attempt2.json",
+      "sha256": "c01d1e775ad3fa68ee3387b56e172930439a21d96b953662ff3269d1ba042cb1",
+      "recorded": "2026-10-15T20:41:48.512410129Z",
+      "revision": "64e6707c0cf11e43be6722c55ae4c3dcc9f1905f",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "server-platforms-sdk32-observer64-debian13-firmware-admission-fail",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "64e6707c0cf11e43be6722c55ae4c3dcc9f1905f"
     }
   ]
 }

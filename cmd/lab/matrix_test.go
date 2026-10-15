@@ -121,6 +121,28 @@ func TestMatrixOwnerKeyTPMCellUsesOwnedBootTopology(t *testing.T) {
 	}
 }
 
+func TestMatrixDeployRetainsExplicitHostFirmwareArguments(t *testing.T) {
+	selection := matrixSelection{root: "../..", platforms: "debian-13", cells: "deploy", architecture: "x86_64"}
+	in, cells, err := selection.plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cells) != 1 {
+		t.Fatal("native deployment cell missing")
+	}
+	run := &matrixRun{root: "../..", archArgs: in.Matrix.GetArchitectureArgs(), deploy: &deployMatrixInputs{}}
+	args, err := run.laneArgs(cells[0], t.TempDir()+"/cell")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, flag := range []string{"firmware-code", "firmware-vars", "firmware-package", "firmware-version"} {
+		want := labhost.FlagValue(in.Matrix.GetArchitectureArgs()["x86_64"].GetArgs(), flag)
+		if want == "" || labhost.FlagValue(args, flag) != want {
+			t.Fatalf("native deployment lost host %s: %v", flag, args)
+		}
+	}
+}
+
 // Original-device signed recovery refuses non-Secure-Boot firmware, so the
 // cell's Microsoft-enrolled template must override the default and come last.
 func TestMatrixSecureBootCellOverridesFirmwareTemplate(t *testing.T) {

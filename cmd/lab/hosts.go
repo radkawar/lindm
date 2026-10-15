@@ -319,7 +319,7 @@ func vmHolds(args []string) bool {
 func vmHasHardwareFlags(command string) bool {
 	switch command {
 	case "serverdeps", "snapshot", "inspect", "inspect-storage", "lifecycle", "dispatch", "resources", "services", "encrypted", "device-actions", "assistance", "enroll-from-console", "updates", "advisories", "airgap",
-		"production-release-signing", "provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
+		"deploy", "deploy-setup", "production-release-signing", "provision-cloud-init", "provision-autoinstall", "provision-kickstart", "provision-autoyast":
 		return true
 	default:
 		// These lanes retain their existing fixed native-KVM hardware contract.
@@ -333,7 +333,7 @@ func vmHasHardwareFlags(command string) bool {
 // explicitly told otherwise; architecture-defaulted lanes use TCG only when no
 // configured host runs that architecture natively.
 func vmRequiresKVM(cfg *labv1.LabConfig, command, accelerator, architecture string) bool {
-	if !vmHasHardwareFlags(command) {
+	if command == "deploy" || command == "deploy-setup" || !vmHasHardwareFlags(command) {
 		return true
 	}
 	switch command {
