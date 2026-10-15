@@ -13,6 +13,7 @@ import {
   assessDeploymentFindings,
   deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
+  readDeploymentPage,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
 } from "./deploy-browser.mjs";
@@ -337,4 +338,77 @@ test("native screenshots have an independent invocation scope instead of overwri
   assert.match(script, /const captureScope = randomUUID\(\);/);
   assert.match(script, /\$\{config\.phase\}-\$\{captureScope\}-\$\{name\}\.png/);
   assert.doesNotMatch(script, /\$\{config\.phase\}-\$\{name\}\.png/);
+});
+
+test("native RPC evidence materializes the selected body before navigation releases its resource", async () => {
+  const body = { snapshotId: "real-selected-snapshot", packages: [{ name: "native-package" }] };
+  let select;
+  let predicate;
+  let released = false;
+  let consumed = false;
+  let navigations = 0;
+  const driver = {
+    page: {
+      waitForResponse(match) {
+        predicate = match;
+        return new Promise((resolve) => {
+          select = resolve;
+        });
+      },
+    },
+    async goto(url) {
+      navigations++;
+      assert.equal(url, "https://console.example/devices/owned?tab=inventory");
+      assert.equal(predicate({ url: () => "https://console.example/other" }), false);
+      assert.equal(
+        predicate({
+          url: () => "https://console.example/lindm.admin.v1.AdminService/ListDevicePackages",
+        }),
+        true,
+      );
+      select({
+        ok: () => true,
+        async json() {
+          assert.equal(released, false, "body must not wait for goto completion");
+          consumed = true;
+          return body;
+        },
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+      assert.equal(consumed, true);
+      released = true;
+    },
+  };
+  assert.equal(
+    await readDeploymentPage(
+      driver,
+      "https://console.example",
+      "/devices/owned?tab=inventory",
+      "ListDevicePackages",
+    ),
+    body,
+  );
+  assert.equal(navigations, 1);
+});
+
+test("native RPC evidence retains HTTP refusal and never retries or consumes an error body", async () => {
+  let navigations = 0;
+  const driver = {
+    page: {
+      waitForResponse: async () => ({
+        ok: () => false,
+        status: () => 403,
+        headers: () => ({ "lindm-reason": "scope_denied" }),
+        json: () => assert.fail("error response bodies are not public evidence"),
+      }),
+    },
+    async goto() {
+      navigations++;
+    },
+  };
+  await assert.rejects(
+    readDeploymentPage(driver, "https://console.example", "/devices/owned", "ListDevicePackages"),
+    { message: "listdevicepackages_query_http_403_scope_denied" },
+  );
+  assert.equal(navigations, 1);
 });

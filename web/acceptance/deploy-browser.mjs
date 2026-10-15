@@ -65,6 +65,26 @@ export async function requirePackageInventoryCard(page) {
   await card.getByText("Installed packages", { exact: true }).waitFor();
 }
 
+// Materialize the selected RPC body while its navigation is still in flight.
+// Chromium can discard a Response's backing resource before goto resolves.
+export async function readDeploymentPage(driver, origin, path, method) {
+  const response = driver.page
+    .waitForResponse(
+      (reply) => new URL(reply.url()).pathname === `/lindm.admin.v1.AdminService/${method}`,
+      { timeout: 30_000 },
+    )
+    .then(async (reply) => {
+      if (!reply.ok()) {
+        const reason = reply.headers()["lindm-reason"];
+        const safe = /^[a-z][a-z0-9_]{0,127}$/.test(reason ?? "") ? `_${reason}` : "";
+        throw new Error(`${method.toLowerCase()}_query_http_${reply.status()}${safe}`);
+      }
+      return reply.json();
+    });
+  const [, body] = await Promise.all([driver.goto(`${origin}${path}`), response]);
+  return body;
+}
+
 // Public failure evidence contains only a finite error category and an owned
 // script position. Playwright messages, URLs and call arguments can be secrets.
 export function deploymentBrowserFailure(error) {

@@ -10,6 +10,7 @@ import {
   assessDeploymentFindings,
   deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
+  readDeploymentPage,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
 } from "./deploy-browser.mjs";
@@ -193,19 +194,7 @@ async function inspectInventoryAndFindings(ui) {
   )
     throw new Error("native_findings_configuration_missing");
   const devicePath = `/devices/${encodeURIComponent(config.deviceId)}`;
-  const readPage = async (path, method) => {
-    const pending = driver.page.waitForResponse(
-      (reply) => new URL(reply.url()).pathname === `/lindm.admin.v1.AdminService/${method}`,
-      { timeout: 30_000 },
-    );
-    const [, reply] = await Promise.all([driver.goto(`${config.origin}${path}`), pending]);
-    if (!reply.ok()) {
-      const reason = reply.headers()["lindm-reason"];
-      const safe = /^[a-z][a-z0-9_]{0,127}$/.test(reason ?? "") ? `_${reason}` : "";
-      throw new Error(`${method.toLowerCase()}_query_http_${reply.status()}${safe}`);
-    }
-    return reply.json();
-  };
+  const readPage = (path, method) => readDeploymentPage(driver, config.origin, path, method);
   const deadline = Date.now() + config.findingsWaitMilliseconds;
   const refreshStarts = new Map();
   const capturedDownloads = new Set();

@@ -4876,6 +4876,24 @@ overwrote earlier images; those old images are not reconstructed. Subsequent
 observers retain invocation-specific images and safe error categories/source
 positions instead.
 
+Fresh `native-ubuntu-attempt26.json`, SHA-256
+`10bca69586645f6b371558c9b625a49733eaa405171df78c1d9e57d60356de27`,
+uses the unchanged SDK19 product and observer
+`420c46bc94802351036c878e142fb499c48073dd`. It again passed installed
+browser/SQL evaluation, backup/archive verification, upgrade and post-upgrade
+completed management with fresh inventory. The second Findings phase now
+retained the exact safe failure category
+`deployment_browser_failed_response_body_unavailable_deploy_207`: Chromium no
+longer had the selected RPC response body when `reply.json()` ran after
+navigation completed. Distinct invocation screenshots preserve both phases.
+The overall verdict remains **FAIL**, with six commands, 60 decisions, one
+observed failure and incomplete cleanup; no fresh restore was reached.
+
+The corrected observer materializes the selected RPC body concurrently with
+navigation, before waiting for both to finish. It keeps exact RPC selection,
+HTTP refusal, same-snapshot/package matching and read-only behavior. It neither
+retries a navigation/response nor converts a missing body into passing evidence.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
