@@ -27,6 +27,7 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 
 ### Changed
 
+- Let held desktop assistance demos start when their platform explicitly lacks advisory coverage, without configuring substitute feeds or claiming vulnerability findings; supported releases still require their real exports and completed findings.
 - Retain AWS native installer failure diagnostics in create-exclusive root-only custody instead of discarding the cause; keep child output out of public errors and refuse overwrites or capture into memory.
 - Require PostgreSQL 16 for all v0.1.0 local and external databases; refuse older or newer server versions before migrations. PostgreSQL 17/18 with matching backup clients is post-v0.1 work.
 - Select RHEL 9's signed distro PostgreSQL 16 stream explicitly; refuse conflicting modules, older PostgreSQL installs and unrelated clusters without resetting or migrating them. Check PostgreSQL server and backup clients before provisioning and upgrade backup. v0.1.0 RHEL server installation is connected-only; offline installation refuses before mutation. Ubuntu air-gap behavior is unchanged.

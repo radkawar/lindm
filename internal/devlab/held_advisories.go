@@ -32,6 +32,18 @@ func HeldAdvisories(release platform.Release, architecture string) (*configv1.Ad
 	return &configv1.AdvisoryConfig{RefreshEnabled: true, Feeds: sources}, nil
 }
 
+// HeldAssistanceAdvisories leaves explicitly unavailable advisory coverage
+// unavailable in a held desktop demo. Supported coverage still requires the
+// complete maintained exports enforced by HeldAdvisories.
+func HeldAssistanceAdvisories(release platform.Release, architecture string) (*configv1.AdvisoryConfig, error) {
+	if registered, ok := platform.Lookup(release.Key); ok {
+		if registered.Gate(platform.Advisories) != nil || len(registered.Advisory.Feeds) == 0 && registered.Advisory.Partial != "" {
+			return nil, nil
+		}
+	}
+	return HeldAdvisories(release, architecture)
+}
+
 const (
 	heldAdvisoryByteBudget = 4 << 30
 	heldAdvisoryDuration   = 2 * time.Hour

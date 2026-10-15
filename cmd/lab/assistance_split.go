@@ -139,19 +139,21 @@ func runSplitAssistance(ctx context.Context, host *labv1.LabHost, architecture, 
 		if err != nil {
 			return err
 		}
-		advisories, err := devlab.HeldAdvisories(*platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()), manifest.GetArchitecture())
+		advisories, err := devlab.HeldAssistanceAdvisories(*platform.ForManifest(manifest.GetDistribution(), manifest.GetVersion()), manifest.GetArchitecture())
 		if err != nil {
 			return err
 		}
-		cache := labhost.FlagValue(args, "advisory-cache")
-		if cache == "" {
-			cache, err = controllerAdvisoryCache()
-			if err != nil {
+		if advisories != nil {
+			cache := labhost.FlagValue(args, "advisory-cache")
+			if cache == "" {
+				cache, err = controllerAdvisoryCache()
+				if err != nil {
+					return err
+				}
+			}
+			if err := controller.Fixture.EnableAdvisories(ctx, advisories, cache); err != nil {
 				return err
 			}
-		}
-		if err := controller.Fixture.EnableAdvisories(ctx, advisories, cache); err != nil {
-			return err
 		}
 	}
 	private, err := os.MkdirTemp("", "lindm-assistance-controller-")

@@ -691,6 +691,8 @@ cache. Unchanged vendor exports are reused after revalidation. Only `lindmd`
 restarts when enabling this configuration; the fixture database and enrolled
 device are retained.
 
+Held assistance demos skip advisory feed seeding and the findings-readiness wait only when the platform registry explicitly marks advisories unavailable, as on Omarchy, Mint and Pop!_OS. The console retains that unavailable status; no base-distribution feed or clean findings are substituted. Supported advisory coverage still requires the maintained complete exports and real evaluated findings before the demo is held.
+
 An unnamed demo holds one lab slot, with no lane deadline, until Ctrl-C tears
 its disposable fixture down. Add `-name NAME` to keep a demo across stops:
 the same command resumes the same database, owner account, console/TURN ports

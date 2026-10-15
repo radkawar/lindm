@@ -108,6 +108,43 @@ func TestHeldAdvisoriesRejectUnsupportedCoverage(t *testing.T) {
 	}
 }
 
+func TestHeldAssistanceLeavesUnavailableAdvisoriesUnconfigured(t *testing.T) {
+	for _, key := range []string{"omarchy-4.0.4", "linuxmint-22.3", "pop-24.04"} {
+		t.Run(key, func(t *testing.T) {
+			release, ok := platform.Lookup(key)
+			if !ok || release.Gate(platform.Advisories) == nil && release.Advisory.Partial == "" {
+				t.Fatal("desktop must have explicitly unavailable vendor advisory coverage")
+			}
+			cfg, err := HeldAssistanceAdvisories(*release, "amd64")
+			if err != nil || cfg != nil {
+				t.Fatalf("unavailable coverage produced held feeds: %v, %v", cfg, err)
+			}
+			if release.Gate(platform.Advisories) == nil && release.Advisory.Partial == "" {
+				t.Fatal("held demo changed the platform's unavailable coverage status")
+			}
+		})
+	}
+}
+
+func TestHeldAssistanceRequiresSupportedAdvisoryExports(t *testing.T) {
+	release, _ := platform.Lookup("ubuntu-24.04")
+	cfg, err := HeldAssistanceAdvisories(*release, "amd64")
+	if err != nil || !cfg.GetRefreshEnabled() || len(cfg.GetFeeds()) == 0 {
+		t.Fatalf("supported desktop lost its real advisory feeds: %v, %v", cfg, err)
+	}
+	if _, err := HeldAssistanceAdvisories(*release, "riscv64"); err == nil {
+		t.Fatal("unsupported architecture was silently skipped")
+	}
+	if release, _ := platform.Lookup("rocky-9"); release != nil {
+		if _, err := HeldAssistanceAdvisories(*release, "amd64"); err == nil {
+			t.Fatal("existing vendor feed without complete coverage was silently skipped")
+		}
+	}
+	if _, err := HeldAssistanceAdvisories(platform.Release{}, "amd64"); err == nil {
+		t.Fatal("unknown release was silently skipped")
+	}
+}
+
 func TestEnableAdvisoriesRejectsConnectedFixture(t *testing.T) {
 	fixture := &AuthorityFixture{connected: &connectedAuthority{}}
 	if err := fixture.EnableAdvisories(t.Context(), nil, ""); err == nil || err.Error() != "advisory configuration requires controller-owned authority fixture" {

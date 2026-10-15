@@ -371,16 +371,18 @@ func AssistanceVM(ctx context.Context, manifest *labv1.ImageManifest, options VM
 	}
 	var findings *devlab.DeviceFindingCounts
 	if options.ControlPlane == nil {
-		advisories, err := devlab.HeldAdvisories(*release, manifest.GetArchitecture())
+		advisories, err := devlab.HeldAssistanceAdvisories(*release, manifest.GetArchitecture())
 		if err != nil {
 			return result, err
 		}
-		if err := fixture.EnableAdvisories(ctx, advisories, options.AdvisoryCache); err != nil {
-			return result, err
-		}
-		findings, err = waitAssistanceFindings(ctx, fixture, result.DeviceID)
-		if err != nil {
-			return result, err
+		if advisories != nil {
+			if err := fixture.EnableAdvisories(ctx, advisories, options.AdvisoryCache); err != nil {
+				return result, err
+			}
+			findings, err = waitAssistanceFindings(ctx, fixture, result.DeviceID)
+			if err != nil {
+				return result, err
+			}
 		}
 	}
 	if !deadline.Stop() {
