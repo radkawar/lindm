@@ -4106,6 +4106,12 @@ download it. This deadline is a lab failure bound, not a promised service latenc
 Upgraded and restored read-only evaluation waits are bounded at 15 minutes each.
 No failed/denied managed action is silently resubmitted while waiting.
 
+Before sending a new action after an upgrade, the browser can refresh the
+existing review's disconnected-device readiness through **Check again**, bounded
+by the normal UI timeout. It sends only after the real control becomes enabled.
+Other policy refusals are not refreshed, and an accepted action still has one
+identity with no resend or replacement.
+
 Public `findings[]` evidence has ordered `installed`, `upgraded` and `restored`
 entries for the original device, each with its distinct completed managed action,
 managed/current snapshot identities, package count, actual durable `evaluated_at`,
@@ -4807,6 +4813,30 @@ streams are bounded and encrypted to the off-server lab operator before teardown
 never published as plaintext. This run records three manual commands, 51 decisions,
 one observed failure and `owned_cleanup_complete: false`; it does not establish
 backup, upgrade, restored-device continuity or cleanup qualification.
+
+Fresh `native-ubuntu-attempt24.json`, SHA-256
+`6f2f3b285ca4219fd05d581818fa820b64bae7fc9b13881fb24041df193be29d`,
+uses unchanged SDK18 product source and the landed `e4b64f2ca` backup observer.
+Installed Findings passed browser and independent SQL binding in 394,064
+milliseconds from installer invocation, including setup, enrollment and inventory.
+Observed refresh start to durable evaluation took 206,982 milliseconds.
+The encrypted backup passed in 8.59 seconds and offline encrypted-archive
+verification in 1.08 seconds. Its ciphertext SHA-256 is
+`832a4b8c839adc06ad8736b396aceeca2209376dd1457e50281095a7e3f0f85f`.
+The authentic 0.2.14-to-0.2.15 upgrade passed in 47.10 seconds, followed by
+PostgreSQL, root-only credential, original integration-key/ciphertext and
+console/device CA retention checks.
+
+The overall verdict remains **FAIL** after 661.79 seconds. Immediately after
+reactivating the routes, the next action review reported **Device is not
+connected**, with **Send action** disabled and **Check again** available.
+The observer waited for Send instead of refreshing this pre-send readiness and
+timed out after 180 seconds. The device UI owner confirms that this readiness
+refresh is read-only; it is not a retry of sent work. The corrected observer
+refreshes only a disconnected pre-send review, never a policy denial or an
+accepted action. This run records six manual commands, 57 decisions, two observed
+failures and `owned_cleanup_complete: false`; it does not qualify post-upgrade
+management continuity, fresh-host restore or cleanup.
 
 #### Durable laboratory custody escrow
 

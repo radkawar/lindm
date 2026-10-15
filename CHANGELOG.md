@@ -33,6 +33,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Create a new private native-lab backup output directory before invoking the unchanged root-owned-directory gate; refuse reused or symlink targets, and encrypt bounded failed backup diagnostics to the off-server lab operator.
 - Serialize an advisory publication's heartbeat with its own bounded batch transaction, so a slow verified RDS COPY cannot cancel itself by waiting on its own lease row; retain lost-lease detection and the independent progress watchdog.
 - Restrict the supported AWS deployment to PostgreSQL 16 with matching native backup clients and a `db.t4g.small` or larger database class; reject other engine majors and micro instances before provisioning.
+- Refresh only a disconnected pre-send action review while an upgraded device reconnects; require the real Send control to become enabled, retain policy refusals, and never retry an accepted action.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.

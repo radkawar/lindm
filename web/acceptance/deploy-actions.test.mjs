@@ -33,6 +33,76 @@ test("a Send action click without an acknowledgement cannot admit navigation", a
   });
 });
 
+test("disconnected pre-send readiness is checked again before exactly one accepted Send", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <div role="dialog">
+        <button onclick="document.body.dataset.reviews='1'">Review action</button>
+        <p id="readiness">Device is not connected</p>
+        <button onclick="
+          document.body.dataset.probes=String(Number(document.body.dataset.probes || 0)+1);
+          if (document.body.dataset.probes === '2') {
+            document.getElementById('readiness').textContent='Ready to send';
+            document.getElementById('send').disabled=false;
+            this.disabled=true;
+          }
+        ">Check again</button>
+        <button id="send" disabled onclick="
+          document.body.dataset.sends=String(Number(document.body.dataset.sends || 0)+1);
+          const acknowledgement=document.createElement('ol');
+          acknowledgement.innerHTML='<li data-sonner-toast data-type=success data-visible=true><div data-title>Action sent to device</div></li>';
+          document.body.append(acknowledgement);
+        ">Send action</button>
+      </div>
+    `);
+    await submitReviewedDeviceAction(new UI(driver, 2_000));
+    assert.deepEqual(
+      await driver.observe(() => ({
+        reviews: document.body.dataset.reviews,
+        probes: document.body.dataset.probes,
+        sends: document.body.dataset.sends,
+      })),
+      { reviews: "1", probes: "2", sends: "1" },
+    );
+  });
+});
+
+test("permanent disconnection times out without sending or recreating the action form", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <div role="dialog">
+        <button onclick="document.body.dataset.reviews='1'">Review action</button>
+        <p>Device is not connected</p>
+        <button onclick="document.body.dataset.probes=String(Number(document.body.dataset.probes || 0)+1)">Check again</button>
+        <button disabled onclick="document.body.dataset.sent='yes'">Send action</button>
+      </div>
+    `);
+    await assert.rejects(submitReviewedDeviceAction(new UI(driver, 300)), /ui_condition_timeout/);
+    assert.equal(await driver.observe(() => document.body.dataset.reviews), "1");
+    assert.ok(Number(await driver.observe(() => document.body.dataset.probes)) > 0);
+    assert.equal(await driver.observe(() => document.body.dataset.sent), undefined);
+  });
+});
+
+test("an unrelated pre-send policy refusal is not retried or sent", async () => {
+  await browser(async (driver) => {
+    await driver.page.setContent(`
+      <div role="dialog">
+        <button>Review action</button>
+        <p>Execution permission is unavailable</p>
+        <button onclick="document.body.dataset.probed='yes'">Check again</button>
+        <button disabled onclick="document.body.dataset.sent='yes'">Send action</button>
+      </div>
+    `);
+    await assert.rejects(
+      submitReviewedDeviceAction(new UI(driver, 300)),
+      /device_action_pre_send_blocked/,
+    );
+    assert.equal(await driver.observe(() => document.body.dataset.probed), undefined);
+    assert.equal(await driver.observe(() => document.body.dataset.sent), undefined);
+  });
+});
+
 test("submission waits for the visible Sonner title without matching its text-bearing ancestors", async () => {
   await browser(async (driver) => {
     await driver.page.setContent(`
