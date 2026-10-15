@@ -13641,6 +13641,23 @@
       "scope": "turnkey-native-default-tls-specific-source-eb5720e88-encrypted-diagnostics",
       "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
       "mainlineRevision": "a797d928d5bc2bb42ac205a7cc7ce37d3a72fea4"
+    },
+    {
+      "platform": "ubuntu-24.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-noble-20260926-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/turnkey-cold-key-care-20261014/native-ubuntu-attempt18.json",
+      "sha256": "6a77fcecc7a1b296211ce429cd2fec74ad3cab219cda470f1c4988c08e143816",
+      "recorded": "2026-10-15T02:35:30.372246373Z",
+      "revision": "a6556969f26f7bbeb68ef6b99fd9626c8dfd5067",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "turnkey-sdk17-a6556969f-download-title-observer",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "b54b552536bbf1407fdd67243c1444887bf48def326ed63aab5bd462af1fff56",
+      "mainlineRevision": "a6556969f26f7bbeb68ef6b99fd9626c8dfd5067"
     }
   ]
 }

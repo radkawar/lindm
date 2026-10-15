@@ -4678,6 +4678,30 @@ history and the same ninety-day retirement rules. That repair needs new signed
 bundles and the complete Ubuntu and RHEL native lifecycle runs; prior failed
 records are not rewritten or promoted.
 
+SDK17 freezes integrated product source
+`a6556969f26f7bbeb68ef6b99fd9626c8dfd5067`. Fresh Ubuntu cold build
+`cold-release-attempt18.json` passed the actual Git clone, pinned SDK setup,
+no-swap check, literal `make release-keys` and two `make release` commands for
+0.2.12 and 0.2.13, authenticated export and owned cleanup in 1,803.83 seconds.
+Its SHA-256 is
+`48106a59de5ce6907ad89bfe0d951ec649c0d59231adfa804a4228131219eeae`.
+Exports remain unchanged in the matching private `cold-release-attempt18`
+directory. This is **build-only**, with `lifecycle_qualified: false`.
+
+The first SDK17 native Ubuntu run, `native-ubuntu-attempt18.json`, SHA-256
+`6a77fcecc7a1b296211ce429cd2fec74ad3cab219cda470f1c4988c08e143816`,
+passed generated-certificate stock Chromium setup/sign-in, Ready packages,
+owner recovery-custody step-up, real SCRAM-PLUS and all six SQL privilege
+denials, root-only database credentials, encrypted integration creation,
+clipboard enrollment and a completed managed action with fresh inventory.
+It then failed in the new Findings observer: the real first-download title is
+a paragraph, not a heading. Its redacted screenshot visibly retains the actual
+automatic Ubuntu source download and start time. The scoped verdict remains
+**FAIL**, with two manual commands, 51 decisions and one failed operation;
+backup, upgrade, restore and a completed vulnerability evaluation were not
+established. A screenshot of download activity is not publication or lifecycle
+qualification. The record reports `owned_cleanup_complete: false`.
+
 #### Durable laboratory custody escrow
 
 This is an explicitly authorized **lab-only fixture**, not product custody and
