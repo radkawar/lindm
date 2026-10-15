@@ -65,24 +65,58 @@ export async function requirePackageInventoryCard(page) {
   await card.getByText("Installed packages", { exact: true }).waitFor();
 }
 
-// Materialize the selected RPC body while its navigation is still in flight.
-// Chromium can discard a Response's backing resource before goto resolves.
+// Observe the original UI fetch, not a second API call or CDP's ephemeral
+// response resource. Only these three read-only replies enter lab memory.
+export async function observeDeploymentRPCs(page, origin) {
+  await page.addInitScript(
+    ({ origin }) => {
+      const methods = new Set(["ListDevicePackages", "ListAdvisoryFeeds", "ListDeviceFindings"]);
+      const replies = Object.create(null);
+      Object.defineProperty(window, "__lindmDeploymentReplies", { value: replies });
+      const fetch = window.fetch.bind(window);
+      window.fetch = async (...args) => {
+        const response = await fetch(...args);
+        const url = new URL(response.url);
+        const method = url.pathname.split("/").at(-1);
+        if (
+          url.origin !== origin ||
+          !methods.has(method) ||
+          url.pathname !== `/lindm.admin.v1.AdminService/${method}`
+        )
+          return response;
+        const entry = { status: response.status, reason: response.headers.get("lindm-reason") };
+        if (response.ok) {
+          try {
+            entry.body = await response.clone().json();
+          } catch {
+            entry.failure = "native_rpc_body_capture_failed";
+          }
+        }
+        replies[method] = entry;
+        return response;
+      };
+    },
+    { origin },
+  );
+}
+
 export async function readDeploymentPage(driver, origin, path, method) {
-  const response = driver.page
-    .waitForResponse(
-      (reply) => new URL(reply.url()).pathname === `/lindm.admin.v1.AdminService/${method}`,
-      { timeout: 30_000 },
-    )
-    .then(async (reply) => {
-      if (!reply.ok()) {
-        const reason = reply.headers()["lindm-reason"];
-        const safe = /^[a-z][a-z0-9_]{0,127}$/.test(reason ?? "") ? `_${reason}` : "";
-        throw new Error(`${method.toLowerCase()}_query_http_${reply.status()}${safe}`);
-      }
-      return reply.json();
-    });
-  const [, body] = await Promise.all([driver.goto(`${origin}${path}`), response]);
-  return body;
+  await driver.goto(`${origin}${path}`);
+  await driver.page.waitForFunction(
+    (method) => Object.hasOwn(window.__lindmDeploymentReplies ?? {}, method),
+    method,
+    { timeout: 30_000 },
+  );
+  const reply = await driver.page.evaluate(
+    (method) => window.__lindmDeploymentReplies[method],
+    method,
+  );
+  if (reply.failure) throw new Error(reply.failure);
+  if (reply.status < 200 || reply.status >= 300) {
+    const safe = /^[a-z][a-z0-9_]{0,127}$/.test(reply.reason ?? "") ? `_${reply.reason}` : "";
+    throw new Error(`${method.toLowerCase()}_query_http_${reply.status}${safe}`);
+  }
+  return reply.body;
 }
 
 // Public failure evidence contains only a finite error category and an owned

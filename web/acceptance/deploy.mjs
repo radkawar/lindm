@@ -10,6 +10,7 @@ import {
   assessDeploymentFindings,
   deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
+  observeDeploymentRPCs,
   readDeploymentPage,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
@@ -87,6 +88,7 @@ async function openTrustedBrowser() {
   driver.context = context;
   driver.page = await driver.context.newPage();
   driver.page.setDefaultTimeout(30_000);
+  if (config.phase === "findings") await observeDeploymentRPCs(driver.page, config.origin);
   result.browser_version = driver.browser.version();
   if (config.phase === "tls") return;
   await driver.context.grantPermissions(["clipboard-read", "clipboard-write"], {

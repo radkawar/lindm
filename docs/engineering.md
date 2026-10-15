@@ -4889,10 +4889,24 @@ navigation completed. Distinct invocation screenshots preserve both phases.
 The overall verdict remains **FAIL**, with six commands, 60 decisions, one
 observed failure and incomplete cleanup; no fresh restore was reached.
 
-The corrected observer materializes the selected RPC body concurrently with
-navigation, before waiting for both to finish. It keeps exact RPC selection,
-HTTP refusal, same-snapshot/package matching and read-only behavior. It neither
-retries a navigation/response nor converts a missing body into passing evidence.
+Materializing the selected CDP response concurrently with navigation was not
+sufficient. Fresh `native-ubuntu-attempt27.json`, SHA-256
+`6a73cf4185f04367a485a1a5f60e6b7a02a0e5645204bacc8bb50dbe43564654`,
+failed at `deployment_browser_failed_response_body_unavailable_deploy_browser_82`
+even with immediate consumption. Its installed browser/SQL evaluation, encrypted
+backup, genuine upgrade and completed post-upgrade managed refresh passed;
+the overall verdict remains **FAIL** before fresh restore, with six commands,
+60 decisions, one observed failure and incomplete cleanup.
+
+The observer now captures a clone of the original UI fetch response inside the
+browser, before returning that same response to the UI. Only the three read-only
+package, feed and Findings RPCs at the exact console origin are observed. It
+sends no additional API request, never retries, and preserves HTTP refusal and
+same-snapshot/package matching. Error bodies are not captured. The clone is lab
+memory only, not a public network log; existing filtered evidence projection is
+unchanged. Real Chromium regression coverage exercises repeated page navigation
+and proves one UI request per visit, unchanged UI consumption and no error-body
+evidence.
 
 #### Durable laboratory custody escrow
 

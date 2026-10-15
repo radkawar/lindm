@@ -4,15 +4,18 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer as createHTTPServer } from "node:http";
 import { createServer } from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
 import {
   assessDeploymentFindings,
   deploymentBrowserFailure,
   launchTrustedDeploymentBrowser,
+  observeDeploymentRPCs,
   readDeploymentPage,
   requireInitialVendorDownload,
   requirePackageInventoryCard,
@@ -340,75 +343,60 @@ test("native screenshots have an independent invocation scope instead of overwri
   assert.doesNotMatch(script, /\$\{config\.phase\}-\$\{name\}\.png/);
 });
 
-test("native RPC evidence materializes the selected body before navigation releases its resource", async () => {
-  const body = { snapshotId: "real-selected-snapshot", packages: [{ name: "native-package" }] };
-  let select;
-  let predicate;
-  let released = false;
-  let consumed = false;
-  let navigations = 0;
-  const driver = {
-    page: {
-      waitForResponse(match) {
-        predicate = match;
-        return new Promise((resolve) => {
-          select = resolve;
-        });
-      },
-    },
-    async goto(url) {
-      navigations++;
-      assert.equal(url, "https://console.example/devices/owned?tab=inventory");
-      assert.equal(predicate({ url: () => "https://console.example/other" }), false);
-      assert.equal(
-        predicate({
-          url: () => "https://console.example/lindm.admin.v1.AdminService/ListDevicePackages",
-        }),
-        true,
-      );
-      select({
-        ok: () => true,
-        async json() {
-          assert.equal(released, false, "body must not wait for goto completion");
-          consumed = true;
-          return body;
-        },
+test("native RPC evidence passively captures real UI fetches across repeated Chromium navigations", async (t) => {
+  let calls = 0;
+  let refuse = false;
+  const body = { snapshotId: "actual-snapshot", packages: [{ name: "native-package" }] };
+  const server = createHTTPServer((request, response) => {
+    if (request.url === "/lindm.admin.v1.AdminService/ListDevicePackages") {
+      calls++;
+      response.writeHead(refuse ? 403 : 200, {
+        "Content-Type": "application/json",
+        "lindm-reason": "scope_denied",
       });
-      await new Promise((resolve) => setImmediate(resolve));
-      assert.equal(consumed, true);
-      released = true;
-    },
-  };
-  assert.equal(
-    await readDeploymentPage(
-      driver,
-      "https://console.example",
-      "/devices/owned?tab=inventory",
-      "ListDevicePackages",
-    ),
-    body,
-  );
-  assert.equal(navigations, 1);
-});
-
-test("native RPC evidence retains HTTP refusal and never retries or consumes an error body", async () => {
-  let navigations = 0;
-  const driver = {
-    page: {
-      waitForResponse: async () => ({
-        ok: () => false,
-        status: () => 403,
-        headers: () => ({ "lindm-reason": "scope_denied" }),
-        json: () => assert.fail("error response bodies are not public evidence"),
-      }),
-    },
-    async goto() {
-      navigations++;
-    },
-  };
+      response.end(JSON.stringify(refuse ? { secret: "not-evidence" } : body));
+    } else {
+      response.writeHead(200, { "Content-Type": "text/html" });
+      response.end(`<script>
+        fetch("/lindm.admin.v1.AdminService/ListDevicePackages", {method:"POST"})
+          .then(response => response.json())
+          .then(body => document.body.textContent = JSON.stringify(body));
+      </script>`);
+    }
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const browser = await chromium.launch({ channel: "chromium", headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await observeDeploymentRPCs(page, origin);
+  const driver = { page, goto: (url) => page.goto(url, { waitUntil: "domcontentloaded" }) };
+  for (let index = 0; index < 4; index++) {
+    assert.deepEqual(
+      await readDeploymentPage(
+        driver,
+        origin,
+        `/inventory?namePrefix=package-${index}`,
+        "ListDevicePackages",
+      ),
+      body,
+    );
+    await page.getByText(JSON.stringify(body), { exact: true }).waitFor();
+    assert.equal(calls, index + 1, "observer never sends another RPC");
+  }
+  refuse = true;
   await assert.rejects(
-    readDeploymentPage(driver, "https://console.example", "/devices/owned", "ListDevicePackages"),
+    readDeploymentPage(driver, origin, "/inventory?denied", "ListDevicePackages"),
     { message: "listdevicepackages_query_http_403_scope_denied" },
   );
-  assert.equal(navigations, 1);
+  assert.equal(calls, 5, "HTTP refusal is never retried");
+  assert.equal(
+    await page.evaluate(() =>
+      JSON.stringify(window.__lindmDeploymentReplies).includes("not-evidence"),
+    ),
+    false,
+    "error bodies never enter evidence memory",
+  );
 });

@@ -36,7 +36,7 @@ There is no tagged public release yet. The repository is a v0.1 preview.
 - Restrict the supported AWS deployment to PostgreSQL 16 with matching native backup clients and a `db.t4g.small` or larger database class; reject other engine majors and micro instances before provisioning.
 - Refresh only a disconnected pre-send action review while an upgraded device reconnects; require the real Send control to become enabled, retain policy refusals, and never retry an accepted action.
 - Give each native browser invocation a distinct screenshot scope, so upgrade and restore evidence cannot overwrite installed evidence; retain safe failure categories and owned source positions without exposing exception text or adding retries.
-- Materialize native-lab browser RPC response bodies while navigation is in flight, before Chromium can discard their backing resources; keep exact selection, HTTP refusals and snapshot matching, without retries.
+- Capture native-lab evidence from the original browser UI fetch's response clone rather than Chromium's ephemeral CDP response resource; observe only the three read-only evidence RPCs at the console origin, with no extra requests, error-body capture, retries or weaker snapshot matching.
 
 - Show enrollment, profile rollouts, vulnerability response, lost-device requests, remote assistance and account administration in the README, with a generated per-release support table and arm64 build list. Count scoped feature passes and retain successful subsets; unsupported subfeatures use footnotes rather than rejecting the whole feature.
 - State common advisory-feed and assistance-desktop conditions once below the README support table, and identify the fresh-install package-database prerequisite for Omarchy console enrollment.
