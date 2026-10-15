@@ -48,6 +48,9 @@ type VMDeployFindingsProof struct {
 func deployAdvisoryExpectations(release *platform.Release, imageVersion, architecture string) ([]deploylab.AdvisorySource, error) {
 	var sources []deploylab.AdvisorySource
 	for _, feed := range release.Advisory.Feeds {
+		if _, exported := release.Advisory.Exports[feed]; !exported {
+			continue
+		}
 		source, err := vmAdvisoryFeedSource(release, imageVersion, architecture, feed, "observation-only")
 		if err != nil {
 			return nil, err

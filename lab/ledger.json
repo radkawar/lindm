@@ -14185,6 +14185,21 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "1c31b79f1e03103ee6d74f16d364571e3ad24bde"
+    },
+    {
+      "platform": "debian-13",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/server-platforms-20261015/native-debian13-attempt1.json",
+      "sha256": "a7c58ae6c756641e4f2cfcac65c360fed61ed1e1af9a1ad5d6c9586258c57cf9",
+      "recorded": "2026-10-15T20:20:31.619738022Z",
+      "revision": "e9c333339d3124273fbc9e2ad165b443da1df033",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "server-platforms-e9c333339-debian13-maintained-export-admission-fail",
+      "reference": "#control-plane-deployment-matrix",
+      "mainlineRevision": "e9c333339d3124273fbc9e2ad165b443da1df033"
     }
   ]
 }

@@ -74,7 +74,7 @@ func TestNativeDeployFindingsKeepPartialAssessmentMeaningful(t *testing.T) {
 }
 
 func TestNativeDeployExpectedVendorIdentityComesFromRegistry(t *testing.T) {
-	for _, test := range []struct{ key, version string }{{"ubuntu-24.04", "24.04"}, {"rhel-9", "9.8"}} {
+	for _, test := range []struct{ key, version string }{{"ubuntu-24.04", "24.04"}, {"rhel-9", "9.8"}, {"debian-12", "12"}, {"debian-13", "13"}} {
 		release, ok := platform.Lookup(test.key)
 		if !ok {
 			t.Fatal("native server platform missing")
@@ -83,8 +83,8 @@ func TestNativeDeployExpectedVendorIdentityComesFromRegistry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(sources) != len(release.Advisory.Feeds) {
-			t.Fatal("expected vendor source missing")
+		if len(sources) != 1 {
+			t.Fatal("expected exactly one maintained vendor export")
 		}
 		for index, source := range sources {
 			export := release.Advisory.Exports[release.Advisory.Feeds[index]]
@@ -92,5 +92,25 @@ func TestNativeDeployExpectedVendorIdentityComesFromRegistry(t *testing.T) {
 				t.Fatal("native proof changed vendor source or stream identity")
 			}
 		}
+	}
+}
+
+func TestNativeDeployVendorExpectationsFailClosedForAbsentOrInvalidExports(t *testing.T) {
+	registered, ok := platform.Lookup("debian-13")
+	if !ok {
+		t.Fatal("native server platform missing")
+	}
+	release := *registered
+	release.Advisory.Feeds = []platform.Feed{platform.FeedDebianTracker, platform.FeedOSV}
+	if sources, err := deployAdvisoryExpectations(&release, "13", "x86_64"); err != nil || len(sources) != 1 || sources[0].SourceURL != registered.Advisory.Exports[platform.FeedOSV].URL {
+		t.Fatalf("unexported feed hid the maintained vendor export: sources=%+v err=%v", sources, err)
+	}
+	release.Advisory.Exports = nil
+	if _, err := deployAdvisoryExpectations(&release, "13", "x86_64"); err == nil {
+		t.Fatal("missing maintained vendor exports admitted")
+	}
+	release.Advisory.Exports = map[platform.Feed]platform.AdvisoryExport{platform.FeedOSV: {Format: "osv-zip", MaxAgeSeconds: 86400}}
+	if _, err := deployAdvisoryExpectations(&release, "13", "x86_64"); err == nil {
+		t.Fatal("invalid maintained vendor export admitted")
 	}
 }
