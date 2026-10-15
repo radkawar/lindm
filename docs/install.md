@@ -45,6 +45,9 @@ The console has its own browser-compatible certificate. For a private CA, import
 printed by the installer. Do not import the device CA instead. Publicly trusted
 console certificates do not need a custom CA import.
 
+Server status marks an absent private CA for the console as inactive.
+This does not mean that the console lacks HTTPS.
+
 To use an existing PostgreSQL database, provide protected runtime and migration
 URL files. Each connection must verify the database certificate. See the
 [installation runbook](security-and-operations.md#native-single-host-installation)

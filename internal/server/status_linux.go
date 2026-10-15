@@ -144,7 +144,7 @@ func consoleCAStatus(resources *config.Resources, now time.Time) *adminv1.Server
 	check := certificateStatus("console_ca", resources.AdminCACertificate, now)
 	if resources.AdminCACertificate == nil && resources.Proto.GetAdminCaFile() == "" {
 		check.State = statusInactive
-		check.Summary = "No private console certificate authority is configured."
+		check.Summary = "This configuration has no private certificate authority for the console."
 		check.NextAction = "A publicly trusted console certificate needs no custom CA import. Manual shared-TLS deployments use their configured issuer."
 		return check
 	}

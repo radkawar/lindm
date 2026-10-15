@@ -57,6 +57,12 @@ func TestConsoleCAStatusAbsentAndUnavailable(t *testing.T) {
 	if check.State != statusInactive || check.ExpiresAt != nil || check.EvidenceAt != nil || !strings.Contains(check.NextAction, "publicly trusted") {
 		t.Fatal("absent optional private CA fabricated expiry or demanded an import")
 	}
+	if check.Summary != "This configuration has no private certificate authority for the console." {
+		t.Fatalf("absent console CA summary did not describe configuration absence: %q", check.Summary)
+	}
+	if !strings.Contains(check.NextAction, "Manual shared-TLS deployments use their configured issuer.") {
+		t.Fatal("absent optional console CA concealed the configured shared-TLS issuer")
+	}
 	resources.Proto = new(configv1.ServerConfig)
 	if err := protojson.Unmarshal([]byte(`{"adminCaFile":"/etc/lindm/console-ca.crt"}`), resources.Proto); err != nil {
 		t.Fatal(err)
