@@ -14474,6 +14474,22 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "0565a11b33d9b5b9b61700a0011419a91fd3f147faf6491b083a61840651c088",
       "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
+    },
+    {
+      "platform": "debian-12",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "debian-12-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/server-platforms-20261015/native-debian12-attempt1.json",
+      "sha256": "440587cc9c934b615afcd2065693e6eec635a119f836717484425c759ef99064",
+      "recorded": "2026-10-16T02:09:52.437704714Z",
+      "revision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "09557b4fbd31d0f47b8226791f56e01583e7a99569b96d6d1aa0fcd7cbaff726",
+      "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
     }
   ]
 }

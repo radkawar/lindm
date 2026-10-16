@@ -619,7 +619,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "debian.md", Family: FamilyDebian, Architectures: both, Packages: apt, Systemd: 252, Provisioning: cloudInitOnly,
 		Server: &ServerInstallation{
 			SnapshotName: "debian12.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
-			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgBookworm,
+			Architectures: x86, Status: "Qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgBookworm,
 			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
 		},
 		FDE: "LUKS2 (partman-crypto LVM); TPM2 via systemd-cryptenroll (dracut)", Desktop: Desktop{Name: "GNOME/KDE", DisplayManager: "gdm3", Lock: "GNOME Shell"}, Firewall: nftables,

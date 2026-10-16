@@ -22,6 +22,7 @@
 - Refuse undersized fresh server filesystems before the native installation journal or authority custody, publish the measured 32 GiB sizing baseline, and show actual database/available/required upgrade bytes while retaining the existing twice-database-plus-4-GiB upgrade rule.
 - Qualify connected x86_64 Debian 13 server installation with native PostgreSQL 17 through stock-browser setup, real device Findings, backup, matching-major offline drill, signed upgrade and fresh-host recovery.
 - Qualify connected x86_64 Ubuntu 22.04 server installation using fingerprint-pinned PGDG PostgreSQL 16, the measured fresh-storage policy, full real managed-device Findings, encrypted backup, signed upgrade and fresh-host restore.
+- Qualify connected x86_64 Debian 12 server installation using fingerprint-pinned PGDG PostgreSQL 16, full same-device vendor Findings, encrypted backup and matching-major drill, signed upgrade and independently authorized fresh-host recovery.
 
 ## [0.1.0] - 2026-10-15
 
