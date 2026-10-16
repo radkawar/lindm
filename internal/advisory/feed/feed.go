@@ -47,6 +47,7 @@ type Client struct {
 	signedTrust *vendorTrust
 	// Tests can isolate rate-limit state; production clients share one policy.
 	redHatHTTP *redHatHTTPPolicy
+	httpRetry  *httpRetryPolicy
 }
 
 func New(client *http.Client) (*Client, error) {
@@ -169,7 +170,7 @@ func (c *Client) Fetch(ctx context.Context, config *advisoryv1.FeedSource) (*adv
 	return doc, nil
 }
 
-func (c *Client) get(ctx context.Context, location string, bound int64) (raw []byte, err error) {
+func (c *Client) get(ctx context.Context, location string, bound int64) ([]byte, error) {
 	u, err := url.Parse(location)
 	if err != nil {
 		return nil, fmt.Errorf("feed: parse URL: %w", err)
@@ -183,21 +184,16 @@ func (c *Client) get(ctx context.Context, location string, bound int64) (raw []b
 	}
 	// Compression is decoded explicitly so the digest always covers vendor bytes.
 	req.Header.Set("Accept-Encoding", "identity")
-	resp, err := c.do(c.http, req)
+	var raw []byte
+	err = c.getHTTP(req, c.http, false, nil, func(resp *http.Response) error {
+		var err error
+		raw, err = boundedRead(resp.Body, bound)
+		return err
+	})
 	if err != nil {
-		return nil, fmt.Errorf("feed: fetch: %w", err)
+		return nil, err
 	}
-	defer func() { err = errors.Join(err, resp.Body.Close()) }()
-	if resp.TLS == nil || !resp.TLS.HandshakeComplete || len(resp.TLS.VerifiedChains) == 0 {
-		return nil, errors.New("feed: response lacks verified TLS")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("feed: HTTP status %d", resp.StatusCode)
-	}
-	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
-		return nil, errors.New("feed: unsupported HTTP content encoding")
-	}
-	return boundedRead(resp.Body, bound)
+	return raw, nil
 }
 
 func httpsURL(u *url.URL) error {
@@ -270,11 +266,11 @@ func parse(config *advisoryv1.FeedSource, raw []byte, validator protovalidate.Va
 
 func boundedRead(r io.Reader, bound int64) ([]byte, error) {
 	data, err := io.ReadAll(io.LimitReader(r, bound+1))
-	if err != nil {
-		return nil, fmt.Errorf("feed: read document: %w", err)
-	}
 	if int64(len(data)) > bound {
 		return nil, errors.New("feed: document byte limit exceeded")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("feed: read document: %w", err)
 	}
 	return data, nil
 }

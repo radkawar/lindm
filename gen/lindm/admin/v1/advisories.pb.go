@@ -1442,8 +1442,11 @@ type AdvisoryFeedStatus struct {
 	RefreshStartedAt      *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=refresh_started_at,json=refreshStartedAt,proto3" json:"refresh_started_at,omitempty"`
 	RefreshLeaseExpiresAt *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=refresh_lease_expires_at,json=refreshLeaseExpiresAt,proto3" json:"refresh_lease_expires_at,omitempty"`
 	RefreshEnabled        bool                   `protobuf:"varint,20,opt,name=refresh_enabled,json=refreshEnabled,proto3" json:"refresh_enabled,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Additional HTTP request attempts during the latest attempted refresh,
+	// successful or failed; reset when a new refresh actually begins.
+	RequestRetryCount uint64 `protobuf:"varint,21,opt,name=request_retry_count,json=requestRetryCount,proto3" json:"request_retry_count,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *AdvisoryFeedStatus) Reset() {
@@ -1614,6 +1617,13 @@ func (x *AdvisoryFeedStatus) GetRefreshEnabled() bool {
 		return x.RefreshEnabled
 	}
 	return false
+}
+
+func (x *AdvisoryFeedStatus) GetRequestRetryCount() uint64 {
+	if x != nil {
+		return x.RequestRetryCount
+	}
+	return 0
 }
 
 type ListAdvisoryFeedsResponse struct {
@@ -1903,7 +1913,7 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"\x11evaluated_devices\x18\x04 \x01(\x04R\x10evaluatedDevices\x12'\n" +
 	"\x0fpartial_devices\x18\x05 \x01(\x04R\x0epartialDevices\x12[\n" +
 	"\x10unchecked_groups\x18\x06 \x03(\v2&.lindm.admin.v1.AdvisoryUncheckedGroupB\b\xbaH\x05\x92\x01\x02\x10\x14R\x0funcheckedGroups\"\x1a\n" +
-	"\x18ListAdvisoryFeedsRequest\"\x96\a\n" +
+	"\x18ListAdvisoryFeedsRequest\"\xc6\a\n" +
 	"\x12AdvisoryFeedStatus\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06distro\x18\x02 \x01(\tR\x06distro\x12\x18\n" +
@@ -1931,7 +1941,8 @@ const file_lindm_admin_v1_advisories_proto_rawDesc = "" +
 	"refreshing\x12H\n" +
 	"\x12refresh_started_at\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\x10refreshStartedAt\x12S\n" +
 	"\x18refresh_lease_expires_at\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\x15refreshLeaseExpiresAt\x12'\n" +
-	"\x0frefresh_enabled\x18\x14 \x01(\bR\x0erefreshEnabled\"U\n" +
+	"\x0frefresh_enabled\x18\x14 \x01(\bR\x0erefreshEnabled\x12.\n" +
+	"\x13request_retry_count\x18\x15 \x01(\x04R\x11requestRetryCount\"U\n" +
 	"\x19ListAdvisoryFeedsResponse\x128\n" +
 	"\x05feeds\x18\x01 \x03(\v2\".lindm.admin.v1.AdvisoryFeedStatusR\x05feeds\"\xb0\x02\n" +
 	"\x1cAcceptAdvisoryFindingRequest\x12'\n" +

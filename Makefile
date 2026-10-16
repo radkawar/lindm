@@ -113,7 +113,7 @@ test: web-assets
 	node --test test/tooling/check-dco.test.mjs test/tooling/enrollment-snippets.test.mjs web/acceptance/assistance-input.test.mjs web/acceptance/assistance-presentation.test.mjs web/acceptance/assistance-marker.test.mjs web/acceptance/mcp-http.test.mjs web/acceptance/assistance-annotation.test.mjs web/acceptance/assistance-overlay.test.mjs web/acceptance/assistance-capability-modes.test.mjs
 	node --experimental-transform-types --test web/acceptance/assistance-files.test.mjs web/acceptance/assistance-recording.test.mjs
 	go test -race -timeout 45m $(GO_PACKAGES)
-	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/assistance-end.test.mjs web/acceptance/journey.test.mjs web/acceptance/review-edit-sheet.test.mjs web/acceptance/review-contrast.test.mjs web/acceptance/patch-status-copy.test.mjs web/acceptance/advisory-initial-download.test.mjs web/eslint/freeform-input.test.mjs web/eslint/no-raw-colours.test.mjs web/eslint/scan-css-colours.test.mjs
+	node --test web/acceptance/assistance-startup.test.mjs web/acceptance/assistance-end.test.mjs web/acceptance/journey.test.mjs web/acceptance/review-edit-sheet.test.mjs web/acceptance/review-contrast.test.mjs web/acceptance/patch-status-copy.test.mjs web/acceptance/advisory-initial-download.test.mjs web/acceptance/advisory-source-retries.test.mjs web/eslint/freeform-input.test.mjs web/eslint/no-raw-colours.test.mjs web/eslint/scan-css-colours.test.mjs
 
 build: web-assets
 	go build -trimpath -o artifacts/bin/lindmd ./cmd/lindmd

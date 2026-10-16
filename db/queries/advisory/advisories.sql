@@ -28,6 +28,7 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  checked_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.checked_at END,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
  attempted_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.attempted_at END,
+ request_retry_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.request_retry_count ELSE 0 END,
  error=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.error ELSE '' END,
  configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
   THEN advisory_feeds.configured_at ELSE clock_timestamp() END;
@@ -42,15 +43,37 @@ SELECT * FROM advisory_feeds WHERE id=$1 FOR UPDATE;
 SELECT * FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32;
 
 -- name: PublishAdvisoryFeed :execrows
-UPDATE advisory_feeds SET revision=$2,source_sha256=$3,checked_at=$4,expires_at=$5,
- attempted_at=$4,error='',advisory_count=$6,complete_snapshot=$7,source_manifest=$8,snapshot_at=$9
-WHERE id=$1 AND enabled AND config_bytes=$10 AND (checked_at IS NULL OR checked_at<=$4);
+UPDATE advisory_feeds SET revision=sqlc.arg('revision'),source_sha256=sqlc.arg('source_sha256'),
+ checked_at=sqlc.arg('checked_at'),expires_at=sqlc.arg('expires_at'),
+ attempted_at=GREATEST(attempted_at,sqlc.arg('checked_at')),
+ error=CASE WHEN attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at') THEN '' ELSE error END,
+ advisory_count=sqlc.arg('advisory_count'),complete_snapshot=sqlc.arg('complete_snapshot'),
+ source_manifest=sqlc.arg('source_manifest'),snapshot_at=sqlc.arg('snapshot_at'),
+ request_retry_count=CASE WHEN attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at')
+  THEN sqlc.arg('request_retry_count')::bigint ELSE request_retry_count END
+WHERE id=sqlc.arg('id') AND enabled AND config_bytes=sqlc.arg('config_bytes')
+ AND (checked_at IS NULL OR checked_at<=sqlc.arg('checked_at'));
 
 -- name: FailAdvisoryFeed :exec
-UPDATE advisory_feeds SET attempted_at=$2,error=$3
-WHERE id=$1 AND enabled AND config_bytes=$4
- AND (checked_at IS NULL OR checked_at<=$2)
- AND (attempted_at IS NULL OR attempted_at<=$2);
+UPDATE advisory_feeds SET attempted_at=sqlc.arg('attempted_at'),
+ error=CASE WHEN sqlc.arg('cancelled')::boolean THEN error ELSE sqlc.arg('error')::text END,
+ request_retry_count=sqlc.arg('request_retry_count')::bigint
+WHERE id=sqlc.arg('id') AND enabled AND advisory_feeds.config_bytes=sqlc.arg('config_bytes')
+ AND (checked_at IS NULL OR checked_at<=sqlc.arg('attempted_at'))
+ AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('attempted_at'))
+ AND EXISTS (SELECT 1 FROM advisory_generation_cleanup g
+  WHERE g.feed_id=advisory_feeds.id AND g.generation=sqlc.arg('generation')
+   AND g.config_bytes=advisory_feeds.config_bytes AND g.cleanup_after>clock_timestamp());
+
+-- name: BeginAdvisoryRefreshAttempt :execrows
+-- Reset only an actual, live exact-configuration attempt, not skipped sources.
+UPDATE advisory_feeds SET attempted_at=sqlc.arg('attempted_at'),request_retry_count=0
+WHERE id=sqlc.arg('id') AND enabled AND advisory_feeds.config_bytes=sqlc.arg('config_bytes')
+ AND (checked_at IS NULL OR checked_at<=sqlc.arg('attempted_at'))
+ AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('attempted_at'))
+ AND EXISTS (SELECT 1 FROM advisory_generation_cleanup g
+  WHERE g.feed_id=advisory_feeds.id AND g.generation=sqlc.arg('generation')
+   AND g.config_bytes=advisory_feeds.config_bytes AND g.cleanup_after>clock_timestamp());
 
 -- name: InsertAdvisoryPublicationBatch :copyfrom
 INSERT INTO advisory_publication_batch(publication_id,position,id,feed_id,advisory_id,package_name,source_package,architecture,record_bytes)

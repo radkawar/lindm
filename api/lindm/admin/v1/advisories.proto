@@ -223,6 +223,9 @@ message AdvisoryFeedStatus {
   google.protobuf.Timestamp refresh_started_at = 18;
   google.protobuf.Timestamp refresh_lease_expires_at = 19;
   bool refresh_enabled = 20;
+  // Additional HTTP request attempts during the latest attempted refresh,
+  // successful or failed; reset when a new refresh actually begins.
+  uint64 request_retry_count = 21;
 }
 message ListAdvisoryFeedsResponse {
   repeated AdvisoryFeedStatus feeds = 1;

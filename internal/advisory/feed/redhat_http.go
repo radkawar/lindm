@@ -18,7 +18,7 @@ const (
 	advisoryFeedUserAgent = "lindm advisory feed"
 	redHatHTTPConcurrency = 4
 	// An absent, malformed, or already elapsed Retry-After must not turn a 429
-	// into immediate repeated requests. This fallback never retries a request.
+	// into immediate repeated requests, even across separate acquisitions.
 	redHatRetryAfterFallback = time.Minute
 )
 
@@ -206,6 +206,13 @@ func (c *Client) do(client *http.Client, request *http.Request) (*http.Response,
 		redHat = nextRedHat
 		return nil
 	}
+	if err := request.Context().Err(); err != nil {
+		if held {
+			policy.release()
+		}
+		return nil, err
+	}
+	countHTTPRetry(request.Context())
 	response, err := copyClient.Do(request)
 	if err != nil {
 		if held {

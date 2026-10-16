@@ -126,23 +126,16 @@ func (s *Service) refreshSources(ctx context.Context, sources []*advisoryv1.Feed
 }
 
 func (s *Service) refreshSource(ctx context.Context, source *advisoryv1.FeedSource) error {
+	var retries atomic.Int64
+	ctx = feed.WithRetryCounter(ctx, &retries)
 	started := s.clock().UTC()
 	err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 		return s.client.FetchStream(producerCtx, source, emit, progress)
 	})
-	if err == nil || ctx.Err() != nil {
-		// Shutdown or leadership loss is not a failed refresh attempt.
-		return err
+	if err != nil {
+		return fmt.Errorf("refresh feed %s: %w", source.GetId(), err)
 	}
-	result := fmt.Errorf("refresh feed %s: %w", source.GetId(), err)
-	encoded, encodeErr := proto.MarshalOptions{Deterministic: true}.Marshal(source)
-	if encodeErr != nil {
-		return errors.Join(result, encodeErr)
-	}
-	failureCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer stop()
-	storeErr := advisorydb.New(s.pool).FailAdvisoryFeed(failureCtx, advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(started), Error: "refresh_failed", ConfigBytes: encoded})
-	return errors.Join(result, storeErr)
+	return nil
 }
 
 // Import uses the same checked parser/publication path. Offline bytes require an

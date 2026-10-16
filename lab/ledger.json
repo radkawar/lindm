@@ -14554,6 +14554,23 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "1eaec491a807f8a15baf697fdf6e335976d97a034cbd11014158ce4b821d93c2",
       "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/rhel-findings-20261015/native-rhel9-attempt2.json",
+      "sha256": "0116a6ab92d777291c5dd3a621e709e4c3f6fc66bcf768883ede0679cb2f0ef3",
+      "recorded": "2026-10-16T02:17:56.169170729Z",
+      "revision": "ccd28b095a0c3c08cac02c4d8a71fad5fc2e2518-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full-native-rhel9-68b-dns-infrastructure-fail",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "ccd28b095a0c3c08cac02c4d8a71fad5fc2e2518"
     }
   ]
 }

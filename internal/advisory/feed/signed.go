@@ -376,8 +376,9 @@ func (c *Client) fetchVendorProofs(ctx context.Context, location string) ([]byte
 }
 
 // fetchRedHatArchives acquires both complete vendor distributions sequentially.
-// Each request retains the HTTP client's two-minute timeout; parsing duration is
-// bounded by the caller's progress watchdog and overall ceiling, not here.
+// Pointer/proof requests include retry waits in their two-minute deadline.
+// Archive transfers and parsing instead use the caller's progress watchdog and
+// overall ceiling, not an ordinary whole-request timeout.
 // At most one 512 MiB compressed file is staged; its original bytes are verified
 // before the parser sees them. Freshness must be bounded by the returned oldest
 // signature time, never by the mutable pointer or local download time.
@@ -482,7 +483,7 @@ func (c *Client) consumeSignedArchive(ctx context.Context, location, fingerprint
 	return &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}, signedAt, nil
 }
 
-func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File, bound int64, progress func() error) (digest []byte, err error) {
+func (c *Client) downloadArchive(ctx context.Context, location string, file *os.File, bound int64, progress func() error) ([]byte, error) {
 	u, err := signedArtifactURL(location)
 	if err != nil {
 		return nil, err
@@ -492,56 +493,64 @@ func (c *Client) downloadArchive(ctx context.Context, location string, file *os.
 		return nil, fmt.Errorf("feed: create archive request: %w", err)
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	resp, err := c.do(c.archive, req)
-	if err != nil {
-		return nil, fmt.Errorf("feed: fetch archive: %w", err)
+	prepare := func() error {
+		// A retried transfer reuses this one private file, never partial bytes or
+		// a second acquisition slot. Reset before initiating the next request.
+		if err := file.Truncate(0); err != nil {
+			return fmt.Errorf("feed: reset archive: %w", err)
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("feed: rewind archive: %w", err)
+		}
+		return nil
 	}
-	defer func() { err = errors.Join(err, resp.Body.Close()) }()
-	if resp.TLS == nil || !resp.TLS.HandshakeComplete || len(resp.TLS.VerifiedChains) == 0 {
-		return nil, errors.New("feed: archive response lacks verified TLS")
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("feed: archive HTTP status %d", resp.StatusCode)
-	}
-	if encoding := resp.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
-		return nil, errors.New("feed: unsupported archive HTTP content encoding")
-	}
-	if resp.ContentLength > bound {
-		return nil, errors.New("feed: compressed archive byte limit exceeded")
-	}
-	digestHasher := sha256.New()
-	destination := io.MultiWriter(file, digestHasher)
-	var expectedCRC []byte
-	for _, header := range resp.Header.Values("X-Goog-Hash") {
-		for _, value := range strings.Split(header, ",") {
-			if encoded, found := strings.CutPrefix(strings.TrimSpace(value), "crc32c="); found {
-				if expectedCRC != nil {
-					return nil, errors.New("feed: duplicate archive CRC32C")
-				}
-				expectedCRC, err = base64.StdEncoding.Strict().DecodeString(encoded)
-				if err != nil || len(expectedCRC) != 4 {
-					return nil, errors.New("feed: invalid archive CRC32C")
+	var digest []byte
+	err = c.getHTTP(req, c.archive, true, prepare, func(resp *http.Response) error {
+		if resp.ContentLength > bound {
+			return errors.New("feed: compressed archive byte limit exceeded")
+		}
+		// All integrity state belongs to this attempt. Authentication of the
+		// completed file by the caller remains outside the retry budget.
+		digestHasher := sha256.New()
+		destination := io.MultiWriter(file, digestHasher)
+		var expectedCRC []byte
+		for _, header := range resp.Header.Values("X-Goog-Hash") {
+			for _, value := range strings.Split(header, ",") {
+				if encoded, found := strings.CutPrefix(strings.TrimSpace(value), "crc32c="); found {
+					if expectedCRC != nil {
+						return errors.New("feed: duplicate archive CRC32C")
+					}
+					var err error
+					expectedCRC, err = base64.StdEncoding.Strict().DecodeString(encoded)
+					if err != nil || len(expectedCRC) != 4 {
+						return errors.New("feed: invalid archive CRC32C")
+					}
 				}
 			}
 		}
-	}
-	var checksum hash.Hash32
-	if expectedCRC != nil {
-		checksum = crc32.New(crc32.MakeTable(crc32.Castagnoli))
-		destination = io.MultiWriter(destination, checksum)
-	}
-	if progress != nil {
-		destination = &progressWriter{dst: destination, progress: progress}
-	}
-	if err := copyArchive(ctx, destination, resp.Body, bound); err != nil {
+		var checksum hash.Hash32
+		if expectedCRC != nil {
+			checksum = crc32.New(crc32.MakeTable(crc32.Castagnoli))
+			destination = io.MultiWriter(destination, checksum)
+		}
+		if progress != nil {
+			destination = &progressWriter{dst: destination, progress: progress}
+		}
+		if err := copyArchive(ctx, destination, resp.Body, bound); err != nil {
+			return err
+		}
+		// GCS transfer integrity is additional to TLS and an operator SHA-256
+		// pin, never a substitute for a publisher signature.
+		if expectedCRC != nil && !bytes.Equal(expectedCRC, checksum.Sum(nil)) {
+			return errors.New("feed: archive CRC32C mismatch")
+		}
+		digest = digestHasher.Sum(nil)
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	// GCS transfer integrity is additional to TLS and an operator SHA-256 pin,
-	// never a substitute for a publisher signature.
-	if expectedCRC != nil && !bytes.Equal(expectedCRC, checksum.Sum(nil)) {
-		return nil, errors.New("feed: archive CRC32C mismatch")
-	}
-	return digestHasher.Sum(nil), nil
+	return digest, nil
 }
 
 // copyArchive writes no more than bound bytes to disk, probing just one further

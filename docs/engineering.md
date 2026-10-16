@@ -5743,14 +5743,33 @@ releasing their permits.
 
 Ordinary and streaming Red Hat HTTP requests also share a process-wide limit of
 four, retained through redirects until the final response body closes. Requests
-identify themselves as `lindm advisory feed`. HTTP 429 fails the current refresh
-without an automatic retry and defers subsequent Red Hat requests according to
-numeric or HTTP-date `Retry-After`; a missing, malformed or nonfuture value uses a
+identify themselves as `lindm advisory feed`. HTTP 429 defers subsequent Red Hat
+requests according to numeric or HTTP-date `Retry-After`; a missing, malformed
+or nonfuture value uses a
 conservative one-minute cooldown. A positive numeric delay beyond the timer range
 instead quarantines further Red Hat requests indefinitely within this process;
 it is never shortened to that fallback. Cancellation interrupts a wait but does
 not erase either shared cooldown. Other vendors are not delayed by Red Hat's
 cooldown, and no source deadline or progress-watchdog allowance is extended.
+
+Feed HTTP GET acquisition has at most five total attempts, with 1/2/4/8-second
+backoff only for transient DNS/socket failures, connection resets, HTTP 5xx and 429. A 429's `Retry-After` can only lengthen that backoff; shared Red Hat
+cooldowns remain authoritative. Bodies and network permits close before any
+wait. Partial bounded responses are discarded; archive retries truncate and
+rewind the same private file and recreate digest/CRC state. TLS identity,
+signature, digest/CRC, document validation, content-encoding, byte-limit, storage
+and cancellation failures are never retried. Ordinary GETs retain one two-minute
+deadline across all attempts and waits; streaming archives retain the existing
+progress and overall refresh ceilings.
+
+Migration `00060` stores nonnegative `request_retry_count` on each feed. It is the
+number of additional HTTP attempts for the latest actual refresh, successful or
+failed, and is shown as **Retries for latest refresh** in source status. A new
+live exact-configuration attempt resets it; skipped feeds retain their previous
+count. Publication and bounded cancellation/failure accounting persist it only
+under the existing configuration, generation-lease and newer-attempt fences.
+Counters are per refresh, never shared between concurrent sources, and survive
+service restart without changing freshness or coverage authority.
 
 Real-source RHEL qualification is explicitly opt-in:
 `LINDM_TEST_DATABASE_URL_FILE=.cache/dev/migration-database-url go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=2h10m`.

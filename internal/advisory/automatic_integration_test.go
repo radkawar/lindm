@@ -51,7 +51,11 @@ func TestAutomaticInventoryActivationAndIndependentInitialSchedule(t *testing.T)
 		t.Fatalf("initial activation not immediately due with archive idle bound: %v %v", initial, err)
 	}
 	q := advisorydb.New(pool)
-	if err := q.FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: rows[0].ID, AttemptedAt: timestamp(time.Now()), Error: "refresh_failed", ConfigBytes: rows[0].ConfigBytes}); err != nil {
+	generation := uuid.New()
+	if err := q.StartAdvisoryGeneration(t.Context(), advisorydb.StartAdvisoryGenerationParams{FeedID: rows[0].ID, Generation: generation, ConfigBytes: rows[0].ConfigBytes}); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: rows[0].ID, AttemptedAt: timestamp(time.Now()), Error: "refresh_failed", ConfigBytes: rows[0].ConfigBytes, Generation: generation}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Evaluate(t.Context(), ubuntu); err != nil {

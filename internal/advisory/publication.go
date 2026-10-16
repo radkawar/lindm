@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,6 +36,41 @@ type advisoryGeneration struct {
 
 const vendorPublicationReason = "Vendor advisory revision published"
 
+type advisoryRefreshAttempt struct {
+	parameters advisorydb.BeginAdvisoryRefreshAttemptParams
+	retries    *atomic.Int64
+}
+
+func (s *Service) beginAdvisoryRefreshAttempt(ctx context.Context, parameters advisorydb.BeginAdvisoryRefreshAttemptParams) (advisoryRefreshAttempt, error) {
+	attempt := advisoryRefreshAttempt{parameters: parameters, retries: feed.RetryCounter(ctx)}
+	if attempt.retries == nil {
+		return attempt, nil // Offline imports have no network refresh accounting.
+	}
+	started, err := advisorydb.New(s.pool).BeginAdvisoryRefreshAttempt(ctx, parameters)
+	if err != nil {
+		return attempt, err
+	}
+	if started != 1 {
+		return attempt, ErrConflict
+	}
+	return attempt, nil
+}
+
+// Persist before cleanup removes the live lease. Cancellation records accounting
+// without turning shutdown into a refresh failure.
+func (s *Service) failAdvisoryRefreshAttempt(ctx, parent context.Context, attempt advisoryRefreshAttempt, result *error) {
+	if *result == nil || attempt.retries == nil {
+		return
+	}
+	storeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	*result = errors.Join(*result, advisorydb.New(s.pool).FailAdvisoryFeed(storeCtx, advisorydb.FailAdvisoryFeedParams{
+		ID: attempt.parameters.ID, AttemptedAt: attempt.parameters.AttemptedAt, Error: "refresh_failed",
+		ConfigBytes: attempt.parameters.ConfigBytes, Generation: attempt.parameters.Generation,
+		RequestRetryCount: attempt.retries.Load(), Cancelled: parent.Err() != nil,
+	}))
+}
+
 // publishStream commits bounded batches under a private generation. Only the
 // final fenced feed update exposes them, after the producer has verified its
 // entire input (including the digest). The producer must call emit serially.
@@ -51,6 +87,7 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	refreshCtx := ctx
 	ctx, progress := feed.NewRefreshProgress(ctx, source)
 	defer progress.Close()
 	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(source)
@@ -66,6 +103,13 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 	// Never sweep all inactive rows: another producer may still be staging them.
 	cleanup := []advisoryGeneration{generation}
 	defer func() { s.cleanupAdvisoryGenerations(ctx, cleanup) }()
+	attempt, err := s.beginAdvisoryRefreshAttempt(ctx, advisorydb.BeginAdvisoryRefreshAttemptParams{
+		ID: source.GetId(), AttemptedAt: timestamp(started), ConfigBytes: encoded, Generation: generation.revision,
+	})
+	if err != nil {
+		return err
+	}
+	defer s.failAdvisoryRefreshAttempt(ctx, refreshCtx, attempt, &err)
 	limit := source.GetTotalClaimsLimit()
 	if source.TotalClaimsLimit == nil {
 		limit = 5000000
@@ -140,7 +184,11 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 		}
 		cleanup = append(cleanup, advisoryGeneration{feedID: source.GetId(), revision: current.Revision})
 	}
-	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: revisionData.manifest, SnapshotAt: revisionData.snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(revisionData.expires), AdvisoryCount: stager.unique, CompleteSnapshot: revisionData.complete, ConfigBytes: encoded})
+	var requestRetryCount int64
+	if attempt.retries != nil {
+		requestRetryCount = attempt.retries.Load()
+	}
+	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: revisionData.manifest, SnapshotAt: revisionData.snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(revisionData.expires), AdvisoryCount: stager.unique, CompleteSnapshot: revisionData.complete, ConfigBytes: encoded, RequestRetryCount: requestRetryCount})
 	if err != nil {
 		return err
 	}

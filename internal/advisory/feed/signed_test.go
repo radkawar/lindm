@@ -367,6 +367,8 @@ func TestRedHatArchiveAcquisitionAndCleanup(t *testing.T) {
 			t.Setenv("TMPDIR", tempDir)
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
+			var retryCounter atomic.Int64
+			ctx = WithRetryCounter(ctx, &retryCounter)
 			var requests atomic.Int32
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
@@ -436,6 +438,17 @@ func TestRedHatArchiveAcquisitionAndCleanup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			clock := &redHatHTTPTestClock{time: time.Now()}
+			client.httpRetry = &httpRetryPolicy{
+				now: clock.now,
+				wait: func(ctx context.Context, delay time.Duration) error {
+					if err := ctx.Err(); err != nil {
+						return err
+					}
+					clock.advance(delay)
+					return nil
+				},
+			}
 			config := source("rhel", "9.4", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF_ARCHIVES)
 			config.Url = server.URL + "/provider/"
 			consumed := 0
@@ -473,6 +486,16 @@ func TestRedHatArchiveAcquisitionAndCleanup(t *testing.T) {
 				}
 				return nil
 			})
+			wantRetries := int64(0)
+			if mode == "truncated" || mode == "http-error" {
+				wantRetries = 4
+				if requests.Load() != 8 {
+					t.Fatalf("transient archive failure did not exhaust exactly five payload attempts: requests=%d", requests.Load())
+				}
+			}
+			if retryCounter.Load() != wantRetries {
+				t.Fatalf("archive retry attribution: mode=%s got=%d want=%d", mode, retryCounter.Load(), wantRetries)
+			}
 			if mode == "success" {
 				if err != nil || consumed != 2 || len(manifest.GetArtifacts()) != 2 || requests.Load() != 8 || !gotOldest.Equal(oldest) {
 					t.Fatalf("archive acquisition failed: %v consumed=%d requests=%d oldest=%s", err, consumed, requests.Load(), gotOldest)

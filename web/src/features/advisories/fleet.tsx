@@ -39,6 +39,7 @@ import { rejectedDocumentDetails, sourceGap } from "./source-gap";
 import { advisoryFeedsQueryOptions, advisorySummaryQueryOptions } from "./queries";
 import { firstDownloadState } from "./initial-download";
 import { InitialDownloadNotice } from "./initial-download-notice";
+import { sourceRetrySummary } from "./source-retries";
 
 export function AdvisoryFleet() {
   const lifetime = useAuthLifetime();
@@ -303,6 +304,9 @@ export function AdvisoryFleet() {
                   ) : null}
                   <p>
                     Last refreshed: <Timestamp value={feed.checkedAt} missing="Never" />
+                  </p>
+                  <p data-advisory-source-retries="">
+                    {sourceRetrySummary(feed.requestRetryCount)}
                   </p>
                   <p>
                     Expires: <Timestamp value={feed.expiresAt} relative={false} />

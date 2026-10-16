@@ -307,6 +307,7 @@ func (s *Service) Feeds(ctx context.Context) (*adminv1.ListAdvisoryFeedsResponse
 		}
 		out.Feeds = append(out.Feeds, &adminv1.AdvisoryFeedStatus{Id: row.ID, Distro: row.Distro, Release: row.Release, OsName: registeredName(platform.ForFeed(row.Distro, row.Release)), PlatformStream: row.PlatformStream, Artifacts: manifest.Artifacts, RejectedRecords: manifest.RejectedRecords, SnapshotAt: protoTime(row.SnapshotAt), SourceUrl: row.SourceUrl, SourceSha256: hex.EncodeToString(row.SourceSha256), CheckedAt: protoTime(row.CheckedAt), ExpiresAt: protoTime(row.ExpiresAt), AttemptedAt: protoTime(row.AttemptedAt), Error: row.Error, Fresh: row.CompleteSnapshot && row.ExpiresAt.Valid && now.Time.Before(row.ExpiresAt.Time), AdvisoryCount: uint64(row.AdvisoryCount)})
 		status := out.Feeds[len(out.Feeds)-1]
+		status.RequestRetryCount = uint64(row.RequestRetryCount)
 		status.RefreshEnabled = s.config.GetRefreshEnabled()
 		for _, refresh := range refreshes {
 			if refresh.FeedID == row.ID {

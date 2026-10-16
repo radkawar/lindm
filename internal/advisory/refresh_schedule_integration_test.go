@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
@@ -39,7 +40,11 @@ func TestRefreshScheduleIsSharedAcrossReplicas(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The first replica's failed refresh records its durable attempt.
-	if err := advisorydb.New(pool).FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(attempted), Error: "refresh_failed", ConfigBytes: encoded}); err != nil {
+	generation := uuid.New()
+	if err := advisorydb.New(pool).StartAdvisoryGeneration(t.Context(), advisorydb.StartAdvisoryGenerationParams{FeedID: source.Id, Generation: generation, ConfigBytes: encoded}); err != nil {
+		t.Fatal(err)
+	}
+	if err := advisorydb.New(pool).FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: source.GetId(), AttemptedAt: timestamp(attempted), Error: "refresh_failed", ConfigBytes: encoded, Generation: generation}); err != nil {
 		t.Fatal(err)
 	}
 	second.clock = func() time.Time { return attempted.Add(time.Minute) }
@@ -52,8 +57,8 @@ func TestRefreshScheduleIsSharedAcrossReplicas(t *testing.T) {
 	}
 }
 
-// A refresh cut short by shutdown or lost leadership is not an attempt: the
-// next leader must still refresh instead of waiting a whole interval.
+// Cancellation before work begins leaves the source due; a started refresh
+// retains latest-attempt accounting without reporting shutdown as failure.
 func TestCancelledRefreshIsNotRecordedAsAttempt(t *testing.T) {
 	pool, _ := testdb.Open(t)
 	s, _, _ := vendorService(t, pool, "ubuntu", "24.04", "ubuntu-USN-6859-1.json")
@@ -99,6 +104,9 @@ func TestRefreshWorkersJoinOnLeadershipCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=7"); err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	done := make(chan error, 1)
@@ -124,13 +132,17 @@ func TestRefreshWorkersJoinOnLeadershipCancellation(t *testing.T) {
 	if peak.Load() != 2 {
 		t.Fatalf("source concurrency = %d, want 2", peak.Load())
 	}
-	for _, source := range config.Feeds {
+	for index, source := range config.Feeds {
 		row, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if row.AttemptedAt.Valid {
-			t.Fatalf("leadership cancellation deferred %s", source.Id)
+		wantRetries := int64(7)
+		if index < 2 {
+			wantRetries = 0
+		}
+		if row.AttemptedAt.Valid != (index < 2) || row.Error != "" || row.RequestRetryCount != wantRetries {
+			t.Fatalf("started/untouched cancellation accounting for %s: %+v", source.Id, row)
 		}
 	}
 }
