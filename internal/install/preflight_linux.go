@@ -17,6 +17,26 @@ import (
 	"lindm/internal/platform"
 )
 
+const freshServerDiskRequirements = "fresh servers require a 32 GiB or larger disk with at least a 24 GiB usable filesystem and 16 GiB free in /var for full feed imports and upgrade staging"
+
+func freshDiskPreflight() error {
+	var disk unix.Statfs_t
+	if err := unix.Statfs("/var", &disk); err != nil {
+		return err
+	}
+	if disk.Bsize <= 0 || disk.Bavail > disk.Blocks || disk.Blocks > ^uint64(0)/uint64(disk.Bsize) {
+		return errors.New("installation disk capacity exceeds measurement bounds")
+	}
+	return checkFreshDiskCapacity(disk.Blocks*uint64(disk.Bsize), disk.Bavail*uint64(disk.Bsize))
+}
+
+func checkFreshDiskCapacity(total, available uint64) error {
+	if total < 24<<30 || available < 16<<30 || available > total {
+		return fmt.Errorf("%s; /var filesystem=%d bytes, free=%d bytes", freshServerDiskRequirements, total, available)
+	}
+	return nil
+}
+
 // Preserve the full least-privilege resource gate before native service startup.
 // PID 1 alone opens the persistent root secrets, handing the checker the same
 // ephemeral credentials as serve. command withholds all child diagnostics.
@@ -130,12 +150,16 @@ func databasePreflight(ctx context.Context, release *platform.Release) error {
 	if err := unix.Statfs("/var/backups", &disk); err != nil {
 		return err
 	}
+	return checkBackupCapacity(size, disk.Bavail*uint64(disk.Bsize))
+}
+
+func checkBackupCapacity(size int64, available uint64) error {
 	if size < 0 || uint64(size) > ((^uint64(0))-(4<<30))/2 {
 		return errors.New("database size exceeds backup capacity bounds")
 	}
 	needed := uint64(size)*2 + (4 << 30)
-	if disk.Bavail*uint64(disk.Bsize) < needed {
-		return errors.New("insufficient backup disk: require twice database size plus 4 GiB before migration")
+	if available < needed {
+		return fmt.Errorf("insufficient backup disk: database=%d bytes, /var/backups free=%d bytes, required=%d bytes (twice database size plus 4 GiB); if the database shares this filesystem, also allow its database bytes plus operating-system and release files", size, available, needed)
 	}
 	return nil
 }

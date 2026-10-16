@@ -150,6 +150,26 @@ remove the option to bypass an error. OpenSSL must be installed on the server.
 The helper and native installer require cgroup v2 and locked secret memory.
 Disable active swap before installation. Do not enable swap during the operation.
 
+### Size database and local staging separately
+
+The Terraform baseline allocates a **40 GiB application-server root volume**,
+a separate **20 GiB optional managed-device root volume**, and **20 GiB of RDS
+database storage**. The 20 GiB device disk is not the server default. The module
+does not set RDS storage autoscaling; review database capacity explicitly.
+The 40 GiB server volume is above the measured 32 GiB server sizing baseline,
+so this external-database default is retained. Before invoking the helper, verify
+at least a 24 GiB usable filesystem and 16 GiB free in `/var`; volume size alone
+does not establish those conditions.
+
+After the full enabled vendor-feed import, measure database size **D** as described
+in [server disk capacity](install.md#disk-capacity). RDS holds the database itself,
+but `/var/backups` on the application host still needs **2 × D + 4 GiB free** for
+backup and upgrades, in addition to the operating system and signed release files.
+RDS managed backups and the encrypted S3 backup copy do not remove this local
+staging requirement. Check actual filesystem availability, not only the nominal
+EBS volume size. These defaults and the historical proof below are not a
+universal capacity guarantee for additional vendor feeds or larger inventories.
+
 ### Match PostgreSQL backup clients to RDS
 
 The native backup and restore commands execute `/usr/bin/pg_dump` and

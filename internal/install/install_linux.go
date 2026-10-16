@@ -90,7 +90,7 @@ func Run(ctx context.Context, o Options) (err error) {
 		return err
 	}
 	if disk.Bavail*uint64(disk.Bsize) < 4<<30 {
-		return errors.New("at least 4 GiB free in /var required before installation")
+		return fmt.Errorf("at least 4 GiB free in /var required before installation; %s", freshServerDiskRequirements)
 	}
 	if _, err := os.Stat("/sys/fs/cgroup/cgroup.controllers"); err != nil {
 		return errors.New("cgroup v2 required")
@@ -145,6 +145,9 @@ func Run(ctx context.Context, o Options) (err error) {
 func installFresh(ctx context.Context, o *Options, release *platform.Release, packagePath, version string) error {
 	if o.Rollback {
 		return errors.New("rollback requires a completed managed installation")
+	}
+	if err := freshDiskPreflight(); err != nil {
+		return err
 	}
 	if o.DatabaseURL == "" {
 		entries, err := os.ReadDir(release.Server.PostgreSQLDataDirectory)

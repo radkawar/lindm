@@ -27,7 +27,7 @@ publication and evaluated Findings before backup, after upgrade and after restor
 | [Ubuntu 24.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | Distribution        | Connected and air gap | Qualified         |
 | [Ubuntu 26.04 LTS](platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Not yet qualified |
 | [Debian 12](platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
-| [Debian 13](platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Not yet qualified |
+| [Debian 13](platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Qualified         |
 | [RHEL 9](platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
 | [RHEL 10](platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
 | [Rocky Linux 9](platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
@@ -85,6 +85,46 @@ Never use a development signing key for a customer installation.
 Prepare an **age public recipient key** for backups. Keep its private identity
 outside the server. Test that identity on the operator's recovery computer.
 Retain the signed bundle, verification key and backup identity for recovery.
+
+### Disk capacity
+
+Provision a **32 GiB or larger server disk**, with at least a **24 GiB usable
+filesystem and 16 GiB free in `/var` before a fresh installation**. The preflight
+checks actual filesystem capacity and free space, not the disk's advertised size.
+A 20 GiB filesystem is refused before the native installer creates its installation
+journal or authority custody. Prefer **64 GiB or more** for additional vendor feeds
+and growth.
+
+This baseline follows the [Debian 13 full native proof](verification.md#control-plane-deployment-matrix)
+on 2026-10-16. After the real Ubuntu vendor import of 2,306,946 advisory rows,
+`pg_database_size` measured **1,998,378,675 bytes (1.86 GiB)**. Its upgrade required
+**8,291,724,646 bytes (7.72 GiB) free**. Measured filesystem usage/reservation plus
+that upgrade reserve was **21.50 GiB**, below the 24 GiB usable-filesystem minimum.
+The full lifecycle itself used 128 GiB lab disks; this is a measured sizing
+baseline, not a separate minimum-disk stress qualification or a multi-feed capacity
+guarantee. Existing installations retain the measured upgrade rule below rather
+than being subjected to a new fresh-install filesystem-size requirement.
+
+Size storage for the complete vendor-feed import, not an empty database. After
+all enabled feeds have published and the first current Findings evaluation has
+completed, measure the database through your protected administrative connection:
+
+```sql
+SELECT pg_database_size(current_database()) AS database_bytes;
+```
+
+Let that result be **D**. Before migration or upgrade, `/var/backups` must have
+at least **2 × D + 4 GiB free**. When database data and backups share the server
+filesystem, the filesystem must therefore fit **D + 2 × D + 4 GiB**, plus the
+operating system, signed releases and their private snapshots. The 4 GiB reserve
+alone is not a server disk-size recommendation. Check actual filesystem space
+with `df -B1 /var/backups`; an advertised volume size is not its available space.
+
+For external PostgreSQL such as RDS, database storage is separate, but the
+application server still needs **2 × D + 4 GiB free locally** for backup and
+upgrade staging. An object-storage backup destination does not eliminate this
+local staging requirement. Re-measure after enabling more vendor feeds or
+substantial inventory growth, and provision capacity before a maintenance window.
 
 ## Install the server
 

@@ -120,6 +120,8 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Restore canonical public embedded-repository and signed executable modes after private cold transport, with unchanged signed release provenance and custody permissions.
 - Preserve authenticated public bundle modes inside the installer's private immutable snapshot without preserving source ownership or weakening provenance verification.
 - Budget 128 GiB source and restore server overlays for complete vendor imports, measure the post-import database size, and account for both disks in ordinary lab admission without weakening the installer's upgrade capacity gate.
+- Refuse undersized fresh server filesystems before installation state or custody, publish the measured 32 GiB sizing baseline, and show actual database/available/required upgrade bytes while retaining the existing twice-database-plus-4-GiB upgrade rule.
+- Qualify connected x86_64 Debian 13 server installation with native PostgreSQL 17 through stock-browser setup, real device Findings, backup, matching-major offline drill, signed upgrade and fresh-host recovery.
 - Retain secret-safe, encrypted lab database failure classifications before owned guest cleanup, without changing installer authorization gates.
 - Sign local PostgreSQL certificates with a constrained P-256/SHA-256 authority so SCRAM-PLUS succeeds without disabling TLS verification, channel binding or sealed PKI custody.
 - Require database channel binding by default, reject disabled binding, and require SCRAM-PLUS for local credentials; explicit pooler `prefer` choices remain visible in startup logs and server status.
