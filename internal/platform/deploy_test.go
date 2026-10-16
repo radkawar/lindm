@@ -68,7 +68,7 @@ func TestServerRecipesHaveExplicitDatabaseAndQualificationPolicy(t *testing.T) {
 			t.Errorf("%s lacks explicit server policy: %+v", release.Key, server)
 		}
 		switch release.Key {
-		case "debian-12", "debian-13", "rhel-10", "rocky-10", "ubuntu-22.04", "ubuntu-26.04":
+		case "almalinux-10", "debian-12", "debian-13", "rhel-10", "rocky-10", "ubuntu-22.04", "ubuntu-26.04":
 			if !server.ConnectedOnly || server.Status != "Qualified" {
 				t.Errorf("%s lost its connected-only native lifecycle qualification", release.Key)
 			}
@@ -85,9 +85,14 @@ func TestServerSupportDocsDistinguishRecipeFromQualification(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, required := range []string{"PostgreSQL", "Lifecycle", "Not yet qualified", "Ubuntu 24.04", "Debian 13", "17", "18"} {
+	for _, required := range []string{"PostgreSQL", "Lifecycle", "Ubuntu 24.04", "Debian 13", "17", "18"} {
 		if !strings.Contains(body, required) {
 			t.Errorf("server table omits %q", required)
+		}
+	}
+	for _, release := range Releases() {
+		if release.Server != nil && (!strings.Contains(body, release.Name) || !strings.Contains(body, release.Server.Status)) {
+			t.Errorf("%s server table omits its registry identity or lifecycle status %q", release.Key, release.Server.Status)
 		}
 	}
 	if strings.Contains(body, "Fedora") || strings.Contains(body, "Linux Mint") {

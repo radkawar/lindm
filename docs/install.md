@@ -33,7 +33,7 @@ publication and evaluated Findings before backup, after upgrade and after restor
 | [Rocky Linux 9](platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
 | [Rocky Linux 10](platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 | [AlmaLinux 9](platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
-| [AlmaLinux 10](platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [AlmaLinux 10](platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 
 <!-- END GENERATED server-support -->
 
