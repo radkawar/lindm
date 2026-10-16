@@ -491,7 +491,7 @@ func TestHTTPRetryArchiveTerminalIntegrityBoundsAndStorage(t *testing.T) {
 	}
 }
 
-func TestHTTPRetryNoRetriesForAuthenticationParsingOrValidation(t *testing.T) {
+func TestHTTPRetryNoTransportRetriesForAuthenticationParsingOrValidation(t *testing.T) {
 	for _, mode := range []string{"pin", "parse", "document-validation", "source-validation", "vendor-checksum", "vendor-signature"} {
 		t.Run(mode, func(t *testing.T) {
 			directory := t.TempDir()
@@ -521,8 +521,8 @@ func TestHTTPRetryNoRetriesForAuthenticationParsingOrValidation(t *testing.T) {
 				}
 				return httpRetryTestResponse(request, payload, nil), nil
 			})
-			var counter atomic.Int64
-			ctx := WithRetryCounter(t.Context(), &counter)
+			var counter, raceCounter atomic.Int64
+			ctx := WithRetryCounter(WithVendorRaceRefetchCounter(t.Context(), &raceCounter), &counter)
 			config := source("ubuntu", "24.04", advisoryv1.FeedFormat_FEED_FORMAT_OSV_JSON)
 			config.Url = "https://security.access.redhat.com/advisory.json"
 			var err error
@@ -544,13 +544,15 @@ func TestHTTPRetryNoRetriesForAuthenticationParsingOrValidation(t *testing.T) {
 				})
 			}
 			wantCalls := 1
+			var wantRaceRefetches int64
 			if mode == "source-validation" {
 				wantCalls = 0
 			} else if strings.HasPrefix(mode, "vendor-") {
-				wantCalls = 3
+				wantCalls = 9
+				wantRaceRefetches = 2
 			}
-			if err == nil || calls != wantCalls || counter.Load() != 0 || len(*waits) != 0 {
-				t.Fatalf("trust/validation failure retried: err=%v calls=%d retries=%d waits=%v", err, calls, counter.Load(), *waits)
+			if err == nil || calls != wantCalls || counter.Load() != 0 || raceCounter.Load() != wantRaceRefetches || len(*waits) != 0 {
+				t.Fatalf("trust/validation failure accounting changed: err=%v calls=%d HTTP retries=%d race refetches=%d waits=%v", err, calls, counter.Load(), raceCounter.Load(), *waits)
 			}
 			replacementTestEmpty(t, directory, nil)
 		})

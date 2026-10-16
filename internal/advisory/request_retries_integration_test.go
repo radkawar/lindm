@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	configv1 "lindm/gen/lindm/config/v1"
 	"lindm/internal/advisory/advisorydb"
+	"lindm/internal/advisory/feed"
 	"lindm/internal/testdb"
 )
 
@@ -174,7 +176,7 @@ func TestRequestRetryAccountingRequiresExactConfigurationAndLiveLease(t *testing
 			if err := q.StartAdvisoryGeneration(t.Context(), advisorydb.StartAdvisoryGenerationParams{FeedID: source.Id, Generation: generation, ConfigBytes: encoded, StartedAt: timestamp(started)}); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=7 WHERE id=$1", source.Id); err != nil {
+			if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=7,vendor_race_refetch_count=9 WHERE id=$1", source.Id); err != nil {
 				t.Fatal(err)
 			}
 			switch fence {
@@ -190,7 +192,7 @@ func TestRequestRetryAccountingRequiresExactConfigurationAndLiveLease(t *testing
 			case "missing":
 				_, err = pool.Exec(t.Context(), "DELETE FROM advisory_generation_cleanup WHERE generation=$1", generation)
 			case "newer-attempt":
-				_, err = pool.Exec(t.Context(), "UPDATE advisory_feeds SET attempted_at=$2 WHERE id=$1", source.Id, started.Add(time.Second))
+				_, err = pool.Exec(t.Context(), "UPDATE advisory_feeds SET attempted_at=$2,error='newer_failure' WHERE id=$1", source.Id, started.Add(time.Second))
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -203,13 +205,218 @@ func TestRequestRetryAccountingRequiresExactConfigurationAndLiveLease(t *testing
 			if err != nil || updated != 0 {
 				t.Fatalf("stale start crossed %s fence: %d %v", fence, updated, err)
 			}
-			if err := q.FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: source.Id, AttemptedAt: timestamp(started), ConfigBytes: encoded, Generation: generation, RequestRetryCount: 4, Error: "refresh_failed"}); err != nil {
+			if err := q.FailAdvisoryFeed(t.Context(), advisorydb.FailAdvisoryFeedParams{ID: source.Id, AttemptedAt: timestamp(started), ConfigBytes: encoded, Generation: generation, RequestRetryCount: 4, VendorRaceRefetchCount: 2, Error: "refresh_failed"}); err != nil {
 				t.Fatal(err)
 			}
+			if fence == "newer-attempt" {
+				updated, err := q.PublishAdvisoryFeed(t.Context(), advisorydb.PublishAdvisoryFeedParams{
+					ID: source.Id, Revision: before.Revision, SourceSha256: []byte{}, SourceManifest: []byte{},
+					CheckedAt: timestamp(started), ConfigBytes: encoded, RefreshAttempt: true,
+					RequestRetryCount: 4, VendorRaceRefetchCount: 2,
+				})
+				if err != nil || updated != 1 {
+					t.Fatalf("older successful publication: updated=%d err=%v", updated, err)
+				}
+			}
 			after, err := q.GetAdvisoryFeed(t.Context(), source.Id)
-			if err != nil || before.RequestRetryCount != after.RequestRetryCount || before.Error != after.Error || before.AttemptedAt != after.AttemptedAt {
+			if err != nil || before.RequestRetryCount != after.RequestRetryCount || before.VendorRaceRefetchCount != after.VendorRaceRefetchCount || before.Error != after.Error || before.AttemptedAt != after.AttemptedAt {
 				t.Fatalf("stale completion crossed %s fence: before=%+v after=%+v err=%v", fence, before, after, err)
 			}
 		})
+	}
+}
+
+func TestVendorRaceRefetchesPersistLatestAttemptAndIsolateSources(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	fixtures := make(map[string][]byte, 3)
+	for _, suffix := range []string{"", ".sha256", ".asc"} {
+		raw, err := os.ReadFile("feed/testdata/redhat-rhsa-2024_6783.json" + suffix)
+		if err != nil {
+			t.Fatal(err)
+		}
+		fixtures[suffix] = raw
+	}
+	var requestsA, requestsB atomic.Int64
+	var checksumsA atomic.Int64
+	var phase atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		counter := &requestsA
+		second := strings.HasPrefix(r.URL.Path, "/b/")
+		if second {
+			counter = &requestsB
+		}
+		suffix := strings.TrimPrefix(r.URL.Path, "/a/rhsa-2024_6783.json")
+		if second {
+			suffix = strings.TrimPrefix(r.URL.Path, "/b/rhsa-2024_6783.json")
+		}
+		if suffix == "" {
+			attempt := counter.Add(1)
+			// Source a has one transport retry and one vendor race. Source b
+			// exhausts all three complete sets without an HTTP transport retry.
+			if phase.Load() == 0 && !second && attempt == 1 {
+				w.Header().Set("Retry-After", "0")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
+		if suffix == ".sha256" && phase.Load() == 0 {
+			if second || checksumsA.Add(1) == 1 {
+				_, _ = w.Write([]byte(strings.Repeat("0", 64) + "  rhsa-2024_6783.json\n"))
+				return
+			}
+		}
+		raw, ok := fixtures[suffix]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(raw)
+	}))
+	defer server.Close()
+	cfg := &configv1.AdvisoryConfig{}
+	for index, arch := range []string{"x86_64", "aarch64"} {
+		id := string(rune('a' + index))
+		cfg.Feeds = append(cfg.Feeds, &advisoryv1.FeedSource{
+			Id: id, Distro: "rhel", Release: "9", Architecture: arch, PlatformStream: "standard",
+			Url:    server.URL + "/" + id + "/rhsa-2024_6783.json",
+			Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, MaxAgeSeconds: 86400,
+		})
+	}
+	s, err := New(t.Context(), pool, cfg, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inherited atomic.Int64
+	inherited.Store(99)
+	ctx := feed.WithVendorRaceRefetchCounter(t.Context(), &inherited)
+	if err := s.Refresh(ctx); err == nil {
+		t.Fatal("exhausted source unexpectedly succeeded")
+	}
+	if requestsA.Load() != 3 || requestsB.Load() != 3 || inherited.Load() != 99 {
+		t.Fatalf("request/counter isolation: requests=%d/%d inherited=%d", requestsA.Load(), requestsB.Load(), inherited.Load())
+	}
+	restarted, err := New(t.Context(), pool, cfg, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := restarted.Feeds(t.Context())
+	if err != nil || len(status.GetFeeds()) != 2 {
+		t.Fatalf("feed status after restart: %v %v", status, err)
+	}
+	for index, want := range []uint64{1, 2} {
+		got := status.Feeds[index]
+		if got.GetVendorRaceRefetchCount() != want || got.GetRequestRetryCount() != uint64(1-index) || got.GetAttemptedAt() == nil || got.GetFresh() || got.GetRefreshing() || len(got.GetRejectedRecords()) != 0 {
+			t.Fatalf("distinct latest-attempt counters/coverage: %v", got)
+		}
+		if (got.GetError() != "") != (index == 1) || (got.GetCheckedAt() != nil) != (index == 0) {
+			t.Fatalf("success/failure publication evidence: %v", got)
+		}
+	}
+	phase.Store(1)
+	if err := restarted.Refresh(ctx); err != nil {
+		t.Fatal(err)
+	}
+	status, err = restarted.Feeds(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, got := range status.Feeds {
+		if got.GetVendorRaceRefetchCount() != 0 || got.GetRequestRetryCount() != 0 || got.GetError() != "" || got.GetCheckedAt() == nil || got.GetFresh() {
+			t.Fatalf("new no-refetch attempt did not reset accounting: %v", got)
+		}
+	}
+}
+
+func TestVendorRaceRefetchesSurviveCancellationAndRestart(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	raw, err := os.ReadFile("feed/testdata/redhat-rhsa-2024_6783.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature, err := os.ReadFile("feed/testdata/redhat-rhsa-2024_6783.json.asc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payloads atomic.Int64
+	entered := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, ".sha256"):
+			_, _ = w.Write([]byte(strings.Repeat("0", 64) + "  rhsa-2024_6783.json\n"))
+		case strings.HasSuffix(r.URL.Path, ".asc"):
+			_, _ = w.Write(signature)
+		default:
+			if payloads.Add(1) == 2 {
+				close(entered)
+				<-r.Context().Done()
+				return
+			}
+			_, _ = w.Write(raw)
+		}
+	}))
+	defer server.Close()
+	source := &advisoryv1.FeedSource{
+		Id: "cancelled", Distro: "rhel", Release: "9", Architecture: "x86_64", PlatformStream: "standard",
+		Url: server.URL + "/rhsa-2024_6783.json", Format: advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF, MaxAgeSeconds: 86400,
+	}
+	cfg := &configv1.AdvisoryConfig{Feeds: []*advisoryv1.FeedSource{source}}
+	s, err := New(t.Context(), pool, cfg, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- s.Refresh(ctx) }()
+	select {
+	case <-entered:
+		cancel()
+	case <-time.After(15 * time.Second):
+		t.Fatal("fresh consistent set never began")
+	}
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("cancelled refresh reported success")
+		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("cancelled refresh did not finish")
+	}
+	restarted, err := New(t.Context(), pool, cfg, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := restarted.Feeds(t.Context())
+	if err != nil || len(status.GetFeeds()) != 1 {
+		t.Fatalf("cancelled feed status after restart: %v %v", status, err)
+	}
+	got := status.Feeds[0]
+	if got.GetVendorRaceRefetchCount() != 1 || got.GetRequestRetryCount() != 0 || got.GetAttemptedAt() == nil || got.GetCheckedAt() != nil || got.GetFresh() || got.GetRefreshing() || got.GetError() != "" {
+		t.Fatalf("cancelled refresh accounting changed status/coverage: %v", got)
+	}
+}
+
+func TestLatestRefreshCountersRemainNonnegativeAndPreserveSQLPrecision(t *testing.T) {
+	pool, _ := testdb.Open(t)
+	s, source, _ := vendorService(t, pool, "ubuntu", "24.04", "ubuntu-USN-6859-1.json")
+	row, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil || row.RequestRetryCount != 0 || row.VendorRaceRefetchCount != 0 {
+		t.Fatalf("counter defaults: %+v %v", row, err)
+	}
+	for _, column := range []string{"request_retry_count", "vendor_race_refetch_count"} {
+		if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET "+column+"=-1 WHERE id=$1", source.Id); err == nil {
+			t.Fatalf("negative %s was accepted", column)
+		}
+	}
+	const large = uint64(9223372036854775807)
+	if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=9223372036854775807,vendor_race_refetch_count=9223372036854775807 WHERE id=$1", source.Id); err != nil {
+		t.Fatal(err)
+	}
+	status, err := s.Feeds(t.Context())
+	if err != nil || len(status.GetFeeds()) != 1 {
+		t.Fatalf("large counter status: %v %v", status, err)
+	}
+	if got := status.Feeds[0]; got.GetRequestRetryCount() != large || got.GetVendorRaceRefetchCount() != large || got.GetAttemptedAt() != nil || got.GetCheckedAt() != nil || got.GetFresh() {
+		t.Fatalf("counter precision changed or invented publication evidence: %v", got)
 	}
 }

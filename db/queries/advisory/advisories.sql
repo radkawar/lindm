@@ -29,6 +29,7 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
  attempted_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.attempted_at END,
  request_retry_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.request_retry_count ELSE 0 END,
+ vendor_race_refetch_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.vendor_race_refetch_count ELSE 0 END,
  error=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.error ELSE '' END,
  configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
   THEN advisory_feeds.configured_at ELSE clock_timestamp() END;
@@ -45,19 +46,22 @@ SELECT * FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32;
 -- name: PublishAdvisoryFeed :execrows
 UPDATE advisory_feeds SET revision=sqlc.arg('revision'),source_sha256=sqlc.arg('source_sha256'),
  checked_at=sqlc.arg('checked_at'),expires_at=sqlc.arg('expires_at'),
- attempted_at=GREATEST(attempted_at,sqlc.arg('checked_at')),
+ attempted_at=CASE WHEN sqlc.arg('refresh_attempt')::boolean THEN GREATEST(attempted_at,sqlc.arg('checked_at')) ELSE attempted_at END,
  error=CASE WHEN attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at') THEN '' ELSE error END,
  advisory_count=sqlc.arg('advisory_count'),complete_snapshot=sqlc.arg('complete_snapshot'),
  source_manifest=sqlc.arg('source_manifest'),snapshot_at=sqlc.arg('snapshot_at'),
- request_retry_count=CASE WHEN attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at')
-  THEN sqlc.arg('request_retry_count')::bigint ELSE request_retry_count END
+ request_retry_count=CASE WHEN sqlc.arg('refresh_attempt')::boolean AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at'))
+  THEN sqlc.arg('request_retry_count')::bigint ELSE request_retry_count END,
+ vendor_race_refetch_count=CASE WHEN sqlc.arg('refresh_attempt')::boolean AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('checked_at'))
+  THEN sqlc.arg('vendor_race_refetch_count')::bigint ELSE vendor_race_refetch_count END
 WHERE id=sqlc.arg('id') AND enabled AND config_bytes=sqlc.arg('config_bytes')
  AND (checked_at IS NULL OR checked_at<=sqlc.arg('checked_at'));
 
 -- name: FailAdvisoryFeed :exec
 UPDATE advisory_feeds SET attempted_at=sqlc.arg('attempted_at'),
  error=CASE WHEN sqlc.arg('cancelled')::boolean THEN error ELSE sqlc.arg('error')::text END,
- request_retry_count=sqlc.arg('request_retry_count')::bigint
+ request_retry_count=sqlc.arg('request_retry_count')::bigint,
+ vendor_race_refetch_count=sqlc.arg('vendor_race_refetch_count')::bigint
 WHERE id=sqlc.arg('id') AND enabled AND advisory_feeds.config_bytes=sqlc.arg('config_bytes')
  AND (checked_at IS NULL OR checked_at<=sqlc.arg('attempted_at'))
  AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('attempted_at'))
@@ -67,7 +71,7 @@ WHERE id=sqlc.arg('id') AND enabled AND advisory_feeds.config_bytes=sqlc.arg('co
 
 -- name: BeginAdvisoryRefreshAttempt :execrows
 -- Reset only an actual, live exact-configuration attempt, not skipped sources.
-UPDATE advisory_feeds SET attempted_at=sqlc.arg('attempted_at'),request_retry_count=0
+UPDATE advisory_feeds SET attempted_at=sqlc.arg('attempted_at'),request_retry_count=0,vendor_race_refetch_count=0
 WHERE id=sqlc.arg('id') AND enabled AND advisory_feeds.config_bytes=sqlc.arg('config_bytes')
  AND (checked_at IS NULL OR checked_at<=sqlc.arg('attempted_at'))
  AND (attempted_at IS NULL OR attempted_at<=sqlc.arg('attempted_at'))

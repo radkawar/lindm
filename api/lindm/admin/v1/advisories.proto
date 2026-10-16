@@ -226,6 +226,10 @@ message AdvisoryFeedStatus {
   // Additional HTTP request attempts during the latest attempted refresh,
   // successful or failed; reset when a new refresh actually begins.
   uint64 request_retry_count = 21;
+  // Additional consistent vendor document sets fetched after checksum or
+  // signature mismatches during the latest attempted refresh, successful or
+  // failed; separate from HTTP retries and reset only when a refresh begins.
+  uint64 vendor_race_refetch_count = 22;
 }
 message ListAdvisoryFeedsResponse {
   repeated AdvisoryFeedStatus feeds = 1;

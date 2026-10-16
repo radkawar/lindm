@@ -55,6 +55,9 @@ func TestImportSnapshotFreshnessAndMonotonicity(t *testing.T) {
 	if row.CompleteSnapshot != doc.GetCompleteSnapshot() || !row.CompleteSnapshot {
 		t.Fatalf("coverage %v; parser established %v", row.CompleteSnapshot, doc.GetCompleteSnapshot())
 	}
+	if row.AttemptedAt.Valid || row.RequestRetryCount != 0 || row.VendorRaceRefetchCount != 0 {
+		t.Fatalf("offline snapshot invented a network refresh attempt: %+v", row)
+	}
 
 	for name, acquired := range map[string]time.Time{
 		"stale":  now.Add(-maxAge),
@@ -89,5 +92,28 @@ func TestImportSnapshotFreshnessAndMonotonicity(t *testing.T) {
 	}
 	if !after.CheckedAt.Time.Equal(newer) || !after.ExpiresAt.Time.Equal(newer.Add(maxAge)) || after.Revision != row.Revision {
 		t.Fatalf("older snapshot replaced newer publication: %v", after)
+	}
+
+	for index, newerAttempt := range []bool{false, true} {
+		acquired := newer.Add(time.Duration(index+1) * time.Minute)
+		attempted := acquired.Add(-time.Second)
+		wantError := ""
+		if newerAttempt {
+			attempted = acquired.Add(time.Second)
+			wantError = "refresh_failed"
+		}
+		if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET attempted_at=$2,request_retry_count=7,vendor_race_refetch_count=9,error='refresh_failed' WHERE id=$1", source.Id, attempted); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.ImportSnapshot(t.Context(), snapshot(acquired, source)); err != nil {
+			t.Fatal(err)
+		}
+		row, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.RequestRetryCount != 7 || row.VendorRaceRefetchCount != 9 || !row.AttemptedAt.Valid || !row.AttemptedAt.Time.Equal(attempted) || row.Error != wantError || !row.CheckedAt.Time.Equal(acquired) {
+			t.Fatalf("offline publication changed latest-refresh accounting or error fence (newer=%v): %+v", newerAttempt, row)
+		}
 	}
 }

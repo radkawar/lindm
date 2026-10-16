@@ -5758,9 +5758,28 @@ cooldowns remain authoritative. Bodies and network permits close before any
 wait. Partial bounded responses are discarded; archive retries truncate and
 rewind the same private file and recreate digest/CRC state. TLS identity,
 signature, digest/CRC, document validation, content-encoding, byte-limit, storage
-and cancellation failures are never retried. Ordinary GETs retain one two-minute
-deadline across all attempts and waits; streaming archives retain the existing
-progress and overall refresh ceilings.
+and cancellation failures do not trigger transport retries. Ordinary GETs retain
+one two-minute deadline across all attempts and waits; streaming archives retain
+the existing progress and overall refresh ceilings.
+
+Mutable Red Hat CSAF JSON documents have a separate, bounded publication-race
+policy. A vendor checksum or cryptographic signature mismatch discards the entire
+acquired set and refetches the document, `.sha256` and `.asc` together, at most
+twice. Only a set whose checksum, signature, trusted signing identity, configured
+pin and captured checkpoint requirements all pass can reach normalization.
+No proof is reused from another set, and no mismatch is repaired or accepted.
+Persistent mismatches still fail closed; configured pin mismatches, invalid or
+revoked signing authority, document validation, TLS identity, cancellation and
+local storage failures do not trigger this refetch. Immutable signed archives
+and non-Red-Hat sources retain their existing trust-failure behavior. The
+process-wide four-request/four-file bounds and source deadlines are unchanged.
+
+Migration `00061` separately stores nonnegative `vendor_race_refetch_count`,
+shown as **Vendor publication race refetches for latest refresh**. This counts
+additional complete proof-set acquisitions, not transport retries or rejected
+documents. It follows the same latest-actual-attempt reset, publication,
+failure/cancellation, configuration and live-generation fences as
+`request_retry_count`; neither counter confers coverage or freshness authority.
 
 Migration `00060` stores nonnegative `request_retry_count` on each feed. It is the
 number of additional HTTP attempts for the latest actual refresh, successful or

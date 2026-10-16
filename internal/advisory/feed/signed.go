@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp/armor"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 
@@ -101,6 +102,12 @@ func signedPublisher(config *advisoryv1.FeedSource) (string, error) {
 // verify authenticates complete original bytes, never canonicalized JSON/text.
 // The timestamp is taken only from the successfully verified signature packet.
 func (t *vendorTrust) verify(ctx context.Context, fingerprint string, payload io.Reader, proof []byte, now time.Time) (string, time.Time, error) {
+	return t.verifySignature(ctx, fingerprint, payload, proof, now, false)
+}
+
+// Classification is opt-in for mutable CSAF sets. Other signed inputs keep the
+// original single-pass failure behavior and never rehash a rejected archive.
+func (t *vendorTrust) verifySignature(ctx context.Context, fingerprint string, payload io.Reader, proof []byte, now time.Time, classifyMismatch bool) (string, time.Time, error) {
 	if t == nil || payload == nil || now.IsZero() || len(proof) == 0 || len(proof) > maxProofBytes {
 		return "", time.Time{}, errors.New("feed: invalid signature verification input")
 	}
@@ -150,6 +157,16 @@ func (t *vendorTrust) verify(ctx context.Context, fingerprint string, payload io
 	cryptoConfig := &packet.Config{Time: func() time.Time { return now }}
 	verified, signer, err := openpgp.VerifyDetachedSignature(keys, contextFeedReader{ctx, payload}, bytes.NewReader(binary), cryptoConfig)
 	if err != nil {
+		var signatureError pgperrors.SignatureError
+		if classifyMismatch && errors.As(err, &signatureError) {
+			mismatch, classifyErr := vendorCryptoMismatch(ctx, keys, fingerprint, payload, sig, now, cryptoConfig)
+			if classifyErr != nil {
+				return "", time.Time{}, classifyErr
+			}
+			if mismatch {
+				err = &vendorSignatureMismatch{err}
+			}
+		}
 		return "", time.Time{}, fmt.Errorf("feed: verify vendor signature: %w", err)
 	}
 	if strings.ToUpper(hex.EncodeToString(signer.PrimaryKey.Fingerprint)) != fingerprint || verified.IssuerKeyId == nil {
@@ -304,45 +321,68 @@ func (c *Client) acquireSignedCSAF(ctx context.Context, config *advisoryv1.FeedS
 		return errors.New("feed: signed CSAF URL must name a JSON document")
 	}
 	location := u.String()
-	checksum, signature, err := c.fetchVendorProofs(ctx, location)
-	if err != nil {
-		return err
-	}
-	result.file, err = os.CreateTemp("", "lindm-feed-csaf-*")
-	if err != nil {
-		return fmt.Errorf("feed: stage CSAF: %w", err)
-	}
 	defer func() {
 		if err != nil {
 			err = errors.Join(err, result.close())
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, location, result.file, redHatRecordBytes, nil)
-	if err != nil {
-		return err
+	for attempt := range vendorCSAFSets {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if attempt != 0 {
+			if counter := VendorRaceRefetchCounter(ctx); counter != nil {
+				counter.Add(1)
+			}
+		}
+		// Each set owns fresh proofs and payload bytes. Neither a prior proof
+		// nor a partial transfer can authenticate a subsequent publication.
+		checksum, signature, err := c.fetchVendorProofs(ctx, location)
+		if err != nil {
+			return err
+		}
+		if result.file == nil {
+			result.file, err = os.CreateTemp("", "lindm-feed-csaf-*")
+			if err != nil {
+				return fmt.Errorf("feed: stage CSAF: %w", err)
+			}
+		}
+		digest, err := c.downloadArchive(ctx, location, result.file, redHatRecordBytes, nil)
+		if err != nil {
+			return err
+		}
+		// An operator pin is immutable policy, not evidence of a vendor race.
+		if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
+			return errors.New("feed: source checksum mismatch")
+		}
+		if !bytes.Equal(digest, checksum) {
+			if attempt+1 < vendorCSAFSets {
+				continue
+			}
+			return errors.New("feed: vendor CSAF checksum mismatch")
+		}
+		if _, err := result.file.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("feed: rewind signed CSAF: %w", err)
+		}
+		signer, signedAt, err := c.signedTrust.verifySignature(ctx, fingerprint, result.file, signature, time.Now(), true)
+		if err != nil {
+			var mismatch *vendorSignatureMismatch
+			if errors.As(err, &mismatch) && attempt+1 < vendorCSAFSets {
+				continue
+			}
+			return err
+		}
+		if _, err := result.file.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("feed: rewind verified CSAF: %w", err)
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		result.artifact = &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}
+		result.signedAt = signedAt
+		return nil
 	}
-	if !bytes.Equal(digest, checksum) {
-		return errors.New("feed: vendor CSAF checksum mismatch")
-	}
-	if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
-		return errors.New("feed: source checksum mismatch")
-	}
-	if _, err := result.file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("feed: rewind signed CSAF: %w", err)
-	}
-	signer, signedAt, err := c.signedTrust.verify(ctx, fingerprint, result.file, signature, time.Now())
-	if err != nil {
-		return err
-	}
-	if _, err := result.file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("feed: rewind verified CSAF: %w", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	result.artifact = &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}
-	result.signedAt = signedAt
-	return nil
+	panic("unreachable vendor CSAF set loop")
 }
 
 func signedArtifactURL(location string) (*url.URL, error) {

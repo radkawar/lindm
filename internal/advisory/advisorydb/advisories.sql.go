@@ -326,7 +326,7 @@ func (q *Queries) AdvisorySourceMappingMissing(ctx context.Context, snapshotID u
 }
 
 const beginAdvisoryRefreshAttempt = `-- name: BeginAdvisoryRefreshAttempt :execrows
-UPDATE advisory_feeds SET attempted_at=$1,request_retry_count=0
+UPDATE advisory_feeds SET attempted_at=$1,request_retry_count=0,vendor_race_refetch_count=0
 WHERE id=$2 AND enabled AND advisory_feeds.config_bytes=$3
  AND (checked_at IS NULL OR checked_at<=$1)
  AND (attempted_at IS NULL OR attempted_at<=$1)
@@ -435,6 +435,7 @@ ON CONFLICT(id) DO UPDATE SET distro=EXCLUDED.distro,release=EXCLUDED.release,
  expires_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.expires_at END,
  attempted_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.attempted_at END,
  request_retry_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.request_retry_count ELSE 0 END,
+ vendor_race_refetch_count=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.vendor_race_refetch_count ELSE 0 END,
  error=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes THEN advisory_feeds.error ELSE '' END,
  configured_at=CASE WHEN advisory_feeds.config_bytes=EXCLUDED.config_bytes AND advisory_feeds.enabled
   THEN advisory_feeds.configured_at ELSE clock_timestamp() END
@@ -615,23 +616,25 @@ func (q *Queries) DisableAdvisoryFeeds(ctx context.Context, enabledIds []string)
 const failAdvisoryFeed = `-- name: FailAdvisoryFeed :exec
 UPDATE advisory_feeds SET attempted_at=$1,
  error=CASE WHEN $2::boolean THEN error ELSE $3::text END,
- request_retry_count=$4::bigint
-WHERE id=$5 AND enabled AND advisory_feeds.config_bytes=$6
+ request_retry_count=$4::bigint,
+ vendor_race_refetch_count=$5::bigint
+WHERE id=$6 AND enabled AND advisory_feeds.config_bytes=$7
  AND (checked_at IS NULL OR checked_at<=$1)
  AND (attempted_at IS NULL OR attempted_at<=$1)
  AND EXISTS (SELECT 1 FROM advisory_generation_cleanup g
-  WHERE g.feed_id=advisory_feeds.id AND g.generation=$7
+  WHERE g.feed_id=advisory_feeds.id AND g.generation=$8
    AND g.config_bytes=advisory_feeds.config_bytes AND g.cleanup_after>clock_timestamp())
 `
 
 type FailAdvisoryFeedParams struct {
-	AttemptedAt       pgtype.Timestamptz
-	Cancelled         bool
-	Error             string
-	RequestRetryCount int64
-	ID                string
-	ConfigBytes       []byte
-	Generation        uuid.UUID
+	AttemptedAt            pgtype.Timestamptz
+	Cancelled              bool
+	Error                  string
+	RequestRetryCount      int64
+	VendorRaceRefetchCount int64
+	ID                     string
+	ConfigBytes            []byte
+	Generation             uuid.UUID
 }
 
 func (q *Queries) FailAdvisoryFeed(ctx context.Context, arg FailAdvisoryFeedParams) error {
@@ -640,6 +643,7 @@ func (q *Queries) FailAdvisoryFeed(ctx context.Context, arg FailAdvisoryFeedPara
 		arg.Cancelled,
 		arg.Error,
 		arg.RequestRetryCount,
+		arg.VendorRaceRefetchCount,
 		arg.ID,
 		arg.ConfigBytes,
 		arg.Generation,
@@ -765,7 +769,7 @@ func (q *Queries) GetAdvisoryExceptionRequest(ctx context.Context, arg GetAdviso
 }
 
 const getAdvisoryFeed = `-- name: GetAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count FROM advisory_feeds WHERE id=$1
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count, vendor_race_refetch_count FROM advisory_feeds WHERE id=$1
 `
 
 func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -792,6 +796,7 @@ func (q *Queries) GetAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed,
 		&i.ConfiguredAt,
 		&i.Architecture,
 		&i.RequestRetryCount,
+		&i.VendorRaceRefetchCount,
 	)
 	return i, err
 }
@@ -996,7 +1001,7 @@ type InsertAdvisorySetUncoveredParams struct {
 }
 
 const listAdvisoryFeeds = `-- name: ListAdvisoryFeeds :many
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count, vendor_race_refetch_count FROM advisory_feeds WHERE enabled ORDER BY id LIMIT 32
 `
 
 func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error) {
@@ -1029,6 +1034,7 @@ func (q *Queries) ListAdvisoryFeeds(ctx context.Context) ([]AdvisoryFeed, error)
 			&i.ConfiguredAt,
 			&i.Architecture,
 			&i.RequestRetryCount,
+			&i.VendorRaceRefetchCount,
 		); err != nil {
 			return nil, err
 		}
@@ -1595,7 +1601,7 @@ func (q *Queries) LockAdvisoryDevice(ctx context.Context, id uuid.UUID) error {
 }
 
 const lockAdvisoryFeed = `-- name: LockAdvisoryFeed :one
-SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count FROM advisory_feeds WHERE id=$1 FOR UPDATE
+SELECT id, distro, release, platform_stream, source_url, config_bytes, revision, source_sha256, source_manifest, snapshot_at, checked_at, expires_at, attempted_at, error, advisory_count, enabled, complete_snapshot, configured_at, architecture, request_retry_count, vendor_race_refetch_count FROM advisory_feeds WHERE id=$1 FOR UPDATE
 `
 
 func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed, error) {
@@ -1622,6 +1628,7 @@ func (q *Queries) LockAdvisoryFeed(ctx context.Context, id string) (AdvisoryFeed
 		&i.ConfiguredAt,
 		&i.Architecture,
 		&i.RequestRetryCount,
+		&i.VendorRaceRefetchCount,
 	)
 	return i, err
 }
@@ -1779,28 +1786,32 @@ func (q *Queries) PruneAdvisoryFindingSets(ctx context.Context, setLimit int32) 
 const publishAdvisoryFeed = `-- name: PublishAdvisoryFeed :execrows
 UPDATE advisory_feeds SET revision=$1,source_sha256=$2,
  checked_at=$3,expires_at=$4,
- attempted_at=GREATEST(attempted_at,$3),
+ attempted_at=CASE WHEN $5::boolean THEN GREATEST(attempted_at,$3) ELSE attempted_at END,
  error=CASE WHEN attempted_at IS NULL OR attempted_at<=$3 THEN '' ELSE error END,
- advisory_count=$5,complete_snapshot=$6,
- source_manifest=$7,snapshot_at=$8,
- request_retry_count=CASE WHEN attempted_at IS NULL OR attempted_at<=$3
-  THEN $9::bigint ELSE request_retry_count END
-WHERE id=$10 AND enabled AND config_bytes=$11
+ advisory_count=$6,complete_snapshot=$7,
+ source_manifest=$8,snapshot_at=$9,
+ request_retry_count=CASE WHEN $5::boolean AND (attempted_at IS NULL OR attempted_at<=$3)
+  THEN $10::bigint ELSE request_retry_count END,
+ vendor_race_refetch_count=CASE WHEN $5::boolean AND (attempted_at IS NULL OR attempted_at<=$3)
+  THEN $11::bigint ELSE vendor_race_refetch_count END
+WHERE id=$12 AND enabled AND config_bytes=$13
  AND (checked_at IS NULL OR checked_at<=$3)
 `
 
 type PublishAdvisoryFeedParams struct {
-	Revision          uuid.UUID
-	SourceSha256      []byte
-	CheckedAt         pgtype.Timestamptz
-	ExpiresAt         pgtype.Timestamptz
-	AdvisoryCount     int64
-	CompleteSnapshot  bool
-	SourceManifest    []byte
-	SnapshotAt        pgtype.Timestamptz
-	RequestRetryCount int64
-	ID                string
-	ConfigBytes       []byte
+	Revision               uuid.UUID
+	SourceSha256           []byte
+	CheckedAt              pgtype.Timestamptz
+	ExpiresAt              pgtype.Timestamptz
+	RefreshAttempt         bool
+	AdvisoryCount          int64
+	CompleteSnapshot       bool
+	SourceManifest         []byte
+	SnapshotAt             pgtype.Timestamptz
+	RequestRetryCount      int64
+	VendorRaceRefetchCount int64
+	ID                     string
+	ConfigBytes            []byte
 }
 
 func (q *Queries) PublishAdvisoryFeed(ctx context.Context, arg PublishAdvisoryFeedParams) (int64, error) {
@@ -1809,11 +1820,13 @@ func (q *Queries) PublishAdvisoryFeed(ctx context.Context, arg PublishAdvisoryFe
 		arg.SourceSha256,
 		arg.CheckedAt,
 		arg.ExpiresAt,
+		arg.RefreshAttempt,
 		arg.AdvisoryCount,
 		arg.CompleteSnapshot,
 		arg.SourceManifest,
 		arg.SnapshotAt,
 		arg.RequestRetryCount,
+		arg.VendorRaceRefetchCount,
 		arg.ID,
 		arg.ConfigBytes,
 	)

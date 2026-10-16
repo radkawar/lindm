@@ -126,8 +126,9 @@ func (s *Service) refreshSources(ctx context.Context, sources []*advisoryv1.Feed
 }
 
 func (s *Service) refreshSource(ctx context.Context, source *advisoryv1.FeedSource) error {
-	var retries atomic.Int64
+	var retries, vendorRaceRefetches atomic.Int64
 	ctx = feed.WithRetryCounter(ctx, &retries)
+	ctx = feed.WithVendorRaceRefetchCounter(ctx, &vendorRaceRefetches)
 	started := s.clock().UTC()
 	err := s.publishStream(ctx, source, started, func(producerCtx context.Context, emit func(*advisoryv1.Advisory) error, progress func() error) (*advisoryv1.FeedDocument, error) {
 		return s.client.FetchStream(producerCtx, source, emit, progress)

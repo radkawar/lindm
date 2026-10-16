@@ -29,26 +29,27 @@ type AdvisoryEvaluation struct {
 }
 
 type AdvisoryFeed struct {
-	ID                string
-	Distro            string
-	Release           string
-	PlatformStream    string
-	SourceUrl         string
-	ConfigBytes       []byte
-	Revision          uuid.UUID
-	SourceSha256      []byte
-	SourceManifest    []byte
-	SnapshotAt        pgtype.Timestamptz
-	CheckedAt         pgtype.Timestamptz
-	ExpiresAt         pgtype.Timestamptz
-	AttemptedAt       pgtype.Timestamptz
-	Error             string
-	AdvisoryCount     int64
-	Enabled           bool
-	CompleteSnapshot  bool
-	ConfiguredAt      pgtype.Timestamptz
-	Architecture      string
-	RequestRetryCount int64
+	ID                     string
+	Distro                 string
+	Release                string
+	PlatformStream         string
+	SourceUrl              string
+	ConfigBytes            []byte
+	Revision               uuid.UUID
+	SourceSha256           []byte
+	SourceManifest         []byte
+	SnapshotAt             pgtype.Timestamptz
+	CheckedAt              pgtype.Timestamptz
+	ExpiresAt              pgtype.Timestamptz
+	AttemptedAt            pgtype.Timestamptz
+	Error                  string
+	AdvisoryCount          int64
+	Enabled                bool
+	CompleteSnapshot       bool
+	ConfiguredAt           pgtype.Timestamptz
+	Architecture           string
+	RequestRetryCount      int64
+	VendorRaceRefetchCount int64
 }
 
 type AdvisoryFinding struct {

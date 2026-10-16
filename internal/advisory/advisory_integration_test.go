@@ -325,6 +325,7 @@ func TestAdvisoryImportPinAndFailedPublicationPreserveFeed(t *testing.T) {
 	if err := s.publish(t.Context(), source, doc, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
+	mustExec(t, t.Context(), pool, "UPDATE advisory_feeds SET request_retry_count=7,vendor_race_refetch_count=9,error='refresh_failed' WHERE id=$1", source.Id)
 	before, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
 	if err != nil {
 		t.Fatal(err)
@@ -336,8 +337,8 @@ func TestAdvisoryImportPinAndFailedPublicationPreserveFeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if before.Revision != after.Revision || !bytes.Equal(before.SourceSha256, after.SourceSha256) {
-		t.Fatal("failed import replaced published feed")
+	if before.Revision != after.Revision || !bytes.Equal(before.SourceSha256, after.SourceSha256) || before.AttemptedAt != after.AttemptedAt || before.RequestRetryCount != after.RequestRetryCount || before.VendorRaceRefetchCount != after.VendorRaceRefetchCount || before.Error != after.Error {
+		t.Fatal("failed import replaced published feed or latest-refresh accounting")
 	}
 }
 
@@ -363,8 +364,18 @@ func TestAdvisoryOfflineImportCannotEstablishCurrentCoverage(t *testing.T) {
 	// The same explicitly synthetic complete wrapper as vendorService preserves
 	// the byte pin. An offline replay still lacks trustworthy acquisition time.
 	raw = append(append([]byte("<updates>"), raw...), []byte("</updates>")...)
+	attempted := time.Now().UTC().Truncate(time.Microsecond)
+	mustExec(t, t.Context(), pool, "UPDATE advisory_feeds SET attempted_at=$2,request_retry_count=7,vendor_race_refetch_count=9,error='refresh_failed' WHERE id=$1", source.Id, attempted)
+	s.clock = func() time.Time { return attempted.Add(time.Second) }
 	if err := s.Import(t.Context(), source.Id, bytes.NewReader(raw)); err != nil {
 		t.Fatal(err)
+	}
+	row, err := advisorydb.New(pool).GetAdvisoryFeed(t.Context(), source.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if row.RequestRetryCount != 7 || row.VendorRaceRefetchCount != 9 || !row.AttemptedAt.Valid || !row.AttemptedAt.Time.Equal(attempted) || row.Error != "" {
+		t.Fatalf("successful offline import changed refresh accounting or retained older failure: %+v", row)
 	}
 	summary, err := s.Summary(t.Context(), &adminv1.ListAdvisorySummaryRequest{}, true, []byte("[]"))
 	if err != nil {

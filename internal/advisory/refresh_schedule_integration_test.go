@@ -104,7 +104,7 @@ func TestRefreshWorkersJoinOnLeadershipCancellation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=7"); err != nil {
+	if _, err := pool.Exec(t.Context(), "UPDATE advisory_feeds SET request_retry_count=7,vendor_race_refetch_count=7"); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(t.Context())
@@ -141,7 +141,7 @@ func TestRefreshWorkersJoinOnLeadershipCancellation(t *testing.T) {
 		if index < 2 {
 			wantRetries = 0
 		}
-		if row.AttemptedAt.Valid != (index < 2) || row.Error != "" || row.RequestRetryCount != wantRetries {
+		if row.AttemptedAt.Valid != (index < 2) || row.Error != "" || row.RequestRetryCount != wantRetries || row.VendorRaceRefetchCount != wantRetries {
 			t.Fatalf("started/untouched cancellation accounting for %s: %+v", source.Id, row)
 		}
 	}

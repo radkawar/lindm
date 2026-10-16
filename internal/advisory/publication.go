@@ -37,13 +37,14 @@ type advisoryGeneration struct {
 const vendorPublicationReason = "Vendor advisory revision published"
 
 type advisoryRefreshAttempt struct {
-	parameters advisorydb.BeginAdvisoryRefreshAttemptParams
-	retries    *atomic.Int64
+	parameters          advisorydb.BeginAdvisoryRefreshAttemptParams
+	retries             *atomic.Int64
+	vendorRaceRefetches *atomic.Int64
 }
 
 func (s *Service) beginAdvisoryRefreshAttempt(ctx context.Context, parameters advisorydb.BeginAdvisoryRefreshAttemptParams) (advisoryRefreshAttempt, error) {
-	attempt := advisoryRefreshAttempt{parameters: parameters, retries: feed.RetryCounter(ctx)}
-	if attempt.retries == nil {
+	attempt := advisoryRefreshAttempt{parameters: parameters, retries: feed.RetryCounter(ctx), vendorRaceRefetches: feed.VendorRaceRefetchCounter(ctx)}
+	if attempt.retries == nil && attempt.vendorRaceRefetches == nil {
 		return attempt, nil // Offline imports have no network refresh accounting.
 	}
 	started, err := advisorydb.New(s.pool).BeginAdvisoryRefreshAttempt(ctx, parameters)
@@ -56,18 +57,29 @@ func (s *Service) beginAdvisoryRefreshAttempt(ctx context.Context, parameters ad
 	return attempt, nil
 }
 
+func (attempt advisoryRefreshAttempt) counts() (requestRetries, vendorRaceRefetches int64) {
+	if attempt.retries != nil {
+		requestRetries = attempt.retries.Load()
+	}
+	if attempt.vendorRaceRefetches != nil {
+		vendorRaceRefetches = attempt.vendorRaceRefetches.Load()
+	}
+	return requestRetries, vendorRaceRefetches
+}
+
 // Persist before cleanup removes the live lease. Cancellation records accounting
 // without turning shutdown into a refresh failure.
 func (s *Service) failAdvisoryRefreshAttempt(ctx, parent context.Context, attempt advisoryRefreshAttempt, result *error) {
-	if *result == nil || attempt.retries == nil {
+	if *result == nil || (attempt.retries == nil && attempt.vendorRaceRefetches == nil) {
 		return
 	}
 	storeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
+	requestRetries, vendorRaceRefetches := attempt.counts()
 	*result = errors.Join(*result, advisorydb.New(s.pool).FailAdvisoryFeed(storeCtx, advisorydb.FailAdvisoryFeedParams{
 		ID: attempt.parameters.ID, AttemptedAt: attempt.parameters.AttemptedAt, Error: "refresh_failed",
 		ConfigBytes: attempt.parameters.ConfigBytes, Generation: attempt.parameters.Generation,
-		RequestRetryCount: attempt.retries.Load(), Cancelled: parent.Err() != nil,
+		RequestRetryCount: requestRetries, VendorRaceRefetchCount: vendorRaceRefetches, Cancelled: parent.Err() != nil,
 	}))
 }
 
@@ -184,11 +196,8 @@ func (s *Service) publishStreamReason(ctx context.Context, source *advisoryv1.Fe
 		}
 		cleanup = append(cleanup, advisoryGeneration{feedID: source.GetId(), revision: current.Revision})
 	}
-	var requestRetryCount int64
-	if attempt.retries != nil {
-		requestRetryCount = attempt.retries.Load()
-	}
-	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: revisionData.manifest, SnapshotAt: revisionData.snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(revisionData.expires), AdvisoryCount: stager.unique, CompleteSnapshot: revisionData.complete, ConfigBytes: encoded, RequestRetryCount: requestRetryCount})
+	requestRetries, vendorRaceRefetches := attempt.counts()
+	updated, err := q.PublishAdvisoryFeed(ctx, advisorydb.PublishAdvisoryFeedParams{ID: source.GetId(), Revision: revision, SourceSha256: doc.GetSourceSha256(), SourceManifest: revisionData.manifest, SnapshotAt: revisionData.snapshotAt, CheckedAt: timestamp(started), ExpiresAt: timestamp(revisionData.expires), AdvisoryCount: stager.unique, CompleteSnapshot: revisionData.complete, ConfigBytes: encoded, RefreshAttempt: attempt.retries != nil || attempt.vendorRaceRefetches != nil, RequestRetryCount: requestRetries, VendorRaceRefetchCount: vendorRaceRefetches})
 	if err != nil {
 		return err
 	}
