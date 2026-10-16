@@ -14425,6 +14425,22 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
       "mainlineRevision": "e362d6875776f578904f10765326146eb725fecc"
+    },
+    {
+      "platform": "ubuntu-26.04",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "ubuntu-resolute-20260927-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/server-platforms-20261015/native-ubuntu2604-attempt1.json",
+      "sha256": "fae109371cdf53d339ec14fefca56d435960e7df50685f446e50de02e84ba729",
+      "recorded": "2026-10-16T01:02:14.393330037Z",
+      "revision": "e362d6875776f578904f10765326146eb725fecc",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
+      "mainlineRevision": "e362d6875776f578904f10765326146eb725fecc"
     }
   ]
 }

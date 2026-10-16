@@ -584,7 +584,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 259, Provisioning: cloudInitAutoinstall,
 		Server: &ServerInstallation{
 			SnapshotName: "ubuntu26.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-18", "postgresql-client-18", "gpgv", "util-linux"},
-			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 18,
+			Architectures: x86, Status: "Qualified", ConnectedOnly: true, PostgreSQLMajor: 18,
 			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/18/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
 		},
 		Desktop: gnomeGDM3, Firewall: ufw,

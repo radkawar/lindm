@@ -25,7 +25,7 @@ publication and evaluated Findings before backup, after upgrade and after restor
 | ----------------------------------------- | ------------ | ---------- | ------------------- | --------------------- | ----------------- |
 | [Ubuntu 22.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
 | [Ubuntu 24.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | Distribution        | Connected and air gap | Qualified         |
-| [Ubuntu 26.04 LTS](platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Not yet qualified |
+| [Ubuntu 26.04 LTS](platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Qualified         |
 | [Debian 12](platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
 | [Debian 13](platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Qualified         |
 | [RHEL 9](platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |

@@ -10,6 +10,7 @@
 - Contain rejected vendor documents to their exhaustive component scope where provable, retaining whole-source uncertainty only for unbounded errors and showing the document count and cause.
 - Distinguish published incomplete vulnerability coverage from unpublished or stale source data in the console and native deployment diagnostics.
 - Allow native server lifecycle proof to enroll an independently pinned managed-device image, keeping all real Findings gates and separate server/device identities; preserve partial device advisory limitations and route entitlement input only to entitled guests.
+- Qualify connected x86_64 Ubuntu 26.04 servers with native PostgreSQL 18, a matching-major encrypted backup drill, signed upgrade and fresh-host restore, retaining full evaluated Findings on the original Ubuntu 24.04 managed device.
 
 ## [0.1.0] - 2026-10-15
 

@@ -67,9 +67,9 @@ func TestServerRecipesHaveExplicitDatabaseAndQualificationPolicy(t *testing.T) {
 		if !PostgreSQLMajorSupported(server.PostgreSQLMajor) || len(server.Architectures) == 0 || server.Status == "" {
 			t.Errorf("%s lacks explicit server policy: %+v", release.Key, server)
 		}
-		if release.Key == "debian-13" {
+		if release.Key == "debian-13" || release.Key == "ubuntu-26.04" {
 			if !server.ConnectedOnly || server.Status != "Qualified" {
-				t.Errorf("Debian 13 lost its connected-only native lifecycle qualification")
+				t.Errorf("%s lost its connected-only native lifecycle qualification", release.Key)
 			}
 			continue
 		}
