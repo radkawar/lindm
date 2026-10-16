@@ -14506,6 +14506,22 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "66c1657e4c5faefdcaf3459fb7851228e9a9cb69e9c47751e695eba87bb74cf3",
       "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
+    },
+    {
+      "platform": "rocky-10",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rocky-10.2-20260525.0-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/server-platforms-20261015/native-rocky10-attempt1.json",
+      "sha256": "beef1eb614e35131a1a07daf96c28fc977f617a6b967271708fb4a38864c767d",
+      "recorded": "2026-10-16T03:08:19.162561780Z",
+      "revision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "8026588bc9d6874d409402a0fe48a5c8a84c61a1812a4f83712bd0fed1936412",
+      "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
     }
   ]
 }

@@ -24,6 +24,7 @@
 - Qualify connected x86_64 Ubuntu 22.04 server installation using fingerprint-pinned PGDG PostgreSQL 16, the measured fresh-storage policy, full real managed-device Findings, encrypted backup, signed upgrade and fresh-host restore.
 - Qualify connected x86_64 Debian 12 server installation using fingerprint-pinned PGDG PostgreSQL 16, full same-device vendor Findings, encrypted backup and matching-major drill, signed upgrade and independently authorized fresh-host recovery.
 - Qualify connected x86_64 RHEL 10 server installation with native PostgreSQL 16 RPMs, verified enforcing SELinux confinement, full independent-device Findings, encrypted backup, signed RPM upgrade and fresh-host recovery; retain separate RHEL-device coverage evidence.
+- Qualify connected x86_64 Rocky Linux 10 servers with native PostgreSQL 16, enforcing SELinux, real independent-device Findings, encrypted backup and exact-major drill, signed upgrade and fresh-host restore; retain Rocky device advisory limitations.
 
 ## [0.1.0] - 2026-10-15
 

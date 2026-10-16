@@ -811,7 +811,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "alma-rocky.md", Family: FamilyRedHat, Architectures: both, Packages: dnf4, Systemd: 257, Provisioning: cloudInitKickstart,
 		Server: &ServerInstallation{
 			SnapshotName: "rocky10.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-server", "postgresql", "rpm", "cpio", "policycoreutils"},
-			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16,
+			Architectures: x86, Status: "Qualified", ConnectedOnly: true, PostgreSQLMajor: 16,
 			PostgreSQLDataDirectory: "/var/lib/pgsql/lindm", PostgreSQLBinDirectory: "/usr/bin/", PostgreSQLPort: "5432", PostgreSQLSocketDirectory: "/run/postgresql/lindm",
 		},
 		Desktop: gnomeGDM, Firewall: firewalld,

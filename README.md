@@ -177,7 +177,7 @@ See the [installation guide](docs/install.md) for prerequisites and proof record
 | [RHEL 9](docs/platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
 | [RHEL 10](docs/platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 | [Rocky Linux 9](docs/platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
-| [Rocky Linux 10](docs/platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [Rocky Linux 10](docs/platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 | [AlmaLinux 9](docs/platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
 | [AlmaLinux 10](docs/platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
 
