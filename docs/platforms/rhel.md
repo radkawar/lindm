@@ -135,7 +135,7 @@ database preflight. Database URLs retain `channel_binding=require` and
 `require_auth=scram-sha-256`; older libpq clients are not accommodated by removing
 authentication requirements.
 
-v0.1.0 RHEL 9 turnkey installation is connected-only. RHEL `--airgap` refuses
+RHEL turnkey installation is connected-only. RHEL `--airgap` refuses
 before mutation: “RHEL offline installation is not available in this release”.
 The current snapshot contract does not establish PostgreSQL 16 module capability;
 the existing generic PostgreSQL closure is not accepted as a PostgreSQL 13
@@ -217,8 +217,8 @@ and SELinux label, not a custom policy or a shared socket directory.
 The cluster config permits 64 connections and 256 MiB shared buffers; server
 device and console pools are 16 and 4 respectively. Protected setup and
 operations state live under `/var/lib/lindmd-operations`. RPM pre-transaction
-checks refuse unsigned native-upgrade bypasses. RHEL 9 offline installation is
-not available in v0.1.0 and refuses before mutation, even with a supplied add-on.
+checks refuse unsigned native-upgrade bypasses. RHEL offline installation is
+not available and refuses before mutation, even with a supplied add-on.
 
 Native units use the distribution's systemd `LoadCredential=` support for distinct
 runtime and migrator URLs. Persistent URL files remain root:root mode 0600;

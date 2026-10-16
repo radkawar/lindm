@@ -60,18 +60,19 @@ separate from the mTLS-required device service.
 
 Native server delivery and OCI build artifacts use the same embedded-console
 executable and strict protobuf configuration. The supported turnkey installation
-path is the independently authenticated private native bundle on Ubuntu 24.04 or
-RHEL 9 x86-64. A root installer verifies release authority before transactions,
+path is the independently authenticated private native bundle on the x86-64
+server platforms in the README server install table. A root installer verifies
+release authority before transactions,
 installs dependencies through the host's normally authenticated distribution
-repositories, provisions a private PostgreSQL 16 cluster and local PKI, invokes
+repositories, provisions a private PostgreSQL cluster and local PKI, invokes
 explicit migration/setup commands, and checks verified HTTPS readiness.
 An optional signed Ubuntu dependency add-on enables `--airgap`; an absent add-on
-fails before mutation and never falls back to network access. RHEL 9 is
-connected-only in v0.1.0: offline installation refuses before mutation, even when
-an add-on is supplied. Its PostgreSQL 16-capable authenticated offline add-on is
-post-v0.1 work.
-Both local and external databases must be PostgreSQL 16 in v0.1.0; version
-preflight refuses older or newer server majors before migrations.
+fails before mutation and never falls back to network access. RHEL-family servers
+are connected-only: offline installation refuses before mutation, even when
+an add-on is supplied.
+Local and external databases must be PostgreSQL 16, 17 or 18, with backup and
+restore clients of the same major; version preflight refuses other server majors
+before migrations.
 Runtime and migrator remain distinct unprivileged identities; only the migrator
 owns database/schema
 DDL authority. Runtime cannot mutate migration, compatibility or restore-hold

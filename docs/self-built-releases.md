@@ -98,7 +98,7 @@ The public backup recipient is `release-keys/backup-recipient.txt`.
 Its private identity remains inside encrypted custody.
 
 `make release` builds the full production-purpose release and Turnkey bundle in `artifacts/release/`.
-Use `RELEASE_ARGS` for documented public options, such as `--version 0.1.0`.
+Use `RELEASE_ARGS` for documented public options, such as `--version 0.1.1`.
 The default build is connected. Offline closures require explicit per-platform inputs.
 Do not assume a connected installer includes every offline dependency.
 

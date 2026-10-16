@@ -1734,7 +1734,7 @@ For native Ubuntu air-gap **server installation**, add `-airgap` to
 `lab deploy setup`. The fresh server guest has external QEMU networking denied,
 and the real installer must consume the authenticated Ubuntu offline add-on.
 An absent or invalid add-on fails rather than falling back to vendor repositories.
-RHEL 9 offline installation is not available in v0.1.0 and refuses before mutation.
+Offline installation is not available on RHEL-family servers and refuses before mutation.
 The record identifies `airgap_server_install`
 and retains the first-run-only scope; this does not qualify an air-gap device
 enrollment or backup/upgrade/restore lifecycle.
@@ -1773,8 +1773,8 @@ No external identity provider is needed.
 For Ubuntu `--airgap`, obtain the authenticated Ubuntu offline add-on.
 The installer imports only that retained vendor-authenticated dependency closure;
 it refuses a missing snapshot and digest before generating custody or changing
-services. It never falls back to a network repository. RHEL 9 is connected-only
-in v0.1.0: `--airgap` refuses before mutation with **RHEL offline installation is
+services. It never falls back to a network repository. RHEL-family servers are
+connected-only: `--airgap` refuses before mutation with **RHEL offline installation is
 not available in this release**, even when an add-on is supplied. Supported modes
 retain the exact signed agent repository inside `lindmd`. Release DSSE does not
 replace vendor or agent package signatures.
@@ -2040,7 +2040,7 @@ The default connected export requires no vendor snapshots. To add Ubuntu air-gap
 support, supply `-serverdeps-cache` and `-ubuntu-serverdeps`. Every supplied closure
 must bind platform, solver/base inventory, native vendor authentication and
 offline replay evidence. A requested but absent or unauthenticated add-on fails
-export. RHEL 9 offline installation is unavailable in v0.1.0; supplying a RHEL
+export. Offline installation is unavailable on RHEL-family servers; supplying a RHEL
 snapshot cannot bypass that refusal. A PostgreSQL 16-capable authenticated add-on
 and its qualification are post-v0.1 work in [the roadmap](../ROADMAP.md).
 Any future RHEL offline redistribution requires appropriate private customer

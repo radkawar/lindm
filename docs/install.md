@@ -227,9 +227,10 @@ setup, enrollment and inventory collection. These are measurements, not completi
 guarantees. The full install, upgrade and recovery result is recorded in the
 [deployment evidence](verification.md#control-plane-deployment-matrix).
 
-RHEL 9 downloads authenticated Red Hat data automatically, but v0.1.0 cannot prove
-complete package coverage. Exposure remains **Unknown** after the download
-finishes. Do not interpret this as an all-clear result. See the
+RHEL 9 and 10 download authenticated Red Hat data automatically. lindm evaluates
+installed packages that are signed by Red Hat and covered by that data. Other
+packages, such as EPEL or third-party RPMs, show as not checked, so a RHEL device
+usually has partial coverage. Not checked does not mean not affected. See the
 [RHEL advisory limits](platforms/rhel.md).
 
 Air-gap installs do not enable network refresh. Explicit advisory policy, including

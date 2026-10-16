@@ -30,7 +30,7 @@ func runBuild(ctx context.Context, args []string, stdout, stderr io.Writer) (err
 	repository := flags.String("repo", ".", "source checkout; complete production matrix is built twice")
 	directory := flags.String("keys", "release-keys", "independent operator key custody directory")
 	output := flags.String("output", "artifacts/release", "new complete bundle directory; refuses overwrite")
-	version := flags.String("version", "0.1.0", "semantic package version")
+	version := flags.String("version", "0.1.1", "semantic package version")
 	revision := flags.String("revision", "", "release label; defaults to source HEAD")
 	epoch := flags.Int64("source-date-epoch", 0, "reproducible timestamp; defaults to source HEAD commit time")
 	passFD := flags.Int("passphrase-fd", -1, "owner-private anonymous pipe with one LF-terminated unlock passphrase")

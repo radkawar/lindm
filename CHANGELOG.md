@@ -1,36 +1,30 @@
 # Changelog
 
-## [0.1.1] - Unreleased
+## [0.1.1] - 2026-10-16
+
+### Added in 0.1.1
+
+- Server installation on Ubuntu 22.04 and 26.04, Debian 12 and 13, RHEL 10, Rocky Linux 9 and 10, and AlmaLinux 9 and 10 (connected, x86_64). Each release passes install, browser setup, device enrollment and management, vulnerability findings, encrypted backup, upgrade and restore onto a new host. The README has a server install table.
+- PostgreSQL 16, 17 and 18. The installer uses the distribution's own PostgreSQL where it ships one of these, and a fingerprint-pinned PGDG 16 repository on Ubuntu 22.04 and Debian 12. Backup and restore clients must match the server's major version.
+- Vulnerability findings for RHEL 9 and 10 devices. lindm builds a verified snapshot of Red Hat's signed CSAF and VEX data, checks each installed RPM's signature and product membership, and reports a package as not affected only when Red Hat data covers it. Packages from other repositories, and packages Red Hat data does not cover, are listed as not checked.
+- Retry counts and publication-race refetch counts on each advisory source's status.
 
 ### Changed in 0.1.1
 
-- Check remote-assistance capture tools and GStreamer elements before asking the desktop user for consent; show the native Arch, Debian or RPM package remedy instead of failing after Allow.
-- Close automatic RHEL 9 and 10 CSAF/VEX snapshots against verified vendor indexes, preserve publisher paths even when filing and advisory identity years differ, apply signed post-archive replacements and preserve conservative source expiry.
-- Acquire signed RHEL replacements in a process-wide four-file window, retain deterministic normalization and honour vendor rate limits without extending source deadlines.
-- Bound transient advisory GET failures to five total attempts within existing deadlines, honour vendor backoff and show durable per-source retry counts without turning trust or validation failures into transport retries.
-- Reacquire a mutable Red Hat document and both vendor proofs together after a publication-race checksum or signature mismatch, accept only a completely verified set within two refetches and report the distinct race-refetch count on source status.
-- Verify installed RPM header signatures and exact product-component identities before applying RHEL vendor absence; list third-party, undeclared and unusable vendor components as unchecked instead of silently clean.
-- Contain rejected vendor documents to their exhaustive component scope where provable, retaining whole-source uncertainty only for unbounded errors and showing the document count and cause.
-- Distinguish published incomplete vulnerability coverage from unpublished or stale source data in the console and native deployment diagnostics.
-- Qualify connected x86_64 RHEL 9 server installation through native signed upgrade and fresh-host restore, with real RHEL 9 device CVEs and newly evaluated durable Findings at every stage; retain explicitly uncovered packages instead of claiming complete device coverage.
-- Allow native server lifecycle proof to enroll an independently pinned managed-device image, keeping all real Findings gates and separate server/device identities; preserve partial device advisory limitations and route entitlement input only to entitled guests.
-- Qualify connected x86_64 Ubuntu 26.04 servers with native PostgreSQL 18, a matching-major encrypted backup drill, signed upgrade and fresh-host restore, retaining full evaluated Findings on the original Ubuntu 24.04 managed device.
-- Generate a separate server-install support table from per-release registry recipes, distinguishing lifecycle qualification from device support; admit connected x86_64 Debian 12/13, Ubuntu 22.04/26.04, RHEL 10 and Rocky Linux/AlmaLinux 9/10 qualification lanes without claiming unrun native proofs.
-- Let native deployment qualification use an explicitly digest-pinned official PostgreSQL recovery client in an off-server networkless, swap-zero container for exact-major offline drills, without installing extra clients or adding third-party sources on the operator host.
-- Admit PostgreSQL 16, 17 and 18 with exact backup/restore client/server major matching; prefer distribution-native supported majors, using a dedicated fingerprint-pinned PGDG APT source only for Ubuntu 22.04 and Debian 12 whose native clients lack the required authentication control.
-- Derive native deployment Findings expectations only from registry feeds with maintained exports, matching the connected source configuration; keep Debian's primary OSV export without requiring its unexported secondary tracker, and retain all browser and durable evaluation checks.
-- Activate Debian's maintained primary vendor OSV export automatically after real inventory, without requiring an unexported secondary tracker; invalidate derived identity eligibility and retain unknown assessments until actual publication and evaluation.
-- Route explicit package-pinned UEFI firmware through native deployment, first-run setup, enrolled-device and fresh-host recovery guests, preserving x86_64 KVM admission, private NVRAM copies, server disk floors and connected/air-gap network policy.
-- Budget 128 GiB source and restore server overlays for complete vendor imports, measure the post-import database size, and account for both disks in ordinary lab admission without weakening the installer's upgrade capacity gate.
-- Refuse undersized fresh server filesystems before the native installation journal or authority custody, publish the measured 32 GiB sizing baseline, and show actual database/available/required upgrade bytes while retaining the existing twice-database-plus-4-GiB upgrade rule.
-- Qualify connected x86_64 Debian 13 server installation with native PostgreSQL 17 through stock-browser setup, real device Findings, backup, matching-major offline drill, signed upgrade and fresh-host recovery.
-- Qualify connected x86_64 Ubuntu 22.04 server installation using fingerprint-pinned PGDG PostgreSQL 16, the measured fresh-storage policy, full real managed-device Findings, encrypted backup, signed upgrade and fresh-host restore.
-- Qualify connected x86_64 Debian 12 server installation using fingerprint-pinned PGDG PostgreSQL 16, full same-device vendor Findings, encrypted backup and matching-major drill, signed upgrade and independently authorized fresh-host recovery.
-- Qualify connected x86_64 RHEL 10 server installation with native PostgreSQL 16 RPMs, verified enforcing SELinux confinement, full independent-device Findings, encrypted backup, signed RPM upgrade and fresh-host recovery; retain separate RHEL-device coverage evidence.
-- Qualify connected x86_64 Rocky Linux 10 servers with native PostgreSQL 16, enforcing SELinux, real independent-device Findings, encrypted backup and exact-major drill, signed upgrade and fresh-host restore; retain Rocky device advisory limitations.
-- Qualify connected x86_64 AlmaLinux 10 servers with native PostgreSQL 16 RPMs, enforced SELinux confinement, complete independent-device Findings, encrypted backup and exact-major offline drill, signed upgrade and authorized fresh-host recovery.
-- Qualify connected x86_64 Rocky Linux 9 servers using the native PostgreSQL 16 module stream, enforcing SELinux, fully evaluated independent-device Findings, encrypted backup and exact-major drill, signed upgrade and fresh-host restore; leave Rocky device advisory coverage unchanged.
-- Qualify connected x86_64 AlmaLinux 9 servers with the native PostgreSQL 16 module, enforced SELinux, complete independent-device Findings, encrypted backup and exact-major drill, signed upgrade and authorized fresh-host recovery, completing the nine-release connected server expansion.
+- RHEL 9 server installation is no longer a preview.
+- The installer refuses a new server with less than 32 GiB of disk (64 GiB recommended). Upgrade refusals now show the database size, the free space and the space needed.
+- Advisory downloads retry temporary network errors up to five times and follow the vendor's rate limits. Signature, checksum and validation failures are never retried. If Red Hat replaces a document during download, lindm downloads the document, checksum and signature again together and accepts only a set that verifies.
+- If one vendor advisory cannot be used, lindm excludes only the packages it concerns and names the advisory, instead of marking the whole source incomplete.
+- The console now says when vulnerability coverage is incomplete, separately from when a source is not published or is out of date.
+- Remote assistance checks for the required screen-capture components before it asks the user for consent, and shows the package to install.
+- Debian devices get findings from Debian's OSV data automatically after their first inventory.
+
+### Known limitations in 0.1.1
+
+- On RHEL devices, packages without a matching Red Hat product record are listed as not checked, so coverage on a typical device is partial.
+- Rocky Linux and AlmaLinux device findings remain partial.
+- Server installation is connected-only and x86_64-only. Fedora is not a supported server platform.
+- Operators must build and sign their own releases.
 
 ## [0.1.0] - 2026-10-15
 

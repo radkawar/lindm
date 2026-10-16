@@ -14,18 +14,18 @@ Use the [capability matrix](docs/verification.md#tier-capability-matrix) for rec
 Implement and qualify [Fedora Atomic and NixOS](docs/platforms/atomic-nixos.md).
 The current pages describe designs, not supported platforms.
 
+Extend vulnerability coverage on RHEL, Rocky Linux and AlmaLinux devices to every installed package from verified vendor repository data. Packages without vendor coverage are listed as not checked until then.
+
 ## Releases
 
 v0.1 uses [self-built releases and operator signing keys](docs/self-built-releases.md).
 Official project-signed releases need an approved key-custody plan before they can ship.
 That work must keep signature verification, independently retained trust pins and trust-domain separation.
 
-- After v0.1.0, implement and qualify an authenticated RHEL 9 offline add-on with
-  explicit PostgreSQL 16 server/client resolution, retained module capability and
+- Implement and qualify authenticated offline installation for RHEL-family servers,
+  with explicit PostgreSQL server/client resolution, retained module capability and
   safe offline installation. Preserve distro package signatures, existing module
-  policy and clusters; never fall back to PostgreSQL 13 or weaken database auth.
-- Qualify each new connected x86_64 server recipe through the complete native
-  lifecycle. PostgreSQL 16/17/18 admission and exact native client/server major
-  matching are implemented; only per-platform full-lane evidence establishes support.
+  policy and clusters; never fall back to an unsupported PostgreSQL major or weaken database auth.
+- Server installation on arm64.
 
 Read [GOVERNANCE](GOVERNANCE.md) for project decisions and [CONTRIBUTING](CONTRIBUTING.md) to propose work.

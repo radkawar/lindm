@@ -65,19 +65,30 @@ func TestPublishExpandedDependenciesAfterForwardMigration(t *testing.T) {
 	`); err != nil {
 		t.Fatal(err)
 	}
+	// Later migrations keep landing, so derive the pending tail from Target
+	// rather than pinning the newest migration number.
 	status, err := db.Preflight(t.Context(), f.pool)
-	if err != nil || status.Current != 56 || status.Target != 59 || status.Online || status.Compatible || !reflect.DeepEqual(status.Pending, []int64{57, 58, 59}) {
+	if err != nil || status.Current != 56 || status.Target < 59 || status.Online || status.Compatible || !reflect.DeepEqual(status.Pending, migrationRange(57, status.Target)) {
 		t.Fatalf("dependency expansion preflight=%+v err=%v", status, err)
 	}
+	target := status.Target
 	provider := profileDependencyMigrationProvider(t, f)
 	if _, err := provider.UpTo(t.Context(), 57); err != nil {
 		t.Fatal(err)
 	}
 	status, err = db.Preflight(t.Context(), f.pool)
-	if err != nil || status.Current != 57 || !reflect.DeepEqual(status.Pending, []int64{58, 59}) {
+	if err != nil || status.Current != 57 || status.Target != target || !reflect.DeepEqual(status.Pending, migrationRange(58, target)) {
 		t.Fatalf("dependency expansion history=%+v err=%v", status, err)
 	}
 	publishExpandedDependencies(t, f)
+}
+
+func migrationRange(first, last int64) []int64 {
+	versions := make([]int64, 0, last-first+1)
+	for version := first; version <= last; version++ {
+		versions = append(versions, version)
+	}
+	return versions
 }
 
 func profileDependencyMigrationProvider(t *testing.T, f *dispatchFixture) *goose.Provider {
