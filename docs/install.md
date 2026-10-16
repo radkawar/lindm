@@ -30,7 +30,7 @@ publication and evaluated Findings before backup, after upgrade and after restor
 | [Debian 13](platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Qualified         |
 | [RHEL 9](platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
 | [RHEL 10](platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
-| [Rocky Linux 9](platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
+| [Rocky Linux 9](platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Qualified         |
 | [Rocky Linux 10](platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 | [AlmaLinux 9](platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
 | [AlmaLinux 10](platforms/alma-rocky.md)   | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
