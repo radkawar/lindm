@@ -13,12 +13,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 	"time"
-
-	"google.golang.org/protobuf/proto"
 
 	advisoryv1 "lindm/gen/lindm/advisory/v1"
 	"lindm/internal/platform"
@@ -82,10 +79,33 @@ func redHatDocumentPath(value, distribution string) bool {
 	if !ok || len(year) != 4 || !suseDigits(year) || strings.Contains(name, "/") || !strings.HasSuffix(name, ".json") {
 		return false
 	}
-	if distribution == "vex" {
-		return strings.HasPrefix(name, "cve-"+year+"-")
+	// The directory is the publisher's filing year, not necessarily the
+	// advisory/CVE identity year. Preserve the indexed path verbatim.
+	kind, identity, ok := strings.Cut(strings.TrimSuffix(name, ".json"), "-")
+	separator := "_"
+	switch distribution {
+	case "vex":
+		if kind != "cve" {
+			return false
+		}
+		separator = "-"
+	case "advisories":
+		if kind != "rhsa" && kind != "rhba" && kind != "rhea" {
+			return false
+		}
+	default:
+		return false
 	}
-	return strings.HasPrefix(name, "rhsa-"+year+"_") || strings.HasPrefix(name, "rhba-"+year+"_") || strings.HasPrefix(name, "rhea-"+year+"_")
+	identityYear, number, numbered := strings.Cut(identity, separator)
+	if !ok || !numbered || len(identityYear) != 4 || !suseDigits(identityYear) || number == "" {
+		return false
+	}
+	for i := range len(number) {
+		if number[i] < '0' || number[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // The inventory shares the private bounded SQLite stage with normalized claims.
@@ -312,42 +332,8 @@ func (c *Client) fetchIndexedRedHatSnapshot(ctx context.Context, source *advisor
 			return err
 		}
 		doc.Artifacts = append(doc.Artifacts, checkpoint.artifacts()...)
-		// Release each query before a document parse uses the single SQLite
-		// connection. The partial index makes each missing-path lookup bounded.
-		individual := proto.CloneOf(source)
-		individual.Format = advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF
-		individual.ExpectedSha256 = nil
-		for {
-			var missing string
-			var modified int64
-			err := stager.db.QueryRowContext(ctx, `SELECT path,modified FROM snapshot_documents WHERE distribution=? AND digest IS NULL ORDER BY path LIMIT 1`, distribution).Scan(&missing, &modified)
-			if errors.Is(err, sql.ErrNoRows) {
-				break
-			}
-			if err != nil {
-				return err
-			}
-			location := *checkpoint.directory
-			location.Path += missing
-			individual.Url = location.String()
-			replacement, replacementAt, err := c.consumeSignedCSAF(ctx, individual, func(file *os.File) error {
-				err := acceptRedHatDocument(source, c.validator, stager, doc, func() error {
-					return parseRedHatFile(ctx, source, file, c.validator, stager.add)
-				})
-				if errors.Is(err, errRedHatNotApplicable) {
-					return nil
-				}
-				return err
-			})
-			if err != nil {
-				return err
-			}
-			if err := checkpoint.recordReplacement(ctx, stager, missing, replacement.GetSha256(), modified, replacementAt); err != nil {
-				return err
-			}
-			if err := markProgress(progress); err != nil {
-				return err
-			}
+		if err := c.fetchRedHatReplacements(ctx, source, checkpoint, stager, doc, progress); err != nil {
+			return err
 		}
 		summary, err := checkpoint.summary(ctx, stager)
 		if err != nil {

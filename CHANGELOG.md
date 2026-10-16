@@ -5,7 +5,8 @@
 ### Changed in 0.1.1
 
 - Check remote-assistance capture tools and GStreamer elements before asking the desktop user for consent; show the native Arch, Debian or RPM package remedy instead of failing after Allow.
-- Close automatic RHEL 9 and 10 CSAF/VEX snapshots against verified vendor indexes, apply signed post-archive replacements and preserve conservative source expiry.
+- Close automatic RHEL 9 and 10 CSAF/VEX snapshots against verified vendor indexes, preserve publisher paths even when filing and advisory identity years differ, apply signed post-archive replacements and preserve conservative source expiry.
+- Acquire signed RHEL replacements in a process-wide four-file window, retain deterministic normalization and honour vendor rate limits without extending source deadlines.
 - Verify installed RPM header signatures and exact product-component identities before applying RHEL vendor absence; list third-party, undeclared and unusable vendor components as unchecked instead of silently clean.
 - Contain rejected vendor documents to their exhaustive component scope where provable, retaining whole-source uncertainty only for unbounded errors and showing the document count and cause.
 - Distinguish published incomplete vulnerability coverage from unpublished or stale source data in the console and native deployment diagnostics.

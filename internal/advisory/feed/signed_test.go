@@ -202,6 +202,11 @@ func TestSignedCSAFTLSAcquisition(t *testing.T) {
 			if !bytes.Equal(got, raw) || artifact.GetUrl() != config.GetUrl() || !bytes.Equal(artifact.GetSha256(), digest[:]) || artifact.GetSignerFingerprint() != test.fingerprint || !signedAt.Equal(signatureCreation(t, signature)) || requests.Load() != 3 {
 				t.Fatalf("lost authenticated source provenance: %v %s requests=%d", artifact, signedAt, requests.Load())
 			}
+			if test.distro == "rhel" {
+				t.Run("separate ownership", func(t *testing.T) {
+					assertSeparateSignedCSAF(t, client, config.GetUrl(), raw, signedAt)
+				})
+			}
 			config.ExpectedSha256 = make([]byte, sha256.Size)
 			if _, _, _, err := acquire(); err == nil {
 				t.Fatal("incorrect out-of-band pin accepted")
@@ -212,6 +217,66 @@ func TestSignedCSAFTLSAcquisition(t *testing.T) {
 				t.Fatal("HTTP source bypassed signing/TLS policy")
 			}
 		})
+	}
+}
+
+func assertSeparateSignedCSAF(t *testing.T, client *Client, location string, raw []byte, signedAt time.Time) {
+	t.Helper()
+	directory := t.TempDir()
+	t.Setenv("TMPDIR", directory)
+	config := source("rhel", "9.4", advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF)
+	config.Url = location
+	var verified verifiedCSAF
+	t.Cleanup(func() {
+		if err := verified.close(); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := client.acquireSignedCSAF(t.Context(), config, &verified); err != nil {
+		t.Fatal(err)
+	}
+	if verified.file == nil || verified.artifact.GetUrl() != location || !verified.signedAt.Equal(signedAt) {
+		t.Fatal("separate acquisition lost authenticated ownership or provenance")
+	}
+	name := verified.file.Name()
+	got, err := boundedRead(verified.file, redHatRecordBytes)
+	if err != nil || !bytes.Equal(got, raw) {
+		t.Fatalf("authenticated payload was not rewound: %v", err)
+	}
+	if err := verified.close(); err != nil {
+		t.Fatal(err)
+	}
+	if verified.file != nil || verified.artifact != nil || !verified.signedAt.IsZero() {
+		t.Fatal("closed acquisition retained ownership or usable provenance")
+	}
+	if err := verified.close(); err != nil {
+		t.Fatalf("close is not idempotent: %v", err)
+	}
+	if _, err := os.Stat(name); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("closed acquisition retained its private file: %v", err)
+	}
+
+	parseFailure := errors.New("normalization refused")
+	artifact, at, err := client.consumeSignedCSAF(t.Context(), config, func(*os.File) error { return parseFailure })
+	if !errors.Is(err, parseFailure) || artifact != nil || !at.IsZero() {
+		t.Fatalf("normalization failure retained usable provenance: %v", err)
+	}
+	artifact, at, err = client.consumeSignedCSAF(t.Context(), config, func(file *os.File) error { return file.Close() })
+	if err == nil || artifact != nil || !at.IsZero() {
+		t.Fatalf("cleanup failure retained usable provenance: %v", err)
+	}
+	config.ExpectedSha256 = make([]byte, sha256.Size)
+	if err := client.acquireSignedCSAF(t.Context(), config, &verified); err == nil || verified.file != nil || verified.artifact != nil || !verified.signedAt.IsZero() {
+		t.Fatalf("rejected pin retained private ownership: %v", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := client.acquireSignedCSAF(ctx, config, &verified); !errors.Is(err, context.Canceled) || verified.file != nil {
+		t.Fatalf("canceled acquisition retained private ownership: %v", err)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("failed acquisitions leaked private staging files: entries=%d error=%v", len(entries), err)
 	}
 }
 

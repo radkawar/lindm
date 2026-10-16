@@ -45,6 +45,8 @@ type Client struct {
 	archive     *http.Client
 	validator   protovalidate.Validator
 	signedTrust *vendorTrust
+	// Tests can isolate rate-limit state; production clients share one policy.
+	redHatHTTP *redHatHTTPPolicy
 }
 
 func New(client *http.Client) (*Client, error) {
@@ -76,7 +78,7 @@ func New(client *http.Client) (*Client, error) {
 	}
 	archiveClient := copyClient
 	archiveClient.Timeout = 0
-	return &Client{http: &copyClient, archive: &archiveClient, validator: validator, signedTrust: signedTrust}, nil
+	return &Client{http: &copyClient, archive: &archiveClient, validator: validator, signedTrust: signedTrust, redHatHTTP: sharedRedHatHTTPPolicy}, nil
 }
 
 // Fetch materializes a bounded document. Publication of complete OSV ecosystems
@@ -181,7 +183,7 @@ func (c *Client) get(ctx context.Context, location string, bound int64) (raw []b
 	}
 	// Compression is decoded explicitly so the digest always covers vendor bytes.
 	req.Header.Set("Accept-Encoding", "identity")
-	resp, err := c.http.Do(req)
+	resp, err := c.do(c.http, req)
 	if err != nil {
 		return nil, fmt.Errorf("feed: fetch: %w", err)
 	}

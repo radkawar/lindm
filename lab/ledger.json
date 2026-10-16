@@ -14441,6 +14441,23 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "500a28a270944400211eb7a470a30e168c5585c4c0f06796848af6f764affc80",
       "mainlineRevision": "e362d6875776f578904f10765326146eb725fecc"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/rhel-findings-20261015/native-rhel9-attempt1.json",
+      "sha256": "c6f81a600f5384ba4619e2dc2d5dd1b2506fc9a578262c2452941474fd1731ef",
+      "recorded": "2026-10-15T23:25:56.188708742Z",
+      "revision": "98f9b99fa9aa93faa5dc092e58e8c10af204d120-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full-native-rhel9-98f-filing-year-index-admission-fail",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "98f9b99fa9aa93faa5dc092e58e8c10af204d120"
     }
   ]
 }

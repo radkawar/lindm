@@ -24,6 +24,14 @@ func TestRedHatIndexedDocumentConfinement(t *testing.T) {
 		{"2024/cve-2024-6119.json", "vex", true},
 		{"2024/rhsa-2024_6783.json", "advisories", true},
 		{"2024/rhba-2024_6783.json", "advisories", true},
+		{"2002/rhsa-2001_164.json", "advisories", true},
+		{"2006/rhba-2007_0331.json", "advisories", true},
+		{"2024/rhsa-2023_7197.json", "advisories", true},
+		{"2024/rhea-2024_0001.json", "advisories", true},
+		{"2024/rhsa-2024_.json", "advisories", false},
+		{"2024/rhsa-2024_12invalid.json", "advisories", false},
+		{"2024/rhsa-2024_1234.json", "unknown", false},
+		{"2024/cve-2024-123invalid.json", "vex", false},
 		{"../2024/cve-2024-6119.json", "vex", false},
 		{"/2024/cve-2024-6119.json", "vex", false},
 		{"2024/../2024/cve-2024-6119.json", "vex", false},
@@ -31,7 +39,7 @@ func TestRedHatIndexedDocumentConfinement(t *testing.T) {
 		{"2024/cve-2024-6119.json#fragment", "vex", false},
 		{"2024/cve-2024-6119%2ejson", "vex", false},
 		{"2024/cve-2024-6119.json\n", "vex", false},
-		{"2023/cve-2024-6119.json", "vex", false},
+		{"2023/cve-2024-6119.json", "vex", true},
 		{"2024/rhsa-2024_6783.json", "vex", false},
 	} {
 		if got := redHatDocumentPath(test.path, test.distribution); got != test.valid {
@@ -286,5 +294,36 @@ func TestRedHatSnapshotCompletionRequiresNativePackageAuthority(t *testing.T) {
 				t.Fatalf("%s %s accepted unbounded rejected document", test.distro, test.release)
 			}
 		}
+	}
+}
+
+func TestRedHatCrossYearIndexClosurePreservesPublisherPaths(t *testing.T) {
+	stager := snapshotStager(t)
+	paths := []string{"2002/rhsa-2001_164.json", "2006/rhba-2007_0331.json"}
+	checkpoint := &redHatCheckpoint{
+		distribution: "advisories",
+		index:        []byte(strings.Join(paths, "\n") + "\n"),
+		changes: []byte("\"2002/rhsa-2001_164.json\",\"2026-10-01T00:00:00Z\"\n" +
+			"\"2006/rhba-2007_0331.json\",\"2026-10-01T00:00:00Z\"\n"),
+	}
+	if err := checkpoint.stage(t.Context(), stager); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	for _, indexed := range paths {
+		if use, err := checkpoint.archived(t.Context(), stager, indexed, at); err != nil || !use {
+			t.Fatalf("publisher path %s rejected: use=%v err=%v", indexed, use, err)
+		}
+		digest := sha256.Sum256([]byte(indexed))
+		if err := checkpoint.record(t.Context(), stager, indexed, digest[:]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if use, err := checkpoint.archived(t.Context(), stager, "2001/rhsa-2001_164.json", at); err != nil || use {
+		t.Fatalf("invented identity-year path admitted: use=%v err=%v", use, err)
+	}
+	summary, err := checkpoint.summary(t.Context(), stager)
+	if err != nil || summary.GetDocumentCount() != 2 || len(summary.GetDocumentManifestSha256()) != sha256.Size {
+		t.Fatalf("cross-year closure summary=%v err=%v", summary, err)
 	}
 }

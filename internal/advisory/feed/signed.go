@@ -243,63 +243,106 @@ func (c *Client) fetchSignedCSAF(ctx context.Context, config *advisoryv1.FeedSou
 // bytes in memory. The parser receives the same file only after both vendor
 // proofs and any configured digest pin have authenticated the entire payload.
 func (c *Client) consumeSignedCSAF(ctx context.Context, config *advisoryv1.FeedSource, consume func(*os.File) error) (artifact *advisoryv1.FeedArtifact, signedAt time.Time, err error) {
-	fingerprint, err := signedPublisher(config)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	if config.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF || consume == nil {
+	if consume == nil {
 		return nil, time.Time{}, errors.New("feed: Red Hat CSAF source and consumer required")
 	}
-	u, err := signedArtifactURL(config.GetUrl())
-	if err != nil {
+	var verified verifiedCSAF
+	if err := c.acquireSignedCSAF(ctx, config, &verified); err != nil {
 		return nil, time.Time{}, err
-	}
-	if !strings.HasSuffix(u.Path, ".json") {
-		return nil, time.Time{}, errors.New("feed: signed CSAF URL must name a JSON document")
-	}
-	location := u.String()
-	checksum, signature, err := c.fetchVendorProofs(ctx, location)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	file, err := os.CreateTemp("", "lindm-feed-csaf-*")
-	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("feed: stage CSAF: %w", err)
 	}
 	defer func() {
-		err = errors.Join(err, file.Close(), os.Remove(file.Name()))
+		err = errors.Join(err, verified.close())
 		if err != nil {
 			artifact = nil
 			signedAt = time.Time{}
 		}
 	}()
-	digest, err := c.downloadArchive(ctx, location, file, redHatRecordBytes, nil)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	if !bytes.Equal(digest, checksum) {
-		return nil, time.Time{}, errors.New("feed: vendor CSAF checksum mismatch")
-	}
-	if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
-		return nil, time.Time{}, errors.New("feed: source checksum mismatch")
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, time.Time{}, fmt.Errorf("feed: rewind signed CSAF: %w", err)
-	}
-	signer, signedAt, err := c.signedTrust.verify(ctx, fingerprint, file, signature, time.Now())
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return nil, time.Time{}, fmt.Errorf("feed: rewind verified CSAF: %w", err)
-	}
-	if err := consume(file); err != nil {
+	if err := consume(verified.file); err != nil {
 		return nil, time.Time{}, fmt.Errorf("feed: parse verified CSAF: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, time.Time{}, err
 	}
-	return &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}, signedAt, nil
+	return verified.artifact, verified.signedAt, nil
+}
+
+// verifiedCSAF owns one authenticated, rewound document until normalization has
+// finished. Acquisition and normalization may run separately, but the payload is
+// never copied or exposed before its checksum, pin and vendor signature pass.
+type verifiedCSAF struct {
+	file     *os.File
+	artifact *advisoryv1.FeedArtifact
+	signedAt time.Time
+}
+
+func (v *verifiedCSAF) close() error {
+	file := v.file
+	*v = verifiedCSAF{}
+	if file == nil {
+		return nil
+	}
+	return errors.Join(file.Close(), os.Remove(file.Name()))
+}
+
+func (c *Client) acquireSignedCSAF(ctx context.Context, config *advisoryv1.FeedSource, result *verifiedCSAF) (err error) {
+	if result.file != nil {
+		return errors.New("feed: verified CSAF result already owns a file")
+	}
+	*result = verifiedCSAF{}
+	fingerprint, err := signedPublisher(config)
+	if err != nil {
+		return err
+	}
+	if config.GetFormat() != advisoryv1.FeedFormat_FEED_FORMAT_REDHAT_CSAF {
+		return errors.New("feed: Red Hat CSAF source and consumer required")
+	}
+	u, err := signedArtifactURL(config.GetUrl())
+	if err != nil {
+		return err
+	}
+	if !strings.HasSuffix(u.Path, ".json") {
+		return errors.New("feed: signed CSAF URL must name a JSON document")
+	}
+	location := u.String()
+	checksum, signature, err := c.fetchVendorProofs(ctx, location)
+	if err != nil {
+		return err
+	}
+	result.file, err = os.CreateTemp("", "lindm-feed-csaf-*")
+	if err != nil {
+		return fmt.Errorf("feed: stage CSAF: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, result.close())
+		}
+	}()
+	digest, err := c.downloadArchive(ctx, location, result.file, redHatRecordBytes, nil)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(digest, checksum) {
+		return errors.New("feed: vendor CSAF checksum mismatch")
+	}
+	if pin := config.GetExpectedSha256(); len(pin) != 0 && !bytes.Equal(pin, digest) {
+		return errors.New("feed: source checksum mismatch")
+	}
+	if _, err := result.file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("feed: rewind signed CSAF: %w", err)
+	}
+	signer, signedAt, err := c.signedTrust.verify(ctx, fingerprint, result.file, signature, time.Now())
+	if err != nil {
+		return err
+	}
+	if _, err := result.file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("feed: rewind verified CSAF: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	result.artifact = &advisoryv1.FeedArtifact{Url: location, Sha256: digest, SignerFingerprint: signer}
+	result.signedAt = signedAt
+	return nil
 }
 
 func signedArtifactURL(location string) (*url.URL, error) {
@@ -449,7 +492,7 @@ func (c *Client) downloadArchive(ctx context.Context, location string, file *os.
 		return nil, fmt.Errorf("feed: create archive request: %w", err)
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	resp, err := c.archive.Do(req)
+	resp, err := c.do(c.archive, req)
 	if err != nil {
 		return nil, fmt.Errorf("feed: fetch archive: %w", err)
 	}

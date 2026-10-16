@@ -5733,6 +5733,25 @@ document is parsed and no publication batch commits for
 overall `refresh_timeout_seconds` ceiling (default 7,200) applies regardless.
 The staging lease is renewed by a one-minute heartbeat throughout parsing.
 
+Red Hat replacement acquisition uses a process-wide four-file window, bounded by
+four existing 128 MiB document allowances on private disk rather than a
+feed-sized memory buffer. Checksum, configured digest pin, vendor signature and
+the captured change watermark must pass before deterministic path-ordered
+normalization on the single reconciliation connection. Cancellation or failure
+joins outstanding acquisitions and removes their private payloads before
+releasing their permits.
+
+Ordinary and streaming Red Hat HTTP requests also share a process-wide limit of
+four, retained through redirects until the final response body closes. Requests
+identify themselves as `lindm advisory feed`. HTTP 429 fails the current refresh
+without an automatic retry and defers subsequent Red Hat requests according to
+numeric or HTTP-date `Retry-After`; a missing, malformed or nonfuture value uses a
+conservative one-minute cooldown. A positive numeric delay beyond the timer range
+instead quarantines further Red Hat requests indefinitely within this process;
+it is never shortened to that fallback. Cancellation interrupts a wait but does
+not erase either shared cooldown. Other vendors are not delayed by Red Hat's
+cooldown, and no source deadline or progress-watchdog allowance is extended.
+
 Real-source RHEL qualification is explicitly opt-in:
 `LINDM_TEST_DATABASE_URL_FILE=.cache/dev/migration-database-url go test -tags=integration,livefeed ./internal/advisory -run '^TestLiveRHEL9SignedArchivePublication$' -count=1 -v -timeout=2h10m`.
 It acquires both real signed archives and publishes through the production service
