@@ -25,7 +25,9 @@ import (
 	"lindm/internal/releasebuild"
 )
 
-const deployServerDiskBytes int64 = 32 << 30
+// DeployServerDiskBytes leaves room for a full vendor import and the unchanged
+// upgrade preflight's twice-database-size plus 4 GiB free-space requirement.
+const DeployServerDiskBytes int64 = 128 << 30
 
 // VMDeployOptions consumes independently authenticated private release exports.
 // Browser drives visible production controls; Recovery signs independently
@@ -63,6 +65,7 @@ type VMDeployResult struct {
 	Runtime                          *vmRuntimeEvidence           `json:"runtime,omitempty"`
 	RestoreRuntime                   *vmRuntimeEvidence           `json:"restore_runtime,omitempty"`
 	ServerMinimumDiskBytes           int64                        `json:"server_minimum_disk_bytes"`
+	PostFeedStorage                  *VMDeployStorageEvidence     `json:"post_feed_storage,omitempty"`
 	ReleaseVersion                   string                       `json:"release_version"`
 	UpgradeVersion                   string                       `json:"upgrade_version"`
 	Custody                          string                       `json:"custody"`
@@ -105,7 +108,7 @@ type VMDeployResult struct {
 // the server, the console-enrolled device, and the fresh restore destination.
 // It never opens the shared development database or imports a fixture owner.
 func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDeployOptions) (result *VMDeployResult, err error) {
-	result = &VMDeployResult{StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), ServerMinimumDiskBytes: deployServerDiskBytes}
+	result = &VMDeployResult{StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), ServerMinimumDiskBytes: DeployServerDiskBytes}
 	setDeployResultScope(result, options)
 	defer func() {
 		result.FinishedAt = time.Now().UTC()
@@ -344,6 +347,12 @@ func DeployVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDepl
 			return nil
 		}, func() error {
 			return findings(server, "installed", firstInstallStarted)
+		}); err != nil {
+			return err
+		}
+		if err := op("measure storage after full vendor import", "harness", func() error {
+			result.PostFeedStorage, err = observeDeployStorage(ctx, server)
+			return err
 		}); err != nil {
 			return err
 		}

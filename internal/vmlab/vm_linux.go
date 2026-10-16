@@ -58,8 +58,8 @@ func createGuestOverlay(ctx context.Context, dir string, base *os.File, minimumB
 	if err := json.Unmarshal(infoBytes, &info); err != nil {
 		return fmt.Errorf("decode qcow2 metadata: %w", err)
 	}
-	if info.Format != "qcow2" || info.Backing != "" || info.VirtualSize <= 0 || info.VirtualSize > 64<<30 {
-		return errors.New("base must be standalone qcow2 with virtual size at most 64 GiB")
+	if info.Format != "qcow2" || info.Backing != "" || info.VirtualSize <= 0 || info.VirtualSize > max(64<<30, minimumBytes) {
+		return errors.New("base must be standalone qcow2 within the 64 GiB default or explicitly admitted server disk budget")
 	}
 	size, err := guestOverlayBytes(info.VirtualSize, minimumBytes)
 	if err != nil {
@@ -70,8 +70,8 @@ func createGuestOverlay(ctx context.Context, dir string, base *os.File, minimumB
 }
 
 func guestOverlayBytes(baseBytes, minimumBytes int64) (int64, error) {
-	if minimumBytes < 0 || minimumBytes > 32<<30 {
-		return 0, errors.New("requested cloud overlay minimum exceeds the 32 GiB per-guest disk budget")
+	if minimumBytes < 0 || minimumBytes > DeployServerDiskBytes {
+		return 0, errors.New("requested overlay minimum exceeds the 128 GiB native server disk budget")
 	}
 	return max(baseBytes, minGuestDiskBytes, minimumBytes), nil
 }

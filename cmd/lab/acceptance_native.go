@@ -79,7 +79,7 @@ func runAcceptanceNative(ctx context.Context, fixture *devlab.AuthorityFixture, 
 			// enrollment remains forbidden stock-image preconditioning.
 			guestOptions.Encrypted = &vmlab.EncryptedVMOptions{CacheDir: options.cache, GoldenDir: options.golden, WorkDir: options.work, Firmware: vmlab.EncryptedFirmwareOptions{Code: options.firmwareCode, Vars: options.firmwareVars, Package: options.firmwarePackage, Version: options.firmwareVersion}, Hardware: &vmlab.VMHardwareOptions{Accelerator: "kvm", StorageBus: "virtio-blk", TPM: true}}
 		}
-		if err := slots.AdmitDisk(ctx, 1, os.Stderr); err != nil {
+		if err := slots.AdmitDisk(ctx, labhost.LaneDiskBytes(1), os.Stderr); err != nil {
 			return records, errors.Join(failures, err)
 		}
 		lease, err := slots.Acquire(ctx)

@@ -235,3 +235,26 @@ func TestDebianBookwormRecoveryIsMeasuredOnly(t *testing.T) {
 		t.Fatalf("Debian 12 recovery sanitize must be supported through measured GRUB: %v", err)
 	}
 }
+
+func TestInstalledImageCapacityBindsMaterializationAndCacheIdentity(t *testing.T) {
+	for _, test := range []struct {
+		minimum int64
+		size    int64
+		suffix  string
+	}{
+		{0, 24 << 30, ""},
+		{10 << 30, 24 << 30, ""},
+		{32 << 30, 32 << 30, "\ninstallation-disk-bytes:34359738368"},
+		{128 << 30, 128 << 30, "\ninstallation-disk-bytes:137438953472"},
+	} {
+		size, suffix, err := installedImageDiskLayout(test.minimum)
+		if err != nil || size != test.size || suffix != test.suffix {
+			t.Errorf("minimum=%d: size=%d suffix=%q err=%v", test.minimum, size, suffix, err)
+		}
+	}
+	for _, minimum := range []int64{-1, (128 << 30) + 1} {
+		if _, _, err := installedImageDiskLayout(minimum); err == nil {
+			t.Errorf("accepted installation capacity outside the admitted range: %d", minimum)
+		}
+	}
+}

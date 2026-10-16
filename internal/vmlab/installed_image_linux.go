@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -103,6 +104,20 @@ func installerImageFor(m *labv1.ImageManifest) (*installerImage, error) {
 	}
 }
 
+// The installation partitioner must see the requested capacity. Enlarging an
+// overlay later cannot grow an atomic Debian root past its trailing swap.
+func installedImageDiskLayout(minimumBytes int64) (int64, string, error) {
+	const ordinaryDiskBytes int64 = 24 << 30
+	size, err := guestOverlayBytes(ordinaryDiskBytes, minimumBytes)
+	if err != nil {
+		return 0, "", err
+	}
+	if size == ordinaryDiskBytes {
+		return size, "", nil
+	}
+	return size, "\ninstallation-disk-bytes:" + strconv.FormatInt(size, 10), nil
+}
+
 // installedImage derives the golden disk from an authenticated installer. The
 // caller reauthenticates the ISO even on reuse. Local disk digests detect cache
 // corruption, not a vendor signature on our installed machine. Only owned
@@ -113,6 +128,10 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 	}
 	if spec.installer == platform.ArchISO && hardware.Firmware.SecureBoot {
 		return nil, errors.New("official archiso is unsigned: install with explicit non-Secure-Boot bootstrap firmware before owner enrollment")
+	}
+	diskBytes, diskIdentity, err := installedImageDiskLayout(hardware.minimumDiskBytes)
+	if err != nil {
+		return nil, err
 	}
 	root, err := openCache(ctx, filepath.Join(cacheDir, spec.cache), true)
 	if err != nil {
@@ -136,6 +155,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 		return nil, err
 	}
 	identity := strings.Join([]string{spec.version, source.SHA256, m.Version, hardware.Architecture, hardware.StorageBus, codeDigest, varsDigest, hardware.Firmware.Package, hardware.Firmware.Version, fmt.Sprint(hardware.Firmware.SecureBoot)}, "\n")
+	identity += diskIdentity
 	if m.GetRepositorySnapshotManifestSha256() != "" {
 		identity += "\nrepository-closure:" + m.GetRepositorySnapshotManifestSha256()
 	}
@@ -217,7 +237,7 @@ func installedImage(ctx context.Context, m *labv1.ImageManifest, spec *installer
 			spec.diagnostics = newInstallerDiagnostics(hardware.goldenDiagnosticsParent(workDir), kind, hardware.Architecture, source.SHA256, loginPublic, string(hostPrivate), hostPublic, string(recipe))
 		}
 	}
-	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", "24G"); err != nil {
+	if _, err := hostCommand(ctx, dir, "qemu-img", nil, "create", "-f", "qcow2", "image", strconv.FormatInt(diskBytes, 10)); err != nil {
 		return nil, err
 	}
 	if spec.bindSources != nil && snapshot == nil {

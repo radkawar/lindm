@@ -274,7 +274,7 @@ func runScheduledVM(ctx context.Context, args []string, stdout, stderr io.Writer
 		clean = labhost.SetFlag(clean, "advisory-cache", filepath.Join(work, "advisory-cache"))
 	}
 	guests := vmGuestCount(clean[1], clean)
-	if err := slots.AdmitDisk(ctx, guests, stderr); err != nil {
+	if err := slots.AdmitDisk(ctx, vmLaneDiskBytes(clean[1], clean), stderr); err != nil {
 		return err
 	}
 	return slots.RunAdmitted(ctx, guests, laneTiming(held), laneWaitReporter(stderr, chosen.Name), func(ctx context.Context) error {
@@ -366,6 +366,20 @@ func vmGuestCount(lane string, args []string) uint32 {
 	return 1
 }
 
+func vmLaneDiskBytes(lane string, args []string) int64 {
+	// Keep 8 GiB for overlay metadata and evidence in addition to each
+	// server's larger virtual disk, not instead of that disk.
+	server := vmlab.DeployServerDiskBytes + 8<<30
+	switch lane {
+	case "deploy":
+		return 2*server + labhost.LaneDiskBytes(1)
+	case "deploy-setup":
+		return server
+	default:
+		return labhost.LaneDiskBytes(vmGuestCount(lane, args))
+	}
+}
+
 // runHostExec is the staged binary's internal entrypoint. It takes the remote
 // flock itself and watches the SSH stdin lifetime, so disconnect does not free a
 // slot while a detached VM continues running. QEMU helpers also use Pdeathsig.
@@ -394,7 +408,7 @@ func runHostExec(ctx context.Context, args []string, stdout, stderr io.Writer) (
 			return runAdmittedHostExec(ctx, args, stdout, stderr, cfg.Hosts[0])
 		}
 		guests := vmGuestCount(args[2], args)
-		if err := slots.AdmitDisk(ctx, guests, stderr); err != nil {
+		if err := slots.AdmitDisk(ctx, vmLaneDiskBytes(args[2], args), stderr); err != nil {
 			return err
 		}
 		if credential, ok := ctx.Value(hostBatchCredentialKey{}).(string); ok {

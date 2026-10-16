@@ -61,3 +61,20 @@ func TestVMHoldsOnlyHeldAssistance(t *testing.T) {
 		}
 	}
 }
+
+func TestVMLaneDiskBudgetIncludesBothNativeServerDisks(t *testing.T) {
+	for _, test := range []struct {
+		lane string
+		args []string
+		want int64
+	}{
+		{"deploy", nil, 304 << 30},
+		{"deploy-setup", nil, 136 << 30},
+		{"inspect", nil, 32 << 30},
+		{"resources", []string{"-kinds", "firewall"}, 64 << 30},
+	} {
+		if got := vmLaneDiskBytes(test.lane, test.args); got != test.want {
+			t.Errorf("%s: disk budget=%d, want=%d", test.lane, got, test.want)
+		}
+	}
+}

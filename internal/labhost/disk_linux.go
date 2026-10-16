@@ -45,14 +45,13 @@ func (r *DiskRefusal) Is(target error) bool { return target == ErrInsufficientDi
 
 func gib(bytes int64) string { return fmt.Sprintf("%.1f GiB", float64(bytes)/(1<<30)) }
 
-// AdmitDisk refuses a lane of guests whose need exceeds the free space on the
-// executing host's work directory filesystem. When short it collects that
-// host's stale lab data once (diskgc.Host, reported to log) and measures
-// again. It never waits and takes no slot or FIFO ticket: call it before
-// RunAdmitted or RunBatchWorker. Concurrent lanes are not reserved against
-// each other; each measures what is free when it starts.
-func (s *Slots) AdmitDisk(ctx context.Context, guests uint32, log io.Writer) error {
-	need := LaneDiskBytes(guests)
+// AdmitDisk refuses a lane whose explicit byte budget exceeds the free space on
+// the executing host's work directory filesystem. Ordinary guests use
+// LaneDiskBytes; larger server overlays must supply their complete budget.
+// When short it collects stale host lab data once and measures again. Call it
+// before RunAdmitted or RunBatchWorker: it takes no slot or FIFO ticket.
+// Concurrent lanes each measure what is free when they start.
+func (s *Slots) AdmitDisk(ctx context.Context, need int64, log io.Writer) error {
 	free, err := s.diskFree(s.work)
 	if err != nil {
 		return fmt.Errorf("lab hosts: measure free disk: %w", err)

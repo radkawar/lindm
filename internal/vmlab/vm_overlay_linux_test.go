@@ -27,6 +27,8 @@ func TestGuestOverlayDiskFloor(t *testing.T) {
 		{"12G", 0, 12 << 30},
 		{"1619001344", coldReleaseDiskBytes, coldReleaseDiskBytes},
 		{"48G", coldReleaseDiskBytes, 48 << 30},
+		{"128G", DeployServerDiskBytes, DeployServerDiskBytes},
+		{"128G", 0, 0},
 	} {
 		t.Run(tc.base, func(t *testing.T) {
 			dir := t.TempDir()
@@ -38,7 +40,14 @@ func TestGuestOverlayDiskFloor(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Cleanup(func() { _ = base.Close() })
-			if err := createGuestOverlay(t.Context(), dir, base, tc.minimum); err != nil {
+			err = createGuestOverlay(t.Context(), dir, base, tc.minimum)
+			if tc.want == 0 {
+				if err == nil {
+					t.Fatal("large installed base bypassed an explicit server disk budget")
+				}
+				return
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
 			output, err := exec.CommandContext(t.Context(), "qemu-img", "info", "--output=json", "-f", "qcow2", filepath.Join(dir, "overlay.qcow2")).Output()

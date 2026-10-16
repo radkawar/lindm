@@ -3333,10 +3333,11 @@ landing.
 
 Lab admission refuses a lane rather than letting it die with ENOSPC. Before
 slot admission, every local lane, every lane a Spark executes (`lab host-exec`)
-and every local demo or native acceptance guest must find guests × 32 GiB free
-on its host's work-directory filesystem (`labhost.LaneDiskBytes`: the 24 GiB
-installer and golden disks plus overlays, firmware and TPM state, serial logs
-and evidence). When it does not, admission runs the host classes of gc once
+and every local demo or native acceptance guest must find its disk budget free
+on the host's work-directory filesystem. Ordinary guests use guests × 32 GiB
+(`labhost.LaneDiskBytes`: 24 GiB disks plus 8 GiB per guest for metadata and
+evidence); the native deployment exceptions are described below. When short,
+admission runs the host classes of gc once
 (build cache and stale lab runs in that work directory) and measures again;
 still short, it refuses at once with `labhost.DiskRefusal`
 (`ErrInsufficientDisk`) naming the host, path, free and needed space. Disk is
@@ -4050,13 +4051,23 @@ Server host recipes and architecture admission come from each release's
 [server table](install.md#server-platforms) distinguishes recipes from qualification.
 Each added connected x86_64 host must pass this entire lane separately; shared
 APT/RPM implementation or setup-only evidence never substitutes for its proof.
-The source and fresh restore servers request a 32 GiB overlay floor, also used by
-the one-server `lab deploy setup` observation. The full multiarchitecture release
-and its private immutable snapshot must fit while preserving the installer's
-4 GiB-free preflight. The managed device and other native lanes keep the existing
-10 GiB default floor; larger vendor bases are not shrunk. Existing conservative
-32 GiB-per-guest disk admission, four slots and FIFO remain unchanged. Evidence
-records `server_minimum_disk_bytes`; this budget is not an installer gate bypass.
+The source and fresh restore servers request a 128 GiB overlay floor, also used by
+the one-server `lab deploy setup` observation. A complete vendor-feed import must
+fit alongside the signed release and its private immutable snapshot, preserving
+the installer's unchanged upgrade requirement of twice the measured database size
+plus 4 GiB free. Evidence records `server_minimum_disk_bytes` and measures
+`post_feed_storage` (database size, filesystem size and available bytes) after
+the first current inventory evaluation.
+The managed device and other native lanes keep the 10 GiB default floor; larger
+vendor bases are not shrunk. Normal disk admission requires 304 GiB for the full
+lane (two 128 GiB server disks, 8 GiB additional overhead per server, and the
+ordinary 32 GiB device budget), or 136 GiB for setup alone. Four slots and FIFO
+remain unchanged; this capacity budget never bypasses an installer gate.
+Installer-backed servers are partitioned at that requested size before publication.
+The effective installation disk size is bound into the derived golden cache key;
+ordinary 24 GiB goldens keep their existing geometry and identity. Cached images
+are never resized or repartitioned in place. This avoids relying on cloud-init to
+grow Debian's root through the atomic recipe's trailing swap partition.
 
 Installer-media manifests require explicit package-owned UEFI inputs:
 `-firmware-code`, `-firmware-vars`, `-firmware-package` and the exact installed

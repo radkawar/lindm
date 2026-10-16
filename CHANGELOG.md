@@ -118,7 +118,7 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Budget a 32 GiB cold-release guest overlay for two isolated full builds without changing other native lane disks or sharing compiler caches.
 - Restore canonical public embedded-repository and signed executable modes after private cold transport, with unchanged signed release provenance and custody permissions.
 - Preserve authenticated public bundle modes inside the installer's private immutable snapshot without preserving source ownership or weakening provenance verification.
-- Budget 32 GiB source and restore server overlays for full signed turnkey bundles while preserving the installer's free-disk preflight and normal lab admission.
+- Budget 128 GiB source and restore server overlays for complete vendor imports, measure the post-import database size, and account for both disks in ordinary lab admission without weakening the installer's upgrade capacity gate.
 - Retain secret-safe, encrypted lab database failure classifications before owned guest cleanup, without changing installer authorization gates.
 - Sign local PostgreSQL certificates with a constrained P-256/SHA-256 authority so SCRAM-PLUS succeeds without disabling TLS verification, channel binding or sealed PKI custody.
 - Require database channel binding by default, reject disabled binding, and require SCRAM-PLUS for local credentials; explicit pooler `prefer` choices remain visible in startup logs and server status.

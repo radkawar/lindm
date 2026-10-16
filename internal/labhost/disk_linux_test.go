@@ -74,7 +74,7 @@ func TestAdmitDisk(t *testing.T) {
 				},
 			}
 			var log bytes.Buffer
-			err := slots.AdmitDisk(t.Context(), 2, &log)
+			err := slots.AdmitDisk(t.Context(), need, &log)
 			if collects != tc.collects || measured != len(tc.free) {
 				t.Fatalf("collected %d times and measured %d times, want %d and %d", collects, measured, tc.collects, len(tc.free))
 			}
@@ -106,8 +106,23 @@ func TestAdmitDisk(t *testing.T) {
 			return nil, nil
 		},
 	}
-	if err := slots.AdmitDisk(t.Context(), 1, io.Discard); err == nil || errors.Is(err, ErrInsufficientDisk) {
+	if err := slots.AdmitDisk(t.Context(), LaneDiskBytes(1), io.Discard); err == nil || errors.Is(err, ErrInsufficientDisk) {
 		t.Fatalf("unmeasurable disk was not a plain failure: %v", err)
+	}
+}
+
+func TestAdmitDiskDoesNotSubstituteAnOrdinaryGuestBudget(t *testing.T) {
+	const need int64 = 304 << 30
+	slots := &Slots{host: "local", work: "/owned/lab",
+		diskFree: func(string) (int64, error) { return LaneDiskBytes(3), nil },
+		diskCollect: func(context.Context, []string, io.Writer) ([]diskgc.Result, error) {
+			return nil, nil
+		},
+	}
+	err := slots.AdmitDisk(t.Context(), need, io.Discard)
+	var refusal *DiskRefusal
+	if !errors.As(err, &refusal) || refusal.Need != need || refusal.Free != LaneDiskBytes(3) {
+		t.Fatalf("large native server budget was not enforced: %v", err)
 	}
 }
 

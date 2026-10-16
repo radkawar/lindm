@@ -74,3 +74,30 @@ func TestNativePostgresProofUsesSelectedLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestDeployStorageObservation(t *testing.T) {
+	for _, test := range []struct {
+		body string
+		want *VMDeployStorageEvidence
+	}{
+		{"8943566848\n4096 33554432 18000000\n", &VMDeployStorageEvidence{DatabaseBytes: 8943566848, FilesystemBytes: 128 << 30, AvailableBytes: 73728000000}},
+		{"1\n4096 1 0\n", &VMDeployStorageEvidence{DatabaseBytes: 1, FilesystemBytes: 4096}},
+		{"", nil},
+		{"0\n4096 1 0\n", nil},
+		{"-1\n4096 1 0\n", nil},
+		{"9223372036854775808\n4096 1 0\n", nil},
+		{"1\n4096 18446744073709551615 0\n", nil},
+		{"1\n4096 1 2\n", nil},
+		{"1\n0 1 0\n", nil},
+		{"8943566848\n4096 33554432 18000000\nprivate diagnostic", nil},
+	} {
+		got, err := parseDeployStorage([]byte(test.body))
+		if test.want == nil {
+			if got != nil || err != errDeployStorage {
+				t.Fatal("invalid storage observation did not return the secret-safe typed refusal")
+			}
+		} else if err != nil || got == nil || *got != *test.want {
+			t.Errorf("storage=%+v, error=%v; want=%+v", got, err, test.want)
+		}
+	}
+}

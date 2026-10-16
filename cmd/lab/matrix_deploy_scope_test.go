@@ -111,7 +111,11 @@ func TestMatrixImportRejectsDroppedOrContradictoryFindingsScope(t *testing.T) {
 }
 
 func TestMatrixImportPreservesFullNativeEvidenceCompatibility(t *testing.T) {
-	for _, body := range []string{`{"passed":true}`, `{"passed":true,"findings_excluded":false,"lifecycle_qualified":true}`} {
+	for _, body := range []string{
+		`{"passed":true}`,
+		`{"passed":true,"findings_excluded":false,"lifecycle_qualified":true}`,
+		`{"passed":true,"findings_excluded":false,"lifecycle_qualified":true,"post_feed_storage":{"database_bytes":8943566848,"filesystem_bytes":137438953472,"available_bytes":73728000000}}`,
+	} {
 		path := filepath.Join(t.TempDir(), "full.json")
 		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
 			t.Fatal(err)

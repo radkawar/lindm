@@ -6,7 +6,9 @@ package vmlab
 
 import (
 	"context"
+	"errors"
 	"strconv"
+	"strings"
 
 	"lindm/internal/platform"
 )
@@ -20,6 +22,44 @@ func proveDeployPostgres(ctx context.Context, guest *guestVM, release *platform.
 	}
 	_, err := serverGuestCommand(ctx, guest, "prove owned hardened PostgreSQL and no vendor default cluster", deployPostgresProofCommand(release), nil)
 	return err
+}
+
+// VMDeployStorageEvidence measures the populated server before backup or upgrade.
+type VMDeployStorageEvidence struct {
+	DatabaseBytes   uint64 `json:"database_bytes"`
+	FilesystemBytes uint64 `json:"filesystem_bytes"`
+	AvailableBytes  uint64 `json:"available_bytes"`
+}
+
+var errDeployStorage = errors.New("deploy storage observation requires bounded database and filesystem byte counts")
+
+func observeDeployStorage(ctx context.Context, guest *guestVM) (*VMDeployStorageEvidence, error) {
+	command := "runuser -u postgres -- " + nativeQuote(guest.release.Server.PostgreSQLBinDirectory+"psql") + " -X -Atq -v ON_ERROR_STOP=1 -h " + nativeQuote(guest.release.Server.PostgreSQLSocketDirectory) + " -p " + nativeQuote(guest.release.Server.PostgreSQLPort) + " -d lindm && stat --file-system --format='%S %b %a' /var/backups"
+	body, err := serverGuestCommand(ctx, guest, "measure storage after full vendor import", command, strings.NewReader("SELECT pg_database_size(current_database());\n"))
+	if err != nil {
+		return nil, err
+	}
+	return parseDeployStorage(body)
+}
+
+func parseDeployStorage(body []byte) (*VMDeployStorageEvidence, error) {
+	fields := strings.Fields(string(body))
+	if len(fields) != 4 {
+		return nil, errDeployStorage
+	}
+	var values [4]uint64
+	for index, field := range fields {
+		value, err := strconv.ParseUint(field, 10, 64)
+		if err != nil {
+			return nil, errDeployStorage
+		}
+		values[index] = value
+	}
+	database, blockSize, blocks, available := values[0], values[1], values[2], values[3]
+	if database == 0 || database > 1<<63-1 || blockSize == 0 || blocks == 0 || available > blocks || blocks > ^uint64(0)/blockSize {
+		return nil, errDeployStorage
+	}
+	return &VMDeployStorageEvidence{DatabaseBytes: database, FilesystemBytes: blockSize * blocks, AvailableBytes: blockSize * available}, nil
 }
 
 func deployPostgresProofCommand(release *platform.Release) string {

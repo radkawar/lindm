@@ -63,7 +63,7 @@ type VMHardwareOptions struct {
 	// diagnostics; empty keeps them in the lane work directory. Lanes set it
 	// when the work directory is removed (remote hosts) before inspection.
 	goldenDiagnosticsDir string
-	// Cold release SDKs need two isolated builds; zero retains the cloud floor.
+	// Cold SDKs and server lifecycle proofs need larger disks; zero keeps defaults.
 	minimumDiskBytes int64
 }
 

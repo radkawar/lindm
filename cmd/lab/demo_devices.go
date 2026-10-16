@@ -128,7 +128,7 @@ func (r *demoRun) runDevice(ctx context.Context, bound *labv1.DemoBinding, crede
 	if err != nil {
 		return err
 	}
-	if err := slots.AdmitDisk(ctx, 1, r.stderr); err != nil {
+	if err := slots.AdmitDisk(ctx, labhost.LaneDiskBytes(1), r.stderr); err != nil {
 		return err
 	}
 	ctx = context.WithValue(ctx, demoDeviceHeldKey{}, ready)

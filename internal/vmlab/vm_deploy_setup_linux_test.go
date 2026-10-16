@@ -55,11 +55,11 @@ func TestDeploySetupAirgapHardwareAndInstaller(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if hardware.Architecture != "x86_64" || hardware.Accelerator != "kvm" || hardware.AllowNetwork == airgap || hardware.minimumDiskBytes != deployServerDiskBytes {
+		if hardware.Architecture != "x86_64" || hardware.Accelerator != "kvm" || hardware.AllowNetwork == airgap || hardware.minimumDiskBytes != DeployServerDiskBytes {
 			t.Fatalf("wrong native server network policy for airgap=%t: %+v", airgap, hardware)
 		}
 		resolved, err := resolveVMHardware(hardware, "amd64")
-		if err != nil || resolved.minimumDiskBytes != 32<<30 {
+		if err != nil || resolved.minimumDiskBytes != 128<<30 {
 			t.Fatalf("server overlay budget was lost: %v", err)
 		}
 		command := deployInstallerCommand(VMDeployOptions{ReleaseKeyID: "independent-pin"}, "/root/signed-release", "https://localhost:18444", "https://localhost:18445", "0.2.1", airgap)
@@ -88,7 +88,7 @@ func TestDeployServerDiskFloorLeavesOtherNativeLanesUnchanged(t *testing.T) {
 	for _, test := range []struct {
 		hardware *VMHardwareOptions
 		want     int64
-	}{{server, 32 << 30}, {&VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, 10 << 30}} {
+	}{{server, 128 << 30}, {&VMHardwareOptions{Architecture: "x86_64", Accelerator: "kvm"}, 10 << 30}} {
 		hardware, err := resolveVMHardware(test.hardware, "amd64")
 		if err != nil {
 			t.Fatal(err)
@@ -111,7 +111,7 @@ func TestDeployHardwarePreservesExplicitFirmwareAndNativePolicy(t *testing.T) {
 		}
 		want := before
 		want.Architecture, want.Accelerator = "x86_64", "kvm"
-		want.AllowNetwork, want.minimumDiskBytes = !airgap, deployServerDiskBytes
+		want.AllowNetwork, want.minimumDiskBytes = !airgap, DeployServerDiskBytes
 		if !reflect.DeepEqual(*hardware, want) || !reflect.DeepEqual(supplied, before) {
 			t.Fatalf("explicit firmware or fixed native/network/disk policy changed: got=%+v supplied=%+v", hardware, supplied)
 		}

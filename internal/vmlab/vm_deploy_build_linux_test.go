@@ -47,13 +47,14 @@ func TestColdReleaseOverlayBudgetDoesNotResizeOtherLanes(t *testing.T) {
 		{16 << 30, 0, 16 << 30},
 		{2 << 30, coldReleaseDiskBytes, 32 << 30},
 		{64 << 30, coldReleaseDiskBytes, 64 << 30},
+		{128 << 30, DeployServerDiskBytes, 128 << 30},
 	} {
 		got, err := guestOverlayBytes(test.base, test.minimum)
 		if err != nil || got != test.want {
 			t.Fatalf("overlay base=%d minimum=%d got=%d want=%d: %v", test.base, test.minimum, got, test.want, err)
 		}
 	}
-	for _, minimum := range []int64{-1, (32 << 30) + 1} {
+	for _, minimum := range []int64{-1, (128 << 30) + 1} {
 		if _, err := guestOverlayBytes(2<<30, minimum); err == nil {
 			t.Fatalf("accepted overlay minimum beyond the admitted budget: %d", minimum)
 		}

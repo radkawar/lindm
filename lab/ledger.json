@@ -14392,6 +14392,23 @@
       "verified": true,
       "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
       "mainlineRevision": "57f61523905a420de43a78bcadb4b2d84c79a0d2"
+    },
+    {
+      "platform": "debian-13",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "debian-13-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/work/server-platforms-20261015/native-debian13-attempt4.json",
+      "sha256": "01a0255e533f60a37ba8bd373785a1c89efff803ad2c4374772796b9b4f47233",
+      "recorded": "2026-10-15T23:44:31.583378926Z",
+      "revision": "57194f3638506d1ab0b21257bd8b009adfa0d8d5",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "full-vendor-import-exceeds-32gib-upgrade-capacity",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
+      "mainlineRevision": "57194f3638506d1ab0b21257bd8b009adfa0d8d5"
     }
   ]
 }

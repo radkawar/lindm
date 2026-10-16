@@ -64,7 +64,7 @@ type VMDeploySetupResult struct {
 // lifecycle. The caller locks secret memory before entering this lab-only API.
 // Success establishes install/first owner only and never qualifies deploy.
 func DeploySetupVM(ctx context.Context, manifest *labv1.ImageManifest, options VMDeploySetupOptions) (result *VMDeploySetupResult, err error) {
-	result = &VMDeploySetupResult{Scope: deploylab.FirstRunInstallScope, StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), AirgapServerInstall: options.Airgap, ServerMinimumDiskBytes: deployServerDiskBytes}
+	result = &VMDeploySetupResult{Scope: deploylab.FirstRunInstallScope, StartedAt: time.Now().UTC(), ImageID: manifest.GetId(), AirgapServerInstall: options.Airgap, ServerMinimumDiskBytes: DeployServerDiskBytes}
 	defer func() { finishDeploySetupResult(result, err) }()
 	if err := validateDeploySetupOptions(manifest, options); err != nil {
 		return result, err
@@ -192,7 +192,7 @@ func deployServerHardware(airgap bool, supplied *VMHardwareOptions) (*VMHardware
 		return nil, errors.New("deploy requires native x86_64 KVM hardware")
 	}
 	hardware.Architecture, hardware.Accelerator = "x86_64", "kvm"
-	hardware.AllowNetwork, hardware.minimumDiskBytes = !airgap, deployServerDiskBytes
+	hardware.AllowNetwork, hardware.minimumDiskBytes = !airgap, DeployServerDiskBytes
 	return &hardware, nil
 }
 
