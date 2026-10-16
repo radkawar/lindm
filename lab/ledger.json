@@ -14490,6 +14490,22 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "09557b4fbd31d0f47b8226791f56e01583e7a99569b96d6d1aa0fcd7cbaff726",
       "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
+    },
+    {
+      "platform": "rhel-10",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-10.2-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/server-platforms-20261015/native-rhel10-attempt1.json",
+      "sha256": "db26613781f90570eaa07fed002d3284fbcc89f5581da2d5c0f5e1ce6e753e7c",
+      "recorded": "2026-10-16T02:31:50.444182869Z",
+      "revision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "66c1657e4c5faefdcaf3459fb7851228e9a9cb69e9c47751e695eba87bb74cf3",
+      "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
     }
   ]
 }

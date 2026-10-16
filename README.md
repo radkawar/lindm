@@ -175,7 +175,7 @@ See the [installation guide](docs/install.md) for prerequisites and proof record
 | [Debian 12](docs/platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Qualified         |
 | [Debian 13](docs/platforms/debian.md)          | x86_64       | 17         | Distribution        | Connected only        | Qualified         |
 | [RHEL 9](docs/platforms/rhel.md)               | x86_64       | 16         | Distribution stream | Connected only        | Preview           |
-| [RHEL 10](docs/platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
+| [RHEL 10](docs/platforms/rhel.md)              | x86_64       | 16         | Distribution        | Connected only        | Qualified         |
 | [Rocky Linux 9](docs/platforms/alma-rocky.md)  | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
 | [Rocky Linux 10](docs/platforms/alma-rocky.md) | x86_64       | 16         | Distribution        | Connected only        | Not yet qualified |
 | [AlmaLinux 9](docs/platforms/alma-rocky.md)    | x86_64       | 16         | Distribution stream | Connected only        | Not yet qualified |
