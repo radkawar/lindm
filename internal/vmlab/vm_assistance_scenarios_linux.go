@@ -407,7 +407,16 @@ func (r *assistanceRun) serveScenario(ctx context.Context, spec assistanceScenar
 		}
 	case agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_USER_STOPPED:
 		// The in-progress indicator is critical with the single action "stop".
-		indicator, banner, err := r.screen.waitBanner(ctx, 30*time.Second)
+		var indicator *image.RGBA
+		var banner image.Rectangle
+		var err error
+		if r.desktop.ocrConsent {
+			// Earlier scenarios may have changed the underlying windows, so
+			// identify this real indicator by text, not the old desktop diff.
+			indicator, _, err = r.screen.waitText(ctx, r.screen.popupRegion, 30*time.Second, "sharing-indicator", "Remote assistance in progress", "Stop")
+		} else {
+			indicator, banner, err = r.screen.waitBanner(ctx, 30*time.Second)
+		}
 		if err != nil {
 			return err
 		}

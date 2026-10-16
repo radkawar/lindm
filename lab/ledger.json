@@ -14347,6 +14347,51 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "4c02aa97e73c9e36f19b1e4ee79695cae566704c5dc3cb361e334847a3d62589",
       "mainlineRevision": "cbbcc5918ea95532e173aee225ed866d5ccc7d4f"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-11/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "63d2617e166475a104c866cc57d5453714ae9042b01e73c21ebdab0f304581ba",
+      "recorded": "2026-10-15T23:32:40.573213162Z",
+      "revision": "57f61523905a420de43a78bcadb4b2d84c79a0d2-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "57f61523905a420de43a78bcadb4b2d84c79a0d2"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_FAIL",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-12/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "3027aa86269f96fbe1adc78762aacbffa1693572ca294989b4ce63297021a72d",
+      "recorded": "2026-10-15T23:49:37.427768665Z",
+      "revision": "57f61523905a420de43a78bcadb4b2d84c79a0d2-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "57f61523905a420de43a78bcadb4b2d84c79a0d2"
+    },
+    {
+      "platform": "pop-24.04",
+      "cell": "assistance-cosmic-pinned",
+      "architecture": "x86_64",
+      "manifest": "pop-os-24.04-encrypted-amd64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/.cache/lindm-upstream-prs/cosmic-assistance-cell-13/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json",
+      "sha256": "159c2b6ce42f2e0c9ce8d258b69bd07b14fd4f944f9a04d49ac10616e500346b",
+      "recorded": "2026-10-15T23:57:17.789892571Z",
+      "revision": "57f61523905a420de43a78bcadb4b2d84c79a0d2-dirty",
+      "source": "MATRIX_SOURCE_RUN",
+      "verified": true,
+      "manifestSha256": "8ea80a9526f174e0a0575a041127fa33a4692d4aec1adbd391643350f615aaf9",
+      "mainlineRevision": "57f61523905a420de43a78bcadb4b2d84c79a0d2"
     }
   ]
 }

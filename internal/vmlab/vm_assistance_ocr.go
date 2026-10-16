@@ -175,3 +175,27 @@ func ocrClearDarkBorder(mask *image.Gray) bool {
 	}
 	return changed
 }
+
+// ocrLowContrastMask rebinarizes a retained luma crop into the existing mask,
+// with matching dimensions but independently strided/originated storage.
+// It schedules OCR only when a lower threshold changes pixel classes and leaves
+// both foreground and background; uniform or identical masks add no evidence.
+func ocrLowContrastMask(mask, luma *image.Gray, threshold, previous uint8) bool {
+	reclassified, dark, light := false, false, false
+	width := luma.Rect.Dx()
+	for y := range luma.Rect.Dy() {
+		source := luma.Pix[y*luma.Stride : y*luma.Stride+width]
+		target := mask.Pix[y*mask.Stride : y*mask.Stride+width]
+		for x, value := range source {
+			if value > threshold {
+				target[x] = 255
+				light = true
+				reclassified = reclassified || value <= previous
+			} else {
+				target[x] = 0
+				dark = true
+			}
+		}
+	}
+	return reclassified && dark && light
+}

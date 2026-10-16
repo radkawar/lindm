@@ -76,7 +76,7 @@ func TestCOSMICForkProfileRequiresExplicitDisposableInputs(t *testing.T) {
 
 func TestCOSMICNativeVersionEvidenceRejectsDriftAndPublicNotifications(t *testing.T) {
 	expected := []string{
-		"xdg-desktop-portal-cosmic=1.10.0+lindm.lifetime.1",
+		"xdg-desktop-portal-cosmic=1.10.0+lindm.lifetime.3",
 		"cosmic-comp=0.1~1791491785~24.04~4d14528",
 		"cosmic-notifications=1.10.0+lindm.actions.1",
 		"cosmic-greeter=1.10.0~1791400742~24.04~98df07d",
@@ -113,6 +113,11 @@ func TestCOSMICNativeVersionEvidenceRejectsDriftAndPublicNotifications(t *testin
 	duplicate := slices.Clone(expected)
 	duplicate[3] = expected[2]
 	invalid = append(invalid, publicNotifications, duplicate)
+	for _, rejected := range []string{"1.10.0+lindm.lifetime.1", "1.10.0+lindm.lifetime.2"} {
+		oldPortal := slices.Clone(expected)
+		oldPortal[0] = "xdg-desktop-portal-cosmic=" + rejected
+		invalid = append(invalid, oldPortal)
+	}
 	for _, observed := range invalid {
 		if err := verifyCosmicAssistancePins(observed); err == nil {
 			t.Fatalf("accepted drifting/incomplete native evidence: %v", observed)

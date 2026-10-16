@@ -31,9 +31,14 @@ const ocrUpscale = 3
 // from the plain luma pass (kde-fedora44-x86_64-05), but not from a threshold.
 const ocrBinaryLuma = 150
 
+// A lower universal threshold preserves faint light glyphs on dark controls.
+// At 150 the native cell-11 Decline label fragmented into separate OCR tokens.
+const ocrLowContrastLuma = 100
+
 // ocrRead returns the words tesseract finds in region of img, with boxes in
-// img coordinates. Plain and binary luma passes retain light-on-dark text; an
-// additional edge-cleared binary pass exposes dark text inside accent buttons.
+// img coordinates. Plain/fixed binary passes retain light-on-dark text; an
+// edge-cleared pass exposes accent-button dark text, and a lower binary pass
+// preserves faint glyphs without changing label or hover verification.
 // Luma, not colour: on Plasma's wallpaper-tinted popups tesseract reads the
 // colour crop as a handful of fragments (kde-fedora44-x86_64-03).
 func ocrRead(ctx context.Context, img *image.RGBA, region image.Rectangle) (_ []ocrWord, err error) {
@@ -47,27 +52,33 @@ func ocrRead(ctx context.Context, img *image.RGBA, region image.Rectangle) (_ []
 	}
 	defer func() { err = errors.Join(err, os.RemoveAll(dir)) }()
 	var words []ocrWord
-	var scaled *image.Gray
-	for pass := range 3 {
-		if pass == 2 {
+	var scaled, plain *image.Gray
+	for pass := range 4 {
+		switch pass {
+		case 0:
+			scaled = image.NewGray(image.Rect(0, 0, region.Dx()*ocrUpscale, region.Dy()*ocrUpscale))
+			for y := range scaled.Rect.Dy() {
+				for x := range scaled.Rect.Dx() {
+					scaled.Pix[scaled.PixOffset(x, y)] = uint8(pixelLuma(img, region.Min.X+x/ocrUpscale, region.Min.Y+y/ocrUpscale))
+				}
+			}
+			plain = scaled
+		case 1:
+			scaled = image.NewGray(plain.Rect)
+			for i, value := range plain.Pix {
+				if value > ocrBinaryLuma {
+					scaled.Pix[i] = 255
+				}
+			}
+		case 2:
 			// Reuse the binary mask. Do not invoke OCR again if there was no
 			// edge-connected background to remove.
 			if !ocrClearDarkBorder(scaled) {
 				continue
 			}
-		} else {
-			scaled = image.NewGray(image.Rect(0, 0, region.Dx()*ocrUpscale, region.Dy()*ocrUpscale))
-			for y := range scaled.Rect.Dy() {
-				for x := range scaled.Rect.Dx() {
-					luma := pixelLuma(img, region.Min.X+x/ocrUpscale, region.Min.Y+y/ocrUpscale)
-					switch {
-					case pass == 1 && luma > ocrBinaryLuma:
-						luma = 255
-					case pass == 1:
-						luma = 0
-					}
-					scaled.Pix[scaled.PixOffset(x, y)] = uint8(luma)
-				}
+		case 3:
+			if !ocrLowContrastMask(scaled, plain, ocrLowContrastLuma, ocrBinaryLuma) {
+				continue
 			}
 		}
 		path := filepath.Join(dir, fmt.Sprintf("screen-%d.png", pass))

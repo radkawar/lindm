@@ -153,3 +153,68 @@ func TestOCRClearDarkBorderHandlesEmptyAndSingleRowOrColumn(t *testing.T) {
 		}
 	}
 }
+
+func TestOCRLowContrastMaskPreservesFaintGlyphsAndStridedCropBounds(t *testing.T) {
+	sourceBacking := image.NewGray(image.Rect(0, 0, 9, 6))
+	for i := range sourceBacking.Pix {
+		sourceBacking.Pix[i] = 211
+	}
+	source, ok := sourceBacking.SubImage(image.Rect(2, 1, 6, 3)).(*image.Gray)
+	if !ok {
+		t.Fatal("source crop did not retain gray storage")
+	}
+	levels := []uint8{72, 120, 180, 255, 0, 100, 150, 151}
+	for y := range source.Rect.Dy() {
+		for x := range source.Rect.Dx() {
+			source.Pix[y*source.Stride+x] = levels[y*source.Rect.Dx()+x]
+		}
+	}
+	maskBacking := image.NewGray(image.Rect(0, 0, 10, 7))
+	for i := range maskBacking.Pix {
+		maskBacking.Pix[i] = 73
+	}
+	mask, ok := maskBacking.SubImage(image.Rect(3, 2, 7, 4)).(*image.Gray)
+	if !ok {
+		t.Fatal("mask crop did not retain gray storage")
+	}
+	if !ocrLowContrastMask(mask, source, 100, 150) {
+		t.Fatal("faint glyph 120 over fill 72 did not schedule contrast OCR")
+	}
+	for y := range maskBacking.Rect.Dy() {
+		for x := range maskBacking.Rect.Dx() {
+			want := uint8(73)
+			if image.Pt(x, y).In(mask.Rect) {
+				value := levels[(y-mask.Rect.Min.Y)*mask.Rect.Dx()+x-mask.Rect.Min.X]
+				want = 0
+				if value > 100 {
+					want = 255
+				}
+			}
+			if got := maskBacking.Pix[maskBacking.PixOffset(x, y)]; got != want {
+				t.Fatalf("mask (%d,%d)=%d, want %d: lost faint glyph or escaped crop", x, y, got, want)
+			}
+		}
+	}
+	for y := range sourceBacking.Rect.Dy() {
+		for x := range sourceBacking.Rect.Dx() {
+			want := uint8(211)
+			if image.Pt(x, y).In(source.Rect) {
+				want = levels[(y-source.Rect.Min.Y)*source.Rect.Dx()+x-source.Rect.Min.X]
+			}
+			if got := sourceBacking.Pix[sourceBacking.PixOffset(x, y)]; got != want {
+				t.Fatalf("retained plain crop changed at (%d,%d)", x, y)
+			}
+		}
+	}
+}
+
+func TestOCRLowContrastMaskSkipsUniformOrUnchangedClasses(t *testing.T) {
+	for _, levels := range [][]uint8{nil, {0}, {72}, {120}, {200}, {72, 200}, {120, 140}, {0, 255}} {
+		source := image.NewGray(image.Rect(0, 0, len(levels), 1))
+		copy(source.Pix, levels)
+		mask := image.NewGray(source.Rect)
+		if ocrLowContrastMask(mask, source, 100, 150) {
+			t.Errorf("uniform/unchanged levels %v would schedule redundant OCR", levels)
+		}
+	}
+}

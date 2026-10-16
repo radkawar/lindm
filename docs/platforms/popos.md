@@ -500,7 +500,7 @@ fork `.deb` inputs. Its COSMIC tuple is:
 
 | Package                                   | Exact version                     |
 | ----------------------------------------- | --------------------------------- |
-| `xdg-desktop-portal-cosmic`               | `1.10.0+lindm.lifetime.1`         |
+| `xdg-desktop-portal-cosmic`               | `1.10.0+lindm.lifetime.3`         |
 | `cosmic-comp`                             | `0.1~1791491785~24.04~4d14528`    |
 | `cosmic-notifications`                    | `1.10.0+lindm.actions.1`          |
 | `cosmic-greeter`, `cosmic-greeter-daemon` | `1.10.0~1791400742~24.04~98df07d` |
@@ -514,10 +514,16 @@ The coherent PipeWire family is pinned to
 `gstreamer1.0-pipewire` and `libpipewire-0.3-common`. Installing only the capture
 plugin would otherwise upgrade that family without a reviewed tuple.
 
-The reviewed portal fork is commit
+The current portal `.deb` uses base commit
 [`148f07ed9a2ebf9a719f8b517e00c2c165a70153`](https://github.com/radkawar/xdg-desktop-portal-cosmic/commit/148f07ed9a2ebf9a719f8b517e00c2c165a70153),
-with input `.deb` SHA-256
-`fc144f9187590d7544fa3e6a5069f1f24032d8189d6bd58227bd0add27821d6f`.
+with reviewed local toolkit override
+`3384ae4ff843e6e5f5549b6af6cfe53157999b0c` and statically embedded runtime assets.
+Its input `.deb` SHA-256 is
+`8d566e0c0d9cd09095790ed13e4a425675c648cf71ad0f29506e65b8d77576fd`.
+The independent sustained producer proof is not a product assistance pass;
+historical `lifetime.1` capture failure and rejected `lifetime.2` startup do not
+qualify this tuple. The current artifact directory is
+`~/.cache/lindm-upstream-prs/cosmic-fork-artifacts-lifetime-3`.
 The current terminal is pinned too: the older golden terminal lost an immediate
 input prefix in the independent native witness. No input warm-up or retry is
 used to qualify the reviewed tuple.
@@ -534,6 +540,17 @@ Native consent-button evidence for `1.10.0-lindm-actions.1` is
 The native action probes observed `allow` and `decline` from their respective
 buttons and no action from clicking the card. This verifies the notification
 surface only; it is not an assistance-session pass or public package evidence.
+
+The final experimental tuple passed the actual maintained matrix scheduler's
+CONTROL, VIEW, local decline and native portal-cancel scenarios in
+`cosmic-assistance-cell-13`: real relay-only decoded media in both modes, a
+remotely typed CONTROL nonce received by the guest, real VIEW local Stop,
+matching terminal causes and session audit evidence. The retained record is
+`~/.cache/lindm-upstream-prs/cosmic-assistance-cell-13/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json`,
+SHA-256 `159c2b6ce42f2e0c9ce8d258b69bd07b14fd4f944f9a04d49ac10616e500346b`.
+This is only the explicit fork-only four-scenario cell: no full assistance tier,
+lock/clipboard qualification or public-package support is implied, and the
+public registry gate remains unchanged.
 
 ## Known gaps
 

@@ -25,7 +25,7 @@ const cosmicAssistanceProfile = "pop-cosmic-actions-v1"
 // Fork package versions identify the patched binaries; SHA256SUMS binds the
 // explicit local inputs, whose digests are retained in the native record.
 var cosmicAssistancePins = []string{
-	"xdg-desktop-portal-cosmic=1.10.0+lindm.lifetime.1",
+	"xdg-desktop-portal-cosmic=1.10.0+lindm.lifetime.3",
 	"cosmic-comp=0.1~1791491785~24.04~4d14528",
 	"cosmic-notifications=1.10.0+lindm.actions.1",
 	"cosmic-greeter=1.10.0~1791400742~24.04~98df07d",

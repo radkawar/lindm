@@ -754,7 +754,7 @@ the dispatch lane's systemd service evidence.
 | AlmaLinux 9         | x86_64 —; aarch64 gated                                                                                    | gated                                                            | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | x86_64 pass; aarch64 [pass][r1]                                                         | [pass][r1]                                             | x86_64 pass; aarch64 [pass (eight kinds)][r22]                                                                                                                          | pass     | x86_64 pass; aarch64 [pass (TPM scenario)][r2]                                                                  | pass                                                                                       | x86_64 pass; aarch64 —                                                                      | x86_64 pass; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                                              | gated                                   | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | x86_64 pass; aarch64 [fail (PipeWire 1.4 capture timestamps stall)][r2]                                                                                                                                | gated                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
 | AlmaLinux 10        | x86_64 —; aarch64 gated                                                                                    | gated                                                            | [pass][r1]                                                                             | pass                                                                                                                            | —                     | gated                         | —                    | gated               | pass                            | [pass][r1]                                                                              | [pass][r1]                                             | x86_64 pass; aarch64 [pass (all kinds)][r22]                                                                                                                            | pass     | x86_64 [pass (scenarios)][r2]; aarch64 [pass (TPM scenario)][r2]                                                | pass                                                                                       | gated                                                                                       | x86_64 [pass (selected phases)][r2]; aarch64 [pass (live erase, report loss, lock/quarantine)][r2]                                      | gated                                   | pass                                                                            | x86_64 pass; aarch64 [pass][r2]                                    | [pass (GNOME (Server with GUI), five scenarios)][r2]                                                                                                                                                   | gated                                   | pass (native feed matching; not complete device coverage) | pass                                                               | gated           |
 | Linux Mint 22.3     | gated                                                                                                      | gated                                                            | [pass (golden recipe linuxmint-ubiquity-v3; 1905 packages; APT origins verified)][r2]  | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | pass                            | [pass (signed DEB 0.7.0→0.7.1; control-plane trust; local authority)][r2]               | [pass (service scenarios, clock skew, revocation)][r2] | [pass (connected firewall with probe-peer guest)][r2]                                                                                                                   | pass     | [pass (scenario all: inventory, escrow, reveal, rotation, TPM2 bind, cold-boot recovery)][r2]                   | [pass (30 consecutive unattended TPM2 cold boots; Secure Boot on; main 8c6af7ff)][r2]      | [pass (legacy 1 of 4 TPM references repaired to 4 of 4; 30 cold boots; Secure Boot on)][r2] | [pass (scenario all: crypto-erase, report-loss, lock unverifiable (no LockedHint), release, quarantine)][r2]                            | gated                                   | [pass (Mint golden as original device; measured shim+GRUB; SATA overwrite)][r2] | [pass (signed agent self-update, interrupted unpack recovery)][r2] | gated                                                                                                                                                                                                  | gated                                   | pass (partial-feed matching)                              | gated                                                              | gated           |
-| Pop!\_OS 24.04 LTS  | gated                                                                                                      | gated                                                            | pass (distinst golden (generic build 28, COSMIC); 1754 packages; APT origins verified) | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | pass                            | pass (signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation) | pass (service scenarios)                               | pass (connected packages: 15 scenarios incl. vendor-updater busy and approved adoption)                                                                                 | pass     | pass (encryption compliance scenario; main 7158bb48)                                                            | gated                                                                                      | gated                                                                                       | pass (report-loss blocks the original device; main 7158bb48)                                                                            | gated                                   | gated                                                                           | pass (signed agent self-update)                                    | gated                                                                                                                                                                                                  | fail                                    | pass (partial-feed matching)                              | gated                                                              | gated           |
+| Pop!\_OS 24.04 LTS  | gated                                                                                                      | gated                                                            | pass (distinst golden (generic build 28, COSMIC); 1754 packages; APT origins verified) | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | pass                            | pass (signed DEB 0.1.0→0.1.1; enrollment, upgrade, reboot, purge/reinstall, revocation) | pass (service scenarios)                               | pass (connected packages: 15 scenarios incl. vendor-updater busy and approved adoption)                                                                                 | pass     | pass (encryption compliance scenario; main 7158bb48)                                                            | gated                                                                                      | gated                                                                                       | pass (report-loss blocks the original device; main 7158bb48)                                                                            | gated                                   | gated                                                                           | pass (signed agent self-update)                                    | gated                                                                                                                                                                                                  | pass                                    | pass (partial-feed matching)                              | gated                                                              | gated           |
 | Arch Linux          | gated                                                                                                      | gated                                                            | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | gated               | pass                            | pass                                                                                    | pass                                                   | pass                                                                                                                                                                    | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | gated                                   | pass                                                                            | pass                                                               | pass                                                                                                                                                                                                   | gated                                   | pass (partial-feed matching)                              | pass                                                               | gated           |
 | Omarchy 4.0.4       | gated                                                                                                      | gated                                                            | [pass (native inspect: 967 packages matched)][r26]                                     | pass                                                                                                                            | gated                 | gated                         | gated                | gated               | gated                           | [pass (signed pacman 0.7.0 to 0.7.1 lifecycle)][r26]                                    | [pass (power actions)][r26]                            | [pass (connected: secret-password, local-admin)][r26]                                                                                                                   | pass     | [pass (escrow, reveal, rotation, cold recovery, TPM2 bind; unattended TPM boot observed unsupported)][r26]      | gated                                                                                      | gated                                                                                       | [pass (live-root report loss)][r26]                                                                                                     | gated                                   | gated                                                                           | [pass (signed agent self-update)][r26]                             | gated                                                                                                                                                                                                  | gated                                   | gated                                                     | gated                                                              | gated           |
 | openSUSE Tumbleweed | gated                                                                                                      | gated                                                            | pass                                                                                   | pass                                                                                                                            | no lane               | gated                         | gated                | pass                | x86_64 —; aarch64 pass          | x86_64 —; aarch64 pass                                                                  | x86_64 —; aarch64 pass                                 | x86_64 pass; aarch64 fail                                                                                                                                               | pass     | pass                                                                                                            | pass                                                                                       | gated                                                                                       | pass                                                                                                                                    | gated                                   | x86_64 pass; aarch64 superseded by 9b4e6f5f                                     | x86_64 —; aarch64 pass                                             | pass                                                                                                                                                                                                   | gated                                   | pass (partial-feed matching)                              | x86_64 pass; aarch64 —                                             | gated           |
@@ -7575,7 +7575,7 @@ The explicit `assistance-cosmic-pinned` matrix cell is a **fork-only experiment*
 not public Pop!_OS support; the ordinary Pop assistance cell remains gated.
 It selects `-cosmic-package-profile=pop-cosmic-actions-v1` on a disposable
 Pop!_OS 24.04 x86_64 COSMIC guest, never a held/persistent demo. Required native
-versions are portal `1.10.0+lindm.lifetime.1`, notifications
+versions are portal `1.10.0+lindm.lifetime.3`, notifications
 `1.10.0+lindm.actions.1` (notification-server runtime
 `1.10.0-lindm-actions.1`), compositor `0.1~1791491785~24.04~4d14528`, and both
 greeter packages (`cosmic-greeter` and `cosmic-greeter-daemon`)
@@ -7595,10 +7595,20 @@ name/version/architecture before installation, pins and holds all eighteen versi
 and records required/observed versions and fork artifact hashes in
 `assistance.json`. Missing exact archive versions or fork artifacts fail; there
 is no unversioned archive fallback.
+The current reviewed artifact directory is
+`/home/r/.cache/lindm-upstream-prs/cosmic-fork-artifacts-lifetime-3`: portal `.deb`
+SHA-256 `8d566e0c0d9cd09095790ed13e4a425675c648cf71ad0f29506e65b8d77576fd`,
+notifications `.deb`
+`54352a20f47bdf957debb762730c8e6a80ee68cfc24d20965ebc8003e7679ce2`.
+The distinct portal version rejects the failed historical `lifetime.1` build and
+the `lifetime.2` packaging attempt that failed fresh native startup.
 The disposable clone uses the existing lab package-frontend quiescence and
 bounded native-lock waits before installing; the cached golden is unchanged.
 Failed installs retain bounded native package-manager stdout/stderr in the
 failure record, rather than replacing the refusal with a fallback package.
+Invoke the matrix from the fixture checkout so the existing
+`.cache/lab/encrypted` golden cache resolves there; the source checkout must
+already contain current built web assets for the scheduler's native server.
 
 ```sh
 lab matrix run -root "$WORKTREE" -platform pop-24.04 -architecture x86_64 \
@@ -7669,6 +7679,123 @@ was not disabled or bypassed.
 Record:
 `/home/r/.cache/lindm-upstream-prs/cosmic-assistance-cell-09/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json`,
 SHA-256 `b019073cc65e59a284cdf142ff136fd47992b4663895196a941481d8318e2377`.
+
+An independent native diagnostic then exercised the unchanged sustained
+production GStreamer graph, including `on-disconnect=error`, through real
+public-portal consent. It received 69 RTP packets carrying one frame before
+GStreamer exited 1, while the public session was still open; the client's
+explicit `Session.Close` came later. The backend's PID 7972 journal records the
+causal Wayland protocol error: `create_frame sent before the previous frame was
+destroyed` (`ext_image_copy_capture_session_v1`, error 1). This is a producer
+frame-lifetime ordering failure, not evidence of an early frontend/client Close
+or a reason to disable source-disconnect safety. It does not qualify any
+replacement portal artifact.
+
+Retained diagnostic evidence under
+`/home/r/.cache/lindm-upstream-prs/cosmic-evidence-production-graph-02/`:
+
+- `sandbox-backend-pid7972.txt`, SHA-256
+  `c4b6225cd8c63970ee8b2972ca90175100dc1f2a8d98b21f4326dc4943814305`;
+  line 53 records the protocol error.
+- `sandbox-failed-client.jsonl`, SHA-256
+  `d1f8648c984c63add39b37e42b7bb84669cd1add51db3bfa86d30e03e210bfd0`;
+  records the exact production arguments and pre-Close capture failure.
+- `normal-teardown.json`, SHA-256
+  `9c56e6c8388ed70aa68c0b30fd41c941e2940bc340441aab57f3faa224df6d22`;
+  records supervisor exit 0, QEMU/runtime removal and private-file cleanup.
+
+The replacement `1.10.0+lindm.lifetime.3` then passed an independent fresh-FIFO
+native sustained-production-graph witness after genuine public-portal consent.
+It combines portal base `148f07ed9a2ebf9a719f8b517e00c2c165a70153` with explicit
+toolkit override `3384ae4ff843e6e5f5549b6af6cfe53157999b0c`, destroying the previous
+frame before invoking ready/failed callbacks, and embeds runtime assets for
+startup outside the build tree. There was no lock-version drift, format-forcing
+or debug-environment workaround. The unchanged graph ran for 113.3968 seconds,
+producing 14,920 RTP packets and 1,698 complete VP8 frames; independently decoded
+first/last 1280×800 frames show a real local scene change rather than a frozen
+image. Node 57 remained running until explicit Close, then disappeared while
+backend/compositor survived; GStreamer exited 1 only after Close. Normal supervisor
+exit 0 removed its owned VM and private files. This is **producer/lifetime
+evidence only**, not an SDK assistance-cell pass.
+
+Retained records under
+`/home/r/.cache/lindm-upstream-prs/cosmic-evidence-production-fixed-05/`:
+
+- `native-qualification.json`, SHA-256
+  `3bdcae774fad31c563333871343bd986aa9d330b021121753511db5d20b81082`.
+- `independent-decoder-proof.json`, SHA-256
+  `5c22945e3b9d5e85855641beb5b9977622f8c10e7ff96cd03fc97c4b1ae432b0`.
+- `normal-teardown.json`, SHA-256
+  `34666a83e115f433ef9a562ad37ad99455f26d172a40749af4f1422b4356fd41`.
+
+SDK matrix attempt `cosmic-assistance-cell-10` stopped before guest admission:
+the new checkout lacked the current `web/dist` required to embed the native
+server. This was a shared-input build prerequisite failure, not a native verdict
+or ledger qualification. Its exact output is retained in
+`/home/r/.cache/lindm-upstream-prs/cosmic-assistance-cell-10/prepare.log`, SHA-256
+`9c49f96d9a72ccf18b794e76d688ba71a1cc9aedbfe342f30e27caec3fd5b4f5`.
+The maintained web build subsequently produced current assets in that checkout.
+
+Actual scheduler attempt `cosmic-assistance-cell-11` used the corrected
+`lifetime.3` tuple and genuinely completed CONTROL: ACTIVE, 1280×800 relay-only
+video with 15 decoded frames, the real input data channel, guest receipt of nonce
+`82d81b27d7bb`, operator Stop and stopped capture. The complete cell remains
+**FAIL**, with no collected audit pass: its subsequent VIEW request was visibly
+prompted but the mandatory simultaneous Allow/Decline OCR check failed, and
+VIEW/decline/portal-cancel were not proved. Retained pixels show the fixed
+150-luma preprocessing fragmented the faint Decline glyphs into separate tokens.
+A universal additive 100-luma binary pass now preserves that low-contrast text
+alongside the unchanged plain, fixed-150 and edge-cleared passes; it reuses the
+same mask and skips uniform or unchanged classes. Exact labels, geometry and
+real hover/stability checks are unchanged.
+Record:
+`/home/r/.cache/lindm-upstream-prs/cosmic-assistance-cell-11/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json`,
+SHA-256 `63d2617e166475a104c866cc57d5453714ae9042b01e73c21ebdab0f304581ba`.
+
+Actual scheduler attempt `cosmic-assistance-cell-12` genuinely reached ACTIVE
+and decoded 15 relay-only 1280×800 frames in each of CONTROL and VIEW. CONTROL
+also received its remote nonce and stopped capture; VIEW had no input data
+channel or control grant. The complete cell nevertheless remains **FAIL**:
+the local Stop driver first tried to isolate a banner against its old desktop
+reference, after earlier scenarios had changed the underlying windows, and
+timed out despite the retained screenshot's visible in-progress popup and Stop.
+No VIEW local Stop, remaining decline/cancel scenarios or audit pass is claimed.
+OCR desktops now identify the real `Remote assistance in progress` heading plus
+`Stop` together instead of that stale background diff, before the unchanged
+physical Stop click and mandatory hover/label stability checks. Non-OCR banner
+identification is unchanged.
+Record:
+`/home/r/.cache/lindm-upstream-prs/cosmic-assistance-cell-12/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json`,
+SHA-256 `3027aa86269f96fbe1adc78762aacbffa1693572ca294989b4ce63297021a72d`.
+
+**Actual scheduler PASS: `cosmic-assistance-cell-13`.** The final experimental
+eighteen-pin `lifetime.3` tuple passed all four requested scenarios through the
+maintained matrix scheduler, not a manual import:
+
+| Scenario      | Genuine native evidence                                                                                                                     | End result                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| CONTROL       | Visible Allow, native output/Allow picker, 17 decoded 1280×800 relay-only frames, `lindm-input`, nonce `fb34f1f47f3a` received by the guest | Operator stopped; capture stopped                                  |
+| VIEW          | Visible Allow, native output/Share picker, 16 decoded 1280×800 relay-only frames, no input/application channel or control grant             | Actual visible local Stop clicked; `user_stopped`; capture stopped |
+| Decline       | Actual visible local Decline clicked; no media grant                                                                                        | `declined`, audit detail `prompt_declined`                         |
+| Portal cancel | Actual visible local Allow then native picker Cancel clicked; no media grant                                                                | `declined`, audit detail `portal_cancelled`                        |
+
+The record retains all eighteen required/observed versions and both exact fork
+artifact hashes, 21 session audit events with all four matching end causes, and
+the post-scenario native server identity
+`('cosmic-notifications', 'System76', '1.10.0-lindm-actions.1', '1.2')`.
+The native portal exposes ScreenCast 5 and RemoteDesktop 2. Pre-consent and
+ended-session actions remained disabled, and VIEW did not gain input controls.
+The scheduler wrote a verified `MATRIX_SOURCE_RUN` pass to the maintained ledger.
+The source revision is `57f61523905a420de43a78bcadb4b2d84c79a0d2-dirty` with
+this exact portal-pin and native-driver follow-up. All historical failed rows
+remain failed.
+
+Record:
+`/home/r/.cache/lindm-upstream-prs/cosmic-assistance-cell-13/pop-24.04/assistance-cosmic-pinned-x86_64/assistance.json`,
+SHA-256 `159c2b6ce42f2e0c9ce8d258b69bd07b14fd4f944f9a04d49ac10616e500346b`.
+This is a **fork-only four-scenario pass**, not public Pop!_OS support, a full
+assistance tier, lock qualification or clipboard support; the corresponding
+tier flags remain false and the public registry gate is unchanged.
 
 Layer records (x86_64, `-secure-boot`, encrypted manifests; evidence under
 `$HOME/.cache/lindm-assistance-roadmap-20261011/`). Source `d04478c2c` built
