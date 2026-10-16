@@ -660,7 +660,7 @@ func (s *session) servable(ctx context.Context, request PortalRequest, admission
 	if admission.refusal != "" {
 		return unavailable(admission.refusal, fmt.Errorf("desktop profile %s", admission.profile.name))
 	}
-	return nil
+	return s.deps.capturer.Check(ctx)
 }
 
 // recordingOffer is the recording the prompt may disclose on this device.

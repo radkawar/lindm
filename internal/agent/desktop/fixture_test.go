@@ -300,6 +300,7 @@ func (c *fakeCapture) Close() error {
 type fakeCapturer struct {
 	capture  *fakeCapture
 	err      error
+	checkErr error
 	captures []*fakeCapture
 	mu       sync.Mutex
 	requests []CaptureRequest
@@ -309,6 +310,10 @@ func newFakeCapturer() *fakeCapturer {
 	packets := make(chan []byte, 4)
 	packets <- []byte{0x80, 96, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0xAA}
 	return &fakeCapturer{capture: &fakeCapture{packets: packets, closed: make(chan struct{})}}
+}
+
+func (c *fakeCapturer) Check(context.Context) error {
+	return c.checkErr
 }
 
 func (c *fakeCapturer) Start(_ context.Context, request CaptureRequest) (Capture, error) {

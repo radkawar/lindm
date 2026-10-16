@@ -154,8 +154,15 @@ nftables libpwquality pam pambase`) come only from the ISO's offline repository
   runtime `desktop_runtime_unqualified` after the portal/notification probes.
   xdg-desktop-portal 1.22.1 with
   xdg-desktop-portal-hyprland 1.4.1 exposes ScreenCast version 6 and no
-  RemoteDesktop. `gst-plugins-good` is not installed. The lab runs only the
-  refusal scenarios.
+  RemoteDesktop. `gst-plugins-good` is not installed. The stock lab runs only the
+  refusal scenarios. The agent package keeps capture packages optional, as Debian
+  and RPM packages do through their weak recommendations. On a qualified desktop,
+  the helper checks the required GStreamer tools and elements before displaying
+  any consent prompt or opening a portal session. Missing capture components
+  refuse the request with native package names in the console; on Arch or
+  Omarchy, install `gst-plugins-good`, `gst-plugin-pipewire`, `gst-plugins-base`
+  and `gstreamer` through the normal coherent vendor upgrade path. The helper
+  checks again when starting capture in case packages changed during consent.
 - **Lab name resolution.** Omarchy places NSS `resolve` before `files`, so rewriting `/etc/hosts` alone leaves synthetic `localhost` at `127.0.0.1`. Assistance fixtures move `files` first in the disposable guest (retaining the original configuration and module actions) before validating the existing `10.0.2.2` QEMU-host route. This is lab routing, not a desktop assistance qualification or a change to the golden.
 - **TPM.** The busybox `encrypt` hook cannot consume systemd TPM2 tokens and the
   lab has no TPM early-boot variant; the device-action lane binds a real token and

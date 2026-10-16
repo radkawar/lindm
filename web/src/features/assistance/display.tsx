@@ -91,9 +91,28 @@ const unsupportedDesktop: Record<string, string> = {
     "The session portal does not expose RemoteDesktop. This desktop may also require it for viewing; check its platform support requirements.",
 };
 
+const captureDependencyRemedy = (
+  <>
+    Screen capture components are missing on the device. On Arch or Omarchy, install{" "}
+    <code>gst-plugins-good</code>, <code>gst-plugin-pipewire</code>, <code>gst-plugins-base</code>{" "}
+    and <code>gstreamer</code>. On Debian or Ubuntu, install <code>gstreamer1.0-plugins-good</code>,{" "}
+    <code>gstreamer1.0-pipewire</code>, <code>gstreamer1.0-plugins-base</code> and{" "}
+    <code>gstreamer1.0-tools</code>. On Fedora or RHEL-family systems, install{" "}
+    <code>gstreamer1-plugins-good</code>, <code>pipewire-gstreamer</code>,{" "}
+    <code>gstreamer1-plugins-base</code> and <code>gstreamer1</code>. Use the distribution&apos;s
+    normal upgrade procedure, then request assistance again.
+  </>
+);
+
 export function startFailureRemedy(session: AssistanceSession): ReactNode {
   if (!couldNotStart(session)) return null;
   if (session.endCause === AssistanceEndCause.UNAVAILABLE) {
+    if (
+      session.endDetail === "gst_launch_missing" ||
+      session.endDetail === "gst_inspect_missing" ||
+      session.endDetail.startsWith("gst_element_missing:")
+    )
+      return captureDependencyRemedy;
     const unsupported = unsupportedDesktop[session.endDetail];
     if (unsupported) return unsupported;
   }

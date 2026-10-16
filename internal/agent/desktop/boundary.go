@@ -161,8 +161,9 @@ type Stream struct {
 	Positioned bool
 }
 
-// Capturer starts the capture/encode pipeline.
+// Capturer checks capture prerequisites before consent and starts the encoder.
 type Capturer interface {
+	Check(ctx context.Context) error
 	Start(ctx context.Context, request CaptureRequest) (Capture, error)
 }
 

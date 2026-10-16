@@ -44,3 +44,28 @@ test("qualification remedies distinguish unknown consent and do not promise unsu
   assert.doesNotMatch(display, /Request view only instead/);
   assert.match(display, /This desktop may also require it for viewing/);
 });
+
+test("missing capture dependencies show native package remedies instead of a portal repair", async () => {
+  const display = await readFile(
+    new URL("../src/features/assistance/display.tsx", import.meta.url),
+    "utf8",
+  );
+  for (const detail of ["gst_launch_missing", "gst_inspect_missing", "gst_element_missing:"])
+    assert.ok(display.includes(`"${detail}"`), `missing dependency reason ${detail}`);
+  assert.match(display, /return captureDependencyRemedy/);
+  for (const name of [
+    "gst-plugins-good",
+    "gst-plugin-pipewire",
+    "gst-plugins-base",
+    "gstreamer",
+    "gstreamer1.0-plugins-good",
+    "gstreamer1.0-pipewire",
+    "gstreamer1.0-plugins-base",
+    "gstreamer1.0-tools",
+    "gstreamer1-plugins-good",
+    "pipewire-gstreamer",
+    "gstreamer1-plugins-base",
+    "gstreamer1",
+  ])
+    assert.ok(display.includes(`<code>${name}</code>`), `missing native package ${name}`);
+});

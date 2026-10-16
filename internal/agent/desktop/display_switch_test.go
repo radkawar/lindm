@@ -31,6 +31,10 @@ type switchTestCapturer struct {
 	started       bool
 }
 
+func (c *switchTestCapturer) Check(context.Context) error {
+	return nil
+}
+
 func (c *switchTestCapturer) Start(context.Context, CaptureRequest) (Capture, error) {
 	if !c.started {
 		c.started = true

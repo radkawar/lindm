@@ -235,6 +235,42 @@ func TestPortalUnavailableAndMissingActionsEndUnavailable(t *testing.T) {
 	})
 }
 
+// Missing optional capture packages must not invite the user to approve a
+// session that cannot start. Start still checks again after consent.
+func TestCapturePrerequisitesRefuseBeforeConsent(t *testing.T) {
+	for _, mode := range []agentv1.AssistanceMode{modeView, modeControl} {
+		for _, detail := range []string{
+			"gst_launch_missing", "gst_inspect_missing",
+			"gst_element_missing:pipewiresrc", "gst_element_missing:imagefreeze",
+			"gst_element_missing:vp8enc",
+		} {
+			t.Run(mode.String()+"/"+detail, func(t *testing.T) {
+				h := newHarness(t)
+				h.capturer.checkErr = unavailable(detail, errors.New("capture dependency unavailable"))
+				h.sync(directiveFor(invitation(mode, time.Minute, 10*time.Minute)))
+				report := h.waitEnded(agentv1.AssistanceEndCause_ASSISTANCE_END_CAUSE_UNAVAILABLE)
+				if report.GetEndDetail() != detail || report.GetControlGranted() {
+					t.Fatalf("detail = %q control=%v", report.GetEndDetail(), report.GetControlGranted())
+				}
+				if h.portal.openCount() != 0 {
+					t.Fatal("portal consent opened with missing capture dependencies")
+				}
+				h.capturer.mu.Lock()
+				starts := len(h.capturer.requests)
+				h.capturer.mu.Unlock()
+				if starts != 0 {
+					t.Fatal("capture started despite a failed prerequisite check")
+				}
+				select {
+				case notice := <-h.notifier.posted:
+					t.Fatalf("posted %q with missing capture dependencies", notice.notification.Summary)
+				default:
+				}
+			})
+		}
+	}
+}
+
 // A desktop whose portal lacks the requested interface (Cinnamon's
 // xdg-desktop-portal-xapp has no ScreenCast; xdg-desktop-portal-hyprland has no
 // RemoteDesktop) ends the session UNAVAILABLE before any consent prompt, and a

@@ -47,6 +47,15 @@ func NewGStreamer(logger *slog.Logger) (*GStreamer, error) {
 	return &GStreamer{logger: logger}, nil
 }
 
+// Check verifies the installed capture tools and elements without opening a
+// portal, accessing PipeWire or capturing any screen.
+func (g *GStreamer) Check(ctx context.Context) error {
+	if _, err := nativeexec.Executable(gstLaunch); err != nil {
+		return unavailable("gst_launch_missing", err)
+	}
+	return checkGstElements(ctx)
+}
+
 // Start checks the required elements and launches the pipeline in its own
 // process group with the portal PipeWire remote as fd 3, framed RTP as fd 4,
 // and a separately bounded lifecycle observer on stdout.
@@ -55,10 +64,7 @@ func (g *GStreamer) Start(ctx context.Context, request CaptureRequest) (Capture,
 	if request.PipeWire == nil {
 		return nil, errors.New("missing pipewire remote")
 	}
-	if _, err := nativeexec.Executable(gstLaunch); err != nil {
-		return nil, unavailable("gst_launch_missing", err)
-	}
-	if err := checkGstElements(ctx); err != nil {
+	if err := g.Check(ctx); err != nil {
 		return nil, err
 	}
 	properties, err := nativeexec.Run(ctx, nativeexec.Command{
