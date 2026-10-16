@@ -14571,6 +14571,22 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "ccd28b095a0c3c08cac02c4d8a71fad5fc2e2518"
+    },
+    {
+      "platform": "almalinux-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "almalinux-9.8-20261005-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/server-platforms-20261015/native-alma9-attempt1.json",
+      "sha256": "b5813bc5783c58d5619be917d61834d6a012992f122b4589ad54aa19f82987aa",
+      "recorded": "2026-10-16T03:50:42.560874605Z",
+      "revision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "1e408855142a84fddf7d97526759e2e7cc2f723ae8f79a37603ab2d57d681134",
+      "mainlineRevision": "9b21aebea18bb25ef5a276851b4e2ed08bd9bae5"
     }
   ]
 }

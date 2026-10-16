@@ -28,6 +28,7 @@
 - Qualify connected x86_64 Rocky Linux 10 servers with native PostgreSQL 16, enforcing SELinux, real independent-device Findings, encrypted backup and exact-major drill, signed upgrade and fresh-host restore; retain Rocky device advisory limitations.
 - Qualify connected x86_64 AlmaLinux 10 servers with native PostgreSQL 16 RPMs, enforced SELinux confinement, complete independent-device Findings, encrypted backup and exact-major offline drill, signed upgrade and authorized fresh-host recovery.
 - Qualify connected x86_64 Rocky Linux 9 servers using the native PostgreSQL 16 module stream, enforcing SELinux, fully evaluated independent-device Findings, encrypted backup and exact-major drill, signed upgrade and fresh-host restore; leave Rocky device advisory coverage unchanged.
+- Qualify connected x86_64 AlmaLinux 9 servers with the native PostgreSQL 16 module, enforced SELinux, complete independent-device Findings, encrypted backup and exact-major drill, signed upgrade and authorized fresh-host recovery, completing the nine-release connected server expansion.
 
 ## [0.1.0] - 2026-10-15
 
