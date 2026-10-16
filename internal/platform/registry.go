@@ -512,7 +512,7 @@ var registry = []*Release{
 		Tier: Tier1, Page: "ubuntu.md", Family: FamilyDebian, Architectures: both, Packages: apt, RebootSignal: ubuntuRebootSignal, Systemd: 249, Provisioning: cloudInitAutoinstall,
 		Server: &ServerInstallation{
 			SnapshotName: "ubuntu22.04.snapshot", RequiredPackages: []string{"openssl", "systemd", "ca-certificates", "postgresql-16", "postgresql-client-16", "gpgv", "util-linux"},
-			Architectures: x86, Status: "Not yet qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgJammy,
+			Architectures: x86, Status: "Qualified", ConnectedOnly: true, PostgreSQLMajor: 16, PostgreSQLRepository: pgdgJammy,
 			PostgreSQLDataDirectory: "/var/lib/postgresql/lindm", PostgreSQLBinDirectory: "/usr/lib/postgresql/16/bin/", PostgreSQLPort: "15432", PostgreSQLSocketDirectory: "/run/lindm-postgresql",
 		},
 		FDE: "LUKS2 (subiquity LVM); TPM2 via systemd-cryptenroll (dracut 051 + TSS2 libraries)", Desktop: gnomeGDM3, Firewall: ufw,

@@ -12,6 +12,16 @@
 - Distinguish published incomplete vulnerability coverage from unpublished or stale source data in the console and native deployment diagnostics.
 - Allow native server lifecycle proof to enroll an independently pinned managed-device image, keeping all real Findings gates and separate server/device identities; preserve partial device advisory limitations and route entitlement input only to entitled guests.
 - Qualify connected x86_64 Ubuntu 26.04 servers with native PostgreSQL 18, a matching-major encrypted backup drill, signed upgrade and fresh-host restore, retaining full evaluated Findings on the original Ubuntu 24.04 managed device.
+- Generate a separate server-install support table from per-release registry recipes, distinguishing lifecycle qualification from device support; admit connected x86_64 Debian 12/13, Ubuntu 22.04/26.04, RHEL 10 and Rocky Linux/AlmaLinux 9/10 qualification lanes without claiming unrun native proofs.
+- Let native deployment qualification use an explicitly digest-pinned official PostgreSQL recovery client in an off-server networkless, swap-zero container for exact-major offline drills, without installing extra clients or adding third-party sources on the operator host.
+- Admit PostgreSQL 16, 17 and 18 with exact backup/restore client/server major matching; prefer distribution-native supported majors, using a dedicated fingerprint-pinned PGDG APT source only for Ubuntu 22.04 and Debian 12 whose native clients lack the required authentication control.
+- Derive native deployment Findings expectations only from registry feeds with maintained exports, matching the connected source configuration; keep Debian's primary OSV export without requiring its unexported secondary tracker, and retain all browser and durable evaluation checks.
+- Activate Debian's maintained primary vendor OSV export automatically after real inventory, without requiring an unexported secondary tracker; invalidate derived identity eligibility and retain unknown assessments until actual publication and evaluation.
+- Route explicit package-pinned UEFI firmware through native deployment, first-run setup, enrolled-device and fresh-host recovery guests, preserving x86_64 KVM admission, private NVRAM copies, server disk floors and connected/air-gap network policy.
+- Budget 128 GiB source and restore server overlays for complete vendor imports, measure the post-import database size, and account for both disks in ordinary lab admission without weakening the installer's upgrade capacity gate.
+- Refuse undersized fresh server filesystems before the native installation journal or authority custody, publish the measured 32 GiB sizing baseline, and show actual database/available/required upgrade bytes while retaining the existing twice-database-plus-4-GiB upgrade rule.
+- Qualify connected x86_64 Debian 13 server installation with native PostgreSQL 17 through stock-browser setup, real device Findings, backup, matching-major offline drill, signed upgrade and fresh-host recovery.
+- Qualify connected x86_64 Ubuntu 22.04 server installation using fingerprint-pinned PGDG PostgreSQL 16, the measured fresh-storage policy, full real managed-device Findings, encrypted backup, signed upgrade and fresh-host restore.
 
 ## [0.1.0] - 2026-10-15
 
@@ -19,7 +29,7 @@
 
 The server install is supported on Ubuntu 24.04, including the AWS deployment. RHEL 9 server install is a preview in this release: install, setup, enrollment and device management work; vulnerability findings for RHEL devices on a fresh install and backup/restore on a RHEL server are still being verified.
 
-- PostgreSQL 16, 17 or 18 is required, with exact native backup/restore client and server major matching.
+- PostgreSQL 16 is required, with matching native backup/restore clients.
 - RHEL 9 server installation is connected-only; offline installation is refused before changes are made.
 - Operators must build and sign their own releases. There are no official project signing keys or project-signed release bundles.
 
@@ -29,8 +39,6 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Contribution, private security disclosure and community conduct guides, with issue and pull request templates.
 - GitHub Actions checks for lint, generated output, unit tests, container integration and the Chromium console journey.
 - Public platform status and operator documentation for self-built, operator-signed releases.
-- Generate a separate server-install support table from per-release registry recipes, distinguishing lifecycle qualification from device support; admit connected x86_64 Debian 12/13, Ubuntu 22.04/26.04, RHEL 10 and Rocky Linux/AlmaLinux 9/10 qualification lanes without claiming unrun native proofs.
-- Let native deployment qualification use an explicitly digest-pinned official PostgreSQL recovery client in an off-server networkless, swap-zero container for exact-major offline drills, without installing extra clients or adding third-party sources on the operator host.
 - Require DCO trailers for each new commit's author and recorded coauthors in public CI.
 - Weekly Dependabot version updates for Go modules, npm and GitHub Actions.
 - Create the native integrations encryption key automatically, retain root-only custody through systemd credentials, and preserve the original key with encrypted backups and restores.
@@ -47,16 +55,12 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Let held desktop assistance demos start when their platform explicitly lacks advisory coverage, without configuring substitute feeds or claiming vulnerability findings; supported releases still require their real exports and completed findings.
 - Put the disposable assistance guest's NSS hosts-file lookup before synthetic localhost resolution, preserving the original modules and action clauses and retaining the verified QEMU-host route.
 - Retain AWS native installer failure diagnostics in create-exclusive root-only custody instead of discarding the cause; keep child output out of public errors and refuse overwrites or capture into memory.
-- Admit PostgreSQL 16, 17 and 18 with exact backup/restore client/server major matching; prefer distribution-native supported majors, using a dedicated fingerprint-pinned PGDG APT source only for Ubuntu 22.04 and Debian 12 whose native clients lack the required authentication control.
 - Select RHEL 9's signed distro PostgreSQL 16 stream explicitly; refuse conflicting modules, older PostgreSQL installs and unrelated clusters without resetting or migrating them. Check PostgreSQL server and backup clients before provisioning and upgrade backup. v0.1.0 RHEL server installation is connected-only; offline installation refuses before mutation. Ubuntu air-gap behavior is unchanged.
 - Make **v0.1.0** the browser-compatible managed-upgrade baseline. Earlier shared-TLS installs are refused before upgrade changes: install fresh and re-enroll devices. Use an independent P-256/SHA-256 console CA and leaf, retain Ed25519 device transport and client/signing authorities, and sign separate per-origin console and device HTTPS roots into new bootstrap bundles. Native deployment proof now imports the actual installed console CA instead of supplying laboratory certificates.
 - Reject Ed25519 console certificates, generate P-256 database leaves, name the console CA in setup and status, and warn that first-owner passkeys require a DNS console URL rather than an IP address.
 - Activate the authenticated installed agent/server release series automatically, so a fresh turnkey device can receive management work without a hidden owner registration step. Preserve immutable release history, exact protocol admission and ninety-day retirement notices.
 - Automatically acquire registry-backed real vendor advisories for enrolled supported inventory on fresh connected turnkey installations; preserve air-gap and explicit operator policy. Keep per-source initial scheduling independent, expose live exact-config refresh start/lease authority, and retain unknown, failed, stale and partial assessment semantics.
 - Require real automatically acquired vendor publication and matching completed native managed-inventory Findings before deployment backup, after upgrade and after recovery; retain explicit partial coverage, bounded cold-feed waits and measured observation/evaluation latency without seeding feeds or findings.
-- Derive native deployment Findings expectations only from registry feeds with maintained exports, matching the connected source configuration; keep Debian's primary OSV export without requiring its unexported secondary tracker, and retain all browser and durable evaluation checks.
-- Activate Debian's maintained primary vendor OSV export automatically after real inventory, without requiring an unexported secondary tracker; invalidate derived identity eligibility and retain unknown assessments until actual publication and evaluation.
-- Route explicit package-pinned UEFI firmware through native deployment, first-run setup, enrolled-device and fresh-host recovery guests, preserving x86_64 KVM admission, private NVRAM copies, server disk floors and connected/air-gap network policy.
 - Observe the first native vendor download through its actual visible status title, rather than requiring a heading that the console does not render; compare its start with the console's canonical protobuf millisecond rounding, retaining exact source, lease and timestamp checks without a tolerance.
 - Retain the actual action identity and expand its existing result before taking failed native management screenshots; never resubmit expired, failed or unknown work to obtain evidence.
 - Continue bounded, read-only observation of the same managed inventory action after start authority makes its outcome temporarily unknown; only verified completion passes, and unknown never permits a retry.
@@ -121,9 +125,6 @@ The server install is supported on Ubuntu 24.04, including the AWS deployment. R
 - Budget a 32 GiB cold-release guest overlay for two isolated full builds without changing other native lane disks or sharing compiler caches.
 - Restore canonical public embedded-repository and signed executable modes after private cold transport, with unchanged signed release provenance and custody permissions.
 - Preserve authenticated public bundle modes inside the installer's private immutable snapshot without preserving source ownership or weakening provenance verification.
-- Budget 128 GiB source and restore server overlays for complete vendor imports, measure the post-import database size, and account for both disks in ordinary lab admission without weakening the installer's upgrade capacity gate.
-- Refuse undersized fresh server filesystems before installation state or custody, publish the measured 32 GiB sizing baseline, and show actual database/available/required upgrade bytes while retaining the existing twice-database-plus-4-GiB upgrade rule.
-- Qualify connected x86_64 Debian 13 server installation with native PostgreSQL 17 through stock-browser setup, real device Findings, backup, matching-major offline drill, signed upgrade and fresh-host recovery.
 - Retain secret-safe, encrypted lab database failure classifications before owned guest cleanup, without changing installer authorization gates.
 - Sign local PostgreSQL certificates with a constrained P-256/SHA-256 authority so SCRAM-PLUS succeeds without disabling TLS verification, channel binding or sealed PKI custody.
 - Require database channel binding by default, reject disabled binding, and require SCRAM-PLUS for local credentials; explicit pooler `prefer` choices remain visible in startup logs and server status.

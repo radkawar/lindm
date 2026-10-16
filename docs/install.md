@@ -23,7 +23,7 @@ publication and evaluated Findings before backup, after upgrade and after restor
 
 | Server platform                           | Architecture | PostgreSQL | Packages            | Install mode          | Lifecycle         |
 | ----------------------------------------- | ------------ | ---------- | ------------------- | --------------------- | ----------------- |
-| [Ubuntu 22.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
+| [Ubuntu 22.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | PGDG                | Connected only        | Qualified         |
 | [Ubuntu 24.04 LTS](platforms/ubuntu.md)   | x86_64       | 16         | Distribution        | Connected and air gap | Qualified         |
 | [Ubuntu 26.04 LTS](platforms/ubuntu.md)   | x86_64       | 18         | Distribution        | Connected only        | Qualified         |
 | [Debian 12](platforms/debian.md)          | x86_64       | 16         | PGDG                | Connected only        | Not yet qualified |
