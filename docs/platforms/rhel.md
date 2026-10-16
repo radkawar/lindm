@@ -901,8 +901,9 @@ The genuine RHEL 9 AppStream notice
 [`RHSA-2023:6529`](../../internal/advisory/feed/testdata/redhat-rhsa-2023_6529.json)
 is retained with [signed-archive provenance](../../internal/advisory/feed/testdata/redhat-rhsa-2023_6529-provenance.txt).
 Informational notices containing even a null or empty vulnerability array are
-refused; unsupported relevant categories, metadata and product trees still fail
-the whole source rather than silently discarding potential claims.
+refused. Unsupported relevant categories, metadata or product trees never lose
+potential claims silently: a verified, exhaustively bounded component scope is
+marked uncovered; otherwise the source remains incomplete.
 
 VEX status references may identify declared products directly. A direct reference
 is skipped only when its explicit, supported CPE syntax proves that the product
@@ -1078,7 +1079,17 @@ vendor errors remains UNKNOWN. Source status reports the rejected-document count
 and exact document/CVE cause. Current incomplete data is labelled incomplete,
 not unpublished/stale. Native lifecycle qualification remains a separate actual
 proof recorded in [verification](../verification.md); adapter support is not a
-claim that an unrun RHEL 10 lifecycle passed.
+claim that an unrun RHEL 10 managed-device lifecycle passed.
+
+The connected x86_64 RHEL 9.8 native lifecycle is qualified at source
+`25f6946202c748bf82c601e519a57db3c8f47f01`, with a fresh signed
+0.2.44 → 0.2.45 pair. The original RHEL device has real CVEs and matching durable
+evaluations after installation, upgrade and fresh-host restore, without importing
+a test feed or excluding Findings. Its 584-package inventory remains visibly
+PARTIAL: 319 open findings and 514 explicitly uncovered packages, not a claim
+that every installed package is vendor-covered or clean. The complete record,
+real installed-NEVRA/CVE joins, backup/recovery gates and RHSM cleanup are in
+[the native deployment evidence](../verification.md#control-plane-deployment-matrix).
 
 ### Historical paired-archive publication observations
 

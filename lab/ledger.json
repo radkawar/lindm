@@ -14604,6 +14604,39 @@
       "reference": "#control-plane-deployment-matrix",
       "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
       "mainlineRevision": "97ea3d76c1f4f34f3c721d17a8d05a2f99e0ccce"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "deploy",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/rhel-findings-20261015/native-rhel9-attempt5.json",
+      "sha256": "db3a107820fad2f2159058691a1f1530a62f69e5e62a23080bc6e52283bc98a5",
+      "recorded": "2026-10-16T06:18:29.390466726Z",
+      "revision": "25f6946202c748bf82c601e519a57db3c8f47f01-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "25f6946202c748bf82c601e519a57db3c8f47f01"
+    },
+    {
+      "platform": "rhel-9",
+      "cell": "advisories",
+      "architecture": "x86_64",
+      "manifest": "rhel-9.8-kvm-x86-64",
+      "verdict": "MATRIX_VERDICT_PASS",
+      "evidence": "~/work/rhel-findings-20261015/native-rhel9-attempt5.json",
+      "sha256": "db3a107820fad2f2159058691a1f1530a62f69e5e62a23080bc6e52283bc98a5",
+      "recorded": "2026-10-16T06:18:29.390466726Z",
+      "revision": "25f6946202c748bf82c601e519a57db3c8f47f01-dirty",
+      "source": "MATRIX_SOURCE_IMPORT",
+      "verified": true,
+      "scope": "native feed matching; not complete device coverage",
+      "reference": "#control-plane-deployment-matrix",
+      "manifestSha256": "567142ff402961a4fb84f0e4bd94194a7a368abc09be3d7fc4c3cbb3dfdc0818",
+      "mainlineRevision": "25f6946202c748bf82c601e519a57db3c8f47f01"
     }
   ]
 }

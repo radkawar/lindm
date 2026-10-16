@@ -68,13 +68,13 @@ func TestServerRecipesHaveExplicitDatabaseAndQualificationPolicy(t *testing.T) {
 			t.Errorf("%s lacks explicit server policy: %+v", release.Key, server)
 		}
 		switch release.Key {
-		case "almalinux-9", "almalinux-10", "debian-12", "debian-13", "rhel-10", "rocky-9", "rocky-10", "ubuntu-22.04", "ubuntu-26.04":
+		case "almalinux-9", "almalinux-10", "debian-12", "debian-13", "rhel-9", "rhel-10", "rocky-9", "rocky-10", "ubuntu-22.04", "ubuntu-26.04":
 			if !server.ConnectedOnly || server.Status != "Qualified" {
 				t.Errorf("%s lost its connected-only native lifecycle qualification", release.Key)
 			}
 			continue
 		}
-		if release.Key != "ubuntu-24.04" && release.Key != "rhel-9" && (!server.ConnectedOnly || server.Status != "Not yet qualified") {
+		if release.Key != "ubuntu-24.04" && (!server.ConnectedOnly || server.Status != "Not yet qualified") {
 			t.Errorf("unproven platform %s promoted without its full lifecycle proof", release.Key)
 		}
 	}
