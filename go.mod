@@ -12,7 +12,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/foxboron/go-uefi v0.0.0-20261004203234-c7f1f57bdc6e
 	github.com/fxamacker/cbor/v2 v2.9.6
-	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-webauthn/webauthn v0.18.2
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/google/go-tpm v0.9.8
