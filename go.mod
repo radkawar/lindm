@@ -27,7 +27,7 @@ require (
 	github.com/pion/interceptor v0.1.49
 	github.com/pion/logging v0.2.4
 	github.com/pion/rtp v1.10.5
-	github.com/pion/turn/v5 v5.1.2
+	github.com/pion/turn/v5 v5.1.3
 	github.com/pion/webrtc/v4 v4.2.23
 	github.com/pquerna/otp v1.5.0
 	github.com/pressly/goose/v3 v3.29.0
